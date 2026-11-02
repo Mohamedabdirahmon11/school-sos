@@ -1,0 +1,8 @@
+{
+  "name": "Remix SchoolOS Multi-School SaaS",
+  "description": "Enterprise Multi-School Management SaaS with Super Admin, School Admin, Teacher, Student, Parent, and Accountant portals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
