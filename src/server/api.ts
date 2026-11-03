@@ -3922,6 +3922,12 @@ apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireS
       reportedBy: user.id, parentNotified
     });
     const student = await db.getStudentById(studentId, school.id);
+    db.logAudit({
+      action: 'DISCIPLINE_RECORD_CREATED', category: 'student', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Created discipline record ${record.id} for a student in this school.`, severity: 'warning'
+    });
+    await db.flush();
     res.status(201).json({ ...record, studentName: student ? `${student.firstName} ${student.lastName}`.trim() : '' });
   } catch (error: any) {
     res.status(400).json({ error: error?.message || 'Discipline incident could not be saved.' });
@@ -3935,7 +3941,17 @@ apiRouter.delete('/school/discipline/:recordId', requireAuth, requireSchoolConte
     res.status(400).json({ error: 'A valid discipline record ID is required.' });
     return;
   }
-  res.json({ success: await db.deleteDisciplineRecord(school.id, recordId) });
+  const success = await db.deleteDisciplineRecord(school.id, recordId);
+  if (success) {
+    const user = (req as any).user as User;
+    db.logAudit({
+      action: 'DISCIPLINE_RECORD_DELETED', category: 'student', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Deleted discipline record ${recordId}.`, severity: 'warning'
+    });
+    await db.flush();
+  }
+  res.json({ success });
 });
 
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
