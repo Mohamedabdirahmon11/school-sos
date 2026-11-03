@@ -10,8 +10,9 @@ The canonical base schema is the repository-root file `schema.sql` (there is no 
    - `supabase/migrations/001_*.sql` through `013_*.sql`, in numeric order.
    - `014_assignment_submission_content.sql`, `015_enable_platform_rls.sql`, and `016_request_performance.sql` from the repository root, in numeric order.
    - `supabase/migrations/017_restrict_public_api_access.sql`.
-4. Check the migration history in Supabase before applying anything to an existing database. Do not re-run a migration merely because its filename is in this list; apply only migrations not already recorded.
-5. Run `scripts/check-rls.sql` in SQL Editor and review its output.
+   - `supabase/migrations/018_allow_kg_grade_level.sql`.
+5. Check the migration history in Supabase before applying anything to an existing database. Do not re-run a migration merely because its filename is in this list; apply only migrations not already recorded.
+6. Run `scripts/check-rls.sql` in SQL Editor and review its output.
 
 The app uses a server-only Supabase service-role client. Never put the service-role key in browser code or commit it to Git.
 
