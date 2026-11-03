@@ -2782,22 +2782,32 @@ apiRouter.post('/school/admissions', requireAuth, requireSchoolAdminOrSuperAdmin
   await db.flush();
   res.status(201).json(application);
 });
-apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
-  const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
-  if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
-  if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
-  const status = req.body?.status;
-  if (status !== 'rejected') { res.status(400).json({ error: 'Use the approve endpoint or set status to rejected.' }); return; }
-  const rejected = await db.updateAdmissionApplication(application.id, school.id, 'rejected');
-  if (!rejected) { res.status(409).json({ error: 'This admission application is no longer pending.' }); return; }
-  db.logAudit({ action: 'ADMISSION_APPLICATION_REJECTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was rejected.`, severity: 'warning' });
-  await db.flush();
-  res.json(rejected);
-});
-// Prevent two simultaneous approvals in the same server process from enrolling twice.
+// Serialize approval and rejection transitions within this server process.
 const admissionApprovalInFlight = new Set<string>();
 
+apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const lockKey = `${school.id}:${req.params.id}`;
+  if (admissionApprovalInFlight.has(lockKey)) {
+    res.status(409).json({ error: 'This admission application is already being processed.' });
+    return;
+  }
+  admissionApprovalInFlight.add(lockKey);
+  try {
+    const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
+    if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+    if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
+    const status = req.body?.status;
+    if (status !== 'rejected') { res.status(400).json({ error: 'Use the approve endpoint or set status to rejected.' }); return; }
+    const rejected = await db.updateAdmissionApplication(application.id, school.id, 'rejected');
+    if (!rejected) { res.status(409).json({ error: 'This admission application is no longer pending.' }); return; }
+    db.logAudit({ action: 'ADMISSION_APPLICATION_REJECTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was rejected.`, severity: 'warning' });
+    await db.flush();
+    res.json(rejected);
+  } finally {
+    admissionApprovalInFlight.delete(lockKey);
+  }
+});
 apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const lockKey = `${school.id}:${req.params.id}`;
