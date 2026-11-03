@@ -606,10 +606,11 @@ ALTER TABLE fee_payments ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(200);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_receipt ON fee_payments(school_id, receipt_number);
 
 CREATE TABLE IF NOT EXISTS public.fee_receipt_sequences (
+  id VARCHAR(160) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
   academic_year VARCHAR(50) NOT NULL,
   next_value BIGINT NOT NULL CHECK (next_value >= 1),
-  PRIMARY KEY (school_id, academic_year)
+  UNIQUE (school_id, academic_year)
 );
 
 ALTER TABLE public.fee_receipt_sequences ENABLE ROW LEVEL SECURITY;
@@ -633,9 +634,9 @@ BEGIN
   END IF;
 
   INSERT INTO public.fee_receipt_sequences AS current_sequence (
-    school_id, academic_year, next_value
+    id, school_id, academic_year, next_value
   )
-  SELECT p_school_id, p_academic_year,
+  SELECT p_school_id || ':' || p_academic_year, p_school_id, p_academic_year,
     COALESCE(MAX(substring(payment.receipt_number FROM '([0-9]+)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fee_payment_school_idempotency ON fee_payments(school_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payments_student ON fee_payments(school_id, student_id);
