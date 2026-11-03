@@ -2558,28 +2558,91 @@ apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, re
 });
 
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
-  const { firstName, middleName, lastName, gender, classId } = req.body || {};
-  if (![firstName, middleName, lastName, classId].every(value => typeof value === 'string' && value.trim())) { res.status(400).json({ error: 'First name, middle name, last name, and class are required.' }); return; }
-  if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
-  const klass = req.body?.classId ? await db.getClassById(req.body.classId, school.id) : null;
-  if (req.body?.classId && !klass) { res.status(400).json({ error: 'Class does not belong to this school.' }); return; }
-  const branches = req.body?.branchId ? await db.getBranches(school.id) : [];
-  if (req.body?.branchId && !branches.some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  if (req.body?.branchId && klass?.branchId && req.body.branchId !== klass.branchId) { res.status(400).json({ error: 'Student branch must match the selected class branch.' }); return; }
-  const studentId = typeof req.body?.studentId === 'string' && req.body.studentId.trim() ? req.body.studentId.trim() : `STD-${school.code}-${randomBytes(4).toString('hex').toUpperCase()}`;
-  // Hydrate existing parent accounts before createStudent links both parents.
+  const school = (req as any).school as School;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const requiredText = ['firstName', 'middleName', 'lastName', 'classId'] as const;
+  if (requiredText.some(field => typeof body[field] !== 'string' || !body[field].trim() || body[field].trim().length > 100)) {
+    res.status(400).json({ error: 'First, middle and last names and a class are required (maximum 100 characters each).' }); return;
+  }
+  if (!['male', 'female'].includes(body.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+  const klass = await db.getClassById(body.classId.trim(), school.id);
+  if (!klass || klass.isArchived) { res.status(400).json({ error: 'Class is unavailable or does not belong to this school.' }); return; }
+  const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
+  const branches = branchId ? await db.getBranches(school.id) : [];
+  if (branchId && !branches.some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (branchId && klass.branchId && branchId !== klass.branchId) { res.status(400).json({ error: 'Student branch must match the selected class branch.' }); return; }
+  const classCount = await db.queryPage('students', { school_id: school.id, class_id: klass.id }, 1, 1, undefined, 'id');
+  if (classCount.total >= klass.capacity) { res.status(409).json({ error: 'The selected class has reached capacity.' }); return; }
+
+  const studentId = typeof body.studentId === 'string' && body.studentId.trim()
+    ? body.studentId.trim()
+    : `STD-${school.code}-${randomBytes(4).toString('hex').toUpperCase()}`;
+  if (!/^[A-Za-z0-9._-]{2,40}$/.test(studentId)) { res.status(400).json({ error: 'Student ID must be 2–40 letters, numbers, dots, underscores or hyphens.' }); return; }
+  const duplicate = await db.queryPage('students', { school_id: school.id, student_id: studentId }, 1, 1, undefined, 'id');
+  if (duplicate.total) { res.status(409).json({ error: 'That Student ID is already used in this school.' }); return; }
+
+  const phoneFields = ['fatherPhone', 'motherPhone', 'studentPhone'] as const;
+  const phones: Record<string, string> = {};
+  for (const field of phoneFields) {
+    const value = body[field] === undefined || body[field] === null ? '' : body[field];
+    if (typeof value !== 'string' || value.length > 30 || (value.trim() && !validImportPhone(value.trim()))) {
+      res.status(400).json({ error: `${field} must be a valid international phone number.` }); return;
+    }
+    phones[field] = value.trim();
+  }
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\\d{4}$/.test(body.pin))) {
+    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
+  }
+  const isDate = (value: unknown) => typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+  const admissionDate = body.admissionDate === undefined || body.admissionDate === '' ? new Date().toISOString().slice(0, 10) : body.admissionDate;
+  if (!isDate(admissionDate) || (body.dateOfBirth !== undefined && body.dateOfBirth !== '' && !isDate(body.dateOfBirth))) {
+    res.status(400).json({ error: 'Admission date and date of birth must use a real YYYY-MM-DD date.' }); return;
+  }
+  if (body.status !== undefined && !['active', 'inactive', 'graduated', 'transferred'].includes(body.status)) {
+    res.status(400).json({ error: 'Student status is invalid.' }); return;
+  }
+  if (body.section !== undefined && (typeof body.section !== 'string' || body.section.trim().length > 50)) {
+    res.status(400).json({ error: 'Section must be text of at most 50 characters.' }); return;
+  }
+  if (body.bloodGroup !== undefined && (typeof body.bloodGroup !== 'string' || body.bloodGroup.length > 10)) {
+    res.status(400).json({ error: 'Blood group must be at most 10 characters.' }); return;
+  }
+  if (body.allergies !== undefined && (typeof body.allergies !== 'string' || body.allergies.length > 1000)) {
+    res.status(400).json({ error: 'Allergy notes must be at most 1,000 characters.' }); return;
+  }
+
+  // Hydrate existing parent accounts before linking the student's family.
   await db.getParents(school.id);
-  const student = db.createStudent({ ...req.body, studentId, admissionDate: req.body?.admissionDate || new Date().toISOString().slice(0, 10), middleName: middleName.trim(), fatherPhone: typeof req.body?.fatherPhone === 'string' ? req.body.fatherPhone.trim() : '', motherPhone: typeof req.body?.motherPhone === 'string' ? req.body.motherPhone.trim() : '', branchId: klass?.branchId || req.body?.branchId, schoolId: school.id });
-  // PIN is returned only once as initialPin for printing the PIN slip!
-  res.status(201).json({
-    ...sanitizeStudent(student),
-    initialPin: student.pin
+  const student = db.createStudent({
+    schoolId: school.id,
+    branchId: klass.branchId || branchId,
+    studentId,
+    firstName: body.firstName.trim(),
+    middleName: body.middleName.trim(),
+    lastName: body.lastName.trim(),
+    gender: body.gender,
+    admissionDate,
+    dateOfBirth: body.dateOfBirth || undefined,
+    studentPhone: phones.studentPhone || undefined,
+    fatherPhone: phones.fatherPhone,
+    motherPhone: phones.motherPhone || undefined,
+    classId: klass.id,
+    section: typeof body.section === 'string' && body.section.trim() ? body.section.trim() : klass.section,
+    status: body.status || 'active',
+    pin: body.pin,
+    bloodGroup: typeof body.bloodGroup === 'string' ? body.bloodGroup.trim() : undefined,
+    allergies: typeof body.allergies === 'string' ? body.allergies.trim() : undefined
   });
+  await db.flush();
+  res.status(201).json({ ...sanitizeStudent(student), initialPin: student.pin });
 });
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\\d{4}$/.test(req.body.customPin))) {
+    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
+  }
   const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
   if (!result) {
     res.status(404).json({ error: 'Student not found.' });
