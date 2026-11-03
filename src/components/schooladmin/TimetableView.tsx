@@ -80,6 +80,10 @@ export const TimetableView: React.FC = () => {
     fetchData();
   }, [school]);
 
+  useEffect(() => {
+    setRoomNumber(classes.find(klass => klass.id === selectedClassId)?.roomNumber || '');
+  }, [classes, selectedClassId]);
+
   // Clash detector
   const checkClash = (day: string, period: number, tchId: string, room: string) => {
     const teacherClash = timetable.find(s => 
