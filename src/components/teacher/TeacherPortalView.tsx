@@ -40,6 +40,21 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'attendance' | 'grades' | 'assignments' | 'notices';
 }
 
+const getTeacherSchoolDate = (timeZone?: string) => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly, t } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -73,8 +88,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, { grade: string; feedback: string }>>({});
 
+  useEffect(() => {
+    if (school?.timezone) setAttendanceDate(getTeacherSchoolDate(school.timezone));
+  }, [school?.timezone]);
+
   // Attendance state
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(() => getTeacherSchoolDate(school?.timezone));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
 
   // Marks state (Small Exam + Big Exam)
