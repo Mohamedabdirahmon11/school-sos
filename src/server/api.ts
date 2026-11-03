@@ -2974,12 +2974,20 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
   const user = (req as any).user as User;
   const { markIds } = req.body;
 
-  if (!Array.isArray(markIds)) {
-    res.status(400).json({ error: 'markIds array is required.' });
+  if (!Array.isArray(markIds) || markIds.length < 1 || markIds.length > 2000 ||
+      markIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+    res.status(400).json({ error: 'Provide 1–2,000 valid mark IDs.' });
     return;
   }
-
-  const approved = db.approveMarks(school.id, markIds, user.id);
+  const uniqueMarkIds = [...new Set(markIds as string[])];
+  if (uniqueMarkIds.length !== markIds.length) {
+    res.status(400).json({ error: 'Duplicate mark IDs are not allowed.' });
+    return;
+  }
+  // Hydrate the selected rows before the synchronous storage update; otherwise
+  // marks created before a server restart may be absent from the in-memory cache.
+  await queryAllRows('student_marks', { school_id: school.id, id: uniqueMarkIds }, 'id');
+  const approved = db.approveMarks(school.id, uniqueMarkIds, user.id);
   res.json({ success: true, approvedCount: approved.length });
 });
 
