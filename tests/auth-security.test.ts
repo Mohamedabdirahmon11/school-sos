@@ -18,7 +18,7 @@ test('session expiry fails closed for malformed or missing database timestamps',
 
 test('Super Admin routes require an authenticated Super Admin', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-  const routePattern = /apiRouter\\.(get|post|put|patch|delete)\\(\\s*'([^']+)'([\\s\\S]{0,260}?)=>/gi;
+  const routePattern = /apiRouter\.(get|post|put|patch|delete)\(\s*'([^']+)'([\s\S]{0,260}?)=>/gi;
   const routes = [...apiSource.matchAll(routePattern)];
   const superAdminRoutes = routes.filter(match => match[2].startsWith('/superadmin/'));
   assert.ok(superAdminRoutes.length > 0, 'Super Admin route list is discoverable');
