@@ -1600,6 +1600,76 @@ apiRouter.delete('/branches/:id', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json({ success: true });
 });
 
+apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (_req, res) => {
+  const csv = [
+    'className,gradeLevel,section,branch,roomNumber,capacity,monthlyFee',
+    'KG,KG,A,,KG Room,40,0',
+    'Grade 1,1,A,,Room 101,40,0',
+    'Grade 1,1,B,,Room 102,40,0'
+  ].join('\\r\\n');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-class-import-template.csv"' }).send(csv);
+});
+
+apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const input = req.body?.classes;
+  if (!Array.isArray(input) || input.length < 1 || input.length > 500) {
+    res.status(400).json({ error: 'Upload between 1 and 500 class rows.' }); return;
+  }
+  const [existing, branches] = await Promise.all([db.getClasses(school.id), db.getBranches(school.id)]);
+  const allowedLevels = new Set([0, ...((school.classLevels?.length ? school.classLevels : [1,2,3,4,5,6,7,8,9,10,11,12]).filter(level => level !== 0))]);
+  const branchByName = new Map(branches.map(branch => [branch.name.trim().toLowerCase(), branch]));
+  const seen = new Set(existing.map(item => `${item.name.trim().toLowerCase()}\\u0000${item.section.trim().toLowerCase()}`));
+  const records: any[] = [];
+  const errors: string[] = [];
+  input.forEach((row: any, index: number) => {
+    const name = typeof row?.className === 'string' ? row.className.trim() : '';
+    const section = typeof row?.section === 'string' ? row.section.trim() : '';
+    const gradeText = String(row?.gradeLevel ?? '').trim();
+    const grade = /^(KG|KINDERGARTEN|NURSERY)$/i.test(gradeText) ? 0 : Number(gradeText);
+    const capacity = Number(row?.capacity || 40);
+    const monthlyFee = Number(row?.monthlyFee || 0);
+    const branchName = typeof row?.branch === 'string' ? row.branch.trim() : '';
+    const branch = branchName ? branchByName.get(branchName.toLowerCase()) : undefined;
+    const key = `${name.toLowerCase()}\\u0000${section.toLowerCase()}`;
+    if (!name || !section) errors.push(`Row ${index + 2}: className and section are required.`);
+    else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class ${name} / ${section}.`);
+    else if (!Number.isInteger(grade) || !allowedLevels.has(grade)) errors.push(`Row ${index + 2}: gradeLevel must be KG or an offered grade from 1 to 12.`);
+    else if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) errors.push(`Row ${index + 2}: capacity must be between 1 and 500.`);
+    else if (!Number.isFinite(monthlyFee) || monthlyFee < 0) errors.push(`Row ${index + 2}: monthlyFee must be zero or greater.`);
+    else if (branchName && !branch) errors.push(`Row ${index + 2}: unknown branch "${branchName}".`);
+    else {
+      seen.add(key);
+      records.push({
+        id: `cls-${randomUUID()}`, schoolId: school.id, branchId: branch?.id,
+        name, gradeLevel: grade, section, roomNumber: String(row?.roomNumber || '').trim(),
+        capacity, monthlyFee
+      });
+    }
+  });
+  if (errors.length) { res.status(400).json({ error: errors.slice(0, 20).join(' '), errors }); return; }
+  const auditId = `log-${randomUUID()}`;
+  try {
+    await db.bulkImportStudents({
+      classes: records.map(item => ({
+        id: item.id, school_id: school.id, branch_id: item.branchId, name: item.name,
+        grade_level: item.gradeLevel, section: item.section, room_number: item.roomNumber,
+        capacity: item.capacity, monthly_fee: item.monthlyFee
+      })),
+      audit_logs: [{
+        id: auditId, action: 'SCHOOL_BULK_CLASS_IMPORT', category: 'school',
+        school_id: school.id, school_name: school.name, user_id: user.id,
+        user_name: user.fullName, user_role: user.role,
+        details: `Bulk class import created ${records.length} classes.`
+      }]
+    });
+  } catch {
+    res.status(500).json({ error: 'Class import failed. No classes were written; please retry.' }); return;
+  }
+  res.json({ success: true, count: records.length });
+});
+
 apiRouter.get('/classes', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const branchId = req.query.branchId as string;
