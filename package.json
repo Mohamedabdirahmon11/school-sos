@@ -32,7 +32,7 @@
     "test:schema-conformance": "tsx --test tests/schema-conformance.test.ts",
     "test": "tsx --test --test-concurrency=1 \"tests/*.test.ts\" \"tests/*.test.tsx\"",
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json",
-    "test:ci": "tsx --test --test-concurrency=1 tests/academics-rules.test.ts tests/admissions-http.test.ts tests/async-errors.test.ts tests/dashboard-render.test.tsx tests/no-json-runtime.test.ts tests/roles.test.ts tests/storage-performance.test.ts"
+    "test:ci": "tsx --test --test-concurrency=1 tests/async-errors.test.ts tests/dashboard-render.test.tsx tests/no-json-runtime.test.ts tests/roles.test.ts tests/storage-performance.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
