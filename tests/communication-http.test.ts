@@ -47,10 +47,16 @@ test('communication gateway secrets are never returned and tenant identity canno
   assert.equal(Object.hasOwn(initial, 'apiKey'), false);
   assert.equal(Object.hasOwn(initial, 'apiSecret'), false);
 
+  const crossSchoolUpdate = await fetch(`${baseUrl}/communication/settings`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({ schoolId: 'another-school', provider: 'none' })
+  });
+  assert.equal(crossSchoolUpdate.status, 403);
+
   const update = await fetch(`${baseUrl}/communication/settings`, {
     method: 'PUT', headers: adminHeaders,
     body: JSON.stringify({
-      id: 'forged-id', schoolId: 'another-school', updatedAt: '2000-01-01T00:00:00Z',
+      id: 'forged-id', updatedAt: '2000-01-01T00:00:00Z',
       provider: 'twilio', isActive: true, apiKey: 'private-account-key',
       apiSecret: 'private-auth-token', senderId: 'SCHOOL'
     })
@@ -87,10 +93,19 @@ test('notification requests are validated and never marked sent without a delive
   });
   assert.equal(invalid.status, 400);
 
+  const crossSchoolQueue = await fetch(`${baseUrl}/communication/send`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({
+      schoolId: 'another-school', recipientPhone: '+251911234567', recipientName: 'Parent',
+      messageType: 'custom', channel: 'sms', content: 'School notice'
+    })
+  });
+  assert.equal(crossSchoolQueue.status, 403);
+
   const queued = await fetch(`${baseUrl}/communication/send`, {
     method: 'POST', headers: adminHeaders,
     body: JSON.stringify({
-      schoolId: 'another-school', status: 'sent', sentAt: new Date().toISOString(),
+      status: 'sent', sentAt: new Date().toISOString(),
       recipientPhone: '+251911234567', recipientName: 'Parent',
       messageType: 'custom', channel: 'sms', content: 'School notice'
     })
