@@ -563,7 +563,7 @@ export class ApiClient {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
     const payments = includeFinance ? await this.getAllFeePayments(id) : [];
     const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
-    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
+    const attendance = await this.getAllStudentAttendance(id).catch(() => []);
     return {
       student,
       payments,
@@ -579,8 +579,23 @@ export class ApiClient {
     return this.request<Array<StudentMark & { subjectName?: string }>>(`/exams/marks?studentId=${encodeURIComponent(studentId)}`);
   }
 
-  public static async getStudentAttendance(studentId: string) {
-    return this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(studentId)}`);
+  public static async getStudentAttendance(studentId: string, params?: any) {
+    const query = new URLSearchParams({ studentId: encodeURIComponent(studentId) });
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    return this.request<AttendanceRecord[]>(`/attendance/student?${query.toString()}`);
+  }
+
+  public static async getAllStudentAttendance(studentId: string, pageSize = 100) {
+    const firstPage = await this.getStudentAttendance(studentId, { page: 1, pageSize });
+    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
+    if (totalPages <= 1) return firstPage;
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        this.getStudentAttendance(studentId, { page: index + 2, pageSize })
+      )
+    );
+    return [...firstPage, ...remainingPages.flat()];
   }
 
   public static async getAssignments() {
