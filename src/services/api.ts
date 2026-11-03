@@ -548,14 +548,14 @@ export class ApiClient {
   }
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
-    const students = await this.getStudents();
-    const student = students.find(s => s.id === id);
-    const payments = includeFinance ? await this.getFeePayments(id) : [];
-    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
-    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
+    const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
+    const payments = includeFinance ? await this.getFeePayments(id, { page: 1, pageSize: 100 }) : [];
+    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${encodeURIComponent(id)}`).catch(() => []);
+    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(id)}&page=1&pageSize=100`).catch(() => []);
     return {
       student,
       payments,
+      fees: payments,
       marks,
       attendance,
       totalDue: payments.reduce((acc, p) => acc + (p.amountDue || 0), 0),
