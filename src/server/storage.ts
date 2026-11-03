@@ -1486,8 +1486,9 @@ class StorageEngine {
   }
 
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
-    await this.getStudentById(id, schoolId || updates.schoolId);
-    const idx = this.data.students.findIndex(s => s.id === id);
+    const existing = await this.getStudentById(id, schoolId || updates.schoolId);
+    if (!existing) return null;
+    const idx = this.data.students.findIndex(student => student.id === id && student.schoolId === existing.schoolId);
     if (idx === -1) return null;
     this.data.students[idx] = { ...this.data.students[idx], ...updates };
     this.save();
@@ -1576,8 +1577,9 @@ class StorageEngine {
   }
 
   public async updateClass(id: string, updates: Partial<SchoolClass>, schoolId?: string): Promise<SchoolClass | null> {
-    await this.getClassById(id, schoolId || updates.schoolId);
-    const idx = this.data.classes.findIndex(c => c.id === id);
+    const existing = await this.getClassById(id, schoolId || updates.schoolId);
+    if (!existing) return null;
+    const idx = this.data.classes.findIndex(klass => klass.id === id && klass.schoolId === existing.schoolId);
     if (idx === -1) return null;
     this.data.classes[idx] = { ...this.data.classes[idx], ...updates };
     this.save();
