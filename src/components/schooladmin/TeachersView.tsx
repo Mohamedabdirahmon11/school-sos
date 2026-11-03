@@ -38,12 +38,7 @@ export const TeachersView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
 
-  const filteredTeachers = teachers.filter(teacher => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification]
-      .some(value => String(value || '').toLowerCase().includes(query));
-  });
+  const filteredTeachers = teachers;
 
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPage(1); }, [search]);
