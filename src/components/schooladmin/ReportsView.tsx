@@ -58,10 +58,10 @@ export const ReportsView: React.FC = () => {
     const filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
 
     if (type === 'census') {
-      csvContent = 'Metric,Value,School,Academic Year\\n';
-      csvContent += `Enrolled Students,${summary.studentCount},${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
-      csvContent += `Today's Attendance Rate,${summary.attendanceRate}%,${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
-      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${summary.passRate}%`},${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
+      csvContent = 'Metric,Value,School,Academic Year\n';
+      csvContent += `Enrolled Students,${summary.studentCount},${csvCell(school?.name)},${csvCell(school?.academicYear)}\n`;
+      csvContent += `Today's Attendance Rate,${summary.attendanceRate}%,${csvCell(school?.name)},${csvCell(school?.academicYear)}\n`;
+      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${summary.passRate}%`},${csvCell(school?.name)},${csvCell(school?.academicYear)}\n`;
     } else {
       return;
     }
