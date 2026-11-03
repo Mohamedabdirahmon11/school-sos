@@ -31,12 +31,39 @@ export const ReportsView: React.FC = () => {
   };
 
   const downloadCSV = async (type: string) => {
+    if (type === 'finance') {
+      try {
+        const response = await fetch('/api/school/reports/finance.csv', { credentials: 'include' });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || 'Finance export failed.');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `schoolos_finance_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error: any) {
+        alert(error.message || 'Finance export failed.');
+      }
+      return;
+    }
+
     if (!summary) return;
-lse if (type === 'census') {
-      csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += `Enrolled Students,${summary.studentCount},"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Today's Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${summary.passRate}%`},"${school?.name}","${school?.academicYear}"\n`;
+    let csvContent = '';
+    const filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (type === 'census') {
+      csvContent = 'Metric,Value,School,Academic Year\\n';
+      csvContent += `Enrolled Students,${summary.studentCount},${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
+      csvContent += `Today's Attendance Rate,${summary.attendanceRate}%,${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
+      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${summary.passRate}%`},${csvCell(school?.name)},${csvCell(school?.academicYear)}\\n`;
+    } else {
+      return;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -47,6 +74,7 @@ lse if (type === 'census') {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
