@@ -20,8 +20,8 @@ ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inventory_items_tenant_scope ON public.inventory_items;
 CREATE POLICY inventory_items_tenant_scope ON public.inventory_items
   FOR ALL TO authenticated
-  USING (public.auth_user_role() = 'super_admin' OR school_id::text = public.auth_school_id()::text)
-  WITH CHECK (public.auth_user_role() = 'super_admin' OR school_id::text = public.auth_school_id()::text);
+  USING (public.auth_user_role() = 'super_admin' OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text))
+  WITH CHECK (public.auth_user_role() = 'super_admin' OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text));
 REVOKE ALL ON public.inventory_items FROM anon;
 NOTIFY pgrst, 'reload schema';
 COMMIT;
