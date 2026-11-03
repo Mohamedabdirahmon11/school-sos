@@ -913,7 +913,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // Verify Scrypt Password Hash
-  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, user.pin || (user as any).pinHash));
+  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
