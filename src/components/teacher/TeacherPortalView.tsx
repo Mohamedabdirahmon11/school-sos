@@ -95,7 +95,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Load class students & existing attendance/marks
   useEffect(() => {
     if (!selectedClassId) return;
-    ApiClient.getStudents(selectedClassId).then(async (stdList) => {
+    ApiClient.getAllStudents(selectedClassId).then(async (stdList) => {
       setStudents(stdList);
 
       // Attendance
