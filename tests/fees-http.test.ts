@@ -122,7 +122,7 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(registrationRetry.body.amountPaid, 50);
   const duplicateRegistration = await postPayment({ studentId: partialStudent.id, academicYear: '2026-2027', month: '2026-2027', feeType: 'annual_registration', amountDue: 50, amountPaid: 1 });
   assert.equal(duplicateRegistration.response.status, 400);
-  assert.match(duplicateRegistration.body.error, /already paid/i);
+  assert.match(duplicateRegistration.body.error, /already (?:fully )?paid/i);
 
   const customPayload = { studentId: partialStudent.id, academicYear: '2026-2027', month: '2026-2027', feeType: 'custom', feeStructureId: activityFee.id, amountDue: 1, amountPaid: 10, idempotencyKey: 'fee-test-custom-concurrent-1' };
   const [customFirst, customRetry] = await Promise.all([postPayment(customPayload), postPayment(customPayload)]);
