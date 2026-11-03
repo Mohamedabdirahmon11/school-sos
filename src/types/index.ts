@@ -377,7 +377,7 @@ export interface SchoolNotice {
   title: string;
   content: string;
   audience: 'all' | 'school' | 'class' | 'teachers' | 'parents' | 'students';
-  classId?: string;
+  classId?: string | null;
   isActive?: boolean;
   isPinned: boolean;
   publishDate: string;
