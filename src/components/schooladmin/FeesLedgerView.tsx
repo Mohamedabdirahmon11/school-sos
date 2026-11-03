@@ -41,8 +41,8 @@ export const FeesLedgerView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const feeLoad = useApi(() => Promise.all([
-    ApiClient.getFeePayments(undefined, { page, pageSize: 20 }), ApiClient.getStudents(), ApiClient.getClasses(),
-    ApiClient.getFeeStructures(), ApiClient.getArrears(), ApiClient.getDailyIncome(), ApiClient.getBusAssignments()
+    ApiClient.getFeePayments(undefined, { page, pageSize: 20 }), ApiClient.getAllStudents(), ApiClient.getAllClasses(),
+    ApiClient.getAllFeeStructures(), ApiClient.getArrears(), ApiClient.getDailyIncome(), ApiClient.getBusAssignments()
   ]), [school?.id, page], Boolean(school));
   const [paymentRows, studentRows, classRows, structureRows, arrearsRows, dailyData, busRows] = feeLoad.data || [[], [], [], [], [], null, []];
   const payments: FeePayment[] = Array.isArray(paymentRows) ? paymentRows : [];
