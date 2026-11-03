@@ -2487,7 +2487,9 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (req.body?.branchId && !branches.some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.branchId && klass?.branchId && req.body.branchId !== klass.branchId) { res.status(400).json({ error: 'Student branch must match the selected class branch.' }); return; }
   const studentId = typeof req.body?.studentId === 'string' && req.body.studentId.trim() ? req.body.studentId.trim() : `STD-${school.code}-${randomBytes(4).toString('hex').toUpperCase()}`;
-  const student = db.createStudent({ ...req.body, studentId, admissionDate: req.body?.admissionDate || new Date().toISOString().slice(0, 10), middleName: middleName.trim(), fatherPhone: typeof req.body?.fatherPhone === 'string' ? req.body.fatherPhone.trim() : '', branchId: klass?.branchId || req.body?.branchId, schoolId: school.id });
+  // Hydrate existing parent accounts before createStudent links both parents.
+  await db.getParents(school.id);
+  const student = db.createStudent({ ...req.body, studentId, admissionDate: req.body?.admissionDate || new Date().toISOString().slice(0, 10), middleName: middleName.trim(), fatherPhone: typeof req.body?.fatherPhone === 'string' ? req.body.fatherPhone.trim() : '', motherPhone: typeof req.body?.motherPhone === 'string' ? req.body.motherPhone.trim() : '', branchId: klass?.branchId || req.body?.branchId, schoolId: school.id });
   // PIN is returned only once as initialPin for printing the PIN slip!
   res.status(201).json({
     ...sanitizeStudent(student),
