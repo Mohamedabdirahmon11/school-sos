@@ -58,7 +58,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     }
   }
   for (const [label, needle] of [
-    ['student', "db.createStudent({\\n    schoolId: school.id"],
+    ['student', "db.createStudent({\n    schoolId: school.id"],
     ['teacher', "db.createTeacher({ ...req.body"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
   ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
