@@ -94,6 +94,7 @@ test('student creation whitelists profile fields, enforces capacity and protects
   assert.equal('twoFactorSecret' in response, false);
   const storedStudent = memory.rows('students').find(row => row.id === response.id);
   assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt:'));
+  assert.equal('pin' in (storedStudent as any), false, 'Plaintext student PIN must never be persisted.');
   assert.equal('password_hash' in (storedStudent as any), false);
   assert.equal('two_factor_secret' in (storedStudent as any), false);
   const parent = (await storage.db.getUsers(school.id, 'parent')).find(user => user.phone === '+15550007111');
