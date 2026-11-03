@@ -10,7 +10,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2 } from 'lucide-react';
+import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download } from 'lucide-react';
 
 export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -49,6 +49,26 @@ export const TeachersView: React.FC = () => {
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
+
+  const handleExportTeachers = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      const response = await fetch('/api/teachers/export?' + params.toString(), { credentials: 'include' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Teacher export failed.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = (school?.code || 'school') + '_teachers_' + new Date().toISOString().split('T')[0] + '.csv';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error: any) {
+      alert(error.message || 'Teacher export failed.');
+    }
+  };
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,14 +112,18 @@ export const TeachersView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          disabled={isReadOnly}
-          className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Appoint Teacher</span>
-        </button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <button type="button" onClick={handleExportTeachers}
+            className="px-3.5 py-2 text-xs font-semibold text-[#334155] bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg flex items-center gap-1.5">
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+          <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
+            className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50">
+            <Plus className="w-4 h-4" />
+            <span>Appoint Teacher</span>
+          </button>
+        </div>
       </div>
 
       {notice && (
