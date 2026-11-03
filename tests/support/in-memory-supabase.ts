@@ -195,14 +195,16 @@ export class InMemorySupabase {
     try {
       this.rows('classes').push(...(payload.classes || []).map(toCamel));
       this.rows('students').push(...(payload.students || []).map((row: Record<string, any>) => ({
-        ...toCamel(row), admissionDate: new Date().toISOString().slice(0, 10), motherPhone: null, status: 'active'
+        ...toCamel(row), admissionDate: new Date().toISOString().slice(0, 10), status: 'active'
       })));
       for (const incoming of (payload.users || []).map(toCamel)) {
         const existing = this.rows('users').find(row => row.id === incoming.id);
         if (existing) {
           existing.linkedStudentIds = incoming.linkedStudentIds;
-          existing.pinHash = incoming.pinHash;
+          if (!existing.pinHash) existing.pinHash = incoming.pinHash;
           if (existing.role === 'parent' && existing.fullName === '') existing.fullName = incoming.fullName;
+          if (!existing.phone) existing.phone = incoming.phone;
+          if (!existing.parentPhone) existing.parentPhone = incoming.parentPhone;
         } else {
           this.rows('users').push({ ...incoming, passwordHash: '', isBlocked: false, failedLoginAttempts: 0 });
         }
