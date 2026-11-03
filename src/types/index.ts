@@ -640,6 +640,8 @@ export interface HealthRecord {
   allergies?: string;
   privateNotes: string;
   nurseName: string;
+  recordedBy: string;
+  createdAt: string;
 }
 
 export interface StaffPayrollRecord {
