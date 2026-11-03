@@ -16,14 +16,14 @@ export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20 }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
   ]), [school?.id, page], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const subjects: Subject[] = Array.isArray(subjectRows) ? subjectRows : [];
-  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [initialPassword, setInitialPassword] = useState('');
@@ -46,9 +46,23 @@ export const TeachersView: React.FC = () => {
   });
 
   const fetchData = teacherLoad.retry;
+  useEffect(() => { setPage(1); }, [search]);
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
+
+  const handleToggleTeacherStatus = async (teacher: Teacher) => {
+    if (isReadOnly) return;
+    const nextStatus = teacher.status === 'active' ? 'inactive' : 'active';
+    if (!confirm(`${nextStatus === 'inactive' ? 'Deactivate' : 'Reactivate'} ${teacher.fullName}?`)) return;
+    try {
+      await ApiClient.updateTeacher(teacher.id, { status: nextStatus });
+      setNotice(`${teacher.fullName} is now ${nextStatus}.`);
+      await fetchData();
+    } catch (error: any) {
+      alert(error.message || 'Could not update teacher status.');
+    }
+  };
 
   const handleExportTeachers = async () => {
     try {
@@ -138,11 +152,11 @@ export const TeachersView: React.FC = () => {
         <label className="relative block w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <input type="search" value={search} onChange={event => setSearch(event.target.value)}
-            placeholder="Search this page by teacher name, ID, phone or department"
-            aria-label="Search teachers on this page"
+            placeholder="Search all teachers by name, ID, phone or department"
+            aria-label="Search all teachers"
             className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
         </label>
-        <span className="text-xs text-[#64748B]">{filteredTeachers.length} of {teachers.length} teachers on this page</span>
+        <span className="text-xs text-[#64748B]">{pageInfo?.total ?? teachers.length} matching teachers</span>
       </div>
 
       {/* Teachers Directory Grid */}
@@ -175,6 +189,10 @@ export const TeachersView: React.FC = () => {
                 Base Salary: <strong className="font-mono text-[#132A29]">${t.monthlySalary} / month</strong>
               </p>
             </div>
+            <button type="button" onClick={() => handleToggleTeacherStatus(t)} disabled={isReadOnly}
+              className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
+              {t.status === 'active' ? 'Deactivate teacher' : 'Reactivate teacher'}
+            </button>
           </div>
         ))}
         {filteredTeachers.length === 0 && (
