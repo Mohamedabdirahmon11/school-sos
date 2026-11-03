@@ -70,7 +70,7 @@ export const ReportsView: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
