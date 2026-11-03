@@ -66,11 +66,11 @@ test('clinic health records enforce school-admin-only access and bounded private
   const migration = readFileSync(new URL('../supabase/migrations/027_school_health_records.sql', import.meta.url), 'utf8');
   const columns = definitions.get('health_records');
   assert.ok(columns?.has('student_id') && columns.has('visit_date') && columns.has('symptoms') && columns.has('private_notes') && columns.has('recorded_by'));
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\\.health_records/);
+  assert.ok(migration.includes('CREATE TABLE IF NOT EXISTS public.health_records'));
   assert.match(migration, /health_records_admin_scope/);
-  assert.match(migration, /auth_user_role\\(\\) = 'school_admin'/);
-  assert.match(migration, /REVOKE ALL ON public\\.health_records FROM anon/);
-  assert.match(migration, /ALTER TABLE public\\.health_records ENABLE ROW LEVEL SECURITY/);
+  assert.ok(migration.includes("auth_user_role() = 'school_admin'"));
+  assert.ok(migration.includes('REVOKE ALL ON public.health_records FROM anon'));
+  assert.ok(migration.includes('ALTER TABLE public.health_records ENABLE ROW LEVEL SECURITY'));
   assert.ok(apiSource.includes("apiRouter.get('/school/health-records'"), 'clinic read endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.post('/school/health-records'"), 'clinic create endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.delete('/school/health-records/:recordId'"), 'clinic delete endpoint is registered');
