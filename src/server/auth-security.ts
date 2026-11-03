@@ -195,6 +195,29 @@ export function verify2FACode(code: string, secret: string): boolean {
   }
 }
 
+export function hashRecoveryCode(code: string): string {
+  const normalized = String(code || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!normalized) return '';
+  return crypto.createHmac('sha256', getSessionSecret()).update(normalized).digest('hex');
+}
+
+export function findRecoveryCodeIndex(code: string, storedCodes: string[]): number {
+  const normalized = String(code || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!normalized || !Array.isArray(storedCodes)) return -1;
+  const candidateHash = Buffer.from(hashRecoveryCode(normalized), 'hex');
+  const candidateLegacy = Buffer.from(normalized);
+  return storedCodes.findIndex(stored => {
+    if (typeof stored !== 'string') return false;
+    if (/^[a-f0-9]{64}$/i.test(stored)) {
+      const storedHash = Buffer.from(stored, 'hex');
+      return storedHash.length === candidateHash.length && crypto.timingSafeEqual(storedHash, candidateHash);
+    }
+    // Accept older plaintext recovery codes once, then replace them with hashes.
+    const legacy = Buffer.from(stored.replace(/[^a-z0-9]/gi, '').toUpperCase());
+    return legacy.length === candidateLegacy.length && crypto.timingSafeEqual(legacy, candidateLegacy);
+  });
+}
+
 export function generateRecoveryCodes(count = 8): string[] {
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
