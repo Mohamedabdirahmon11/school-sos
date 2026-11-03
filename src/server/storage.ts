@@ -90,6 +90,7 @@ interface DatabaseSchema {
   lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
   libraryBooks: any[];
   transportRoutes: any[];
+  inventoryItems: any[];
 }
 
 interface StorageContext {
@@ -228,7 +229,7 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
   assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
-  transport_routes: 'transportRoutes', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
+  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
@@ -322,6 +323,7 @@ class StorageEngine {
       lockoutCounterRows: [],
       libraryBooks: [],
       transportRoutes: [],
+      inventoryItems: [],
       lockoutCounters: {}
     };
   }
@@ -416,7 +418,7 @@ class StorageEngine {
       ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
-      ['admissionApplications', 'admission_applications'],
+      ['admissionApplications', 'admission_applications'], ['inventoryItems', 'inventory_items'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['notificationTemplates', 'notification_templates'],
       ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
     ];
@@ -549,7 +551,7 @@ class StorageEngine {
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
-      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes],
+      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
@@ -3004,6 +3006,63 @@ class StorageEngine {
     this.data.transportRoutes.push(newRoute);
     this.save();
     return newRoute;
+  }
+
+  public async getInventoryItems(schoolId: string): Promise<any[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load inventory.');
+    }
+    return this.queryRows<any>('inventory_items', { school_id: schoolId.trim() });
+  }
+
+  public async addInventoryItem(item: any): Promise<any> {
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        typeof item.schoolId !== 'string' || !item.schoolId.trim() || item.schoolId.length > 64 ||
+        typeof item.assetTag !== 'string' || !item.assetTag.trim() || item.assetTag.trim().length > 80 ||
+        typeof item.itemName !== 'string' || !item.itemName.trim() || item.itemName.trim().length > 255 ||
+        !Number.isSafeInteger(item.quantity) || item.quantity < 0 || item.quantity > 1000000 ||
+        typeof item.roomLocation !== 'string' || item.roomLocation.trim().length > 150 ||
+        !['good', 'fair', 'poor', 'damaged'].includes(item.condition) ||
+        typeof item.value !== 'number' || !Number.isFinite(item.value) || item.value < 0 || item.value > 1000000000) {
+      throw new Error('Inventory details are invalid. Check the asset tag, item name, quantity, location, condition and value.');
+    }
+    const schoolId = item.schoolId.trim();
+    const assetTag = item.assetTag.trim();
+    const rows = await this.getInventoryItems(schoolId);
+    if (rows.some(row => String(row.assetTag).toLowerCase() === assetTag.toLowerCase())) {
+      throw new Error('That asset tag is already used by this school.');
+    }
+    const now = new Date().toISOString();
+    const created = {
+      id: `inv-${randomUUID()}`,
+      schoolId,
+      assetTag,
+      itemName: item.itemName.trim(),
+      quantity: item.quantity,
+      roomLocation: item.roomLocation.trim(),
+      condition: item.condition,
+      value: Math.round(item.value * 100) / 100,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.data.inventoryItems.push(created);
+    this.save();
+    return created;
+  }
+
+  public async deleteInventoryItem(schoolId: string, itemId: string): Promise<boolean> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof itemId !== 'string' || !itemId.trim() || itemId.length > 64) {
+      throw new Error('A valid school and inventory item are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    await this.getInventoryItems(scopedSchoolId);
+    const before = this.data.inventoryItems.length;
+    this.data.inventoryItems = this.data.inventoryItems.filter(item =>
+      !(item.schoolId === scopedSchoolId && item.id === itemId.trim())
+    );
+    if (this.data.inventoryItems.length !== before) this.save();
+    return this.data.inventoryItems.length !== before;
   }
 
   public async getBusAssignments(schoolId: string): Promise<any[]> {
