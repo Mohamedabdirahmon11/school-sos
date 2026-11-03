@@ -146,6 +146,7 @@ test('fee receipt numbers use a database-atomic per-school academic-year sequenc
   assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.fee_receipt_sequences/);
   assert.match(migration, /UNIQUE \(school_id, academic_year\)/);
   assert.match(migration, /ON CONFLICT \(school_id, academic_year\)/);
+  assert.match(migration, /CREATE POLICY fee_receipt_sequences_deny_client/);
   assert.match(migration, /SET search_path = ''/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_next_fee_receipt/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_next_fee_receipt[^;]+TO service_role/);
