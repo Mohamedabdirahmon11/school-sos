@@ -1067,7 +1067,8 @@ class StorageEngine {
   }
 
   public createStaffMember(staffData: Omit<StaffMember, 'id' | 'joinedDate'>): StaffMember {
-    const staff: StaffMember = { ...staffData, id: `stf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, joinedDate: new Date().toISOString().slice(0, 10) };
+    const school = this.data.schools.find(item => item.id === staffData.schoolId);
+    const staff: StaffMember = { ...staffData, id: `stf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, joinedDate: schoolLocalDate(school?.timezone) };
     this.data.staffMembers.push(staff);
     this.save();
     return staff;
@@ -1107,7 +1108,8 @@ class StorageEngine {
   }
 
   public createAdmissionApplication(application: Omit<AdmissionApplication, 'id' | 'appliedDate' | 'status'>): AdmissionApplication {
-    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: new Date().toISOString().slice(0, 10), status: 'pending' };
+    const school = this.data.schools.find(item => item.id === application.schoolId);
+    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: schoolLocalDate(school?.timezone), status: 'pending' };
     this.data.admissionApplications.push(record);
     this.save();
     return record;
