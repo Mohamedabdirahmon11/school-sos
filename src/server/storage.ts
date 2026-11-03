@@ -511,8 +511,10 @@ class StorageEngine {
           this.cacheQueryRows('plans', this.plansCache.value.map(plan => ({ ...plan })));
           return;
         }
-        const plans = await this.queryRows<PlanConfig>('plans', {});
-        if (plans.length) this.data.plans = plans;
+        // queryRows already merges persisted plan fields over built-in defaults
+        // and records the matching persistence baseline. Do not replace that
+        // merged state with raw rows, or unrelated writes will upsert it again.
+        await this.queryRows<PlanConfig>('plans', {});
         this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
       };
       await Promise.all([settingsTask(), plansTask()]);
