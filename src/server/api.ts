@@ -2668,12 +2668,18 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
-  const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
-  if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
+  const usedStaffIds = await queryAllRows('users', {}, 'id,staff_id');
+  if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That Teacher ID is already used. Teacher IDs must be unique across all schools.' }); return; }
+  const [schoolClasses, schoolSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
+  const assignedClasses = Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [];
+  const assignedSubjects = Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [];
+  if (assignedClasses.some((id: unknown) => typeof id !== 'string' || !schoolClasses.some(item => item.id === id))) { res.status(400).json({ error: 'Every assigned class must belong to this school.' }); return; }
+  if (assignedSubjects.some((id: unknown) => typeof id !== 'string' || !schoolSubjects.some(item => item.id === id))) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (req.body?.monthlySalary !== undefined && (!Number.isFinite(Number(req.body.monthlySalary)) || Number(req.body.monthlySalary) < 0)) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
-  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
+  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects });
+  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses, assignedSubjects, status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   res.status(201).json({ ...teacher, initialPin });
 });
