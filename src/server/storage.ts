@@ -2539,10 +2539,11 @@ class StorageEngine {
     const item: CommunicationQueueItem = {
       ...itemData,
       id: `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      status: isConfigured ? 'sent' : 'queued',
+      // Queueing is not proof of delivery. A delivery worker must mark it sent
+      // only after the provider confirms successful transmission.
+      status: 'queued',
       errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Stored in queue as not sent.',
-      createdAt: new Date().toISOString(),
-      sentAt: isConfigured ? new Date().toISOString() : undefined
+      createdAt: new Date().toISOString()
     };
 
     this.data.communicationQueue.push(item);
