@@ -61,4 +61,14 @@ test('admissions create, reject and approve flows persist; approval enrolls once
   const duplicateApproval = await fetch(`${baseUrl}/school/admissions/${secondRow.id}/approve`, { method: 'POST', headers });
   assert.equal(duplicateApproval.status, 409, `${await duplicateApproval.text()} rows=${JSON.stringify(memory.rows('admission_applications').map(row => ({ id: row.id, schoolId: row.school_id, status: row.status })))}`);
   assert.equal(memory.rows('audit_logs').filter(row => String(row.action).startsWith('ADMISSION_APPLICATION_')).length, 4);
+
+  const concurrent = await post({ firstName: 'Concurrent', lastName: 'Applicant', gender: 'female', gradeApplying: 'Grade 1', classId: klass.id, fatherPhone: '+15550007003', motherPhone: '' });
+  assert.equal(concurrent.status, 201);
+  const concurrentRow = await concurrent.json();
+  const attempts = await Promise.all([
+    fetch(`${baseUrl}/school/admissions/${concurrentRow.id}/approve`, { method: 'POST', headers }),
+    fetch(`${baseUrl}/school/admissions/${concurrentRow.id}/approve`, { method: 'POST', headers })
+  ]);
+  assert.deepEqual(attempts.map(response => response.status).sort(), [200, 409]);
+  assert.equal(memory.rows('students').filter(row => row.student_id === `STD-${school.code}-${concurrentRow.id.slice(-8).toUpperCase()}` || row.studentId === `STD-${school.code}-${concurrentRow.id.slice(-8).toUpperCase()}`).length, 1);
 });
