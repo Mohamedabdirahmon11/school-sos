@@ -2,7 +2,8 @@
  * Production Multi-Role Authentication Screen
  * Supports:
  * - Super Admin: Email + Password
- * - School Admin, Teacher, Accountant: Email or Phone + Password (forced change at first login, forgot password)
+ * - School Admin, Accountant: Email or Phone + Password
+ * - Teacher: School-issued Teacher ID + Password or PIN
  * - Student & Parent: School Code + Phone Number + PIN (with children switcher and lockout protection)
  */
 
@@ -49,7 +50,7 @@ export const LoginView: React.FC = () => {
 
     try {
       const result = await login({
-        ...(parentStudentMode ? { role: activeTab } : {}),
+        role: activeTab,
         email,
         phone,
         schoolCode,
@@ -170,14 +171,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">{t('staff_signin_identifier')}</label>
+                  <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Teacher ID' : t('staff_signin_identifier')}</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={t('staff_signin_placeholder')}
+                      placeholder={activeTab === 'teacher' ? 'STF-SCHOOL-0001' : t('staff_signin_placeholder')}
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
@@ -185,9 +186,9 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">Password</label>
+                    <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Password / PIN' : 'Password'}</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : 'Contact your school administrator to reset your password.'}
+                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? 'Use the password or PIN given to you by your School Admin.' : 'Contact your school administrator to reset your password.'}
                     </span>
                   </div>
                   <div className="mt-1">
