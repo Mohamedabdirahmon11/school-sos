@@ -118,6 +118,8 @@ export const SchoolSettingsView: React.FC = () => {
 
   // SMS / WhatsApp Gateway State
   const [commSettings, setCommSettings] = useState<CommunicationSettings | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiSecretInput, setApiSecretInput] = useState('');
   const [queueItems, setQueueItems] = useState<CommunicationQueueItem[]>([]);
   const [queuePageInfo, setQueuePageInfo] = useState<PageInfo | null>(null);
   const [queuePage, setQueuePage] = useState(1);
@@ -395,8 +397,17 @@ export const SchoolSettingsView: React.FC = () => {
     if (isReadOnly || !commSettings) return;
     setIsSaving(true);
     try {
-      const updated = await ApiClient.updateCommunicationSettings(commSettings);
+      const updated = await ApiClient.updateCommunicationSettings({
+        provider: commSettings.provider,
+        isActive: commSettings.isActive,
+        senderId: commSettings.senderId || '',
+        webhookUrl: commSettings.webhookUrl || '',
+        ...(apiKeyInput.trim() ? { apiKey: apiKeyInput.trim() } : {}),
+        ...(apiSecretInput.trim() ? { apiSecret: apiSecretInput.trim() } : {})
+      });
       setCommSettings(updated);
+      setApiKeyInput('');
+      setApiSecretInput('');
       setNotice('SMS / WhatsApp Gateway settings saved successfully!');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -1421,8 +1432,9 @@ export const SchoolSettingsView: React.FC = () => {
                   <label className="block font-semibold text-[#334155] mb-1">API Key / Account SID</label>
                   <input
                     type="password"
-                    value={commSettings.apiKey || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiKey: e.target.value })}
+                    value={apiKeyInput}
+                    placeholder={commSettings.apiKeyConfigured ? 'Saved securely — leave blank to keep current key' : 'Enter API key'}
+                    onChange={e => setApiKeyInput(e.target.value)}
                     className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   />
                 </div>
@@ -1430,8 +1442,9 @@ export const SchoolSettingsView: React.FC = () => {
                   <label className="block font-semibold text-[#334155] mb-1">API Secret / Auth Token</label>
                   <input
                     type="password"
-                    value={commSettings.apiSecret || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiSecret: e.target.value })}
+                    value={apiSecretInput}
+                    placeholder={commSettings.apiSecretConfigured ? 'Saved securely — leave blank to keep current secret' : 'Enter API secret'}
+                    onChange={e => setApiSecretInput(e.target.value)}
                     className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   />
                 </div>
@@ -1453,7 +1466,7 @@ export const SchoolSettingsView: React.FC = () => {
                     className="rounded text-[#0F766E] focus:ring-[#0F766E]"
                   />
                   <span className="font-semibold text-[#132A29]">
-                    Activate live dispatch (Unchecked messages stay queued as "not sent")
+                    Enable provider configuration (messages remain queued; live delivery is not connected)
                   </span>
                 </label>
               </>
