@@ -2450,6 +2450,18 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   });
 });
 
+apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(String(req.params.id), school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+  if (!await canAccessStudentRecord(user, student.id)) {
+    res.status(403).json({ error: 'You do not have access to this student record.' });
+    return;
+  }
+  res.json(sanitizeStudent(student));
+});
+
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
