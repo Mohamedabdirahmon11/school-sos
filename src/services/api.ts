@@ -541,8 +541,20 @@ export class ApiClient {
     });
   }
 
-  public static async getSchoolStudents(params?: any) {
-    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize);
+  public static async getSchoolStudents(params?: {
+    classId?: string;
+    branchId?: string;
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.classId) query.set('classId', params.classId);
+    if (params?.branchId) query.set('branchId', params.branchId);
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    return this.request<Student[]>(`/students?${query.toString()}`);
   }
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
