@@ -2635,6 +2635,48 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (payload.allergies !== undefined && (typeof payload.allergies !== 'string' || payload.allergies.length > 1000)) {
     res.status(400).json({ error: 'Allergy notes must be at most 1,000 characters.' }); return;
   }
+  if (payload.busRouteId !== undefined) {
+    if (typeof payload.busRouteId !== 'string' || payload.busRouteId.length > 80) {
+      res.status(400).json({ error: 'Bus route selection is invalid.' }); return;
+    }
+    if (payload.busRouteId.trim()) {
+      const routes = await db.getTransportRoutes(school.id);
+      if (!routes.some(route => route.id === payload.busRouteId!.trim())) {
+        res.status(400).json({ error: 'Bus route does not belong to this school.' }); return;
+      }
+      payload.busRouteId = payload.busRouteId.trim();
+    } else {
+      payload.busRouteId = undefined;
+    }
+  }
+  if (payload.documents !== undefined) {
+    if (!Array.isArray(payload.documents) || payload.documents.length > 50 || payload.documents.some(document =>
+      !document || typeof document !== 'object' ||
+      typeof document.id !== 'string' || !document.id.trim() || document.id.length > 80 ||
+      typeof document.name !== 'string' || !document.name.trim() || document.name.length > 160 ||
+      typeof document.url !== 'string' || !document.url.trim() || document.url.length > 2048 || /^javascript:/i.test(document.url.trim()) ||
+      typeof document.uploadDate !== 'string' || document.uploadDate.length > 40 || Number.isNaN(Date.parse(document.uploadDate))
+    )) {
+      res.status(400).json({ error: 'Student documents must contain up to 50 valid document records.' }); return;
+    }
+    payload.documents = payload.documents.map(document => ({
+      id: document.id.trim(), name: document.name.trim(), url: document.url.trim(), uploadDate: document.uploadDate
+    }));
+  }
+  if (payload.notes !== undefined) {
+    if (!Array.isArray(payload.notes) || payload.notes.length > 100 || payload.notes.some(note =>
+      !note || typeof note !== 'object' ||
+      typeof note.id !== 'string' || !note.id.trim() || note.id.length > 80 ||
+      typeof note.text !== 'string' || !note.text.trim() || note.text.length > 2000 ||
+      typeof note.author !== 'string' || !note.author.trim() || note.author.length > 120 ||
+      typeof note.date !== 'string' || note.date.length > 40 || Number.isNaN(Date.parse(note.date))
+    )) {
+      res.status(400).json({ error: 'Student notes must contain up to 100 valid note records.' }); return;
+    }
+    payload.notes = payload.notes.map(note => ({
+      id: note.id.trim(), text: note.text.trim(), author: note.author.trim(), date: note.date
+    }));
+  }
   if (payload.gender !== undefined && !['male', 'female'].includes(payload.gender)) {
     res.status(400).json({ error: 'Student gender is invalid.' }); return;
   }
