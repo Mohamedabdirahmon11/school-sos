@@ -2581,6 +2581,40 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
   res.json({ success: true });
 });
 
+apiRouter.put('/teachers/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const teacher = (await db.getTeachers(school.id)).find(item => item.id === req.params.id);
+  if (!teacher) { res.status(404).json({ error: 'Teacher not found.' }); return; }
+  const allowedFields = new Set(['fullName', 'phone', 'gender', 'department', 'qualification', 'monthlySalary', 'assignedClasses', 'assignedSubjects', 'status', 'branchId']);
+  const payload = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key))) as Record<string, any>;
+  if (payload.fullName !== undefined && (typeof payload.fullName !== 'string' || !payload.fullName.trim())) { res.status(400).json({ error: 'Teacher full name cannot be empty.' }); return; }
+  if (payload.gender !== undefined && !['male', 'female'].includes(payload.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+  if (payload.status !== undefined && !['active', 'inactive'].includes(payload.status)) { res.status(400).json({ error: 'Teacher status must be active or inactive.' }); return; }
+  if (payload.monthlySalary !== undefined && (!Number.isFinite(Number(payload.monthlySalary)) || Number(payload.monthlySalary) < 0)) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
+  const [classes, subjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
+  if (payload.assignedClasses !== undefined && (!Array.isArray(payload.assignedClasses) || payload.assignedClasses.some((id: unknown) => typeof id !== 'string' || !classes.some(item => item.id === id)))) { res.status(400).json({ error: 'Every assigned class must belong to this school.' }); return; }
+  if (payload.assignedSubjects !== undefined && (!Array.isArray(payload.assignedSubjects) || payload.assignedSubjects.some((id: unknown) => typeof id !== 'string' || !subjects.some(item => item.id === id)))) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
+  if (payload.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === payload.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (payload.phone !== undefined && typeof payload.phone !== 'string') { res.status(400).json({ error: 'Teacher phone must be text.' }); return; }
+  if (payload.department !== undefined && typeof payload.department !== 'string') { res.status(400).json({ error: 'Department must be text.' }); return; }
+  if (payload.qualification !== undefined && typeof payload.qualification !== 'string') { res.status(400).json({ error: 'Qualification must be text.' }); return; }
+  const updated = db.updateTeacher(teacher.id, payload);
+  if (!updated) { res.status(404).json({ error: 'Teacher not found.' }); return; }
+  const account = await db.getUserById(teacher.userId);
+  if (account && account.schoolId === school.id) {
+    db.updateUser(account.id, {
+      fullName: updated.fullName,
+      phone: updated.phone,
+      assignedClassIds: updated.assignedClasses || [],
+      assignedSubjectIds: updated.assignedSubjects || [],
+      isBlocked: updated.status === 'inactive'
+    });
+  }
+  db.logAudit({ action: 'TEACHER_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated teacher ${updated.staffId || updated.id}; status: ${updated.status}.`, severity: updated.status === 'inactive' ? 'warning' : 'info' });
+  res.json(updated);
+});
+
 apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
@@ -2616,7 +2650,15 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
 
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
-  void sendDatabasePage(req, res, 'teachers', { school_id: school.id });
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.replace(/[,%().*\\"']/g, ' ').trim().slice(0, 80)
+    : '';
+  const searchFilter = search
+    ? ['full_name', 'staff_id', 'phone', 'department', 'qualification', 'status']
+        .map(field => `${field}.ilike.*${search}*`)
+        .join(',')
+    : undefined;
+  void sendDatabasePage(req, res, 'teachers', { school_id: school.id }, searchFilter);
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
