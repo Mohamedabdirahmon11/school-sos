@@ -52,7 +52,8 @@ const csv = (...rows: string[][]) => [
 const csvWithGuardians = (...rows: string[][]) => [
   'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,fatherPhone,motherName,motherPhone,studentPhone,branch',
   ...rows.map(row => row.join(','))
-].join('\\n');
+].join('\n');
+
 async function preview(user: typeof admin, text: string, headers: Record<string, string> = {}) {
   const form = new FormData();
   form.append('file', new Blob([text], { type: 'text/csv' }), 'school-import.csv');
