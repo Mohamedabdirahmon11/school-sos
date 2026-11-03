@@ -524,6 +524,18 @@ export class ApiClient {
     return this.request<Student[]>(`/students?${params.toString()}`);
   }
 
+  public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100) {
+    const firstPage = await this.getStudents(classId, branchId, 1, pageSize);
+    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
+    if (totalPages <= 1) return firstPage;
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        this.getStudents(classId, branchId, index + 2, pageSize)
+      )
+    );
+    return [...firstPage, ...remainingPages.flat()];
+  }
+
   public static async createStudent(studentData: Partial<Student>, schoolId?: string) {
     return this.request<Student>('/students', {
       method: 'POST',
