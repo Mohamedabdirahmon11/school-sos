@@ -1084,7 +1084,7 @@ class StorageEngine {
   public async getPayrollRecords(schoolId: string, userId?: string, month?: string): Promise<StaffPayrollRecord[]> {
     if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
         (userId !== undefined && (typeof userId !== 'string' || !userId.trim() || userId.length > 64)) ||
-        (month !== undefined && (typeof month !== 'string' || !/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)))) {
+        (month !== undefined && (typeof month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)))) {
       throw new Error('Payroll query filters are invalid.');
     }
     return this.queryRows<StaffPayrollRecord>('payroll_records', { school_id: schoolId.trim(), user_id: userId, payroll_month: month });
@@ -1105,7 +1105,7 @@ class StorageEngine {
         typeof record.userId !== 'string' || !record.userId.trim() || record.userId.length > 64 ||
         typeof record.staffId !== 'string' || !record.staffId.trim() || record.staffId.length > 64 ||
         typeof record.staffName !== 'string' || !record.staffName.trim() || record.staffName.trim().length > 255 ||
-        !/^\\d{4}-(0[1-9]|1[0-2])$/.test(record.payrollMonth) ||
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(record.payrollMonth) ||
         typeof record.createdBy !== 'string' || !record.createdBy.trim() || record.createdBy.length > 64 ||
         record.status !== 'draft' || !validLines(allowances) || !validLines(deductions) ||
         !Number.isFinite(record.baseSalary) || record.baseSalary < 0 || record.baseSalary > 1_000_000_000 ||
@@ -1145,7 +1145,7 @@ class StorageEngine {
       typeof current.approvedBy === 'string' && typeof current.approvedAt === 'string' &&
       typeof updates.paidBy === 'string' && !!updates.paidBy.trim() && updates.paidBy.length <= 64 &&
       typeof updates.paidAt === 'string' && !Number.isNaN(Date.parse(updates.paidAt)) &&
-      typeof updates.paidDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(updates.paidDate);
+      typeof updates.paidDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(updates.paidDate);
     if (!approval && !payment) return null;
     this.data.payrollRecords[index] = { ...current, ...updates, id, schoolId: schoolId.trim() };
     this.save();
@@ -3130,7 +3130,7 @@ class StorageEngine {
     if (!record || typeof record !== 'object' ||
         typeof record.schoolId !== 'string' || !record.schoolId.trim() || record.schoolId.length > 64 ||
         typeof record.studentId !== 'string' || !record.studentId.trim() || record.studentId.length > 64 ||
-        !/^\\d{4}-\\d{2}-\\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
         typeof record.infractionType !== 'string' || !record.infractionType.trim() || record.infractionType.trim().length > 120 ||
         typeof record.description !== 'string' || record.description.length > 2000 ||
         !['minor', 'moderate', 'severe'].includes(record.severity) ||
@@ -3188,7 +3188,7 @@ class StorageEngine {
     if (!record || typeof record !== 'object' ||
         typeof record.schoolId !== 'string' || !record.schoolId.trim() || record.schoolId.length > 64 ||
         typeof record.studentId !== 'string' || !record.studentId.trim() || record.studentId.length > 64 ||
-        !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
         typeof record.symptoms !== 'string' || !record.symptoms.trim() || record.symptoms.trim().length > 2000 ||
         typeof record.treatment !== 'string' || record.treatment.length > 2000 ||
         typeof record.allergies !== 'string' || record.allergies.length > 1000 ||
