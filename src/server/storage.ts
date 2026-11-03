@@ -1811,6 +1811,7 @@ class StorageEngine {
         a.studentId === rec.studentId && 
         a.date === date
       );
+      const wasAlreadyAbsent = existingIdx >= 0 && this.data.attendance[existingIdx].status === 'absent';
 
       if (existingIdx >= 0) {
         this.data.attendance[existingIdx].status = rec.status;
@@ -1834,13 +1835,14 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // If absent, automatically queue parent SMS notification if communication is enabled
-      if (rec.status === 'absent') {
+      // Notify a parent only when the record first transitions into absent.
+      if (rec.status === 'absent' && !wasAlreadyAbsent) {
         const student = await this.getStudentById(rec.studentId, schoolId);
-        if (student && student.fatherPhone) {
+        const parentPhone = student?.fatherPhone || student?.motherPhone;
+        if (student && parentPhone) {
           await this.queueNotification({
             schoolId,
-            recipientPhone: student.fatherPhone,
+            recipientPhone: parentPhone,
             recipientName: `Parent of ${student.firstName}`,
             studentId: student.id,
             messageType: 'attendance_absent',
