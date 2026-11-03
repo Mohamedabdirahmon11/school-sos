@@ -3183,8 +3183,13 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
 });
 
 apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
-  const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+  const school = (req as any).school as School;
+  const requestedDate = typeof req.query.date === 'string' ? req.query.date : '';
+  const date = requestedDate || getSchoolLocalDate(school.timezone);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(new Date(`${date}T00:00:00Z`).getTime())) {
+    res.status(400).json({ error: 'Date must use YYYY-MM-DD format.' });
+    return;
+  }
   res.json(await db.getDailyIncomeReport(school.id, date));
 });
 
