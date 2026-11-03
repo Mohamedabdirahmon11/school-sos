@@ -22,11 +22,11 @@ import {
   Filter
 } from 'lucide-react';
 
-export const AttendanceView: React.FC = () => {
+const schoolLocalDate = (timeZone?: string) => {\n  const parts = new Intl.DateTimeFormat('en-CA', {\n    timeZone: timeZone || 'Africa/Addis_Ababa',\n    year: 'numeric', month: '2-digit', day: '2-digit'\n  }).formatToParts(new Date());\n  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));\n  return `${values.year}-${values.month}-${values.day}`;\n};\n\nexport const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => schoolLocalDate(school?.timezone));
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
