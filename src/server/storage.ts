@@ -2700,7 +2700,7 @@ class StorageEngine {
       id: `msg-q-${randomUUID()}`,
       status: 'queued',
       errorMessage: isConfigured
-        ? 'Provider credentials are configured, but no delivery worker is connected. This message has not been sent.'
+        ? 'Provider is enabled, but no delivery worker is connected. This message has not been sent.'
         : 'No active SMS/WhatsApp provider configured. This message has not been sent.',
       createdAt: new Date().toISOString()
     };
