@@ -2752,7 +2752,14 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
   if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
   if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
   const klass = await db.getClassById(application.classId, school.id);
-  if (!klass) { res.status(400).json({ error: 'Application class no longer belongs to this school.' }); return; }
+  if (!klass || klass.isArchived) { res.status(400).json({ error: 'Application class is unavailable or no longer belongs to this school.' }); return; }
+  const [classCount] = await Promise.all([
+    db.queryPage('students', { school_id: school.id, class_id: application.classId }, 1, 1, undefined, 'id')
+  ]);
+  if (classCount.total >= klass.capacity) { res.status(409).json({ error: 'The selected class has reached capacity. Move the application to another class before approval.' }); return; }
+  // Load existing parent accounts before creating the student so both parents
+  // are linked to this child instead of creating duplicate login accounts.
+  await db.getParents(school.id);
   const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
   const student = db.createStudent({ schoolId: school.id, branchId: klass.branchId, studentId, firstName: application.firstName, middleName: application.middleName, lastName: application.lastName, gender: application.gender, admissionDate: new Date().toISOString().slice(0, 10), fatherPhone: application.fatherPhone, motherPhone: application.motherPhone, classId: application.classId, status: 'active' } as any);
   const updated = await db.updateAdmissionApplication(application.id, school.id, 'approved', studentId);
