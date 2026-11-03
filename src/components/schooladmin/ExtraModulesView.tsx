@@ -54,6 +54,15 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   // Discipline State
   const [disciplineLogs, setDisciplineLogs] = useState<any[]>([]);
+  const [showDisciplineForm, setShowDisciplineForm] = useState(false);
+  const [disciplineStudentId, setDisciplineStudentId] = useState('');
+  const [disciplineDate, setDisciplineDate] = useState('');
+  const [disciplineInfraction, setDisciplineInfraction] = useState('');
+  const [disciplineDescription, setDisciplineDescription] = useState('');
+  const [disciplineSeverity, setDisciplineSeverity] = useState<'minor' | 'moderate' | 'severe'>('minor');
+  const [disciplineAction, setDisciplineAction] = useState('');
+  const [disciplineParentNotified, setDisciplineParentNotified] = useState(false);
+  const [disciplineBusy, setDisciplineBusy] = useState(false);
 
   // Health State
   const [healthLogs] = useState<any[]>([]);
@@ -81,6 +90,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
+    ApiClient.getDisciplineRecords().then(setDisciplineLogs).catch(error => {
+      console.error(error);
+      setNotice('Discipline records could not be loaded. Check your school administrator access.');
+    });
     ApiClient.getInventoryItems().then(setInventory).catch(error => {
       console.error(error);
       setNotice('Inventory could not be loaded. Check your school administrator access.');
@@ -130,6 +143,55 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleAddDisciplineRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (disciplineBusy) return;
+    if (!disciplineStudentId || !disciplineDate || !disciplineInfraction.trim()) {
+      setNotice('Choose a student, incident date and infraction type.');
+      return;
+    }
+    setDisciplineBusy(true);
+    try {
+      const created = await ApiClient.addDisciplineRecord({
+        studentId: disciplineStudentId,
+        incidentDate: disciplineDate,
+        infractionType: disciplineInfraction.trim(),
+        description: disciplineDescription.trim(),
+        severity: disciplineSeverity,
+        actionTaken: disciplineAction.trim(),
+        parentNotified: disciplineParentNotified
+      });
+      setDisciplineLogs(current => [created, ...current]);
+      setShowDisciplineForm(false);
+      setDisciplineStudentId('');
+      setDisciplineDate('');
+      setDisciplineInfraction('');
+      setDisciplineDescription('');
+      setDisciplineSeverity('minor');
+      setDisciplineAction('');
+      setDisciplineParentNotified(false);
+      setNotice('Discipline incident saved securely for this school.');
+    } catch (error: any) {
+      setNotice(error?.message || 'Discipline incident could not be saved.');
+    } finally {
+      setDisciplineBusy(false);
+    }
+  };
+
+  const handleDeleteDisciplineRecord = async (recordId: string) => {
+    try {
+      const result = await ApiClient.deleteDisciplineRecord(recordId);
+      if (result.success) {
+        setDisciplineLogs(current => current.filter(record => record.id !== recordId));
+        setNotice('Discipline record deleted.');
+      } else {
+        setNotice('Discipline record was not found.');
+      }
+    } catch (error: any) {
+      setNotice(error?.message || 'Discipline record could not be deleted.');
     }
   };
 
@@ -365,10 +427,61 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       {/* 3. DISCIPLINE MODULE */}
       {activeModule === 'discipline' && (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span>Discipline & Behaviour Incidents</span>
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <span>Discipline & Behaviour Incidents</span>
+            </h2>
+            {!isReadOnly && (
+              <button type="button" onClick={() => setShowDisciplineForm(value => !value)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white">
+                <Plus className="h-4 w-4" /> Add incident
+              </button>
+            )}
+          </div>
+          {showDisciplineForm && !isReadOnly && (
+            <form onSubmit={handleAddDisciplineRecord} className="grid grid-cols-1 gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-2">
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Student
+                <select required value={disciplineStudentId} onChange={e => setDisciplineStudentId(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm">
+                  <option value="">Choose student</option>
+                  {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} — {student.studentId}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Incident date
+                <input required type="date" value={disciplineDate} onChange={e => setDisciplineDate(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Infraction type
+                <input required maxLength={120} value={disciplineInfraction} onChange={e => setDisciplineInfraction(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Severity
+                <select value={disciplineSeverity} onChange={e => setDisciplineSeverity(e.target.value as typeof disciplineSeverity)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm">
+                  <option value="minor">Minor</option><option value="moderate">Moderate</option><option value="severe">Severe</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569] sm:col-span-2">Description
+                <textarea maxLength={2000} rows={2} value={disciplineDescription} onChange={e => setDisciplineDescription(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569] sm:col-span-2">Action taken
+                <textarea maxLength={1000} rows={2} value={disciplineAction} onChange={e => setDisciplineAction(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-[#475569] sm:col-span-2">
+                <input type="checkbox" checked={disciplineParentNotified} onChange={e => setDisciplineParentNotified(e.target.checked)} />
+                Parent has been notified (manual confirmation)
+              </label>
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <button disabled={disciplineBusy} type="submit" className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                  {disciplineBusy ? 'Saving…' : 'Save incident'}
+                </button>
+                <button type="button" onClick={() => setShowDisciplineForm(false)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs font-semibold text-[#475569]">Cancel</button>
+              </div>
+            </form>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -379,6 +492,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Severity</th>
                   <th className="px-4 py-2.5">Action Taken</th>
                   <th className="px-4 py-2.5">Parent Notified</th>
+                  {!isReadOnly && <th className="px-4 py-2.5">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
@@ -388,10 +502,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
                     <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
                     <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (SMS)' : 'No'}</td>
+                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken || '—'}</td>
+                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes' : 'No'}</td>
+                    {!isReadOnly && <td className="px-4 py-2.5">
+                      <button type="button" onClick={() => handleDeleteDisciplineRecord(d.id)} className="rounded px-2 py-1 text-red-600 hover:bg-red-50">Delete</button>
+                    </td>}
                   </tr>
                 ))}
+                {disciplineLogs.length === 0 && (
+                  <tr><td colSpan={isReadOnly ? 6 : 7} className="px-4 py-8 text-center text-[#64748B]">No discipline incidents have been recorded.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
