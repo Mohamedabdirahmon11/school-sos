@@ -981,6 +981,24 @@ CREATE TABLE IF NOT EXISTS library_books (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  asset_tag VARCHAR(80) NOT NULL,
+  item_name VARCHAR(255) NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 0 AND 1000000),
+  room_location VARCHAR(150) NOT NULL DEFAULT '',
+  condition VARCHAR(20) NOT NULL DEFAULT 'good' CHECK (condition IN ('good','fair','poor','damaged')),
+  value NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (value BETWEEN 0 AND 1000000000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_items_school_asset_tag
+  ON inventory_items (school_id, lower(btrim(asset_tag)));
+CREATE INDEX IF NOT EXISTS idx_inventory_items_school_created
+  ON inventory_items (school_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS transport_routes (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -1048,6 +1066,7 @@ CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment ON assignment_s
 CREATE INDEX IF NOT EXISTS idx_staff_user ON staff_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_admissions_class ON admission_applications(school_id, class_id);
 CREATE INDEX IF NOT EXISTS idx_library_school ON library_books(school_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_school ON inventory_items(school_id);
 CREATE INDEX IF NOT EXISTS idx_transport_school ON transport_routes(school_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_invoices_paid_date ON subscription_invoices(status, paid_date);
@@ -1294,6 +1313,13 @@ CREATE POLICY notification_templates_admin_scope ON notification_templates AS RE
 DROP POLICY IF EXISTS staff_members_role_scope ON staff_members;
 CREATE POLICY staff_members_role_scope ON staff_members AS RESTRICTIVE FOR SELECT TO authenticated
   USING (auth_user_role() IN ('super_admin','school_admin','accountant') OR user_id = auth_user_id());
+
+ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inventory_items_tenant_scope ON inventory_items;
+CREATE POLICY inventory_items_tenant_scope ON inventory_items
+  FOR ALL TO authenticated
+  USING (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text)
+  WITH CHECK (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text);
 
 DROP POLICY IF EXISTS bus_assignments_student_scope ON bus_assignments;
 CREATE POLICY bus_assignments_student_scope ON bus_assignments AS RESTRICTIVE FOR SELECT TO authenticated
