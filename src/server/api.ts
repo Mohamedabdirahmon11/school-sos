@@ -3290,7 +3290,7 @@ apiRouter.post('/payroll/:id/pay', requireAuth, requireAccountantOrSuperAdmin, r
 
 apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
-  if (!['school_admin', 'accountant', 'teacher'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to school staff.' }); return; }
+  if (!['school_admin', 'accountant', 'teacher', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to school staff.' }); return; }
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.userId !== user.id && !['accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to your own payroll record.' }); return; }
   const line = (item: any) => `${item.label}: ${formatMoney(Number(item.amount) || 0, school.currency)}`;
