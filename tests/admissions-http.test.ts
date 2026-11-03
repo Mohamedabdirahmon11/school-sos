@@ -147,3 +147,54 @@ test('student creation whitelists profile fields, enforces capacity and protects
   });
   assert.equal(invalidPin.status, 400);
 });
+
+test('teacher creation ignores client-controlled identity and credential fields', async () => {
+  const post = (body: Record<string, unknown>) => fetch(`${baseUrl}/teachers`, {
+    method: 'POST', headers, body: JSON.stringify(body)
+  });
+  const response = await post({
+    id: 'forged-teacher-id',
+    schoolId: 'forged-school',
+    userId: 'forged-user',
+    role: 'super_admin',
+    passwordHash: 'forged-password',
+    twoFactorSecret: 'forged-secret',
+    recoveryCodes: ['forged-code'],
+    pin: '9999',
+    staffId: 'STF-SEC-001',
+    fullName: 'Scoped Teacher',
+    phone: '+15550007201',
+    gender: 'male',
+    qualification: 'B.Ed',
+    department: 'Science',
+    assignedClasses: [klass.id],
+    assignedSubjects: []
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  const result = await response.json();
+  assert.notEqual(result.id, 'forged-teacher-id');
+  assert.equal(result.schoolId, school.id);
+  assert.notEqual(result.userId, 'forged-user');
+  assert.equal(result.initialPin.length, 4);
+  assert.equal('passwordHash' in result, false);
+  assert.equal('twoFactorSecret' in result, false);
+  const storedTeacher = (await storage.db.getTeachers(school.id)).find(item => item.id === result.id);
+  assert.ok(storedTeacher);
+  assert.equal('passwordHash' in (storedTeacher as any), false);
+  assert.equal('twoFactorSecret' in (storedTeacher as any), false);
+  const teacherUser = await storage.db.getUserById(result.userId, school.id);
+  assert.equal(teacherUser?.role, 'teacher');
+  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'));
+
+  const duplicate = await post({
+    staffId: 'STF-SEC-001', fullName: 'Duplicate Staff ID',
+    gender: 'female', assignedClasses: [], assignedSubjects: []
+  });
+  assert.equal(duplicate.status, 409);
+
+  const invalidAssignments = await post({
+    staffId: 'STF-SEC-002', fullName: 'Invalid Assignments',
+    gender: 'female', assignedClasses: [klass.id, null], assignedSubjects: []
+  });
+  assert.equal(invalidAssignments.status, 400);
+});
