@@ -35,6 +35,9 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   assert.deepEqual(firstSemester.map(mark => mark.percentage), [90, 70, 60, 40]);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], smallExamMarks: 21 }], 'teacher-1'), /configured maximums/);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], bigExamMarks: -1 }], 'teacher-1'), /configured maximums/);
+  const draftMark = (await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], status: 'draft' }], 'teacher-1'))[0];
+  assert.equal(db.approveMarks(school.id, [draftMark.id], 'admin-1').length, 0);
+  assert.equal((await db.getMarks(school.id, source.id, subject.id, 'Semester 2')).find(mark => mark.id === draftMark.id)?.status, 'draft');
   await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', marks, 'teacher-1');
   await db.flush();
 
