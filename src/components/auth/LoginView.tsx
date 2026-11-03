@@ -33,6 +33,7 @@ export const LoginView: React.FC = () => {
   const [parentStudentMode, setParentStudentMode] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
   const [pin, setPin] = useState('');
   const [password, setPassword] = useState('');
@@ -244,7 +245,7 @@ export const LoginView: React.FC = () => {
                       maxLength={6}
                       required
                       value={pin}
-                      onChange={e => setPin(e.target.value)}
+                      onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       placeholder="1234"
                       className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
