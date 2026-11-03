@@ -2733,7 +2733,7 @@ class StorageEngine {
         !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(noticeData.audience) ||
         (noticeData.audience === 'class' && (typeof noticeData.classId !== 'string' || !noticeData.classId.trim() || noticeData.classId.length > 64)) ||
         typeof noticeData.isPinned !== 'boolean' || typeof noticeData.isActive !== 'boolean' ||
-        !/^\\d{4}-\\d{2}-\\d{2}$/.test(publishDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== publishDate ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(publishDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== publishDate ||
         typeof noticeData.authorName !== 'string' || !noticeData.authorName.trim() || noticeData.authorName.trim().length > 150 ||
         typeof noticeData.authorRole !== 'string' || !['school_admin', 'super_admin'].includes(noticeData.authorRole)) {
       throw new Error('Notice details are invalid.');
@@ -2762,7 +2762,7 @@ class StorageEngine {
     if (updates.classId !== undefined && updates.classId !== null && (typeof updates.classId !== 'string' || updates.classId.length > 64)) throw new Error('Notice class ID is invalid.');
     if (updates.publishDate !== undefined) {
       const parsed = new Date(`${updates.publishDate}T00:00:00.000Z`);
-      if (typeof updates.publishDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(updates.publishDate) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== updates.publishDate) throw new Error('Notice publish date is invalid.');
+      if (typeof updates.publishDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(updates.publishDate) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== updates.publishDate) throw new Error('Notice publish date is invalid.');
     }
     await this.queryRows<SchoolNotice>('school_notices', { id: id.trim(), school_id: schoolId.trim() });
     const index = this.data.notices.findIndex(notice => notice.id === id.trim() && notice.schoolId === schoolId.trim() && notice.isActive !== false);
