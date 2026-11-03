@@ -63,7 +63,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, schoolId: school?.id, page, pageSize: 20 }),
+    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, page, pageSize: 20 }),
     ApiClient.getClasses(), ApiClient.getBranches()
   ]), [school?.id, search, classFilter, branchFilter, page], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
