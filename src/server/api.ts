@@ -11,7 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, TimetableSlot, StaffPayrollRecord } from '../types/index.ts';
+import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
