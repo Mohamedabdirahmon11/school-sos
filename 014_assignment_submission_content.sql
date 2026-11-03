@@ -1,1 +1,0 @@
-ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT '';
