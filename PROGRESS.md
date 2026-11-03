@@ -1,5 +1,18 @@
 # SchoolOS implementation progress
 
+Updated: 2026-11-02
+Current stage: Security hardening and automated validation are in progress. Historical feature completion notes below remain as previously recorded; they are not a claim that every live production flow has been re-tested today.
+
+## Security and CI continuation (2026-11-02)
+
+- DONE: Confirmed `.env` is absent from the current `main` tree. `.gitignore` contains `.env*` and explicitly allows `.env.example`.
+- NOT DONE: Historical Git commits may still contain the former `.env`; repository history has not been rewritten. Any real credentials that were present must be rotated, but the old Supabase key must remain active until the replacement is installed and tested in the deployed server.
+- DONE: Added `.github/workflows/ci.yml` to run `npm ci`, `npm run lint`, `npm test`, and `npm run build` on pushes and pull requests to `main`. Commit: `08d893fc9f0b85b601ea46bb5fb9920769a05716`.
+- PENDING: GitHub reported no status checks for the CI commit at the time of this update; the workflow result must be checked after GitHub starts the run.
+- REVIEW NEEDED: Parent/student API list scopes include phone-number fallback matching in addition to explicit linked student IDs. This preserves legacy parent access, but shared family phone numbers can broaden the set of matching records. Review the account-linking model and add regression tests before changing it.
+- VERIFIED EARLIER: Supabase public-schema direct grants were restricted to the server service role, and Security Advisor returned no lints after migration `restrict_public_api_access`. Do not treat this as proof that every application route or deployed user journey is secure.
+
+
 Updated: 2026-11-01
 Current stage: Steps 0–12 remain recorded DONE; Step 13 (data-safety and owner-handoff hardening) is complete and committed after the checks below.
 
