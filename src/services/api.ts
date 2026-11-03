@@ -514,12 +514,13 @@ export class ApiClient {
   }
 
   // Students & Teachers
-  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number) {
+  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string) {
     const params = new URLSearchParams();
     if (classId) params.append('classId', classId);
     if (branchId) params.append('branchId', branchId);
     if (page) params.append('page', String(page));
     if (pageSize) params.append('pageSize', String(pageSize));
+    if (search?.trim()) params.append('search', search.trim());
     return this.request<Student[]>(`/students?${params.toString()}`);
   }
 
@@ -542,12 +543,11 @@ export class ApiClient {
   }
 
   public static async getSchoolStudents(params?: any) {
-    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize);
+    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search);
   }
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
-    const students = await this.getStudents();
-    const student = students.find(s => s.id === id);
+    const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
     const payments = includeFinance ? await this.getFeePayments(id) : [];
     const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
     const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
