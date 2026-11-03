@@ -1,5 +1,17 @@
 # SchoolOS implementation progress
 
+Updated: 2026-11-03
+Current stage: Repository UI consistency fixes and CI validation continue. This is not a claim of live production readiness.
+
+## UI consistency and CI validation (2026-11-03)
+
+- DONE: Removed the School Admin dashboard's misleading "Record Payment" action because School Admin is intentionally denied access to finance screens; Accountant remains the finance role.
+- DONE: Removed School Admin sidebar links for Assignments and Certificates because the current app router has no corresponding School Admin screens. This prevents navigation to blank pages; those School Admin workflows remain unimplemented.
+- VERIFIED: GitHub Actions passed on commit `d10d4b26e036e35a00b153845916d67e0ea7cfa2`: dependency installation, application TypeScript check, the configured four-test CI subset, frontend/server route parity audit, and production build. Run: https://github.com/Mohamedabdirahmon11/school-sos/actions/runs/41593762381.
+- LIMITATION: The broader test scripts currently reference files that are absent from `tests/` (including security, storage, and schema-idempotency test files); several existing HTTP tests also import missing `tests/support/in-memory-supabase.ts`, and report-card tests import missing `tests/support/png.ts`. Therefore the full legacy suite and those additional suites are not currently verified.
+- LIMITATION: `supabase/schema.sql` is absent from the current repository tree, although the static schema-conformance test and RLS source-audit script expect it. The RLS source audit was therefore removed from CI rather than reported as passing. Live Supabase hardening verification recorded above remains separate from this missing source artifact.
+- NOT DONE: No live deployed application login/workflow test, production user-journey test, or load test has been completed.
+
 Updated: 2026-11-02
 Current stage: Security hardening and automated validation are in progress. Historical feature completion notes below remain as previously recorded; they are not a claim that every live production flow has been re-tested today.
 
