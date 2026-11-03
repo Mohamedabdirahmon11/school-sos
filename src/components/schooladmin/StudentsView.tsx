@@ -13,6 +13,7 @@ import { BulkImportWizard } from './BulkImportWizard.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { getSchoolLocalDate } from '../../lib/school-date.ts';
 import { 
   GraduationCap, 
   Search, 
@@ -57,7 +58,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [admissionDate, setAdmissionDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const [studentPhone, setStudentPhone] = useState('');
   const [fatherPhone, setFatherPhone] = useState('');
   const [motherPhone, setMotherPhone] = useState('');
@@ -74,6 +75,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const isLoading = studentLoad.loading;
 
   const fetchStudents = studentLoad.retry;
+  useEffect(() => { setAdmissionDate(getSchoolLocalDate(school?.timezone)); }, [school?.timezone]);
   useEffect(() => { if (classes.length > 0 && !classId) setClassId(classes[0].id); }, [classes, classId]);
   useEffect(() => { setPageInfo((studentRows as any)?.pagination || null); }, [studentRows]);
 
