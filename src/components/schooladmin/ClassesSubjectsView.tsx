@@ -88,8 +88,8 @@ export const ClassesSubjectsView: React.FC = () => {
       const payload = {
         name: subjectName,
         code: subjectCode,
-        creditUnits,
-        department
+        creditUnits: 0,
+        department: 'General'
       };
       const savedSubject = editingSubject ? await ApiClient.updateSubject(editingSubject.id, payload) : await ApiClient.addSubject(payload, school?.id);
       await ApiClient.saveSubjectAssignments(savedSubject.id, subjectAssignments);
@@ -126,7 +126,7 @@ export const ClassesSubjectsView: React.FC = () => {
           Classes, Sections & Curriculum Subjects
         </h1>
         <p className="text-xs text-[#64748B]">
-          Configure grade allocations, room assignments, capacities, and course credit units
+          Configure KG–Grade 12 classes, sections, room assignments, and curriculum subjects
         </p>
       </div>
 
@@ -183,7 +183,7 @@ export const ClassesSubjectsView: React.FC = () => {
           <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-[#0F766E]" />
-              <span>Academic Subjects & Credits ({subjects.length})</span>
+              <span>Academic Subjects ({subjects.length})</span>
             </h2>
             <button
               onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setShowSubjectModal(true); }}
@@ -200,12 +200,12 @@ export const ClassesSubjectsView: React.FC = () => {
               <div key={s.id} className="py-3 flex items-center justify-between text-xs gap-2">
                 <div>
                   <p className="font-semibold text-[#132A29]">{s.name}</p>
-                  <p className="text-[11px] text-[#64748B]">Department: {s.department} · {s.creditUnits} Credits</p>
+                  <p className="text-[11px] text-[#64748B]">Subject code: {s.code}</p>
                 </div>
                 <span className="font-mono text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded text-[11px]">
                   {s.code}
                 </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${s.name}`} onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(s.id); setSubjectAssignments(current); setEditingSubject(s); setSubjectName(s.name); setSubjectCode(s.code); setCreditUnits(s.creditUnits); setDepartment(s.department || ''); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); } }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
+                <button disabled={isReadOnly} aria-label={`Edit ${s.name}`} onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(s.id); setSubjectAssignments(current); setEditingSubject(s); setSubjectName(s.name); setSubjectCode(s.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); } }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
                 <button disabled={isReadOnly} aria-label={`Delete ${s.name}`} onClick={async () => { if (!window.confirm(`Delete subject ${s.name}?`)) return; try { await ApiClient.deleteSubject(s.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); } }} className="p-1.5 rounded hover:bg-red-50 text-red-600 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             ))}
@@ -264,8 +264,8 @@ export const ClassesSubjectsView: React.FC = () => {
                     onChange={e => setGradeLevel(parseInt(e.target.value, 10))}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   >
-                    {(school?.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map(level => (
-                      <option key={level} value={level}>Grade {level}</option>
+                    {[0, ...(school?.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)].map(level => (
+                      <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>
                     ))}
                   </select>
                 </div>
@@ -355,28 +355,9 @@ export const ClassesSubjectsView: React.FC = () => {
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
                 </div>
-                <div>
-                  <label className="block font-medium">Credit Units</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="6"
-                    value={creditUnits}
-                    onChange={e => setCreditUnits(parseInt(e.target.value, 10))}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                </div>
+>
               </div>
-              <div>
-                <label className="block font-medium">Department</label>
-                <input
-                  type="text"
-                  value={department}
-                  onChange={e => setDepartment(e.target.value)}
-                  placeholder="Sciences"
-                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-                />
-              </div>
+>
               <fieldset className="border rounded-lg p-3 space-y-3">
                 <legend className="px-1 font-semibold">Assign to classes</legend>
                 <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">{classes.map(klass => <label key={klass.id} className="flex gap-2 items-center"><input type="checkbox" checked={subjectAssignments.some(item => item.classId === klass.id)} onChange={event => setSubjectAssignments(current => event.target.checked ? [...current, { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }] : current.filter(item => item.classId !== klass.id))} />{klass.name} · {klass.section}</label>)}</div>
