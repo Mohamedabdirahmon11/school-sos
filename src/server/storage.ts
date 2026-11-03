@@ -2946,8 +2946,24 @@ class StorageEngine {
   }
 
   public addLibraryBook(book: any): any {
+    if (!book || typeof book !== 'object' || Array.isArray(book) ||
+        typeof book.schoolId !== 'string' || !book.schoolId.trim() ||
+        typeof book.title !== 'string' || !book.title.trim() || book.title.trim().length > 255 ||
+        typeof book.author !== 'string' || book.author.length > 150 ||
+        typeof book.isbn !== 'string' || book.isbn.length > 50 ||
+        !Number.isSafeInteger(book.quantity) || book.quantity < 1 || book.quantity > 100000) {
+      throw new Error('Library book details are invalid.');
+    }
     this.data.libraryBooks = this.data.libraryBooks || [];
-    const newBook = { id: `bk-${Date.now()}`, ...book, createdAt: new Date().toISOString() };
+    const newBook = {
+      id: `bk-${randomUUID()}`,
+      schoolId: book.schoolId.trim(),
+      title: book.title.trim(),
+      author: book.author.trim(),
+      isbn: book.isbn.trim(),
+      quantity: book.quantity,
+      createdAt: new Date().toISOString()
+    };
     this.data.libraryBooks.push(newBook);
     this.save();
     return newBook;
