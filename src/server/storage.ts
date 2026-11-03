@@ -1501,14 +1501,35 @@ class StorageEngine {
     await Promise.all([
       this.queryRows<StudentMark>('student_marks', { school_id: student.schoolId, student_id: id }),
       this.queryRows<AttendanceRecord>('attendance_records', { school_id: student.schoolId, student_id: id }),
-      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id })
+      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id }),
+      this.getUsers(student.schoolId, 'student'),
+      this.getUsers(student.schoolId, 'parent')
     ]);
+    const studentUserIds = new Set(this.data.users
+      .filter(user => user.schoolId === student.schoolId && user.role === 'student' &&
+        (user.studentId === student.studentId || user.id === `usr-student-${student.id}`))
+      .map(user => user.id));
+    const parentUsers = this.data.users.filter(user =>
+      user.schoolId === student.schoolId && user.role === 'parent' && user.linkedStudentIds?.includes(student.id)
+    );
+    for (const parent of parentUsers) {
+      parent.linkedStudentIds = (parent.linkedStudentIds || []).filter(studentId => studentId !== student.id);
+      if (!parent.linkedStudentIds.length) studentUserIds.add(parent.id);
+    }
     const len = this.data.students.length;
-    this.data.students = this.data.students.filter(s => s.id !== id);
+    this.data.students = this.data.students.filter(existing => existing.id !== id);
     if (this.data.students.length < len) {
-      this.data.marks = this.data.marks.filter(m => m.studentId !== id);
-      this.data.attendance = this.data.attendance.filter(a => a.studentId !== id);
-      this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id);
+      this.data.marks = this.data.marks.filter(mark => mark.studentId !== id);
+      this.data.attendance = this.data.attendance.filter(record => record.studentId !== id);
+      this.data.feePayments = this.data.feePayments.filter(payment => payment.studentId !== id);
+      this.data.assignmentSubmissions = this.data.assignmentSubmissions.filter(submission => submission.studentId !== id);
+      this.data.busAssignments = this.data.busAssignments.filter(assignment => assignment.studentId !== id);
+      this.data.promotionHistory = this.data.promotionHistory.filter(record => record.studentId !== id);
+      this.data.promotions = this.data.promotions.filter(record => record.studentId !== id);
+      this.data.communicationQueue = this.data.communicationQueue.filter(item => item.studentId !== id);
+      this.data.messages = this.data.messages.filter(message => !studentUserIds.has(message.senderId) && !studentUserIds.has(message.recipientId));
+      this.data.users = this.data.users.filter(user => !studentUserIds.has(user.id));
+      this.data.sessions = this.data.sessions.filter(session => !studentUserIds.has(session.userId));
       this.save();
       return true;
     }
