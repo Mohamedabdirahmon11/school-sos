@@ -99,14 +99,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, sessionTimeoutMinutes * 60 * 1000);
     };
 
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
+    // Pointer and touch activity must keep sessions alive on mobile devices too.
+    const activityEvents = ['pointerdown', 'pointermove', 'touchstart', 'keydown', 'wheel'] as const;
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetTimer, { passive: true });
+    });
     resetTimer();
 
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetTimer);
+      });
     };
   }, [user, sessionTimeoutMinutes]);
 
