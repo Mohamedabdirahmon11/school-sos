@@ -212,7 +212,7 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
     const data = Object.fromEntries(IMPORT_COLUMNS.map(column => [column, String((source as any)?.[column] ?? '').trim()])) as unknown as SchoolImportRow;
     const reasons: string[] = [];
     if (isExampleImportRow(data)) return { row: index + 2, data, status: 'skipped', reasons: ['Example row is skipped.'] };
-    for (const column of ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone'] as const) {
+    for (const column of ['className', 'section', 'studentName', 'gender', 'parentName', 'parentPhone'] as const) {
       if (!data[column].trim()) reasons.push(`${column} is required.`);
     }
     if (data.studentName && (() => { try { splitStudentName(data.studentName); return false; } catch { return true; } })()) reasons.push('studentName must contain at least two names.');
@@ -1460,7 +1460,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     if (!classIds.has(key) && !classPayload.has(key)) {
       const id = `cls-${randomUUID()}`;
       const grade = /\b(?:KG|KINDERGARTEN|NURSERY)\b/i.test(row.data.className) ? 0 : Number(/\d+/.exec(row.data.className)?.[0] || 1);
-      const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), gradeLevel: Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), roomNumber: '', capacity: 40, monthlyFee: 0 };
+      const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), gradeLevel: grade === 0 ? 0 : Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), roomNumber: '', capacity: 40, monthlyFee: 0 };
       classPayload.set(key, record);
       classRecords.push(record);
       classIds.set(key, id);
@@ -1498,7 +1498,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const auditId = `log-${randomUUID()}`;
   const payload = {
     classes: classRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, name: item.name, grade_level: item.gradeLevel, section: item.section, room_number: item.roomNumber, capacity: item.capacity, monthly_fee: item.monthlyFee })),
-    students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, date_of_birth: item.dateOfBirth, student_phone: item.studentPhone, parent_phone: item.fatherPhone, class_id: item.classId, section: item.section, pin_hash: item.pinHash })),
+    students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, date_of_birth: item.dateOfBirth || null, student_phone: item.studentPhone, parent_phone: item.fatherPhone, class_id: item.classId, section: item.section, pin_hash: item.pinHash })),
     users: userRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, role: item.role, full_name: item.fullName, phone: item.phone, parent_phone: item.parentPhone, student_id: item.studentId, linked_student_ids: item.linkedStudentIds, pin_hash: item.pin })),
     audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
   };
@@ -2395,7 +2395,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  const initialPin = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
+  const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
   const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
   const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
