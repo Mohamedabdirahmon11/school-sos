@@ -2296,6 +2296,9 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.normalize('NFKC').trim().replace(/[^\\p{L}\\p{N}\\s-]/gu, '').replace(/\\s+/g, ' ').slice(0, 80)
+    : '';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
   let roleFilter: string | undefined;
   if (user.role === 'teacher') {
@@ -2312,7 +2315,13 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
-  const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, roleFilter, LIST_QUERY_COLUMNS.students);
+  // Search is applied in the database before pagination so results span every page.
+  // Student/parent role filters are already an OR expression; keep those restrictions
+  // intact rather than replacing them with a broader search expression.
+  const searchFilter = search && !roleFilter
+    ? ['student_id', 'first_name', 'middle_name', 'last_name'].map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students);
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   res.json(sanitizeStudents(result.items));
 });
