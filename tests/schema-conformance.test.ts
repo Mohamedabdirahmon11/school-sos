@@ -140,3 +140,13 @@ test('student list route applies role scope in its single paged query', () => {
   assert.equal((route![0].match(/db\.queryPage\('students'/g) || []).length, 1);
   assert.equal(route![0].includes('db.getStudents('), false, 'role scoping does not hydrate the full student list');
 });
+
+test('fee receipt numbers use a database-atomic per-school academic-year sequence', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/026_fee_receipt_sequences.sql', import.meta.url), 'utf8');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\\.fee_receipt_sequences/);
+  assert.match(migration, /UNIQUE \\(school_id, academic_year\\)/);
+  assert.match(migration, /ON CONFLICT \\(school_id, academic_year\\)/);
+  assert.match(migration, /SET search_path = ''/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\\.schoolos_next_fee_receipt/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\\.schoolos_next_fee_receipt[^;]+TO service_role/);
+});
