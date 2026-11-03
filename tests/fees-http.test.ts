@@ -35,6 +35,12 @@ storage.db.createFeeStructure({ schoolId: school.id, feeType: 'monthly_tuition',
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'annual_registration', name: 'Annual registration', amount: 50, cadence: 'annual', isActive: true });
 const route = storage.db.addTransportRoute({ schoolId: school.id, name: 'North Route', feeAmount: 25, active: true });
 await storage.db.flush();
+const persistedStudent = await storage.db.getStudentById(partialStudent.id, school.id);
+assert.ok(persistedStudent, 'the created student must be readable from the test database');
+assert.equal(persistedStudent?.schoolId, school.id);
+const persistedRoutes = await storage.db.getTransportRoutes(school.id);
+assert.ok(persistedRoutes.some(item => item.id === route.id && item.schoolId === school.id && item.active !== false),
+  `the created transport route must be readable from the test database: ${JSON.stringify(persistedRoutes)}`);
 await storage.db.setBusAssignment(school.id, partialStudent.id, route.id);
 await storage.db.flush();
 
