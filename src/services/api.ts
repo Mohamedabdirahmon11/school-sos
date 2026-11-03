@@ -69,6 +69,16 @@ export class ApiClient {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
+  private static async getAllPages<T>(loadPage: (page: number, pageSize: number) => Promise<T[]>, pageSize = 100): Promise<T[]> {
+    const firstPage = await loadPage(1, pageSize);
+    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
+    if (totalPages <= 1) return firstPage;
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) => loadPage(index + 2, pageSize))
+    );
+    return [...firstPage, ...remainingPages.flat()];
+  }
+
   private static pageQuery(params?: { page?: number; pageSize?: number }) {
     if (!params?.page && !params?.pageSize) return '';
     const query = new URLSearchParams();
@@ -368,8 +378,12 @@ export class ApiClient {
   }
 
   // Branches
-  public static async getBranches() {
-    return this.request<SchoolBranch[]>('/branches?pageSize=100');
+  public static async getBranches(params?: any) {
+    return this.request<SchoolBranch[]>(`/branches${this.pageQuery(params)}`);
+  }
+
+  public static async getAllBranches(pageSize = 100) {
+    return this.getAllPages<SchoolBranch>((page, size) => this.getBranches({ page, pageSize: size }), pageSize);
   }
 
   public static async createBranch(branchData: Partial<SchoolBranch>) {
@@ -394,9 +408,17 @@ export class ApiClient {
 
   // Classes, Subjects, Timetable
   public static async getClasses(branchIdOrParams?: any) {
-    let branchId = typeof branchIdOrParams === 'string' ? branchIdOrParams : branchIdOrParams?.branchId;
-    const q = branchId ? `?branchId=${branchId}` : '';
+    const params = typeof branchIdOrParams === 'string' ? { branchId: branchIdOrParams } : (branchIdOrParams || {});
+    const query = new URLSearchParams();
+    if (params.branchId) query.set('branchId', params.branchId);
+    if (params.page) query.set('page', String(params.page));
+    if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    const q = query.size ? `?${query.toString()}` : '';
     return this.request<SchoolClass[]>(`/classes${q}`);
+  }
+
+  public static async getAllClasses(branchId?: string, pageSize = 100) {
+    return this.getAllPages<SchoolClass>((page, size) => this.getClasses({ branchId, page, pageSize: size }), pageSize);
   }
 
   public static async createClass(classData: Partial<SchoolClass>, schoolId?: string) {
@@ -430,7 +452,11 @@ export class ApiClient {
   }
 
   public static async getSubjects(params?: any) {
-    return this.request<Subject[]>('/subjects');
+    return this.request<Subject[]>(`/subjects${this.pageQuery(params)}`);
+  }
+
+  public static async getAllSubjects(pageSize = 100) {
+    return this.getAllPages<Subject>((page, size) => this.getSubjects({ page, pageSize: size }), pageSize);
   }
 
   public static async getTeacherSubjectAssignments() {
@@ -526,15 +552,7 @@ export class ApiClient {
   }
 
   public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100) {
-    const firstPage = await this.getStudents(classId, branchId, 1, pageSize);
-    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
-    if (totalPages <= 1) return firstPage;
-    const remainingPages = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, index) =>
-        this.getStudents(classId, branchId, index + 2, pageSize)
-      )
-    );
-    return [...firstPage, ...remainingPages.flat()];
+    return this.getAllPages<Student>((page, size) => this.getStudents(classId, branchId, page, size), pageSize);
   }
 
   public static async createStudent(studentData: Partial<Student>, schoolId?: string) {
@@ -587,15 +605,7 @@ export class ApiClient {
   }
 
   public static async getAllStudentAttendance(studentId: string, pageSize = 100) {
-    const firstPage = await this.getStudentAttendance(studentId, { page: 1, pageSize });
-    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
-    if (totalPages <= 1) return firstPage;
-    const remainingPages = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, index) =>
-        this.getStudentAttendance(studentId, { page: index + 2, pageSize })
-      )
-    );
-    return [...firstPage, ...remainingPages.flat()];
+    return this.getAllPages<AttendanceRecord>((page, size) => this.getStudentAttendance(studentId, { page, pageSize: size }), pageSize);
   }
 
   public static async getAssignments() {
@@ -638,6 +648,10 @@ export class ApiClient {
 
   public static async resetTeacherPin(id: string) {
     return this.request<{ success: boolean; newPin: string }>(`/teachers/${encodeURIComponent(id)}/reset-pin`, { method: 'POST' });
+  }
+
+  public static async getAllTeachers(pageSize = 100, search?: string) {
+    return this.getAllPages<Teacher>((page, size) => this.getTeachers({ page, pageSize: size, search }), pageSize);
   }
 
   public static async updateTeacher(id: string, updates: Partial<Teacher>) {
@@ -768,6 +782,10 @@ export class ApiClient {
     return this.request<FeeStructureItem[]>('/fees/structures');
   }
 
+  public static async getAllFeeStructures() {
+    return this.getFeeStructures();
+  }
+
   public static async createFeeStructure(structure: Partial<FeeStructureItem>) {
     return this.request<FeeStructureItem>('/fees/structures', {
       method: 'POST',
@@ -784,15 +802,7 @@ export class ApiClient {
   }
 
   public static async getAllFeePayments(studentId?: string, pageSize = 100) {
-    const firstPage = await this.getFeePayments(studentId, { page: 1, pageSize });
-    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
-    if (totalPages <= 1) return firstPage;
-    const remainingPages = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, index) =>
-        this.getFeePayments(studentId, { page: index + 2, pageSize })
-      )
-    );
-    return [...firstPage, ...remainingPages.flat()];
+    return this.getAllPages<FeePayment>((page, size) => this.getFeePayments(studentId, { page, pageSize: size }), pageSize);
   }
 
   public static async getFeePayments(studentId?: string, params?: any) {
