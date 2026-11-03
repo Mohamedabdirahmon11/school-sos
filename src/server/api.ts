@@ -3527,7 +3527,7 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
   const recipientName = typeof payload.recipientName === 'string' ? payload.recipientName.trim() : '';
   const studentId = payload.studentId === undefined ? undefined : (typeof payload.studentId === 'string' ? payload.studentId.trim() : '');
   const messageTypes = ['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'];
-  if (!/^\\+?[0-9][0-9\\s().-]{5,48}$/.test(recipientPhone) || recipientPhone.length > 50 ||
+  if (!/^\+?[0-9][0-9\s().-]{5,48}$/.test(recipientPhone) || recipientPhone.length > 50 ||
       !recipientName || recipientName.length > 150 ||
       (studentId !== undefined && (!studentId || studentId.length > 64)) ||
       (studentId !== undefined && !await db.getStudentById(studentId, school.id)) ||
