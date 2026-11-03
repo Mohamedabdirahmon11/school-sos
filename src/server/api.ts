@@ -1748,7 +1748,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
     db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students),
     db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
+    db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: schoolLocalDate(school.timezone) }, 1, 1, undefined, 'id')
   ]);
   const subjectIds = [...new Set(assignments.items.map((item: any) => item.subjectId))];
   const teacherIds = [...new Set(assignments.items.map((item: any) => item.teacherId).filter(Boolean))];
@@ -1759,7 +1759,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
   const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
   const classSubjects = assignments.items.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
-  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: timetable.items, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
+  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: timetable.items, attendance: { date: schoolLocalDate(school.timezone), recordedStudents: attendance.total } });
 });
 
 apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req, res) => {
@@ -2402,7 +2402,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.csv"`
+    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${schoolLocalDate(school.timezone)}.csv"`
   }).send('\uFEFF' + csv);
 });
 
@@ -2417,7 +2417,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (req.body?.branchId && !branches.some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.branchId && klass?.branchId && req.body.branchId !== klass.branchId) { res.status(400).json({ error: 'Student branch must match the selected class branch.' }); return; }
   const studentId = typeof req.body?.studentId === 'string' && req.body.studentId.trim() ? req.body.studentId.trim() : `STD-${school.code}-${randomBytes(4).toString('hex').toUpperCase()}`;
-  const student = db.createStudent({ ...req.body, studentId, admissionDate: req.body?.admissionDate || new Date().toISOString().slice(0, 10), middleName: middleName.trim(), fatherPhone: typeof req.body?.fatherPhone === 'string' ? req.body.fatherPhone.trim() : '', branchId: klass?.branchId || req.body?.branchId, schoolId: school.id });
+  const student = db.createStudent({ ...req.body, studentId, admissionDate: req.body?.admissionDate || schoolLocalDate(school.timezone), middleName: middleName.trim(), fatherPhone: typeof req.body?.fatherPhone === 'string' ? req.body.fatherPhone.trim() : '', branchId: klass?.branchId || req.body?.branchId, schoolId: school.id });
   // PIN is returned only once as initialPin for printing the PIN slip!
   res.status(201).json({
     ...sanitizeStudent(student),
@@ -2502,7 +2502,7 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-teachers-${new Date().toISOString().slice(0, 10)}.csv"`
+    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-teachers-${schoolLocalDate(school.timezone)}.csv"`
   }).send('\uFEFF' + csv);
 });
 
@@ -2531,7 +2531,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
   const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
+  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: schoolLocalDate(school.timezone), monthlySalary: Number(req.body.monthlySalary) || 0 });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   res.status(201).json({ ...teacher, initialPin });
 });
@@ -2632,7 +2632,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
   const klass = await db.getClassById(application.classId, school.id);
   if (!klass) { res.status(400).json({ error: 'Application class no longer belongs to this school.' }); return; }
   const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
-  const student = db.createStudent({ schoolId: school.id, branchId: klass.branchId, studentId, firstName: application.firstName, middleName: application.middleName, lastName: application.lastName, gender: application.gender, admissionDate: new Date().toISOString().slice(0, 10), fatherPhone: application.fatherPhone, motherPhone: application.motherPhone, classId: application.classId, status: 'active' } as any);
+  const student = db.createStudent({ schoolId: school.id, branchId: klass.branchId, studentId, firstName: application.firstName, middleName: application.middleName, lastName: application.lastName, gender: application.gender, admissionDate: schoolLocalDate(school.timezone), fatherPhone: application.fatherPhone, motherPhone: application.motherPhone, classId: application.classId, status: 'active' } as any);
   const updated = await db.updateAdmissionApplication(application.id, school.id, 'approved', studentId);
   db.logAudit({ action: 'ADMISSION_APPLICATION_APPROVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was approved and enrolled as ${studentId}.`, severity: 'info' });
   await db.flush();
