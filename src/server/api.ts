@@ -3293,7 +3293,7 @@ apiRouter.get('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, re
 apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
-  if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120 || !['monthly_tuition, 'annual_registration', 'bus', 'custom'].includes(body.feeType) || !Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0 || Number(body.amount) > 9999999999.99 || !['monthly', 'annual', 'one_time'].includes(body.cadence)) {
+  if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120 || !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(body.feeType) || !Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0 || Number(body.amount) > 9999999999.99 || !['monthly', 'annual', 'one_time'].includes(body.cadence)) {
     res.status(400).json({ error: 'Enter a fee name, supported category, positive amount, and valid billing cadence.' }); return;
   }
   const hasGradeRange = body.minGrade !== undefined || body.maxGrade !== undefined;
@@ -3328,7 +3328,7 @@ apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin
     .map(key => [key, body[key]]));
   const next = { ...existing, ...updates };
   if (typeof next.name !== 'string' || !next.name.trim() || next.name.trim().length > 120 ||
-      !['monthly_tuition, 'annual_registration', 'bus', 'custom'].includes(next.feeType) ||
+      !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(next.feeType) ||
       !Number.isFinite(Number(next.amount)) || Number(next.amount) <= 0 || Number(next.amount) > 9999999999.99 ||
       !['monthly', 'annual', 'one_time'].includes(next.cadence) ||
       (next.isActive !== undefined && typeof next.isActive !== 'boolean')) {
