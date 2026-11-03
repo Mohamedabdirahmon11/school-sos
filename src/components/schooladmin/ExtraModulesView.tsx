@@ -64,8 +64,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [disciplineParentNotified, setDisciplineParentNotified] = useState(false);
   const [disciplineBusy, setDisciplineBusy] = useState(false);
 
-  // Health State
-  const [healthLogs] = useState<any[]>([]);
+  // Clinic records are fetched only for school administrators by the protected API.
+  const [healthLogs, setHealthLogs] = useState<any[]>([]);
+  const [showHealthForm, setShowHealthForm] = useState(false);
+  const [healthStudentId, setHealthStudentId] = useState('');
+  const [healthVisitDate, setHealthVisitDate] = useState(new Date().toISOString().slice(0, 10));
+  const [healthSymptoms, setHealthSymptoms] = useState('');
+  const [healthTreatment, setHealthTreatment] = useState('');
+  const [healthAllergies, setHealthAllergies] = useState('');
+  const [healthPrivateNotes, setHealthPrivateNotes] = useState('');
+  const [healthBusy, setHealthBusy] = useState(false);
 
   // Payroll State
   const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
@@ -90,6 +98,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
+    ApiClient.getHealthRecords().then(setHealthLogs).catch(error => {
+      console.error(error);
+      setNotice('Clinic records could not be loaded. Only school administrators can access health information.');
+    });
     ApiClient.getDisciplineRecords().then(setDisciplineLogs).catch(error => {
       console.error(error);
       setNotice('Discipline records could not be loaded. Check your school administrator access.');
@@ -192,6 +204,53 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       }
     } catch (error: any) {
       setNotice(error?.message || 'Discipline record could not be deleted.');
+    }
+  };
+
+  const handleAddHealthRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (healthBusy) return;
+    if (!healthStudentId || !healthVisitDate || !healthSymptoms.trim()) {
+      setNotice('Choose a student, visit date and reported symptoms.');
+      return;
+    }
+    setHealthBusy(true);
+    try {
+      const created = await ApiClient.addHealthRecord({
+        studentId: healthStudentId,
+        visitDate: healthVisitDate,
+        symptoms: healthSymptoms.trim(),
+        treatment: healthTreatment.trim(),
+        allergies: healthAllergies.trim(),
+        privateNotes: healthPrivateNotes.trim()
+      });
+      setHealthLogs(current => [created, ...current].slice(0, 200));
+      setShowHealthForm(false);
+      setHealthStudentId('');
+      setHealthVisitDate(new Date().toISOString().slice(0, 10));
+      setHealthSymptoms('');
+      setHealthTreatment('');
+      setHealthAllergies('');
+      setHealthPrivateNotes('');
+      setNotice('Clinic visit saved securely for this school.');
+    } catch (error: any) {
+      setNotice(error?.message || 'Clinic visit could not be saved.');
+    } finally {
+      setHealthBusy(false);
+    }
+  };
+
+  const handleDeleteHealthRecord = async (recordId: string) => {
+    try {
+      const result = await ApiClient.deleteHealthRecord(recordId);
+      if (result.success) {
+        setHealthLogs(current => current.filter(record => record.id !== recordId));
+        setNotice('Clinic record deleted.');
+      } else {
+        setNotice('Clinic record was not found.');
+      }
+    } catch (error: any) {
+      setNotice(error?.message || 'Clinic record could not be deleted.');
     }
   };
 
@@ -521,10 +580,48 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       {/* 4. HEALTH / CLINIC MODULE */}
       {activeModule === 'health' && (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <HeartPulse className="w-4 h-4 text-rose-600" />
-            <span>School Clinic & Health Visits</span>
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+              <HeartPulse className="w-4 h-4 text-rose-600" />
+              <span>School Clinic & Health Visits</span>
+            </h2>
+            {!isReadOnly && (
+              <button type="button" onClick={() => setShowHealthForm(value => !value)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white">
+                <Plus className="h-4 w-4" /> Add clinic visit
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-[#64748B]">Confidential student health information. Access is restricted to this school's administrators.</p>
+          {showHealthForm && !isReadOnly && (
+            <form onSubmit={handleAddHealthRecord} className="grid grid-cols-1 gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-2">
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Student
+                <select required value={healthStudentId} onChange={e => setHealthStudentId(e.target.value)} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2">
+                  <option value="">Select student</option>
+                  {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.studentId})</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Visit date
+                <input required type="date" value={healthVisitDate} onChange={e => setHealthVisitDate(e.target.value)} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569] sm:col-span-2">Reported symptoms
+                <textarea required maxLength={2000} value={healthSymptoms} onChange={e => setHealthSymptoms(e.target.value)} rows={2} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Treatment given
+                <textarea maxLength={2000} value={healthTreatment} onChange={e => setHealthTreatment(e.target.value)} rows={2} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Allergy information
+                <textarea maxLength={1000} value={healthAllergies} onChange={e => setHealthAllergies(e.target.value)} rows={2} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569] sm:col-span-2">Private clinical notes
+                <textarea maxLength={3000} value={healthPrivateNotes} onChange={e => setHealthPrivateNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2" />
+              </label>
+              <div className="flex justify-end gap-2 sm:col-span-2">
+                <button type="button" onClick={() => setShowHealthForm(false)} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs">Cancel</button>
+                <button type="submit" disabled={healthBusy} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{healthBusy ? 'Saving...' : 'Save confidential record'}</button>
+              </div>
+            </form>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -533,7 +630,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Student</th>
                   <th className="px-4 py-2.5">Reported Symptoms</th>
                   <th className="px-4 py-2.5">Treatment Given</th>
-                  <th className="px-4 py-2.5">Attending Nurse</th>
+                  <th className="px-4 py-2.5">Recorded by</th>
+                  {!isReadOnly && <th className="px-4 py-2.5 text-right">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
@@ -544,9 +642,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 text-[#334155]">{h.symptoms}</td>
                     <td className="px-4 py-2.5 text-[#475569]">{h.treatment}</td>
                     <td className="px-4 py-2.5 text-[#0F766E] font-medium">{h.nurseName}</td>
+                    {!isReadOnly && <td className="px-4 py-2.5 text-right"><button type="button" onClick={() => handleDeleteHealthRecord(h.id)} className="rounded px-2 py-1 text-red-600 hover:bg-red-50">Delete</button></td>}
                   </tr>
                 )) : (
-                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>No health visits have been recorded.</td></tr>
+                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={isReadOnly ? 5 : 6}>No clinic visits have been recorded.</td></tr>
                 )}
               </tbody>
             </table>
