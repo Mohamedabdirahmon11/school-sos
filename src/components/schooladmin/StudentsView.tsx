@@ -163,7 +163,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       if (classFilter) params.set('classId', classFilter);
       if (branchFilter) params.set('branchId', branchFilter);
       if (search.trim()) params.set('search', search.trim());
-      if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
       const response = await fetch('/api/students/export?' + params.toString(), { credentials: 'include' });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
