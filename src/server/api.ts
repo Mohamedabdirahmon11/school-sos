@@ -1494,17 +1494,35 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     studentRecords.push(student);
     userRecords.push({ id: `usr-student-${id}`, schoolId: school.id, branchId: student.branchId, role: 'student', fullName: row.data.studentName.trim(), phone: row.data.studentPhone || row.data.parentPhone, studentId, pin: pinHash });
     pinSlips.push({ type: 'student', name: row.data.studentName.trim(), studentId, pin });
-    const phoneKey = row.data.parentPhone.replace(/[\s()-]/g, '');
-    let parentRecord = parentRecords.get(phoneKey);
-    if (!parentRecord) {
-      const existingParents = await db.findUsersByPhoneInSchool(row.data.parentPhone, school.id);
-      const parent = existingParents.find(item => item.role === 'parent');
-      const parentPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
-      parentRecord = { id: parent?.id || `usr-parent-${randomUUID()}`, schoolId: school.id, role: 'parent', fullName: parent?.fullName || row.data.parentName.trim(), phone: row.data.parentPhone, parentPhone: row.data.parentPhone, pin: hashPin(parentPin), linkedStudentIds: [...(parent?.linkedStudentIds || [])] };
-      parentRecords.set(phoneKey, parentRecord);
-      pinSlips.push({ type: 'parent', name: parentRecord.fullName, phone: row.data.parentPhone, studentName: row.data.studentName.trim(), pin: parentPin });
+    const guardians = [
+      { phone: row.data.fatherPhone || row.data.parentPhone, name: row.data.parentName.trim() },
+      { phone: row.data.motherPhone, name: row.data.motherName.trim() || `Mother of ${row.data.studentName.trim()}` }
+    ];
+    for (const guardian of guardians) {
+      const phoneValue = guardian.phone.trim();
+      if (!phoneValue) continue;
+      const phoneKey = phoneValue.replace(/[\\s()-]/g, '');
+      let parentRecord = parentRecords.get(phoneKey);
+      if (!parentRecord) {
+        const parent = (await db.getParents(school.id)).find(item =>
+          [item.phone, item.parentPhone].some(value => String(value || '').replace(/[\\s()-]/g, '') === phoneKey)
+        );
+        const parentPin = parent?.pin ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+        parentRecord = {
+          id: parent?.id || `usr-parent-${randomUUID()}`,
+          schoolId: school.id,
+          role: 'parent',
+          fullName: parent?.fullName || guardian.name,
+          phone: parent?.phone || phoneValue,
+          parentPhone: parent?.parentPhone || phoneValue,
+          pin: parent?.pin || hashPin(parentPin!),
+          linkedStudentIds: [...(parent?.linkedStudentIds || [])]
+        };
+        parentRecords.set(phoneKey, parentRecord);
+        if (parentPin) pinSlips.push({ type: 'parent', name: parentRecord.fullName, phone: phoneValue, studentName: row.data.studentName.trim(), pin: parentPin });
+      }
+      parentRecord.linkedStudentIds = [...new Set([...parentRecord.linkedStudentIds, id])];
     }
-    parentRecord.linkedStudentIds.push(id);
   }
   userRecords.push(...parentRecords.values());
   const auditId = `log-${randomUUID()}`;
