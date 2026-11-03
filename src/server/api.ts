@@ -687,10 +687,12 @@ apiRouter.post('/auth/login', async (req, res) => {
     if (candidateUsers.length === 0) {
       // Check if student or parent exists in student records
       const students = await db.getStudents(school.id);
-      const matchStd = students.find(s => 
-        (role === 'student' && (s.studentPhone === phone || s.fatherPhone === phone)) ||
-        (role === 'parent' && (s.fatherPhone === phone || s.motherPhone === phone))
+      const matchedStudents = students.filter(student =>
+        role === 'student'
+          ? student.studentPhone === phone || student.fatherPhone === phone
+          : student.fatherPhone === phone || student.motherPhone === phone
       );
+      const matchStd = matchedStudents[0];
 
       if (!matchStd) {
         const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
@@ -755,7 +757,7 @@ apiRouter.post('/auth/login', async (req, res) => {
           pin: matchStd.pinHash,
           isBlocked: false,
           failedLoginAttempts: 0,
-          linkedStudentIds: [matchStd.id]
+          linkedStudentIds: role === 'parent' ? matchedStudents.map(student => student.id) : [matchStd.id]
         });
       }
 
@@ -776,7 +778,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         user: sanitizeUser(existingUser),
         school,
         sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-        linkedStudents: role === 'parent' ? sanitizeStudents([matchStd]) : undefined
+        linkedStudents: role === 'parent' ? sanitizeStudents(matchedStudents) : undefined
       });
       return;
     }
