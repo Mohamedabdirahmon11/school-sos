@@ -1393,7 +1393,7 @@ class StorageEngine {
     const parentPhones = [...new Set([student.fatherPhone, student.motherPhone]
       .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
       .map(phone => phone.trim()))];
-    const normalizePhone = (phone: string) => phone.replace(/[\\s()-]/g, '');
+    const normalizePhone = (phone: string) => phone.replace(/[\s()-]/g, '');
     for (const parentPhone of parentPhones) {
       const normalizedPhone = normalizePhone(parentPhone);
       const existingParent = this.data.users.find(user =>
