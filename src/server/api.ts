@@ -990,7 +990,10 @@ apiRouter.post('/auth/login', async (req, res) => {
       res.json({ requireTwoFactorCode: true });
       return;
     }
-    if (!verify2FACode(twoFactorCode, user.twoFactorSecret)) {
+    const recoveryCodes = Array.isArray(user.recoveryCodes) ? user.recoveryCodes : [];
+    const recoveryCodeIndex = recoveryCodes.findIndex(code => String(code).toUpperCase() === twoFactorCode.toUpperCase());
+    const validTotp = verify2FACode(twoFactorCode, user.twoFactorSecret);
+    if (!validTotp && recoveryCodeIndex < 0) {
       const lockResult = await db.handleFailedLogin(user.id);
       db.recordLoginFailure(staffLockKey, threshold, durationMins);
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
@@ -1000,13 +1003,29 @@ apiRouter.post('/auth/login', async (req, res) => {
         userId: user.id,
         userName: user.fullName,
         userRole: user.role,
-        details: `Invalid Super Admin authenticator code from IP ${clientIp}.`,
+        details: `Invalid Super Admin authenticator or recovery code from IP ${clientIp}.`,
         severity: lockResult.locked ? 'critical' : 'warning'
       });
       res.status(lockResult.locked ? 429 : 401).json({
-        error: lockResult.locked ? `Too many failed login attempts. Account locked for ${durationMins} minutes.` : 'The authenticator code is invalid.'
+        error: lockResult.locked ? `Too many failed login attempts. Account locked for ${durationMins} minutes.` : 'The authenticator or recovery code is invalid.'
       });
       return;
+    }
+    if (!validTotp && recoveryCodeIndex >= 0) {
+      const updated = db.updateUser(user.id, {
+        recoveryCodes: recoveryCodes.filter((_code, index) => index !== recoveryCodeIndex)
+      });
+      if (!updated) { res.status(503).json({ error: 'Unable to consume the recovery code. Try again.' }); return; }
+      await db.flush();
+      db.logAudit({
+        action: 'TWO_FACTOR_RECOVERY_CODE_USED',
+        category: 'security',
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        details: 'A one-time Super Admin recovery code was used to sign in.',
+        severity: 'warning'
+      });
     }
   }
 
