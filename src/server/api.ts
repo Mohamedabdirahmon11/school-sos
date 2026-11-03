@@ -2526,12 +2526,26 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
-  const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
-  if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
+  const existingStaffId = await db.queryPage('users', { staff_id: staffId }, 1, 1, undefined, 'id');
+  if (existingStaffId.total) { res.status(409).json({ error: 'That Teacher ID is already in use. Choose another ID.' }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  const rawClasses = req.body?.assignedClasses ?? [];
+  const rawSubjects = req.body?.assignedSubjects ?? [];
+  if (!Array.isArray(rawClasses) || !Array.isArray(rawSubjects) || rawClasses.length > 100 || rawSubjects.length > 100 || [...rawClasses, ...rawSubjects].some(id => typeof id !== 'string' || !id.trim())) {
+    res.status(400).json({ error: 'Teacher assignments must be valid lists of school class and subject IDs.' }); return;
+  }
+  const assignedClasses = [...new Set(rawClasses as string[])];
+  const assignedSubjects = [...new Set(rawSubjects as string[])];
+  const [classRows, subjectRows] = await Promise.all([
+    assignedClasses.length ? db.queryPage('classes', { school_id: school.id, id: assignedClasses }, 1, 100, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0 }),
+    assignedSubjects.length ? db.queryPage('subjects', { school_id: school.id, id: assignedSubjects }, 1, 100, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0 })
+  ]);
+  if (classRows.total !== assignedClasses.length || subjectRows.total !== assignedSubjects.length) {
+    res.status(400).json({ error: 'Every assigned class and subject must belong to this school.' }); return;
+  }
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
-  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: schoolLocalDate(school.timezone), monthlySalary: Number(req.body.monthlySalary) || 0 });
+  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects });
+  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses, assignedSubjects, status: 'active', joinedDate: schoolLocalDate(school.timezone), monthlySalary: Number(req.body.monthlySalary) || 0 });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   res.status(201).json({ ...teacher, initialPin });
 });
