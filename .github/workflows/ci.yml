@@ -37,5 +37,17 @@ jobs:
       - name: Test suite
         run: npm run test:ci
 
+      - name: Security regression tests
+        run: npm run test:security
+
+      - name: Storage regression tests
+        run: npm run test:storage
+
+      - name: Route parity audit
+        run: npm run audit:routes
+
+      - name: RLS source audit
+        run: npm run audit:rls
+
       - name: Production build
         run: npm run build
