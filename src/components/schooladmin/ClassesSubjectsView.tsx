@@ -8,7 +8,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { Layers, BookOpen, Plus, X, CheckCircle2, Upload, Search, Archive, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
-import { BulkImportWizard } from './BulkImportWizard.tsx';
+import { ClassBulkImportWizard } from './ClassBulkImportWizard.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
@@ -375,7 +375,7 @@ export const ClassesSubjectsView: React.FC = () => {
           </div>
         </div>
       )}
-      <BulkImportWizard open={showBulkImport} onClose={() => setShowBulkImport(false)} onComplete={() => { void fetchData(); }} />
+      <ClassBulkImportWizard open={showBulkImport} onClose={() => setShowBulkImport(false)} onComplete={() => { void fetchData(); }} />
     </div>
   );
 };
