@@ -80,7 +80,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const loadStudentDetails = async (student: any) => {
     setSelectedStudent(student);
     try {
-      const details = await ApiClient.getStudentDetails(student.id, school?.id);
+      const details = await ApiClient.getStudentDetails(student.id, school?.id, true);
       setStudentDetails(details);
     } catch (err: any) {
       alert(err.message);
