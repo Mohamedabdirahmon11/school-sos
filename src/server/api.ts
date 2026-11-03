@@ -3834,9 +3834,9 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
   res.status(201).json(book);
 });
 
-apiRouter.get('/school/transport', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(db.getTransportRoutes(school.id));
+  res.json(await db.getTransportRoutes(school.id));
 });
 
 apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
@@ -3875,7 +3875,36 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
 
 apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
   const school = (req as any).school;
-  const route = db.addTransportRoute({ ...req.body, schoolId: school.id });
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid transport route details.' });
+    return;
+  }
+  const name = typeof payload.name === 'string' ? payload.name.trim() : typeof payload.routeName === 'string' ? payload.routeName.trim() : '';
+  const routeNumber = payload.routeNumber ?? '';
+  const vehicleNumber = payload.vehicleNumber ?? '';
+  const driverName = payload.driverName ?? '';
+  const driverPhone = payload.driverPhone ?? '';
+  const stops = payload.stops ?? [];
+  const feeAmount = payload.feeAmount ?? payload.monthlyFee ?? 0;
+  const active = payload.active === undefined ? true : payload.active;
+  if (!name || name.length > 150 ||
+      typeof routeNumber !== 'string' || routeNumber.trim().length > 50 ||
+      typeof vehicleNumber !== 'string' || vehicleNumber.trim().length > 80 ||
+      typeof driverName !== 'string' || driverName.trim().length > 150 ||
+      typeof driverPhone !== 'string' || driverPhone.trim().length > 50 ||
+      !Array.isArray(stops) || stops.length > 100 ||
+      stops.some((stop: unknown) => typeof stop !== 'string' || !stop.trim() || stop.trim().length > 150) ||
+      typeof feeAmount !== 'number' || !Number.isFinite(feeAmount) || feeAmount < 0 || feeAmount > 1000000 ||
+      typeof active !== 'boolean') {
+    res.status(400).json({ error: 'Transport route fields are invalid. Check the route name, contact details, stops, fee and active status.' });
+    return;
+  }
+  const route = db.addTransportRoute({
+    name, routeNumber: routeNumber.trim(), vehicleNumber: vehicleNumber.trim(),
+    driverName: driverName.trim(), driverPhone: driverPhone.trim(), stops,
+    feeAmount, active, schoolId: school.id
+  });
   res.status(201).json(route);
 });
 
