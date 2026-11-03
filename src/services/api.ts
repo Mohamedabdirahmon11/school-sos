@@ -525,6 +525,18 @@ export class ApiClient {
     return this.request<Student[]>(`/students?${params.toString()}`);
   }
 
+  public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100): Promise<Student[]> {
+    const firstPage = await this.getStudents(classId, branchId, 1, pageSize);
+    const pagination = (firstPage as any).pagination;
+    const totalPages = Math.max(1, Number(pagination?.totalPages) || 1);
+    const allStudents = [...firstPage];
+    for (let page = 2; page <= totalPages; page += 1) {
+      const nextPage = await this.getStudents(classId, branchId, page, pageSize);
+      allStudents.push(...nextPage);
+    }
+    return allStudents;
+  }
+
   public static async createStudent(studentData: Partial<Student>, schoolId?: string) {
     return this.request<Student>('/students', {
       method: 'POST',
@@ -777,6 +789,17 @@ export class ApiClient {
   public static async getPayrollRecords(month: string, page = 1, pageSize = 20) {
     const query = new URLSearchParams({ month, page: String(page), pageSize: String(pageSize) });
     return this.request<StaffPayrollRecord[]>(`/payroll?${query.toString()}`);
+  }
+
+  public static async getAllPayrollRecords(month: string, pageSize = 100): Promise<StaffPayrollRecord[]> {
+    const firstPage = await this.getPayrollRecords(month, 1, pageSize);
+    const pagination = (firstPage as any).pagination;
+    const totalPages = Math.max(1, Number(pagination?.totalPages) || 1);
+    const records = [...firstPage];
+    for (let page = 2; page <= totalPages; page += 1) {
+      records.push(...await this.getPayrollRecords(month, page, pageSize));
+    }
+    return records;
   }
 
   public static async createPayrollDraft(month: string, staff: Array<{ staffId: string; allowances: Array<{ label: string; amount: number }>; deductions: Array<{ label: string; amount: number }> }>) {
