@@ -634,6 +634,7 @@ async function refreshSessionCookie(res: Response, user: User, previous: ReturnT
 
 apiRouter.post('/auth/login', async (req, res) => {
   const { email, phone, schoolCode, pin, password } = req.body;
+  const studentId = typeof req.body?.studentId === 'string' ? req.body.studentId.trim() : '';
   const requestedRole = normalizeRole(req.body?.role);
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
   const settings = db.getSettings();
@@ -648,9 +649,13 @@ apiRouter.post('/auth/login', async (req, res) => {
       res.status(400).json({ error: 'School code, phone number, and PIN are required.' });
       return;
     }
+    if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
+      res.status(400).json({ error: 'PIN must contain exactly four digits.' });
+      return;
+    }
 
     // Rate Limiting & Lockout for Student/Parent
-    const lockKey = `sp:${schoolCode}:${phone.trim()}`;
+    const lockKey = `sp:${schoolCode}:${phone.trim()}:${role === 'student' ? studentId : ''}`;
     const ipKey = `ip:${clientIp}`;
     const lockCheck = db.checkLoginLockout(lockKey, threshold, durationMins);
     const ipCheck = db.checkLoginLockout(ipKey, ipThreshold, durationMins);
@@ -682,13 +687,13 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     const matchingUsers = await db.findUsersByPhoneInSchool(phone, school.id);
-    const candidateUsers = matchingUsers.filter(u => normalizeRole(u.role) === role).map(u => ({ ...u, role }));
+    const candidateUsers = matchingUsers.filter(u => normalizeRole(u.role) === role && (role !== 'student' || !studentId || u.studentId === studentId)).map(u => ({ ...u, role }));
 
     if (candidateUsers.length === 0) {
       // Check if student or parent exists in student records
       const students = await db.getStudents(school.id);
-      const matchStd = students.find(s => 
-        (role === 'student' && (s.studentPhone === phone || s.fatherPhone === phone)) ||
+      const matchStd = students.find(s =>
+        (role === 'student' && (!studentId || s.studentId === studentId) && (s.studentPhone === phone || s.fatherPhone === phone)) ||
         (role === 'parent' && (s.fatherPhone === phone || s.motherPhone === phone))
       );
 
@@ -782,7 +787,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     if (candidateUsers.length > 1) {
-      res.status(400).json({ error: 'Multiple accounts linked to this phone. Please contact your school administrator.' });
+      res.status(400).json({ error: role === 'student' ? 'This phone is shared by multiple students. Enter the Student ID shown on the student ID card.' : 'Multiple parent accounts are linked to this phone. Contact your school administrator.' });
       return;
     }
 
