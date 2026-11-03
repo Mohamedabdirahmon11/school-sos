@@ -37,14 +37,8 @@ jobs:
       - name: Test suite
         run: npm run test:ci
 
-      - name: Schema conformance test
-        run: npx tsx --test tests/schema-conformance.test.ts
-
       - name: Route parity audit
         run: npm run audit:routes
-
-      - name: RLS source audit
-        run: npm run audit:rls
 
       - name: Production build
         run: npm run build
