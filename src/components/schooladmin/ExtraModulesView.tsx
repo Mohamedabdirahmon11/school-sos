@@ -83,9 +83,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         title: bookTitle,
         author: bookAuthor,
         isbn: bookIsbn.trim(),
-        totalCopies: bookCopies,
-        availableCopies: bookCopies,
-        shelfLocation: 'Section B'
+        quantity: bookCopies
       }, school?.id);
       setBooks(prev => [...prev, b]);
       setShowAddBookModal(false);
@@ -218,8 +216,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{b.title}</td>
                       <td className="px-4 py-2.5 text-[#475569]">{b.author}</td>
                       <td className="px-4 py-2.5 font-mono text-[#64748B]">{b.isbn}</td>
-                      <td className="px-4 py-2.5 font-mono">{b.availableCopies} / {b.totalCopies}</td>
-                      <td className="px-4 py-2.5 text-[#64748B]">{b.shelfLocation}</td>
+                      <td className="px-4 py-2.5 font-mono">{b.quantity}</td>
                     </tr>
                   ))
                 )}
