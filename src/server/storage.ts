@@ -1402,28 +1402,29 @@ class StorageEngine {
     };
     this.data.users.push(studentUser);
 
-    // If father or mother phone provided, check or create parent user linked to student
-    if (student.fatherPhone) {
-      const existingParent = this.data.users.find(u => 
-        u.schoolId === student.schoolId && 
-        u.role === 'parent' && 
-        u.phone === student.fatherPhone
+    // Create or link a parent account for each distinct parent phone number.
+    const parentPhones = [...new Set([student.fatherPhone, student.motherPhone]
+      .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
+      .map(phone => phone.trim()))];
+    for (const parentPhone of parentPhones) {
+      const existingParent = this.data.users.find(user =>
+        user.schoolId === student.schoolId &&
+        user.role === 'parent' &&
+        user.phone === parentPhone
       );
       if (existingParent) {
         existingParent.linkedStudentIds = existingParent.linkedStudentIds || [];
-        if (!existingParent.linkedStudentIds.includes(id)) {
-          existingParent.linkedStudentIds.push(id);
-        }
+        if (!existingParent.linkedStudentIds.includes(id)) existingParent.linkedStudentIds.push(id);
       } else {
         const parentUser: User = {
           id: `usr-parent-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
           schoolId: student.schoolId,
           role: 'parent',
           fullName: `Parent of ${student.firstName}`,
-          phone: student.fatherPhone,
-          parentPhone: student.fatherPhone,
+          phone: parentPhone,
+          parentPhone,
           passwordHash: '',
-          pin: pinHash, // Parent gets student's initial PIN
+          pin: pinHash,
           linkedStudentIds: [id],
           isBlocked: false,
           failedLoginAttempts: 0,
@@ -1457,7 +1458,10 @@ class StorageEngine {
       user.schoolId === student.schoolId &&
       (
         (user.role === 'student' && (user.studentId === student.studentId || user.id === `usr-student-${student.id}`)) ||
-        (user.role === 'parent' && user.linkedStudentIds?.includes(student.id))
+        (user.role === 'parent' && (
+          user.linkedStudentIds?.includes(student.id) ||
+          (!user.linkedStudentIds?.length && [student.fatherPhone, student.motherPhone].includes(user.phone || ''))
+        ))
       )
     );
     for (const linkedUser of linkedUsers) {
