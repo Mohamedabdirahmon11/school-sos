@@ -2502,9 +2502,17 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
-apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/teachers', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  void sendDatabasePage(req, res, 'teachers', { school_id: school.id });
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.normalize('NFKC').trim().replace(/[^\p{L}\p{N}\s@._+-]/gu, '').replace(/\s+/g, ' ').slice(0, 80)
+    : '';
+  const orFilter = search
+    ? ['full_name', 'staff_id', 'phone', 'department', 'qualification'].map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  const result = await db.queryPage('teachers', { school_id: school.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.teachers);
+  res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
+  res.json(result.items);
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
