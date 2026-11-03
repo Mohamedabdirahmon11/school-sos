@@ -2622,6 +2622,9 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const { fullName, phone, gender } = req.body || {};
   if (typeof fullName !== 'string' || !fullName.trim()) { res.status(400).json({ error: 'Teacher full name is required.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+  if (phone !== undefined && typeof phone !== 'string') { res.status(400).json({ error: 'Teacher phone must be text.' }); return; }
+  const monthlySalary = req.body?.monthlySalary === undefined || req.body?.monthlySalary === '' ? 0 : Number(req.body.monthlySalary);
+  if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
@@ -2643,7 +2646,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
   const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses, assignedSubjects, status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
+  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses, assignedSubjects, status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   res.status(201).json({ ...teacher, initialPin });
 });
