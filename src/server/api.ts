@@ -3133,13 +3133,17 @@ apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWr
 
 apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
   const user = (req as any).user as User;
-  const { content } = req.body;
+  const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+  if (!content || content.length > 5000) {
+    res.status(400).json({ error: 'A support reply of 1–5000 characters is required.' });
+    return;
+  }
   const ticket = await db.replyTicket(req.params.id, {
     senderId: user.id,
     senderName: user.fullName,
     senderRole: user.role,
     content
-  }, user.role === 'super_admin' ? undefined : user.schoolId);
+  }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
   if (!ticket) {
     res.status(404).json({ error: 'Ticket not found' });
     return;
