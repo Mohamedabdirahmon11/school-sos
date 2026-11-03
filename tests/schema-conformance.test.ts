@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
-const sql = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
@@ -45,6 +45,7 @@ test('domain write payloads map to real schema columns and satisfy required colu
 
 test('schema checks exercised by student, teacher, fee and messaging writes are represented', () => {
   assert.match(sql, /gender\s+VARCHAR\(10\)\s+NOT NULL\s+CHECK\s*\(gender IN \('male', 'female'\)\)/i);
+  assert.match(sql, /grade_level\s+INTEGER\s+NOT NULL\s+CHECK\s*\(grade_level BETWEEN 0 AND 12\)/i);
   assert.match(sql, /payment_method\s+VARCHAR\(20\)\s+NOT NULL DEFAULT 'Cash' CHECK\s*\(payment_method = 'Cash'\)/i);
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
   assert.ok(definitions.has('payroll_records'), 'payroll persistence is represented in the schema');
