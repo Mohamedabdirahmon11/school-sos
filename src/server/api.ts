@@ -1802,6 +1802,34 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   }
 });
 
+apiRouter.get('/school/reports/finance.csv', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  try {
+    const payments = (await db.getFeePayments(school.id))
+      .filter(payment => !payment.voidedAt)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const cell = (value: unknown) => {
+      const raw = String(value ?? '');
+      const safe = /^[\t\r ]*[=+@-]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    const rows = [
+      ['Receipt Number', 'Month', 'Amount Due', 'Amount Paid', 'Remaining Arrears', 'Method', 'Status', 'Date'],
+      ...payments.map(payment => [
+        payment.receiptNumber, payment.month, payment.amountDue, payment.amountPaid,
+        payment.remainingAmount, payment.paymentMethod, payment.status, payment.date
+      ])
+    ];
+    const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-finance-${new Date().toISOString().slice(0, 10)}.csv"`
+    }).send('\uFEFF' + csv);
+  } catch {
+    res.status(503).json({ error: 'Unable to export the complete finance report.' });
+  }
+});
+
 apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
