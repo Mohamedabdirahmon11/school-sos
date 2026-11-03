@@ -3011,24 +3011,56 @@ class StorageEngine {
   }
 
   public async setBusAssignment(schoolId: string, studentId: string, routeId: string): Promise<any> {
-    const student = await this.getStudentById(studentId, schoolId);
-    const route = (await this.getTransportRoutes(schoolId)).find(item => item.id === routeId && item.active !== false);
-    await this.getBusAssignments(schoolId);
-    if (!student || student.schoolId !== schoolId || !route) throw new Error('Choose a student and active route from this school.');
-    const existing = this.data.busAssignments.find(item => item.schoolId === schoolId && item.studentId === studentId);
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof studentId !== 'string' || !studentId.trim() || studentId.length > 64 ||
+        typeof routeId !== 'string' || !routeId.trim() || routeId.length > 64) {
+      throw new Error('A valid school, student and route are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    const scopedStudentId = studentId.trim();
+    const scopedRouteId = routeId.trim();
+    const student = await this.getStudentById(scopedStudentId, scopedSchoolId);
+    const route = (await this.getTransportRoutes(scopedSchoolId)).find(item =>
+      item.id === scopedRouteId && item.schoolId === scopedSchoolId && item.active === true
+    );
+    await this.getBusAssignments(scopedSchoolId);
+    if (!student || student.schoolId !== scopedSchoolId || !route) {
+      throw new Error('Choose a student and active route from this school.');
+    }
+    const feeAmount = Number(route.feeAmount ?? 0);
+    if (!Number.isFinite(feeAmount) || feeAmount < 0 || feeAmount > 1000000) {
+      throw new Error('The selected route has an invalid transport fee.');
+    }
+    const existing = this.data.busAssignments.find(item =>
+      item.schoolId === scopedSchoolId && item.studentId === scopedStudentId
+    );
     const assignment = {
-      ...(existing || {}), id: existing?.id || `bus-${studentId}`, schoolId, studentId, routeId,
-      feeAmount: Number(route.feeAmount || 0), active: true
+      ...(existing || {}),
+      id: existing?.id || `bus-${randomUUID()}`,
+      schoolId: scopedSchoolId,
+      studentId: scopedStudentId,
+      routeId: scopedRouteId,
+      feeAmount,
+      active: true
     };
-    if (existing) Object.assign(existing, assignment); else this.data.busAssignments.push(assignment);
+    if (existing) Object.assign(existing, assignment);
+    else this.data.busAssignments.push(assignment);
     this.save();
     return assignment;
   }
 
   public async removeBusAssignment(schoolId: string, studentId: string): Promise<boolean> {
-    await this.getBusAssignments(schoolId);
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof studentId !== 'string' || !studentId.trim() || studentId.length > 64) {
+      throw new Error('A valid school and student are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    const scopedStudentId = studentId.trim();
+    await this.getBusAssignments(scopedSchoolId);
     const previous = this.data.busAssignments.length;
-    this.data.busAssignments = this.data.busAssignments.filter(item => !(item.schoolId === schoolId && item.studentId === studentId));
+    this.data.busAssignments = this.data.busAssignments.filter(item =>
+      !(item.schoolId === scopedSchoolId && item.studentId === scopedStudentId)
+    );
     if (previous !== this.data.busAssignments.length) this.save();
     return previous !== this.data.busAssignments.length;
   }
