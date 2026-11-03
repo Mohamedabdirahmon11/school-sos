@@ -157,7 +157,46 @@ export class InMemorySupabase {
 
   replaceRows(table: string, rows: any[]) { this.tables.set(table, rows); }
   from(table: string) { return new MemoryQuery(this, table); }
-  async rpc(_name: string, _args?: any) { return { data: null, error: null }; }
+  private failBulkImport = false;
+
+  failNextBulkImport() { this.failBulkImport = true; }
+
+  async rpc(name: string, args?: any) {
+    if (name !== 'schoolos_bulk_import') return { data: null, error: null };
+    if (this.failBulkImport) {
+      this.failBulkImport = false;
+      return { data: null, error: { message: 'Simulated atomic bulk import failure.' } };
+    }
+
+    const payload = args?.p_payload || {};
+    const toCamel = (row: Record<string, any>) => Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase()), value])
+    );
+    const snapshots = new Map(['classes', 'students', 'users', 'audit_logs'].map(table => [table, structuredClone(this.rows(table))]));
+    try {
+      this.rows('classes').push(...(payload.classes || []).map(toCamel));
+      this.rows('students').push(...(payload.students || []).map((row: Record<string, any>) => ({
+        ...toCamel(row), admissionDate: new Date().toISOString().slice(0, 10), motherPhone: null, status: 'active'
+      })));
+      for (const incoming of (payload.users || []).map(toCamel)) {
+        const existing = this.rows('users').find(row => row.id === incoming.id);
+        if (existing) {
+          existing.linkedStudentIds = incoming.linkedStudentIds;
+          existing.pinHash = incoming.pinHash;
+          if (existing.role === 'parent' && existing.fullName === '') existing.fullName = incoming.fullName;
+        } else {
+          this.rows('users').push({ ...incoming, passwordHash: '', isBlocked: false, failedLoginAttempts: 0 });
+        }
+      }
+      this.rows('audit_logs').push(...(payload.audit_logs || []).map((row: Record<string, any>) => ({
+        ...toCamel(row), severity: 'info'
+      })));
+      return { data: null, error: null };
+    } catch (error) {
+      for (const [table, rows] of snapshots) this.replaceRows(table, rows);
+      return { data: null, error: { message: error instanceof Error ? error.message : 'Atomic import failed.' } };
+    }
+  }
 }
 
 export function createHttpTestStorage(memory: InMemorySupabase) {
