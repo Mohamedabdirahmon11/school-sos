@@ -27,7 +27,7 @@ export const AnalyticsView: React.FC = () => {
   // Export Analytics CSV
   const handleExportCSV = () => {
     let csv = 'School Name,School Code,Plan,Status,Students,Teachers,Valid Until\n';
-    for (const s of schools) {
+    for (const s of schools as any[]) {
       csv += `"${s.name}","${s.code}","${s.subscription.plan}","${s.subscription.status}",${s.studentCount || 0},${s.teacherCount || 0},"${s.subscription.validUntil.split('T')[0]}"\n`;
     }
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -116,7 +116,7 @@ export const AnalyticsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
-              {schools.map(s => (
+              {(schools as any[]).map((s: any) => (
                 <tr key={s.id} className="hover:bg-[#F8FAFC]">
                   <td className="px-4 py-3 font-semibold text-[#132A29]">{s.name}</td>
                   <td className="px-4 py-3 font-mono text-[#64748B]">{s.code}</td>
