@@ -2423,6 +2423,33 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
   res.json({ success: true });
 });
 
+apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const teachers = await queryAllRows('teachers', { school_id: school.id }, '*');
+  const filtered = teachers.filter((teacher: any) =>
+    !search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
+      .some(value => String(value || '').toLowerCase().includes(search))
+  );
+  const cell = (value: unknown) => {
+    const raw = String(value ?? '');
+    const safe = /^\\s*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const rows = [
+    ['Teacher ID', 'Full Name', 'Gender', 'Department', 'Qualification', 'Phone', 'Monthly Salary', 'Status', 'Joined Date'],
+    ...filtered.map((teacher: any) => [
+      teacher.staffId, teacher.fullName, teacher.gender, teacher.department, teacher.qualification,
+      teacher.phone, teacher.monthlySalary, teacher.status, teacher.joinedDate
+    ])
+  ];
+  const csv = rows.map(row => row.map(cell).join(',')).join('\\r\\n');
+  res.set({
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-teachers-${new Date().toISOString().slice(0, 10)}.csv"`
+  }).send('\\uFEFF' + csv);
+});
+
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
   void sendDatabasePage(req, res, 'teachers', { school_id: school.id });
