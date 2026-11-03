@@ -30,21 +30,9 @@ export const ReportsView: React.FC = () => {
     return `"${clean.replace(/"/g, '""')}"`;
   };
 
-  const downloadCSV = (type: string) => {
+  const downloadCSV = async (type: string) => {
     if (!summary) return;
-    let csvContent = '';
-    let filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
-
-    if (type === 'finance') {
-      csvContent = 'Receipt Number,Month,Amount Due,Amount Paid,Remaining Arrears,Method,Status,Date\n';
-      if (summary.recentPayments && summary.recentPayments.length > 0) {
-        summary.recentPayments.forEach((p: any) => {
-          csvContent += [p.receiptNumber, p.month, p.amountDue, p.amountPaid, p.remainingAmount, p.paymentMethod, p.status, p.date].map(csvCell).join(',') + '\n';
-        });
-      } else {
-        csvContent += `Summary Total,${school?.academicYear},${summary.totalDue},${summary.totalCollected},${summary.totalArrears},"Aggregate","Computed","${new Date().toISOString()}"\n`;
-      }
-    } else if (type === 'census') {
+lse if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
       csvContent += `Enrolled Students,${summary.studentCount},"${school?.name}","${school?.academicYear}"\n`;
       csvContent += `Today's Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
