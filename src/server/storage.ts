@@ -2191,7 +2191,10 @@ class StorageEngine {
       if (!rank || promotion.classFromId !== classId) throw new Error('Promotion includes a student outside the selected class.');
       const eligible = rank.isPass && rank.rank <= topN;
       const isDefaultDecision = (eligible && promotion.decision === 'promoted') || (!eligible && promotion.decision === 'repeated');
-      if (!isDefaultDecision && (!promotion.adminOverride || !promotion.notes?.trim())) {
+      if (promotion.adminOverride && !promotion.notes?.trim()) {
+        throw new Error('A reason is required for an administrator promotion override.');
+      }
+      if (!isDefaultDecision && !promotion.adminOverride) {
         throw new Error('A reason is required for an administrator promotion override.');
       }
       if (promotion.decision === 'promoted') {
