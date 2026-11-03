@@ -158,17 +158,30 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
-  const handleExportCSV = () => {
-    let csv = 'Student ID,First Name,Father Name,Grandfather Name,Gender,Class,Admission Date,Father Phone,Mother Phone,Fee Status\n';
-    for (const s of students) {
-      csv += `"${s.studentId}","${s.firstName}","${s.middleName}","${s.lastName}","${s.gender}","${s.className}","${s.admissionDate}","${s.fatherPhone}","${s.motherPhone}","${s.feeStatus}"\n`;
+  const handleExportCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (classFilter) params.set('classId', classFilter);
+      if (branchFilter) params.set('branchId', branchFilter);
+      if (search.trim()) params.set('search', search.trim());
+      if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+      const response = await fetch('/api/students/export?' + params.toString(), { credentials: 'include' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Student export failed.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = (school?.code || 'school') + '_students_' + new Date().toISOString().split('T')[0] + '.csv';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Student CSV exported with all matching records.');
+      window.setTimeout(() => setNotice(null), 4000);
+    } catch (error: any) {
+      setNotice(error.message || 'Student export failed.');
     }
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${school?.code || 'school'}_students_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
   };
 
   if (isLoading) return <div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>;
