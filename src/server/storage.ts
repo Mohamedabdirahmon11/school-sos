@@ -28,6 +28,7 @@ import {
   StaffPayrollRecord,
   AdmissionApplication,
   DisciplineRecord,
+  HealthRecord,
   AuditLog,
   SuperAdminSettings,
   SubscriptionInvoice,
@@ -83,6 +84,7 @@ interface DatabaseSchema {
   payrollRecords: StaffPayrollRecord[];
   admissionApplications: AdmissionApplication[];
   disciplineRecords: DisciplineRecord[];
+  healthRecords: HealthRecord[];
   feeRanges: any[];
   busAssignments: any[];
   notificationTemplates: any[];
@@ -231,7 +233,7 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
   assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
-  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', discipline_records: 'disciplineRecords', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
+  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', discipline_records: 'disciplineRecords', health_records: 'healthRecords', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
@@ -318,6 +320,7 @@ class StorageEngine {
       payrollRecords: [],
       admissionApplications: [],
       disciplineRecords: [],
+      healthRecords: [],
       feeRanges: [],
       busAssignments: [],
       notificationTemplates: [],
@@ -421,7 +424,7 @@ class StorageEngine {
       ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
-      ['admissionApplications', 'admission_applications'], ['inventoryItems', 'inventory_items'], ['disciplineRecords', 'discipline_records'],
+      ['admissionApplications', 'admission_applications'], ['inventoryItems', 'inventory_items'], ['disciplineRecords', 'discipline_records'], ['healthRecords', 'health_records'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['notificationTemplates', 'notification_templates'],
       ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
     ];
@@ -3066,6 +3069,59 @@ class StorageEngine {
     );
     if (this.data.disciplineRecords.length !== before) this.save();
     return this.data.disciplineRecords.length !== before;
+  }
+
+  public async getHealthRecords(schoolId: string): Promise<HealthRecord[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load health records.');
+    }
+    const records = await this.queryRows<HealthRecord>('health_records', { school_id: schoolId.trim() });
+    return records.sort((a, b) => b.visitDate.localeCompare(a.visitDate) || b.createdAt.localeCompare(a.createdAt)).slice(0, 200);
+  }
+
+  public async createHealthRecord(record: Omit<HealthRecord, 'id' | 'createdAt'>): Promise<HealthRecord> {
+    const visitDate = typeof record?.visitDate === 'string' ? record.visitDate : '';
+    const parsedDate = new Date(`${visitDate}T00:00:00.000Z`);
+    if (!record || typeof record !== 'object' ||
+        typeof record.schoolId !== 'string' || !record.schoolId.trim() || record.schoolId.length > 64 ||
+        typeof record.studentId !== 'string' || !record.studentId.trim() || record.studentId.length > 64 ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
+        typeof record.symptoms !== 'string' || !record.symptoms.trim() || record.symptoms.trim().length > 2000 ||
+        typeof record.treatment !== 'string' || record.treatment.length > 2000 ||
+        typeof record.allergies !== 'string' || record.allergies.length > 1000 ||
+        typeof record.privateNotes !== 'string' || record.privateNotes.length > 3000 ||
+        typeof record.nurseName !== 'string' || !record.nurseName.trim() || record.nurseName.trim().length > 150 ||
+        typeof record.recordedBy !== 'string' || !record.recordedBy.trim() || record.recordedBy.length > 64) {
+      throw new Error('Health visit details are invalid.');
+    }
+    const schoolId = record.schoolId.trim();
+    const student = await this.getStudentById(record.studentId.trim(), schoolId);
+    if (!student || student.schoolId !== schoolId) throw new Error('Choose a student from this school.');
+    const created: HealthRecord = {
+      id: `health-${randomUUID()}`, schoolId, studentId: record.studentId.trim(), visitDate,
+      symptoms: record.symptoms.trim(), treatment: record.treatment.trim(),
+      allergies: record.allergies.trim(), privateNotes: record.privateNotes.trim(),
+      nurseName: record.nurseName.trim(), recordedBy: record.recordedBy.trim(),
+      createdAt: new Date().toISOString()
+    };
+    this.data.healthRecords.push(created);
+    this.save();
+    return created;
+  }
+
+  public async deleteHealthRecord(schoolId: string, recordId: string): Promise<boolean> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof recordId !== 'string' || !recordId.trim() || recordId.length > 80) {
+      throw new Error('A valid school and health record are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    await this.getHealthRecords(scopedSchoolId);
+    const before = this.data.healthRecords.length;
+    this.data.healthRecords = this.data.healthRecords.filter(record =>
+      !(record.schoolId === scopedSchoolId && record.id === recordId.trim())
+    );
+    if (this.data.healthRecords.length !== before) this.save();
+    return this.data.healthRecords.length !== before;
   }
 
   public async getInventoryItems(schoolId: string): Promise<any[]> {
