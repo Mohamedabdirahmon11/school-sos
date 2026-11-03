@@ -3594,6 +3594,7 @@ apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) =
     schoolId: school.id, title, content, audience, classId: audience === 'class' ? classId : null,
     isPinned, publishDate, authorName: user.fullName, authorRole: user.role, isActive: true
   });
+  await db.flush();
   res.status(201).json(notice);
 });
 
@@ -3628,6 +3629,7 @@ apiRouter.put('/notices/:id', requireAuth, requireSchoolContext, async (req, res
   }
   const updated = await db.updateNotice(req.params.id.trim(), school.id, updates);
   if (!updated) return res.status(404).json({ error: 'Notice not found.' });
+  await db.flush();
   res.json(updated);
 });
 
@@ -3636,6 +3638,7 @@ apiRouter.delete('/notices/:id', requireAuth, requireSchoolContext, async (req, 
   if (!['school_admin', 'super_admin'].includes(user.role)) return res.status(403).json({ error: 'Only a School Admin can manage notices.' });
   const archived = await db.archiveNotice(req.params.id, (req as any).school.id);
   if (!archived) return res.status(404).json({ error: 'Notice not found.' });
+  await db.flush();
   res.json({ success: true });
 });
 
@@ -3754,6 +3757,7 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
     senderName: user.fullName,
     senderRole: user.role
   });
+  await db.flush();
   res.status(201).json(msg);
 });
 
@@ -3764,6 +3768,7 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, 
   const contact = await db.getUserById(contactId, (req as any).school.id);
   if (!contact) return res.status(404).json({ error: 'Message contact was not found in this school.' });
   await db.markMessagesRead((req as any).school.id, user.id, contactId);
+  await db.flush();
   res.json({ success: true });
 });
 
