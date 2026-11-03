@@ -18,6 +18,10 @@ await memory.from('schools').insert([
   { id: 'import-readonly', code: 'IMR', name: 'Import Read Only', subscription: { status: 'read_only' } },
   { id: 'import-other', code: 'IMO', name: 'Other School', subscription: { status: 'active' } }
 ]);
+await memory.from('school_subscriptions').insert([
+  { id: 'import-school', schoolId: 'import-school', plan: 'basic', cadence: 'yearly', status: 'active', startDate: new Date().toISOString(), validUntil: '2099-12-31', graceDays: 7, pricePaid: 0, autoRenew: false },
+  { id: 'import-readonly', schoolId: 'import-readonly', plan: 'basic', cadence: 'yearly', status: 'read_only', startDate: new Date().toISOString(), validUntil: '2020-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+]);
 const storage = await import('../src/server/storage.ts');
 const adapter = createHttpTestStorage(memory);
 storage.installTestStorageAdapter(adapter as any);
