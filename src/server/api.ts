@@ -2447,7 +2447,7 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-teachers-${new Date().toISOString().slice(0, 10)}.csv"`
-  }).send('\\uFEFF' + csv);
+  }).send('\uFEFF' + csv);
 });
 
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
