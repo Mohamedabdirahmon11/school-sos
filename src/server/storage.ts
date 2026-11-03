@@ -2028,7 +2028,7 @@ class StorageEngine {
 
     for (const id of markIds) {
       const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId);
-      if (idx >= 0) {
+      if (idx >= 0 && this.data.marks[idx].status === 'submitted') {
         this.data.marks[idx].status = 'approved';
         this.data.marks[idx].approvedBy = approvedBy;
         this.data.marks[idx].approvedAt = now;
