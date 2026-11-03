@@ -33,7 +33,7 @@ export const ReportsView: React.FC = () => {
   const downloadCSV = async (type: string) => {
     if (!summary) return;
     let csvContent = '';
-    const filename = \`schoolos_\${type}_\${new Date().toISOString().split('T')[0]}.csv\`;
+    const filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
 
     if (type === 'finance') {
       csvContent = 'Receipt Number,Month,Amount Due,Amount Paid,Remaining Arrears,Method,Status,Date\n';
@@ -49,7 +49,7 @@ export const ReportsView: React.FC = () => {
             csvContent += [p.receiptNumber, p.month, p.amountDue, p.amountPaid, p.remainingAmount, p.paymentMethod, p.status, p.date].map(csvCell).join(',') + '\n';
           });
         } else {
-          csvContent += \`Summary Total,\${school?.academicYear},\${summary.totalDue},\${summary.totalCollected},\${summary.totalArrears},"Aggregate","Computed","\${new Date().toISOString()}"\n\`;
+          csvContent += `Summary Total,${school?.academicYear},${summary.totalDue},${summary.totalCollected},${summary.totalArrears},"Aggregate","Computed","${new Date().toISOString()}"\n`;
         }
       } catch (error: any) {
         alert(error?.message || 'Unable to export all fee payments.');
@@ -57,9 +57,9 @@ export const ReportsView: React.FC = () => {
       }
     } else if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += \`Enrolled Students,\${summary.studentCount}," \${school?.name}","\${school?.academicYear}"\n\`;
-      csvContent += \`Average Attendance Rate,\${summary.attendanceRate}%,"\${school?.name}","\${school?.academicYear}"\n\`;
-      csvContent += \`Academic Pass Rate,\${summary.passRate == null ? 'Not available' : \`\${Number(summary.passRate).toFixed(1)}%\` },"\${school?.name}","\${school?.academicYear}"\n\`;
+      csvContent += `Enrolled Students,${summary.studentCount}, "${school?.name}","${school?.academicYear}"\n`;
+      csvContent += `Average Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
+      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${Number(summary.passRate).toFixed(1)}%` },"${school?.name}","${school?.academicYear}"\n`;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
