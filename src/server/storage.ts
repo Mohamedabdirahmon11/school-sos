@@ -2240,6 +2240,12 @@ class StorageEngine {
     return this.queryRows<FeePayment>('fee_payments', { school_id: schoolId, student_id: studentId });
   }
 
+  public async getFeePaymentsForStudents(schoolId: string, studentIds: string[]): Promise<FeePayment[]> {
+    const ids = [...new Set(studentIds.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!ids.length) return [];
+    return this.queryRows<FeePayment>('fee_payments', { school_id: schoolId, student_id: ids });
+  }
+
   public async getFeePaymentById(id: string, schoolId: string): Promise<FeePayment | null> {
     const rows = await this.queryRows<FeePayment>('fee_payments', { id, school_id: schoolId });
     return rows[0] || null;
