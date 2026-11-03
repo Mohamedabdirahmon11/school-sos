@@ -3435,7 +3435,8 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
 apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00.000Z`)) || new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) !== date) {
+  const parsedDate = new Date(date + 'T00:00:00.000Z');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Income report date must be a real YYYY-MM-DD date.' }); return;
   }
   res.json(await db.getDailyIncomeReport(school.id, date));
