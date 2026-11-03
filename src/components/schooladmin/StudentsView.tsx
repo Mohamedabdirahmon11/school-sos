@@ -42,7 +42,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
-  const [feeFilter, setFeeFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [pinSlip, setPinSlip] = useState<{ studentName: string; studentId: string; pin: string } | null>(null);
   const [studentDetails, setStudentDetails] = useState<any | null>(null);
@@ -64,9 +63,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 20 }),
+    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, schoolId: school?.id, page, pageSize: 20 }),
     ApiClient.getClasses(), ApiClient.getBranches()
-  ]), [school?.id, search, classFilter, branchFilter, feeFilter, page], Boolean(school));
+  ]), [school?.id, search, classFilter, branchFilter, page], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
@@ -263,17 +262,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             ))}
           </select>
 
-          {/* Fee Payment Status Filter */}
-          <select
-            value={feeFilter}
-            onChange={e => setFeeFilter(e.target.value)}
-            className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
-          >
-            <option value="all">All Fee Statuses</option>
-            <option value="paid">Paid in Full</option>
-            <option value="partial">Partial Payment</option>
-            <option value="unpaid">Unpaid Fees</option>
-          </select>
         </div>
       </div>
 
@@ -291,23 +279,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <th className="px-4 py-3">Class</th>
                   <th className="px-4 py-3">Gender</th>
                   <th className="px-4 py-3">Parent Phone</th>
-                  <th className="px-4 py-3">Fee Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={6} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
                 ) : (
                   students.map(s => {
                     const isSelected = selectedStudent?.id === s.id;
-                    // Older/imported rows may omit this derived field; never let one row crash the screen.
-                    const feeStatus = typeof s.feeStatus === 'string' ? s.feeStatus.trim() : '';
-                    const normalizedFeeStatus = feeStatus.toLowerCase();
                     return (
                       <tr
                         key={s.id}
@@ -323,16 +307,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-4 py-3 text-[#334155]">{s.className}</td>
                         <td className="px-4 py-3 capitalize text-[#64748B]">{s.gender}</td>
                         <td className="px-4 py-3 font-mono text-[#64748B]">{s.fatherPhone}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] font-semibold ${
-                            normalizedFeeStatus === 'paid' ? 'text-emerald-700' :
-                            normalizedFeeStatus === 'partial' ? 'text-amber-700' :
-                            normalizedFeeStatus === 'unpaid' ? 'text-rose-700' :
-                            'text-slate-500'
-                          }`}>
-                            {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
-                          </span>
-                        </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
                             {onPrintIDCard && (
