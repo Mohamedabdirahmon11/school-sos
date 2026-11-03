@@ -1482,7 +1482,9 @@ class StorageEngine {
     await Promise.all([
       this.queryRows<StudentMark>('student_marks', { school_id: student.schoolId, student_id: id }),
       this.queryRows<AttendanceRecord>('attendance_records', { school_id: student.schoolId, student_id: id }),
-      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id })
+      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id }),
+      this.getUsers(student.schoolId, 'student'),
+      this.getUsers(student.schoolId, 'parent')
     ]);
     const len = this.data.students.length;
     this.data.students = this.data.students.filter(s => s.id !== id);
