@@ -1116,7 +1116,7 @@ class StorageEngine {
   public async updateAdmissionApplication(id: string, schoolId: string, status: AdmissionApplication['status'], studentId?: string): Promise<AdmissionApplication | null> {
     await this.queryRows<AdmissionApplication>('admission_applications', { id, school_id: schoolId });
     const index = this.data.admissionApplications.findIndex(row => row.id === id && row.schoolId === schoolId);
-    if (index < 0) return null;
+    if (index < 0 || this.data.admissionApplications[index].status !== 'pending') return null;
     this.data.admissionApplications[index] = { ...this.data.admissionApplications[index], status, studentId: studentId || this.data.admissionApplications[index].studentId };
     this.save();
     return this.data.admissionApplications[index];
