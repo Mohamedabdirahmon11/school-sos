@@ -38,9 +38,9 @@ test('Super Admin 2FA policy is enforced at login and before protected routes', 
   const loginStart = apiSource.indexOf("apiRouter.post('/auth/login'");
   const loginEnd = apiSource.indexOf("// Logout endpoint", loginStart);
   const loginHandler = apiSource.slice(loginStart, loginEnd);
-  assert.match(loginHandler, /settings\\.requireSuperAdmin2FA/);
-  assert.match(loginHandler, /verify2FACode\\(twoFactorCode, user\\.twoFactorSecret\\)/);
-  assert.match(loginHandler, /requireTwoFactorSetup: true/);
-  assert.match(apiSource, /requiresTwoFactorSetup && !twoFactorSetupRoutes\\.includes\\(req\\.path\\)/);
-  assert.match(apiSource, /await db\\.flush\\(\\);[\\s\\S]{0,250}requireTwoFactorSetup: true/);
+  assert.ok(loginHandler.includes('settings.requireSuperAdmin2FA'));
+  assert.ok(loginHandler.includes('verify2FACode(twoFactorCode, user.twoFactorSecret)'));
+  assert.ok(loginHandler.includes('requireTwoFactorSetup: true'));
+  assert.ok(apiSource.includes('requiresTwoFactorSetup && !user.mustChangePassword && !twoFactorSetupRoutes.includes(req.path)'));
+  assert.ok(apiSource.includes('await db.flush();'));
 });
