@@ -3097,7 +3097,19 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, 
 
 apiRouter.get('/support/tickets', requireAuth, (req, res) => {
   const user = (req as any).user as User;
-  void sendDatabasePage(req, res, 'support_tickets', user.role === 'super_admin' ? {} : { school_id: user.schoolId });
+  if (user.role === 'super_admin') {
+    void sendDatabasePage(req, res, 'support_tickets', {});
+    return;
+  }
+  if (!user.schoolId) {
+    res.status(403).json({ error: 'A school account is required to view support tickets.' });
+    return;
+  }
+  const filters: Record<string, string | string[] | undefined> = { school_id: user.schoolId };
+  // Only school administrators can inspect every ticket in their tenant.
+  // Other roles see only tickets they personally created.
+  if (user.role !== 'school_admin') filters.created_by_user_id = user.id;
+  void sendDatabasePage(req, res, 'support_tickets', filters);
 });
 
 apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
