@@ -1438,7 +1438,7 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && !/^\\d{4}$/.test(customPin)) {
+    if (customPin !== undefined && !/^\d{4}$/.test(customPin)) {
       throw new Error('A custom student PIN must contain exactly four digits.');
     }
     const student = await this.getStudentById(studentId, schoolId);
