@@ -2762,36 +2762,73 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
-  const { fullName, phone, gender } = req.body || {};
-  if (typeof fullName !== 'string' || !fullName.trim()) { res.status(400).json({ error: 'Teacher full name is required.' }); return; }
+  const school = (req as any).school as School;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const gender = body.gender;
+  if (!fullName || fullName.length > 120) { res.status(400).json({ error: 'Teacher full name is required and must be at most 120 characters.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
-  if (phone !== undefined && typeof phone !== 'string') { res.status(400).json({ error: 'Teacher phone must be text.' }); return; }
-  const monthlySalary = req.body?.monthlySalary === undefined || req.body?.monthlySalary === '' ? 0 : Number(req.body.monthlySalary);
+  if (body.phone !== undefined && (typeof body.phone !== 'string' || phone.length > 30 || (phone && !validImportPhone(phone)))) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
+  const qualification = body.qualification === undefined ? '' : body.qualification;
+  const department = body.department === undefined ? '' : body.department;
+  if (typeof qualification !== 'string' || qualification.length > 120 || typeof department !== 'string' || department.length > 120) {
+    res.status(400).json({ error: 'Qualification and department must be text of at most 120 characters.' }); return;
+  }
+  const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
+  const staffId = normalizeStaffId(body.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
-  const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
-  if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
-  if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  if (req.body?.assignedClasses !== undefined && !Array.isArray(req.body.assignedClasses)) { res.status(400).json({ error: 'Assigned classes must be a list of class IDs.' }); return; }
-  if (req.body?.assignedSubjects !== undefined && !Array.isArray(req.body.assignedSubjects)) { res.status(400).json({ error: 'Assigned subjects must be a list of subject IDs.' }); return; }
-  const assignedClasses: string[] = Array.isArray(req.body.assignedClasses)
-    ? [...new Set((req.body.assignedClasses as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim()))]
-    : [];
-  const assignedSubjects: string[] = Array.isArray(req.body.assignedSubjects)
-    ? [...new Set((req.body.assignedSubjects as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim()))]
-    : [];
+  const [usedStaffIds, existingTeachers] = await Promise.all([
+    queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
+    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
+  ]);
+  if ([...usedStaffIds, ...existingTeachers].some((record: any) => String(record.staffId || '').toUpperCase() === staffId)) {
+    res.status(409).json({ error: 'That staff ID is already used in this school.' }); return;
+  }
+  const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
+  if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (body.assignedClasses !== undefined && (!Array.isArray(body.assignedClasses) || body.assignedClasses.length > 100 || body.assignedClasses.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
+    res.status(400).json({ error: 'Assigned classes must contain up to 100 valid class IDs.' }); return;
+  }
+  if (body.assignedSubjects !== undefined && (!Array.isArray(body.assignedSubjects) || body.assignedSubjects.length > 100 || body.assignedSubjects.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
+    res.status(400).json({ error: 'Assigned subjects must contain up to 100 valid subject IDs.' }); return;
+  }
+  const assignedClasses: string[] = Array.isArray(body.assignedClasses) ? [...new Set((body.assignedClasses as string[]).map(id => id.trim()))] : [];
+  const assignedSubjects: string[] = Array.isArray(body.assignedSubjects) ? [...new Set((body.assignedSubjects as string[]).map(id => id.trim()))] : [];
   const [validClasses, validSubjects] = await Promise.all([
     assignedClasses.length ? queryAllRows('classes', { school_id: school.id, id: assignedClasses }, 'id') : [],
     assignedSubjects.length ? queryAllRows('subjects', { school_id: school.id, id: assignedSubjects }, 'id') : []
   ]);
   if (validClasses.length !== assignedClasses.length) { res.status(400).json({ error: 'Every assigned class must belong to this school.' }); return; }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
+
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
-  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses, assignedSubjects, status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary });
+  const account = db.createUser({
+    schoolId: school.id, role: 'teacher', staffId, fullName, phone,
+    passwordHash: randomBytes(32).toString('base64url'), pin: initialPin,
+    mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
+    assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
+  });
+  const teacher = db.createTeacher({
+    schoolId: school.id,
+    branchId,
+    userId: account.id,
+    staffId,
+    fullName,
+    email: '',
+    phone,
+    gender,
+    qualification: qualification.trim(),
+    department: department.trim(),
+    assignedClasses,
+    assignedSubjects,
+    status: 'active',
+    joinedDate: new Date().toISOString().slice(0, 10),
+    monthlySalary
+  });
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
+  await db.flush();
   res.status(201).json({ ...teacher, initialPin });
 });
 
