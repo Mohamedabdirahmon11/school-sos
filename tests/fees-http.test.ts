@@ -33,7 +33,7 @@ const unpaidStudent = storage.db.createStudent({ schoolId: school.id, studentId:
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'monthly_tuition', name: 'Grade 2 tuition range', minGrade: 2, maxGrade: 3, amount: 120, cadence: 'monthly', isActive: true });
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'monthly_tuition', name: 'Grade 1 tuition range', minGrade: 1, maxGrade: 1, amount: 80, cadence: 'monthly', isActive: true });
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'annual_registration', name: 'Annual registration', amount: 50, cadence: 'annual', isActive: true });
-const route = storage.db.addTransportRoute({ schoolId: school.id, name: 'North Route', feeAmount: 25, active: true });
+const route = await storage.db.addTransportRoute({ schoolId: school.id, name: 'North Route', feeAmount: 25, active: true });
 await storage.db.flush();
 const persistedStudent = await storage.db.getStudentById(partialStudent.id, school.id);
 assert.ok(persistedStudent, 'the created student must be readable from the test database');
