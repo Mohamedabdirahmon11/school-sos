@@ -138,6 +138,14 @@ export class ApiClient {
     }
 
     const data = await response.json().catch(() => ({}));
+    if (Array.isArray(data) && response.headers.has('X-Page')) {
+      (data as any).pagination = {
+        page: Number(response.headers.get('X-Page')) || 1,
+        pageSize: Number(response.headers.get('X-Page-Size')) || data.length,
+        total: Number(response.headers.get('X-Total-Count')) || data.length,
+        totalPages: Number(response.headers.get('X-Total-Pages')) || (data.length ? 1 : 0)
+      };
+    }
 
     if (!response.ok) {
       const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
