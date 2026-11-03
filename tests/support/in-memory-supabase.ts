@@ -5,6 +5,22 @@ type Filter = { column: string; operator: 'eq' | 'in' | 'ilike'; value: any };
 const camel = (value: string) => value.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
 const valueFor = (row: Record<string, any>, column: string) => row[column] ?? row[camel(column)];
 
+function splitOrTerms(expression: string): string[] {
+  const terms: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < expression.length; index += 1) {
+    if (expression[index] === '(') depth += 1;
+    else if (expression[index] === ')') depth = Math.max(0, depth - 1);
+    else if (expression[index] === ',' && depth === 0) {
+      terms.push(expression.slice(start, index));
+      start = index + 1;
+    }
+  }
+  terms.push(expression.slice(start));
+  return terms.filter(Boolean);
+}
+
 class MemoryQuery implements PromiseLike<any> {
   private operation: 'select' | 'insert' | 'upsert' | 'update' | 'delete' = 'select';
   private columns = '*';
@@ -44,7 +60,7 @@ class MemoryQuery implements PromiseLike<any> {
   }
 
   private matchesOr(row: Record<string, any>, expression: string): boolean {
-    return expression.split(',').some(part => {
+    return splitOrTerms(expression).some(part => {
       const match = /^([a-zA-Z0-9_]+)\.(eq|ilike|in)\.(.*)$/.exec(part.trim());
       if (!match) return false;
       const [, column, operator, raw] = match;
@@ -115,7 +131,7 @@ class MemoryQuery implements PromiseLike<any> {
     selected = selected.slice(this.from, Number.isFinite(this.to) ? this.to + 1 : undefined);
     let data = selected.map(row => this.project(row));
     if (this.singleMode) {
-      if (data.length === 0 && this.singleMode === 'maybeSingle') data = [];
+      if (data.length === 0 && this.singleMode === 'maybeSingle') return { data: null, error: null, count };
       else if (data.length !== 1) return { data: null, error: { message: 'Expected a single row.' }, count };
       else return { data: data[0], error: null, count };
     }
