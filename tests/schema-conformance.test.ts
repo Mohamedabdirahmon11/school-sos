@@ -90,7 +90,7 @@ test('performance migration has scoped dashboard aggregates, execute grants, and
     'CREATE INDEX IF NOT EXISTS idx_messages_recipient',
     "NOTIFY pgrst, 'reload schema'"
   ]) assert.ok(migration.includes(fragment), `migration includes ${fragment}`);
-  assert.match(sql, /CREATE OR REPLACE FUNCTION school_dashboard_summary/);
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.school_dashboard_summary/);
   assert.match(sql, /CREATE OR REPLACE FUNCTION super_admin_dashboard_summary/);
 });
 
