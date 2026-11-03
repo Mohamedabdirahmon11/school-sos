@@ -3788,20 +3788,38 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
 });
 
 // Extra Modules: Library & Transport
-apiRouter.get('/school/library', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/school/library', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(db.getLibraryBooks(school.id));
+  res.json(await db.getLibraryBooks(school.id));
 });
 
-apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
+apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const book = db.addLibraryBook({ ...req.body, schoolId: school.id });
-  res.status(201).json(book);
+  const body = req.body || {};
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const author = typeof body.author === 'string' ? body.author.trim() : '';
+  const isbn = typeof body.isbn === 'string' ? body.isbn.trim() : '';
+  const quantity = Number(body.quantity ?? 1);
+  if (!title || title.length > 255 || author.length > 255 || isbn.length > 50 ||
+      !Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+    res.status(400).json({ error: 'Book title, author, ISBN or quantity is invalid.' });
+    return;
+  }
+  try {
+    const book = await db.addLibraryBook({ title, author, isbn, quantity, schoolId: school.id });
+    res.status(201).json(book);
+  } catch (error: any) {
+    if (String(error?.message || '').includes('ISBN already exists')) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 });
 
-apiRouter.get('/school/transport', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(db.getTransportRoutes(school.id));
+  res.json(await db.getTransportRoutes(school.id));
 });
 
 apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
@@ -3838,9 +3856,29 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json(updated);
 });
 
-apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
+apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const route = db.addTransportRoute({ ...req.body, schoolId: school.id });
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : typeof body.routeName === 'string' ? body.routeName.trim() : '';
+  const routeNumber = typeof body.routeNumber === 'string' ? body.routeNumber.trim() : '';
+  const vehicleNumber = typeof body.vehicleNumber === 'string' ? body.vehicleNumber.trim() : '';
+  const driverName = typeof body.driverName === 'string' ? body.driverName.trim() : '';
+  const driverPhone = typeof body.driverPhone === 'string' ? body.driverPhone.trim() : '';
+  const feeAmount = Number(body.feeAmount ?? body.monthlyFee ?? 0);
+  const stops = body.stops ?? [];
+  if (!name || name.length > 150 || routeNumber.length > 50 || vehicleNumber.length > 80 ||
+      driverName.length > 150 || driverPhone.length > 50 || !Number.isFinite(feeAmount) || feeAmount < 0 ||
+      !Array.isArray(stops) || stops.length > 100 ||
+      stops.some((stop: unknown) => typeof stop !== 'string' || !stop.trim() || stop.length > 150) ||
+      (body.active !== undefined && typeof body.active !== 'boolean')) {
+    res.status(400).json({ error: 'Transport route details are invalid.' });
+    return;
+  }
+  const route = await db.addTransportRoute({
+    name, routeNumber, vehicleNumber, driverName, driverPhone,
+    stops: stops.map((stop: string) => stop.trim()), feeAmount,
+    active: body.active !== false, schoolId: school.id
+  });
   res.status(201).json(route);
 });
 
