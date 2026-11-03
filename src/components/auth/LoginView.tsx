@@ -242,7 +242,10 @@ export const LoginView: React.FC = () => {
                   <div className="mt-1">
                     <input
                       type="password"
-                      maxLength={6}
+                      inputMode="numeric"
+                      minLength={4}
+                      maxLength={4}
+                      pattern="[0-9]{4}"
                       required
                       value={pin}
                       onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -290,10 +293,13 @@ export const LoginView: React.FC = () => {
                   <div className="mt-1">
                     <input
                       type="password"
-                      maxLength={6}
+                      inputMode="numeric"
+                      minLength={4}
+                      maxLength={4}
+                      pattern="[0-9]{4}"
                       required
                       value={pin}
-                      onChange={e => setPin(e.target.value)}
+                      onChange={e => setPin(e.target.value.replace(/\\D/g, '').slice(0, 4))}
                       placeholder="4-digit PIN"
                       className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
