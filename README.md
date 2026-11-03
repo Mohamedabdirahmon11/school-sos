@@ -1,18 +1,37 @@
-# SchoolOS
+# Supabase setup for SchoolOS
 
-SchoolOS is a multi-school school management web application built with React, Vite, Express, and TypeScript.
+## Run the schema
 
-## Local setup
+Re-running schema.sql is safe.
 
-1. Install Node.js and npm.
-2. Install dependencies with `npm install --legacy-peer-deps`.
-3. Copy `.env.example` to `.env` and fill in the five required variables. Keep `.env` private and out of git.
-4. Create a Supabase project. In its dashboard, open **SQL Editor**, choose **New query**, paste the complete contents of `supabase/schema.sql`, and run the query.
-5. After the schema and migration script are verified, import existing JSON data by running `npx tsx scripts/migrate-dbjson-to-supabase.ts` from the project root. Do not delete the backed-up JSON files until the import succeeds and has been checked.
-6. Start the web app with `npm run dev`.
+1. Create a Supabase project.
+2. In the project dashboard, open **SQL Editor** and click **New query**.
+3. Open `supabase/schema.sql` from this repository, copy the entire file into the query editor, and click **Run**.
+4. Run every file in `supabase/migrations/` in numeric order. They are rerun-safe and must run after `schema.sql`.
+5. Review the result and run the RLS verification query in `scripts/check-rls.sql` in a new SQL Editor tab.
 
-The five required variable names are listed without values in `.env.example`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, `SUPER_ADMIN_EMAIL`, and `SUPER_ADMIN_PASSWORD`. The service role key and session secret must stay server-side. `npm run dev` starts the development server; `npm start` serves the production build and requires `npm run build` first.
+## Configure the server
 
-## Current implementation status
+Copy `.env.example` to `.env` and fill in these values from Supabase **Project Settings → API** and your own secret manager:
 
-Check `PROGRESS.md` before deployment. Supabase-only storage, complete schema/RLS coverage, and the JSON import script are still being completed. `npm run lint`, `npm run build`, and `npm run test:security` are available; no production-readiness claim is made until the remaining items and real-Supabase verification pass.
+```env
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SESSION_SECRET=
+SUPER_ADMIN_EMAIL=
+SUPER_ADMIN_PASSWORD=
+```
+
+Do not commit `.env`, share the service role key, or place server secrets in browser code. Startup stops with the missing variable names if required settings are absent.
+
+## Import existing data
+
+After installing dependencies, run `npx tsx scripts/migrate-dbjson-to-supabase.ts`. The script requires the real Supabase URL and service role key in `.env`. It repairs the legacy Super Admin role and invalid 2FA record during import. Keep `data/db.json.bak` until the owner verifies the imported rows.
+
+## Start SchoolOS
+
+From the project root, run `npm install --legacy-peer-deps`, then `npm run dev`.
+
+## Verification status
+
+The committed schema is still under development. The application has not been verified against a real Supabase project. See `PROGRESS.md` for the precise status and remaining work.
