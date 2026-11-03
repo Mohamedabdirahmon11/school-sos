@@ -2134,3 +2134,8 @@ NOTIFY pgrst, 'reload schema';
 REVOKE UPDATE, DELETE ON public.notice_reads FROM PUBLIC, anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+REVOKE INSERT, UPDATE, DELETE ON public.support_tickets FROM PUBLIC, anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
