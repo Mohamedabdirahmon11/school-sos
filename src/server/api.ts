@@ -857,10 +857,15 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT (Email/Phone + Password)
-  const identifier = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  // B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT
+  // Teachers use their school-issued staff ID and either password or PIN.
+  const identifier = typeof email === 'string' ? email.trim() : '';
   if (!identifier || !password) {
-    res.status(400).json({ error: 'Email and password are required.' });
+    res.status(400).json({ error: requestedRole === 'teacher' ? 'Teacher ID and password or PIN are required.' : 'Email or phone and password are required.' });
+    return;
+  }
+  if (requestedRole === 'teacher' && !validStaffId(normalizeStaffId(identifier))) {
+    res.status(400).json({ error: 'Enter the Teacher ID provided by your School Admin.' });
     return;
   }
 
@@ -892,7 +897,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
   const normalizedRole = normalizeRole(storedUser.role);
-  if (!normalizedRole) {
+  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
     res.status(401).json({ error: 'Invalid email or password.' });
@@ -908,7 +913,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // Verify Scrypt Password Hash
-  const isPasswordValid = verifyPassword(password, user.passwordHash);
+  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, user.pin));
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
@@ -2382,21 +2387,19 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const { fullName, email, phone, gender } = req.body || {};
-  if (![fullName, email, phone].every(value => typeof value === 'string' && value.trim())) { res.status(400).json({ error: 'Full name, email, and phone are required.' }); return; }
+  const { fullName, phone, gender } = req.body || {};
+  if (typeof fullName !== 'string' || !fullName.trim()) { res.status(400).json({ error: 'Teacher full name is required.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
-  const cleanEmail = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid teacher email.' }); return; }
-  if (await db.findUserForLogin(cleanEmail)) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const usedStaffIds = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  const temporaryPassword = randomBytes(12).toString('base64url');
-  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), email: cleanEmail, phone: phone.trim(), passwordHash: temporaryPassword, mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
-  const teacher = db.createTeacher({ ...req.body, staffId, email: cleanEmail, fullName: fullName.trim(), phone: phone.trim(), gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
-  res.status(201).json({ ...teacher, initialPassword: temporaryPassword });
+  const initialPin = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
+  const account = db.createUser({ schoolId: school.id, role: 'teacher', staffId, fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: randomBytes(32).toString('base64url'), pin: initialPin, mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0, assignedClassIds: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjectIds: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [] });
+  const teacher = db.createTeacher({ ...req.body, staffId, email: '', fullName: fullName.trim(), phone: typeof phone === 'string' ? phone.trim() : '', gender, userId: account.id, schoolId: school.id, qualification: req.body.qualification || '', department: req.body.department || '', assignedClasses: Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [], assignedSubjects: Array.isArray(req.body.assignedSubjects) ? req.body.assignedSubjects : [], status: 'active', joinedDate: new Date().toISOString().slice(0, 10), monthlySalary: Number(req.body.monthlySalary) || 0 });
+  db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
+  res.status(201).json({ ...teacher, initialPin });
 });
 
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export']);
