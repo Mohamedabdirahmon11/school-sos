@@ -72,10 +72,13 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const structureResponse = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Science activity', feeType: 'custom', amount: 35, cadence: 'one_time', isActive: true }) });
   assert.equal(structureResponse.status, 201);
   const activityFee = await structureResponse.json() as any;
+  const loadedFeeStructures = await storage.db.getFeeStructures(school.id);
+  assert.ok(loadedFeeStructures.some(item => item.id === activityFee.id),
+    `new fee structure must be visible to the next request; response=${JSON.stringify(activityFee)}, loaded=${JSON.stringify(loadedFeeStructures)}, raw=${JSON.stringify(memory.rows('fee_structures'))}`);
   const tamperedStructure = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, {
     method: 'PUT', headers, body: JSON.stringify({ id: 'forged-id', schoolId: 'another-school', amount: 35 })
   });
-  assert.equal(tamperedStructure.status, 200);
+  assert.equal(tamperedStructure.status, 200, await tamperedStructure.text());
   const protectedStructure = await tamperedStructure.json() as any;
   assert.equal(protectedStructure.id, activityFee.id, 'fee structure ID cannot be overwritten');
   assert.equal(protectedStructure.schoolId, school.id, 'fee structure tenant cannot be overwritten');
