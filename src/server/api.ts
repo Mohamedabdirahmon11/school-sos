@@ -1789,12 +1789,17 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
       passRate: null
     };
     if (user.role === 'accountant' || user.role === 'super_admin') {
-      const payments = (await db.getFeePayments(school.id)).filter(payment => !payment.voidedAt);
-      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
-      result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
-      result.paymentCount = payments.length;
-      result.recentPayments = payments.slice(-20).reverse();
+      const allPayments = await db.getFeePayments(school.id);
+      const activePayments = allPayments.filter(payment => !payment.voidedAt);
+      result.totalDue = allPayments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
+      result.totalCollected = activePayments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
+      result.totalArrears = allPayments.reduce((total, payment) => total + Number(
+        payment.voidedAt ? payment.amountDue || 0 : payment.remainingAmount || 0
+      ), 0);
+      result.paymentCount = activePayments.length;
+      result.recentPayments = activePayments
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 20);
     }
     res.json(result);
   } catch {
