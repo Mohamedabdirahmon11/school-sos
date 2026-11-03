@@ -3072,7 +3072,18 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
     res.status(400).json({ error: 'Fee grade ranges must be whole grades from 1 to 12, with the first grade no higher than the last.' }); return;
   }
   if (body.classId && !await db.getClassById(String(body.classId), school.id)) { res.status(400).json({ error: 'Fee class must belong to this school.' }); return; }
-  const item = db.createFeeStructure({ ...body, name: body.name.trim(), amount: Number(body.amount), minGrade: hasGradeRange ? Number(body.minGrade) : undefined, maxGrade: hasGradeRange ? Number(body.maxGrade) : undefined, schoolId: school.id });
+  if (body.isActive !== undefined && typeof body.isActive !== 'boolean') { res.status(400).json({ error: 'Fee active status must be true or false.' }); return; }
+  const item = db.createFeeStructure({
+    schoolId: school.id,
+    name: body.name.trim(),
+    feeType: body.feeType,
+    amount: Number(body.amount),
+    cadence: body.cadence,
+    minGrade: hasGradeRange ? Number(body.minGrade) : undefined,
+    maxGrade: hasGradeRange ? Number(body.maxGrade) : undefined,
+    classId: typeof body.classId === 'string' ? body.classId : undefined,
+    isActive: body.isActive === undefined ? true : body.isActive
+  });
   res.status(201).json(item);
 });
 
