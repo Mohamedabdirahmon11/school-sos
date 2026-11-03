@@ -2685,7 +2685,7 @@ class StorageEngine {
 
   public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string): Promise<SupportTicket | null> {
     await this.queryRows<SupportTicket>('support_tickets', { id: ticketId, school_id: schoolId });
-    const ticket = this.data.tickets.find(t => t.id === ticketId);
+    const ticket = this.data.tickets.find(t => t.id === ticketId && (!schoolId || t.schoolId === schoolId));
     if (!ticket) return null;
     const now = new Date().toISOString();
     ticket.messages.push({
