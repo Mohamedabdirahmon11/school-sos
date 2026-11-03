@@ -45,6 +45,21 @@ import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+const schoolLocalDate = (timeZone?: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
 interface DatabaseSchema {
   settings: SuperAdminSettings;
   plans: PlanConfig[];
@@ -2291,6 +2306,8 @@ class StorageEngine {
   }): Promise<FeePayment> {
     const student = await this.getStudentById(paymentData.studentId, paymentData.schoolId);
     if (!student || student.schoolId !== paymentData.schoolId) throw new Error('Student is not part of this school.');
+    const school = await this.getSchoolById(paymentData.schoolId);
+    const paymentDate = schoolLocalDate(school?.timezone);
     await this.getFeePayments(paymentData.schoolId, student.id);
     if (paymentData.idempotencyKey) {
       const prior = (await this.getFeePayments(paymentData.schoolId)).find(payment => payment.idempotencyKeys?.includes(paymentData.idempotencyKey!));
@@ -2326,7 +2343,7 @@ class StorageEngine {
       registrationRecord.amountPaid = cumulativePaid;
       registrationRecord.remainingAmount = registrationRecord.amountDue - cumulativePaid;
       registrationRecord.status = registrationRecord.remainingAmount === 0 ? 'paid' : 'partial';
-      registrationRecord.date = new Date().toISOString().split('T')[0];
+      registrationRecord.date = paymentDate;
       registrationRecord.recordedBy = paymentData.recordedBy;
       if (paymentData.idempotencyKey) registrationRecord.idempotencyKeys = [...(registrationRecord.idempotencyKeys || []), paymentData.idempotencyKey];
       if (paymentData.notes) registrationRecord.notes = [registrationRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
@@ -2337,7 +2354,6 @@ class StorageEngine {
     }
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
-    const school = await this.getSchoolById(paymentData.schoolId);
     const paymentCount = await this.queryPage('fee_payments', { school_id: paymentData.schoolId }, 1, 1);
     const receiptCount = paymentCount.total + 1;
     const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptCount).padStart(4, '0')}`;
@@ -2357,7 +2373,7 @@ class StorageEngine {
       remainingAmount: remaining,
       paymentMethod: 'Cash', // Strictly Cash only
       status,
-      date: new Date().toISOString().split('T')[0],
+      date: paymentDate,
       recordedBy: paymentData.recordedBy,
       notes: paymentData.notes,
       idempotencyKeys: paymentData.idempotencyKey ? [paymentData.idempotencyKey] : []
