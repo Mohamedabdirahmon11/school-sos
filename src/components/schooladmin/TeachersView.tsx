@@ -81,7 +81,7 @@ export const TeachersView: React.FC = () => {
             Faculty & Teaching Staff
           </h1>
           <p className="text-xs text-[#64748B]">
-            Create teachers with a school-issued Teacher ID and secure sign-in PIN
+            Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
           </p>
         </div>
 
