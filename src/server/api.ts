@@ -2691,7 +2691,14 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
   if (req.body?.staffId !== undefined) {
     staffId = normalizeStaffId(req.body.staffId);
     if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
-    if ((await db.getStaffMembers(school.id)).some(item => item.id !== prior.id && item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
+    const [otherStaff, existingUsers] = await Promise.all([
+      db.getStaffMembers(school.id),
+      queryAllRows('users', { school_id: school.id }, 'id,staff_id')
+    ]);
+    if (otherStaff.some(item => item.id !== prior.id && item.staffId?.toUpperCase() === staffId) ||
+        existingUsers.some((item: any) => item.id !== prior.userId && String(item.staffId || '').toUpperCase() === staffId)) {
+      res.status(409).json({ error: 'That staff ID is already used in this school.' }); return;
+    }
   }
   if (email !== undefined && prior.userId) {
     const cleanEmail = email.trim().toLowerCase();
@@ -2703,7 +2710,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
-    const updatedUser = db.updateUser(updated.userId, { fullName: updated.fullName, email: updated.email, phone: updated.phone, permissions: updated.permissions });
+    const updatedUser = db.updateUser(updated.userId, { staffId: updated.staffId, fullName: updated.fullName, email: updated.email, phone: updated.phone, permissions: updated.permissions });
     if (!updatedUser) { res.status(500).json({ error: 'Staff member was updated, but the linked sign-in account could not be updated.' }); return; }
     invalidateAuthenticatedSnapshot(updated.userId);
   }
