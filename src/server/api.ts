@@ -2615,7 +2615,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     return;
   }
   const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
