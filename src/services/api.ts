@@ -558,8 +558,7 @@ export class ApiClient {
   }
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
-    const students = await this.getStudents();
-    const student = students.find(s => s.id === id);
+    const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
     const payments = includeFinance ? await this.getFeePayments(id) : [];
     const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
     const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
