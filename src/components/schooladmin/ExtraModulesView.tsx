@@ -201,8 +201,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Title</th>
                   <th className="px-4 py-2.5">Author</th>
                   <th className="px-4 py-2.5">ISBN</th>
-                  <th className="px-4 py-2.5">Copies</th>
-                  <th className="px-4 py-2.5">Location</th>
+                  <th className="px-4 py-2.5">Copies in stock</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
