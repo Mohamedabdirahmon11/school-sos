@@ -2510,6 +2510,10 @@ apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, re
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\\d{4}$/.test(req.body.customPin))) {
+    res.status(400).json({ error: 'A custom student PIN must contain exactly four digits.' });
+    return;
+  }
   const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
   if (!result) {
     res.status(404).json({ error: 'Student not found.' });
@@ -2547,8 +2551,23 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
 });
 
 apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  await db.getStudentById(req.params.id, (req as any).school.id);
-  await db.deleteStudent(req.params.id, (req as any).school.id);
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(req.params.id, school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+  const deleted = await db.deleteStudent(req.params.id, school.id);
+  if (!deleted) { res.status(404).json({ error: 'Student was not found or could not be deleted.' }); return; }
+  db.logAudit({
+    action: 'STUDENT_DELETED',
+    category: 'security',
+    schoolId: school.id,
+    schoolName: school.name,
+    userId: user.id,
+    userName: user.fullName,
+    userRole: user.role,
+    details: `Permanently deleted student ${student.studentId} (${student.firstName} ${student.middleName} ${student.lastName}) and associated attendance, marks, and fee-payment records.`,
+    severity: 'warning'
+  });
   res.json({ success: true });
 });
 
