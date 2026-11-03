@@ -2958,16 +2958,17 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   const user = (req as any).user as User;
   const { classId, date, records } = req.body;
 
-  if (!classId || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
+  if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
     res.status(400).json({ error: 'A class, a valid date, and 1–2,000 student records are required.' });
     return;
   }
+  const normalizedClassId = classId.trim();
   const parsedDate = new Date(`${date}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
-  if (!await canAccessTeachingClass(req, res, classId)) return;
+  if (!await canAccessTeachingClass(req, res, normalizedClassId)) return;
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
   for (const record of records) {
@@ -2979,20 +2980,25 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
       res.status(400).json({ error: 'Duplicate students are not allowed in one attendance submission.' });
       return;
     }
-    if (typeof record.note === 'string' && record.note.length > 500) {
-      res.status(400).json({ error: 'Attendance notes cannot exceed 500 characters.' });
+    if (record.note !== undefined && (typeof record.note !== 'string' || record.note.length > 500)) {
+      res.status(400).json({ error: 'Attendance notes must be text of at most 500 characters.' });
       return;
     }
-    seenStudentIds.add(record.studentId);
+    seenStudentIds.add(record.studentId.trim());
   }
-  const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
+  const normalizedRecords = records.map(record => ({
+    ...record,
+    studentId: record.studentId.trim(),
+    note: typeof record.note === 'string' ? record.note.trim() : undefined
+  }));
+  const classStudents = await queryAllRows('students', { school_id: school.id, class_id: normalizedClassId }, 'id');
   const classStudentIds = new Set(classStudents.map((student: any) => student.id));
-  if (records.some(record => !classStudentIds.has(record.studentId))) {
+  if (normalizedRecords.some(record => !classStudentIds.has(record.studentId))) {
     res.status(400).json({ error: 'Attendance can only be recorded for students currently enrolled in the selected class.' });
     return;
   }
 
-  const saved = await db.recordDailyAttendance(school.id, classId, date, records, user.id);
+  const saved = await db.recordDailyAttendance(school.id, normalizedClassId, date, normalizedRecords, user.id);
   res.json({ success: true, count: saved.length, records: saved });
 });
 
