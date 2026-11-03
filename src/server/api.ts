@@ -37,6 +37,22 @@ import { forwardAsyncErrors } from './async-errors.ts';
 
 export const apiRouter = Router();
 
+const schoolLocalDate = (timeZone?: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
+
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
   classes: 'id,school_id,branch_id,name,grade_level,section,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
@@ -2965,7 +2981,7 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
 
 apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+  const date = (req.query.date as string) || schoolLocalDate(school.timezone);
   res.json(await db.getDailyIncomeReport(school.id, date));
 });
 
