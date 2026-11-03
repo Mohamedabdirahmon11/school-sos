@@ -3078,7 +3078,36 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
 
 apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const updated = await db.updateFeeStructure(req.params.id, school.id, req.body || {});
+  const existing = (await db.getFeeStructures(school.id)).find(item => item.id === req.params.id);
+  if (!existing) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const editable = ['name', 'feeType', 'amount', 'cadence', 'minGrade', 'maxGrade', 'classId', 'isActive'];
+  const updates = Object.fromEntries(editable
+    .filter(key => Object.prototype.hasOwnProperty.call(body, key))
+    .map(key => [key, body[key]]));
+  const next = { ...existing, ...updates };
+  if (typeof next.name !== 'string' || !next.name.trim() ||
+      !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(next.feeType) ||
+      !Number.isFinite(Number(next.amount)) || Number(next.amount) <= 0 ||
+      !['monthly', 'annual', 'one_time'].includes(next.cadence) ||
+      (next.isActive !== undefined && typeof next.isActive !== 'boolean')) {
+    res.status(400).json({ error: 'Fee name, category, positive amount, billing cadence, or active status is invalid.' }); return;
+  }
+  const hasGradeRange = next.minGrade !== undefined || next.maxGrade !== undefined;
+  if (hasGradeRange && (!Number.isInteger(Number(next.minGrade)) || !Number.isInteger(Number(next.maxGrade)) ||
+      Number(next.minGrade) < 1 || Number(next.maxGrade) > 12 || Number(next.minGrade) > Number(next.maxGrade))) {
+    res.status(400).json({ error: 'Fee grade ranges must be whole grades from 1 to 12, with the first grade no higher than the last.' }); return;
+  }
+  if (next.classId && !await db.getClassById(String(next.classId), school.id)) {
+    res.status(400).json({ error: 'Fee class must belong to this school.' }); return;
+  }
+  const updated = await db.updateFeeStructure(req.params.id, school.id, {
+    ...updates,
+    name: next.name.trim(),
+    amount: Number(next.amount),
+    minGrade: hasGradeRange ? Number(next.minGrade) : undefined,
+    maxGrade: hasGradeRange ? Number(next.maxGrade) : undefined
+  });
   if (!updated) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
   res.json(updated);
 });
