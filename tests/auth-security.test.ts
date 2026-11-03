@@ -20,6 +20,11 @@ test('Super Admin routes require an authenticated Super Admin', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const routePattern = /apiRouter\.(get|post|put|patch|delete)\(\s*'([^']+)'([\s\S]{0,260}?)=>/gi;
   const routes = [...apiSource.matchAll(routePattern)];
+  const publicRoutes = routes
+    .filter(match => !match[3].includes('requireAuth'))
+    .map(match => `${match[1].toUpperCase()} ${match[2]}`)
+    .sort();
+  assert.deepEqual(publicRoutes, ['POST /auth/login', 'POST /auth/logout']);
   const superAdminRoutes = routes.filter(match => match[2].startsWith('/superadmin/'));
   assert.ok(superAdminRoutes.length > 0, 'Super Admin route list is discoverable');
   for (const route of superAdminRoutes) {
