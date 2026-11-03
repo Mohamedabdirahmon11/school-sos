@@ -573,9 +573,9 @@ export class ApiClient {
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}/profile`);
-    const payments = includeFinance ? await this.getFeePayments(id) : [];
-    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
-    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
+    const payments = includeFinance ? await this.getAllFeePayments(id) : [];
+    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${encodeURIComponent(id)}`).catch(() => []);
+    const attendance = await this.getAllStudentAttendance(id).catch(() => []);
     return {
       student,
       payments,
@@ -765,6 +765,27 @@ export class ApiClient {
 
   public static async deleteFeeStructure(id: string) {
     return this.request<{ success: boolean }>(`/fees/structures/${id}`, { method: 'DELETE' });
+  }
+
+  public static async getAllFeePayments(studentId?: string) {
+    const allPayments: FeePayment[] = [];
+    for (let page = 1; ; page += 1) {
+      const rows = await this.getFeePayments(studentId, { page, pageSize: 100 });
+      allPayments.push(...rows);
+      if (rows.length < 100) break;
+    }
+    return allPayments;
+  }
+
+  public static async getAllStudentAttendance(studentId: string) {
+    const allRecords: AttendanceRecord[] = [];
+    for (let page = 1; ; page += 1) {
+      const query = new URLSearchParams({ studentId, page: String(page), pageSize: '100' });
+      const rows = await this.request<AttendanceRecord[]>(`/attendance/student?${query.toString()}`);
+      allRecords.push(...rows);
+      if (rows.length < 100) break;
+    }
+    return allRecords;
   }
 
   public static async getFeePayments(studentId?: string, params?: any) {
