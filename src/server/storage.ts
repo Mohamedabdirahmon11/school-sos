@@ -2674,7 +2674,7 @@ class StorageEngine {
   public async queueNotification(itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>): Promise<CommunicationQueueItem> {
     if (!itemData || typeof itemData !== 'object' ||
         typeof itemData.schoolId !== 'string' || !itemData.schoolId.trim() || itemData.schoolId.length > 64 ||
-        typeof itemData.recipientPhone !== 'string' || !/^\\+?[0-9][0-9\\s().-]{5,48}$/.test(itemData.recipientPhone.trim()) ||
+        typeof itemData.recipientPhone !== 'string' || !/^\+?[0-9][0-9\s().-]{5,48}$/.test(itemData.recipientPhone.trim()) ||
         typeof itemData.recipientName !== 'string' || !itemData.recipientName.trim() || itemData.recipientName.trim().length > 150 ||
         (itemData.studentId !== undefined && (typeof itemData.studentId !== 'string' || !itemData.studentId.trim() || itemData.studentId.length > 64)) ||
         !['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'].includes(itemData.messageType) ||
