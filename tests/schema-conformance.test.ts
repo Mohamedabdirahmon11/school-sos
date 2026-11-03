@@ -146,6 +146,22 @@ test('payroll records enforce one staff payroll per school and month with scoped
   assert.match(migration, /ALTER TABLE payroll_records ENABLE ROW LEVEL SECURITY/);
 });
 
+test('communication credentials and recipient queue are restricted to school administrators', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/029_harden_communication_security.sql', import.meta.url), 'utf8');
+  for (const policy of ['communication_settings_admin_access', 'communication_queue_admin_access']) {
+    assert.ok(migration.includes(policy), `migration includes ${policy}`);
+  }
+  assert.ok(migration.includes('ALTER TABLE public.communication_settings ENABLE ROW LEVEL SECURITY'));
+  assert.ok(migration.includes('ALTER TABLE public.communication_queue ENABLE ROW LEVEL SECURITY'));
+  assert.ok(migration.includes("public.auth_user_role() = 'school_admin'"));
+  assert.ok(migration.includes('REVOKE ALL ON public.communication_settings FROM anon'));
+  assert.ok(migration.includes('REVOKE ALL ON public.communication_queue FROM anon'));
+  assert.ok(sql.includes('communication_settings_admin_access'));
+  assert.ok(sql.includes('communication_queue_admin_access'));
+  assert.ok(apiSource.includes('apiKeyConfigured: Boolean(apiKey)'));
+  assert.ok(apiSource.includes('apiSecretConfigured: Boolean(apiSecret)'));
+});
+
 test('payroll deletion and status transitions are protected by database policies', () => {
   const migration = readFileSync(new URL('../supabase/migrations/028_harden_payroll_access.sql', import.meta.url), 'utf8');
   assert.ok(migration.includes('payroll_records_accountant_delete'));
