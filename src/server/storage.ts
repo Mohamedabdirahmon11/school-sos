@@ -2724,9 +2724,25 @@ class StorageEngine {
   }
 
   public createNotice(noticeData: Omit<SchoolNotice, 'id'>): SchoolNotice {
+    const publishDate = typeof noticeData?.publishDate === 'string' ? noticeData.publishDate : '';
+    const parsedDate = new Date(`${publishDate}T00:00:00.000Z`);
+    if (!noticeData || typeof noticeData !== 'object' ||
+        typeof noticeData.schoolId !== 'string' || !noticeData.schoolId.trim() || noticeData.schoolId.length > 64 ||
+        typeof noticeData.title !== 'string' || !noticeData.title.trim() || noticeData.title.trim().length > 255 ||
+        typeof noticeData.content !== 'string' || !noticeData.content.trim() || noticeData.content.trim().length > 10000 ||
+        !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(noticeData.audience) ||
+        (noticeData.audience === 'class' && (typeof noticeData.classId !== 'string' || !noticeData.classId.trim() || noticeData.classId.length > 64)) ||
+        typeof noticeData.isPinned !== 'boolean' || typeof noticeData.isActive !== 'boolean' ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(publishDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== publishDate ||
+        typeof noticeData.authorName !== 'string' || !noticeData.authorName.trim() || noticeData.authorName.trim().length > 150 ||
+        typeof noticeData.authorRole !== 'string' || !['school_admin', 'super_admin'].includes(noticeData.authorRole)) {
+      throw new Error('Notice details are invalid.');
+    }
     const notice: SchoolNotice = {
       ...noticeData,
-      id: `ntc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+      title: noticeData.title.trim(), content: noticeData.content.trim(),
+      classId: noticeData.audience === 'class' ? noticeData.classId : null,
+      id: `ntc-${randomUUID()}`
     };
     this.data.notices.push(notice);
     this.invalidateNoticeCounts(notice.schoolId);
@@ -2735,11 +2751,25 @@ class StorageEngine {
   }
 
   public async updateNotice(id: string, schoolId: string, updates: Partial<SchoolNotice>): Promise<SchoolNotice | null> {
-    await this.queryRows<SchoolNotice>('school_notices', { id, school_id: schoolId });
-    const index = this.data.notices.findIndex(notice => notice.id === id && notice.schoolId === schoolId && notice.isActive !== false);
+    if (typeof id !== 'string' || !id.trim() || id.length > 64 ||
+        typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        !updates || typeof updates !== 'object' || Array.isArray(updates)) return null;
+    if (updates.title !== undefined && (typeof updates.title !== 'string' || !updates.title.trim() || updates.title.trim().length > 255)) throw new Error('Notice title must be 1–255 characters.');
+    if (updates.content !== undefined && (typeof updates.content !== 'string' || !updates.content.trim() || updates.content.trim().length > 10000)) throw new Error('Notice content must be 1–10000 characters.');
+    if (updates.audience !== undefined && !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(updates.audience)) throw new Error('Choose a supported notice audience.');
+    if (updates.isPinned !== undefined && typeof updates.isPinned !== 'boolean') throw new Error('Notice pinned state must be true or false.');
+    if (updates.isActive !== undefined && typeof updates.isActive !== 'boolean') throw new Error('Notice active state must be true or false.');
+    if (updates.classId !== undefined && updates.classId !== null && (typeof updates.classId !== 'string' || updates.classId.length > 64)) throw new Error('Notice class ID is invalid.');
+    if (updates.publishDate !== undefined) {
+      const parsed = new Date(`${updates.publishDate}T00:00:00.000Z`);
+      if (typeof updates.publishDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(updates.publishDate) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== updates.publishDate) throw new Error('Notice publish date is invalid.');
+    }
+    await this.queryRows<SchoolNotice>('school_notices', { id: id.trim(), school_id: schoolId.trim() });
+    const index = this.data.notices.findIndex(notice => notice.id === id.trim() && notice.schoolId === schoolId.trim() && notice.isActive !== false);
     if (index < 0) return null;
-    this.data.notices[index] = { ...this.data.notices[index], ...updates, id, schoolId };
-    this.invalidateNoticeCounts(schoolId);
+    this.data.notices[index] = { ...this.data.notices[index], ...updates, id: id.trim(), schoolId: schoolId.trim() };
+    if (this.data.notices[index].audience !== 'class') this.data.notices[index].classId = null;
+    this.invalidateNoticeCounts(schoolId.trim());
     this.save();
     return this.data.notices[index];
   }
