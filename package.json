@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "node -e \"const fs=require('fs'); for (const p of ['dist','server.js']) fs.rmSync(p,{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
-    "test:security": "tsx --test tests/security.test.ts tests/security-http.test.ts tests/security-middleware.test.ts tests/superadmin-bootstrap-http.test.ts",
+    "test:security": "tsx --test tests/auth-security.test.ts tests/roles.test.ts",
     "test:superadmin-auth": "tsx --test tests/superadmin-bootstrap-http.test.ts",
     "test:fees": "tsx --test tests/fees-http.test.ts",
     "test:payroll": "tsx --test --test-concurrency=1 tests/payroll-http.test.ts",
