@@ -137,7 +137,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays },
       { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
       { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet },
-      { id: 'sch_assignments', label: t('assignments'), icon: FileCheck2 },
       { id: 'sch_promotion', label: 'Promotion & Alumni', icon: Award },
       { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays },
       { id: 'sch_notices', label: noticeLabel, icon: BellRing },
@@ -152,7 +151,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { id: 'sch_transport', label: t('transport'), icon: Bus },
       { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle },
       { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse },
-      { id: 'sch_certificates', label: t('certificates_id'), icon: Award },
       { id: 'sch_inventory', label: t('inventory'), icon: Boxes },
       { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy }
     ];
