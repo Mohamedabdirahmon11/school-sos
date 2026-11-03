@@ -3223,7 +3223,7 @@ const payrollAmounts = (items: unknown): { lines: Array<{ label: string; amount:
 
 apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
-  if (!['school_admin', 'accountant', 'teacher'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to school staff.' }); return; }
+  if (!['school_admin', 'accountant', 'teacher', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to school staff.' }); return; }
   void sendDatabasePage(req, res, 'payroll_records', { school_id: school.id, user_id: user.id, payroll_month: typeof req.query.month === 'string' ? req.query.month : undefined });
 });
 
