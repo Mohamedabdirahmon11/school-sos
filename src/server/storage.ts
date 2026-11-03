@@ -2206,6 +2206,11 @@ class StorageEngine {
     return this.queryRows<FeePayment>('fee_payments', { school_id: schoolId, student_id: studentId });
   }
 
+  public async getFeePaymentById(id: string, schoolId: string): Promise<FeePayment | null> {
+    const rows = await this.queryRows<FeePayment>('fee_payments', { id, school_id: schoolId });
+    return rows[0] || null;
+  }
+
   public async voidFeePayment(id: string, schoolId: string, userId: string, reason: string): Promise<FeePayment | null> {
     await this.queryRows<FeePayment>('fee_payments', { id, school_id: schoolId });
     const payment = this.data.feePayments.find(item => item.id === id && item.schoolId === schoolId);
