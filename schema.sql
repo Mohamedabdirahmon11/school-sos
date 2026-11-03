@@ -994,6 +994,25 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS discipline_records (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  student_id VARCHAR(64) NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  incident_date DATE NOT NULL,
+  infraction_type VARCHAR(120) NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  severity VARCHAR(20) NOT NULL CHECK (severity IN ('minor','moderate','severe')),
+  action_taken VARCHAR(1000) NOT NULL DEFAULT '',
+  reported_by VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  parent_notified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_discipline_school_date
+  ON discipline_records (school_id, incident_date DESC);
+CREATE INDEX IF NOT EXISTS idx_discipline_student_date
+  ON discipline_records (school_id, student_id, incident_date DESC);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_items_school_asset_tag
   ON inventory_items (school_id, lower(btrim(asset_tag)));
 CREATE INDEX IF NOT EXISTS idx_inventory_items_school_created
@@ -1067,6 +1086,7 @@ CREATE INDEX IF NOT EXISTS idx_staff_user ON staff_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_admissions_class ON admission_applications(school_id, class_id);
 CREATE INDEX IF NOT EXISTS idx_library_school ON library_books(school_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_school ON inventory_items(school_id);
+CREATE INDEX IF NOT EXISTS idx_discipline_school ON discipline_records(school_id, incident_date DESC);
 CREATE INDEX IF NOT EXISTS idx_transport_school ON transport_routes(school_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_invoices_paid_date ON subscription_invoices(status, paid_date);
@@ -1318,8 +1338,15 @@ ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inventory_items_tenant_scope ON inventory_items;
 CREATE POLICY inventory_items_tenant_scope ON inventory_items
   FOR ALL TO authenticated
-  USING (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text)
-  WITH CHECK (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text);
+  USING (auth_user_role() = 'super_admin' OR (auth_user_role() = 'school_admin' AND school_id::text = auth_school_id()::text))
+  WITH CHECK (auth_user_role() = 'super_admin' OR (auth_user_role() = 'school_admin' AND school_id::text = auth_school_id()::text));
+
+ALTER TABLE discipline_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS discipline_records_admin_scope ON discipline_records;
+CREATE POLICY discipline_records_admin_scope ON discipline_records
+  FOR ALL TO authenticated
+  USING (auth_user_role() = 'super_admin' OR (auth_user_role() = 'school_admin' AND school_id::text = auth_school_id()::text))
+  WITH CHECK (auth_user_role() = 'super_admin' OR (auth_user_role() = 'school_admin' AND school_id::text = auth_school_id()::text));
 
 DROP POLICY IF EXISTS bus_assignments_student_scope ON bus_assignments;
 CREATE POLICY bus_assignments_student_scope ON bus_assignments AS RESTRICTIVE FOR SELECT TO authenticated
