@@ -30,7 +30,6 @@ export const TeachersView: React.FC = () => {
 
   // Form State
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [department, setDepartment] = useState('Sciences');
@@ -46,12 +45,11 @@ export const TeachersView: React.FC = () => {
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email || !phone) return;
+    if (!fullName) return;
 
     try {
       const created = await ApiClient.addTeacher({
         fullName,
-        email,
         phone,
         gender,
         department,
@@ -63,9 +61,8 @@ export const TeachersView: React.FC = () => {
 
       setShowAddModal(false);
       setFullName('');
-      setEmail('');
       setPhone('');
-      setInitialPassword((created as any).initialPassword || '');
+      setInitialPassword(`Teacher ID: ${(created as any).staffId}\nInitial PIN: ${(created as any).initialPin}`);
       setNotice(`Teacher ${fullName} appointed to faculty.`);
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
@@ -84,7 +81,7 @@ export const TeachersView: React.FC = () => {
             Faculty & Teaching Staff
           </h1>
           <p className="text-xs text-[#64748B]">
-            Manage teacher appointments, course allocations, qualifications, and payroll rates
+            Create teachers with a school-issued Teacher ID and secure sign-in PIN
           </p>
         </div>
 
@@ -104,7 +101,7 @@ export const TeachersView: React.FC = () => {
           <span>{notice}</span>
         </div>
       )}
-      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t('reset_password')}: <strong className="font-mono select-all">{initialPassword}</strong></div>}
+      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Give these sign-in details to the teacher. They are shown only now: <strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong></div>}
 
       {/* Teachers Directory Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -164,26 +161,13 @@ export const TeachersView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-[#334155]">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="teacher@school.so"
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-                  />
-                </div>
-                <div>
+              <div>
                   <label className="block font-medium text-[#334155]">Phone Number *</label>
                   <input
                     type="tel"
-                    required
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
-                    placeholder="+25261..."
+                    placeholder="Optional contact number"
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
                 </div>
