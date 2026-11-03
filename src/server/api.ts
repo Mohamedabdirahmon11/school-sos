@@ -2238,9 +2238,10 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (!klass || klass.isArchived || !subject.total || !teacher.total || !assignment.total) { res.status(400).json({ error: 'Class, subject, and teacher must belong to this school and match an active subject assignment.' }); return; }
   if (unavailable.total) { res.status(409).json({ error: 'This teacher is unavailable for that period.' }); return; }
   if (existing.items.some((slot: any) => slot.classId !== classId && slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in that period.' }); return; }
-  if (roomNumber && existing.items.some((slot: any) => slot.classId !== classId && String(slot.roomNumber || '').toLowerCase() === String(roomNumber).toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in that period.' }); return; }
+  const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
+  if (effectiveRoomNumber && existing.items.some((slot: any) => slot.classId !== classId && String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in that period.' }); return; }
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: String(roomNumber || klass.roomNumber || '') };
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
   try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
