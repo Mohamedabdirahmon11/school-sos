@@ -1221,7 +1221,7 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, (req, res)
   res.json(updated);
 });
 
-apiRouter.get('/superadmin/plans', (_req, res) => {
+apiRouter.get('/superadmin/plans', requireAuth, requireSuperAdmin, (_req, res) => {
   res.json(db.getPlans());
 });
 
