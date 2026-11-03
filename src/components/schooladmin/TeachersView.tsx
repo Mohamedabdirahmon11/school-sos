@@ -1,0 +1,264 @@
+/**
+ * Teachers & Faculty Management for School Admin
+ * Appoint teachers, assign classes and subjects, set salaries and contact info
+ */
+
+import React, { useState, useEffect } from 'react';
+import { ApiClient } from '../../services/api.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
+import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
+import { useApi } from '../../hooks/useApi.ts';
+import { ErrorState } from '../common/ErrorState.tsx';
+import { UserCheck, Plus, Search, Mail, Phone, BookOpen, Layers, X, CheckCircle2 } from 'lucide-react';
+
+export const TeachersView: React.FC = () => {
+  const { school, isReadOnly, t } = useAuth();
+  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
+  const [page, setPage] = useState(1);
+  const teacherLoad = useApi(() => Promise.all([
+    ApiClient.getTeachers({ page, pageSize: 20 }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page], Boolean(school));
+  const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
+  const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
+  const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
+  const subjects: Subject[] = Array.isArray(subjectRows) ? subjectRows : [];
+  const [search, setSearch] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [initialPassword, setInitialPassword] = useState('');
+
+  // Form State
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [department, setDepartment] = useState('Sciences');
+  const [qualification, setQualification] = useState('B.Ed / B.Sc');
+  const [monthlySalary, setMonthlySalary] = useState(550);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
+  const fetchData = teacherLoad.retry;
+  useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
+  useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
+  useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
+
+  const handleAddTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullName || !email || !phone) return;
+
+    try {
+      const created = await ApiClient.addTeacher({
+        fullName,
+        email,
+        phone,
+        gender,
+        department,
+        qualification,
+        monthlySalary,
+        assignedClasses: selectedClassId ? [selectedClassId] : [],
+        assignedSubjects: selectedSubjectId ? [selectedSubjectId] : []
+      }, school?.id);
+
+      setShowAddModal(false);
+      setFullName('');
+      setEmail('');
+      setPhone('');
+      setInitialPassword((created as any).initialPassword || '');
+      setNotice(`Teacher ${fullName} appointed to faculty.`);
+      await fetchData();
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
+  if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
+            Faculty & Teaching Staff
+          </h1>
+          <p className="text-xs text-[#64748B]">
+            Manage teacher appointments, course allocations, qualifications, and payroll rates
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          disabled={isReadOnly}
+          className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Appoint Teacher</span>
+        </button>
+      </div>
+
+      {notice && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{notice}</span>
+        </div>
+      )}
+      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t('reset_password')}: <strong className="font-mono select-all">{initialPassword}</strong></div>}
+
+      {/* Teachers Directory Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {teachers.map(t => (
+          <div key={t.id} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#132A29]">{t.fullName}</h3>
+                <span className="text-[11px] font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded border border-[#CCFBF1]">
+                  {t.department}
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-700 uppercase">{t.status}</span>
+            </div>
+
+            <p className="text-xs text-[#64748B]">{t.qualification}</p>
+
+            <div className="space-y-1 text-xs text-[#334155] pt-2 border-t border-[#F1F5F9]">
+              <p className="flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5 text-[#64748B]" />
+                <span>{t.email}</span>
+              </p>
+              <p className="flex items-center gap-2 font-mono">
+                <Phone className="w-3.5 h-3.5 text-[#64748B]" />
+                <span>{t.phone}</span>
+              </p>
+              <p className="text-[11px] text-[#64748B] pt-1">
+                Base Salary: <strong className="font-mono text-[#132A29]">${t.monthlySalary} / month</strong>
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <PaginationControls info={pageInfo} onPage={setPage} />
+
+      {/* APPOINT TEACHER MODAL */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
+              <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-[#0F766E]" />
+                <span>Appoint Faculty Member</span>
+              </h2>
+              <button onClick={() => setShowAddModal(false)} className="text-[#64748B] hover:text-[#132A29]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTeacher} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-[#334155]">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="e.g. Dr. Ahmed Warsame"
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-[#334155]">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="teacher@school.so"
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+25261..."
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-[#334155]">{t('gender')} *</label>
+                <select required value={gender} onChange={e => setGender(e.target.value as 'male' | 'female')} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                  <option value="male">{t('male')}</option>
+                  <option value="female">{t('female')}</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-[#334155]">Department</label>
+                  <select
+                    value={department}
+                    onChange={e => setDepartment(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                  >
+                    <option value="Sciences">Sciences</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Languages">Languages</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="Islamic Studies">Islamic Studies</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
+                  <input
+                    type="number"
+                    min="100"
+                    required
+                    value={monthlySalary}
+                    onChange={e => setMonthlySalary(parseFloat(e.target.value) || 0)}
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-[#334155]">Qualification & Degree</label>
+                <input
+                  type="text"
+                  required
+                  value={qualification}
+                  onChange={e => setQualification(e.target.value)}
+                  placeholder="e.g. M.Sc Physics, SNU"
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 border border-[#CBD5E1] rounded-lg text-[#334155]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold shadow-sm"
+                >
+                  Appoint Teacher
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

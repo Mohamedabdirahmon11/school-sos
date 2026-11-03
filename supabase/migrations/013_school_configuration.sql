@@ -1,0 +1,13 @@
+ALTER TABLE schools ALTER COLUMN currency SET DEFAULT 'ETB';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS language VARCHAR(5) NOT NULL DEFAULT 'en';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Addis_Ababa';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS terms JSONB NOT NULL DEFAULT '{"semester1Start": "", "semester1End": "", "semester2Start": "", "semester2End": ""}'::JSONB;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS grading_scale JSONB NOT NULL DEFAULT '[{"minPercentage": 90, "label": "A", "remark": "Excellent"}, {"minPercentage": 80, "label": "B", "remark": "Very good"}, {"minPercentage": 70, "label": "C", "remark": "Good"}, {"minPercentage": 60, "label": "D", "remark": "Satisfactory"}, {"minPercentage": 0, "label": "F", "remark": "Below pass mark"}]'::JSONB;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS attendance_rules JSONB NOT NULL DEFAULT '{"lateAfterMinutes": 15, "absentAfterMinutes": 0, "requireExcusedReason": true, "allowParentExcuses": false}'::JSONB;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_levels JSONB NOT NULL DEFAULT '[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]'::JSONB;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS report_card_header TEXT NOT NULL DEFAULT '';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS report_card_footer TEXT NOT NULL DEFAULT '';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS receipt_header TEXT NOT NULL DEFAULT '';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS receipt_footer TEXT NOT NULL DEFAULT '';
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"email": true, "sms": true, "inApp": true, "attendanceAlerts": true, "feeReminders": true, "examResults": true}'::JSONB;
+NOTIFY pgrst, 'reload schema';

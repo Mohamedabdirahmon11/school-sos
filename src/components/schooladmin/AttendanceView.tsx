@@ -1,0 +1,386 @@
+/**
+ * Daily Attendance Register for School Admin & Teachers
+ * Taken ONCE PER DAY per class per student.
+ * Status: Present / Absent / Late / Excused with optional note.
+ */
+
+import React, { useState, useEffect } from 'react';
+import { ApiClient } from '../../services/api.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
+import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
+import { 
+  CalendarCheck, 
+  Check, 
+  UserCheck, 
+  Clock, 
+  AlertCircle, 
+  Save, 
+  CheckCircle2, 
+  Send,
+  Search,
+  Filter
+} from 'lucide-react';
+
+export const AttendanceView: React.FC = () => {
+  const { school, isReadOnly, t } = useAuth();
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [pageStudents, setPageStudents] = useState<Student[]>([]);
+  const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    if (!school) return;
+    ApiClient.getClasses().then(cls => {
+      setClasses(cls);
+      if (cls.length > 0) setSelectedClassId(cls[0].id);
+    });
+  }, [school]);
+
+  const loadAttendanceSheet = async () => {
+    if (!school || !selectedClassId) return;
+    setIsLoading(true);
+    try {
+      const [firstPage, existingRecords] = await Promise.all([
+        ApiClient.getStudents(selectedClassId, undefined, 1, 20),
+        ApiClient.getDailyAttendance(selectedClassId, date)
+      ]);
+      const firstPageInfo = ((firstPage as any).pagination || {
+        page: 1, pageSize: 20, total: firstPage.length, totalPages: firstPage.length ? 1 : 0
+      }) as PageInfo;
+      const allStudents = [...firstPage];
+      for (let pageNumber = 2; pageNumber <= firstPageInfo.totalPages; pageNumber += 1) {
+        const nextPage = await ApiClient.getStudents(selectedClassId, undefined, pageNumber, 20);
+        allStudents.push(...nextPage);
+      }
+      setStudents(allStudents);
+      setPageStudents(firstPage);
+      setServerPageInfo(firstPageInfo);
+
+      const map: Record<string, { status: AttendanceStatus; note: string }> = {};
+      for (const std of allStudents) {
+        const record = existingRecords.find(r => r.studentId === std.id);
+        map[std.id] = {
+          status: record ? record.status : 'present',
+          note: record?.note || ''
+        };
+      }
+      setAttendanceMap(map);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setPage(1);
+    loadAttendanceSheet();
+  }, [school, selectedClassId, date]);
+
+  const handleAttendancePage = async (nextPage: number) => {
+    setPage(nextPage);
+    if (searchQuery.trim()) return;
+    try {
+      const result = await ApiClient.getStudents(selectedClassId, undefined, nextPage, 20);
+      setPageStudents(result);
+      setServerPageInfo((result as any).pagination);
+    } catch (err: any) {
+      setNotice(err.message || 'Unable to load this attendance page.');
+    }
+  };
+
+  const handleMarkAllPresent = () => {
+    const updated: Record<string, { status: AttendanceStatus; note: string }> = {};
+    for (const std of students) {
+      updated[std.id] = {
+        status: 'present',
+        note: attendanceMap[std.id]?.note || ''
+      };
+    }
+    setAttendanceMap(updated);
+    setNotice('All students marked as Present. Click "Save Attendance" to commit.');
+  };
+
+  const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
+    setAttendanceMap(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        status
+      }
+    }));
+  };
+
+  const handleNoteChange = (studentId: string, note: string) => {
+    setAttendanceMap(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        note
+      }
+    }));
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!selectedClassId || isReadOnly) return;
+    if (school?.attendanceRules?.requireExcusedReason) {
+      const missingReason = students.some(std => attendanceMap[std.id]?.status === 'excused' && !attendanceMap[std.id]?.note.trim());
+      if (missingReason) {
+        setNotice('Add a reason for every excused student before saving.');
+        return;
+      }
+    }
+    setIsSaving(true);
+    setNotice(null);
+
+    try {
+      const records = students.map(std => ({
+        studentId: std.id,
+        status: attendanceMap[std.id]?.status || 'present',
+        note: attendanceMap[std.id]?.note || ''
+      }));
+
+      await ApiClient.recordDailyAttendance(selectedClassId, date, records);
+      setNotice('Daily attendance recorded successfully! Absent notifications queued for parents.');
+      setTimeout(() => setNotice(null), 4000);
+    } catch (err: any) {
+      setNotice(err.message || 'Failed to save attendance.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Stats calculation
+  const totalCount = students.length;
+  const presentCount = Object.values(attendanceMap).filter(v => v.status === 'present').length;
+  const absentCount = Object.values(attendanceMap).filter(v => v.status === 'absent').length;
+  const lateCount = Object.values(attendanceMap).filter(v => v.status === 'late').length;
+  const excusedCount = Object.values(attendanceMap).filter(v => v.status === 'excused').length;
+
+  const filteredStudents = students.filter(s => 
+    `${s.firstName} ${s.middleName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const localAttendancePageInfo: PageInfo = { page, pageSize: 20, total: filteredStudents.length, totalPages: Math.ceil(filteredStudents.length / 20) };
+  const attendancePageInfo = searchQuery.trim() ? localAttendancePageInfo : serverPageInfo;
+  const visibleStudents = searchQuery.trim() ? filteredStudents.slice((page - 1) * 20, page * 20) : pageStudents;
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
+            <CalendarCheck className="w-6 h-6 text-[#0F766E]" />
+            {t('attendance')} (Once Per Day)
+          </h1>
+          <p className="text-xs text-[#64748B] mt-1">
+            Take official daily class attendance. Absent students automatically trigger parent notifications.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleMarkAllPresent}
+            disabled={isReadOnly || students.length === 0}
+            className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" />
+            {t('mark_all_present')}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAttendance}
+            disabled={isSaving || isReadOnly || students.length === 0}
+            className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Save className="w-3.5 h-3.5" />
+            {isSaving ? 'Saving...' : 'Save Attendance'}
+          </button>
+        </div>
+      </div>
+
+      {notice && (
+        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+          <span>{notice}</span>
+        </div>
+      )}
+
+      {/* Control Bar: Class, Date */}
+      <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-[#475569] mb-1">Select Class</label>
+          <select
+            value={selectedClassId}
+            onChange={e => setSelectedClassId(e.target.value)}
+            className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+          >
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-[#475569] mb-1">Attendance Date</label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-[#475569] mb-1">Search Student</label>
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#94A3B8]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+              placeholder="Search name or ID..."
+              className="w-full text-xs py-2 pl-9 pr-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Summary KPI Counters */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] shadow-sm">
+          <p className="text-[11px] font-medium text-[#64748B]">Enrolled Students</p>
+          <p className="text-xl font-bold text-[#132A29] font-mono mt-0.5">{totalCount}</p>
+        </div>
+        <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 shadow-sm">
+          <p className="text-[11px] font-medium text-emerald-700">{t('present')}</p>
+          <p className="text-xl font-bold text-emerald-800 font-mono mt-0.5">{presentCount}</p>
+        </div>
+        <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 shadow-sm">
+          <p className="text-[11px] font-medium text-rose-700">{t('absent')}</p>
+          <p className="text-xl font-bold text-rose-800 font-mono mt-0.5">{absentCount}</p>
+        </div>
+        <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 shadow-sm">
+          <p className="text-[11px] font-medium text-amber-700">{t('late')}</p>
+          <p className="text-xl font-bold text-amber-800 font-mono mt-0.5">{lateCount}</p>
+        </div>
+        <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 shadow-sm col-span-2 sm:col-span-1">
+          <p className="text-[11px] font-medium text-indigo-700">{t('excused')}</p>
+          <p className="text-xl font-bold text-indigo-800 font-mono mt-0.5">{excusedCount}</p>
+        </div>
+      </div>
+
+      {/* Daily Attendance Student Register Table */}
+      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center text-xs text-[#64748B]">Loading student attendance register...</div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="p-8 text-center text-xs text-[#64748B]">
+            No students found in this class. Add students from the Students view.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#132A29]">
+              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
+                <tr>
+                  <th className="py-3 px-4">Student ID</th>
+                  <th className="py-3 px-4">Student Name</th>
+                  <th className="py-3 px-4">Parent Phone</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                  <th className="py-3 px-4">Attendance Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F1F5F9]">
+                {visibleStudents.map(std => {
+                  const state = attendanceMap[std.id] || { status: 'present', note: '' };
+                  return (
+                    <tr key={std.id} className="hover:bg-[#F8FAFC]">
+                      <td className="py-3 px-4 font-mono font-medium text-[#475569]">{std.studentId}</td>
+                      <td className="py-3 px-4 font-semibold text-[#132A29]">
+                        {std.firstName} {std.middleName} {std.lastName}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || 'N/A'}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(std.id, 'present')}
+                            disabled={isReadOnly}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                              state.status === 'present'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            P
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(std.id, 'absent')}
+                            disabled={isReadOnly}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                              state.status === 'absent'
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            A
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(std.id, 'late')}
+                            disabled={isReadOnly}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                              state.status === 'late'
+                                ? 'bg-amber-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            L
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(std.id, 'excused')}
+                            disabled={isReadOnly}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                              state.status === 'excused'
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            E
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={state.note}
+                          onChange={e => handleNoteChange(std.id, e.target.value)}
+                          placeholder="Optional reason or note..."
+                          disabled={isReadOnly}
+                          className="w-full text-xs px-2.5 py-1 border border-[#CBD5E1] rounded focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <PaginationControls info={attendancePageInfo} onPage={handleAttendancePage} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
