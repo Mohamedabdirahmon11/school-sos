@@ -1791,12 +1791,13 @@ class StorageEngine {
     const now = new Date().toISOString();
 
     for (const rec of records) {
-      const existingIdx = this.data.attendance.findIndex(a => 
-        a.schoolId === schoolId && 
-        a.classId === classId && 
-        a.studentId === rec.studentId && 
+      const existingIdx = this.data.attendance.findIndex(a =>
+        a.schoolId === schoolId &&
+        a.classId === classId &&
+        a.studentId === rec.studentId &&
         a.date === date
       );
+      const wasAbsent = existingIdx >= 0 && this.data.attendance[existingIdx].status === 'absent';
 
       if (existingIdx >= 0) {
         this.data.attendance[existingIdx].status = rec.status;
@@ -1820,13 +1821,15 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // If absent, automatically queue parent SMS notification if communication is enabled
-      if (rec.status === 'absent') {
+      // Notify only on a transition into absent; re-saving an unchanged register
+      // must not send duplicate absence alerts. Use either available parent contact.
+      if (rec.status === 'absent' && !wasAbsent) {
         const student = await this.getStudentById(rec.studentId, schoolId);
-        if (student && student.fatherPhone) {
+        const parentPhone = student?.fatherPhone || student?.motherPhone;
+        if (student && parentPhone) {
           await this.queueNotification({
             schoolId,
-            recipientPhone: student.fatherPhone,
+            recipientPhone: parentPhone,
             recipientName: `Parent of ${student.firstName}`,
             studentId: student.id,
             messageType: 'attendance_absent',
