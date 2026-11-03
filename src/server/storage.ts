@@ -423,7 +423,7 @@ class StorageEngine {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
       if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql and check service-role access. ${error.message}`);
     }
-    for (const table of ['super_admin_settings', 'school_subscriptions']) {
+    for (const table of ['super_admin_settings', 'school_subscriptions', 'fee_receipt_sequences']) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
       if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql. ${error.message}`);
     }
@@ -2303,6 +2303,21 @@ class StorageEngine {
     }
   }
 
+  private async nextFeeReceiptSequence(schoolId: string, academicYear: string): Promise<number> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Unique fee receipt numbering is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_next_fee_receipt', {
+      p_school_id: schoolId,
+      p_academic_year: academicYear
+    });
+    this.recordQuery('rpc:schoolos_next_fee_receipt', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to allocate a unique fee receipt number.');
+    const sequence = Number(data);
+    if (!Number.isSafeInteger(sequence) || sequence < 1) throw new Error('Database returned an invalid fee receipt sequence.');
+    return sequence;
+  }
+
   private async recordCashFeePaymentInternal(paymentData: {
     schoolId: string; studentId: string; academicYear: string; month: string;
     feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom'; amountDue: number; amountPaid: number;
@@ -2375,9 +2390,8 @@ class StorageEngine {
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
     const school = await this.getSchoolById(paymentData.schoolId);
-    const paymentCount = await this.queryPage('fee_payments', { school_id: paymentData.schoolId }, 1, 1);
-    const receiptCount = paymentCount.total + 1;
-    const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptCount).padStart(4, '0')}`;
+    const receiptSequence = await this.nextFeeReceiptSequence(paymentData.schoolId, paymentData.academicYear);
+    const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptSequence).padStart(4, '0')}`;
 
     const payment: FeePayment = {
       id: `fee-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
