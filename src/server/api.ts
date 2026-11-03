@@ -1627,16 +1627,31 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
 });
 
 apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (!['school_admin', 'accountant', 'super_admin', 'teacher'].includes(role || '')) {
+    res.status(403).json({ error: 'This role cannot view the school dashboard.' });
+    return;
+  }
   try {
     const summary = await db.getSchoolDashboardSummary((req as any).school.id);
-    const user = (req as any).user as User;
-    if (user.role === 'school_admin') {
-      const stats = { ...(summary?.stats || {}) };
-      delete stats.todayCollection;
-      delete stats.totalOutstanding;
-      const { recentPayments: _moneyRows, ...safe } = summary || {};
-      res.json({ ...safe, stats });
-    } else res.json(summary);
+    if (role === 'accountant' || role === 'super_admin') {
+      res.json(summary);
+      return;
+    }
+
+    // School admins and teachers may see academic dashboard data, never finance data.
+    const redactFinance = (value: any): any => {
+      if (Array.isArray(value)) return value.map(redactFinance);
+      if (!value || typeof value !== 'object') return value;
+      const safe: Record<string, any> = {};
+      for (const [key, child] of Object.entries(value)) {
+        if (/(payment|collection|outstanding|arrear|revenue|income|fee|receivable|dueamount)/i.test(key)) continue;
+        safe[key] = redactFinance(child);
+      }
+      return safe;
+    };
+    res.json(redactFinance(summary));
   }
   catch { res.status(503).json({ error: 'Unable to load the school dashboard.' }); }
 });
