@@ -2513,8 +2513,24 @@ apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuper
 
 apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const payload = { ...req.body };
-  delete payload.pin; // Do not allow direct plain overwrite
+  // Never accept identity, tenant, credential, or audit fields from the client.
+  // Only the editable student profile fields may be changed through this route.
+  const editableFields = [
+    'firstName', 'middleName', 'lastName', 'gender', 'admissionDate',
+    'dateOfBirth', 'studentPhone', 'fatherPhone', 'motherPhone',
+    'classId', 'section', 'status', 'branchId', 'bloodGroup',
+    'allergies', 'busRouteId', 'documents', 'notes'
+  ] as const;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const payload = Object.fromEntries(editableFields
+    .filter(field => Object.prototype.hasOwnProperty.call(body, field))
+    .map(field => [field, body[field]])) as Partial<Student>;
+  if (payload.gender !== undefined && !['male', 'female'].includes(payload.gender)) {
+    res.status(400).json({ error: 'Student gender is invalid.' }); return;
+  }
+  if (payload.status !== undefined && !['active', 'inactive', 'graduated', 'transferred'].includes(payload.status)) {
+    res.status(400).json({ error: 'Student status is invalid.' }); return;
+  }
   const existingStudent = await db.getStudentById(String(req.params.id), school.id);
   if (!existingStudent) { res.status(404).json({ error: 'Student not found.' }); return; }
   if (payload.classId && payload.classId !== existingStudent.classId) {
