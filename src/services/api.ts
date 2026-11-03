@@ -561,7 +561,7 @@ export class ApiClient {
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
-    const payments = includeFinance ? await this.getFeePayments(id) : [];
+    const payments = includeFinance ? await this.getAllFeePayments(id) : [];
     const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
     const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
     return {
@@ -753,6 +753,18 @@ export class ApiClient {
 
   public static async deleteFeeStructure(id: string) {
     return this.request<{ success: boolean }>(`/fees/structures/${id}`, { method: 'DELETE' });
+  }
+
+  public static async getAllFeePayments(studentId?: string, pageSize = 100) {
+    const firstPage = await this.getFeePayments(studentId, { page: 1, pageSize });
+    const totalPages = Number((firstPage as any).pagination?.totalPages) || 1;
+    if (totalPages <= 1) return firstPage;
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        this.getFeePayments(studentId, { page: index + 2, pageSize })
+      )
+    );
+    return [...firstPage, ...remainingPages.flat()];
   }
 
   public static async getFeePayments(studentId?: string, params?: any) {
