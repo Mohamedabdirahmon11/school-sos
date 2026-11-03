@@ -172,7 +172,7 @@ export class InMemorySupabase {
     const toCamel = (row: Record<string, any>) => Object.fromEntries(
       Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase()), value])
     );
-    const snapshots = new Map(['classes', 'students', 'users', 'audit_logs'].map(table => [table, structuredClone(this.rows(table))]));
+    const snapshots = new Map<string, any[]>(['classes', 'students', 'users', 'audit_logs'].map(table => [table, structuredClone(this.rows(table))] as [string, any[]]));
     try {
       this.rows('classes').push(...(payload.classes || []).map(toCamel));
       this.rows('students').push(...(payload.students || []).map((row: Record<string, any>) => ({
