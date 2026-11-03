@@ -3675,7 +3675,15 @@ apiRouter.get('/support/tickets', requireAuth, (req, res) => {
 
 apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
   const user = (req as any).user as User;
-  const { subject, description, priority } = req.body;
+  const body = req.body || {};
+  const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const priority = body.priority ?? 'medium';
+  if (!subject || subject.length > 200 || !description || description.length > 10000 ||
+      !['low', 'medium', 'high', 'urgent'].includes(priority)) {
+    res.status(400).json({ error: 'A valid ticket subject, description and priority are required.' });
+    return;
+  }
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
 
   const ticket = await db.createTicket({
@@ -3686,7 +3694,7 @@ apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWr
     createdByRole: user.role,
     subject,
     description,
-    priority: priority || 'medium',
+    priority,
     status: 'open'
   }, description);
 
