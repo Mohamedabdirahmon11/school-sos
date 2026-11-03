@@ -35,6 +35,21 @@ interface StudentsViewProps {
   onPrintIDCard?: (student: any) => void;
 }
 
+const getAdmissionLocalDate = (timeZone?: string) => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
 export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => {
   const { school, isReadOnly, t } = useAuth();
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
@@ -51,12 +66,16 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (school?.timezone) setAdmissionDate(getAdmissionLocalDate(school.timezone));
+  }, [school?.timezone]);
+
   // Add Student Form State (NO Date of Birth!)
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [admissionDate, setAdmissionDate] = useState(() => getAdmissionLocalDate(school?.timezone));
   const [studentPhone, setStudentPhone] = useState('');
   const [fatherPhone, setFatherPhone] = useState('');
   const [motherPhone, setMotherPhone] = useState('');
