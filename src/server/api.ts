@@ -2710,7 +2710,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
-    const updatedUser = db.updateUser(updated.userId, { staffId: updated.staffId, fullName: updated.fullName, email: updated.email, phone: updated.phone, permissions: updated.permissions });
+    const updatedUser = db.updateUser(updated.userId, { staffId: updated.staffId, fullName: updated.fullName, email: updated.email, phone: updated.phone, permissions: updated.permissions, isBlocked: updated.status !== 'active' });
     if (!updatedUser) { res.status(500).json({ error: 'Staff member was updated, but the linked sign-in account could not be updated.' }); return; }
     invalidateAuthenticatedSnapshot(updated.userId);
   }
