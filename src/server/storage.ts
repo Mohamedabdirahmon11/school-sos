@@ -1377,7 +1377,7 @@ class StorageEngine {
   }
 
   public createStudent(studentData: Omit<Student, 'id' | 'createdAt'>): Student {
-    if (studentData.pin !== undefined && !/^\\d{4}$/.test(studentData.pin)) {
+    if (studentData.pin !== undefined && !/^\d{4}$/.test(studentData.pin)) {
       throw new Error('Student PIN must contain exactly four digits.');
     }
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -1444,7 +1444,7 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && !/^\\d{4}$/.test(customPin)) {
+    if (customPin !== undefined && !/^\d{4}$/.test(customPin)) {
       throw new Error('Student PIN must contain exactly four digits.');
     }
     const student = await this.getStudentById(studentId, schoolId);
