@@ -1847,20 +1847,22 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
 
 apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  const allowedFields = new Set(['name', 'gradeLevel', 'section', 'roomNumber', 'capacity', 'classTeacherId', 'monthlyFee', 'isArchived', 'branchId']);
+  const payload = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key))) as Record<string, any>;
   const role = normalizeRole((req as any).user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
   const existing = await db.getClassById(String(req.params.id), school.id);
   if (!existing) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  if (req.body?.capacity !== undefined) {
+  if (payload.capacity !== undefined) {
     const enrolled = await db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id');
-    if (!Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < enrolled.total) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
+    if (!Number.isInteger(Number(payload.capacity)) || Number(payload.capacity) < enrolled.total) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
   }
-  if (req.body?.gradeLevel !== undefined) {
+  if (payload.gradeLevel !== undefined) {
     const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
-    if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+    if (!allowedLevels.includes(Number(payload.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   }
-  if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  const updated = await db.updateClass(String(req.params.id), req.body, school.id);
+  if (payload.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === payload.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  const updated = await db.updateClass(String(req.params.id), payload, school.id);
   res.json(updated);
 });
 
@@ -2529,10 +2531,12 @@ apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuper
 
 apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const payload = { ...req.body };
-  delete payload.pin; // Do not allow direct plain overwrite
+  const allowedFields = new Set(['firstName', 'middleName', 'lastName', 'gender', 'admissionDate', 'studentPhone', 'fatherPhone', 'motherPhone', 'classId', 'branchId', 'section', 'status', 'busRouteId', 'documents', 'notes', 'bloodGroup', 'allergies']);
+  const payload = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key))) as Record<string, any>;
   const existingStudent = await db.getStudentById(String(req.params.id), school.id);
   if (!existingStudent) { res.status(404).json({ error: 'Student not found.' }); return; }
+  if (payload.gender !== undefined && !['male', 'female'].includes(payload.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+  if (payload.status !== undefined && !['active', 'inactive', 'graduated', 'transferred'].includes(payload.status)) { res.status(400).json({ error: 'Invalid student status.' }); return; }
   if (payload.classId && payload.classId !== existingStudent.classId) {
     const role = normalizeRole((req as any).user.role);
     if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
@@ -3018,7 +3022,15 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
 
 apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const updated = await db.updateFeeStructure(req.params.id, school.id, req.body || {});
+  const allowedFields = new Set(['feeType', 'name', 'minGrade', 'maxGrade', 'classId', 'amount', 'cadence', 'isActive']);
+  const payload = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key))) as Record<string, any>;
+  if (payload.amount !== undefined && (!Number.isFinite(Number(payload.amount)) || Number(payload.amount) < 0)) { res.status(400).json({ error: 'Fee amount must be a valid non-negative number.' }); return; }
+  if (payload.cadence !== undefined && !['monthly', 'annual', 'one_time'].includes(payload.cadence)) { res.status(400).json({ error: 'Invalid fee cadence.' }); return; }
+  if (payload.minGrade !== undefined && (!Number.isInteger(Number(payload.minGrade)) || Number(payload.minGrade) < 0 || Number(payload.minGrade) > 12)) { res.status(400).json({ error: 'Minimum grade must be between KG and Grade 12.' }); return; }
+  if (payload.maxGrade !== undefined && (!Number.isInteger(Number(payload.maxGrade)) || Number(payload.maxGrade) < 0 || Number(payload.maxGrade) > 12)) { res.status(400).json({ error: 'Maximum grade must be between KG and Grade 12.' }); return; }
+  if (payload.minGrade !== undefined && payload.maxGrade !== undefined && Number(payload.minGrade) > Number(payload.maxGrade)) { res.status(400).json({ error: 'Minimum grade cannot exceed maximum grade.' }); return; }
+  if (payload.classId && !await db.getClassById(payload.classId, school.id)) { res.status(400).json({ error: 'Class does not belong to this school.' }); return; }
+  const updated = await db.updateFeeStructure(req.params.id, school.id, payload);
   if (!updated) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
   res.json(updated);
 });
