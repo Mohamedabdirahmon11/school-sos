@@ -11,6 +11,7 @@ The canonical base schema is the repository-root file `schema.sql` (there is no 
    - `014_assignment_submission_content.sql`, `015_enable_platform_rls.sql`, and `016_request_performance.sql` from the repository root, in numeric order.
    - `supabase/migrations/017_restrict_public_api_access.sql`.
    - `supabase/migrations/018_allow_kg_grade_level.sql`.
+   - `supabase/migrations/019_school_dashboard_timezone_and_voids.sql`.
 4. Check the migration history in Supabase before applying anything to an existing database. Do not re-run a migration merely because its filename is in this list; apply only migrations not already recorded.
 6. Run `scripts/check-rls.sql` in SQL Editor and review its output.
 
