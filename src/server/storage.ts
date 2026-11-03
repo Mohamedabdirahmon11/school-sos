@@ -746,7 +746,7 @@ class StorageEngine {
       const graceEnd = new Date(validUntil.getTime() + (sub.graceDays ?? 7) * 24 * 60 * 60 * 1000);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
-      if (now > graceEnd && sub.status !== 'read_only') {
+      if (now > graceEnd && this.data.settings.readOnlyAfterExpiry !== false && sub.status !== 'read_only') {
         sub.status = 'read_only';
         this.updateSchool(school.id, { subscription: sub });
         this.logAudit({
