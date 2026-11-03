@@ -3125,6 +3125,12 @@ apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin
 
 apiRouter.delete('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  const structure = (await db.getFeeStructures(school.id)).find(item => item.id === req.params.id);
+  if (!structure) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
+  const payments = await db.getFeePayments(school.id);
+  if (payments.some(payment => payment.feeStructureId === structure.id)) {
+    res.status(409).json({ error: 'This fee structure is referenced by payment history. Deactivate it instead of deleting it.' }); return;
+  }
   res.json({ success: await db.deleteFeeStructure(req.params.id, school.id) });
 });
 
