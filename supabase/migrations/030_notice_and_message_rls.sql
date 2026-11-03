@@ -37,6 +37,7 @@ DROP POLICY IF EXISTS direct_messages_sender_insert ON public.direct_messages;
 REVOKE INSERT ON public.direct_messages FROM PUBLIC, anon, authenticated;
 REVOKE UPDATE ON public.direct_messages FROM PUBLIC, anon, authenticated;
 GRANT UPDATE (is_read) ON public.direct_messages TO authenticated;
+REVOKE UPDATE, DELETE ON public.notice_reads FROM PUBLIC, anon, authenticated;
 
 REVOKE ALL ON public.school_notices FROM anon;
 NOTIFY pgrst, 'reload schema';
