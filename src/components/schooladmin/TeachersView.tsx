@@ -51,6 +51,18 @@ export const TeachersView: React.FC = () => {
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
 
+  const handleResetTeacherPin = async (teacher: Teacher) => {
+    if (isReadOnly) return;
+    if (!confirm(`Reset the sign-in PIN for ${teacher.fullName}? The new PIN will be shown once.`)) return;
+    try {
+      const result = await ApiClient.resetTeacherPin(teacher.id);
+      setInitialPassword(`Teacher ID: ${teacher.staffId}\nNew 4-digit PIN: ${result.newPin}`);
+      setNotice(`A new sign-in PIN was created for ${teacher.fullName}.`);
+    } catch (error: any) {
+      alert(error.message || 'Could not reset teacher PIN.');
+    }
+  };
+
   const handleToggleTeacherStatus = async (teacher: Teacher) => {
     if (isReadOnly) return;
     const nextStatus = teacher.status === 'active' ? 'inactive' : 'active';
@@ -189,6 +201,10 @@ export const TeachersView: React.FC = () => {
                 Base Salary: <strong className="font-mono text-[#132A29]">${t.monthlySalary} / month</strong>
               </p>
             </div>
+            <button type="button" onClick={() => handleResetTeacherPin(t)} disabled={isReadOnly}
+              className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
+              Reset 4-digit PIN
+            </button>
             <button type="button" onClick={() => handleToggleTeacherStatus(t)} disabled={isReadOnly}
               className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
               {t.status === 'active' ? 'Deactivate teacher' : 'Reactivate teacher'}
