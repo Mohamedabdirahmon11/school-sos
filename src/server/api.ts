@@ -1280,7 +1280,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
       status: 'trial',
       startDate: now.toISOString(),
       validUntil: validUntil.toISOString(),
-      graceDays: settings.graceDays || 7,
+      graceDays: settings.graceDays ?? 7,
       pricePaid: 0,
       autoRenew: true
     }
