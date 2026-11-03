@@ -2403,12 +2403,25 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     queryAllRows('students', filters, '*'),
     db.getClasses(school.id)
   ]);
+  const payments = (await db.getFeePaymentsForStudents(school.id, allStudents.map((student: any) => student.id))).filter(payment => !payment.voidedAt);
+  const totals = new Map<string, { due: number; paid: number; remaining: number }>();
+  for (const payment of payments) {
+    const current = totals.get(payment.studentId) || { due: 0, paid: 0, remaining: 0 };
+    current.due += Number(payment.amountDue || 0);
+    current.paid += Number(payment.amountPaid || 0);
+    current.remaining += Number(payment.remainingAmount ?? Math.max(0, Number(payment.amountDue || 0) - Number(payment.amountPaid || 0)));
+    totals.set(payment.studentId, current);
+  }
+  const getFeeStatus = (studentId: string) => {
+    const total = totals.get(studentId) || { due: 0, paid: 0, remaining: 0 };
+    return total.remaining <= 0 && (total.due > 0 || total.paid > 0) ? 'paid' : total.paid > 0 ? 'partial' : 'unpaid';
+  };
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const studentClass = classNames.get(student.classId) || student.className || '';
     const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, studentClass]
       .some(value => String(value || '').toLowerCase().includes(search));
-    const matchesFee = feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase();
+    const matchesFee = feeStatus === 'all' || getFeeStatus(student.id) === feeStatus.toLowerCase();
     return (!search || searchable) && matchesFee;
   });
   const cell = (value: unknown) => {
