@@ -616,7 +616,16 @@ export class ApiClient {
   }
 
   public static async getTeachers(params?: any) {
-    return this.request<Teacher[]>(`/teachers${this.pageQuery(params)}`);
+    const query = new URLSearchParams(this.pageQuery(params).replace(/^\\?/, ''));
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    return this.request<Teacher[]>(`/teachers?${query.toString()}`);
+  }
+
+  public static async updateTeacher(id: string, updates: Partial<Teacher>) {
+    return this.request<Teacher>(`/teachers/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
   }
 
   public static async createTeacher(data: Partial<Teacher>, schoolId?: string) {
