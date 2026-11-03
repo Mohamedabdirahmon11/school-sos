@@ -720,6 +720,26 @@ export class ApiClient {
     });
   }
 
+  public static async getHealthRecords() {
+    return this.request<any[]>('/school/health-records');
+  }
+
+  public static async addHealthRecord(data: {
+    studentId: string; visitDate: string; symptoms: string; treatment: string;
+    allergies: string; privateNotes: string;
+  }) {
+    return this.request<any>('/school/health-records', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async deleteHealthRecord(recordId: string) {
+    return this.request<{ success: boolean }>(`/school/health-records/${encodeURIComponent(recordId)}`, {
+      method: 'DELETE'
+    });
+  }
+
   public static async getInventoryItems() {
     return this.request<any[]>('/school/inventory');
   }
