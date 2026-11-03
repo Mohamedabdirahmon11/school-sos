@@ -1151,6 +1151,43 @@ apiRouter.get('/superadmin/settings', requireAuth, requireSuperAdmin, (_req, res
   res.json(db.getSettings());
 });
 
+apiRouter.get('/superadmin/analytics', requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    const schools = await db.getSchools();
+    const directory = await Promise.all(schools.map(async school => {
+      const [students, teachers] = await Promise.all([
+        db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
+        db.queryPage('teachers', { school_id: school.id }, 1, 1, undefined, 'id')
+      ]);
+      return { ...school, studentCount: students.total, teacherCount: teachers.total };
+    }));
+    const firstPage = await db.queryPage('users', {}, 1, 100, undefined, LIST_QUERY_COLUMNS.users);
+    const users = [...firstPage.items];
+    const pages = Math.ceil(firstPage.total / 100);
+    for (let page = 2; page <= pages; page += 1) {
+      const nextPage = await db.queryPage('users', {}, page, 100, undefined, LIST_QUERY_COLUMNS.users);
+      users.push(...nextPage.items);
+    }
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const activeUsers30Days = users.filter(user => {
+      const lastLogin = Date.parse(String((user as any).lastLoginAt || ''));
+      return Number.isFinite(lastLogin) && lastLogin >= cutoff;
+    }).length;
+    const invoices = await db.getSubscriptionInvoices();
+    const totalPaidBillings = invoices.filter(invoice => invoice.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+    res.json({
+      schools: directory,
+      activeSchools: directory.filter(school => school.subscription?.status === 'active').length,
+      totalStudents: directory.reduce((sum, school) => sum + school.studentCount, 0),
+      totalTeachers: directory.reduce((sum, school) => sum + school.teacherCount, 0),
+      activeUsers30Days,
+      totalPaidBillings
+    });
+  } catch {
+    res.status(503).json({ error: 'Unable to load platform analytics.' });
+  }
+});
+
 apiRouter.get('/superadmin/dashboard', requireAuth, requireSuperAdmin, async (_req, res) => {
   try { res.json(await db.getSuperAdminDashboardSummary()); }
   catch { res.status(503).json({ error: 'Unable to load the Super Admin dashboard.' }); }
@@ -1781,7 +1818,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     if (!Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < enrolled.total) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
   }
   if (req.body?.gradeLevel !== undefined) {
-    const allowedLevels: number[] = (school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
     if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
