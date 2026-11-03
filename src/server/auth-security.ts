@@ -19,6 +19,12 @@ function getSessionSecret(): string {
   return secret;
 }
 
+export function isSessionExpiryValid(expiresAt: unknown, now = Date.now()): boolean {
+  if (typeof expiresAt !== 'string' || !expiresAt.trim()) return false;
+  const parsedExpiry = Date.parse(expiresAt);
+  return Number.isFinite(parsedExpiry) && parsedExpiry > now;
+}
+
 export interface SessionPayload {
   sessionId: string;
   userId: string;
