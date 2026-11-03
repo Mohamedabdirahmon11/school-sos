@@ -11,7 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, TimetableSlot, StaffPayrollRecord } from '../types/index.ts';
+import { User, UserRole, School, TimetableSlot, StaffPayrollRecord, CommunicationSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -3437,41 +3437,116 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
 // 9. COMMUNICATION & NOTIFICATIONS QUEUE
 // ==============================================================================
 
+const sanitizeCommunicationSettings = (settings: CommunicationSettings) => {
+  const { apiKey, apiSecret, ...safeSettings } = settings;
+  return {
+    ...safeSettings,
+    apiKeyConfigured: Boolean(apiKey),
+    apiSecretConfigured: Boolean(apiSecret)
+  };
+};
+
 apiRouter.get('/communication/settings', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
-  res.json(await db.getCommunicationSettings(school.id));
+  const school = (req as any).school as School;
+  const settings = await db.getCommunicationSettings(school.id);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(sanitizeCommunicationSettings(settings));
 });
 
 apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
-  const provider = String(req.body?.provider || '');
-  if (!['twilio', 'infobip', 'local_gateway', 'whatsapp_business', 'none'].includes(provider)) { res.status(400).json({ error: 'Choose a supported notification provider.' }); return; }
-  if (req.body?.isActive !== undefined && typeof req.body.isActive !== 'boolean') { res.status(400).json({ error: 'Gateway activation must be true or false.' }); return; }
-  const updated = await db.updateCommunicationSettings(school.id, req.body);
-  db.logAudit({
-    action: 'COMMUNICATION_SETTINGS_UPDATED',
-    category: 'school',
-    schoolId: school.id,
-    schoolName: school.name,
-    userId: user.id,
-    userName: user.fullName,
-    userRole: user.role,
-    details: `Updated notification gateway to ${updated.provider} (${updated.isActive ? 'active' : 'inactive'}).`,
-    severity: 'info'
-  });
-  res.json(updated);
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid notification gateway settings.' });
+    return;
+  }
+  const provider = payload.provider;
+  if (!['twilio', 'infobip', 'local_gateway', 'whatsapp_business', 'none'].includes(provider)) {
+    res.status(400).json({ error: 'Choose a supported notification provider.' });
+    return;
+  }
+  const updates: Partial<CommunicationSettings> = { provider };
+  if (payload.isActive !== undefined) {
+    if (typeof payload.isActive !== 'boolean') { res.status(400).json({ error: 'Gateway activation must be true or false.' }); return; }
+    updates.isActive = payload.isActive;
+  }
+  for (const key of ['apiKey', 'apiSecret'] as const) {
+    if (payload[key] !== undefined) {
+      if (typeof payload[key] !== 'string' || !payload[key].trim() || payload[key].length > 512) {
+        res.status(400).json({ error: 'Provider credentials must be non-empty strings no longer than 512 characters.' });
+        return;
+      }
+      updates[key] = payload[key].trim();
+    }
+  }
+  if (payload.senderId !== undefined) {
+    if (typeof payload.senderId !== 'string' || payload.senderId.length > 50) { res.status(400).json({ error: 'Sender ID must be no longer than 50 characters.' }); return; }
+    updates.senderId = payload.senderId.trim();
+  }
+  if (payload.webhookUrl !== undefined) {
+    if (typeof payload.webhookUrl !== 'string' || payload.webhookUrl.length > 1000) { res.status(400).json({ error: 'Webhook URL must be no longer than 1000 characters.' }); return; }
+    updates.webhookUrl = payload.webhookUrl.trim();
+  }
+  try {
+    const updated = await db.updateCommunicationSettings(school.id, updates);
+    await db.flush();
+    db.logAudit({
+      action: 'COMMUNICATION_SETTINGS_UPDATED',
+      category: 'school',
+      schoolId: school.id,
+      schoolName: school.name,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      details: `Updated notification gateway to ${updated.provider} (${updated.isActive ? 'active' : 'inactive'}); credential values are excluded from audit logs.`,
+      severity: 'info'
+    });
+    await db.flush();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(sanitizeCommunicationSettings(updated));
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Notification settings could not be saved.' });
+  }
 });
 
 apiRouter.get('/communication/queue', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
+  res.setHeader('Cache-Control', 'no-store');
   void sendDatabasePage(req, res, 'communication_queue', { school_id: school.id });
 });
 
 apiRouter.post('/communication/send', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
-  const item = await db.queueNotification({ ...req.body, schoolId: school.id });
-  res.status(201).json(item);
+  const school = (req as any).school as School;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid notification details.' });
+    return;
+  }
+  const recipientPhone = typeof payload.recipientPhone === 'string' ? payload.recipientPhone.trim() : '';
+  const recipientName = typeof payload.recipientName === 'string' ? payload.recipientName.trim() : '';
+  const studentId = payload.studentId === undefined ? undefined : (typeof payload.studentId === 'string' ? payload.studentId.trim() : '');
+  const messageTypes = ['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'];
+  if (!/^\\+?[0-9][0-9\\s().-]{5,48}$/.test(recipientPhone) || recipientPhone.length > 50 ||
+      !recipientName || recipientName.length > 150 ||
+      (studentId !== undefined && (!studentId || studentId.length > 64)) ||
+      (studentId !== undefined && !await db.getStudentById(studentId, school.id)) ||
+      !messageTypes.includes(payload.messageType) ||
+      !['sms', 'whatsapp'].includes(payload.channel) ||
+      typeof payload.content !== 'string' || !payload.content.trim() || payload.content.length > 2000) {
+    res.status(400).json({ error: 'Invalid notification. Check recipient, school student, channel, message type and message length.' });
+    return;
+  }
+  try {
+    const item = await db.queueNotification({
+      schoolId: school.id, recipientPhone, recipientName, studentId,
+      messageType: payload.messageType, channel: payload.channel, content: payload.content.trim()
+    });
+    await db.flush();
+    res.status(201).json(item);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Notification could not be queued.' });
+  }
 });
 
 // ==============================================================================
