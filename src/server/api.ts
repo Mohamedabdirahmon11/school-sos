@@ -3404,10 +3404,22 @@ apiRouter.get('/communication/settings', requireAuth, requireSchoolContext, requ
 apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
-  const provider = String(req.body?.provider || '');
+  const body = req.body || {};
+  const provider = body.provider;
   if (!['twilio', 'infobip', 'local_gateway', 'whatsapp_business', 'none'].includes(provider)) { res.status(400).json({ error: 'Choose a supported notification provider.' }); return; }
-  if (req.body?.isActive !== undefined && typeof req.body.isActive !== 'boolean') { res.status(400).json({ error: 'Gateway activation must be true or false.' }); return; }
-  const updated = await db.updateCommunicationSettings(school.id, req.body);
+  if (body.isActive !== undefined && typeof body.isActive !== 'boolean') { res.status(400).json({ error: 'Gateway activation must be true or false.' }); return; }
+  const optionalCredentials = ['apiKey', 'apiSecret', 'senderId', 'webhookUrl'] as const;
+  for (const field of optionalCredentials) {
+    if (body[field] !== undefined && (typeof body[field] !== 'string' || body[field].length > 2048)) {
+      res.status(400).json({ error: 'Notification gateway credentials contain invalid values.' });
+      return;
+    }
+  }
+  const updated = await db.updateCommunicationSettings(school.id, {
+    provider,
+    ...(body.isActive === undefined ? {} : { isActive: body.isActive }),
+    ...Object.fromEntries(optionalCredentials.filter(field => body[field] !== undefined).map(field => [field, body[field].trim()]))
+  });
   db.logAudit({
     action: 'COMMUNICATION_SETTINGS_UPDATED',
     category: 'school',
@@ -3429,7 +3441,26 @@ apiRouter.get('/communication/queue', requireAuth, requireSchoolContext, require
 
 apiRouter.post('/communication/send', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  const item = await db.queueNotification({ ...req.body, schoolId: school.id });
+  const body = req.body || {};
+  const recipientPhone = typeof body.recipientPhone === 'string' ? body.recipientPhone.trim() : '';
+  const recipientName = typeof body.recipientName === 'string' ? body.recipientName.trim() : '';
+  const content = typeof body.content === 'string' ? body.content.trim() : '';
+  const messageTypes = ['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'];
+  if (recipientPhone.length < 3 || recipientPhone.length > 50 || !recipientName || recipientName.length > 120 ||
+      !content || content.length > 1600 || !messageTypes.includes(body.messageType) ||
+      !['sms', 'whatsapp'].includes(body.channel) ||
+      (body.studentId !== undefined && (typeof body.studentId !== 'string' || body.studentId.length > 64))) {
+    res.status(400).json({ error: 'Recipient, message type, channel and message content are required and must be valid.' });
+    return;
+  }
+  if (body.studentId && !(await db.getStudentById(body.studentId, school.id))) {
+    res.status(400).json({ error: 'The selected student does not belong to this school.' });
+    return;
+  }
+  const item = await db.queueNotification({
+    recipientPhone, recipientName, content, messageType: body.messageType, channel: body.channel,
+    ...(body.studentId ? { studentId: body.studentId } : {}), schoolId: school.id
+  });
   res.status(201).json(item);
 });
 
@@ -3456,10 +3487,20 @@ apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) =
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (!['school_admin', 'super_admin'].includes(user.role)) return res.status(403).json({ error: 'Only a School Admin can manage notices.' });
-  if (!['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(req.body?.audience)) return res.status(400).json({ error: 'Choose a supported notice audience.' });
-  if (typeof req.body?.title !== 'string' || !req.body.title.trim() || typeof req.body?.content !== 'string' || !req.body.content.trim()) return res.status(400).json({ error: 'Notice title and content are required.' });
-  if (req.body.audience === 'class' && !(await db.getClassById(req.body.classId, school.id))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
-  const notice = db.createNotice({ ...req.body, title: req.body.title.trim(), content: req.body.content.trim(), schoolId: school.id, authorName: user.fullName, authorRole: user.role, isActive: true });
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+  const audience = req.body?.audience;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId : undefined;
+  if (!['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(audience)) return res.status(400).json({ error: 'Choose a supported notice audience.' });
+  if (!title || title.length > 200 || !content || content.length > 10000) return res.status(400).json({ error: 'Notice title and content are required and must be within the allowed length.' });
+  if (audience === 'class' && (!classId || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
+  if (req.body?.isPinned !== undefined && typeof req.body.isPinned !== 'boolean') return res.status(400).json({ error: 'Pinned must be true or false.' });
+  const notice = db.createNotice({
+    title, content, audience, ...(audience === 'class' ? { classId } : {}),
+    isPinned: req.body?.isPinned === true,
+    publishDate: typeof req.body?.publishDate === 'string' && !Number.isNaN(Date.parse(req.body.publishDate)) ? req.body.publishDate : new Date().toISOString(),
+    schoolId: school.id, authorName: user.fullName, authorRole: user.role, isActive: true
+  });
   res.status(201).json(notice);
 });
 
@@ -3467,12 +3508,17 @@ apiRouter.put('/notices/:id', requireAuth, requireSchoolContext, async (req, res
   const user = (req as any).user as User;
   const school = (req as any).school;
   if (!['school_admin', 'super_admin'].includes(user.role)) return res.status(403).json({ error: 'Only a School Admin can manage notices.' });
-  const title = String(req.body?.title || '').trim();
-  const content = String(req.body?.content || '').trim();
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
   const audience = req.body?.audience;
-  if (!title || !content || !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(audience)) return res.status(400).json({ error: 'Valid notice title, content and audience are required.' });
-  if (audience === 'class' && !(await db.getClassById(req.body?.classId || '', school.id))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
-  const updated = await db.updateNotice(req.params.id, school.id, { title, content, audience, classId: req.body?.classId, isPinned: Boolean(req.body?.isPinned) });
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId : undefined;
+  if (!title || title.length > 200 || !content || content.length > 10000 || !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(audience)) return res.status(400).json({ error: 'Valid notice title, content and audience are required.' });
+  if (audience === 'class' && (!classId || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
+  if (req.body?.isPinned !== undefined && typeof req.body.isPinned !== 'boolean') return res.status(400).json({ error: 'Pinned must be true or false.' });
+  const updated = await db.updateNotice(req.params.id, school.id, {
+    title, content, audience, ...(audience === 'class' ? { classId } : { classId: undefined }),
+    isPinned: req.body?.isPinned === true
+  });
   if (!updated) return res.status(404).json({ error: 'Notice not found.' });
   res.json(updated);
 });
