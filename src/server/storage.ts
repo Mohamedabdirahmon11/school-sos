@@ -1944,7 +1944,8 @@ class StorageEngine {
   }
 
   public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
-    return this.queryRows<StudentMark>('student_marks', { school_id: schoolId, class_id: classId, subject_id: subjectId, semester });
+    const academicYear = this.getExamConfig(schoolId).academicYear;
+    return this.queryRows<StudentMark>('student_marks', { school_id: schoolId, class_id: classId, subject_id: subjectId, semester, academic_year: academicYear });
   }
 
   public async getStudentMarks(schoolId: string, studentId: string): Promise<StudentMark[]> {
@@ -1979,6 +1980,7 @@ class StorageEngine {
         mk.classId === classId && 
         mk.subjectId === subjectId && 
         mk.studentId === m.studentId && 
+        mk.academicYear === config.academicYear &&
         mk.semester === semester
       );
 
