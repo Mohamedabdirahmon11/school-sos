@@ -175,6 +175,7 @@ export class ApiClient {
     schoolCode?: string;
     pin?: string;
     password?: string;
+    twoFactorCode?: string;
   }) {
     return this.request<any>('/auth/login', {
       method: 'POST',
