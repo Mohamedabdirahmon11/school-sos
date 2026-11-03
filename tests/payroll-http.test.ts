@@ -22,6 +22,7 @@ storage.db.createStaffMember({ schoolId: school.id, staffId: 'PAY-ACCT', userId:
 const teacherUser = storage.db.createUser({ schoolId: school.id, role: 'teacher', fullName: 'Test Teacher', email: 'payroll-teacher@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 const teacher = storage.db.createTeacher({ schoolId: school.id, userId: teacherUser.id, staffId: 'PAY-TEACHER', fullName: teacherUser.fullName, email: teacherUser.email!, phone: '+15550009900', gender: 'female', qualification: 'B.Ed', department: 'Science', assignedClasses: [], assignedSubjects: [], status: 'active', joinedDate: '2026-09-01', monthlySalary: 1200 });
 const admin = storage.db.createUser({ schoolId: school.id, role: 'school_admin', fullName: 'Test School Admin', email: 'payroll-school-admin@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
+const superAdmin = storage.db.createUser({ schoolId: school.id, role: 'super_admin', fullName: 'Test Super Admin', email: 'payroll-super-admin@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 
 function cookieFor(user: any, sessionId: string) {
   const expiresAt = Date.now() + 60_000;
@@ -31,6 +32,7 @@ function cookieFor(user: any, sessionId: string) {
 const accountantCookie = cookieFor(accountant, 'payroll-accountant-session');
 const teacherCookie = cookieFor(teacherUser, 'payroll-teacher-session');
 const adminCookie = cookieFor(admin, 'payroll-admin-session');
+const superAdminCookie = cookieFor(superAdmin, 'payroll-super-admin-session');
 const app = express(); app.use(express.json()); app.use(cookieParser());
 const { apiRouter } = await import('../src/server/api.ts'); app.use('/api', apiRouter);
 const server = app.listen(0); await new Promise<void>(resolve => server.once('listening', resolve));
@@ -55,6 +57,8 @@ test('accountant payroll runs are unique per staff and month, progress through a
   assert.equal(otherPayslip.status, 403);
   const adminCreate = await fetch(`${baseUrl}/payroll`, { method: 'POST', headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ month: '2026-12', staff: [{ staffId: teacher.id }] }) });
   assert.equal(adminCreate.status, 403);
+  const superAdminPayslip = await fetch(`${baseUrl}/payroll/${record.id}/payslip.pdf`, { headers: { Cookie: superAdminCookie } });
+  assert.equal(superAdminPayslip.status, 200, 'super admins may access payslips within the selected school context');
 
   const approve = await fetch(`${baseUrl}/payroll/${record.id}/approve`, { method: 'POST', headers: accountantHeaders });
   assert.equal(approve.status, 200); assert.equal((await approve.json() as any).status, 'approved');
