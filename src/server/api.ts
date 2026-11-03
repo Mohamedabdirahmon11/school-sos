@@ -2622,10 +2622,10 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (payload.section !== undefined && (typeof payload.section !== 'string' || payload.section.trim().length > 50)) {
     res.status(400).json({ error: 'Section must be text of at most 50 characters.' }); return;
   }
-  if (payload.admissionDate !== undefined && (typeof payload.admissionDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.admissionDate) || Number.isNaN(Date.parse(`${payload.admissionDate}T00:00:00.000Z`)) || new Date(`${payload.admissionDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.admissionDate)) {
+  if (payload.admissionDate !== undefined && (typeof payload.admissionDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(payload.admissionDate) || Number.isNaN(Date.parse(`${payload.admissionDate}T00:00:00.000Z`)) || new Date(`${payload.admissionDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.admissionDate)) {
     res.status(400).json({ error: 'Admission date must be a real YYYY-MM-DD date.' }); return;
   }
-  if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== '' && (typeof payload.dateOfBirth !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.dateOfBirth) || Number.isNaN(Date.parse(`${payload.dateOfBirth}T00:00:00.000Z`)) || new Date(`${payload.dateOfBirth}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.dateOfBirth)) {
+  if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== '' && (typeof payload.dateOfBirth !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(payload.dateOfBirth) || Number.isNaN(Date.parse(`${payload.dateOfBirth}T00:00:00.000Z`)) || new Date(`${payload.dateOfBirth}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.dateOfBirth)) {
     res.status(400).json({ error: 'Date of birth must be a real YYYY-MM-DD date.' }); return;
   }
   if (payload.bloodGroup !== undefined && (typeof payload.bloodGroup !== 'string' || payload.bloodGroup.length > 10)) {
