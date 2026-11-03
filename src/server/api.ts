@@ -2346,11 +2346,11 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     return `"${safe.replace(/"/g, '""')}"`;
   };
   const rows = [
-    ['Student ID', 'First Name', 'Father Name', 'Grandfather Name', 'Gender', 'Class', 'Admission Date', 'Student Phone', 'Father Phone', 'Mother Phone', 'Fee Status'],
+    ['Student ID', 'First Name', 'Father Name', 'Grandfather Name', 'Gender', 'Class', 'Admission Date', 'Student Phone', 'Father Phone', 'Mother Phone', 'Status', 'Fee Status'],
     ...filtered.map((student: any) => [
       student.studentId, student.firstName, student.middleName, student.lastName, student.gender,
       classNames.get(student.classId) || student.className, student.admissionDate,
-      student.studentPhone, student.fatherPhone, student.motherPhone, student.feeStatus
+      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, student.feeStatus
     ])
   ];
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
