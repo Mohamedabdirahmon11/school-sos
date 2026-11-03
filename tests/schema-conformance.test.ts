@@ -82,11 +82,11 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
 test('performance migration has scoped dashboard aggregates, execute grants, and idempotent filter indexes', () => {
   const migration = readFileSync(new URL('../supabase/migrations/002_performance_aggregates.sql', import.meta.url), 'utf8');
   for (const fragment of [
-    'CREATE OR REPLACE FUNCTION school_dashboard_summary',
+    'CREATE OR REPLACE FUNCTION public.school_dashboard_summary',
     'WHERE school_id = p_school_id',
     'CREATE OR REPLACE FUNCTION super_admin_dashboard_summary',
-    'REVOKE ALL ON FUNCTION school_dashboard_summary(VARCHAR) FROM PUBLIC, anon, authenticated',
-    'GRANT EXECUTE ON FUNCTION school_dashboard_summary(VARCHAR) TO service_role',
+    'REVOKE ALL ON FUNCTION public.school_dashboard_summary(VARCHAR) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.school_dashboard_summary(VARCHAR) TO service_role',
     'CREATE INDEX IF NOT EXISTS idx_messages_recipient',
     "NOTIFY pgrst, 'reload schema'"
   ]) assert.ok(migration.includes(fragment), `migration includes ${fragment}`);
@@ -150,9 +150,10 @@ test('paged-list projections contain only columns that exist in schema.sql', () 
   }
 });
 
-test('student list route applies role scope in its single paged query', () => {
+test('student list route pages ordinary lists and scopes fee-status filtering to administrators', () => {
   const route = apiSource.match(/apiRouter\.get\('\/students',[\s\S]*?\n\}\);/);
   assert.ok(route, 'students list route exists');
   assert.equal((route![0].match(/db\.queryPage\('students'/g) || []).length, 1);
-  assert.equal(route![0].includes('db.getStudents('), false, 'role scoping does not hydrate the full student list');
+  assert.match(route![0], /if \(\['paid', 'partial', 'unpaid'\]\.includes\(feeStatus\) && \['school_admin', 'super_admin'\]\.includes\(user\.role\)\)/, 'fee-status full-list path is limited to administrators');
+  assert.match(route![0], /Number\(req\.query\.page\)/, 'regular student lists apply pagination');
 });
