@@ -2131,6 +2131,7 @@ class StorageEngine {
     if (!sourceClass) throw new Error('Promotion source class was not found in this school.');
     const rankings = await this.getClassYearlyRankings(schoolId, classId);
     const rankByStudent = new Map(rankings.map((row, index) => [row.student.id, { ...row, rank: index + 1 }]));
+    const targetClasses = new Map<string, SchoolClass>();
     if (new Set(promotions.map(row => row.studentId)).size !== promotions.length || promotions.length !== rankings.length) {
       throw new Error('Confirmations must include each student in the selected class exactly once.');
     }
@@ -2143,7 +2144,10 @@ class StorageEngine {
         throw new Error('A reason is required for an administrator promotion override.');
       }
       if (promotion.decision === 'promoted') {
-        if (!promotion.classToId || !(await this.getClassById(promotion.classToId, schoolId))) throw new Error('Target class must belong to this school.');
+        if (!promotion.classToId) throw new Error('Target class must belong to this school.');
+        const targetClass = await this.getClassById(promotion.classToId, schoolId);
+        if (!targetClass || targetClass.isArchived) throw new Error('Target class must be an active class in this school.');
+        targetClasses.set(targetClass.id, targetClass);
       }
       promotion.yearlyPercentage = rank.yearlyPercentage;
       promotion.yearlyRank = rank.rank;
@@ -2178,7 +2182,11 @@ class StorageEngine {
 
       // If promoted to next class, update student record
       if (p.decision === 'promoted' && p.classToId) {
-        await this.updateStudent(p.studentId, { classId: p.classToId }, schoolId);
+        const targetClass = targetClasses.get(p.classToId);
+        await this.updateStudent(p.studentId, {
+          classId: p.classToId,
+          branchId: (targetClass?.branchId ?? null) as any
+        }, schoolId);
       }
     }
 
