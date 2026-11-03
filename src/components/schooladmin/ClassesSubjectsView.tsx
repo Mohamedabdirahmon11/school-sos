@@ -355,9 +355,7 @@ export const ClassesSubjectsView: React.FC = () => {
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
                 </div>
->
               </div>
->
               <fieldset className="border rounded-lg p-3 space-y-3">
                 <legend className="px-1 font-semibold">Assign to classes</legend>
                 <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">{classes.map(klass => <label key={klass.id} className="flex gap-2 items-center"><input type="checkbox" checked={subjectAssignments.some(item => item.classId === klass.id)} onChange={event => setSubjectAssignments(current => event.target.checked ? [...current, { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }] : current.filter(item => item.classId !== klass.id))} />{klass.name} · {klass.section}</label>)}</div>
