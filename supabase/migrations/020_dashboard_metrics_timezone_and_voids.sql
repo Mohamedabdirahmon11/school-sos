@@ -4,7 +4,7 @@ RETURNS JSONB
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = public, pg_temp
 AS $function$
   SELECT jsonb_build_object(
     'stats', jsonb_build_object(
