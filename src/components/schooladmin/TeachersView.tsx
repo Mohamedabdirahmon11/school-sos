@@ -132,7 +132,7 @@ export const TeachersView: React.FC = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-          <input type="search" value={search} onChange={event => setSearch(event.target.value)}
+          <input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }}
             placeholder="Search this page by teacher name, ID, phone or department"
             aria-label="Search teachers on this page"
             className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
