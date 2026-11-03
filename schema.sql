@@ -215,6 +215,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id VARCHAR(40);
 UPDATE users SET staff_id = 'STF-' || upper(substr(md5(school_id || ':' || id), 1, 10))
   WHERE staff_id IS NULL AND school_id IS NOT NULL AND role IN ('school_admin','teacher','accountant');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_school_staff_id ON users(school_id, lower(staff_id)) WHERE staff_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_staff_id_global ON users(lower(staff_id)) WHERE staff_id IS NOT NULL AND btrim(staff_id) <> '';
 
 -- 9. USER SESSIONS
 CREATE TABLE IF NOT EXISTS user_sessions (
