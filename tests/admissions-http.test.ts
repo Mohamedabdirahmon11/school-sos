@@ -310,6 +310,11 @@ test('concurrent attendance submissions converge on one daily row and one alert 
   assert.equal(created.status, 201, await created.clone().text());
   const student = await created.json();
   const date = '2026-11-03';
+  const invalidNote = await fetch(`${baseUrl}/attendance`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
+  });
+  assert.equal(invalidNote.status, 400);
   const submit = () => fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent' }] })
