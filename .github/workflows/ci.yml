@@ -35,7 +35,7 @@ jobs:
         run: npm run typecheck:ci
 
       - name: Test suite
-        run: npm run test:ci
+        run: npm test
 
       - name: Route parity audit
         run: npm run audit:routes
