@@ -52,7 +52,7 @@ export const TimetableView: React.FC = () => {
       const [clsList, subList, tchList, schedule, schoolSettings, unavailable] = await Promise.all([
         ApiClient.getClasses(),
         ApiClient.getSubjects(school.id),
-        ApiClient.getTeachers(school.id),
+        ApiClient.getTeachers(),
         ApiClient.getTimetable(),
         ApiClient.getTimetableSettings(),
         ApiClient.getTeacherUnavailability()
