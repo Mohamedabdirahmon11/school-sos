@@ -2341,24 +2341,31 @@ class StorageEngine {
     if (!Number.isFinite(paymentData.amountDue) || !Number.isFinite(paymentData.amountPaid) || paymentData.amountDue < 0 || paymentData.amountPaid < 0 || paymentData.amountPaid > paymentData.amountDue) {
       throw new Error('Payment amounts must be valid, non-negative values and cash paid cannot exceed the amount due.');
     }
-    const registrationRecord = paymentData.feeType === 'annual_registration'
-      ? this.data.feePayments.find(item => item.schoolId === paymentData.schoolId && item.studentId === student.id && item.feeType === 'annual_registration' && item.academicYear === paymentData.academicYear && !item.voidedAt)
-      : undefined;
-    if (registrationRecord) {
-      if (registrationRecord.status === 'paid') throw new Error('The annual registration fee is already paid for this student and academic year.');
-      const cumulativePaid = registrationRecord.amountPaid + paymentData.amountPaid;
-      if (cumulativePaid > registrationRecord.amountDue) throw new Error('Cash paid cannot exceed the remaining registration balance.');
-      registrationRecord.amountPaid = cumulativePaid;
-      registrationRecord.remainingAmount = registrationRecord.amountDue - cumulativePaid;
-      registrationRecord.status = registrationRecord.remainingAmount === 0 ? 'paid' : 'partial';
-      registrationRecord.date = paymentDate;
-      registrationRecord.recordedBy = paymentData.recordedBy;
-      if (paymentData.idempotencyKey) registrationRecord.idempotencyKeys = [...(registrationRecord.idempotencyKeys || []), paymentData.idempotencyKey];
-      if (paymentData.notes) registrationRecord.notes = [registrationRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
-      this.logAudit({ action: 'REGISTRATION_FEE_INSTALLMENT', category: 'finance', schoolId: paymentData.schoolId, userId: paymentData.recordedBy, userName: 'Cashier / Accountant', userRole: 'accountant', details: `Collected an additional registration-fee installment for student ID ${student.id}. Balance: ${registrationRecord.remainingAmount}.`, severity: 'info' });
+    const structureId = matching?.id || paymentData.feeStructureId;
+    const installmentRecord = this.data.feePayments.find(item =>
+      item.schoolId === paymentData.schoolId &&
+      item.studentId === student.id &&
+      item.feeType === paymentData.feeType &&
+      item.academicYear === paymentData.academicYear &&
+      !item.voidedAt &&
+      (paymentData.feeType === 'annual_registration' || item.month === paymentData.month) &&
+      (item.feeStructureId === structureId || !item.feeStructureId)
+    );
+    if (installmentRecord) {
+      if (installmentRecord.status === 'paid') throw new Error('This fee is already paid for the selected billing period.');
+      const cumulativePaid = Number(installmentRecord.amountPaid || 0) + paymentData.amountPaid;
+      if (cumulativePaid > Number(installmentRecord.amountDue || 0)) throw new Error('Cash paid cannot exceed the remaining fee balance.');
+      installmentRecord.amountPaid = cumulativePaid;
+      installmentRecord.remainingAmount = Number(installmentRecord.amountDue || 0) - cumulativePaid;
+      installmentRecord.status = installmentRecord.remainingAmount === 0 ? 'paid' : cumulativePaid > 0 ? 'partial' : 'unpaid';
+      installmentRecord.date = paymentDate;
+      installmentRecord.recordedBy = paymentData.recordedBy;
+      if (paymentData.idempotencyKey) installmentRecord.idempotencyKeys = [...(installmentRecord.idempotencyKeys || []), paymentData.idempotencyKey];
+      if (paymentData.notes) installmentRecord.notes = [installmentRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
+      this.logAudit({ action: 'FEE_INSTALLMENT_RECORDED', category: 'finance', schoolId: paymentData.schoolId, userId: paymentData.recordedBy, userName: 'Cashier / Accountant', userRole: 'accountant', details: `Collected an additional ${paymentData.feeType} installment for student ID ${student.id}. Balance: ${installmentRecord.remainingAmount}.`, severity: 'info' });
       this.save();
       await this.flush();
-      return registrationRecord;
+      return installmentRecord;
     }
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
@@ -2374,7 +2381,7 @@ class StorageEngine {
       academicYear: paymentData.academicYear,
       month: paymentData.month,
       feeType: paymentData.feeType,
-      feeStructureId: paymentData.feeType === 'custom' ? matching?.id : undefined,
+      feeStructureId: structureId,
       idempotencyKey: paymentData.idempotencyKey,
       amountDue: paymentData.amountDue,
       amountPaid: paymentData.amountPaid,
