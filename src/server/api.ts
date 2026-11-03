@@ -2433,7 +2433,7 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   );
   const cell = (value: unknown) => {
     const raw = String(value ?? '');
-    const safe = /^\\s*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+    const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
     return `"${safe.replace(/"/g, '""')}"`;
   };
   const rows = [
@@ -2443,7 +2443,7 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
       teacher.phone, teacher.monthlySalary, teacher.status, teacher.joinedDate
     ])
   ];
-  const csv = rows.map(row => row.map(cell).join(',')).join('\\r\\n');
+  const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-teachers-${new Date().toISOString().slice(0, 10)}.csv"`
