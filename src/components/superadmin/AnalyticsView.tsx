@@ -33,9 +33,16 @@ export const AnalyticsView: React.FC = () => {
     load();
   }, []);
 
-  const totalStudents = schools.reduce((sum, s) => sum + (s.studentCount || 0), 0);
-  const totalTeachers = schools.reduce((sum, s) => sum + (s.teacherCount || 0), 0);
-  const totalInvoiced = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
+  const totalStudents = schools.reduce((sum, school) => sum + (Number(school.studentCount) || 0), 0);
+  const totalTeachers = schools.reduce((sum, school) => sum + (Number(school.teacherCount) || 0), 0);
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const activeUsers = users.filter(user => {
+    const lastLogin = Date.parse(user.lastLoginAt || '');
+    return Number.isFinite(lastLogin) && lastLogin >= cutoff;
+  }).length;
+  const paidInvoices = invoices.filter(invoice => invoice.status === 'paid');
+  const totalInvoiced = paidInvoices.reduce((sum, invoice) => sum + (Number(invoice.amount) || 0), 0);
+  const activeSchools = schools.filter(school => school.subscription?.status === 'active').length;
 
   // Export Analytics CSV
   const handleExportCSV = () => {
@@ -78,15 +85,15 @@ export const AnalyticsView: React.FC = () => {
       {/* Aggregate Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
-          <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Overall Attendance Rate</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">94.8%</p>
-          <p className="text-[11px] text-[#64748B] mt-1">Weighted daily average across schools</p>
+          <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Active Schools</span>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{activeSchools.toLocaleString()}</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Schools with an active subscription</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Active Users (30 Days)</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{users.length}</p>
-          <p className="text-[11px] text-[#64748B] mt-1">Admins, Teachers, Parents, Students</p>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{activeUsers}</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Based on last successful sign-in</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
@@ -96,9 +103,9 @@ export const AnalyticsView: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
-          <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Report Cards Generated</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">1,240</p>
-          <p className="text-[11px] text-[#64748B] mt-1">Official term PDF transcripts issued</p>
+          <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total Teachers</span>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">—</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Across all schools</p>
         </div>
       </div>
 
