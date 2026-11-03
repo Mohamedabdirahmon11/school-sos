@@ -703,10 +703,12 @@ apiRouter.post('/auth/login', async (req, res) => {
     if (candidateUsers.length === 0) {
       // Check if student or parent exists in student records
       const students = await db.getStudents(school.id);
-      const matchStd = students.find(s => 
-        (role === 'student' && (s.studentPhone === phone || s.fatherPhone === phone)) ||
-        (role === 'parent' && (s.fatherPhone === phone || s.motherPhone === phone))
+      const matchingStudents = students.filter(student =>
+        (role === 'student' && (student.studentPhone === phone || student.fatherPhone === phone)) ||
+        (role === 'parent' && (student.fatherPhone === phone || student.motherPhone === phone))
       );
+      // A parent phone may be shared by siblings. Use the PIN to select the correct child.
+      const matchStd = matchingStudents.find(student => verifyPin(pin, student.pinHash || (student as any).pin)) || matchingStudents[0];
 
       if (!matchStd) {
         const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
@@ -797,12 +799,18 @@ apiRouter.post('/auth/login', async (req, res) => {
       return;
     }
 
+    let targetUser = candidateUsers[0];
     if (candidateUsers.length > 1) {
-      res.status(400).json({ error: 'Multiple accounts linked to this phone. Please contact your school administrator.' });
-      return;
+      // Siblings may share a guardian phone; their individual PINs disambiguate accounts.
+      const pinMatches = role === 'student'
+        ? candidateUsers.filter(candidate => verifyPin(pin, String(candidate.pin || (candidate as any).pinHash || '')))
+        : [];
+      if (pinMatches.length !== 1) {
+        res.status(400).json({ error: 'Multiple accounts share this phone. Use the student-specific PIN or contact the school administrator.' });
+        return;
+      }
+      targetUser = pinMatches[0];
     }
-
-    const targetUser = candidateUsers[0];
 
     // Check user record lockout
     if (targetUser.lockedUntil && new Date(targetUser.lockedUntil) > new Date()) {
