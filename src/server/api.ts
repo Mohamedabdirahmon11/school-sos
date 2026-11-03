@@ -2663,6 +2663,11 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
 
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
+  const user = (req as any).user as User;
+  if (!['school_admin', 'accountant', 'super_admin', 'teacher'].includes(user.role)) {
+    res.status(403).json({ error: 'This role cannot view the staff directory.' });
+    return;
+  }
   const search = typeof req.query.search === 'string'
     ? req.query.search.replace(/[,%().*\\"']/g, ' ').trim().slice(0, 80)
     : '';
@@ -2671,7 +2676,10 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
         .map(field => `${field}.ilike.*${search}*`)
         .join(',')
     : undefined;
-  void sendDatabasePage(req, res, 'teachers', { school_id: school.id }, searchFilter);
+  const sanitize = user.role === 'teacher'
+    ? (items: any[]) => items.map(({ monthlySalary, ...item }) => item)
+    : undefined;
+  void sendDatabasePage(req, res, 'teachers', { school_id: school.id }, searchFilter, sanitize);
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
