@@ -270,13 +270,11 @@ export class ApiClient {
     const school = schools.find(s => s.id === id);
     const users = await this.request<User[]>(`/users?schoolId=${id}`).catch(() => []);
     const admin = users.find(u => u.role === 'school_admin') || users[0];
-    const students = await this.getStudents(undefined, undefined);
-    const teachers = await this.getTeachers();
     return {
       school,
       admin,
-      studentCount: students.length,
-      teacherCount: teachers.length
+      studentCount: Number((school as any)?.studentCount) || 0,
+      teacherCount: Number((school as any)?.teacherCount) || 0
     };
   }
 
