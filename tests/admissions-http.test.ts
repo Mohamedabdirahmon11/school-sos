@@ -297,3 +297,42 @@ test('student profile updates validate phones and keep parent/student login link
   assert.ok(newFather?.pin && verifyPin(first.initialPin, newFather.pin));
   assert.ok(newMother?.pin && verifyPin(first.initialPin, newMother.pin));
 });
+
+test('concurrent attendance submissions converge on one daily row and one alert per parent', async () => {
+  const created = await fetch(`${baseUrl}/students`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      firstName: 'Attendance', middleName: 'Concurrent', lastName: 'Pupil', gender: 'female',
+      classId: klass.id, studentId: 'ATTENDANCE-CONCURRENT-01',
+      fatherPhone: '+15550007401', motherPhone: '+15550007402'
+    })
+  });
+  assert.equal(created.status, 201, await created.clone().text());
+  const student = await created.json();
+  const date = '2026-11-03';
+  const submit = () => fetch(`${baseUrl}/attendance`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent' }] })
+  });
+  const [first, retry] = await Promise.all([submit(), submit()]);
+  assert.equal(first.status, 200, await first.clone().text());
+  assert.equal(retry.status, 200, await retry.clone().text());
+
+  const rows = memory.rows('attendance_records').filter(row =>
+    row.school_id === school.id && row.class_id === klass.id &&
+    row.student_id === student.id && row.date === date
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, 'absent');
+
+  const alerts = memory.rows('communication_queue').filter(row =>
+    row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
+  );
+  assert.equal(alerts.length, 2, 'one idempotent queued alert per distinct parent phone');
+
+  const repeated = await submit();
+  assert.equal(repeated.status, 200, await repeated.clone().text());
+  assert.equal(memory.rows('communication_queue').filter(row =>
+    row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
+  ).length, 2, 're-saving an absent status must not queue duplicate alerts');
+});
