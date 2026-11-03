@@ -2312,9 +2312,27 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\\s-]/gu, ' ').replace(/\\s+/g, ' ').slice(0, 80)
+    : '';
+  if (search && !roleFilter) {
+    const pattern = `%${search}%`;
+    roleFilter = [
+      `student_id.ilike.${pattern}`,
+      `first_name.ilike.${pattern}`,
+      `middle_name.ilike.${pattern}`,
+      `last_name.ilike.${pattern}`,
+      `student_phone.ilike.${pattern}`,
+      `father_phone.ilike.${pattern}`,
+      `mother_phone.ilike.${pattern}`
+    ].join(',');
+  }
   const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, roleFilter, LIST_QUERY_COLUMNS.students);
+  const classes = await db.getClasses(school.id);
+  const classNames = new Map(classes.map(klass => [klass.id, `${klass.name}${klass.section ? ` - ${klass.section}` : ''}`]));
+  const studentsWithClass = result.items.map(student => ({ ...student, className: classNames.get(student.classId) || '' }));
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
-  res.json(sanitizeStudents(result.items));
+  res.json(sanitizeStudents(studentsWithClass));
 });
 
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -2358,6 +2376,19 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.csv"`
   }).send('\uFEFF' + csv);
+});
+
+apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(String(req.params.id), school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+  if (!await canAccessStudentRecord(user, student.id)) {
+    res.status(403).json({ error: 'You do not have access to this student record.' });
+    return;
+  }
+  const klass = await db.getClassById(student.classId, school.id);
+  res.json(sanitizeStudent({ ...student, className: klass ? `${klass.name}${klass.section ? ` - ${klass.section}` : ''}` : '' }));
 });
 
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
