@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(res.user);
       setSchool(res.school);
       setSessionTimeoutMinutes(res.sessionTimeoutMinutes || 60);
-    } else if (!res.requirePasswordChange && !res.requireTwoFactorCode && !res.requireTwoFactorSetup) {
+    } else {
       await refreshUser();
     }
     return res;
