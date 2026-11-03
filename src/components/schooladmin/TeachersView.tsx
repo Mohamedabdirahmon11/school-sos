@@ -162,15 +162,14 @@ export const TeachersView: React.FC = () => {
               </div>
 
               <div>
-                  <label className="block font-medium text-[#334155]">Phone Number *</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    placeholder="Optional contact number"
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-                  />
-                </div>
+                <label className="block font-medium text-[#334155]">Phone Number (optional)</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="Optional contact number"
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                />
               </div>
 
               <div>
