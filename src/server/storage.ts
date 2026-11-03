@@ -2174,8 +2174,8 @@ class StorageEngine {
     if (!Number.isInteger(topN) || topN < 1) throw new Error('topN must be a positive whole number.');
     if (!Array.isArray(promotions) || promotions.length > 2000 || promotions.some(p =>
       !p || typeof p !== 'object' || typeof p.studentId !== 'string' || !p.studentId.trim() ||
-      typeof p.classFromId !== 'string' || typeof p.classToId !== 'string' ||
-      !['promoted', 'repeated'].includes(p.decision) ||
+      typeof p.classFromId !== 'string' || !['promoted', 'repeated'].includes(p.decision) ||
+      (p.decision === 'promoted' && (typeof p.classToId !== 'string' || !p.classToId.trim())) ||
       (p.adminOverride !== undefined && typeof p.adminOverride !== 'boolean') ||
       (p.notes !== undefined && (typeof p.notes !== 'string' || p.notes.length > 500))
     )) throw new Error('Each promotion must include valid student, class, decision, and notes fields.');
