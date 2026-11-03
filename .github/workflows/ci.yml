@@ -37,6 +37,9 @@ jobs:
       - name: Test suite
         run: npm run test:ci
 
+      - name: Schema conformance test
+        run: npx tsx --test tests/schema-conformance.test.ts
+
       - name: Route parity audit
         run: npm run audit:routes
 
