@@ -80,7 +80,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const loadStudentDetails = async (student: any) => {
     setSelectedStudent(student);
     try {
-      const details = await ApiClient.getStudentDetails(student.id, school?.id);
+      const details = await ApiClient.getStudentDetails(student.id, school?.id, true);
       setStudentDetails(details);
     } catch (err: any) {
       alert(err.message);
@@ -450,7 +450,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 ) : (
                   studentDetails?.attendance?.slice(-5).map((a: any) => (
                     <div key={a.id} className="p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
-                      <span className="font-mono">{a.date} ({a.session})</span>
+                      <span className="font-mono">{a.date}</span>
                       <span className={`font-semibold uppercase text-[11px] ${
                         a.status === 'present' ? 'text-emerald-700' : 'text-rose-700'
                       }`}>
@@ -472,10 +472,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   studentDetails?.marks?.map((m: any) => (
                     <div key={m.id} className="p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-[#132A29]">Score: {m.marksObtained}/{m.maxMarks}</p>
-                        <p className="text-[10px] text-[#64748B]">Grade: {m.grade} · Status: {m.status}</p>
+                        <p className="font-semibold text-[#132A29]">Score: {m.totalMarks} · {Number(m.percentage || 0).toFixed(1)}%</p>
+                        <p className="text-[10px] text-[#64748B]">Subject: {m.subjectName || m.subjectId} · Status: {m.status}</p>
                       </div>
-                      <span className="font-bold font-mono text-emerald-700">{m.grade}</span>
+                      <span className="font-bold font-mono text-emerald-700">{Number(m.percentage || 0).toFixed(0)}%</span>
                     </div>
                   ))
                 )}
