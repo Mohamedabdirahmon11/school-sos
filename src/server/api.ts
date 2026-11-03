@@ -2317,6 +2317,49 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   res.json(sanitizeStudents(result.items));
 });
 
+apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
+  const filters: Record<string, string | string[] | undefined> = {
+    school_id: school.id,
+    class_id: classId,
+    branch_id: branchId
+  };
+  const [allStudents, classes] = await Promise.all([
+    queryAllRows('students', filters, '*'),
+    db.getClasses(school.id)
+  ]);
+  const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
+  const filtered = allStudents.filter((student: any) => {
+    const studentClass = classNames.get(student.classId) || student.className || '';
+    const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, studentClass]
+      .some(value => String(value || '').toLowerCase().includes(search));
+    const matchesFee = feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase();
+    return (!search || searchable) && matchesFee;
+  });
+  const cell = (value: unknown) => {
+    const raw = String(value ?? '');
+    const safe = /^\\s*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const rows = [
+    ['Student ID', 'First Name', 'Father Name', 'Grandfather Name', 'Gender', 'Class', 'Admission Date', 'Student Phone', 'Father Phone', 'Mother Phone', 'Fee Status'],
+    ...filtered.map((student: any) => [
+      student.studentId, student.firstName, student.middleName, student.lastName, student.gender,
+      classNames.get(student.classId) || student.className, student.admissionDate,
+      student.studentPhone, student.fatherPhone, student.motherPhone, student.feeStatus
+    ])
+  ];
+  const csv = rows.map(row => row.map(cell).join(',')).join('\\r\\n');
+  res.set({
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.csv"`
+  }).send('\\uFEFF' + csv);
+});
+
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const { firstName, middleName, lastName, gender, classId } = req.body || {};
