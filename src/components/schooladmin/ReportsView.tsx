@@ -56,10 +56,10 @@ export const ReportsView: React.FC = () => {
         return;
       }
     } else if (type === 'census') {
-      csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += `Enrolled Students,${summary.studentCount}, "${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Average Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Academic Pass Rate,${summary.passRate == null ? 'Not available' : `${Number(summary.passRate).toFixed(1)}%` },"${school?.name}","${school?.academicYear}"\n`;
+      csvContent = 'Metric,Value,School,Academic Year\\n';
+      csvContent += ['Enrolled Students', summary.studentCount, school?.name, school?.academicYear].map(csvCell).join(',') + '\\n';
+      csvContent += ['Average Attendance Rate', `${summary.attendanceRate}%`, school?.name, school?.academicYear].map(csvCell).join(',') + '\\n';
+      csvContent += ['Academic Pass Rate', summary.passRate == null ? 'Not available' : `${Number(summary.passRate).toFixed(1)}%`, school?.name, school?.academicYear].map(csvCell).join(',') + '\\n';
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
