@@ -64,6 +64,8 @@ export const GlobalUsersView: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => {
+    // Student identities belong in each school's student directory, not the platform staff directory.
+    if (u.role === 'student') return false;
     const matchSearch = 
       u.fullName.toLowerCase().includes(search.toLowerCase()) ||
       (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
@@ -83,7 +85,7 @@ export const GlobalUsersView: React.FC = () => {
             Global User Management & Security
           </h1>
           <p className="text-xs text-[#64748B]">
-            All registered platform identities, roles, credentials, and access statuses
+            Platform staff and administrator accounts across all schools
           </p>
         </div>
         <button
@@ -113,7 +115,7 @@ export const GlobalUsersView: React.FC = () => {
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search by name, email, phone, student ID..."
+            placeholder="Search by name, email, phone, or staff ID..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
@@ -127,7 +129,6 @@ export const GlobalUsersView: React.FC = () => {
             { id: 'school_admin', label: 'School Admin' },
             { id: 'teacher', label: 'Teacher' },
             { id: 'parent', label: 'Parent' },
-            { id: 'student', label: 'Student' }
           ].map(r => (
             <button
               key={r.id}
