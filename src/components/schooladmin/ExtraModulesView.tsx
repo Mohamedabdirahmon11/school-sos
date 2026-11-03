@@ -71,7 +71,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     if (!school) return;
     ApiClient.getLibraryBooks(school.id).then(setBooks).catch(console.error);
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
-    ApiClient.getStudents(undefined, undefined, 1, 100).then(setStudents).catch(console.error);
+    ApiClient.getAllSchoolStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
   }, [school]);
 
