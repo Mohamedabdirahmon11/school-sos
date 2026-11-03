@@ -2793,19 +2793,33 @@ apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdmin
   await db.flush();
   res.json(rejected);
 });
+// Prevent two simultaneous approvals in the same server process from enrolling twice.
+const admissionApprovalInFlight = new Set<string>();
+
 apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
-  if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
-  if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
-  const klass = await db.getClassById(application.classId, school.id);
-  if (!klass) { res.status(400).json({ error: 'Application class no longer belongs to this school.' }); return; }
-  const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
-  const student = db.createStudent({ schoolId: school.id, branchId: klass.branchId, studentId, firstName: application.firstName, middleName: application.middleName, lastName: application.lastName, gender: application.gender, admissionDate: new Date().toISOString().slice(0, 10), fatherPhone: application.fatherPhone, motherPhone: application.motherPhone, classId: application.classId, status: 'active' } as any);
-  const updated = await db.updateAdmissionApplication(application.id, school.id, 'approved', studentId);
-  db.logAudit({ action: 'ADMISSION_APPLICATION_APPROVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was approved and enrolled as ${studentId}.`, severity: 'info' });
-  await db.flush();
-  res.json({ application: updated, student: { ...sanitizeStudent(student), initialPin: student.pin } });
+  const lockKey = `${school.id}:${req.params.id}`;
+  if (admissionApprovalInFlight.has(lockKey)) {
+    res.status(409).json({ error: 'This admission application is already being processed.' });
+    return;
+  }
+  admissionApprovalInFlight.add(lockKey);
+  try {
+    const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
+    if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+    if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
+    const klass = await db.getClassById(application.classId, school.id);
+    if (!klass) { res.status(400).json({ error: 'Application class no longer belongs to this school.' }); return; }
+    const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
+    const student = db.createStudent({ schoolId: school.id, branchId: klass.branchId, studentId, firstName: application.firstName, middleName: application.middleName, lastName: application.lastName, gender: application.gender, admissionDate: new Date().toISOString().slice(0, 10), fatherPhone: application.fatherPhone, motherPhone: application.motherPhone, classId: application.classId, status: 'active' } as any);
+    const updated = await db.updateAdmissionApplication(application.id, school.id, 'approved', studentId);
+    if (!updated) { res.status(409).json({ error: 'This admission application is no longer pending.' }); return; }
+    db.logAudit({ action: 'ADMISSION_APPLICATION_APPROVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was approved and enrolled as ${studentId}.`, severity: 'info' });
+    await db.flush();
+    res.json({ application: updated, student: { ...sanitizeStudent(student), initialPin: student.pin } });
+  } finally {
+    admissionApprovalInFlight.delete(lockKey);
+  }
 });
 
 // ==============================================================================
