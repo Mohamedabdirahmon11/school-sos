@@ -209,8 +209,8 @@ export const LoginView: React.FC = () => {
 
                 {twoFactorRequired && (
                   <div>
-                    <label className="block text-xs font-medium text-[#334155]">Authenticator code</label>
-                    <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] text-center border border-[#CBD5E1] rounded-lg" />
+                    <label className="block text-xs font-medium text-[#334155]">Authenticator or recovery code</label>
+                    <input type="text" autoComplete="one-time-code" maxLength={16} required value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.toUpperCase().slice(0, 16))} placeholder="6-digit or recovery code" className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] text-center border border-[#CBD5E1] rounded-lg" />
                   </div>
                 )}
                 <div>
