@@ -11,7 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, TimetableSlot, StaffPayrollRecord, CommunicationSettings } from '../types/index.ts';
+import { User, UserRole, School, TimetableSlot, StaffPayrollRecord, CommunicationSettings, SchoolNotice } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -2846,7 +2846,7 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
     return;
   }
   const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
@@ -3584,7 +3584,7 @@ apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) =
   if (!title || title.length > 255 || !content || content.length > 10000 ||
       !['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(audience) ||
       typeof isPinned !== 'boolean' ||
-      typeof publishDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(publishDate) ||
+      typeof publishDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(publishDate) ||
       Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== publishDate) {
     return res.status(400).json({ error: 'Notice title, content, audience, pin state or publish date is invalid.' });
   }
@@ -3620,7 +3620,7 @@ apiRouter.put('/notices/:id', requireAuth, requireSchoolContext, async (req, res
   if (payload.publishDate !== undefined) {
     const date = payload.publishDate;
     const parsed = typeof date === 'string' ? new Date(`${date}T00:00:00.000Z`) : new Date('invalid');
-    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
       return res.status(400).json({ error: 'Notice publish date is invalid.' });
     }
     updates.publishDate = date;
@@ -4040,7 +4040,7 @@ apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireS
   const actionTaken = payload.actionTaken === undefined ? '' : payload.actionTaken;
   const parentNotified = payload.parentNotified === undefined ? false : payload.parentNotified;
   if (!studentId || studentId.length > 64 ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
       !infractionType || infractionType.length > 120 ||
       typeof description !== 'string' || description.length > 2000 ||
       !['minor', 'moderate', 'severe'].includes(severity) ||
@@ -4112,7 +4112,7 @@ apiRouter.post('/school/health-records', requireAuth, requireSchoolContext, requ
   const allergies = payload.allergies === undefined ? '' : payload.allergies;
   const privateNotes = payload.privateNotes === undefined ? '' : payload.privateNotes;
   if (!studentId || studentId.length > 64 ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
       typeof symptoms !== 'string' || !symptoms.trim() || symptoms.trim().length > 2000 ||
       typeof treatment !== 'string' || treatment.length > 2000 ||
       typeof allergies !== 'string' || allergies.length > 1000 ||
