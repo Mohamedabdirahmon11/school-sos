@@ -234,10 +234,10 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
     const key = `${data.className.trim().toLowerCase()}\u0000${data.section.trim().toLowerCase()}`;
     const existingClass = byClass.get(key);
     if (branch && existingClass?.branchId && existingClass.branchId !== branch.id) reasons.push('branch does not match the existing class branch.');
-    const identity = `${data.studentName.trim().toLowerCase()}\u0000${key}\u0000${data.parentPhone.replace(/[\s()-]/g, '')}`;
+    const identity = `${data.studentName.trim().toLowerCase()}\u0000${key}\u0000${data.fatherPhone.replace(/[\s()-]/g, '')}`;
     if (seen.has(identity) || students.some(student => {
       const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.replace(/\s+/g, ' ').trim().toLowerCase();
-      return fullName === data.studentName.trim().replace(/\s+/g, ' ').toLowerCase() && student.classId === existingClass?.id && (student.fatherPhone || '').replace(/[\s()-]/g, '') === data.parentPhone.replace(/[\s()-]/g, '');
+      return fullName === data.studentName.trim().replace(/\s+/g, ' ').toLowerCase() && student.classId === existingClass?.id && (student.fatherPhone || '').replace(/[\s()-]/g, '') === data.fatherPhone.replace(/[\s()-]/g, '');
     })) reasons.push('Duplicate student with the same name, class, and parentPhone.');
     seen.add(identity);
     const capacityKey = existingClass?.id || key;
