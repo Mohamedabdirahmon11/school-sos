@@ -2353,7 +2353,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
       student.studentPhone, student.fatherPhone, student.motherPhone, student.feeStatus
     ])
   ];
-  const csv = rows.map(row => row.map(cell).join(',')).join('\\r\\n');
+  const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.csv"`
