@@ -1244,9 +1244,11 @@ class StorageEngine {
   }
 
   // Sessions
-  public createSession(session: UserSession): void {
+  public async createSession(session: UserSession): Promise<void> {
     this.data.sessions.push(session);
     this.save();
+    // Do not issue a cookie until its backing database session is durable.
+    await this.flush();
   }
 
   public async getSessionById(id: string): Promise<UserSession | null> {
@@ -1327,6 +1329,7 @@ class StorageEngine {
     session.expiresAt = expiresAt;
     session.lastActivityAt = new Date().toISOString();
     this.save();
+    await this.flush();
   }
 
   public async revokeSession(id: string): Promise<boolean> {
@@ -1335,6 +1338,7 @@ class StorageEngine {
     this.data.sessions = this.data.sessions.filter(session => session.id !== id);
     if (previous === this.data.sessions.length) return false;
     this.save();
+    await this.flush();
     return true;
   }
 
