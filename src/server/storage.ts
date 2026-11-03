@@ -1438,6 +1438,9 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
+    if (customPin !== undefined && !/^\\d{4}$/.test(customPin)) {
+      throw new Error('A custom student PIN must contain exactly four digits.');
+    }
     const student = await this.getStudentById(studentId, schoolId);
     if (!student) return null;
     await Promise.all([
@@ -1450,10 +1453,12 @@ class StorageEngine {
     delete student.pin;
 
     // The PIN is the shared credential for a student's and their linked parent's login.
-    const familyPhones = [student.studentPhone, student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
     const linkedUsers = this.data.users.filter(user =>
-      ['student', 'parent'].includes(user.role) &&
-      (user.studentId === student.studentId || user.id === `usr-student-${student.id}` || user.linkedStudentIds?.includes(student.id) || familyPhones.includes(user.phone || ''))
+      user.schoolId === student.schoolId &&
+      (
+        (user.role === 'student' && (user.studentId === student.studentId || user.id === `usr-student-${student.id}`)) ||
+        (user.role === 'parent' && user.linkedStudentIds?.includes(student.id))
+      )
     );
     for (const linkedUser of linkedUsers) {
       linkedUser.pin = pinHash;
