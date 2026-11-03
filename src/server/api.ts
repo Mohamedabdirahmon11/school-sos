@@ -3084,6 +3084,7 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
     classId: typeof body.classId === 'string' ? body.classId : undefined,
     isActive: body.isActive === undefined ? true : body.isActive
   });
+  await db.flush();
   res.status(201).json(item);
 });
 
