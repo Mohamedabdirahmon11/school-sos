@@ -3954,6 +3954,78 @@ apiRouter.delete('/school/discipline/:recordId', requireAuth, requireSchoolConte
   res.json({ success });
 });
 
+apiRouter.get('/school/health-records', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const [records, students] = await Promise.all([db.getHealthRecords(school.id), db.getStudents(school.id)]);
+  const studentNames = new Map(students.map(student => [student.id, `${student.firstName} ${student.lastName}`.trim()]));
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(records.map(record => ({ ...record, studentName: studentNames.get(record.studentId) || 'Student record unavailable' })));
+});
+
+apiRouter.post('/school/health-records', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid clinic visit details.' });
+    return;
+  }
+  const studentId = typeof payload.studentId === 'string' ? payload.studentId.trim() : '';
+  const visitDate = typeof payload.visitDate === 'string' ? payload.visitDate : '';
+  const parsedDate = new Date(`${visitDate}T00:00:00.000Z`);
+  const symptoms = payload.symptoms;
+  const treatment = payload.treatment === undefined ? '' : payload.treatment;
+  const allergies = payload.allergies === undefined ? '' : payload.allergies;
+  const privateNotes = payload.privateNotes === undefined ? '' : payload.privateNotes;
+  if (!studentId || studentId.length > 64 ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
+      typeof symptoms !== 'string' || !symptoms.trim() || symptoms.trim().length > 2000 ||
+      typeof treatment !== 'string' || treatment.length > 2000 ||
+      typeof allergies !== 'string' || allergies.length > 1000 ||
+      typeof privateNotes !== 'string' || privateNotes.length > 3000) {
+    res.status(400).json({ error: 'Invalid clinic visit details. Check student, date, symptoms and field lengths.' });
+    return;
+  }
+  try {
+    const record = await db.createHealthRecord({
+      schoolId: school.id, studentId, visitDate, symptoms: symptoms.trim(),
+      treatment: treatment.trim(), allergies: allergies.trim(), privateNotes: privateNotes.trim(),
+      nurseName: user.fullName, recordedBy: user.id
+    });
+    const student = await db.getStudentById(studentId, school.id);
+    db.logAudit({
+      action: 'HEALTH_RECORD_CREATED', category: 'academics', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Created a clinic record (${record.id}); health details are intentionally excluded from audit logs.`, severity: 'warning'
+    });
+    await db.flush();
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ ...record, studentName: student ? `${student.firstName} ${student.lastName}`.trim() : '' });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Clinic visit could not be saved.' });
+  }
+});
+
+apiRouter.delete('/school/health-records/:recordId', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const recordId = typeof req.params.recordId === 'string' ? req.params.recordId.trim() : '';
+  if (!recordId || recordId.length > 80) {
+    res.status(400).json({ error: 'A valid health record ID is required.' });
+    return;
+  }
+  const success = await db.deleteHealthRecord(school.id, recordId);
+  if (success) {
+    const user = (req as any).user as User;
+    db.logAudit({
+      action: 'HEALTH_RECORD_DELETED', category: 'academics', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Deleted clinic record ${recordId}; health details are intentionally excluded from audit logs.`, severity: 'warning'
+    });
+    await db.flush();
+  }
+  res.json({ success });
+});
+
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
