@@ -2598,6 +2598,42 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   const payload = Object.fromEntries(editableFields
     .filter(field => Object.prototype.hasOwnProperty.call(body, field))
     .map(field => [field, body[field]])) as Partial<Student>;
+  for (const field of ['firstName', 'middleName', 'lastName'] as const) {
+    if (payload[field] !== undefined && (typeof payload[field] !== 'string' || !payload[field]!.trim() || payload[field]!.trim().length > 100)) {
+      res.status(400).json({ error: 'Student names must be non-empty text of at most 100 characters.' }); return;
+    }
+    if (typeof payload[field] === 'string') payload[field] = payload[field]!.trim();
+  }
+  for (const field of ['fatherPhone', 'motherPhone', 'studentPhone'] as const) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      const value = body[field];
+      if (typeof value !== 'string' || value.length > 30 || (value.trim() && !validImportPhone(value.trim()))) {
+        res.status(400).json({ error: `${field} must be a valid international phone number.` }); return;
+      }
+      payload[field] = value.trim();
+    }
+  }
+  if (payload.classId !== undefined && (typeof payload.classId !== 'string' || !payload.classId.trim())) {
+    res.status(400).json({ error: 'Class selection is invalid.' }); return;
+  }
+  if (payload.branchId !== undefined && (typeof payload.branchId !== 'string' || !payload.branchId.trim())) {
+    res.status(400).json({ error: 'Branch selection is invalid.' }); return;
+  }
+  if (payload.section !== undefined && (typeof payload.section !== 'string' || payload.section.trim().length > 50)) {
+    res.status(400).json({ error: 'Section must be text of at most 50 characters.' }); return;
+  }
+  if (payload.admissionDate !== undefined && (typeof payload.admissionDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.admissionDate) || Number.isNaN(Date.parse(`${payload.admissionDate}T00:00:00.000Z`)) || new Date(`${payload.admissionDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.admissionDate)) {
+    res.status(400).json({ error: 'Admission date must be a real YYYY-MM-DD date.' }); return;
+  }
+  if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== '' && (typeof payload.dateOfBirth !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.dateOfBirth) || Number.isNaN(Date.parse(`${payload.dateOfBirth}T00:00:00.000Z`)) || new Date(`${payload.dateOfBirth}T00:00:00.000Z`).toISOString().slice(0, 10) !== payload.dateOfBirth)) {
+    res.status(400).json({ error: 'Date of birth must be a real YYYY-MM-DD date.' }); return;
+  }
+  if (payload.bloodGroup !== undefined && (typeof payload.bloodGroup !== 'string' || payload.bloodGroup.length > 10)) {
+    res.status(400).json({ error: 'Blood group must be at most 10 characters.' }); return;
+  }
+  if (payload.allergies !== undefined && (typeof payload.allergies !== 'string' || payload.allergies.length > 1000)) {
+    res.status(400).json({ error: 'Allergy notes must be at most 1,000 characters.' }); return;
+  }
   if (payload.gender !== undefined && !['male', 'female'].includes(payload.gender)) {
     res.status(400).json({ error: 'Student gender is invalid.' }); return;
   }
