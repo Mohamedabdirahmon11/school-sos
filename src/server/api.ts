@@ -3882,6 +3882,62 @@ apiRouter.delete('/school/inventory/:itemId', requireAuth, requireSchoolContext,
   res.json({ success: await db.deleteInventoryItem(school.id, itemId) });
 });
 
+apiRouter.get('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const [records, students] = await Promise.all([db.getDisciplineRecords(school.id), db.getStudents(school.id)]);
+  const studentNames = new Map(students.map(student => [student.id, `${student.firstName} ${student.lastName}`.trim()]));
+  res.json(records.map(record => ({ ...record, studentName: studentNames.get(record.studentId) || 'Student record unavailable' })));
+});
+
+apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid discipline incident details.' });
+    return;
+  }
+  const studentId = typeof payload.studentId === 'string' ? payload.studentId.trim() : '';
+  const incidentDate = typeof payload.incidentDate === 'string' ? payload.incidentDate : '';
+  const parsedDate = new Date(`${incidentDate}T00:00:00.000Z`);
+  const infractionType = typeof payload.infractionType === 'string' ? payload.infractionType.trim() : '';
+  const description = payload.description === undefined ? '' : payload.description;
+  const severity = payload.severity;
+  const actionTaken = payload.actionTaken === undefined ? '' : payload.actionTaken;
+  const parentNotified = payload.parentNotified === undefined ? false : payload.parentNotified;
+  if (!studentId || studentId.length > 64 ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
+      !infractionType || infractionType.length > 120 ||
+      typeof description !== 'string' || description.length > 2000 ||
+      !['minor', 'moderate', 'severe'].includes(severity) ||
+      typeof actionTaken !== 'string' || actionTaken.length > 1000 ||
+      typeof parentNotified !== 'boolean') {
+    res.status(400).json({ error: 'Invalid incident details. Check student, date, infraction, severity and action.' });
+    return;
+  }
+  try {
+    const record = await db.createDisciplineRecord({
+      schoolId: school.id, studentId, incidentDate, infractionType,
+      description: description.trim(), severity, actionTaken: actionTaken.trim(),
+      reportedBy: user.id, parentNotified
+    });
+    const student = await db.getStudentById(studentId, school.id);
+    res.status(201).json({ ...record, studentName: student ? `${student.firstName} ${student.lastName}`.trim() : '' });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Discipline incident could not be saved.' });
+  }
+});
+
+apiRouter.delete('/school/discipline/:recordId', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const recordId = typeof req.params.recordId === 'string' ? req.params.recordId.trim() : '';
+  if (!recordId || recordId.length > 64) {
+    res.status(400).json({ error: 'A valid discipline record ID is required.' });
+    return;
+  }
+  res.json({ success: await db.deleteDisciplineRecord(school.id, recordId) });
+});
+
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
