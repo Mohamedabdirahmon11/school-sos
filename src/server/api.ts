@@ -214,15 +214,20 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
   for (const student of students) capacityUse.set(student.classId, (capacityUse.get(student.classId) || 0) + 1);
   const results: ImportValidation[] = rows.map((source, index) => {
     const data = Object.fromEntries(IMPORT_COLUMNS.map(column => [column, String((source as any)?.[column] ?? '').trim()])) as unknown as SchoolImportRow;
+    data.fatherPhone = data.fatherPhone || data.parentPhone;
     const reasons: string[] = [];
     if (isExampleImportRow(data)) return { row: index + 2, data, status: 'skipped', reasons: ['Example row is skipped.'] };
-    for (const column of ['className', 'section', 'studentName', 'gender', 'parentName', 'parentPhone'] as const) {
+    for (const column of ['className', 'section', 'studentName', 'gender'] as const) {
       if (!data[column].trim()) reasons.push(`${column} is required.`);
     }
+    if (!data.fatherPhone) reasons.push('fatherPhone or legacy parentPhone is required.');
+    if (data.fatherPhone && !data.parentName) reasons.push('parentName is required when fatherPhone is provided.');
     if (data.studentName && (() => { try { splitStudentName(data.studentName); return false; } catch { return true; } })()) reasons.push('studentName must contain at least two names.');
     if (data.gender && !['male', 'female'].includes(data.gender.toLowerCase())) reasons.push('gender must be male or female.');
     if (data.dateOfBirth && (!/^\d{4}-\d{2}-\d{2}$/.test(data.dateOfBirth) || Number.isNaN(Date.parse(`${data.dateOfBirth}T00:00:00Z`)))) reasons.push('dateOfBirth must use YYYY-MM-DD.');
     if (data.parentPhone && !validImportPhone(data.parentPhone)) reasons.push('parentPhone must be a valid international phone number.');
+    if (data.fatherPhone && !validImportPhone(data.fatherPhone)) reasons.push('fatherPhone must be a valid international phone number.');
+    if (data.motherPhone && !validImportPhone(data.motherPhone)) reasons.push('motherPhone must be a valid international phone number.');
     if (data.studentPhone && !validImportPhone(data.studentPhone)) reasons.push('studentPhone must be a valid international phone number.');
     const branch = data.branch ? branchByName.get(data.branch.trim().toLowerCase()) : undefined;
     if (data.branch && !branch) reasons.push(`Unknown branch: ${data.branch}.`);
@@ -1431,9 +1436,9 @@ apiRouter.get('/branches', requireAuth, requireSchoolContext, async (req, res) =
 
 apiRouter.get('/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireImportSchoolAccess, (_req, res) => {
   const records = [
-    ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'studentPhone', 'branch'],
-    ['KG', 'A', 'EXAMPLE Student One', 'female', '2018-01-15', 'EXAMPLE Parent One', '+252611111111', '', ''],
-    ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2018-04-22', 'EXAMPLE Parent Two', '+252622222222', '+252633333333', '']
+    ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'fatherPhone', 'motherName', 'motherPhone', 'studentPhone', 'branch'],
+    ['KG', 'A', 'EXAMPLE Student One', 'female', '2018-01-15', 'EXAMPLE Father One', '+252611111111', '', 'EXAMPLE Mother One', '+252622222222', '', ''],
+    ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2018-04-22', 'EXAMPLE Father Two', '+252633333333', '', 'EXAMPLE Mother Two', '+252644444444', '+252655555555', '']
   ];
   const csv = records.map(record => record.map(value => `"${value.replace(/"/g, '""')}"`).join(',')).join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-student-import-template.csv"' }).send(csv);
@@ -1482,6 +1487,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const userRecords: any[] = [];
   const pinSlips: Array<{ type: 'student' | 'parent'; name: string; studentName?: string; phone?: string; studentId?: string; pin: string }> = [];
   const parentRecords = new Map<string, any>();
+  const existingParentAccounts = await db.getParents(school.id);
   for (const row of importRows) {
     const names = splitStudentName(row.data.studentName);
     const id = `std-${randomUUID()}`;
@@ -1490,26 +1496,26 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     const pinHash = hashPin(pin);
     const classId = classIds.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`)!;
     const klass = classes.find(item => item.id === classId) || classPayload.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`);
-    const student = { id, schoolId: school.id, branchId: klass?.branchId, studentId, ...names, gender: row.data.gender.toLowerCase(), dateOfBirth: row.data.dateOfBirth, studentPhone: row.data.studentPhone || undefined, fatherPhone: row.data.parentPhone, classId, section: row.data.section.trim(), status: 'active', pinHash };
+    const student = { id, schoolId: school.id, branchId: klass?.branchId, studentId, ...names, gender: row.data.gender.toLowerCase(), dateOfBirth: row.data.dateOfBirth, studentPhone: row.data.studentPhone || undefined, fatherPhone: row.data.fatherPhone || row.data.parentPhone, motherPhone: row.data.motherPhone || undefined, classId, section: row.data.section.trim(), status: 'active', pinHash };
     studentRecords.push(student);
-    userRecords.push({ id: `usr-student-${id}`, schoolId: school.id, branchId: student.branchId, role: 'student', fullName: row.data.studentName.trim(), phone: row.data.studentPhone || row.data.parentPhone, studentId, pin: pinHash });
+    userRecords.push({ id: `usr-student-${id}`, schoolId: school.id, branchId: student.branchId, role: 'student', fullName: row.data.studentName.trim(), phone: row.data.studentPhone || student.fatherPhone, studentId, pin: pinHash });
     pinSlips.push({ type: 'student', name: row.data.studentName.trim(), studentId, pin });
     const guardians = [
       { phone: row.data.fatherPhone || row.data.parentPhone, name: row.data.parentName.trim() },
-      { phone: row.data.motherPhone, name: row.data.motherName.trim() || `Mother of ${row.data.studentName.trim()}` }
+      { phone: row.data.motherPhone, name: row.data.motherName.trim() || ('Mother of ' + row.data.studentName.trim()) }
     ];
     for (const guardian of guardians) {
       const phoneValue = guardian.phone.trim();
       if (!phoneValue) continue;
-      const phoneKey = phoneValue.replace(/[\\s()-]/g, '');
+      const phoneKey = phoneValue.replace(/[\s()-]/g, '');
       let parentRecord = parentRecords.get(phoneKey);
       if (!parentRecord) {
-        const parent = (await db.getParents(school.id)).find(item =>
-          [item.phone, item.parentPhone].some(value => String(value || '').replace(/[\\s()-]/g, '') === phoneKey)
+        const parent = existingParentAccounts.find(item =>
+          [item.phone, item.parentPhone].some(value => String(value || '').replace(/[\s()-]/g, '') === phoneKey)
         );
         const parentPin = parent?.pin ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
         parentRecord = {
-          id: parent?.id || `usr-parent-${randomUUID()}`,
+          id: parent?.id || ('usr-parent-' + randomUUID()),
           schoolId: school.id,
           role: 'parent',
           fullName: parent?.fullName || guardian.name,
@@ -1528,7 +1534,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const auditId = `log-${randomUUID()}`;
   const payload = {
     classes: classRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, name: item.name, grade_level: item.gradeLevel, section: item.section, room_number: item.roomNumber, capacity: item.capacity, monthly_fee: item.monthlyFee })),
-    students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, date_of_birth: item.dateOfBirth || null, student_phone: item.studentPhone, parent_phone: item.fatherPhone, class_id: item.classId, section: item.section, pin_hash: item.pinHash })),
+    students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, date_of_birth: item.dateOfBirth || null, student_phone: item.studentPhone, father_phone: item.fatherPhone, mother_phone: item.motherPhone, class_id: item.classId, section: item.section, pin_hash: item.pinHash })),
     users: userRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, role: item.role, full_name: item.fullName, phone: item.phone, parent_phone: item.parentPhone, student_id: item.studentId, linked_student_ids: item.linkedStudentIds, pin_hash: item.pin })),
     audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
   };
