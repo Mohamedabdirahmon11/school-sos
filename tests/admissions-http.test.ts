@@ -168,7 +168,8 @@ test('teacher creation ignores client-controlled identity and credential fields'
     qualification: 'B.Ed',
     department: 'Science',
     assignedClasses: [klass.id],
-    assignedSubjects: []
+    assignedSubjects: [],
+    monthlySalary: 850
   });
   assert.equal(response.status, 201, await response.clone().text());
   const result = await response.json();
@@ -185,6 +186,43 @@ test('teacher creation ignores client-controlled identity and credential fields'
   const teacherUser = await storage.db.getUserById(result.userId, school.id);
   assert.equal(teacherUser?.role, 'teacher');
   assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'));
+
+  // Prime the shared list cache as an administrator, then request the same
+  // list as a student to ensure salary fields cannot leak across cache roles.
+  const adminTeacherList = await fetch(`${baseUrl}/teachers`, { headers });
+  assert.equal(adminTeacherList.status, 200);
+  const adminTeacherRows = await adminTeacherList.json();
+  assert.equal(adminTeacherRows.find((item: any) => item.id === result.id)?.monthlySalary, 850);
+
+  const studentUser = storage.db.createUser({
+    schoolId: school.id, role: 'student', fullName: 'Teacher Directory Student',
+    phone: '+15550007299', studentId: 'DIRECTORY-TEST', passwordHash: '',
+    pin: '1234', isBlocked: false, failedLoginAttempts: 0
+  } as any);
+  const authSecurity = await import('../src/server/auth-security.ts');
+  const studentSessionToken = authSecurity.createSignedSessionToken({
+    sessionId: 'teacher-directory-student-session',
+    userId: studentUser.id,
+    role: 'student',
+    schoolId: school.id,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 60_000
+  });
+  memory.rows('user_sessions').push({
+    id: 'teacher-directory-student-session', userId: studentUser.id, userRole: 'student',
+    schoolId: school.id, ipAddress: '127.0.0.1', userAgent: 'test',
+    createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    lastActivityAt: new Date().toISOString()
+  });
+  await storage.db.flush();
+  const studentTeacherList = await fetch(`${baseUrl}/teachers`, {
+    headers: { Cookie: `schoolos_session=${studentSessionToken}` }
+  });
+  assert.equal(studentTeacherList.status, 200);
+  const studentTeacherRows = await studentTeacherList.json();
+  const studentTeacher = studentTeacherRows.find((item: any) => item.id === result.id);
+  assert.ok(studentTeacher);
+  assert.equal('monthlySalary' in studentTeacher, false);
 
   const duplicate = await post({
     staffId: 'STF-SEC-001', fullName: 'Duplicate Staff ID',
