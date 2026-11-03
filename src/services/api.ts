@@ -69,11 +69,12 @@ export class ApiClient {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
-  private static pageQuery(params?: { page?: number; pageSize?: number }) {
-    if (!params?.page && !params?.pageSize) return '';
+  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string }) {
+    if (!params?.page && !params?.pageSize && !params?.search?.trim()) return '';
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params.search?.trim()) query.set('search', params.search.trim());
     return `?${query.toString()}`;
   }
   private static getHeaders(): HeadersInit {
