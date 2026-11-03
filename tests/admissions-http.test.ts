@@ -185,7 +185,7 @@ test('teacher creation ignores client-controlled identity and credential fields'
   assert.equal('twoFactorSecret' in (storedTeacher as any), false);
   const teacherUser = await storage.db.getUserById(result.userId, school.id);
   assert.equal(teacherUser?.role, 'teacher');
-  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'), `Persisted teacher credential was not PIN-hashed: ${JSON.stringify(teacherUser)}`);
+  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'));
 
   // Prime the shared list cache as an administrator, then request the same
   // list as a student to ensure salary fields cannot leak across cache roles.
