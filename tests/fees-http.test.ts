@@ -126,6 +126,8 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(customReceiptPdf.status, 200);
   assert.equal(customReceiptPdf.headers.get('content-type'), 'application/pdf');
   assert.ok(Buffer.from(await customReceiptPdf.arrayBuffer()).toString('latin1').includes('Science activity'));
+  const deleteReferencedFee = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, { method: 'DELETE', headers });
+  assert.equal(deleteReferencedFee.status, 409, 'fee structures used by historical payments must be retained');
   const [parallelReceiptA, parallelReceiptB] = await Promise.all([
     postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'November 2026', feeType: 'monthly_tuition', amountDue: 80, amountPaid: 5, idempotencyKey: 'fee-test-parallel-a' }),
     postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'November 2026', feeType: 'monthly_tuition', amountDue: 80, amountPaid: 7, idempotencyKey: 'fee-test-parallel-b' })
