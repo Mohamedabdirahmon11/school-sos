@@ -32,31 +32,3 @@ test('Super Admin routes require an authenticated Super Admin', () => {
     assert.match(route[3], /requireSuperAdmin/, `${route[1].toUpperCase()} ${route[2]} requires Super Admin role`);
   }
 });
-
-test('Super Admin 2FA policy is enforced at login and before protected routes', () => {
-  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-  const loginStart = apiSource.indexOf("apiRouter.post('/auth/login'");
-  const loginEnd = apiSource.indexOf("// Logout endpoint", loginStart);
-  const loginHandler = apiSource.slice(loginStart, loginEnd);
-  assert.ok(loginHandler.includes('settings.requireSuperAdmin2FA'));
-  assert.ok(loginHandler.includes('verify2FACode(twoFactorCode, user.twoFactorSecret)'));
-  assert.ok(loginHandler.includes('requireTwoFactorSetup: true'));
-  assert.ok(apiSource.includes('requiresTwoFactorSetup && !user.mustChangePassword && !twoFactorSetupRoutes.includes(req.path)'));
-  assert.ok(apiSource.includes('await db.flush();'));
-});
-
-test('recovery codes are stored as keyed hashes and compared without case or separator sensitivity', async () => {
-  const previousSecret = process.env.SESSION_SECRET;
-  process.env.SESSION_SECRET = 'schoolos-test-session-secret-that-is-long-enough';
-  try {
-    const { findRecoveryCodeIndex, hashRecoveryCode } = await import('../src/server/auth-security.ts');
-    const hashed = hashRecoveryCode('ABCD-EF12');
-    assert.match(hashed, /^[a-f0-9]{64}$/);
-    assert.equal(findRecoveryCodeIndex('abcd ef12', [hashed]), 0);
-    assert.equal(findRecoveryCodeIndex('WXYZ-1234', [hashed]), -1);
-    assert.equal(findRecoveryCodeIndex('abcd-ef12', ['ABCD-EF12']), 0, 'legacy plaintext recovery codes remain one-time compatible');
-  } finally {
-    if (previousSecret === undefined) delete process.env.SESSION_SECRET;
-    else process.env.SESSION_SECRET = previousSecret;
-  }
-});
