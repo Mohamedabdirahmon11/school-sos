@@ -7,7 +7,7 @@ Re-running schema.sql is safe.
 1. Create a Supabase project.
 2. In the project dashboard, open **SQL Editor** and click **New query**.
 3. Open `schema.sql` in the repository root, copy the entire file into the query editor, and click **Run**.
-4. Apply the SQL migrations after the schema in this order: `supabase/migrations/001` through `013` (numeric order), then the root-level `014_assignment_submission_content.sql`, `015_enable_platform_rls.sql`, and `016_request_performance.sql`, then `supabase/migrations/017_restrict_public_api_access.sql` and `018_allow_kg_grade_level.sql`, then `019_index_uncovered_foreign_keys.sql` and `020_dashboard_metrics_timezone_and_voids.sql`. Do not skip the root-level migration files.
+4. Apply the SQL migrations after the schema in this order: `supabase/migrations/001` through `013` (numeric order), then the root-level `014_assignment_submission_content.sql`, `015_enable_platform_rls.sql`, and `016_request_performance.sql`, then `supabase/migrations/017_restrict_public_api_access.sql` and `018_allow_kg_grade_level.sql`, then `019_index_uncovered_foreign_keys.sql` and `020_dashboard_metrics_timezone_and_voids.sql`, then `021_global_staff_id_uniqueness.sql`. Do not skip the root-level migration files.
 5. Review the result and run the RLS verification query in `scripts/check-rls.sql` in a new SQL Editor tab.
 
 ## Configure the server
