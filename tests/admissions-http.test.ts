@@ -92,10 +92,10 @@ test('student creation whitelists profile fields, enforces capacity and protects
   assert.equal(response.initialPin, '1234');
   assert.equal('passwordHash' in response, false);
   assert.equal('twoFactorSecret' in response, false);
-  const storedStudent = await storage.db.getStudentById(response.id, school.id);
-  assert.ok(storedStudent?.pinHash?.startsWith('pin_scrypt:'));
-  assert.equal('passwordHash' in (storedStudent as any), false);
-  assert.equal('twoFactorSecret' in (storedStudent as any), false);
+  const storedStudent = memory.rows('students').find(row => row.id === response.id);
+  assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt:'));
+  assert.equal('password_hash' in (storedStudent as any), false);
+  assert.equal('two_factor_secret' in (storedStudent as any), false);
   const parent = (await storage.db.getUsers(school.id, 'parent')).find(user => user.phone === '+15550007111');
   assert.ok(parent?.linkedStudentIds?.includes(response.id));
   assert.ok(parent?.pin?.startsWith('pin_scrypt:'));
@@ -154,7 +154,7 @@ test('teacher creation ignores client-controlled identity and credential fields'
   });
   const response = await post({
     id: 'forged-teacher-id',
-    schoolId: 'forged-school',
+    schoolId: school.id,
     userId: 'forged-user',
     role: 'super_admin',
     passwordHash: 'forged-password',
