@@ -66,3 +66,16 @@ test('accountant payroll runs are unique per staff and month, progress through a
   assert.equal(payslip.status, 200); assert.equal(payslip.headers.get('content-type'), 'application/pdf');
   assert.ok(Buffer.from(await payslip.arrayBuffer()).toString('latin1').includes('ETB'));
 });
+
+test('payroll API rejects oversized adjustment lists and values', async () => {
+  const oversizedAmount = await fetch(`${baseUrl}/payroll`, {
+    method: 'POST', headers: accountantHeaders,
+    body: JSON.stringify({ month: '2026-10', staff: [{ staffId: teacher.id, allowances: [{ label: 'Excess', amount: 1_000_000_001 }], deductions: [] }] })
+  });
+  assert.equal(oversizedAmount.status, 400);
+  const tooManyLines = await fetch(`${baseUrl}/payroll`, {
+    method: 'POST', headers: accountantHeaders,
+    body: JSON.stringify({ month: '2026-09', staff: [{ staffId: teacher.id, allowances: Array.from({ length: 51 }, (_, index) => ({ label: `Allowance ${index}`, amount: 1 })), deductions: [] }] })
+  });
+  assert.equal(tooManyLines.status, 400);
+});
