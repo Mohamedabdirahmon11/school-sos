@@ -26,7 +26,6 @@ import {
 interface SchoolDashboardProps {
   onNavigate: (view: string) => void;
   onOpenAddStudent: () => void;
-  onOpenRecordPayment: () => void;
 }
 
 export function normalizeSchoolDashboardData(data: unknown) {
@@ -49,11 +48,7 @@ export function normalizeSchoolDashboardData(data: unknown) {
   };
 }
 
-export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ 
-  onNavigate, 
-  onOpenAddStudent, 
-  onOpenRecordPayment 
-}) => {
+export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, onOpenAddStudent }) => {
   const { school, isReadOnly, t } = useAuth();
   const { data, loading, error, retry } = useApi(
     () => ApiClient.getSchoolDashboard(school?.id),
@@ -95,14 +90,6 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={onOpenRecordPayment}
-            disabled={isReadOnly}
-            className="px-3 py-1.5 text-xs font-semibold text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] border border-[#99F6E4] rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>Record Payment</span>
-          </button>
           <button
             onClick={onOpenAddStudent}
             disabled={isReadOnly}
