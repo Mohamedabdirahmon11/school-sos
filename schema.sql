@@ -624,7 +624,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_next_fee_receipt(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   allocated_value BIGINT;
 BEGIN
@@ -636,8 +636,21 @@ BEGIN
   INSERT INTO public.fee_receipt_sequences AS current_sequence (
     id, school_id, academic_year, next_value
   )
-  SELECT p_school_id || ':' || p_academic_year, p_school_id, p_academic_year,
-    COALESCE(MAX(substring(payment.receipt_number FROM '([0-9]+)
+  SELECT
+    p_school_id || ':' || p_academic_year,
+    p_school_id,
+    p_academic_year,
+    COALESCE(MAX(substring(payment.receipt_number FROM '([0-9]+)$')::BIGINT), 0) + 1
+  FROM public.fee_payments payment
+  WHERE payment.school_id = p_school_id
+    AND payment.academic_year = p_academic_year
+  ON CONFLICT (school_id, academic_year)
+  DO UPDATE SET next_value = GREATEST(current_sequence.next_value + 1, EXCLUDED.next_value)
+  RETURNING next_value INTO allocated_value;
+
+  RETURN allocated_value;
+END;
+$$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fee_payment_school_idempotency ON fee_payments(school_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payments_student ON fee_payments(school_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_payments_date ON fee_payments(school_id, date);
