@@ -26,16 +26,27 @@ export const AnalyticsView: React.FC = () => {
 
   // Export Analytics CSV
   const handleExportCSV = () => {
-    let csv = 'School Name,School Code,Plan,Status,Students,Teachers,Valid Until\n';
-    for (const s of schools as any[]) {
-      csv += `"${s.name}","${s.code}","${s.subscription.plan}","${s.subscription.status}",${s.studentCount || 0},${s.teacherCount || 0},"${s.subscription.validUntil.split('T')[0]}"\n`;
-    }
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csvCell = (value: unknown) => {
+      const text = String(value ?? '');
+      const safe = /^[\\s]*[=+\\-@]/.test(text) ? "'" + text : text;
+      return '"' + safe.replace(/"/g, '""') + '"';
+    };
+    const rows = [
+      ['School Name', 'School Code', 'Plan', 'Status', 'Students', 'Teachers', 'Valid Until'],
+      ...(schools as any[]).map(s => {
+        const subscription = s.subscription || {};
+        const validUntil = typeof subscription.validUntil === 'string' ? subscription.validUntil.slice(0, 10) : '';
+        return [s.name, s.code, subscription.plan, subscription.status, s.studentCount || 0, s.teacherCount || 0, validUntil];
+      })
+    ];
+    const csv = rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
+    const blob = new Blob(['\\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `schoolos_analytics_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = 'schoolos_analytics_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading platform analytics…</div>;
