@@ -1992,7 +1992,7 @@ class StorageEngine {
     const approved: StudentMark[] = [];
 
     for (const id of markIds) {
-      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId);
+      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId && m.status === 'submitted');
       if (idx >= 0) {
         this.data.marks[idx].status = 'approved';
         this.data.marks[idx].approvedBy = approvedBy;
