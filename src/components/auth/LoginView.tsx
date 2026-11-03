@@ -42,9 +42,6 @@ export const LoginView: React.FC = () => {
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
-  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [twoFactorSetup, setTwoFactorSetup] = useState<{ secret: string; qrCodeUrl: string; recoveryCodes: string[] } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,24 +55,11 @@ export const LoginView: React.FC = () => {
         phone,
         schoolCode,
         pin,
-        password,
-        twoFactorCode: twoFactorRequired ? twoFactorCode : undefined
+        password
       });
       if (result.requirePasswordChange && result.challengeToken) {
         setBootstrapToken(result.challengeToken);
         setPasswordChangeRequired(true);
-      } else if (result.requireTwoFactorSetup && result.challengeToken) {
-        setBootstrapToken(result.challengeToken);
-        setTwoFactorRequired(false);
-        setTwoFactorCode('');
-        const setup = await ApiClient.setup2FA(result.challengeToken);
-        setTwoFactorSetup(setup);
-      } else if (result.requireTwoFactorCode) {
-        setTwoFactorRequired(true);
-        setTwoFactorCode('');
-      } else if (result.user) {
-        setTwoFactorRequired(false);
-        setTwoFactorCode('');
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check credentials.');
@@ -92,38 +76,14 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await ApiClient.changePassword(newAdminPassword, bootstrapToken);
+      await ApiClient.changePassword(newAdminPassword, bootstrapToken);
       setNewAdminPassword('');
       setConfirmAdminPassword('');
       setPasswordChangeRequired(false);
-      if (result.requireTwoFactorSetup && bootstrapToken) {
-        const setup = await ApiClient.setup2FA(bootstrapToken);
-        setTwoFactorSetup(setup);
-      } else {
-        setBootstrapToken(null);
-        await refreshUser();
-      }
-    } catch (err: any) {
-      setError(err.message || 'Could not update the Super Admin password.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEnableTwoFactor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bootstrapToken || !twoFactorSetup) { setError('This 2FA setup session expired. Sign in again.'); return; }
-    if (!/^\d{6}$/.test(twoFactorCode)) { setError('Enter the 6-digit code from your authenticator app.'); return; }
-    setIsLoading(true);
-    setError(null);
-    try {
-      await ApiClient.enable2FA(twoFactorCode, bootstrapToken);
-      setTwoFactorSetup(null);
       setBootstrapToken(null);
-      setTwoFactorCode('');
       await refreshUser();
     } catch (err: any) {
-      setError(err.message || 'The authenticator code could not be verified.');
+      setError(err.message || 'Could not update the Super Admin password.');
     } finally {
       setIsLoading(false);
     }
@@ -148,24 +108,7 @@ export const LoginView: React.FC = () => {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-6 px-4 shadow-sm border border-[#E2E8F0] sm:rounded-xl sm:px-8">
           
-          {twoFactorSetup ? (
-            <form className="space-y-4" onSubmit={handleEnableTwoFactor}>
-              <h3 className="text-base font-semibold text-[#132A29]">Secure your Super Admin account</h3>
-              <p className="text-xs text-[#64748B]">Scan this QR code with an authenticator app, then enter the current 6-digit code to finish enabling two-factor authentication.</p>
-              <img src={twoFactorSetup.qrCodeUrl} alt="Super Admin authenticator setup QR code" className="mx-auto w-44 h-44 border border-[#E2E8F0] rounded-lg p-2" />
-              <p className="text-[11px] text-slate-600 break-all">Manual setup key: <span className="font-mono font-semibold">{twoFactorSetup.secret}</span></p>
-              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
-                <p className="text-xs font-semibold text-amber-900">Save these recovery codes somewhere safe</p>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {twoFactorSetup.recoveryCodes.map(code => <code key={code} className="text-xs text-amber-950">{code}</code>)}
-                </div>
-              </div>
-              <label className="block text-xs font-medium text-[#334155]">6-digit authenticator code</label>
-              <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full px-3 py-2 text-sm font-mono tracking-[0.35em] text-center border border-[#CBD5E1] rounded-lg" placeholder="000000" />
-              {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
-              <button disabled={isLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white">{isLoading ? 'Verifying…' : 'Enable 2FA and sign in'}</button>
-            </form>
-          ) : passwordChangeRequired ? (
+          {passwordChangeRequired ? (
             <form className="space-y-4" onSubmit={handleBootstrapPasswordChange}>
               <h3 className="text-base font-semibold text-[#132A29]">Change the Super Admin password</h3>
               <p className="text-xs text-[#64748B]">Set a new password to continue to the dashboard.</p>
@@ -207,12 +150,6 @@ export const LoginView: React.FC = () => {
                   </div>
                 </div>
 
-                {twoFactorRequired && (
-                  <div>
-                    <label className="block text-xs font-medium text-[#334155]">Authenticator or recovery code</label>
-                    <input type="text" autoComplete="one-time-code" maxLength={16} required value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.toUpperCase().slice(0, 16))} placeholder="6-digit or recovery code" className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] text-center border border-[#CBD5E1] rounded-lg" />
-                  </div>
-                )}
                 <div>
                   <label className="block text-xs font-medium text-[#334155]">Master Password</label>
                   <div className="mt-1 relative">
