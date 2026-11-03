@@ -2610,11 +2610,39 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   const user = (req as any).user as User;
   const { classId, date, records } = req.body;
 
-  if (!classId || !date || !Array.isArray(records)) {
-    res.status(400).json({ error: 'classId, date, and student records array are required.' });
+  if (!classId || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
+    res.status(400).json({ error: 'A class, a valid date, and 1–2,000 student records are required.' });
+    return;
+  }
+  const parsedDate = new Date(`${date}T00:00:00.000Z`);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+    res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
   if (!await canAccessTeachingClass(req, res, classId)) return;
+  const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
+  const seenStudentIds = new Set<string>();
+  for (const record of records) {
+    if (!record || typeof record.studentId !== 'string' || !record.studentId.trim() || !allowedStatuses.has(record.status)) {
+      res.status(400).json({ error: 'Every attendance row must include a valid student ID and attendance status.' });
+      return;
+    }
+    if (seenStudentIds.has(record.studentId)) {
+      res.status(400).json({ error: 'Duplicate students are not allowed in one attendance submission.' });
+      return;
+    }
+    if (typeof record.note === 'string' && record.note.length > 500) {
+      res.status(400).json({ error: 'Attendance notes cannot exceed 500 characters.' });
+      return;
+    }
+    seenStudentIds.add(record.studentId);
+  }
+  const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
+  const classStudentIds = new Set(classStudents.map((student: any) => student.id));
+  if (records.some(record => !classStudentIds.has(record.studentId))) {
+    res.status(400).json({ error: 'Attendance can only be recorded for students currently enrolled in the selected class.' });
+    return;
+  }
 
   const saved = await db.recordDailyAttendance(school.id, classId, date, records, user.id);
   res.json({ success: true, count: saved.length, records: saved });
@@ -2690,11 +2718,37 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   const user = (req as any).user as User;
   const { classId, subjectId, semester, marks } = req.body;
 
-  if (!classId || !subjectId || !semester || !Array.isArray(marks)) {
-    res.status(400).json({ error: 'classId, subjectId, semester, and marks array are required.' });
+  if (!classId || typeof subjectId !== 'string' || !subjectId || !['Semester 1', 'Semester 2'].includes(semester) || !Array.isArray(marks) || marks.length < 1 || marks.length > 2000) {
+    res.status(400).json({ error: 'A class, subject, valid semester, and 1–2,000 student mark rows are required.' });
     return;
   }
   if (!await canAccessTeachingClass(req, res, classId)) return;
+  const subjectResult = await db.queryPage('subjects', { school_id: school.id, id: subjectId }, 1, 1, undefined, 'id');
+  if (!subjectResult.items.length) {
+    res.status(400).json({ error: 'The selected subject does not belong to this school.' });
+    return;
+  }
+  const seenStudentIds = new Set<string>();
+  for (const mark of marks) {
+    if (!mark || typeof mark.studentId !== 'string' || !mark.studentId.trim() ||
+        !Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) ||
+        !['draft', 'submitted'].includes(mark.status) ||
+        (typeof mark.teacherRemarks === 'string' && mark.teacherRemarks.length > 1000)) {
+      res.status(400).json({ error: 'Every mark row must include a student, numeric marks, a valid status, and remarks of at most 1,000 characters.' });
+      return;
+    }
+    if (seenStudentIds.has(mark.studentId)) {
+      res.status(400).json({ error: 'Duplicate students are not allowed in one marks submission.' });
+      return;
+    }
+    seenStudentIds.add(mark.studentId);
+  }
+  const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
+  const classStudentIds = new Set(classStudents.map((student: any) => student.id));
+  if (marks.some(mark => !classStudentIds.has(mark.studentId))) {
+    res.status(400).json({ error: 'Marks can only be entered for students currently enrolled in the selected class.' });
+    return;
+  }
 
   try {
     const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id);
