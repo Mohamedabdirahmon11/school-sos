@@ -383,7 +383,7 @@ class StorageEngine {
   public async initialize(clientOverride?: any): Promise<void> {
     const client = clientOverride || this.testClient || supabase;
     if (!client || (!isSupabaseConfigured && !clientOverride && !this.testClient)) {
-      throw new Error('Supabase storage is unavailable. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run supabase/schema.sql.');
+      throw new Error('Supabase storage is unavailable. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run schema.sql.');
     }
 
     // Keep the explicitly installed test adapter persistent for unit tests.
