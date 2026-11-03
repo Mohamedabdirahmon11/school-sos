@@ -1486,12 +1486,79 @@ class StorageEngine {
   }
 
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
-    await this.getStudentById(id, schoolId || updates.schoolId);
-    const idx = this.data.students.findIndex(s => s.id === id && (!schoolId || s.schoolId === schoolId));
-    if (idx === -1) return null;
-    this.data.students[idx] = { ...this.data.students[idx], ...updates };
+    const current = await this.getStudentById(id, schoolId || updates.schoolId);
+    if (!current) return null;
+    const tenantId = schoolId || current.schoolId;
+    await Promise.all([
+      this.getStudents(tenantId),
+      this.getUsers(tenantId, 'student'),
+      this.getUsers(tenantId, 'parent')
+    ]);
+    const idx = this.data.students.findIndex(student => student.id === id && student.schoolId === tenantId);
+    if (idx < 0) return null;
+
+    const updated: Student = { ...this.data.students[idx], ...updates, id, schoolId: tenantId };
+    this.data.students[idx] = updated;
+    const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/[\\s()-]/g, '') : '';
+    const newParentPhones = new Set([updated.fatherPhone, updated.motherPhone].map(normalizePhone).filter(Boolean));
+    const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
+
+    // Reconcile parent links without removing siblings or changing an existing
+    // parent's PIN. This also repairs links for older parent records.
+    for (const parent of parentUsers) {
+      const contactPhones = new Set([parent.phone, parent.parentPhone].map(normalizePhone).filter(Boolean));
+      const matchingSiblings = this.data.students.filter(student =>
+        student.schoolId === tenantId && student.id !== id &&
+        [student.fatherPhone, student.motherPhone].some(phone => contactPhones.has(normalizePhone(phone)))
+      );
+      const linkedIds = new Set(parent.linkedStudentIds || []);
+      if ([...newParentPhones].some(phone => contactPhones.has(phone))) linkedIds.add(id);
+      else linkedIds.delete(id);
+      for (const sibling of matchingSiblings) linkedIds.add(sibling.id);
+      if (linkedIds.size || parent.linkedStudentIds) parent.linkedStudentIds = [...linkedIds];
+    }
+
+    const studentAccount = this.data.users.find(user =>
+      user.schoolId === tenantId && user.role === 'student' &&
+      (user.id === `usr-student-${id}` || user.studentId === updated.studentId)
+    );
+    if (studentAccount) {
+      studentAccount.fullName = `${updated.firstName} ${updated.middleName} ${updated.lastName}`.trim();
+      studentAccount.phone = updated.studentPhone || updated.fatherPhone || '';
+      studentAccount.branchId = updated.branchId;
+    }
+
+    const parentPin = updated.pinHash || studentAccount?.pin || '';
+    for (const phone of newParentPhones) {
+      const parent = parentUsers.find(user =>
+        [user.phone, user.parentPhone].some(value => normalizePhone(value) === phone)
+      );
+      if (parent) {
+        parent.linkedStudentIds = [...new Set([...(parent.linkedStudentIds || []), id])];
+        if (!parent.phone) parent.phone = phone;
+        if (!parent.parentPhone) parent.parentPhone = phone;
+      } else {
+        const createdParent: User = {
+          id: `usr-parent-${randomUUID()}`,
+          schoolId: tenantId,
+          role: 'parent',
+          fullName: `Parent of ${updated.firstName}`,
+          phone,
+          parentPhone: phone,
+          passwordHash: '',
+          pin: parentPin,
+          linkedStudentIds: [id],
+          isBlocked: false,
+          failedLoginAttempts: 0,
+          createdAt: new Date().toISOString()
+        };
+        this.data.users.push(createdParent);
+        parentUsers.push(createdParent);
+      }
+    }
+
     this.save();
-    return this.data.students[idx];
+    return updated;
   }
 
   public async deleteStudent(id: string, schoolId?: string): Promise<boolean> {
