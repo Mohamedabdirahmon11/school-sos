@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
-const sql = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
