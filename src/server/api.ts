@@ -3069,7 +3069,7 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
 });
 
 // Year-End Promotion Confirmation
-apiRouter.get('/promotions/history', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/promotions/history', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getPromotionHistory(school.id));
 });
@@ -3079,7 +3079,7 @@ apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmi
   const user = (req as any).user as User;
   const { promotions, classId, topN = 3 } = req.body;
 
-  if (!Array.isArray(promotions) || typeof classId !== 'string') {
+  if (!Array.isArray(promotions) || promotions.length > 2000 || typeof classId !== 'string' || !classId.trim()) {
     res.status(400).json({ error: 'classId and promotions array are required.' });
     return;
   }
