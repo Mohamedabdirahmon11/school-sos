@@ -1811,9 +1811,10 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
     if (user.role === 'accountant' || user.role === 'super_admin') {
       const allPayments = await db.getFeePayments(school.id);
       const payments = allPayments.filter(payment => !payment.voidedAt);
-      result.totalDue = allPayments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
+      // Voided receipts are excluded from every live finance total.
+      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
       result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = allPayments.reduce((total, payment) => total + Number(payment.voidedAt ? payment.amountDue || 0 : payment.remainingAmount || 0), 0);
+      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
       result.paymentCount = payments.length;
       result.recentPayments = payments.slice(-20).reverse();
     }
