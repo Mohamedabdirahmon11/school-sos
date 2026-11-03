@@ -305,6 +305,10 @@ export class ApiClient {
     });
   }
 
+  public static async getPlatformAnalytics() {
+    return this.request<any>('/superadmin/analytics');
+  }
+
   public static async getSuperAdminDashboard() {
     const response = await this.request<any>('/superadmin/dashboard');
     const revenueTrend = Array.isArray(response?.revenueTrend) ? response.revenueTrend : [];
