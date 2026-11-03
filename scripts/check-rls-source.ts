@@ -20,7 +20,8 @@ const specificRules = [
   ['student_marks', 'marks_role_read'],
   ['fee_payments', 'fees_role_read'],
   ['user_sessions', 'sessions_self_read'],
-  ['health_records', 'health_records_admin_scope']
+  ['health_records', 'health_records_admin_scope'],
+  ['payroll_records', 'payroll_records_accountant_delete']
 ];
 
 let failed = false;
