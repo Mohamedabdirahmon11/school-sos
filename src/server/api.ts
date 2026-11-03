@@ -34,6 +34,7 @@ import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
+import { getSchoolLocalDate } from '../lib/school-date.ts';
 
 export const apiRouter = Router();
 
