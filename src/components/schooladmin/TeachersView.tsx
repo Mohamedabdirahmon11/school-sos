@@ -18,7 +18,7 @@ export const TeachersView: React.FC = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getAllClasses(), ApiClient.getAllSubjects()
    ]), [school?.id, page, search], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
