@@ -3,6 +3,13 @@
 Updated: 2026-11-02
 Current stage: Security hardening and automated validation are in progress. Historical feature completion notes below remain as previously recorded; they are not a claim that every live production flow has been re-tested today.
 
+## Follow-up fixes (2026-11-03)
+
+- DONE: `GET /support/tickets` now requires a school context for non-super-admin users. School administrators can list their school's tickets; other school users can list only tickets they created.
+- DONE: Support-ticket replies are restricted to the ticket creator or a school administrator within that tenant (super admins retain platform access). Reply content is validated to 1–5000 characters.
+- DONE: Added a tenant-scoped `getFeePaymentById` storage method and changed receipt PDF lookup to fetch only the requested payment instead of loading every payment for the school.
+- LIMITATION: These changes have been committed; latest CI run must complete before they are marked verified. Full legacy test suite remains blocked by missing test fixtures.
+
 ## API access review (2026-11-03)
 
 - DONE: Restricted `GET /school/dashboard` to school admins, accountants, super admins, and teachers. Parent/student accounts can no longer retrieve the school-wide dashboard summary.
