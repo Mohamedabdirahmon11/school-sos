@@ -797,6 +797,16 @@ export class ApiClient {
     return this.request<Array<{ id: string; staffId: string; userId: string; name: string; monthlySalary: number }>>('/payroll/staff');
   }
 
+  public static async getAllPayrollRecords(month: string) {
+    const allRecords: StaffPayrollRecord[] = [];
+    for (let page = 1; ; page += 1) {
+      const rows = await this.getPayrollRecords(month, page, 100);
+      allRecords.push(...rows);
+      if (rows.length < 100) break;
+    }
+    return allRecords;
+  }
+
   public static async getPayrollRecords(month: string, page = 1, pageSize = 20) {
     const query = new URLSearchParams({ month, page: String(page), pageSize: String(pageSize) });
     return this.request<StaffPayrollRecord[]>(`/payroll?${query.toString()}`);
