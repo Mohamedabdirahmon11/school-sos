@@ -30,25 +30,36 @@ export const ReportsView: React.FC = () => {
     return `"${clean.replace(/"/g, '""')}"`;
   };
 
-  const downloadCSV = (type: string) => {
+  const downloadCSV = async (type: string) => {
     if (!summary) return;
     let csvContent = '';
-    let filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = \`schoolos_\${type}_\${new Date().toISOString().split('T')[0]}.csv\`;
 
     if (type === 'finance') {
       csvContent = 'Receipt Number,Month,Amount Due,Amount Paid,Remaining Arrears,Method,Status,Date\n';
-      if (summary.recentPayments && summary.recentPayments.length > 0) {
-        summary.recentPayments.forEach((p: any) => {
-          csvContent += [p.receiptNumber, p.month, p.amountDue, p.amountPaid, p.remainingAmount, p.paymentMethod, p.status, p.date].map(csvCell).join(',') + '\n';
-        });
-      } else {
-        csvContent += `Summary Total,${school?.academicYear},${summary.totalDue},${summary.totalCollected},${summary.totalArrears},"Aggregate","Computed","${new Date().toISOString()}"\n`;
+      try {
+        const allPayments: any[] = [];
+        for (let pageNumber = 1; ; pageNumber += 1) {
+          const pageRows = await ApiClient.getFeePayments(undefined, { page: pageNumber, pageSize: 100 });
+          allPayments.push(...pageRows.filter((payment: any) => !payment.voidedAt));
+          if (pageRows.length < 100) break;
+        }
+        if (allPayments.length > 0) {
+          allPayments.forEach((p: any) => {
+            csvContent += [p.receiptNumber, p.month, p.amountDue, p.amountPaid, p.remainingAmount, p.paymentMethod, p.status, p.date].map(csvCell).join(',') + '\n';
+          });
+        } else {
+          csvContent += \`Summary Total,\${school?.academicYear},\${summary.totalDue},\${summary.totalCollected},\${summary.totalArrears},"Aggregate","Computed","\${new Date().toISOString()}"\n\`;
+        }
+      } catch (error: any) {
+        alert(error?.message || 'Unable to export all fee payments.');
+        return;
       }
     } else if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += `Enrolled Students,${summary.studentCount},"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Average Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Academic Pass Rate,${summary.passRate}%,"${school?.name}","${school?.academicYear}"\n`;
+      csvContent += \`Enrolled Students,\${summary.studentCount}," \${school?.name}","\${school?.academicYear}"\n\`;
+      csvContent += \`Average Attendance Rate,\${summary.attendanceRate}%,"\${school?.name}","\${school?.academicYear}"\n\`;
+      csvContent += \`Academic Pass Rate,\${summary.passRate == null ? 'Not available' : \`\${Number(summary.passRate).toFixed(1)}%\` },"\${school?.name}","\${school?.academicYear}"\n\`;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -59,6 +70,7 @@ export const ReportsView: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
