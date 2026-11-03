@@ -2974,14 +2974,31 @@ class StorageEngine {
   }
 
   public addTransportRoute(route: any): any {
+    if (!route || typeof route !== 'object' || Array.isArray(route) ||
+        typeof route.schoolId !== 'string' || !route.schoolId.trim() ||
+        typeof route.name !== 'string' || !route.name.trim() || route.name.trim().length > 150 ||
+        typeof route.routeNumber !== 'string' || route.routeNumber.length > 50 ||
+        typeof route.vehicleNumber !== 'string' || route.vehicleNumber.length > 80 ||
+        typeof route.driverName !== 'string' || route.driverName.length > 150 ||
+        typeof route.driverPhone !== 'string' || route.driverPhone.length > 50 ||
+        !Array.isArray(route.stops) || route.stops.length > 100 ||
+        route.stops.some((stop: unknown) => typeof stop !== 'string' || !stop.trim() || stop.trim().length > 150) ||
+        typeof route.feeAmount !== 'number' || !Number.isFinite(route.feeAmount) || route.feeAmount < 0 || route.feeAmount > 1000000 ||
+        typeof route.active !== 'boolean') {
+      throw new Error('Transport route details are invalid.');
+    }
     this.data.transportRoutes = this.data.transportRoutes || [];
-    const { routeName, monthlyFee, ...fields } = route;
     const newRoute = {
-      id: `tr-${Date.now()}`, ...fields,
-      name: route.name || routeName,
-      routeNumber: route.routeNumber || route.vehicleNumber,
-      feeAmount: Number(route.feeAmount ?? monthlyFee ?? 0),
-      active: route.active !== false,
+      id: `tr-${randomUUID()}`,
+      schoolId: route.schoolId.trim(),
+      name: route.name.trim(),
+      routeNumber: route.routeNumber.trim(),
+      vehicleNumber: route.vehicleNumber.trim(),
+      driverName: route.driverName.trim(),
+      driverPhone: route.driverPhone.trim(),
+      stops: [...route.stops],
+      feeAmount: route.feeAmount,
+      active: route.active,
       createdAt: new Date().toISOString()
     };
     this.data.transportRoutes.push(newRoute);
