@@ -31,7 +31,7 @@ export const ParentPortalView: React.FC = () => {
   const children: any[] = childrenState.data ?? [];
   const currentChild = children[selectedChildIndex];
   const childState = useApi(
-    () => ApiClient.getStudentDetails(currentChild?.id, school?.id),
+    () => ApiClient.getStudentDetails(currentChild?.id, school?.id, true),
     [currentChild?.id, school?.id],
     Boolean(currentChild)
   );
