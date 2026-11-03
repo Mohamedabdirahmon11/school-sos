@@ -21,7 +21,9 @@ const specificRules = [
   ['fee_payments', 'fees_role_read'],
   ['user_sessions', 'sessions_self_read'],
   ['health_records', 'health_records_admin_scope'],
-  ['payroll_records', 'payroll_records_accountant_delete']
+  ['payroll_records', 'payroll_records_accountant_delete'],
+  ['communication_settings', 'communication_settings_admin_access'],
+  ['communication_queue', 'communication_queue_admin_access']
 ];
 
 let failed = false;
