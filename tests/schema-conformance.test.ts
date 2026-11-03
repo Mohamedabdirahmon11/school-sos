@@ -6,7 +6,7 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
-for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
+for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
   const columns = new Map<string, { required: boolean; hasDefault: boolean }>();
   for (const line of match[2].split('\n')) {
     const column = line.trim().match(/^([a-z][a-z0-9_]*)\s+([A-Z][A-Z0-9_]*(?:\([^)]*\))?(?:\[\])?)(.*)$/i);
