@@ -1370,7 +1370,7 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, (req, r
   res.status(201).json(b);
 });
 
-apiRouter.get('/superadmin/broadcasts', requireAuth, (_req, res) => {
+apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, (_req, res) => {
   res.json(db.getBroadcasts());
 });
 
