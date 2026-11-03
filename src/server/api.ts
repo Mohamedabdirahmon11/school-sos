@@ -3554,6 +3554,7 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
 // ==============================================================================
 
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const school = (req as any).school;
   const user = (req as any).user as User;
   const filters: Record<string, any> = { school_id: school.id, is_active: true };
@@ -3671,6 +3672,7 @@ apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (re
 });
 
 apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const user = (req as any).user as User;
   const school = (req as any).school;
   const users = await db.getUsers(school.id);
@@ -3704,6 +3706,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
 });
 
 apiRouter.get('/messages', requireAuth, requireSchoolContext, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const school = (req as any).school;
   const user = (req as any).user as User;
   void sendDatabasePage(req, res, 'direct_messages', { school_id: school.id }, 'sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id);
@@ -3756,7 +3759,8 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
 
 apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
-  const contactId = String(req.body?.contactId || '');
+  const contactId = typeof req.body?.contactId === 'string' ? req.body.contactId.trim() : '';
+  if (!contactId || contactId.length > 64) return res.status(400).json({ error: 'A valid message contact is required.' });
   const contact = await db.getUserById(contactId, (req as any).school.id);
   if (!contact) return res.status(404).json({ error: 'Message contact was not found in this school.' });
   await db.markMessagesRead((req as any).school.id, user.id, contactId);
