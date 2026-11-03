@@ -10,7 +10,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { UserCheck, Plus, Search, Mail, Phone, BookOpen, Layers, X, CheckCircle2 } from 'lucide-react';
+import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2 } from 'lucide-react';
 
 export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -123,10 +123,7 @@ export const TeachersView: React.FC = () => {
             <p className="text-xs text-[#64748B]">{t.qualification}</p>
 
             <div className="space-y-1 text-xs text-[#334155] pt-2 border-t border-[#F1F5F9]">
-              <p className="flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 text-[#64748B]" />
-                <span>{t.email}</span>
-              </p>
+              <p className="text-[11px] font-mono text-[#0F766E]">Teacher ID: {t.staffId || t.id}</p>
               <p className="flex items-center gap-2 font-mono">
                 <Phone className="w-3.5 h-3.5 text-[#64748B]" />
                 <span>{t.phone}</span>
