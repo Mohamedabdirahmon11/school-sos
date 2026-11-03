@@ -3159,26 +3159,35 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireAccountantO
 apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const { studentId, academicYear, month, feeType, feeStructureId, amountDue, amountPaid, notes, idempotencyKey } = req.body;
-
-  if (!studentId || !amountDue || amountPaid === undefined) {
-    res.status(400).json({ error: 'studentId, amountDue, and amountPaid are required.' });
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const { studentId, academicYear, month, feeType, feeStructureId, amountDue, amountPaid, notes, idempotencyKey } = body;
+  const resolvedFeeType = feeType || 'monthly_tuition';
+  const due = Number(amountDue);
+  const paid = Number(amountPaid);
+  if (typeof studentId !== 'string' || !studentId.trim() ||
+      !Number.isFinite(due) || due <= 0 || amountPaid === undefined || !Number.isFinite(paid) || paid < 0 ||
+      !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(resolvedFeeType) ||
+      (academicYear !== undefined && (typeof academicYear !== 'string' || !academicYear.trim() || academicYear.length > 20)) ||
+      (month !== undefined && (typeof month !== 'string' || !month.trim() || month.length > 40)) ||
+      (notes !== undefined && (typeof notes !== 'string' || notes.length > 1000)) ||
+      (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128))) {
+    res.status(400).json({ error: 'Provide a student, positive amount due, non-negative cash amount, valid fee category, and valid optional payment details.' });
     return;
   }
 
   try {
     const payment = await db.recordCashFeePayment({
       schoolId: school.id,
-      studentId,
+      studentId: studentId.trim(),
       academicYear: academicYear || school.academicYear,
       month: month || new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
-      feeType: feeType || 'monthly_tuition',
+      feeType: resolvedFeeType,
       feeStructureId: typeof feeStructureId === 'string' ? feeStructureId : undefined,
-      amountDue: Number(amountDue),
-      amountPaid: Number(amountPaid),
+      amountDue: due,
+      amountPaid: paid,
       recordedBy: user.id,
       notes,
-      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey.trim() : undefined
     });
     res.status(201).json(payment);
   } catch (error: any) {
