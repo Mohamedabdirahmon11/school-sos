@@ -479,6 +479,8 @@ export interface CommunicationSettings {
   provider: 'twilio' | 'infobip' | 'local_gateway' | 'whatsapp_business' | 'none';
   apiKey?: string;
   apiSecret?: string;
+  apiKeyConfigured?: boolean;
+  apiSecretConfigured?: boolean;
   senderId?: string;
   webhookUrl?: string;
   isActive: boolean;
