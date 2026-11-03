@@ -2998,10 +2998,12 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
 apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const { markIds } = req.body;
+  const { markIds } = req.body || {};
 
-  if (!Array.isArray(markIds)) {
-    res.status(400).json({ error: 'markIds array is required.' });
+  if (!Array.isArray(markIds) || markIds.length < 1 || markIds.length > 2000 ||
+      markIds.some((id: unknown) => typeof id !== 'string' || !id.trim()) ||
+      new Set(markIds).size !== markIds.length) {
+    res.status(400).json({ error: 'Provide 1–2,000 unique examination mark IDs.' });
     return;
   }
 
