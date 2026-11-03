@@ -78,8 +78,9 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const tamperedStructure = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, {
     method: 'PUT', headers, body: JSON.stringify({ id: 'forged-id', schoolId: 'another-school', amount: 35 })
   });
-  assert.equal(tamperedStructure.status, 200, await tamperedStructure.text());
-  const protectedStructure = await tamperedStructure.json() as any;
+  const tamperedBody = await tamperedStructure.text();
+  assert.equal(tamperedStructure.status, 200, tamperedBody);
+  const protectedStructure = JSON.parse(tamperedBody) as any;
   assert.equal(protectedStructure.id, activityFee.id, 'fee structure ID cannot be overwritten');
   assert.equal(protectedStructure.schoolId, school.id, 'fee structure tenant cannot be overwritten');
   assert.equal(protectedStructure.amount, 35);
