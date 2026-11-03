@@ -2434,7 +2434,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     ...filtered.map((student: any) => [
       student.studentId, student.firstName, student.middleName, student.lastName, student.gender,
       classNames.get(student.classId) || student.className, student.admissionDate,
-      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, student.feeStatus
+      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, getFeeStatus(student.id)
     ])
   ];
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
