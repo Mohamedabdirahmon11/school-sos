@@ -1783,16 +1783,25 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   try {
     const summary = await db.getSchoolDashboardSummary(school.id);
     const stats = summary?.stats || {};
+    const approvedMarks = (await queryAllRows('student_marks', {
+      school_id: school.id,
+      academic_year: school.academicYear
+    }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
+    const examConfig = db.getExamConfig(school.id, school.academicYear);
+    const passMark = Number(examConfig.passMarkPercentage) || 50;
     const result: Record<string, unknown> = {
       studentCount: Number(stats.totalStudents) || 0,
       attendanceRate: Number(stats.attendanceRate) || 0,
-      passRate: null
+      passRate: approvedMarks.length
+        ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
+        : null
     };
     if (user.role === 'accountant' || user.role === 'super_admin') {
-      const payments = (await db.getFeePayments(school.id)).filter(payment => !payment.voidedAt);
-      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
+      const allPayments = await db.getFeePayments(school.id);
+      const payments = allPayments.filter(payment => !payment.voidedAt);
+      result.totalDue = allPayments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
       result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
+      result.totalArrears = allPayments.reduce((total, payment) => total + Number(payment.voidedAt ? payment.amountDue || 0 : payment.remainingAmount || 0), 0);
       result.paymentCount = payments.length;
       result.recentPayments = payments.slice(-20).reverse();
     }
