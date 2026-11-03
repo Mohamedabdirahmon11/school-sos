@@ -2949,7 +2949,7 @@ apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, r
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { studentId } = req.query;
-  if (!['accountant', 'super_admin', 'parent', 'student'].includes(user.role)) { res.status(403).json({ error: 'School Accountant privilege required for money records.' }); return; }
+  if (!['school_admin', 'accountant', 'super_admin', 'parent', 'student'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view student fee records.' }); return; }
   if (studentId && !await canAccessStudentRecord(user, studentId as string)) {
     res.status(403).json({ error: 'You do not have access to this student fee record.' });
     return;
