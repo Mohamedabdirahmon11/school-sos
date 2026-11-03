@@ -1513,7 +1513,8 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
         const parent = existingParentAccounts.find(item =>
           [item.phone, item.parentPhone].some(value => String(value || '').replace(/[\s()-]/g, '') === phoneKey)
         );
-        const parentPin = parent?.pin ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+        const existingPinHash = parent?.pin || (parent as any)?.pinHash;
+        const parentPin = existingPinHash ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
         parentRecord = {
           id: parent?.id || ('usr-parent-' + randomUUID()),
           schoolId: school.id,
@@ -1521,7 +1522,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
           fullName: parent?.fullName || guardian.name,
           phone: parent?.phone || phoneValue,
           parentPhone: parent?.parentPhone || phoneValue,
-          pin: parent?.pin || hashPin(parentPin!),
+          pin: existingPinHash || hashPin(parentPin!),
           linkedStudentIds: [...(parent?.linkedStudentIds || [])]
         };
         parentRecords.set(phoneKey, parentRecord);
