@@ -580,7 +580,7 @@ export class ApiClient {
   }
 
   public static async getStudentAttendance(studentId: string, params?: any) {
-    const query = new URLSearchParams({ studentId: encodeURIComponent(studentId) });
+    const query = new URLSearchParams({ studentId });
     if (params?.page) query.set('page', String(params.page));
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
     return this.request<AttendanceRecord[]>(`/attendance/student?${query.toString()}`);
