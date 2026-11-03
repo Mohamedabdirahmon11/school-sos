@@ -2857,8 +2857,7 @@ apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAd
 
 apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const payments = await db.getFeePayments(school.id);
-  const payment = payments.find(row => row.id === req.params.paymentId);
+  const payment = await db.getFeePaymentById(req.params.paymentId, school.id);
   if (!payment) { res.status(404).json({ error: 'Receipt not found.' }); return; }
   const user = (req as any).user as User;
   if (!['accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
