@@ -146,6 +146,17 @@ test('payroll records enforce one staff payroll per school and month with scoped
   assert.match(migration, /ALTER TABLE payroll_records ENABLE ROW LEVEL SECURITY/);
 });
 
+test('payroll deletion and status transitions are protected by database policies', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/028_harden_payroll_access.sql', import.meta.url), 'utf8');
+  assert.ok(migration.includes('payroll_records_accountant_delete'));
+  assert.ok(migration.includes('FOR DELETE TO authenticated'));
+  assert.ok(migration.includes("OLD.status = 'draft' AND NEW.status = 'approved'"));
+  assert.ok(migration.includes("OLD.status = 'approved' AND NEW.status = 'paid'"));
+  assert.ok(migration.includes("USING ERRCODE = 'P0001'"));
+  assert.ok(sql.includes('payroll_records_accountant_delete'));
+  assert.ok(sql.includes('payroll_status_transition_guard'));
+});
+
 test('notice class audiences and archive state are additive in migration 011', () => {
   const migration = readFileSync(new URL('../supabase/migrations/011_notice_audiences_archive.sql', import.meta.url), 'utf8');
   assert.match(sql, /ALTER TABLE school_notices ADD COLUMN IF NOT EXISTS class_id/i);
