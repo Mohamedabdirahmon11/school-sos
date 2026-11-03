@@ -490,10 +490,12 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
     return;
   }
 
+  // Tenant selection comes only from an explicit request header/query or the
+  // authenticated account. A body field is mutable business data and must
+  // never silently switch the request's school context.
   let requestedSchoolId = (
     req.headers['x-school-id'] ||
-    req.query.schoolId ||
-    req.body?.schoolId
+    req.query.schoolId
   ) as string;
 
   // STRICT ENFORCEMENT: If non-super-admin tries to pass or touch a different schoolId, DENY with 403 Forbidden!
