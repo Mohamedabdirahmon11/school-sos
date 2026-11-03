@@ -1366,8 +1366,11 @@ class StorageEngine {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const rawPin = studentData.pin || randomInt(1000, 10000).toString();
     const pinHash = hashPin(rawPin);
+    // Keep the plaintext PIN out of the persisted student row. It is returned
+    // separately once to the authorized creator, never stored in the database.
+    const { pin: _rawPin, ...studentFields } = studentData;
     const student: Student = {
-      ...studentData,
+      ...studentFields,
       id,
       pinHash,
       createdAt: new Date().toISOString()
