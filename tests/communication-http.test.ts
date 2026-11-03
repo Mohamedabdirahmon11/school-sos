@@ -79,6 +79,51 @@ test('communication gateway secrets are never returned and tenant identity canno
   assert.equal(Object.hasOwn(rereadBody, 'apiSecret'), false);
 });
 
+test('notices accept only bounded content and authenticated author metadata', async () => {
+  const invalid = await fetch(`${baseUrl}/notices`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ title: 'x'.repeat(256), content: 'notice', audience: 'all' })
+  });
+  assert.equal(invalid.status, 400);
+
+  const created = await fetch(`${baseUrl}/notices`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({
+      id: 'forged-notice', schoolId: 'another-school', title: 'School meeting',
+      content: 'Meeting at 9 AM', audience: 'all', authorName: 'Fake Author',
+      authorRole: 'super_admin', isActive: false, isPinned: false,
+      publishDate: new Date().toISOString().slice(0, 10)
+    })
+  });
+  assert.equal(created.status, 403);
+  const valid = await fetch(`${baseUrl}/notices`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({
+      id: 'forged-notice', title: 'School meeting', content: 'Meeting at 9 AM',
+      audience: 'all', authorName: 'Fake Author', authorRole: 'super_admin',
+      isActive: false, isPinned: false, publishDate: new Date().toISOString().slice(0, 10)
+    })
+  });
+  assert.equal(valid.status, 201);
+  const notice = await valid.json() as any;
+  assert.notEqual(notice.id, 'forged-notice');
+  assert.equal(notice.schoolId, school.id);
+  assert.equal(notice.authorName, admin.fullName);
+  assert.equal(notice.authorRole, 'school_admin');
+  assert.equal(notice.isActive, true);
+
+  const invalidUpdate = await fetch(`${baseUrl}/notices/${notice.id}`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({ title: 'Updated', content: 'Updated content', audience: 'all', isPinned: 'false' })
+  });
+  assert.equal(invalidUpdate.status, 400);
+  const update = await fetch(`${baseUrl}/notices/${notice.id}`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({ title: 'Updated', content: 'Updated content', audience: 'all', isPinned: false })
+  });
+  assert.equal(update.status, 200);
+});
+
 test('only school administrators can read gateway settings and recipient queue', async () => {
   const settings = await fetch(`${baseUrl}/communication/settings`, { headers: { Cookie: teacherCookie } });
   const queue = await fetch(`${baseUrl}/communication/queue`, { headers: { Cookie: teacherCookie } });
