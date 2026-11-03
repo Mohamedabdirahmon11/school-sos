@@ -700,6 +700,26 @@ export class ApiClient {
     });
   }
 
+  public static async getDisciplineRecords() {
+    return this.request<any[]>('/school/discipline');
+  }
+
+  public static async addDisciplineRecord(data: {
+    studentId: string; incidentDate: string; infractionType: string; description: string;
+    severity: 'minor' | 'moderate' | 'severe'; actionTaken: string; parentNotified: boolean;
+  }) {
+    return this.request<any>('/school/discipline', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async deleteDisciplineRecord(recordId: string) {
+    return this.request<{ success: boolean }>(`/school/discipline/${encodeURIComponent(recordId)}`, {
+      method: 'DELETE'
+    });
+  }
+
   public static async getInventoryItems() {
     return this.request<any[]>('/school/inventory');
   }
