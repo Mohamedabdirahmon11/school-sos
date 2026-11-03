@@ -1924,7 +1924,7 @@ class StorageEngine {
       } else {
         // A stable ID makes simultaneous submissions converge on the same
         // row as well as respecting the database's natural-key unique index.
-        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\\u0000');
+        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
         const newRecord: AttendanceRecord = {
           id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
           schoolId,
@@ -1945,7 +1945,7 @@ class StorageEngine {
         const student = await this.getStudentById(rec.studentId, schoolId);
         const parentPhones = [...new Map([student?.fatherPhone, student?.motherPhone]
           .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
-          .map(phone => [phone.replace(/[\\s()-]/g, ''), phone.trim()] as const)).values()];
+          .map(phone => [phone.replace(/[\s()-]/g, ''), phone.trim()] as const)).values()];
         if (student) {
           for (const parentPhone of parentPhones) {
             await this.queueNotification({
@@ -1956,7 +1956,7 @@ class StorageEngine {
               messageType: 'attendance_absent',
               channel: 'sms',
               content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
-            }, `attendance-absent:${schoolId}:${student.id}:${date}:${parentPhone.replace(/[\\s()-]/g, '')}`);
+            }, `attendance-absent:${schoolId}:${student.id}:${date}:${parentPhone.replace(/[\s()-]/g, '')}`);
           }
         }
       }
