@@ -498,3 +498,12 @@ pm run audit:rls PASSED (45 tables; helper and table-order checks); schema confo
 pm run dev failed on 	imetable_settings.id does not exist because the startup table check selected id for every table. Changed the preflight probe to select('*', { count: 'exact', head: true }), which verifies table access without assuming an id column (	imetable_settings is keyed by school_id). Verification: lint PASSED; build PASSED (existing Vite __dirname warning); 
 pm test PASSED 80/80; schema idempotency PASSED. Live Supabase startup still needs the owner to rerun 
 pm run dev and apply migrations 001-014.
+
+## Urgent security hardening (2026-11-02)
+
+- DONE (live Supabase): migration `017_restrict_public_api_access` applied. Direct table privileges for `anon` and `authenticated` are now zero across all 45 public tables; `service_role` retains full access to all 45. Direct sequence and function privileges were also revoked from browser roles, and default privileges were set for future objects.
+- DONE (live Supabase): hardened the five RLS helper functions with an empty search path and schema-qualified references. `auth_user_role()` now reads the SchoolOS role from `public.users` rather than mistaking Postgres's `authenticated` JWT role for an app role.
+- DONE (GitHub): added matching `supabase/migrations/017_restrict_public_api_access.sql`.
+- DONE (GitHub): mobile session activity now includes pointer/touch/wheel events as well as keyboard input.
+- PARTIAL: `.env` is tracked in GitHub history. Deletion was attempted but GitHub rejected the stale blob version; it remains tracked pending a fresh metadata fetch and removal. Rotate every real secret in it, especially the Supabase service-role key and session secret. Removing the file does not erase past Git history.
+- NOT VERIFIED: local `npm run lint`, `npm run build`, and automated tests were not run from this connector session. Re-run CI/local checks before deployment. Also confirm SchoolOS browser code does not call Supabase directly; the reviewed source uses a server-only service-role client.
