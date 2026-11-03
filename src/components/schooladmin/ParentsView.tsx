@@ -17,6 +17,7 @@ export const ParentsView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!school) {
@@ -42,7 +43,7 @@ export const ParentsView: React.FC = () => {
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [school?.id, page, search]);
+  }, [school?.id, page, search, reloadCount]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -94,7 +95,7 @@ export const ParentsView: React.FC = () => {
         ) : loadError ? (
           <div className="p-8 text-center text-sm text-rose-700" role="alert">
             {loadError}
-            <button type="button" onClick={() => setPage(current => current)} className="ml-3 underline">Retry</button>
+            <button type="button" onClick={() => setReloadCount(count => count + 1)} className="ml-3 underline">Retry</button>
           </div>
         ) : (
           <>
