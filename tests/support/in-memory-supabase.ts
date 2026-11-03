@@ -173,7 +173,7 @@ export class InMemorySupabase {
         .filter(row => (row.schoolId ?? row.school_id) === schoolId && (row.academicYear ?? row.academic_year) === academicYear)
         .reduce((max, row) => {
           const receipt = String(row.receiptNumber ?? row.receipt_number ?? '');
-          const suffix = receipt.match(/(\\d+)$/)?.[1];
+          const suffix = receipt.match(/(\d+)$/)?.[1];
           return suffix ? Math.max(max, Number(suffix) || 0) : max;
         }, 0);
       const nextValue = Math.max(Number(existing?.nextValue || 0) + 1, maxReceipt + 1);
