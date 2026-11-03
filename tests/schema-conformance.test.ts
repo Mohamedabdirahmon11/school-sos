@@ -146,6 +146,14 @@ test('payroll records enforce one staff payroll per school and month with scoped
   assert.match(migration, /ALTER TABLE payroll_records ENABLE ROW LEVEL SECURITY/);
 });
 
+test('support ticket writes are server-only and reads are owner/admin scoped', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/031_harden_support_tickets.sql', import.meta.url), 'utf8');
+  assert.ok(migration.includes('ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY'));
+  assert.ok(migration.includes('REVOKE INSERT, UPDATE, DELETE ON public.support_tickets FROM PUBLIC, anon, authenticated'));
+  assert.ok(sql.includes('support_tickets_owner_scope'));
+  assert.ok(sql.includes('created_by_user_id = auth_user_id()'));
+});
+
 test('notice audiences and direct-message content are protected at the database layer', () => {
   const migration = readFileSync(new URL('../supabase/migrations/030_notice_and_message_rls.sql', import.meta.url), 'utf8');
   for (const policy of ['school_notices_audience_read', 'school_notices_admin_insert', 'school_notices_admin_update', 'school_notices_admin_delete']) {
