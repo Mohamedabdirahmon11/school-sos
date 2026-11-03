@@ -64,6 +64,14 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   // Inventory State
   const [inventory, setInventory] = useState<any[]>([]);
+  const [showInventoryForm, setShowInventoryForm] = useState(false);
+  const [inventoryAssetTag, setInventoryAssetTag] = useState('');
+  const [inventoryItemName, setInventoryItemName] = useState('');
+  const [inventoryQuantity, setInventoryQuantity] = useState('1');
+  const [inventoryLocation, setInventoryLocation] = useState('');
+  const [inventoryCondition, setInventoryCondition] = useState<'good' | 'fair' | 'poor' | 'damaged'>('good');
+  const [inventoryValue, setInventoryValue] = useState('0');
+  const [inventoryBusy, setInventoryBusy] = useState(false);
 
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -73,6 +81,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
+    ApiClient.getInventoryItems().then(setInventory).catch(error => {
+      console.error(error);
+      setNotice('Inventory could not be loaded. Check your school administrator access.');
+    });
   }, [school]);
 
   const handleAddBook = async (e: React.FormEvent) => {
@@ -118,6 +130,57 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleAddInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inventoryBusy) return;
+    const quantity = Number(inventoryQuantity);
+    const value = Number(inventoryValue);
+    if (!inventoryAssetTag.trim() || !inventoryItemName.trim() ||
+        !Number.isSafeInteger(quantity) || quantity < 0 ||
+        !Number.isFinite(value) || value < 0) {
+      setNotice('Enter a valid asset tag, item name, quantity and value.');
+      return;
+    }
+    setInventoryBusy(true);
+    try {
+      const created = await ApiClient.addInventoryItem({
+        assetTag: inventoryAssetTag.trim(),
+        itemName: inventoryItemName.trim(),
+        quantity,
+        roomLocation: inventoryLocation.trim(),
+        condition: inventoryCondition,
+        value
+      });
+      setInventory(current => [...current, created]);
+      setShowInventoryForm(false);
+      setInventoryAssetTag('');
+      setInventoryItemName('');
+      setInventoryQuantity('1');
+      setInventoryLocation('');
+      setInventoryCondition('good');
+      setInventoryValue('0');
+      setNotice('Inventory item saved.');
+    } catch (error: any) {
+      setNotice(error?.message || 'Inventory item could not be saved.');
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
+  const handleDeleteInventoryItem = async (itemId: string) => {
+    try {
+      const result = await ApiClient.deleteInventoryItem(itemId);
+      if (result.success) {
+        setInventory(current => current.filter(item => item.id !== itemId));
+        setNotice('Inventory item deleted.');
+      } else {
+        setNotice('Inventory item was not found.');
+      }
+    } catch (error: any) {
+      setNotice(error?.message || 'Inventory item could not be deleted.');
     }
   };
 
@@ -423,10 +486,55 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       {/* 6. INVENTORY MODULE */}
       {activeModule === 'inventory' && (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-[#0F766E]" />
-            <span>School Assets & Equipment Register</span>
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+              <Boxes className="w-4 h-4 text-[#0F766E]" />
+              <span>School Assets & Equipment Register</span>
+            </h2>
+            {!isReadOnly && (
+              <button type="button" onClick={() => setShowInventoryForm(value => !value)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white">
+                <Plus className="h-4 w-4" /> Add asset
+              </button>
+            )}
+          </div>
+
+          {showInventoryForm && !isReadOnly && (
+            <form onSubmit={handleAddInventoryItem} className="grid grid-cols-1 gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Asset tag
+                <input required maxLength={80} value={inventoryAssetTag} onChange={e => setInventoryAssetTag(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Item description
+                <input required maxLength={255} value={inventoryItemName} onChange={e => setInventoryItemName(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Quantity
+                <input required type="number" min="0" max="1000000" step="1" value={inventoryQuantity} onChange={e => setInventoryQuantity(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Room / location
+                <input maxLength={150} value={inventoryLocation} onChange={e => setInventoryLocation(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Condition
+                <select value={inventoryCondition} onChange={e => setInventoryCondition(e.target.value as typeof inventoryCondition)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm">
+                  <option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option><option value="damaged">Damaged</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-medium text-[#475569]">Estimated value
+                <input required type="number" min="0" max="1000000000" step="0.01" value={inventoryValue} onChange={e => setInventoryValue(e.target.value)}
+                  className="w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-sm" />
+              </label>
+              <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
+                <button disabled={inventoryBusy} type="submit" className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                  {inventoryBusy ? 'Saving…' : 'Save asset'}
+                </button>
+                <button type="button" onClick={() => setShowInventoryForm(false)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs font-semibold text-[#475569]">Cancel</button>
+              </div>
+            </form>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -438,6 +546,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Location</th>
                   <th className="px-4 py-2.5">Condition</th>
                   <th className="px-4 py-2.5">Estimated Value</th>
+                  {!isReadOnly && <th className="px-4 py-2.5">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
@@ -446,11 +555,17 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 font-mono font-bold text-[#0F766E]">{i.assetTag}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{i.itemName}</td>
                     <td className="px-4 py-2.5 font-mono">{i.quantity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{i.roomLocation}</td>
+                    <td className="px-4 py-2.5 text-[#475569]">{i.roomLocation || '—'}</td>
                     <td className="px-4 py-2.5 capitalize text-emerald-700 font-medium">{i.condition}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold">${i.value}</td>
+                    <td className="px-4 py-2.5 font-mono font-bold">{formatMoney(Number(i.value || 0), school?.currency || 'ETB')}</td>
+                    {!isReadOnly && <td className="px-4 py-2.5">
+                      <button type="button" onClick={() => handleDeleteInventoryItem(i.id)} className="rounded px-2 py-1 text-red-600 hover:bg-red-50">Delete</button>
+                    </td>}
                   </tr>
                 ))}
+                {inventory.length === 0 && (
+                  <tr><td colSpan={isReadOnly ? 6 : 7} className="px-4 py-8 text-center text-[#64748B]">No inventory assets have been recorded yet.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
