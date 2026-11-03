@@ -621,6 +621,10 @@ export class ApiClient {
     return this.request<Teacher[]>(`/teachers?${query.toString()}`);
   }
 
+  public static async resetTeacherPin(id: string) {
+    return this.request<{ success: boolean; newPin: string }>(`/teachers/${encodeURIComponent(id)}/reset-pin`, { method: 'POST' });
+  }
+
   public static async updateTeacher(id: string, updates: Partial<Teacher>) {
     return this.request<Teacher>(`/teachers/${encodeURIComponent(id)}`, {
       method: 'PUT',
