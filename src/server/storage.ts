@@ -735,6 +735,7 @@ class StorageEngine {
   // Daily subscription state reconciler: Trial -> Active -> Grace -> Read-only
   public async runSubscriptionDailyCheck(now = new Date()): Promise<void> {
     const schools = await this.getSchools();
+    const settings = this.getSettings();
 
     for (const school of schools) {
       const sub = school.subscription;
@@ -743,10 +744,10 @@ class StorageEngine {
       }
 
       const validUntil = new Date(sub.validUntil);
-      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays || 7) * 24 * 60 * 60 * 1000);
+      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays ?? 7) * 24 * 60 * 60 * 1000);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
-      if (now > graceEnd && sub.status !== 'read_only') {
+      if (now > graceEnd && settings.readOnlyAfterExpiry && sub.status !== 'read_only') {
         sub.status = 'read_only';
         this.updateSchool(school.id, { subscription: sub });
         this.logAudit({
