@@ -1648,7 +1648,7 @@ apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuper
     'KG,KG,A,,KG Room,40,0',
     'Grade 1,1,A,,Room 101,40,0',
     'Grade 1,1,B,,Room 102,40,0'
-  ].join('\\r\\n');
+  ].join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-class-import-template.csv"' }).send(csv);
 });
 
@@ -2342,7 +2342,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   });
   const cell = (value: unknown) => {
     const raw = String(value ?? '');
-    const safe = /^\\s*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+    const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
     return `"${safe.replace(/"/g, '""')}"`;
   };
   const rows = [
@@ -2357,7 +2357,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.set({
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.csv"`
-  }).send('\\uFEFF' + csv);
+  }).send('\uFEFF' + csv);
 });
 
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
