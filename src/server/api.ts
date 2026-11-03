@@ -598,7 +598,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     expiresAt
   });
 
-  db.createSession({
+  await db.createSession({
     id: sessionId,
     userId: user.id,
     userRole: user.role,
