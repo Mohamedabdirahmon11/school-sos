@@ -69,6 +69,8 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   };
   const invalidStructure = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Invalid grades', feeType: 'custom', minGrade: 13, maxGrade: 14, amount: 10, cadence: 'one_time', isActive: true }) });
   assert.equal(invalidStructure.status, 400);
+  const oversizedStructure = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Oversized amount', feeType: 'custom', amount: 10000000000, cadence: 'one_time', isActive: true }) });
+  assert.equal(oversizedStructure.status, 400);
   const structureResponse = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Science activity', feeType: 'custom', amount: 35, cadence: 'one_time', isActive: true }) });
   assert.equal(structureResponse.status, 201);
   const activityFee = await structureResponse.json() as any;
@@ -153,6 +155,8 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(voidResponse.status, 200);
   const voided = await voidResponse.json() as any;
   assert.equal(voided.voidReason, 'Cash entered against wrong student');
+  assert.ok(memory.rows('fee_payments').find(row => row.id === partial.body.id)?.voided_at,
+    'voided receipt state must be persisted before the HTTP response completes');
   assert.equal((await fetch(`${baseUrl}/fees/payments/${partial.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Trying a second reversal' }) })).status, 409);
   const invalidVoid = await fetch(`${baseUrl}/fees/payments/${unpaid.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'no' }) });
   assert.equal(invalidVoid.status, 400);
@@ -166,9 +170,12 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const arrears = await arrearsResponse.json();
   assert.deepEqual(arrears.map((row: any) => row.student.id).sort(), [partialStudent.id, unpaidStudent.id].sort());
 
+  const invalidIncomeDate = await fetch(`${baseUrl}/fees/daily-income?date=not-a-date`, { headers });
+  assert.equal(invalidIncomeDate.status, 400);
   const incomeResponse = await fetch(`${baseUrl}/fees/daily-income?date=${today}`, { headers });
   assert.equal(incomeResponse.status, 200);
   const income = await incomeResponse.json();
-  assert.equal(income.paymentCount, 6);
+  assert.equal(income.paymentCount, 5, 'zero-cash unpaid receipts are not counted as daily collections');
+  assert.ok(income.payments.every((payment: any) => payment.amountPaid > 0));
   assert.equal(income.totalCollected, 97);
 });
