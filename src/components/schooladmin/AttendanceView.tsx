@@ -64,21 +64,18 @@ export const AttendanceView: React.FC = () => {
     if (!school || !selectedClassId) return;
     setIsLoading(true);
     try {
-      const [firstPage, existingRecords] = await Promise.all([
-        ApiClient.getStudents(selectedClassId, undefined, 1, 20),
+      const [allStudents, existingRecords] = await Promise.all([
+        ApiClient.getAllSchoolStudents({ classId: selectedClassId }),
         ApiClient.getDailyAttendance(selectedClassId, date)
       ]);
-      const firstPageInfo = ((firstPage as any).pagination || {
-        page: 1, pageSize: 20, total: firstPage.length, totalPages: firstPage.length ? 1 : 0
-      }) as PageInfo;
-      const allStudents = [...firstPage];
-      for (let pageNumber = 2; pageNumber <= firstPageInfo.totalPages; pageNumber += 1) {
-        const nextPage = await ApiClient.getStudents(selectedClassId, undefined, pageNumber, 20);
-        allStudents.push(...nextPage);
-      }
       setStudents(allStudents);
-      setPageStudents(firstPage);
-      setServerPageInfo(firstPageInfo);
+      setPageStudents(allStudents.slice(0, 20));
+      setServerPageInfo({
+        page: 1,
+        pageSize: 20,
+        total: allStudents.length,
+        totalPages: Math.ceil(allStudents.length / 20)
+      });
 
       const map: Record<string, { status: AttendanceStatus; note: string }> = {};
       for (const std of allStudents) {
