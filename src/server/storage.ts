@@ -130,6 +130,17 @@ export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt:
   return requested - current >= refreshWindowMs;
 }
 
+export function calculateSubscriptionGraceEnd(
+  validUntil: string | Date,
+  schoolGraceDays: number | undefined,
+  platformGraceDays = 7
+): Date {
+  const configuredDays = typeof schoolGraceDays === 'number' && Number.isFinite(schoolGraceDays)
+    ? Math.max(0, schoolGraceDays)
+    : Math.max(0, Number(platformGraceDays) || 0);
+  return new Date(new Date(validUntil).getTime() + configuredDays * 24 * 60 * 60 * 1000);
+}
+
 const DEFAULT_SETTINGS: SuperAdminSettings = {
   trialDays: 7,
   graceDays: 7,
@@ -743,10 +754,7 @@ class StorageEngine {
       }
 
       const validUntil = new Date(sub.validUntil);
-      const configuredGraceDays = typeof sub.graceDays === 'number' && Number.isFinite(sub.graceDays)
-        ? Math.max(0, sub.graceDays)
-        : Math.max(0, Number(this.getSettings().graceDays ?? 7) || 0);
-      const graceEnd = new Date(validUntil.getTime() + configuredGraceDays * 24 * 60 * 60 * 1000);
+      const graceEnd = calculateSubscriptionGraceEnd(sub.validUntil, sub.graceDays, this.getSettings().graceDays);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
       if (now > graceEnd && sub.status !== 'read_only') {
