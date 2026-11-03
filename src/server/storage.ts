@@ -1503,18 +1503,26 @@ class StorageEngine {
       this.queryRows<AttendanceRecord>('attendance_records', { school_id: student.schoolId, student_id: id }),
       this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id }),
       this.getUsers(student.schoolId, 'student'),
-      this.getUsers(student.schoolId, 'parent')
+      this.getUsers(student.schoolId, 'parent'),
+      this.getStudents(student.schoolId)
     ]);
     const studentUserIds = new Set(this.data.users
       .filter(user => user.schoolId === student.schoolId && user.role === 'student' &&
         (user.studentId === student.studentId || user.id === `usr-student-${student.id}`))
       .map(user => user.id));
+    const parentPhones = [student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
     const parentUsers = this.data.users.filter(user =>
-      user.schoolId === student.schoolId && user.role === 'parent' && user.linkedStudentIds?.includes(student.id)
+      user.schoolId === student.schoolId && user.role === 'parent' &&
+      (user.linkedStudentIds?.includes(student.id) ||
+        (!user.linkedStudentIds?.length && parentPhones.includes(user.phone || '')))
     );
     for (const parent of parentUsers) {
       parent.linkedStudentIds = (parent.linkedStudentIds || []).filter(studentId => studentId !== student.id);
-      if (!parent.linkedStudentIds.length) studentUserIds.add(parent.id);
+      const hasOtherChildren = this.data.students.some(other =>
+        other.id !== student.id && other.schoolId === student.schoolId &&
+        (other.fatherPhone === parent.phone || other.motherPhone === parent.phone)
+      );
+      if (!parent.linkedStudentIds.length && !hasOtherChildren) studentUserIds.add(parent.id);
     }
     const len = this.data.students.length;
     this.data.students = this.data.students.filter(existing => existing.id !== id);
