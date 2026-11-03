@@ -27,8 +27,23 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['school_notices', { id: 'n1', schoolId: 's1', title: 'Notice', content: 'Text', audience: 'class', classId: 'c1', isActive: true, isPinned: false, publishDate: '2026-09-01', authorName: 'Admin', authorRole: 'school_admin' }],
   ['direct_messages', { id: 'm1', schoolId: 's1', senderId: 'u1', senderName: 'Teacher', senderRole: 'teacher', recipientId: 'u2', recipientName: 'Parent', recipientRole: 'parent', content: 'Hello', timestamp: '2026-09-01T00:00:00Z', isRead: false }],
   ['fee_payments', { id: 'p1', schoolId: 's1', studentId: 'st1', receiptNumber: 'R-1', academicYear: '2026', month: 'September', feeType: 'custom', feeStructureId: 'fs1', idempotencyKey: 'key-1', amountDue: 10, amountPaid: 10, remainingAmount: 0, paymentMethod: 'Cash', status: 'paid', date: '2026-09-01', recordedBy: 'u1' }],
-  ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }]
+  ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }],
+  ['inventory_items', { id: 'inv1', schoolId: 's1', assetTag: 'ASSET-001', itemName: 'Laptop', quantity: 2, roomLocation: 'Lab 1', condition: 'good', value: 25000, createdAt: '2026-11-03T00:00:00Z', updatedAt: '2026-11-03T00:00:00Z' }]
 ];
+
+test('inventory migration enforces school scope, unique asset tags and bounded asset values', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/025_school_inventory.sql', import.meta.url), 'utf8');
+  const columns = definitions.get('inventory_items');
+  assert.ok(columns?.has('asset_tag') && columns.has('item_name') && columns.has('quantity') && columns.has('value'));
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.inventory_items/);
+  assert.match(migration, /UNIQUE INDEX IF NOT EXISTS uq_inventory_items_school_asset_tag/);
+  assert.match(migration, /quantity BETWEEN 0 AND 1000000/);
+  assert.match(migration, /inventory_items_tenant_scope/);
+  assert.match(migration, /ALTER TABLE public\.inventory_items ENABLE ROW LEVEL SECURITY/);
+  assert.ok(apiSource.includes("apiRouter.get('/school/inventory'"), 'inventory read endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.post('/school/inventory'"), 'inventory create endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.delete('/school/inventory/:itemId'"), 'inventory delete endpoint is registered');
+});
 
 test('domain write payloads map to real schema columns and satisfy required columns', () => {
   assert.ok(definitions.size > 20, 'schema tables parsed');
