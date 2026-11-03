@@ -199,7 +199,6 @@ const AppContent: React.FC = () => {
               <SchoolDashboard
                 onNavigate={handleNavigate}
                 onOpenAddStudent={() => setCurrentView('sch_students')}
-                onOpenRecordPayment={() => setCurrentView('sch_fees')}
               />
             )}
             {activeView === 'sch_students' && (
