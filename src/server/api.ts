@@ -2830,12 +2830,17 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
 apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const { classId, date } = req.query;
-  if (!classId || !date) {
+  if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string') {
     res.status(400).json({ error: 'classId and date (YYYY-MM-DD) are required.' });
     return;
   }
-  if (!await canAccessTeachingClass(req, res, classId as string)) return;
-  res.json(await db.getAttendance(school.id, classId as string, date as string));
+  const parsedDate = new Date(`${date}T00:00:00.000Z`);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+    res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
+    return;
+  }
+  if (!await canAccessTeachingClass(req, res, classId)) return;
+  res.json(await db.getAttendance(school.id, classId, date));
 });
 
 apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (req, res) => {
@@ -2858,7 +2863,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   const user = (req as any).user as User;
   const { classId, date, records } = req.body;
 
-  if (!classId || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
+  if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
     res.status(400).json({ error: 'A class, a valid date, and 1–2,000 student records are required.' });
     return;
   }
@@ -2871,7 +2876,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
   for (const record of records) {
-    if (!record || typeof record.studentId !== 'string' || !record.studentId.trim() || !allowedStatuses.has(record.status)) {
+    if (!record || typeof record.studentId !== 'string' || !record.studentId.trim() || record.studentId !== record.studentId.trim() || !allowedStatuses.has(record.status) || (record.note !== undefined && typeof record.note !== 'string')) {
       res.status(400).json({ error: 'Every attendance row must include a valid student ID and attendance status.' });
       return;
     }
