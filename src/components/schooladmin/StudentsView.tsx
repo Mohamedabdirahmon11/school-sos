@@ -66,7 +66,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
     ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 20 }),
-    ApiClient.getClasses(), ApiClient.getBranches()
+    ApiClient.getAllClasses(), ApiClient.getAllBranches()
   ]), [school?.id, search, classFilter, branchFilter, feeFilter, page], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
