@@ -1415,7 +1415,7 @@ apiRouter.get('/branches', requireAuth, requireSchoolContext, async (req, res) =
 apiRouter.get('/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireImportSchoolAccess, (_req, res) => {
   const records = [
     ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'studentPhone', 'branch'],
-    ['Grade 1', 'A', 'EXAMPLE Student One', 'female', '2018-01-15', 'EXAMPLE Parent One', '+252611111111', '', ''],
+    ['KG', 'A', 'EXAMPLE Student One', 'female', '2018-01-15', 'EXAMPLE Parent One', '+252611111111', '', ''],
     ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2018-04-22', 'EXAMPLE Parent Two', '+252622222222', '+252633333333', '']
   ];
   const csv = records.map(record => record.map(value => `"${value.replace(/"/g, '""')}"`).join(',')).join('\r\n');
