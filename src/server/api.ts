@@ -568,11 +568,23 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
 }
 
 async function requireSchoolContextForSupportWrite(req: Request, res: Response, next: () => void) {
-  if ((req as any).user?.role === 'super_admin') {
-    next();
+  const user = (req as any).user as User;
+  if (!user) { res.status(401).json({ error: 'Authentication required.' }); return; }
+  if (user.role === 'super_admin') { next(); return; }
+  const requestedSchoolId = (req.headers['x-school-id'] || req.query.schoolId || req.body?.schoolId) as string | undefined;
+  if (requestedSchoolId && requestedSchoolId !== user.schoolId) {
+    res.status(403).json({ error: 'Cross-school access denied. Tenant violation detected.' });
     return;
   }
-  await requireSchoolContext(req, res, next);
+  if (typeof user.schoolId !== 'string' || !user.schoolId.trim() || user.schoolId.length > 64) {
+    res.status(403).json({ error: 'A school account is required to contact support.' });
+    return;
+  }
+  const school = await getSchoolForRequest(req, user.schoolId);
+  if (!school) { res.status(404).json({ error: 'School not found.' }); return; }
+  // Support must remain available when a subscription is read-only or suspended.
+  (req as any).school = school;
+  next();
 }
 
 // Helper: Issue signed cookie session
@@ -3773,6 +3785,7 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, 
 });
 
 apiRouter.get('/support/tickets', requireAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const user = (req as any).user as User;
   if (user.role === 'super_admin') {
     void sendDatabasePage(req, res, 'support_tickets', {});
@@ -3791,42 +3804,63 @@ apiRouter.get('/support/tickets', requireAuth, (req, res) => {
 
 apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
   const user = (req as any).user as User;
-  const { subject, description, priority } = req.body;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid support ticket details.' });
+    return;
+  }
+  const subject = typeof payload.subject === 'string' ? payload.subject.trim() : '';
+  const description = typeof payload.description === 'string' ? payload.description.trim() : '';
+  const priority = payload.priority === undefined ? 'medium' : payload.priority;
+  if (!subject || subject.length > 255 || !description || description.length > 10000 ||
+      !['low', 'medium', 'high', 'urgent'].includes(priority)) {
+    res.status(400).json({ error: 'Subject, description or priority is invalid.' });
+    return;
+  }
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
-
-  const ticket = await db.createTicket({
-    schoolId: user.schoolId,
-    schoolName: school?.name,
-    createdByUserId: user.id,
-    createdByName: user.fullName,
-    createdByRole: user.role,
-    subject,
-    description,
-    priority: priority || 'medium',
-    status: 'open'
-  }, description);
-
-  res.status(201).json(ticket);
+  try {
+    const ticket = await db.createTicket({
+      schoolId: user.schoolId,
+      schoolName: school?.name,
+      createdByUserId: user.id,
+      createdByName: user.fullName,
+      createdByRole: user.role,
+      subject,
+      description,
+      priority,
+      status: 'open'
+    }, description);
+    await db.flush();
+    res.status(201).json(ticket);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Support ticket could not be created.' });
+  }
 });
 
 apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
   const user = (req as any).user as User;
+  const ticketId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
-  if (!content || content.length > 5000) {
-    res.status(400).json({ error: 'A support reply of 1–5000 characters is required.' });
+  if (!ticketId || ticketId.length > 64 || !content || content.length > 5000) {
+    res.status(400).json({ error: 'A valid ticket ID and reply of 1–5000 characters are required.' });
     return;
   }
-  const ticket = await db.replyTicket(req.params.id, {
-    senderId: user.id,
-    senderName: user.fullName,
-    senderRole: user.role,
-    content
-  }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
-  if (!ticket) {
-    res.status(404).json({ error: 'Ticket not found' });
-    return;
+  try {
+    const ticket = await db.replyTicket(ticketId, {
+      senderId: user.id,
+      senderName: user.fullName,
+      senderRole: user.role,
+      content
+    }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
+    if (!ticket) {
+      res.status(404).json({ error: 'Ticket not found.' });
+      return;
+    }
+    await db.flush();
+    res.json(ticket);
+  } catch (error: any) {
+    res.status(409).json({ error: error?.message || 'Support reply could not be saved.' });
   }
-  res.json(ticket);
 });
 
 // School Data Backup
