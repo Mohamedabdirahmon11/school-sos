@@ -1184,7 +1184,15 @@ apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, (req, res
 });
 
 apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (_req, res) => {
-  res.json(await db.getSchools());
+  const schools = await db.getSchools();
+  const directory = await Promise.all(schools.map(async school => {
+    const [students, teachers] = await Promise.all([
+      db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
+      db.queryPage('teachers', { school_id: school.id }, 1, 1, undefined, 'id')
+    ]);
+    return { ...school, studentCount: students.total, teacherCount: teachers.total };
+  }));
+  res.json(directory);
 });
 
 apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req, res) => {
@@ -1409,7 +1417,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     const key = `${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`;
     if (!classIds.has(key) && !classPayload.has(key)) {
       const id = `cls-${randomUUID()}`;
-      const grade = Number(/\d+/.exec(row.data.className)?.[0] || 1);
+      const grade = /\b(?:KG|KINDERGARTEN|NURSERY)\b/i.test(row.data.className) ? 0 : Number(/\d+/.exec(row.data.className)?.[0] || 1);
       const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), gradeLevel: Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), roomNumber: '', capacity: 40, monthlyFee: 0 };
       classPayload.set(key, record);
       classRecords.push(record);
@@ -1684,8 +1692,8 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
 
 apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 1 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (1-12), section, and positive capacity are required.' }); return; }
-  const allowedLevels: number[] = (school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
+  const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
   if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const newClass = db.createClass({ ...req.body, schoolId: school.id });
