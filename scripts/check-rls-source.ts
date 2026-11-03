@@ -23,7 +23,11 @@ const specificRules = [
   ['health_records', 'health_records_admin_scope'],
   ['payroll_records', 'payroll_records_accountant_delete'],
   ['communication_settings', 'communication_settings_admin_access'],
-  ['communication_queue', 'communication_queue_admin_access']
+  ['communication_queue', 'communication_queue_admin_access'],
+  ['school_notices', 'school_notices_audience_read'],
+  ['school_notices', 'school_notices_admin_insert'],
+  ['school_notices', 'school_notices_admin_update'],
+  ['school_notices', 'school_notices_admin_delete']
 ];
 
 let failed = false;
