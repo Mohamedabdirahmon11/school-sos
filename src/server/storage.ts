@@ -41,6 +41,7 @@ import {
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
 import { randomInt, randomUUID } from 'node:crypto';
+import { getSchoolLocalDate } from '../lib/school-date.ts';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -2352,7 +2353,11 @@ class StorageEngine {
     if (!student || student.schoolId !== paymentData.schoolId) throw new Error('Student is not part of this school.');
     await this.getFeePayments(paymentData.schoolId, student.id);
     if (paymentData.idempotencyKey) {
-      const prior = (await this.getFeePayments(paymentData.schoolId)).find(payment => payment.idempotencyKeys?.includes(paymentData.idempotencyKey!));
+      const prior = this.data.feePayments.find(payment =>
+        payment.schoolId === paymentData.schoolId &&
+        payment.studentId === student.id &&
+        payment.idempotencyKeys?.includes(paymentData.idempotencyKey!)
+      );
       if (prior) return prior;
     }
     const classInfo = (await this.getClasses(paymentData.schoolId)).find(item => item.id === student.classId);
@@ -2375,28 +2380,40 @@ class StorageEngine {
     if (!Number.isFinite(paymentData.amountDue) || !Number.isFinite(paymentData.amountPaid) || paymentData.amountDue < 0 || paymentData.amountPaid < 0 || paymentData.amountPaid > paymentData.amountDue) {
       throw new Error('Payment amounts must be valid, non-negative values and cash paid cannot exceed the amount due.');
     }
-    const registrationRecord = paymentData.feeType === 'annual_registration'
-      ? this.data.feePayments.find(item => item.schoolId === paymentData.schoolId && item.studentId === student.id && item.feeType === 'annual_registration' && item.academicYear === paymentData.academicYear && !item.voidedAt)
-      : undefined;
-    if (registrationRecord) {
-      if (registrationRecord.status === 'paid') throw new Error('The annual registration fee is already paid for this student and academic year.');
-      const cumulativePaid = registrationRecord.amountPaid + paymentData.amountPaid;
-      if (cumulativePaid > registrationRecord.amountDue) throw new Error('Cash paid cannot exceed the remaining registration balance.');
-      registrationRecord.amountPaid = cumulativePaid;
-      registrationRecord.remainingAmount = registrationRecord.amountDue - cumulativePaid;
-      registrationRecord.status = registrationRecord.remainingAmount === 0 ? 'paid' : 'partial';
-      registrationRecord.date = new Date().toISOString().split('T')[0];
-      registrationRecord.recordedBy = paymentData.recordedBy;
-      if (paymentData.idempotencyKey) registrationRecord.idempotencyKeys = [...(registrationRecord.idempotencyKeys || []), paymentData.idempotencyKey];
-      if (paymentData.notes) registrationRecord.notes = [registrationRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
-      this.logAudit({ action: 'REGISTRATION_FEE_INSTALLMENT', category: 'finance', schoolId: paymentData.schoolId, userId: paymentData.recordedBy, userName: 'Cashier / Accountant', userRole: 'accountant', details: `Collected an additional registration-fee installment for student ID ${student.id}. Balance: ${registrationRecord.remainingAmount}.`, severity: 'info' });
+    const school = await this.getSchoolById(paymentData.schoolId);
+    const paymentDate = getSchoolLocalDate(school?.timezone);
+    const installmentRecord = this.data.feePayments.find(item => {
+      if (item.schoolId !== paymentData.schoolId || item.studentId !== student.id ||
+          item.feeType !== paymentData.feeType || item.academicYear !== paymentData.academicYear || item.voidedAt) return false;
+      if (paymentData.feeType === 'annual_registration') return true;
+      if (paymentData.feeType === 'monthly_tuition' || paymentData.feeType === 'bus') {
+        return item.month === paymentData.month &&
+          (!matching?.id || !item.feeStructureId || item.feeStructureId === matching.id);
+      }
+      if (paymentData.feeType === 'custom') {
+        return item.feeStructureId === matching?.id &&
+          (matching?.cadence !== 'monthly' || item.month === paymentData.month);
+      }
+      return false;
+    });
+    if (installmentRecord) {
+      if (installmentRecord.status === 'paid') throw new Error('This fee is already paid for the selected billing period.');
+      const cumulativePaid = installmentRecord.amountPaid + paymentData.amountPaid;
+      if (cumulativePaid > installmentRecord.amountDue) throw new Error('Cash paid cannot exceed the remaining fee balance.');
+      installmentRecord.amountPaid = cumulativePaid;
+      installmentRecord.remainingAmount = installmentRecord.amountDue - cumulativePaid;
+      installmentRecord.status = installmentRecord.remainingAmount === 0 ? 'paid' : cumulativePaid > 0 ? 'partial' : 'unpaid';
+      installmentRecord.date = paymentDate;
+      installmentRecord.recordedBy = paymentData.recordedBy;
+      if (paymentData.idempotencyKey) installmentRecord.idempotencyKeys = [...(installmentRecord.idempotencyKeys || []), paymentData.idempotencyKey];
+      if (paymentData.notes) installmentRecord.notes = [installmentRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
+      this.logAudit({ action: 'FEE_PAYMENT_INSTALLMENT', category: 'finance', schoolId: paymentData.schoolId, userId: paymentData.recordedBy, userName: 'Cashier / Accountant', userRole: 'accountant', details: `Collected an additional ${paymentData.feeType} installment for student ID ${student.id}. Balance: ${installmentRecord.remainingAmount}.`, severity: 'info' });
       this.save();
       await this.flush();
-      return registrationRecord;
+      return installmentRecord;
     }
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
-    const school = await this.getSchoolById(paymentData.schoolId);
     const paymentCount = await this.queryPage('fee_payments', { school_id: paymentData.schoolId }, 1, 1);
     const receiptCount = paymentCount.total + 1;
     const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptCount).padStart(4, '0')}`;
@@ -2409,14 +2426,14 @@ class StorageEngine {
       academicYear: paymentData.academicYear,
       month: paymentData.month,
       feeType: paymentData.feeType,
-      feeStructureId: paymentData.feeType === 'custom' ? matching?.id : undefined,
+      feeStructureId: matching?.id,
       idempotencyKey: paymentData.idempotencyKey,
       amountDue: paymentData.amountDue,
       amountPaid: paymentData.amountPaid,
       remainingAmount: remaining,
       paymentMethod: 'Cash', // Strictly Cash only
       status,
-      date: new Date().toISOString().split('T')[0],
+      date: paymentDate,
       recordedBy: paymentData.recordedBy,
       notes: paymentData.notes,
       idempotencyKeys: paymentData.idempotencyKey ? [paymentData.idempotencyKey] : []
