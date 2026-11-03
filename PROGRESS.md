@@ -1,3 +1,10 @@
+
+## Request write-amplification fix (2026-11-03)
+
+- DONE: Settings and plan cache hits now register the current request's persistence baseline. Default-merged settings/plans are compared using the same Supabase column mapping as writes, preventing unrelated authenticated GET requests from repeatedly upserting unchanged configuration.
+- DONE: Session expiry persistence is throttled to at most once per minute (or 5% of shorter session lifetimes); the signed HttpOnly cookie continues to refresh on authenticated requests, and expiry reductions are still persisted immediately.
+- ADDED: Three focused regression tests for session-refresh throttling; included them in the configured CI test subset.
+- NOT YET VERIFIED: GitHub Actions and live request logs must pass after this commit. No Supabase schema or key changes were made.
 # SchoolOS implementation progress
 
 Updated: 2026-11-03
