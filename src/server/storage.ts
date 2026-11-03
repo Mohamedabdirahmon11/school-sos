@@ -735,6 +735,7 @@ class StorageEngine {
   // Daily subscription state reconciler: Trial -> Active -> Grace -> Read-only
   public async runSubscriptionDailyCheck(now = new Date()): Promise<void> {
     const schools = await this.getSchools();
+    const readOnlyAfterExpiry = this.getSettings().readOnlyAfterExpiry !== false;
 
     for (const school of schools) {
       const sub = school.subscription;
@@ -743,10 +744,10 @@ class StorageEngine {
       }
 
       const validUntil = new Date(sub.validUntil);
-      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays || 7) * 24 * 60 * 60 * 1000);
+      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays ?? 7) * 24 * 60 * 60 * 1000);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
-      if (now > graceEnd && sub.status !== 'read_only') {
+      if (now > graceEnd && sub.status !== 'read_only' && readOnlyAfterExpiry) {
         sub.status = 'read_only';
         this.updateSchool(school.id, { subscription: sub });
         this.logAudit({
@@ -759,6 +760,20 @@ class StorageEngine {
           userRole: 'super_admin',
           details: `School ${school.name} (${school.code}) grace period lapsed. State changed to read_only. Mutating actions blocked.`,
           severity: 'warning'
+        });
+      } else if (now > graceEnd && sub.status === 'read_only' && !readOnlyAfterExpiry) {
+        sub.status = 'grace';
+        this.updateSchool(school.id, { subscription: sub });
+        this.logAudit({
+          action: 'SUBSCRIPTION_READ_ONLY_DISABLED',
+          category: 'subscription',
+          schoolId: school.id,
+          schoolName: school.name,
+          userId: 'system',
+          userName: 'System Daemon',
+          userRole: 'super_admin',
+          details: `School ${school.name} returned to grace status because read-only-after-expiry is disabled.`,
+          severity: 'info'
         });
       } else if (now >= validUntil && now <= graceEnd && sub.status !== 'grace' && sub.status !== 'read_only') {
         sub.status = 'grace';
