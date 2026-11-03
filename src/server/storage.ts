@@ -40,7 +40,7 @@ import {
   CommunicationQueueItem
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
-import { randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -1922,8 +1922,11 @@ class StorageEngine {
         this.data.attendance[existingIdx].recordedAt = now;
         results.push(this.data.attendance[existingIdx]);
       } else {
+        // A stable ID makes simultaneous submissions converge on the same
+        // row as well as respecting the database's natural-key unique index.
+        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\\u0000');
         const newRecord: AttendanceRecord = {
-          id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
           schoolId,
           classId,
           studentId: rec.studentId,
@@ -1940,9 +1943,9 @@ class StorageEngine {
       // Notify only on a transition into absent; repeated saves must not spam parents.
       if (rec.status === 'absent' && previousStatus !== 'absent') {
         const student = await this.getStudentById(rec.studentId, schoolId);
-        const parentPhones = [...new Set([student?.fatherPhone, student?.motherPhone]
+        const parentPhones = [...new Map([student?.fatherPhone, student?.motherPhone]
           .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
-          .map(phone => phone.trim()))];
+          .map(phone => [phone.replace(/[\\s()-]/g, ''), phone.trim()] as const)).values()];
         if (student) {
           for (const parentPhone of parentPhones) {
             await this.queueNotification({
@@ -1953,7 +1956,7 @@ class StorageEngine {
               messageType: 'attendance_absent',
               channel: 'sms',
               content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
-            });
+            }, `attendance-absent:${schoolId}:${student.id}:${date}:${parentPhone.replace(/[\\s()-]/g, '')}`);
           }
         }
       }
@@ -2646,13 +2649,23 @@ class StorageEngine {
     return this.data.communicationSettings[idx];
   }
 
-  public async queueNotification(itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>): Promise<CommunicationQueueItem> {
+  public async queueNotification(
+    itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>,
+    idempotencyKey?: string
+  ): Promise<CommunicationQueueItem> {
+    const id = idempotencyKey
+      ? `msg-q-${createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 32)}`
+      : `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    if (idempotencyKey) {
+      const existing = (await this.queryRows<CommunicationQueueItem>('communication_queue', { id, school_id: itemData.schoolId }))[0];
+      if (existing) return existing;
+    }
     const settings = await this.getCommunicationSettings(itemData.schoolId);
     const isConfigured = settings.isActive && settings.provider !== 'none';
 
     const item: CommunicationQueueItem = {
       ...itemData,
-      id: `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id,
       // Queueing is not proof of delivery. A delivery worker must mark it sent
       // only after the provider confirms successful transmission.
       status: 'queued',
