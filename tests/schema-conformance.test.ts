@@ -29,6 +29,7 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['fee_payments', { id: 'p1', schoolId: 's1', studentId: 'st1', receiptNumber: 'R-1', academicYear: '2026', month: 'September', feeType: 'custom', feeStructureId: 'fs1', idempotencyKey: 'key-1', amountDue: 10, amountPaid: 10, remainingAmount: 0, paymentMethod: 'Cash', status: 'paid', date: '2026-09-01', recordedBy: 'u1' }],
   ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }],
   ['inventory_items', { id: 'inv1', schoolId: 's1', assetTag: 'ASSET-001', itemName: 'Laptop', quantity: 2, roomLocation: 'Lab 1', condition: 'good', value: 25000, createdAt: '2026-11-03T00:00:00Z', updatedAt: '2026-11-03T00:00:00Z' }],
+  ['health_records', { id: 'health1', schoolId: 's1', studentId: 'st1', visitDate: '2026-11-03', symptoms: 'Headache', treatment: 'Rest', allergies: '', privateNotes: 'Private clinical note', nurseName: 'Clinic Admin', recordedBy: 'u1', createdAt: '2026-11-03T00:00:00Z' }],
   ['discipline_records', { id: 'dis1', schoolId: 's1', studentId: 'st1', incidentDate: '2026-11-03', infractionType: 'Disruption', description: 'Classroom disruption', severity: 'minor', actionTaken: 'Counselling', reportedBy: 'u1', parentNotified: false }]
 ];
 
@@ -59,6 +60,21 @@ test('discipline migration validates school-owned student records and admin-only
   assert.ok(apiSource.includes("apiRouter.get('/school/discipline'"), 'discipline read endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.post('/school/discipline'"), 'discipline create endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.delete('/school/discipline/:recordId'"), 'discipline delete endpoint is registered');
+});
+
+test('clinic health records enforce school-admin-only access and bounded private data', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/027_school_health_records.sql', import.meta.url), 'utf8');
+  const columns = definitions.get('health_records');
+  assert.ok(columns?.has('student_id') && columns.has('visit_date') && columns.has('symptoms') && columns.has('private_notes') && columns.has('recorded_by'));
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\\.health_records/);
+  assert.match(migration, /health_records_admin_scope/);
+  assert.match(migration, /auth_user_role\\(\\) = 'school_admin'/);
+  assert.match(migration, /REVOKE ALL ON public\\.health_records FROM anon/);
+  assert.match(migration, /ALTER TABLE public\\.health_records ENABLE ROW LEVEL SECURITY/);
+  assert.ok(apiSource.includes("apiRouter.get('/school/health-records'"), 'clinic read endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.post('/school/health-records'"), 'clinic create endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.delete('/school/health-records/:recordId'"), 'clinic delete endpoint is registered');
+  assert.ok(apiSource.includes('health details are intentionally excluded from audit logs'), 'audit logs exclude private health details');
 });
 
 test('domain write payloads map to real schema columns and satisfy required columns', () => {
