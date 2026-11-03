@@ -41,7 +41,7 @@ export const AttendanceView: React.FC = () => {
   useEffect(() => {
     if (!school) return;
     setDate(getSchoolLocalDate(school.timezone));
-    ApiClient.getClasses().then(cls => {
+    ApiClient.getAllClasses().then(cls => {
       setClasses(cls);
       if (cls.length > 0) setSelectedClassId(cls[0].id);
     });
