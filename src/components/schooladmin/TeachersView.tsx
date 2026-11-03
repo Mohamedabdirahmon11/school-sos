@@ -160,6 +160,10 @@ export const TeachersView: React.FC = () => {
             </div>
 
             <p className="text-xs text-[#64748B]">{t.qualification}</p>
+            <div className="space-y-1 text-[11px] text-[#64748B]">
+              <p><strong className="text-[#334155]">Classes:</strong> {(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</p>
+              <p><strong className="text-[#334155]">Subjects:</strong> {(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</p>
+            </div>
 
             <div className="space-y-1 text-xs text-[#334155] pt-2 border-t border-[#F1F5F9]">
               <p className="text-[11px] font-mono text-[#0F766E]">Teacher ID: {t.staffId || t.id}</p>
