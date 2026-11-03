@@ -1082,10 +1082,44 @@ class StorageEngine {
   }
 
   public async getPayrollRecords(schoolId: string, userId?: string, month?: string): Promise<StaffPayrollRecord[]> {
-    return this.queryRows<StaffPayrollRecord>('payroll_records', { school_id: schoolId, user_id: userId, payroll_month: month });
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        (userId !== undefined && (typeof userId !== 'string' || !userId.trim() || userId.length > 64)) ||
+        (month !== undefined && (typeof month !== 'string' || !/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)))) {
+      throw new Error('Payroll query filters are invalid.');
+    }
+    return this.queryRows<StaffPayrollRecord>('payroll_records', { school_id: schoolId.trim(), user_id: userId, payroll_month: month });
   }
 
   public createPayrollRecord(record: Omit<StaffPayrollRecord, 'id' | 'createdAt'>): StaffPayrollRecord {
+    const validLines = (value: unknown): value is Array<{ label: string; amount: number }> =>
+      Array.isArray(value) && value.length <= 50 && value.every(line =>
+        typeof line?.label === 'string' && !!line.label.trim() && line.label.trim().length <= 100 &&
+        typeof line.amount === 'number' && Number.isFinite(line.amount) && line.amount >= 0 && line.amount <= 1_000_000_000
+      );
+    const allowances = Array.isArray(record?.allowances) ? record.allowances : null;
+    const deductions = Array.isArray(record?.deductions) ? record.deductions : null;
+    const allowanceTotal = allowances?.reduce((sum, line) => sum + Number(line.amount), 0);
+    const deductionTotal = deductions?.reduce((sum, line) => sum + Number(line.amount), 0);
+    if (!record || typeof record !== 'object' ||
+        typeof record.schoolId !== 'string' || !record.schoolId.trim() || record.schoolId.length > 64 ||
+        typeof record.userId !== 'string' || !record.userId.trim() || record.userId.length > 64 ||
+        typeof record.staffId !== 'string' || !record.staffId.trim() || record.staffId.length > 64 ||
+        typeof record.staffName !== 'string' || !record.staffName.trim() || record.staffName.trim().length > 255 ||
+        !/^\\d{4}-(0[1-9]|1[0-2])$/.test(record.payrollMonth) ||
+        typeof record.createdBy !== 'string' || !record.createdBy.trim() || record.createdBy.length > 64 ||
+        record.status !== 'draft' || !validLines(allowances) || !validLines(deductions) ||
+        !Number.isFinite(record.baseSalary) || record.baseSalary < 0 || record.baseSalary > 1_000_000_000 ||
+        !Number.isFinite(record.allowanceTotal) || record.allowanceTotal !== allowanceTotal || allowanceTotal! > 1_000_000_000 ||
+        !Number.isFinite(record.deductionTotal) || record.deductionTotal !== deductionTotal || deductionTotal! > 1_000_000_000 ||
+        !Number.isFinite(record.netSalary) || record.netSalary < 0 ||
+        record.deductionTotal > record.baseSalary + record.allowanceTotal ||
+        Math.abs(record.netSalary - (record.baseSalary + record.allowanceTotal - record.deductionTotal)) > 0.01 ||
+        record.approvedBy || record.approvedAt || record.paidBy || record.paidAt) {
+      throw new Error('Payroll record details are invalid.');
+    }
+    if (this.data.payrollRecords.some(item => item.schoolId === record.schoolId && item.userId === record.userId && item.payrollMonth === record.payrollMonth)) {
+      throw new Error('A payroll record already exists for this staff member and month.');
+    }
     const payroll: StaffPayrollRecord = { ...record, id: `pay-${randomUUID()}`, createdAt: new Date().toISOString() };
     this.data.payrollRecords.push(payroll);
     this.save();
@@ -1093,10 +1127,27 @@ class StorageEngine {
   }
 
   public async updatePayrollRecord(id: string, schoolId: string, updates: Partial<StaffPayrollRecord>): Promise<StaffPayrollRecord | null> {
-    await this.queryRows<StaffPayrollRecord>('payroll_records', { id, school_id: schoolId });
-    const index = this.data.payrollRecords.findIndex(record => record.id === id && record.schoolId === schoolId);
+    if (typeof id !== 'string' || !id.trim() || id.length > 64 ||
+        typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        !updates || typeof updates !== 'object' || Array.isArray(updates)) return null;
+    await this.queryRows<StaffPayrollRecord>('payroll_records', { id, school_id: schoolId.trim() });
+    const index = this.data.payrollRecords.findIndex(record => record.id === id && record.schoolId === schoolId.trim());
     if (index < 0) return null;
-    this.data.payrollRecords[index] = { ...this.data.payrollRecords[index], ...updates, id, schoolId };
+    const current = this.data.payrollRecords[index];
+    const keys = Object.keys(updates);
+    const approval = current.status === 'draft' && updates.status === 'approved' &&
+      keys.every(key => ['status', 'approvedBy', 'approvedAt'].includes(key)) &&
+      typeof updates.approvedBy === 'string' && !!updates.approvedBy.trim() && updates.approvedBy.length <= 64 &&
+      typeof updates.approvedAt === 'string' && !Number.isNaN(Date.parse(updates.approvedAt)) &&
+      !current.paidBy && !current.paidAt;
+    const payment = current.status === 'approved' && updates.status === 'paid' &&
+      keys.every(key => ['status', 'paidBy', 'paidAt', 'paidDate'].includes(key)) &&
+      typeof current.approvedBy === 'string' && typeof current.approvedAt === 'string' &&
+      typeof updates.paidBy === 'string' && !!updates.paidBy.trim() && updates.paidBy.length <= 64 &&
+      typeof updates.paidAt === 'string' && !Number.isNaN(Date.parse(updates.paidAt)) &&
+      typeof updates.paidDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(updates.paidDate);
+    if (!approval && !payment) return null;
+    this.data.payrollRecords[index] = { ...current, ...updates, id, schoolId: schoolId.trim() };
     this.save();
     return this.data.payrollRecords[index];
   }
