@@ -53,6 +53,10 @@ export const AttendanceView: React.FC = () => {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    if (school?.timezone) setDate(getSchoolLocalDate(school.timezone));
+  }, [school?.timezone]);
+
+  useEffect(() => {
     if (!school) return;
     ApiClient.getClasses().then(cls => {
       setClasses(cls);
