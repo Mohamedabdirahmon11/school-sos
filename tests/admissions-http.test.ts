@@ -237,3 +237,63 @@ test('teacher creation ignores client-controlled identity and credential fields'
   });
   assert.equal(invalidAssignments.status, 400);
 });
+
+test('student profile updates validate phones and keep parent/student login links synchronized', async () => {
+  const create = (body: Record<string, unknown>) => fetch(`${baseUrl}/students`, {
+    method: 'POST', headers, body: JSON.stringify(body)
+  });
+  const firstResponse = await create({
+    firstName: 'Parent', middleName: 'Link', lastName: 'One', gender: 'female',
+    classId: klass.id, studentId: 'PARENT-LINK-01',
+    fatherPhone: '+15550007301', motherPhone: '+15550007302',
+    studentPhone: '+15550007303'
+  });
+  assert.equal(firstResponse.status, 201, await firstResponse.clone().text());
+  const first = await firstResponse.json();
+
+  const siblingResponse = await create({
+    firstName: 'Parent', middleName: 'Link', lastName: 'Sibling', gender: 'male',
+    classId: klass.id, studentId: 'PARENT-LINK-02',
+    fatherPhone: '+15550007301', motherPhone: '+15550007304'
+  });
+  assert.equal(siblingResponse.status, 201, await siblingResponse.clone().text());
+  const sibling = await siblingResponse.json();
+
+  const invalid = await fetch(`${baseUrl}/students/${first.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ fatherPhone: 'not-a-phone' })
+  });
+  assert.equal(invalid.status, 400);
+
+  const updatedResponse = await fetch(`${baseUrl}/students/${first.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({
+      id: 'forged-student-id', schoolId: 'other-school',
+      fatherPhone: '+15550007306', motherPhone: '+15550007307',
+      studentPhone: '+15550007308'
+    })
+  });
+  assert.equal(updatedResponse.status, 200, await updatedResponse.clone().text());
+  const updated = await updatedResponse.json();
+  assert.equal(updated.id, first.id);
+  assert.equal(updated.schoolId, school.id);
+  assert.equal(updated.fatherPhone, '+15550007306');
+  assert.equal(updated.motherPhone, '+15550007307');
+
+  const users = await storage.db.getUsers(school.id, 'parent');
+  const oldFather = users.find(user => user.phone === '+15550007301');
+  const oldMother = users.find(user => user.phone === '+15550007302');
+  const newFather = users.find(user => user.phone === '+15550007306');
+  const newMother = users.find(user => user.phone === '+15550007307');
+  assert.ok(oldFather?.linkedStudentIds?.includes(sibling.id));
+  assert.equal(oldFather?.linkedStudentIds?.includes(first.id), false);
+  assert.equal(oldMother?.linkedStudentIds?.includes(first.id), false);
+  assert.ok(newFather?.linkedStudentIds?.includes(first.id));
+  assert.ok(newMother?.linkedStudentIds?.includes(first.id));
+
+  const studentUser = await storage.db.getUserById(`usr-student-${first.id}`, school.id);
+  assert.equal(studentUser?.phone, '+15550007308');
+  const { verifyPin } = await import('../src/server/auth-security.ts');
+  assert.ok(newFather?.pin && verifyPin(first.initialPin, newFather.pin));
+  assert.ok(newMother?.pin && verifyPin(first.initialPin, newMother.pin));
+});
