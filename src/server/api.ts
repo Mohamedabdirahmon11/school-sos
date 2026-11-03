@@ -2581,6 +2581,19 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
   res.json({ success: true });
 });
 
+apiRouter.post('/teachers/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const teacher = (await db.getTeachers(school.id)).find(item => item.id === req.params.id);
+  if (!teacher) { res.status(404).json({ error: 'Teacher not found.' }); return; }
+  const account = await db.getUserById(teacher.userId);
+  if (!account || account.schoolId !== school.id || account.role !== 'teacher') { res.status(404).json({ error: 'Teacher sign-in account not found.' }); return; }
+  const newPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+  db.updateUser(account.id, { pin: newPin, failedLoginAttempts: 0, lockedUntil: null, isBlocked: teacher.status !== 'active' });
+  db.logAudit({ action: 'TEACHER_PIN_RESET', category: 'security', schoolId: school.id, schoolName: school.name, userId: actor.id, userName: actor.fullName, userRole: actor.role, details: `Reset the four-digit PIN for Teacher ID ${teacher.staffId}.`, severity: 'warning' });
+  res.json({ success: true, newPin });
+});
+
 apiRouter.put('/teachers/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
