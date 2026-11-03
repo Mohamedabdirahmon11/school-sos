@@ -700,6 +700,26 @@ export class ApiClient {
     });
   }
 
+  public static async getInventoryItems() {
+    return this.request<any[]>('/school/inventory');
+  }
+
+  public static async addInventoryItem(data: {
+    assetTag: string; itemName: string; quantity: number; roomLocation: string;
+    condition: 'good' | 'fair' | 'poor' | 'damaged'; value: number;
+  }) {
+    return this.request<any>('/school/inventory', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async deleteInventoryItem(itemId: string) {
+    return this.request<{ success: boolean }>(`/school/inventory/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE'
+    });
+  }
+
   public static async getBusAssignments() {
     return this.request<any[]>('/bus/assignments');
   }
