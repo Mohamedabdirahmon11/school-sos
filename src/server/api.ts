@@ -2790,6 +2790,7 @@ apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdmin
   const status = req.body?.status;
   if (status !== 'rejected') { res.status(400).json({ error: 'Use the approve endpoint or set status to rejected.' }); return; }
   const rejected = await db.updateAdmissionApplication(application.id, school.id, 'rejected');
+  if (!rejected) { res.status(409).json({ error: 'This admission application is no longer pending.' }); return; }
   db.logAudit({ action: 'ADMISSION_APPLICATION_REJECTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was rejected.`, severity: 'warning' });
   await db.flush();
   res.json(rejected);
