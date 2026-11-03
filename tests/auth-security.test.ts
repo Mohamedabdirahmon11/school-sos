@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { isSessionExpiryValid } from '../src/server/auth-security.ts';
 
 test('session expiry accepts only a valid future ISO timestamp', () => {
