@@ -635,8 +635,12 @@ export class ApiClient {
     });
   }
 
-  public static async getTeachers(params?: any) {
-    return this.request<Teacher[]>(`/teachers${this.pageQuery(params)}`);
+  public static async getTeachers(params?: { page?: number; pageSize?: number; search?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    return this.request<Teacher[]>(`/teachers?${query.toString()}`);
   }
 
   public static async createTeacher(data: Partial<Teacher>, schoolId?: string) {
