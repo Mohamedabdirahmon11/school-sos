@@ -413,7 +413,7 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     res.status(403).json({ error: 'Password change is required before using SchoolOS.', code: 'MUST_CHANGE_PASSWORD' });
     return;
   }
-  if (requiresTwoFactorSetup && !twoFactorSetupRoutes.includes(req.path)) {
+  if (requiresTwoFactorSetup && !user.mustChangePassword && !twoFactorSetupRoutes.includes(req.path)) {
     res.status(403).json({ error: 'Two-factor authentication setup is required before using SchoolOS.', code: 'TWO_FACTOR_SETUP_REQUIRED' });
     return;
   }
@@ -1141,6 +1141,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   });
   if (!updated) { res.status(404).json({ error: 'User account not found; password was not changed.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
+  await db.flush();
 
   db.logAudit({
     action: 'PASSWORD_CHANGED',
