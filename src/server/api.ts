@@ -2427,7 +2427,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  if (req.body?.customPin !== undefined && !/^\\d{4}$/.test(String(req.body.customPin))) {
+  if (req.body?.customPin !== undefined && !/^\d{4}$/.test(String(req.body.customPin))) {
     res.status(400).json({ error: 'A custom student PIN must contain exactly four digits.' });
     return;
   }
