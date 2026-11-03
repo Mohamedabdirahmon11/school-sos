@@ -18,7 +18,7 @@ CREATE OR REPLACE FUNCTION schoolos_notice_unread_count(
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = public, pg_temp
 AS $$
   SELECT COUNT(*)::INTEGER
   FROM public.school_notices n
