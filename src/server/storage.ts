@@ -1492,6 +1492,15 @@ class StorageEngine {
       this.data.marks = this.data.marks.filter(m => m.studentId !== id);
       this.data.attendance = this.data.attendance.filter(a => a.studentId !== id);
       this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id);
+      // Remove the deleted student's sign-in and detach only this child from
+      // parent accounts; siblings and their access remain untouched.
+      this.data.users = this.data.users.filter(user => {
+        if (user.schoolId !== student.schoolId) return true;
+        if (user.role === 'student' && (user.studentId === student.studentId || user.id === `usr-student-${id}`)) return false;
+        if (user.role !== 'parent' || !user.linkedStudentIds?.includes(id)) return true;
+        user.linkedStudentIds = user.linkedStudentIds.filter(linkedId => linkedId !== id);
+        return true;
+      });
       this.save();
       return true;
     }
