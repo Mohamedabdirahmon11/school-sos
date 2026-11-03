@@ -40,5 +40,8 @@ jobs:
       - name: Route parity audit
         run: npm run audit:routes
 
+      - name: Supabase RLS source audit
+        run: npm run audit:rls
+
       - name: Production build
         run: npm run build
