@@ -3569,26 +3569,63 @@ apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) =>
 });
 
 apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const user = (req as any).user as User;
+  const payload = req.body;
   if (!['school_admin', 'super_admin'].includes(user.role)) return res.status(403).json({ error: 'Only a School Admin can manage notices.' });
-  if (!['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(req.body?.audience)) return res.status(400).json({ error: 'Choose a supported notice audience.' });
-  if (typeof req.body?.title !== 'string' || !req.body.title.trim() || typeof req.body?.content !== 'string' || !req.body.content.trim()) return res.status(400).json({ error: 'Notice title and content are required.' });
-  if (req.body.audience === 'class' && !(await db.getClassById(req.body.classId, school.id))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
-  const notice = db.createNotice({ ...req.body, title: req.body.title.trim(), content: req.body.content.trim(), schoolId: school.id, authorName: user.fullName, authorRole: user.role, isActive: true });
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return res.status(400).json({ error: 'Provide valid notice details.' });
+  const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const content = typeof payload.content === 'string' ? payload.content.trim() : '';
+  const audience = payload.audience;
+  const classId = payload.classId === undefined || payload.classId === null ? '' : (typeof payload.classId === 'string' ? payload.classId.trim() : '');
+  const publishDate = payload.publishDate === undefined ? new Date().toISOString().slice(0, 10) : payload.publishDate;
+  const parsedDate = typeof publishDate === 'string' ? new Date(`${publishDate}T00:00:00.000Z`) : new Date('invalid');
+  const isPinned = payload.isPinned === undefined ? false : payload.isPinned;
+  if (!title || title.length > 255 || !content || content.length > 10000 ||
+      !['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(audience) ||
+      typeof isPinned !== 'boolean' ||
+      typeof publishDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(publishDate) ||
+      Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== publishDate) {
+    return res.status(400).json({ error: 'Notice title, content, audience, pin state or publish date is invalid.' });
+  }
+  if (audience === 'class' && (!classId || classId.length > 64 || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
+  const notice = db.createNotice({
+    schoolId: school.id, title, content, audience, classId: audience === 'class' ? classId : null,
+    isPinned, publishDate, authorName: user.fullName, authorRole: user.role, isActive: true
+  });
   res.status(201).json(notice);
 });
 
 apiRouter.put('/notices/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
-  const school = (req as any).school;
+  const school = (req as any).school as School;
+  const payload = req.body;
   if (!['school_admin', 'super_admin'].includes(user.role)) return res.status(403).json({ error: 'Only a School Admin can manage notices.' });
-  const title = String(req.body?.title || '').trim();
-  const content = String(req.body?.content || '').trim();
-  const audience = req.body?.audience;
-  if (!title || !content || !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(audience)) return res.status(400).json({ error: 'Valid notice title, content and audience are required.' });
-  if (audience === 'class' && !(await db.getClassById(req.body?.classId || '', school.id))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
-  const updated = await db.updateNotice(req.params.id, school.id, { title, content, audience, classId: req.body?.classId, isPinned: Boolean(req.body?.isPinned) });
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || typeof req.params.id !== 'string' || !req.params.id.trim() || req.params.id.length > 64) {
+    return res.status(400).json({ error: 'Provide a valid notice ID and details.' });
+  }
+  const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const content = typeof payload.content === 'string' ? payload.content.trim() : '';
+  const audience = payload.audience;
+  const classId = payload.classId === undefined || payload.classId === null ? '' : (typeof payload.classId === 'string' ? payload.classId.trim() : '');
+  if (!title || title.length > 255 || !content || content.length > 10000 || !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(audience)) {
+    return res.status(400).json({ error: 'Valid notice title, content and audience are required.' });
+  }
+  if (audience === 'class' && (!classId || classId.length > 64 || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
+  if (payload.isPinned !== undefined && typeof payload.isPinned !== 'boolean') return res.status(400).json({ error: 'Notice pinned state must be true or false.' });
+  const updates: Partial<SchoolNotice> = {
+    title, content, audience, classId: audience === 'class' ? classId : null
+  };
+  if (payload.isPinned !== undefined) updates.isPinned = payload.isPinned;
+  if (payload.publishDate !== undefined) {
+    const date = payload.publishDate;
+    const parsed = typeof date === 'string' ? new Date(`${date}T00:00:00.000Z`) : new Date('invalid');
+    if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+      return res.status(400).json({ error: 'Notice publish date is invalid.' });
+    }
+    updates.publishDate = date;
+  }
+  const updated = await db.updateNotice(req.params.id.trim(), school.id, updates);
   if (!updated) return res.status(404).json({ error: 'Notice not found.' });
   res.json(updated);
 });
