@@ -16,6 +16,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { getSchoolMonthLabel } from '../../lib/school-date.ts';
 import { FeePayment, FeeStructureItem, Student, SchoolClass, FeeType } from '../../types/index.ts';
 import { 
   Banknote, 
@@ -80,10 +81,11 @@ export const FeesLedgerView: React.FC = () => {
   const [feeStructureId, setFeeStructureId] = useState('');
   const [amountDue, setAmountDue] = useState(30);
   const [amountPaid, setAmountPaid] = useState(30);
-  const [month, setMonth] = useState(new Date().toLocaleString('default', { month: 'long', year: 'numeric' }));
+  const [month, setMonth] = useState(() => getSchoolMonthLabel(school?.timezone));
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const paymentIdempotencyKey = useRef<string | null>(null);
+  useEffect(() => { setMonth(getSchoolMonthLabel(school?.timezone)); }, [school?.timezone]);
 
   // New Structure Form State
   const [newFeeName, setNewFeeName] = useState('');
