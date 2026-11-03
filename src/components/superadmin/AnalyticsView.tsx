@@ -83,7 +83,7 @@ export const AnalyticsView: React.FC = () => {
       {schools.length === 0 && <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-[#64748B]">No school data is available yet.</div>}
 
       {/* Aggregate Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Active Schools</span>
           <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{activeSchools.toLocaleString()}</p>
@@ -104,7 +104,13 @@ export const AnalyticsView: React.FC = () => {
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total Teachers</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">—</p>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{totalTeachers.toLocaleString()}</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Across all schools</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
+          <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total Students</span>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{totalStudents.toLocaleString()}</p>
           <p className="text-[11px] text-[#64748B] mt-1">Across all schools</p>
         </div>
       </div>
