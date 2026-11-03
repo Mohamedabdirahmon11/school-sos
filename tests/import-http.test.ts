@@ -23,8 +23,7 @@ await memory.from('school_subscriptions').insert([
   { id: 'import-readonly', schoolId: 'import-readonly', plan: 'basic', cadence: 'yearly', status: 'read_only', startDate: new Date().toISOString(), validUntil: '2020-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
 ]);
 const storage = await import('../src/server/storage.ts');
-const adapter = createHttpTestStorage(memory);
-storage.installTestStorageAdapter(adapter as any);
+createHttpTestStorage(memory);
 const { apiRouter } = await import('../src/server/api.ts');
 const app = express();
 app.use(express.json());
@@ -106,7 +105,7 @@ test('import scope rejects cross-school attempts; read-only schools and teacher 
 test('mid-transaction failure leaves classes, students, users and audit rows unchanged', async () => {
   const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
   const before = ['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length);
-  adapter.failNextBulkImport();
+  memory.failNextBulkImport();
   const failed = await confirm(admin, body.rows.map((row: any) => row.data));
   assert.equal(failed.status, 500);
   assert.deepEqual(['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length), before);
