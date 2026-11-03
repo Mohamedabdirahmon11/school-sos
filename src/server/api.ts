@@ -2426,7 +2426,13 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
 apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
-  const teachers = await queryAllRows('teachers', { school_id: school.id }, '*');
+  const [teachers, classes, subjects] = await Promise.all([
+    queryAllRows('teachers', { school_id: school.id }, '*'),
+    queryAllRows('classes', { school_id: school.id }, 'id,name,section'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
+  ]);
+  const classNames = new Map(classes.map((item: any) => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
+  const subjectNames = new Map(subjects.map((item: any) => [item.id, item.name]));
   const filtered = teachers.filter((teacher: any) =>
     !search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
       .some(value => String(value || '').toLowerCase().includes(search))
@@ -2437,10 +2443,10 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     return `"${safe.replace(/"/g, '""')}"`;
   };
   const rows = [
-    ['Teacher ID', 'Full Name', 'Gender', 'Department', 'Qualification', 'Phone', 'Monthly Salary', 'Status', 'Joined Date'],
+    ['Teacher ID', 'Full Name', 'Gender', 'Department', 'Qualification', 'Phone', 'Assigned Classes', 'Assigned Subjects', 'Monthly Salary', 'Status', 'Joined Date'],
     ...filtered.map((teacher: any) => [
       teacher.staffId, teacher.fullName, teacher.gender, teacher.department, teacher.qualification,
-      teacher.phone, teacher.monthlySalary, teacher.status, teacher.joinedDate
+      teacher.phone, (teacher.assignedClasses || []).map((id: string) => classNames.get(id) || id).join('; '), (teacher.assignedSubjects || []).map((id: string) => subjectNames.get(id) || id).join('; '), teacher.monthlySalary, teacher.status, teacher.joinedDate
     ])
   ];
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
