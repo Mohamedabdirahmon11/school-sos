@@ -8,7 +8,8 @@ Current stage: Security hardening and automated validation are in progress. Hist
 - DONE: `GET /support/tickets` now requires a school context for non-super-admin users. School administrators can list their school's tickets; other school users can list only tickets they created.
 - DONE: Support-ticket replies are restricted to the ticket creator or a school administrator within that tenant (super admins retain platform access). Reply content is validated to 1–5000 characters.
 - DONE: Added a tenant-scoped `getFeePaymentById` storage method and changed receipt PDF lookup to fetch only the requested payment instead of loading every payment for the school.
-- LIMITATION: These changes have been committed; latest CI run must complete before they are marked verified. Full legacy test suite remains blocked by missing test fixtures.
+- VERIFIED: GitHub Actions passed for commit `ae34e31cfb4013039de23f0ca2a02570076a4459`: dependency install, application TypeScript check, configured CI test subset, and production build. Run: https://github.com/Mohamedabdirahmon11/school-sos/actions/runs/41592550599.
+- LIMITATION: The full legacy test suite remains blocked by missing test fixtures; CI still runs only the configured subset. No live production user-journey or load test was performed.
 
 ## API access review (2026-11-03)
 
