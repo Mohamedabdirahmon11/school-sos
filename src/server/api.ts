@@ -3086,8 +3086,8 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
     res.status(400).json({ error: 'Enter a fee name, supported category, positive amount, and valid billing cadence.' }); return;
   }
   const hasGradeRange = body.minGrade !== undefined || body.maxGrade !== undefined;
-  if (hasGradeRange && (!Number.isInteger(Number(body.minGrade)) || !Number.isInteger(Number(body.maxGrade)) || Number(body.minGrade) < 1 || Number(body.maxGrade) > 12 || Number(body.minGrade) > Number(body.maxGrade))) {
-    res.status(400).json({ error: 'Fee grade ranges must be whole grades from 1 to 12, with the first grade no higher than the last.' }); return;
+  if (hasGradeRange && (!Number.isInteger(Number(body.minGrade)) || !Number.isInteger(Number(body.maxGrade)) || Number(body.minGrade) < 0 || Number(body.minGrade) > 12 || Number(body.maxGrade) < 0 || Number(body.maxGrade) > 12 || Number(body.minGrade) > Number(body.maxGrade))) {
+    res.status(400).json({ error: 'Fee grade ranges must be whole grades from KG (0) to Grade 12, with the minimum no higher than the maximum.' }); return;
   }
   if (body.classId && !await db.getClassById(String(body.classId), school.id)) { res.status(400).json({ error: 'Fee class must belong to this school.' }); return; }
   const item = db.createFeeStructure({ ...body, name: body.name.trim(), amount: Number(body.amount), minGrade: hasGradeRange ? Number(body.minGrade) : undefined, maxGrade: hasGradeRange ? Number(body.maxGrade) : undefined, schoolId: school.id });
@@ -3098,12 +3098,22 @@ apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin
   const school = (req as any).school;
   const allowedFields = new Set(['feeType', 'name', 'minGrade', 'maxGrade', 'classId', 'amount', 'cadence', 'isActive']);
   const payload = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key))) as Record<string, any>;
-  if (payload.amount !== undefined && (!Number.isFinite(Number(payload.amount)) || Number(payload.amount) < 0)) { res.status(400).json({ error: 'Fee amount must be a valid non-negative number.' }); return; }
+  const existing = (await db.getFeeStructures(school.id)).find(item => item.id === req.params.id);
+  if (!existing) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
+  if (payload.name !== undefined && (typeof payload.name !== 'string' || !payload.name.trim())) { res.status(400).json({ error: 'Fee name cannot be empty.' }); return; }
+  if (payload.feeType !== undefined && !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(payload.feeType)) { res.status(400).json({ error: 'Invalid fee category.' }); return; }
+  if (payload.amount !== undefined && (!Number.isFinite(Number(payload.amount)) || Number(payload.amount) <= 0)) { res.status(400).json({ error: 'Fee amount must be a positive number.' }); return; }
   if (payload.cadence !== undefined && !['monthly', 'annual', 'one_time'].includes(payload.cadence)) { res.status(400).json({ error: 'Invalid fee cadence.' }); return; }
-  if (payload.minGrade !== undefined && (!Number.isInteger(Number(payload.minGrade)) || Number(payload.minGrade) < 0 || Number(payload.minGrade) > 12)) { res.status(400).json({ error: 'Minimum grade must be between KG and Grade 12.' }); return; }
-  if (payload.maxGrade !== undefined && (!Number.isInteger(Number(payload.maxGrade)) || Number(payload.maxGrade) < 0 || Number(payload.maxGrade) > 12)) { res.status(400).json({ error: 'Maximum grade must be between KG and Grade 12.' }); return; }
-  if (payload.minGrade !== undefined && payload.maxGrade !== undefined && Number(payload.minGrade) > Number(payload.maxGrade)) { res.status(400).json({ error: 'Minimum grade cannot exceed maximum grade.' }); return; }
+  const minGrade = payload.minGrade !== undefined ? Number(payload.minGrade) : existing.minGrade;
+  const maxGrade = payload.maxGrade !== undefined ? Number(payload.maxGrade) : existing.maxGrade;
+  if ((payload.minGrade !== undefined || payload.maxGrade !== undefined) &&
+      (minGrade === undefined || maxGrade === undefined || !Number.isInteger(minGrade) || !Number.isInteger(maxGrade) || minGrade < 0 || maxGrade > 12 || minGrade > maxGrade)) {
+    res.status(400).json({ error: 'Fee grade ranges must be whole grades from KG (0) to Grade 12, with the minimum no higher than the maximum.' });
+    return;
+  }
   if (payload.classId && !await db.getClassById(payload.classId, school.id)) { res.status(400).json({ error: 'Class does not belong to this school.' }); return; }
+  if (payload.isActive !== undefined && typeof payload.isActive !== 'boolean') { res.status(400).json({ error: 'Fee active status must be true or false.' }); return; }
+  if (payload.name !== undefined) payload.name = payload.name.trim();
   const updated = await db.updateFeeStructure(req.params.id, school.id, payload);
   if (!updated) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
   res.json(updated);
