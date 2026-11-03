@@ -152,3 +152,21 @@ test('fee receipt numbers use a database-atomic per-school academic-year sequenc
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_next_fee_receipt/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_next_fee_receipt[^;]+TO service_role/);
 });
+
+test('SECURITY DEFINER functions are schema-qualified and restricted to the service role', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/025_harden_security_definer_search_paths.sql', import.meta.url), 'utf8');
+  for (const name of [
+    'schoolos_bulk_import',
+    'schoolos_save_subject_assignments',
+    'super_admin_dashboard_summary',
+    'school_dashboard_summary',
+    'schoolos_notice_unread_count',
+    'schoolos_replace_class_timetable',
+    'schoolos_swap_timetable_slots'
+  ]) {
+    assert.ok(migration.includes(`public.${name}`), `${name} is schema-qualified`);
+    assert.ok(migration.includes(`REVOKE ALL ON FUNCTION public.${name}`), `${name} is revoked from client roles`);
+    assert.ok(migration.includes(`GRANT EXECUTE ON FUNCTION public.${name}`), `${name} is granted to service_role`);
+  }
+  assert.match(migration, /SET search_path = ''/);
+});
