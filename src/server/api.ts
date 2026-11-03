@@ -2326,6 +2326,21 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   res.json(sanitizeStudents(result.items));
 });
 
+apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  const school = (req as any).school as School;
+  if (!await canAccessStudentRecord(user, String(req.params.id))) {
+    res.status(403).json({ error: 'You do not have access to this student record.' });
+    return;
+  }
+  const student = await db.getStudentById(String(req.params.id), school.id);
+  if (!student) {
+    res.status(404).json({ error: 'Student not found.' });
+    return;
+  }
+  res.json(sanitizeStudent(student));
+});
+
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
@@ -2888,7 +2903,7 @@ apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, r
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { studentId } = req.query;
-  if (!['accountant', 'super_admin', 'parent', 'student'].includes(user.role)) { res.status(403).json({ error: 'School Accountant privilege required for money records.' }); return; }
+  if (!['school_admin', 'accountant', 'super_admin', 'parent', 'student'].includes(user.role)) { res.status(403).json({ error: 'School Accountant privilege required for money records.' }); return; }
   if (studentId && !await canAccessStudentRecord(user, studentId as string)) {
     res.status(403).json({ error: 'You do not have access to this student fee record.' });
     return;
