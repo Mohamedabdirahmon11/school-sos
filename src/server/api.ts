@@ -2296,6 +2296,10 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.replace(/[,%().*\\"']/g, ' ').trim().slice(0, 80)
+    : '';
+  const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus.toLowerCase() : 'all';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
   let roleFilter: string | undefined;
   if (user.role === 'teacher') {
@@ -2312,9 +2316,76 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
-  const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, roleFilter, LIST_QUERY_COLUMNS.students);
+  const searchFilter = search
+    ? ['student_id', 'first_name', 'middle_name', 'last_name', 'father_phone', 'mother_phone']
+        .map(field => `${field}.ilike.*${search}*`)
+        .join(',')
+    : undefined;
+  const combinedOrFilter = roleFilter && searchFilter
+    ? `and(or(${roleFilter}),or(${searchFilter}))`
+    : roleFilter || searchFilter;
+
+  if (['paid', 'partial', 'unpaid'].includes(feeStatus) && ['school_admin', 'super_admin'].includes(user.role)) {
+    const [allStudents, classes] = await Promise.all([
+      db.getStudents(school.id, classId, branchId),
+      db.getClasses(school.id)
+    ]);
+    const studentIds = allStudents.map(student => student.id);
+    const payments = (await db.getFeePaymentsForStudents(school.id, studentIds)).filter(payment => !payment.voidedAt);
+    const totals = new Map<string, { due: number; paid: number; remaining: number }>();
+    for (const payment of payments) {
+      const current = totals.get(payment.studentId) || { due: 0, paid: 0, remaining: 0 };
+      current.due += Number(payment.amountDue || 0);
+      current.paid += Number(payment.amountPaid || 0);
+      current.remaining += Number(payment.remainingAmount ?? Math.max(0, Number(payment.amountDue || 0) - Number(payment.amountPaid || 0)));
+      totals.set(payment.studentId, current);
+    }
+    const classNames = new Map(classes.map(item => [item.id, `${item.name} ${item.section || ''}`.trim()]));
+    const filtered = allStudents.filter(student => {
+      const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, classNames.get(student.classId)]
+        .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()));
+      const total = totals.get(student.id) || { due: 0, paid: 0, remaining: 0 };
+      const status = total.remaining <= 0 && (total.due > 0 || total.paid > 0)
+        ? 'paid'
+        : total.paid > 0 ? 'partial' : 'unpaid';
+      return (!search || searchable) && status === feeStatus;
+    });
+    const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
+    const pageSize = Math.min(100, Math.max(1, Math.floor(Number(req.query.pageSize) || 20)));
+    const start = (page - 1) * pageSize;
+    const pageItems = filtered.slice(start, start + pageSize).map(student => {
+      const total = totals.get(student.id) || { due: 0, paid: 0, remaining: 0 };
+      const status = total.remaining <= 0 && (total.due > 0 || total.paid > 0)
+        ? 'paid'
+        : total.paid > 0 ? 'partial' : 'unpaid';
+      return { ...student, feeStatus: status };
+    });
+    res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(filtered.length), 'X-Total-Pages': String(Math.ceil(filtered.length / pageSize)) });
+    res.json(sanitizeStudents(pageItems));
+    return;
+  }
+
+  const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, combinedOrFilter, LIST_QUERY_COLUMNS.students);
+  const pagePayments = ['school_admin', 'super_admin'].includes(user.role)
+    ? (await db.getFeePaymentsForStudents(school.id, result.items.map(student => student.id))).filter(payment => !payment.voidedAt)
+    : [];
+  const totals = new Map<string, { due: number; paid: number; remaining: number }>();
+  for (const payment of pagePayments) {
+    const current = totals.get(payment.studentId) || { due: 0, paid: 0, remaining: 0 };
+    current.due += Number(payment.amountDue || 0);
+    current.paid += Number(payment.amountPaid || 0);
+    current.remaining += Number(payment.remainingAmount ?? Math.max(0, Number(payment.amountDue || 0) - Number(payment.amountPaid || 0)));
+    totals.set(payment.studentId, current);
+  }
+  const pageItems = result.items.map(student => {
+    const total = totals.get(student.id) || { due: 0, paid: 0, remaining: 0 };
+    const feeStatus = total.remaining <= 0 && (total.due > 0 || total.paid > 0)
+      ? 'paid'
+      : total.paid > 0 ? 'partial' : 'unpaid';
+    return { ...student, feeStatus };
+  });
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
-  res.json(sanitizeStudents(result.items));
+  res.json(sanitizeStudents(pageItems));
 });
 
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
