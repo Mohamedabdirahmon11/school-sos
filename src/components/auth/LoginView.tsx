@@ -187,20 +187,35 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Password / PIN' : 'Password'}</label>
+                    <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? '4-Digit Teacher PIN' : 'Password'}</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? 'Use the password or PIN given to you by your School Admin.' : 'Contact your school administrator to reset your password.'}
+                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? 'Use the 4-digit PIN given to you by your School Admin.' : 'Contact your school administrator to reset your password.'}
                     </span>
                   </div>
                   <div className="mt-1">
-                    <PasswordInput
-                      label="password"
-                      required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
+                    {activeTab === 'teacher' ? (
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        minLength={4}
+                        maxLength={4}
+                        pattern="[0-9]{4}"
+                        required
+                        value={password}
+                        onChange={e => setPassword(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="4-digit PIN"
+                        className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                      />
+                    ) : (
+                      <PasswordInput
+                        label="password"
+                        required
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                      />
+                    )}
                   </div>
                 </div>
               </>
