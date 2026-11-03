@@ -239,7 +239,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             type="text"
             placeholder="Search by student name, ID, or phone..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
           />
         </div>
@@ -252,7 +252,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           {/* Class Filter */}
           <select
             value={classFilter}
-            onChange={e => setClassFilter(e.target.value)}
+            onChange={e => { setClassFilter(e.target.value); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
             <option value="">All Classes</option>
