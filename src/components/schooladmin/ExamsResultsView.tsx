@@ -308,6 +308,11 @@ export const ExamsResultsView: React.FC = () => {
             </div>
           </div>
 
+          <div className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-900">
+            <strong>Selected results:</strong> {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'No class selected'} · {selectedSubject ? `${selectedSubject.name} (${selectedSubject.code})` : 'No subject selected'} · {selectedSemester}
+            <span className="ml-2 text-teal-700">{students.length} students loaded</span>
+          </div>
+
           {/* Mark Scheme Guidance Banner */}
           <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center justify-between text-xs text-teal-900">
             <span className="font-medium">
