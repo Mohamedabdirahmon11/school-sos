@@ -2131,3 +2131,6 @@ REVOKE UPDATE ON public.direct_messages FROM PUBLIC, anon, authenticated;
 GRANT UPDATE (is_read) ON public.direct_messages TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
+REVOKE UPDATE, DELETE ON public.notice_reads FROM PUBLIC, anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
