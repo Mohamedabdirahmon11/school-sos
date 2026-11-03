@@ -2326,7 +2326,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   res.json(sanitizeStudents(result.items));
 });
 
-apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/students/:id/profile', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
   if (!await canAccessStudentRecord(user, String(req.params.id))) {
