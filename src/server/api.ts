@@ -2590,10 +2590,10 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     }
     phones[field] = value.trim();
   }
-  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\\d{4}$/.test(body.pin))) {
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
     res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
   }
-  const isDate = (value: unknown) => typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+  const isDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
   const admissionDate = body.admissionDate === undefined || body.admissionDate === '' ? new Date().toISOString().slice(0, 10) : body.admissionDate;
   if (!isDate(admissionDate) || (body.dateOfBirth !== undefined && body.dateOfBirth !== '' && !isDate(body.dateOfBirth))) {
@@ -2640,7 +2640,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\\d{4}$/.test(req.body.customPin))) {
+  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{4}$/.test(req.body.customPin))) {
     res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
   }
   const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
