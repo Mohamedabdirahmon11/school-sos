@@ -22,11 +22,30 @@ import {
   Filter
 } from 'lucide-react';
 
+const getDateForSchoolTimezone = (timeZone?: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const year = parts.find(part => part.type === 'year')?.value;
+    const month = parts.find(part => part.type === 'month')?.value;
+    const day = parts.find(part => part.type === 'day')?.value;
+    if (year && month && day) return `${year}-${month}-${day}`;
+  } catch {
+    // Fall back to the browser's local calendar date for an invalid timezone.
+  }
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => getDateForSchoolTimezone(school?.timezone));
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
@@ -39,6 +58,7 @@ export const AttendanceView: React.FC = () => {
 
   useEffect(() => {
     if (!school) return;
+    setDate(getDateForSchoolTimezone(school.timezone));
     ApiClient.getClasses().then(cls => {
       setClasses(cls);
       if (cls.length > 0) setSelectedClassId(cls[0].id);
