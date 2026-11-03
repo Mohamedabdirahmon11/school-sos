@@ -1797,6 +1797,7 @@ class StorageEngine {
         a.date === date
       );
 
+      const previousStatus = existingIdx >= 0 ? this.data.attendance[existingIdx].status : undefined;
       if (existingIdx >= 0) {
         this.data.attendance[existingIdx].status = rec.status;
         this.data.attendance[existingIdx].note = rec.note;
@@ -1819,13 +1820,14 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // If absent, automatically queue parent SMS notification if communication is enabled
-      if (rec.status === 'absent') {
+      // Notify only on a transition into absent; repeated saves must not spam parents.
+      if (rec.status === 'absent' && previousStatus !== 'absent') {
         const student = await this.getStudentById(rec.studentId, schoolId);
-        if (student && student.fatherPhone) {
+        const parentPhone = student?.fatherPhone || student?.motherPhone;
+        if (student && parentPhone) {
           await this.queueNotification({
             schoolId,
-            recipientPhone: student.fatherPhone,
+            recipientPhone: parentPhone,
             recipientName: `Parent of ${student.firstName}`,
             studentId: student.id,
             messageType: 'attendance_absent',
