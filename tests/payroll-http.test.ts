@@ -43,6 +43,8 @@ after(async () => new Promise<void>((resolve, reject) => server.close(error => e
 
 test('accountant payroll runs are unique per staff and month, progress through approval/payment, and protect payslips', async () => {
   const month = '2026-11';
+  const oversizedAllowance = await fetch(`${baseUrl}/payroll`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ month, staff: [{ staffId: teacher.id, allowances: [{ label: 'Invalid overflow', amount: 10000000000 }], deductions: [] }] }) });
+  assert.equal(oversizedAllowance.status, 400);
   const create = await fetch(`${baseUrl}/payroll`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ month, staff: [{ staffId: teacher.id, allowances: [{ label: 'Transport', amount: 100 }], deductions: [{ label: 'Tax', amount: 50 }] }] }) });
   const createBody = await create.text();
   assert.equal(create.status, 201, createBody);
