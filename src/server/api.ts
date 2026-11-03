@@ -27,6 +27,8 @@ import {
   get2FAUri,
   generate2FAQRCode,
   verify2FACode,
+  hashRecoveryCode,
+  findRecoveryCodeIndex,
   generateRecoveryCodes
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
@@ -991,7 +993,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       return;
     }
     const recoveryCodes = Array.isArray(user.recoveryCodes) ? user.recoveryCodes : [];
-    const recoveryCodeIndex = recoveryCodes.findIndex(code => String(code).toUpperCase() === twoFactorCode.toUpperCase());
+    const recoveryCodeIndex = findRecoveryCodeIndex(twoFactorCode, recoveryCodes);
     const validTotp = verify2FACode(twoFactorCode, user.twoFactorSecret);
     if (!validTotp && recoveryCodeIndex < 0) {
       const lockResult = await db.handleFailedLogin(user.id);
@@ -1073,10 +1075,11 @@ apiRouter.post('/auth/2fa/setup', requireAuth, requireSuperAdmin, async (req, re
   const uri = get2FAUri(secret, user.email || 'Super Administrator');
   const qrCodeUrl = await generate2FAQRCode(uri);
   const recoveryCodes = generateRecoveryCodes(8);
+  const recoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
 
   const updated = db.updateUser(user.id, {
     pendingTwoFactorSecret: secret,
-    recoveryCodes
+    recoveryCodes: recoveryCodeHashes
   });
   if (!updated) { res.status(404).json({ error: 'Super Admin account not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
