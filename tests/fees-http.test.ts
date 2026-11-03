@@ -144,7 +144,7 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   ]);
   assert.equal(parallelReceiptA.response.status, 201);
   assert.equal(parallelReceiptB.response.status, 201);
-  assert.notEqual(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, 'parallel payments receive unique receipts');
+  assert.notEqual(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, `parallel payments receive unique receipts; sequences=${JSON.stringify(memory.rows('fee_receipt_sequences'))}; payments=${JSON.stringify([parallelReceiptA.body, parallelReceiptB.body])}`);
   const invalidCustom = await postPayment({ ...customPayload, idempotencyKey: 'fee-test-custom-invalid-1', feeStructureId: 'fee-from-another-school' });
   assert.equal(invalidCustom.response.status, 400);
   assert.match(invalidCustom.body.error, /active custom fee/i);
