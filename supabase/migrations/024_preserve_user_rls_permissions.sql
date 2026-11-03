@@ -3,6 +3,8 @@
 BEGIN;
 DROP POLICY IF EXISTS users_read_scope ON public.users;
 DROP POLICY IF EXISTS users_update_scope ON public.users;
+DROP POLICY IF EXISTS users_super_admin_insert ON public.users;
+DROP POLICY IF EXISTS users_super_admin_delete ON public.users;
 CREATE POLICY users_read_scope ON public.users
   FOR SELECT TO authenticated
   USING (
