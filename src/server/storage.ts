@@ -2614,54 +2614,106 @@ class StorageEngine {
   // COMMUNICATION & SMS / WHATSAPP QUEUE
   // -------------------------------------------------------------
   public async getCommunicationSettings(schoolId: string): Promise<CommunicationSettings> {
-    await this.queryRows<CommunicationSettings>('communication_settings', { school_id: schoolId });
-    let s = this.data.communicationSettings.find(cs => cs.schoolId === schoolId);
-    if (!s) {
-      s = {
-        id: `cs-${schoolId}`,
-        schoolId,
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load notification settings.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    await this.queryRows<CommunicationSettings>('communication_settings', { school_id: scopedSchoolId });
+    let settings = this.data.communicationSettings.find(cs => cs.schoolId === scopedSchoolId);
+    if (!settings) {
+      settings = {
+        id: `cs-${scopedSchoolId}`,
+        schoolId: scopedSchoolId,
         provider: 'none',
         isActive: false,
         updatedAt: new Date().toISOString()
       };
-      this.data.communicationSettings.push(s);
+      this.data.communicationSettings.push(settings);
       this.save();
     }
-    return s;
+    return settings;
   }
 
   public async updateCommunicationSettings(schoolId: string, updates: Partial<CommunicationSettings>): Promise<CommunicationSettings> {
-    const s = await this.getCommunicationSettings(schoolId);
-    const idx = this.data.communicationSettings.findIndex(cs => cs.id === s.id);
-    this.data.communicationSettings[idx] = {
-      ...this.data.communicationSettings[idx],
-      ...updates,
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      throw new Error('Notification gateway settings are invalid.');
+    }
+    const allowedProviders = ['twilio', 'infobip', 'local_gateway', 'whatsapp_business', 'none'];
+    if (updates.provider !== undefined && !allowedProviders.includes(updates.provider)) throw new Error('Choose a supported notification provider.');
+    if (updates.isActive !== undefined && typeof updates.isActive !== 'boolean') throw new Error('Gateway activation must be true or false.');
+    for (const key of ['apiKey', 'apiSecret'] as const) {
+      const value = updates[key];
+      if (value !== undefined && (typeof value !== 'string' || !value.trim() || value.length > 512)) {
+        throw new Error('Provider credentials must be non-empty strings no longer than 512 characters.');
+      }
+    }
+    if (updates.senderId !== undefined && (typeof updates.senderId !== 'string' || updates.senderId.length > 50)) {
+      throw new Error('Sender ID must be a string no longer than 50 characters.');
+    }
+    if (updates.webhookUrl !== undefined && (typeof updates.webhookUrl !== 'string' || updates.webhookUrl.length > 1000)) {
+      throw new Error('Webhook URL must be a string no longer than 1000 characters.');
+    }
+    const current = await this.getCommunicationSettings(schoolId);
+    const idx = this.data.communicationSettings.findIndex(cs => cs.id === current.id && cs.schoolId === current.schoolId);
+    if (idx < 0) throw new Error('Notification settings were not found for this school.');
+    const updated: CommunicationSettings = {
+      ...current,
+      provider: updates.provider ?? current.provider,
+      isActive: (updates.provider === 'none') ? false : (updates.isActive ?? current.isActive),
+      ...(updates.apiKey !== undefined ? { apiKey: updates.apiKey.trim() } : {}),
+      ...(updates.apiSecret !== undefined ? { apiSecret: updates.apiSecret.trim() } : {}),
+      ...(updates.senderId !== undefined ? { senderId: updates.senderId.trim() } : {}),
+      ...(updates.webhookUrl !== undefined ? { webhookUrl: updates.webhookUrl.trim() } : {}),
       updatedAt: new Date().toISOString()
     };
+    this.data.communicationSettings[idx] = updated;
     this.save();
-    return this.data.communicationSettings[idx];
+    return updated;
   }
 
   public async queueNotification(itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>): Promise<CommunicationQueueItem> {
-    const settings = await this.getCommunicationSettings(itemData.schoolId);
+    if (!itemData || typeof itemData !== 'object' ||
+        typeof itemData.schoolId !== 'string' || !itemData.schoolId.trim() || itemData.schoolId.length > 64 ||
+        typeof itemData.recipientPhone !== 'string' || !/^\\+?[0-9][0-9\\s().-]{5,48}$/.test(itemData.recipientPhone.trim()) ||
+        typeof itemData.recipientName !== 'string' || !itemData.recipientName.trim() || itemData.recipientName.trim().length > 150 ||
+        (itemData.studentId !== undefined && (typeof itemData.studentId !== 'string' || !itemData.studentId.trim() || itemData.studentId.length > 64)) ||
+        !['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'].includes(itemData.messageType) ||
+        !['sms', 'whatsapp'].includes(itemData.channel) ||
+        typeof itemData.content !== 'string' || !itemData.content.trim() || itemData.content.length > 2000) {
+      throw new Error('Notification details are invalid.');
+    }
+    const schoolId = itemData.schoolId.trim();
+    if (itemData.studentId) {
+      const student = await this.getStudentById(itemData.studentId.trim(), schoolId);
+      if (!student || student.schoolId !== schoolId) throw new Error('Choose a student from this school.');
+    }
+    const settings = await this.getCommunicationSettings(schoolId);
     const isConfigured = settings.isActive && settings.provider !== 'none';
-
     const item: CommunicationQueueItem = {
-      ...itemData,
-      id: `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      status: isConfigured ? 'sent' : 'queued',
-      errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Stored in queue as not sent.',
-      createdAt: new Date().toISOString(),
-      sentAt: isConfigured ? new Date().toISOString() : undefined
+      schoolId,
+      recipientPhone: itemData.recipientPhone.trim(),
+      recipientName: itemData.recipientName.trim(),
+      ...(itemData.studentId ? { studentId: itemData.studentId.trim() } : {}),
+      messageType: itemData.messageType,
+      channel: itemData.channel,
+      content: itemData.content.trim(),
+      id: `msg-q-${randomUUID()}`,
+      status: 'queued',
+      errorMessage: isConfigured
+        ? 'Provider credentials are configured, but no delivery worker is connected. This message has not been sent.'
+        : 'No active SMS/WhatsApp provider configured. This message has not been sent.',
+      createdAt: new Date().toISOString()
     };
-
     this.data.communicationQueue.push(item);
     this.save();
     return item;
   }
 
   public async getCommunicationQueue(schoolId: string): Promise<CommunicationQueueItem[]> {
-    return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId });
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load notification queue.');
+    }
+    return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId.trim() });
   }
 
   // -------------------------------------------------------------
