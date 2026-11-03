@@ -5,7 +5,7 @@ const migration = fs.readFileSync('supabase/migrations/001_missing_tables.sql', 
 const migrationFiles = fs.readdirSync('supabase/migrations').filter(file => /^\d+_.+\.sql$/.test(file)).sort();
 const storage = fs.readFileSync('src/server/storage.ts', 'utf8');
 const liveCheck = fs.readFileSync('scripts/check-rls.sql', 'utf8');
-const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase());
+const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase());
 const uniqueTables = [...new Set(tables)].sort();
 const globalRlsEnable = /ALTER TABLE public\.%I ENABLE ROW LEVEL SECURITY/i.test(schema);
 const genericTenantPolicy = /CREATE POLICY tenant_scope_v2 ON public\.%I/i.test(schema);
