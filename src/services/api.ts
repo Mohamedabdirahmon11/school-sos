@@ -616,7 +616,7 @@ export class ApiClient {
   }
 
   public static async getTeachers(params?: any) {
-    const query = new URLSearchParams(this.pageQuery(params).replace(/^\\?/, ''));
+    const query = new URLSearchParams(this.pageQuery(params).replace('?', ''));
     if (params?.search?.trim()) query.set('search', params.search.trim());
     return this.request<Teacher[]>(`/teachers?${query.toString()}`);
   }
