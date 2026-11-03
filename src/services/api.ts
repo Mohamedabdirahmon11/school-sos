@@ -557,6 +557,20 @@ export class ApiClient {
     return this.request<Student[]>(`/students?${query.toString()}`);
   }
 
+  public static async getAllSchoolStudents(params?: {
+    classId?: string;
+    branchId?: string;
+    search?: string;
+  }) {
+    const allStudents: Student[] = [];
+    for (let page = 1; ; page += 1) {
+      const rows = await this.getSchoolStudents({ ...params, page, pageSize: 100 });
+      allStudents.push(...rows);
+      if (rows.length < 100) break;
+    }
+    return allStudents;
+  }
+
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}/profile`);
     const payments = includeFinance ? await this.getFeePayments(id) : [];
