@@ -156,6 +156,7 @@ test('notice audiences and direct-message content are protected at the database 
   assert.ok(migration.includes('REVOKE INSERT ON public.direct_messages FROM PUBLIC, anon, authenticated'));
   assert.ok(migration.includes('REVOKE UPDATE ON public.direct_messages FROM PUBLIC, anon, authenticated'));
   assert.ok(migration.includes('GRANT UPDATE (is_read) ON public.direct_messages TO authenticated'));
+  assert.ok(migration.includes('REVOKE UPDATE, DELETE ON public.notice_reads FROM PUBLIC, anon, authenticated'));
   assert.ok(migration.includes('DROP POLICY IF EXISTS direct_messages_sender_insert'));
 });
 
