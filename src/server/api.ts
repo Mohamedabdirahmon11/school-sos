@@ -2540,7 +2540,7 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
   if (!deleted) { res.status(404).json({ error: 'Student not found.' }); return; }
   db.logAudit({
     action: 'STUDENT_DELETED',
-    category: 'student',
+    category: 'school',
     schoolId: school.id,
     schoolName: school.name,
     userId: user.id,
@@ -2609,8 +2609,12 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.assignedClasses !== undefined && !Array.isArray(req.body.assignedClasses)) { res.status(400).json({ error: 'Assigned classes must be a list of class IDs.' }); return; }
   if (req.body?.assignedSubjects !== undefined && !Array.isArray(req.body.assignedSubjects)) { res.status(400).json({ error: 'Assigned subjects must be a list of subject IDs.' }); return; }
-  const assignedClasses = [...new Set((req.body.assignedClasses || []).filter((id: unknown): id is string => typeof id === 'string' && id.trim()).map((id: string) => id.trim()))];
-  const assignedSubjects = [...new Set((req.body.assignedSubjects || []).filter((id: unknown): id is string => typeof id === 'string' && id.trim()).map((id: string) => id.trim()))];
+  const assignedClasses: string[] = Array.isArray(req.body.assignedClasses)
+    ? [...new Set((req.body.assignedClasses as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim()))]
+    : [];
+  const assignedSubjects: string[] = Array.isArray(req.body.assignedSubjects)
+    ? [...new Set((req.body.assignedSubjects as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim()))]
+    : [];
   const [validClasses, validSubjects] = await Promise.all([
     assignedClasses.length ? queryAllRows('classes', { school_id: school.id, id: assignedClasses }, 'id') : [],
     assignedSubjects.length ? queryAllRows('subjects', { school_id: school.id, id: assignedSubjects }, 'id') : []
