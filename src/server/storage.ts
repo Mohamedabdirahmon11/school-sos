@@ -27,6 +27,7 @@ import {
   StaffMember,
   StaffPayrollRecord,
   AdmissionApplication,
+  DisciplineRecord,
   AuditLog,
   SuperAdminSettings,
   SubscriptionInvoice,
@@ -81,6 +82,7 @@ interface DatabaseSchema {
   staffMembers: StaffMember[];
   payrollRecords: StaffPayrollRecord[];
   admissionApplications: AdmissionApplication[];
+  disciplineRecords: DisciplineRecord[];
   feeRanges: any[];
   busAssignments: any[];
   notificationTemplates: any[];
@@ -229,7 +231,7 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
   assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
-  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
+  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', discipline_records: 'disciplineRecords', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
@@ -315,6 +317,7 @@ class StorageEngine {
       staffMembers: [],
       payrollRecords: [],
       admissionApplications: [],
+      disciplineRecords: [],
       feeRanges: [],
       busAssignments: [],
       notificationTemplates: [],
@@ -418,7 +421,7 @@ class StorageEngine {
       ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
-      ['admissionApplications', 'admission_applications'], ['inventoryItems', 'inventory_items'],
+      ['admissionApplications', 'admission_applications'], ['inventoryItems', 'inventory_items'], ['disciplineRecords', 'discipline_records'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['notificationTemplates', 'notification_templates'],
       ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
     ];
@@ -551,7 +554,7 @@ class StorageEngine {
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
-      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems],
+      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems], ['discipline_records', snapshot.disciplineRecords],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
@@ -3006,6 +3009,63 @@ class StorageEngine {
     this.data.transportRoutes.push(newRoute);
     this.save();
     return newRoute;
+  }
+
+  public async getDisciplineRecords(schoolId: string): Promise<DisciplineRecord[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load discipline records.');
+    }
+    return this.queryRows<DisciplineRecord>('discipline_records', { school_id: schoolId.trim() });
+  }
+
+  public async createDisciplineRecord(record: Omit<DisciplineRecord, 'id'>): Promise<DisciplineRecord> {
+    const incidentDate = typeof record?.incidentDate === 'string' ? record.incidentDate : '';
+    const parsedDate = new Date(`${incidentDate}T00:00:00.000Z`);
+    if (!record || typeof record !== 'object' ||
+        typeof record.schoolId !== 'string' || !record.schoolId.trim() || record.schoolId.length > 64 ||
+        typeof record.studentId !== 'string' || !record.studentId.trim() || record.studentId.length > 64 ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(incidentDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate ||
+        typeof record.infractionType !== 'string' || !record.infractionType.trim() || record.infractionType.trim().length > 120 ||
+        typeof record.description !== 'string' || record.description.length > 2000 ||
+        !['minor', 'moderate', 'severe'].includes(record.severity) ||
+        typeof record.actionTaken !== 'string' || record.actionTaken.length > 1000 ||
+        typeof record.reportedBy !== 'string' || !record.reportedBy.trim() || record.reportedBy.length > 64 ||
+        typeof record.parentNotified !== 'boolean') {
+      throw new Error('Discipline incident details are invalid.');
+    }
+    const schoolId = record.schoolId.trim();
+    const student = await this.getStudentById(record.studentId.trim(), schoolId);
+    if (!student || student.schoolId !== schoolId) throw new Error('Choose a student from this school.');
+    const created: DisciplineRecord = {
+      id: `dis-${randomUUID()}`,
+      schoolId,
+      studentId: record.studentId.trim(),
+      incidentDate,
+      infractionType: record.infractionType.trim(),
+      description: record.description.trim(),
+      severity: record.severity,
+      actionTaken: record.actionTaken.trim(),
+      reportedBy: record.reportedBy.trim(),
+      parentNotified: record.parentNotified
+    };
+    this.data.disciplineRecords.push(created);
+    this.save();
+    return created;
+  }
+
+  public async deleteDisciplineRecord(schoolId: string, recordId: string): Promise<boolean> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof recordId !== 'string' || !recordId.trim() || recordId.length > 64) {
+      throw new Error('A valid school and discipline record are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    await this.getDisciplineRecords(scopedSchoolId);
+    const before = this.data.disciplineRecords.length;
+    this.data.disciplineRecords = this.data.disciplineRecords.filter(record =>
+      !(record.schoolId === scopedSchoolId && record.id === recordId.trim())
+    );
+    if (this.data.disciplineRecords.length !== before) this.save();
+    return this.data.disciplineRecords.length !== before;
   }
 
   public async getInventoryItems(schoolId: string): Promise<any[]> {
