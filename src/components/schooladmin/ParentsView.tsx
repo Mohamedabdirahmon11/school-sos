@@ -16,7 +16,7 @@ export const ParentsView: React.FC = () => {
 
   useEffect(() => {
     if (!school) return;
-    ApiClient.getSchoolStudents().then(setStudents).finally(() => setIsLoading(false));
+    ApiClient.getAllSchoolStudents().then(setStudents).finally(() => setIsLoading(false));
   }, [school]);
 
   const filtered = students.filter(s => 
