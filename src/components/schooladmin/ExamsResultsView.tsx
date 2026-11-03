@@ -80,7 +80,7 @@ export const ExamsResultsView: React.FC = () => {
     if (!selectedClassId) return;
     try {
       const [stdList, existingMarks] = await Promise.all([
-        ApiClient.getStudents(selectedClassId),
+        ApiClient.getAllSchoolStudents({ classId: selectedClassId }),
         ApiClient.getMarks(selectedClassId, selectedSubjectId || undefined, selectedSemester)
       ]);
 
