@@ -41,7 +41,7 @@ export const PlatformSettingsView: React.FC = () => {
     try {
       const updated = await ApiClient.updateSettings(settings);
       setSettings(updated);
-      setNotice('Platform configuration saved and live across all tenants.');
+      setNotice('Platform configuration saved. If 2FA was enabled, sign out and sign in again to complete enrollment.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       alert(err.message);
