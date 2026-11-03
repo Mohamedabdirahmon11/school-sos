@@ -232,8 +232,15 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
 
-function fromSupabaseRow(row: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(Object.entries(row).map(([key, value]) => [DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase()), value]));
+function fromSupabaseRow(row: Record<string, any>, table = ''): Record<string, any> {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    // Both users.pin and students.pinHash share the database pin_hash column.
+    // The reverse alias must therefore be resolved with the source table.
+    const field = key === 'pin_hash' && table === 'users'
+      ? 'pin'
+      : DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+    return [field, value];
+  }));
 }
 
 export function mapStorageRowToDatabase(table: string, row: Record<string, any>): Record<string, any> {
@@ -577,7 +584,7 @@ class StorageEngine {
     const { data, error, count } = await query.range((safePage - 1) * safeSize, safePage * safeSize - 1);
     this.recordQuery(table, 'select-page', startedAt);
     if (error) throw new Error('Unable to load paginated Supabase list "' + table + '": ' + error.message);
-    return { items: (data || []).map((row: any) => fromSupabaseRow(row)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
+    return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
   private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
@@ -1297,7 +1304,7 @@ class StorageEngine {
     if (!data?.user) return null;
     const { user: joinedUser, ...session } = data;
     const { school: joinedSchool, ...user } = joinedUser;
-    const normalizedUser = fromSupabaseRow(user) as User;
+    const normalizedUser = fromSupabaseRow(user, 'users') as User;
     const normalizedSession = fromSupabaseRow(session) as UserSession;
     this.cacheQueryRows('users', [normalizedUser]);
     this.cacheQueryRows('user_sessions', [normalizedSession]);
