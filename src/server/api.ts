@@ -163,7 +163,8 @@ async function sendDatabasePage(req: Request, res: Response, table: string, filt
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
-    const cacheKey = `${table}:${JSON.stringify({ filters, page, pageSize, orFilter })}`;
+    const cacheScope = table === 'teachers' ? normalizeRole((req as any).user?.role) : undefined;
+    const cacheKey = `${table}:${JSON.stringify({ filters, page, pageSize, orFilter, cacheScope })}`;
     if (CACHED_LIST_TABLES.has(table)) {
       const cached = serverListCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
@@ -2751,6 +2752,8 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
 
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
+  const user = (req as any).user as User;
+  const canViewSalary = ['school_admin', 'super_admin', 'accountant'].includes(user.role);
   const search = typeof req.query.search === 'string'
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
     : '';
@@ -2758,7 +2761,14 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
     ? ['full_name', 'staff_id', 'phone', 'department', 'qualification', 'status']
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
-  void sendDatabasePage(req, res, 'teachers', { school_id: school.id }, searchFilter);
+  void sendDatabasePage(
+    req,
+    res,
+    'teachers',
+    { school_id: school.id },
+    searchFilter,
+    items => canViewSalary ? items : items.map(({ monthlySalary: _salary, ...teacher }) => teacher)
+  );
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
