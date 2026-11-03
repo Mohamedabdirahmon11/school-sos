@@ -117,6 +117,19 @@ const schoolContextCache = new Map<string, { school: School; expiresAt: number }
 const branchListCache = new Map<string, { branches: SchoolBranch[]; expiresAt: number }>();
 const noticeCountCache = new Map<string, { count: number; expiresAt: number }>();
 
+// Avoid writing the session row on every API request. The signed cookie is
+// refreshed each request, while the database expiry is extended at most once
+// per minute (or 5% of shorter session lifetimes).
+export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt: string, now = Date.now()): boolean {
+  const current = Date.parse(currentExpiresAt);
+  const requested = Date.parse(requestedExpiresAt);
+  if (!Number.isFinite(current) || !Number.isFinite(requested)) return true;
+  if (requested <= current) return requested < current;
+  const timeoutMs = Math.max(1_000, requested - now);
+  const refreshWindowMs = Math.min(60_000, Math.max(1_000, timeoutMs / 20));
+  return requested - current >= refreshWindowMs;
+}
+
 const DEFAULT_SETTINGS: SuperAdminSettings = {
   trialDays: 7,
   graceDays: 7,
@@ -486,7 +499,7 @@ class StorageEngine {
     await this.contexts.run(context, async () => {
       const settingsTask = async () => {
         if (this.settingsCache && this.settingsCache.expiresAt > Date.now()) {
-          this.data.settings = { ...this.settingsCache.value };
+          this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.settingsCache.value }]);
           return;
         }
         const rows = await this.queryRows<SuperAdminSettings>('super_admin_settings', { id: 'default' });
@@ -495,7 +508,7 @@ class StorageEngine {
       };
       const plansTask = async () => {
         if (this.plansCache && this.plansCache.expiresAt > Date.now()) {
-          this.data.plans = this.plansCache.value.map(plan => ({ ...plan }));
+          this.cacheQueryRows('plans', this.plansCache.value.map(plan => ({ ...plan })));
           return;
         }
         const plans = await this.queryRows<PlanConfig>('plans', {});
@@ -594,14 +607,18 @@ class StorageEngine {
       const previous = this.persistedRows.get(table) || new Map<string, string>();
       for (const row of rows) {
         ids.add(String(row.id));
-        previous.set(String(row.id), JSON.stringify(toSupabaseRow(row)));
+        // Plans are merged with built-in defaults before they are used. Record
+        // that merged value as the read baseline so a later unrelated write
+        // does not upsert defaults back into Supabase on every request.
+        const baselineRow = table === 'plans' ? byId.get(String(row.id)) : row;
+        previous.set(String(row.id), JSON.stringify(toSupabaseRow(baselineRow, table)));
       }
       this.persistedIds.set(table, ids);
       this.persistedRows.set(table, previous);
     } else if (table === 'super_admin_settings' && rows[0]) {
       this.data.settings = { ...DEFAULT_SETTINGS, ...(rows[0] as any) };
       this.persistedIds.set(table, new Set(['default']));
-      this.persistedRows.set(table, new Map([['default', JSON.stringify(toSupabaseRow({ id: 'default', ...rows[0] }))]]));
+      this.persistedRows.set(table, new Map([['default', JSON.stringify(toSupabaseRow({ id: 'default', ...this.data.settings }, table))]]));
     }
   }
 
@@ -1304,7 +1321,7 @@ class StorageEngine {
 
   public async touchSession(id: string, expiresAt: string): Promise<void> {
     const session = await this.getSessionById(id);
-    if (!session) return;
+    if (!session || !shouldTouchSession(session.expiresAt, expiresAt)) return;
     session.expiresAt = expiresAt;
     session.lastActivityAt = new Date().toISOString();
     this.save();
