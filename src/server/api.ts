@@ -15,6 +15,7 @@ import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord } fr
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
+  isSessionExpiryValid,
   sanitizeUser,
   sanitizeUsers,
   sanitizeStudent,
@@ -367,7 +368,11 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   const user: User = { ...storedUser, role: normalizedRole };
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
   if (!session && !isBootstrap) return null;
-  if (session && Date.parse(session.expiresAt) <= Date.now()) return null;
+  if (session && !isSessionExpiryValid(session.expiresAt)) return null;
+  // Non-super-admin sessions must remain bound to the user's current tenant.
+  // Super admins may have a selected school in the session while their account
+  // itself is platform-wide and therefore has no permanent schoolId.
+  if (session && user.role !== 'super_admin' && session.schoolId !== user.schoolId) return null;
   if (user.role === 'accountant') {
     const staffAccount = await getStaffForRequest(req, user.id, user.schoolId || '');
     if (!staffAccount || staffAccount.status !== 'active') return null;
