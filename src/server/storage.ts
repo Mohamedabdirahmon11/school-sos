@@ -2683,9 +2683,9 @@ class StorageEngine {
     return ticket;
   }
 
-  public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string): Promise<SupportTicket | null> {
+  public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string, allowedCreatorUserId?: string): Promise<SupportTicket | null> {
     await this.queryRows<SupportTicket>('support_tickets', { id: ticketId, school_id: schoolId });
-    const ticket = this.data.tickets.find(t => t.id === ticketId && (!schoolId || t.schoolId === schoolId));
+    const ticket = this.data.tickets.find(t => t.id === ticketId && (!schoolId || t.schoolId === schoolId) && (!allowedCreatorUserId || t.createdByUserId === allowedCreatorUserId));
     if (!ticket) return null;
     const now = new Date().toISOString();
     ticket.messages.push({
