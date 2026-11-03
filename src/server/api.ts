@@ -3814,7 +3814,23 @@ apiRouter.get('/school/library', requireAuth, requireSchoolContext, (req, res) =
 
 apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
   const school = (req as any).school;
-  const book = db.addLibraryBook({ ...req.body, schoolId: school.id });
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid library book details.' });
+    return;
+  }
+  const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const author = payload.author === undefined || payload.author === null ? '' : payload.author;
+  const isbn = payload.isbn === undefined || payload.isbn === null ? '' : payload.isbn;
+  const quantity = payload.quantity === undefined ? 1 : payload.quantity;
+  if (!title || title.length > 255 ||
+      typeof author !== 'string' || author.trim().length > 150 ||
+      typeof isbn !== 'string' || isbn.trim().length > 50 ||
+      !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100000) {
+    res.status(400).json({ error: 'Book title, author, ISBN or quantity is invalid. Quantity must be a whole number from 1 to 100000.' });
+    return;
+  }
+  const book = db.addLibraryBook({ title, author: author.trim(), isbn: isbn.trim(), quantity, schoolId: school.id });
   res.status(201).json(book);
 });
 
