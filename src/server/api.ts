@@ -2297,7 +2297,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
   const search = typeof req.query.search === 'string'
-    ? req.query.search.normalize('NFKC').trim().replace(/[^\\p{L}\\p{N}\\s-]/gu, '').replace(/\\s+/g, ' ').slice(0, 80)
+    ? req.query.search.normalize('NFKC').trim().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, ' ').slice(0, 80)
     : '';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
   let roleFilter: string | undefined;
