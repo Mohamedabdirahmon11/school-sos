@@ -333,9 +333,10 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
 }
 
 async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
-  // Explicit bearer challenges (first-login password/2FA setup) take
-  // precedence over any stale browser cookie.
-  let token = req.headers.authorization?.replace(/^Bearer\s+/, '').trim() || req.cookies?.schoolos_session;
+  let token = req.cookies?.schoolos_session;
+  if (!token && req.headers.authorization) {
+    token = req.headers.authorization.replace(/^Bearer\s+/, '').trim();
+  }
   if (!token) return null;
   const cached = authenticatedRequestCache.get(req);
   const bootstrapToken = Boolean(verifySignedSessionToken(token)?.sessionId.startsWith('bootstrap-'));
@@ -398,26 +399,17 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
   }
-  const token = req.headers.authorization?.replace(/^Bearer\s+/, '').trim() || req.cookies?.schoolos_session;
+  const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
-  const passwordSetupRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
-  const twoFactorSetupRoutes = ['/auth/2fa/setup', '/auth/2fa/verify-and-enable', '/auth/logout'];
-  const requiresTwoFactorSetup = user.role === 'super_admin' &&
-    db.getSettings().requireSuperAdmin2FA && !user.twoFactorEnabled;
+  const firstLoginAllowedRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
   if (isBootstrap) {
-    const passwordBootstrapAllowed = user.mustChangePassword && passwordSetupRoutes.includes(req.path);
-    const twoFactorBootstrapAllowed = requiresTwoFactorSetup && !user.mustChangePassword && twoFactorSetupRoutes.includes(req.path);
-    if (user.role !== 'super_admin' || (!passwordBootstrapAllowed && !twoFactorBootstrapAllowed)) {
-      res.status(403).json({ error: 'Complete the required account security setup before continuing.' }); return;
+    if (user.role !== 'super_admin' || !user.mustChangePassword || !firstLoginAllowedRoutes.includes(req.path)) {
+      res.status(403).json({ error: 'Complete the required password change before continuing.' }); return;
     }
   }
-  if (user.mustChangePassword && !passwordSetupRoutes.includes(req.path)) {
+  if (user.mustChangePassword && !firstLoginAllowedRoutes.includes(req.path)) {
     res.status(403).json({ error: 'Password change is required before using SchoolOS.', code: 'MUST_CHANGE_PASSWORD' });
-    return;
-  }
-  if (requiresTwoFactorSetup && !user.mustChangePassword && !twoFactorSetupRoutes.includes(req.path)) {
-    res.status(403).json({ error: 'Two-factor authentication setup is required before using SchoolOS.', code: 'TWO_FACTOR_SETUP_REQUIRED' });
     return;
   }
   if (payload && !isBootstrap) await refreshSessionCookie(res, user, payload);
@@ -971,66 +963,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // Enforce Super Admin TOTP when platform policy enables it. Accounts that
-  // have not enrolled receive a short-lived setup-only challenge, never a session.
-  if (user.role === 'super_admin' && settings.requireSuperAdmin2FA) {
-    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      const challengeToken = createSignedSessionToken({
-        sessionId: `bootstrap-${randomUUID()}`,
-        userId: user.id,
-        role: user.role,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 5 * 60 * 1000
-      });
-      res.clearCookie('schoolos_session', { path: '/' });
-      res.json({ requireTwoFactorSetup: true, challengeToken });
-      return;
-    }
-
-    const twoFactorCode = typeof req.body?.twoFactorCode === 'string' ? req.body.twoFactorCode.trim() : '';
-    if (!twoFactorCode) {
-      res.clearCookie('schoolos_session', { path: '/' });
-      res.json({ requireTwoFactorCode: true });
-      return;
-    }
-    const recoveryCodes = Array.isArray(user.recoveryCodes) ? user.recoveryCodes : [];
-    const recoveryCodeIndex = findRecoveryCodeIndex(twoFactorCode, recoveryCodes);
-    const validTotp = verify2FACode(twoFactorCode, user.twoFactorSecret);
-    if (!validTotp && recoveryCodeIndex < 0) {
-      const lockResult = await db.handleFailedLogin(user.id);
-      db.recordLoginFailure(staffLockKey, threshold, durationMins);
-      db.recordLoginFailure(ipKey, ipThreshold, durationMins);
-      db.logAudit({
-        action: 'FAILED_LOGIN_2FA',
-        category: 'auth',
-        userId: user.id,
-        userName: user.fullName,
-        userRole: user.role,
-        details: `Invalid Super Admin authenticator or recovery code from IP ${clientIp}.`,
-        severity: lockResult.locked ? 'critical' : 'warning'
-      });
-      res.status(lockResult.locked ? 429 : 401).json({
-        error: lockResult.locked ? `Too many failed login attempts. Account locked for ${durationMins} minutes.` : 'The authenticator or recovery code is invalid.'
-      });
-      return;
-    }
-    if (!validTotp && recoveryCodeIndex >= 0) {
-      const updated = db.updateUser(user.id, {
-        recoveryCodes: recoveryCodes.filter((_code, index) => index !== recoveryCodeIndex)
-      });
-      if (!updated) { res.status(503).json({ error: 'Unable to consume the recovery code. Try again.' }); return; }
-      await db.flush();
-      db.logAudit({
-        action: 'TWO_FACTOR_RECOVERY_CODE_USED',
-        category: 'security',
-        userId: user.id,
-        userName: user.fullName,
-        userRole: user.role,
-        details: 'A one-time Super Admin recovery code was used to sign in.',
-        severity: 'warning'
-      });
-    }
-  }
+  // Login is password-only; stored TOTP settings do not affect sign-in.
 
   // Success -> Reset failed attempts
   await db.handleSuccessfulLogin(user.id);
@@ -1179,11 +1112,6 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     severity: 'info'
   });
 
-  if (updated.role === 'super_admin' && db.getSettings().requireSuperAdmin2FA && !updated.twoFactorEnabled) {
-    // Keep the short-lived bootstrap challenge restricted to the 2FA setup flow.
-    res.json({ success: true, requireTwoFactorSetup: true });
-    return;
-  }
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'Password updated successfully.' });
 });
