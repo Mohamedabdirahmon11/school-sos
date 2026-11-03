@@ -218,7 +218,7 @@ export class ApiClient {
   }
 
   public static async changePassword(newPassword: string, challengeToken?: string) {
-    return this.request<{ success: boolean; message: string }>('/auth/change-password', {
+    return this.request<{ success: boolean; message?: string; requireTwoFactorSetup?: boolean }>('/auth/change-password', {
       method: 'POST',
       headers: challengeToken ? { Authorization: `Bearer ${challengeToken}` } : undefined,
       body: JSON.stringify({ newPassword })
