@@ -421,11 +421,11 @@ class StorageEngine {
     ];
     for (const [, table] of tableMap) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
-      if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql and check service-role access. ${error.message}`);
+      if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql and check service-role access. ${error.message}`);
     }
     for (const table of ['super_admin_settings', 'school_subscriptions', 'fee_receipt_sequences']) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
-      if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql. ${error.message}`);
+      if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql. ${error.message}`);
     }
     const context = await this.createRequestContext();
     await this.contexts.run(context, async () => {
