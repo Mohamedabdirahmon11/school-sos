@@ -14,16 +14,16 @@ import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Down
 
 export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
+  const [search, setSearch] = useState('');
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20 }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page], Boolean(school));
+    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page, search], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const subjects: Subject[] = Array.isArray(subjectRows) ? subjectRows : [];
-  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [initialPassword, setInitialPassword] = useState('');
@@ -38,12 +38,7 @@ export const TeachersView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
 
-  const filteredTeachers = teachers.filter(teacher => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification]
-      .some(value => String(value || '').toLowerCase().includes(query));
-  });
+  const filteredTeachers = teachers;
 
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
