@@ -28,7 +28,7 @@ export const AnalyticsView: React.FC = () => {
   const handleExportCSV = () => {
     const csvCell = (value: unknown) => {
       const text = String(value ?? '');
-      const safe = /^[\\s]*[=+\\-@]/.test(text) ? "'" + text : text;
+      const safe = /^\s*[=+\-@]/.test(text) ? "'" + text : text;
       return '"' + safe.replace(/"/g, '""') + '"';
     };
     const rows = [
@@ -39,8 +39,8 @@ export const AnalyticsView: React.FC = () => {
         return [s.name, s.code, subscription.plan, subscription.status, s.studentCount || 0, s.teacherCount || 0, validUntil];
       })
     ];
-    const csv = rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
-    const blob = new Blob(['\\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+    const csv = rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
