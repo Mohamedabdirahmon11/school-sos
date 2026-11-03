@@ -3834,6 +3834,54 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
   res.status(201).json(book);
 });
 
+apiRouter.get('/school/inventory', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  res.json(await db.getInventoryItems(school.id));
+});
+
+apiRouter.post('/school/inventory', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid inventory item details.' });
+    return;
+  }
+  const assetTag = typeof payload.assetTag === 'string' ? payload.assetTag.trim() : '';
+  const itemName = typeof payload.itemName === 'string' ? payload.itemName.trim() : '';
+  const quantity = payload.quantity;
+  const roomLocation = payload.roomLocation === undefined ? '' : payload.roomLocation;
+  const condition = payload.condition === undefined ? 'good' : payload.condition;
+  const value = payload.value;
+  if (!assetTag || assetTag.length > 80 || !itemName || itemName.length > 255 ||
+      !Number.isSafeInteger(quantity) || quantity < 0 || quantity > 1000000 ||
+      typeof roomLocation !== 'string' || roomLocation.trim().length > 150 ||
+      !['good', 'fair', 'poor', 'damaged'].includes(condition) ||
+      typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1000000000) {
+    res.status(400).json({ error: 'Invalid inventory details. Quantity must be 0–1000000 and value 0–1000000000.' });
+    return;
+  }
+  try {
+    const item = await db.addInventoryItem({
+      assetTag, itemName, quantity, roomLocation: roomLocation.trim(), condition, value,
+      schoolId: school.id
+    });
+    res.status(201).json(item);
+  } catch (error: any) {
+    const message = error?.message || 'Inventory item could not be saved.';
+    res.status(message.includes('already used') ? 409 : 400).json({ error: message });
+  }
+});
+
+apiRouter.delete('/school/inventory/:itemId', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const itemId = typeof req.params.itemId === 'string' ? req.params.itemId.trim() : '';
+  if (!itemId || itemId.length > 64) {
+    res.status(400).json({ error: 'A valid inventory item ID is required.' });
+    return;
+  }
+  res.json({ success: await db.deleteInventoryItem(school.id, itemId) });
+});
+
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
