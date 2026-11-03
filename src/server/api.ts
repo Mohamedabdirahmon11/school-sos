@@ -1843,7 +1843,7 @@ apiRouter.get('/school/reports/finance.csv', requireAuth, requireAccountantOrSup
 apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
-  const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
+  const allowedLevels: number[] = (school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const newClass = db.createClass({ ...req.body, schoolId: school.id });
@@ -1863,7 +1863,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     if (!Number.isInteger(Number(payload.capacity)) || Number(payload.capacity) < enrolled.total) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
   }
   if (payload.gradeLevel !== undefined) {
-    const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
+    const allowedLevels: number[] = (school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     if (!allowedLevels.includes(Number(payload.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   }
   if (payload.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === payload.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
