@@ -78,6 +78,11 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(partialRetry.response.status, 201);
   assert.equal(partialRetry.body.id, partial.body.id);
   assert.equal(partialRetry.body.amountPaid, 30);
+  const partialInstallment = await postPayment({ ...partialPayload, amountPaid: 20, idempotencyKey: 'fee-test-payment-installment-2' });
+  assert.equal(partialInstallment.response.status, 201);
+  assert.equal(partialInstallment.body.id, partial.body.id);
+  assert.equal(partialInstallment.body.amountPaid, 50);
+  assert.equal(partialInstallment.body.remainingAmount, 70);
 
   const unpaid = await postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'October 2026', feeType: 'monthly_tuition', amountDue: 1, amountPaid: 0 });
   assert.equal(unpaid.response.status, 201);
@@ -124,7 +129,10 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   ]);
   assert.equal(parallelReceiptA.response.status, 201);
   assert.equal(parallelReceiptB.response.status, 201);
-  assert.notEqual(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, 'parallel payments receive unique receipts');
+  assert.equal(parallelReceiptA.body.id, parallelReceiptB.body.id, 'parallel installments update one billing record');
+  assert.equal(parallelReceiptB.body.amountPaid, 12, 'parallel installments accumulate instead of duplicating the full amount due');
+  assert.equal(parallelReceiptB.body.remainingAmount, 68);
+  assert.equal(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, 'one billing period keeps one receipt number');
   const invalidCustom = await postPayment({ ...customPayload, idempotencyKey: 'fee-test-custom-invalid-1', feeStructureId: 'fee-from-another-school' });
   assert.equal(invalidCustom.response.status, 400);
   assert.match(invalidCustom.body.error, /active custom fee/i);
