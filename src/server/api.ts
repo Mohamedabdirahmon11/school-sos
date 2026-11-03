@@ -3229,15 +3229,17 @@ apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, 
 // Monthly payroll management is reserved for accountants; staff only see their own payslips.
 const payrollAmounts = (items: unknown): { lines: Array<{ label: string; amount: number }>; total: number } | null => {
   if (items === undefined) return { lines: [], total: 0 };
-  if (!Array.isArray(items)) return null;
+  if (!Array.isArray(items) || items.length > 50) return null;
   const lines: Array<{ label: string; amount: number }> = [];
   for (const item of items) {
     const label = typeof (item as any)?.label === 'string' ? (item as any).label.trim() : '';
-    const amount = Number((item as any)?.amount);
-    if (!label || label.length > 100 || !Number.isFinite(amount) || amount < 0) return null;
+    const amount = typeof (item as any)?.amount === 'number' ? (item as any).amount : Number.NaN;
+    if (!label || label.length > 100 || !Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000) return null;
     lines.push({ label, amount });
   }
-  return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0) };
+  const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  if (!Number.isFinite(total) || total > 1_000_000_000) return null;
+  return { lines, total };
 };
 
 apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3278,21 +3280,33 @@ apiRouter.post('/payroll', requireAuth, requireAccountantOrSuperAdmin, requireSc
     if (seen.has(employee.userId) || existing.some(record => record.userId === employee.userId)) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
     seen.add(employee.userId);
     const allowances = payrollAmounts(selection.allowances); const deductions = payrollAmounts(selection.deductions);
-    if (!allowances || !deductions || !Number.isFinite(employee.salary) || employee.salary < 0 || deductions.total > employee.salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
+    if (!allowances || !deductions || !Number.isFinite(employee.salary) || employee.salary < 0 || employee.salary > 1_000_000_000 || deductions.total > employee.salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
     prepared.push({ schoolId: school.id, userId: employee.userId, staffId: employee.id, staffName: employee.name, payrollMonth: month, baseSalary: employee.salary,
       allowances: allowances.lines, allowanceTotal: allowances.total, deductions: deductions.lines, deductionTotal: deductions.total,
       netSalary: employee.salary + allowances.total - deductions.total, status: 'draft', createdBy: user.id });
   }
   const created = prepared.map(record => db.createPayrollRecord(record));
   db.logAudit({ action: 'PAYROLL_DRAFT_CREATED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Created payroll draft for ${month} with ${created.length} staff records.`, severity: 'info' });
-  await db.flush(); res.status(201).json(created);
+  try { await db.flush(); } catch (error: any) {
+    if (error?.code === '23505') { res.status(409).json({ error: `A payroll record already exists for one of the selected staff members in ${month}.` }); return; }
+    throw error;
+  }
+  res.status(201).json(created);
 });
 
 apiRouter.post('/payroll/:id/approve', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.status !== 'draft') { res.status(409).json({ error: 'Only a draft payroll record can be approved.' }); return; }
-  const updated = await db.updatePayrollRecord(record.id, school.id, { status: 'approved', approvedBy: user.id, approvedAt: new Date().toISOString() });
+  let updated: StaffPayrollRecord | null;
+  try {
+    updated = await db.updatePayrollRecord(record.id, school.id, { status: 'approved', approvedBy: user.id, approvedAt: new Date().toISOString() });
+    if (!updated) { res.status(409).json({ error: 'Payroll record changed before approval. Refresh and try again.' }); return; }
+    await db.flush();
+  } catch (error: any) {
+    if (error?.code === 'P0001') { res.status(409).json({ error: 'Payroll record was already changed. Refresh and try again.' }); return; }
+    throw error;
+  }
   db.logAudit({ action: 'PAYROLL_APPROVED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Approved payroll for ${record.staffName}, ${record.payrollMonth}.`, severity: 'warning' });
   await db.flush(); res.json(updated);
 });
@@ -3302,7 +3316,15 @@ apiRouter.post('/payroll/:id/pay', requireAuth, requireAccountantOrSuperAdmin, r
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.status !== 'approved') { res.status(409).json({ error: 'Only an approved payroll record can be marked paid.' }); return; }
   const paidAt = new Date().toISOString();
-  const updated = await db.updatePayrollRecord(record.id, school.id, { status: 'paid', paidBy: user.id, paidAt, paidDate: paidAt.slice(0, 10) });
+  let updated: StaffPayrollRecord | null;
+  try {
+    updated = await db.updatePayrollRecord(record.id, school.id, { status: 'paid', paidBy: user.id, paidAt, paidDate: paidAt.slice(0, 10) });
+    if (!updated) { res.status(409).json({ error: 'Payroll record changed before payment. Refresh and try again.' }); return; }
+    await db.flush();
+  } catch (error: any) {
+    if (error?.code === 'P0001') { res.status(409).json({ error: 'Payroll record was already changed. Refresh and try again.' }); return; }
+    throw error;
+  }
   db.logAudit({ action: 'PAYROLL_PAID', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Marked payroll paid for ${record.staffName}, ${record.payrollMonth}.`, severity: 'warning' });
   await db.flush(); res.json(updated);
 });
