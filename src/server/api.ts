@@ -2921,6 +2921,24 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     res.status(400).json({ error: 'The selected subject does not belong to this school.' });
     return;
   }
+  if (normalizeRole(user.role) === 'teacher') {
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    if (!teacher.items.length) {
+      res.status(403).json({ error: 'Your teacher profile is not linked to this school.' });
+      return;
+    }
+    const assignment = await db.queryPage('class_subjects', {
+      school_id: school.id,
+      class_id: classId,
+      subject_id: subjectId,
+      teacher_id: teacher.items[0].id,
+      is_active: 'true'
+    }, 1, 1, undefined, 'id');
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may only enter marks for subjects actively assigned to you in this class.' });
+      return;
+    }
+  }
   const seenStudentIds = new Set<string>();
   for (const mark of marks) {
     if (!mark || typeof mark.studentId !== 'string' || !mark.studentId.trim() ||
