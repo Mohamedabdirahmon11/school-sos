@@ -2668,7 +2668,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
-  const usedStaffIds = await queryAllRows('users', {}, 'id,staff_id');
+  const usedStaffIds = await db.getUsers();
   if (usedStaffIds.some((record: any) => record.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That Teacher ID is already used. Teacher IDs must be unique across all schools.' }); return; }
   const [schoolClasses, schoolSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
   const assignedClasses = Array.isArray(req.body.assignedClasses) ? req.body.assignedClasses : [];
