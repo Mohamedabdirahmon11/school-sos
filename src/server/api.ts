@@ -3716,7 +3716,7 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { recipientId, content } = req.body || {};
-  if (typeof content !== 'string' || !content.trim() || content.length > 5000 || typeof recipientId !== 'string') return res.status(400).json({ error: 'A recipient and a message of 1–5000 characters are required.' });
+  if (typeof content !== 'string' || !content.trim() || content.length > 5000 || typeof recipientId !== 'string' || !recipientId.trim() || recipientId.length > 64) return res.status(400).json({ error: 'A recipient and a message of 1–5000 characters are required.' });
   const recipient = await db.getUserById(recipientId, school.id);
   if (!recipient || recipient.id === user.id) return res.status(404).json({ error: 'Message recipient was not found in this school.' });
   const allowed: Record<string, string[]> = { school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent'], parent: ['teacher', 'student'], student: ['parent'] };
