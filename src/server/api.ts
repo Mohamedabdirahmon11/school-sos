@@ -1950,6 +1950,28 @@ async function nextSchoolStaffId(school: School): Promise<string> {
 }
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
 const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
+  const statuses = new Map<string, 'paid' | 'partial' | 'unpaid'>();
+  if (studentIds && studentIds.length === 0) return statuses;
+  const payments = await queryAllRows('fee_payments', {
+    school_id: schoolId,
+    student_id: studentIds
+  }, 'student_id,amount_due,amount_paid,remaining_amount,voided_at,academic_year');
+  const totals = new Map<string, { due: number; paid: number; remaining: number }>();
+  for (const payment of payments) {
+    if (payment.voidedAt || (academicYear && payment.academicYear !== academicYear)) continue;
+    const current = totals.get(payment.studentId) || { due: 0, paid: 0, remaining: 0 };
+    current.due += Number(payment.amountDue) || 0;
+    current.paid += Number(payment.amountPaid) || 0;
+    current.remaining += Number(payment.remainingAmount) || 0;
+    totals.set(payment.studentId, current);
+  }
+  for (const [studentId, total] of totals) {
+    statuses.set(studentId, total.due > 0 && total.remaining <= 0 ? 'paid' : total.paid > 0 ? 'partial' : 'unpaid');
+  }
+  return statuses;
+}
+
 async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
@@ -2296,6 +2318,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
+    : '';
+  const requestedFeeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus.toLowerCase() : 'all';
+  const canViewFeeStatus = ['school_admin', 'accountant', 'super_admin'].includes(user.role);
+  const feeStatus = canViewFeeStatus && ['paid', 'partial', 'unpaid'].includes(requestedFeeStatus) ? requestedFeeStatus : 'all';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
   let roleFilter: string | undefined;
   if (user.role === 'teacher') {
@@ -2312,9 +2340,39 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
-  const result = await db.queryPage('students', filters, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, roleFilter, LIST_QUERY_COLUMNS.students);
+
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+  const searchFilter = search && !roleFilter
+    ? ['student_id', 'first_name', 'middle_name', 'last_name', 'student_phone', 'father_phone', 'mother_phone']
+      .map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+
+  if (feeStatus !== 'all') {
+    const allStudents = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
+    const statusMap = await getStudentFeeStatusMap(school.id, undefined, school.academicYear);
+    const filtered = allStudents.filter((student: any) => {
+      const matchesSearch = !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
+        .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()));
+      return matchesSearch && (statusMap.get(student.id) || 'unpaid') === feeStatus;
+    });
+    const total = filtered.length;
+    const items = filtered.slice((page - 1) * pageSize, page * pageSize)
+      .map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }));
+    res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(total), 'X-Total-Pages': String(Math.ceil(total / pageSize)) });
+    res.json(sanitizeStudents(items));
+    return;
+  }
+
+  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students);
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
-  res.json(sanitizeStudents(result.items));
+  const canDecorateFeeStatus = canViewFeeStatus;
+  if (!canDecorateFeeStatus) {
+    res.json(sanitizeStudents(result.items));
+    return;
+  }
+  const statusMap = await getStudentFeeStatusMap(school.id, result.items.map((student: any) => student.id), school.academicYear);
+  res.json(sanitizeStudents(result.items.map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }))));
 });
 
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
