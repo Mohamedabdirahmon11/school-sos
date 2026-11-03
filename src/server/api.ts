@@ -399,7 +399,7 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
   const passwordSetupRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
-  const twoFactorSetupRoutes = ['/auth/me', '/auth/2fa/setup', '/auth/2fa/verify-and-enable', '/auth/logout'];
+  const twoFactorSetupRoutes = ['/auth/2fa/setup', '/auth/2fa/verify-and-enable', '/auth/logout'];
   const requiresTwoFactorSetup = user.role === 'super_admin' &&
     db.getSettings().requireSuperAdmin2FA && !user.twoFactorEnabled;
   if (isBootstrap) {
@@ -979,12 +979,14 @@ apiRouter.post('/auth/login', async (req, res) => {
         createdAt: Date.now(),
         expiresAt: Date.now() + 5 * 60 * 1000
       });
+      res.clearCookie('schoolos_session', { path: '/' });
       res.json({ requireTwoFactorSetup: true, challengeToken });
       return;
     }
 
     const twoFactorCode = typeof req.body?.twoFactorCode === 'string' ? req.body.twoFactorCode.trim() : '';
     if (!twoFactorCode) {
+      res.clearCookie('schoolos_session', { path: '/' });
       res.json({ requireTwoFactorCode: true });
       return;
     }
