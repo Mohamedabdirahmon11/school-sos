@@ -3915,8 +3915,16 @@ apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, async (req,
 
 apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  const studentId = typeof req.params.studentId === 'string' ? req.params.studentId.trim() : '';
+  const routeId = req.body && typeof req.body === 'object' && !Array.isArray(req.body) && typeof req.body.routeId === 'string'
+    ? req.body.routeId.trim()
+    : '';
+  if (!studentId || studentId.length > 64 || !routeId || routeId.length > 64) {
+    res.status(400).json({ error: 'A valid student ID and transport route ID are required.' });
+    return;
+  }
   try {
-    res.json(await db.setBusAssignment(school.id, req.params.studentId, String(req.body?.routeId || '')));
+    res.json(await db.setBusAssignment(school.id, studentId, routeId));
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Bus assignment could not be saved.' });
   }
@@ -3924,7 +3932,12 @@ apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSu
 
 apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json({ success: await db.removeBusAssignment(school.id, req.params.studentId) });
+  const studentId = typeof req.params.studentId === 'string' ? req.params.studentId.trim() : '';
+  if (!studentId || studentId.length > 64) {
+    res.status(400).json({ error: 'A valid student ID is required.' });
+    return;
+  }
+  res.json({ success: await db.removeBusAssignment(school.id, studentId) });
 });
 
 forwardAsyncErrors(apiRouter);
