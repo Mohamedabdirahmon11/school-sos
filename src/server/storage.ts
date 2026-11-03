@@ -1387,34 +1387,40 @@ class StorageEngine {
     };
     this.data.users.push(studentUser);
 
-    // If father or mother phone provided, check or create parent user linked to student
-    if (student.fatherPhone) {
-      const existingParent = this.data.users.find(u => 
-        u.schoolId === student.schoolId && 
-        u.role === 'parent' && 
-        u.phone === student.fatherPhone
+    // Create or link a parent account for each distinct parent phone.
+    // Keep an existing parent's PIN unchanged so adding a sibling never locks
+    // the parent out; a new parent starts with this student's initial PIN.
+    const parentPhones = [...new Set([student.fatherPhone, student.motherPhone]
+      .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
+      .map(phone => phone.trim()))];
+    const normalizePhone = (phone: string) => phone.replace(/[\\s()-]/g, '');
+    for (const parentPhone of parentPhones) {
+      const normalizedPhone = normalizePhone(parentPhone);
+      const existingParent = this.data.users.find(user =>
+        user.schoolId === student.schoolId &&
+        user.role === 'parent' &&
+        [user.phone, user.parentPhone].some(value => Boolean(value) && normalizePhone(value!) === normalizedPhone)
       );
       if (existingParent) {
         existingParent.linkedStudentIds = existingParent.linkedStudentIds || [];
-        if (!existingParent.linkedStudentIds.includes(id)) {
-          existingParent.linkedStudentIds.push(id);
-        }
+        if (!existingParent.linkedStudentIds.includes(id)) existingParent.linkedStudentIds.push(id);
+        if (!existingParent.phone) existingParent.phone = parentPhone;
+        if (!existingParent.parentPhone) existingParent.parentPhone = parentPhone;
       } else {
-        const parentUser: User = {
-          id: `usr-parent-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        this.data.users.push({
+          id: `usr-parent-${randomUUID()}`,
           schoolId: student.schoolId,
           role: 'parent',
           fullName: `Parent of ${student.firstName}`,
-          phone: student.fatherPhone,
-          parentPhone: student.fatherPhone,
+          phone: parentPhone,
+          parentPhone,
           passwordHash: '',
-          pin: pinHash, // Parent gets student's initial PIN
+          pin: pinHash,
           linkedStudentIds: [id],
           isBlocked: false,
           failedLoginAttempts: 0,
           createdAt: new Date().toISOString()
-        };
-        this.data.users.push(parentUser);
+        });
       }
     }
 
