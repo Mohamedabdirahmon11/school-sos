@@ -1783,10 +1783,15 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   try {
     const summary = await db.getSchoolDashboardSummary(school.id);
     const stats = summary?.stats || {};
+    const approvedMarks = (await db.getSchoolMarks(school.id)).filter(mark => mark.status === 'approved');
+    const examConfig = db.getExamConfig(school.id);
+    const passRate = approvedMarks.length
+      ? (approvedMarks.filter(mark => Number(mark.percentage) >= examConfig.passMarkPercentage).length / approvedMarks.length) * 100
+      : null;
     const result: Record<string, unknown> = {
       studentCount: Number(stats.totalStudents) || 0,
       attendanceRate: Number(stats.attendanceRate) || 0,
-      passRate: null
+      passRate
     };
     if (user.role === 'accountant' || user.role === 'super_admin') {
       const payments = (await db.getFeePayments(school.id)).filter(payment => !payment.voidedAt);
