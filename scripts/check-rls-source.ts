@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-const schema = fs.readFileSync('supabase/schema.sql', 'utf8');
+const schema = fs.readFileSync('schema.sql', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/001_missing_tables.sql', 'utf8');
 const migrationFiles = fs.readdirSync('supabase/migrations').filter(file => /^\d+_.+\.sql$/.test(file)).sort();
 const storage = fs.readFileSync('src/server/storage.ts', 'utf8');
