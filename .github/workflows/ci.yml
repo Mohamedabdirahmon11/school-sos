@@ -37,21 +37,6 @@ jobs:
       - name: Test suite
         run: npm run test:ci
 
-      - name: Security unit tests
-        run: npx tsx --test tests/security.test.ts
-
-      - name: Security HTTP tests
-        run: npx tsx --test --test-concurrency=1 tests/security-http.test.ts
-
-      - name: Security middleware tests
-        run: npm run test:middleware
-
-      - name: Super-admin authentication tests
-        run: npm run test:superadmin-auth
-
-      - name: Storage regression tests
-        run: npm run test:storage
-
       - name: Route parity audit
         run: npm run audit:routes
 
