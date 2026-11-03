@@ -3,6 +3,15 @@
 Updated: 2026-11-02
 Current stage: Security hardening and automated validation are in progress. Historical feature completion notes below remain as previously recorded; they are not a claim that every live production flow has been re-tested today.
 
+## API access review (2026-11-03)
+
+- DONE: Restricted `GET /school/dashboard` to school admins, accountants, super admins, and teachers. Parent/student accounts can no longer retrieve the school-wide dashboard summary.
+- DONE: For school admins and teachers, the dashboard response now recursively removes finance-related fields (including payment, collection, fee, arrears, revenue, income, and outstanding keys). Accountant and super-admin dashboard access remains unchanged.
+- VERIFIED: GitHub Actions passed for commit `8202faf5f753f08e15be7e19228eb8093e3a0742`: dependency install, application TypeScript check, configured CI test subset, and production build. Run: https://github.com/Mohamedabdirahmon11/school-sos/actions/runs/41591466848.
+- REVIEW NEEDED: Performance hotspots remain in API handlers that hydrate whole-school collections: messaging contacts, school report summary fee aggregation, import duplicate/capacity validation, and some staff/payroll lookups. These should be converted to bounded/filtered queries with regression coverage before large-school use.
+- REVIEW NEEDED: Parent/teacher relationship checks still use phone-number fallback in several places; preserve legacy sibling access until account-linking semantics and tests are clarified.
+- LIMITATION: CI still runs only its configured subset; the missing legacy test fixtures documented below mean this is not full-suite proof. No live user-journey or production latency test was performed.
+
 ## Security and CI continuation (2026-11-02)
 
 - DONE: Confirmed `.env` is absent from the current `main` tree. `.gitignore` contains `.env*` and explicitly allows `.env.example`.
