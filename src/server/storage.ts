@@ -1433,6 +1433,9 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
+    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\\d{4}$/.test(customPin))) {
+      throw new Error('Student PIN must contain exactly four digits.');
+    }
     const student = await this.getStudentById(studentId, schoolId);
     if (!student) return null;
     await Promise.all([
@@ -1447,6 +1450,7 @@ class StorageEngine {
     // The PIN is the shared credential for a student's and their linked parent's login.
     const familyPhones = [student.studentPhone, student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
     const linkedUsers = this.data.users.filter(user =>
+      user.schoolId === student.schoolId &&
       ['student', 'parent'].includes(user.role) &&
       (user.studentId === student.studentId || user.id === `usr-student-${student.id}` || user.linkedStudentIds?.includes(student.id) || familyPhones.includes(user.phone || ''))
     );
@@ -1473,7 +1477,7 @@ class StorageEngine {
 
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
     await this.getStudentById(id, schoolId || updates.schoolId);
-    const idx = this.data.students.findIndex(s => s.id === id);
+    const idx = this.data.students.findIndex(s => s.id === id && (!schoolId || s.schoolId === schoolId));
     if (idx === -1) return null;
     this.data.students[idx] = { ...this.data.students[idx], ...updates };
     this.save();
@@ -1491,11 +1495,11 @@ class StorageEngine {
       this.getUsers(student.schoolId, 'parent')
     ]);
     const len = this.data.students.length;
-    this.data.students = this.data.students.filter(s => s.id !== id);
+    this.data.students = this.data.students.filter(s => s.id !== id || s.schoolId !== student.schoolId);
     if (this.data.students.length < len) {
-      this.data.marks = this.data.marks.filter(m => m.studentId !== id);
-      this.data.attendance = this.data.attendance.filter(a => a.studentId !== id);
-      this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id);
+      this.data.marks = this.data.marks.filter(m => m.studentId !== id || m.schoolId !== student.schoolId);
+      this.data.attendance = this.data.attendance.filter(a => a.studentId !== id || a.schoolId !== student.schoolId);
+      this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id || f.schoolId !== student.schoolId);
       // Remove the deleted student's sign-in and detach only this child from
       // parent accounts; siblings and their access remain untouched.
       this.data.users = this.data.users.filter(user => {
