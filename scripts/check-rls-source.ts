@@ -85,7 +85,7 @@ const tableMapEnd = storage.indexOf('];', tableMapStart);
 const tableMapSource = storage.slice(tableMapStart, tableMapEnd);
 const startupTables = new Set([...tableMapSource.matchAll(/\['(?:[^']+)',\s*'([a-z_][a-z0-9_]*)'\]/g)].map(match => match[1].toLowerCase()));
 const schemaTables = new Set(uniqueTables);
-const uncovered = [...startupTables].filter(table => !schemaTables.has(table) || (['school_branches','fee_ranges','bus_assignments','notification_templates','staff_members','admission_applications','library_books','transport_routes','inventory_items','lockout_counters','restore_test_records','promotion_history'].includes(table) && !migrationTables.has(table)));
+const uncovered = [...startupTables].filter(table => !schemaTables.has(table) || (['school_branches','fee_ranges','bus_assignments','notification_templates','staff_members','admission_applications','library_books','transport_routes','inventory_items','discipline_records','lockout_counters','restore_test_records','promotion_history'].includes(table) && !migrationTables.has(table)));
 console.log(`${uncovered.length ? 'FAIL' : 'PASS'} startup table check coverage in schema and missing-tables migration${uncovered.length ? ` (${uncovered.join(', ')})` : ''}`);
 if (uncovered.length) failed = true;
 for (const table of uniqueTables) {
