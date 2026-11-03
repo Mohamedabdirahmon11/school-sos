@@ -61,7 +61,7 @@ test('communication gateway secrets are never returned and tenant identity canno
       apiSecret: 'private-auth-token', senderId: 'SCHOOL'
     })
   });
-  assert.equal(update.status, 200);
+  assert.equal(update.status, 200, await update.clone().text());
   const result = await update.json() as any;
   assert.equal(result.schoolId, school.id);
   assert.equal(result.id, initial.id);
@@ -110,7 +110,7 @@ test('notification requests are validated and never marked sent without a delive
       messageType: 'custom', channel: 'sms', content: 'School notice'
     })
   });
-  assert.equal(queued.status, 201);
+  assert.equal(queued.status, 201, await queued.clone().text());
   const item = await queued.json() as any;
   assert.equal(item.schoolId, school.id);
   assert.equal(item.status, 'queued');
