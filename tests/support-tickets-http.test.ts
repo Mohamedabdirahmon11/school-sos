@@ -59,7 +59,7 @@ test('support tickets validate content, bind author metadata, and remain availab
     method: 'POST', headers: headers(teacherACookie),
     body: JSON.stringify({
       subject: 'Login support', description: 'Unable to sign in', priority: 'high',
-      schoolId: 'forged-school', createdByUserId: 'forged-user', createdByName: 'Fake',
+      createdByUserId: 'forged-user', createdByName: 'Fake',
       createdByRole: 'super_admin', status: 'closed', messages: [{ content: 'forged' }]
     })
   });
