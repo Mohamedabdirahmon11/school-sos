@@ -2889,16 +2889,21 @@ class StorageEngine {
     };
   }
 
-  public getLibraryBooks(schoolId: string): any[] {
-    this.data.libraryBooks = this.data.libraryBooks || [];
-    return this.data.libraryBooks.filter(b => b.schoolId === schoolId);
+  public async getLibraryBooks(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('library_books', { school_id: schoolId });
+    return rows.filter(book => book.schoolId === schoolId);
   }
 
-  public addLibraryBook(book: any): any {
-    this.data.libraryBooks = this.data.libraryBooks || [];
-    const newBook = { id: `bk-${Date.now()}`, ...book, createdAt: new Date().toISOString() };
+  public async addLibraryBook(book: { schoolId: string; title: string; author?: string; isbn?: string; quantity: number }): Promise<any> {
+    const rows = await this.queryRows<any>('library_books', { school_id: book.schoolId });
+    const isbn = String(book.isbn || '').trim();
+    if (isbn && rows.some(existing => String(existing.isbn || '').trim().toLowerCase() === isbn.toLowerCase())) {
+      throw new Error('A book with this ISBN already exists in this school.');
+    }
+    const newBook = { id: `bk-${Date.now()}`, ...book, isbn: isbn || null, createdAt: new Date().toISOString() };
     this.data.libraryBooks.push(newBook);
     this.save();
+    await this.flush();
     return newBook;
   }
 
@@ -2906,19 +2911,21 @@ class StorageEngine {
     return this.queryRows<any>('transport_routes', { school_id: schoolId });
   }
 
-  public addTransportRoute(route: any): any {
-    this.data.transportRoutes = this.data.transportRoutes || [];
-    const { routeName, monthlyFee, ...fields } = route;
+  public async addTransportRoute(route: { schoolId: string; name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; active?: boolean }): Promise<any> {
+    await this.queryRows<any>('transport_routes', { school_id: route.schoolId });
+    const { vehicleNumber, ...fields } = route;
     const newRoute = {
       id: `tr-${Date.now()}`, ...fields,
-      name: route.name || routeName,
-      routeNumber: route.routeNumber || route.vehicleNumber,
-      feeAmount: Number(route.feeAmount ?? monthlyFee ?? 0),
+      routeNumber: route.routeNumber || vehicleNumber || null,
+      vehicleNumber: vehicleNumber || null,
+      stops: Array.isArray(route.stops) ? route.stops : [],
+      feeAmount: Number(route.feeAmount),
       active: route.active !== false,
       createdAt: new Date().toISOString()
     };
     this.data.transportRoutes.push(newRoute);
     this.save();
+    await this.flush();
     return newRoute;
   }
 
