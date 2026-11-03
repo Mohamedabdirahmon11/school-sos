@@ -30,25 +30,38 @@ export const ReportsView: React.FC = () => {
     return `"${clean.replace(/"/g, '""')}"`;
   };
 
-  const downloadCSV = (type: string) => {
+  const downloadCSV = async (type: string) => {
     if (!summary) return;
-    let csvContent = '';
-    let filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `schoolos_${type}_${new Date().toISOString().split('T')[0]}.csv`;
 
     if (type === 'finance') {
-      csvContent = 'Receipt Number,Month,Amount Due,Amount Paid,Remaining Arrears,Method,Status,Date\n';
-      if (summary.recentPayments && summary.recentPayments.length > 0) {
-        summary.recentPayments.forEach((p: any) => {
-          csvContent += [p.receiptNumber, p.month, p.amountDue, p.amountPaid, p.remainingAmount, p.paymentMethod, p.status, p.date].map(csvCell).join(',') + '\n';
-        });
-      } else {
-        csvContent += `Summary Total,${school?.academicYear},${summary.totalDue},${summary.totalCollected},${summary.totalArrears},"Aggregate","Computed","${new Date().toISOString()}"\n`;
+      try {
+        const response = await fetch('/api/school/reports/finance/export', { credentials: 'include' });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || 'Financial ledger export failed.');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error: any) {
+        window.alert(error.message || 'Unable to download the financial ledger.');
       }
-    } else if (type === 'census') {
+      return;
+    }
+
+    let csvContent = '';
+    if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += `Enrolled Students,${summary.studentCount},"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Average Attendance Rate,${summary.attendanceRate}%,"${school?.name}","${school?.academicYear}"\n`;
-      csvContent += `Academic Pass Rate,${summary.passRate}%,"${school?.name}","${school?.academicYear}"\n`;
+      csvContent += [csvCell('Enrolled Students'), csvCell(summary.studentCount), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
+      csvContent += [csvCell('Attendance Rate'), csvCell(`${summary.attendanceRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
+      csvContent += [csvCell('Academic Pass Rate'), csvCell(summary.passRate == null ? 'Not calculated' : `${summary.passRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -59,6 +72,7 @@ export const ReportsView: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
