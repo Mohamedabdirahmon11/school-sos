@@ -66,6 +66,14 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const structureResponse = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Science activity', feeType: 'custom', amount: 35, cadence: 'one_time', isActive: true }) });
   assert.equal(structureResponse.status, 201);
   const activityFee = await structureResponse.json() as any;
+  const tamperedStructure = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, {
+    method: 'PUT', headers, body: JSON.stringify({ id: 'forged-id', schoolId: 'another-school', amount: 35 })
+  });
+  assert.equal(tamperedStructure.status, 200);
+  const protectedStructure = await tamperedStructure.json() as any;
+  assert.equal(protectedStructure.id, activityFee.id, 'fee structure ID cannot be overwritten');
+  assert.equal(protectedStructure.schoolId, school.id, 'fee structure tenant cannot be overwritten');
+  assert.equal(protectedStructure.amount, 35);
 
   const partialPayload = { studentId: partialStudent.id, academicYear: '2026-2027', month: 'October 2026', feeType: 'monthly_tuition', amountDue: 1, amountPaid: 30, idempotencyKey: 'fee-test-payment-retry-1' };
   const partial = await postPayment(partialPayload);
