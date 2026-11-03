@@ -146,6 +146,19 @@ test('payroll records enforce one staff payroll per school and month with scoped
   assert.match(migration, /ALTER TABLE payroll_records ENABLE ROW LEVEL SECURITY/);
 });
 
+test('notice audiences and direct-message content are protected at the database layer', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/030_notice_and_message_rls.sql', import.meta.url), 'utf8');
+  for (const policy of ['school_notices_audience_read', 'school_notices_admin_insert', 'school_notices_admin_update', 'school_notices_admin_delete']) {
+    assert.ok(migration.includes(policy), `migration includes ${policy}`);
+    assert.ok(sql.includes(policy), `schema includes ${policy}`);
+  }
+  assert.ok(migration.includes('auth_can_access_class(class_id)'));
+  assert.ok(migration.includes('REVOKE INSERT ON public.direct_messages FROM PUBLIC, anon, authenticated'));
+  assert.ok(migration.includes('REVOKE UPDATE ON public.direct_messages FROM PUBLIC, anon, authenticated'));
+  assert.ok(migration.includes('GRANT UPDATE (is_read) ON public.direct_messages TO authenticated'));
+  assert.ok(migration.includes('DROP POLICY IF EXISTS direct_messages_sender_insert'));
+});
+
 test('communication credentials and recipient queue are restricted to school administrators', () => {
   const migration = readFileSync(new URL('../supabase/migrations/029_harden_communication_security.sql', import.meta.url), 'utf8');
   for (const policy of ['communication_settings_admin_access', 'communication_queue_admin_access']) {
