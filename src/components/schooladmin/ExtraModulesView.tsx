@@ -16,11 +16,9 @@ import {
   Wallet, 
   Boxes, 
   Plus, 
-  Printer, 
   CheckCircle2, 
   DollarSign, 
   FileText,
-  X
 } from 'lucide-react';
 
 interface ExtraModulesViewProps {
@@ -75,9 +73,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [healthPrivateNotes, setHealthPrivateNotes] = useState('');
   const [healthBusy, setHealthBusy] = useState(false);
 
-  // Payroll State
-  const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
-  const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null);
 
   // Inventory State
   const [inventory, setInventory] = useState<any[]>([]);
@@ -655,50 +650,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
       {/* 5. PAYROLL MODULE & PAYSLIP PDF */}
       {activeModule === 'payroll' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-[#0F766E]" />
-              <span>Staff Monthly Payroll & Payslips</span>
-            </h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Faculty Member</th>
-                  <th className="px-4 py-2.5">Pay Month</th>
-                  <th className="px-4 py-2.5">Base Salary</th>
-                  <th className="px-4 py-2.5">Allowances</th>
-                  <th className="px-4 py-2.5">Net Salary</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5 text-right">Payslip</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {payrollLogs.map(p => (
-                  <tr key={p.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{p.teacherName}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{p.month}</td>
-                    <td className="px-4 py-2.5 font-mono">${p.baseSalary}</td>
-                    <td className="px-4 py-2.5 font-mono text-emerald-700">+${p.allowances}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-[#132A29]">${p.netSalary}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-bold uppercase">{p.paymentStatus}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => setSelectedPayslip(p)}
-                        className="px-2.5 py-1 text-xs font-medium text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] rounded border border-[#CCFBF1] transition-colors flex items-center gap-1 ml-auto"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Print Payslip</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
+          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-[#0F766E]" />
+            <span>Staff Monthly Payroll</span>
+          </h2>
+          <p className="text-sm text-[#475569]">Payroll creation, approval and payment are restricted to the Accountant role. Open the Accountant dashboard to manage payroll records and issue staff payslips.</p>
         </div>
       )}
 
@@ -787,57 +744,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* OFFICIAL PAYSLIP MODAL */}
-      {selectedPayslip && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0] text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4 no-print">
-              <h2 className="text-base font-bold text-[#132A29]">Official Staff Payslip</h2>
-              <button onClick={() => setSelectedPayslip(null)} className="text-[#64748B] hover:text-[#132A29]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 bg-white border border-[#CBD5E1] rounded space-y-3 font-mono">
-              <div className="text-center pb-2 border-b border-[#E2E8F0]">
-                <h3 className="font-bold text-sm text-[#132A29]">{school?.name}</h3>
-                <p className="text-[10px] text-[#64748B]">Staff Salary Disbursal Slip · {selectedPayslip.month}</p>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Employee:</span>
-                  <span className="font-bold">{selectedPayslip.teacherName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Base Monthly Salary:</span>
-                  <span>${selectedPayslip.baseSalary}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Teaching Allowances:</span>
-                  <span className="text-emerald-700">+${selectedPayslip.allowances}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-[#E2E8F0] font-bold text-sm">
-                  <span>Net Salary Disbursed:</span>
-                  <span>${selectedPayslip.netSalary}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-between items-center no-print">
-              <span className="text-[10px] text-[#64748B]">Finance Office Approved</span>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded font-medium flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Payslip</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
