@@ -1663,8 +1663,8 @@ DROP POLICY IF EXISTS admission_applications_tenant ON public.admission_applicat
 DROP POLICY IF EXISTS tenant_scope_v2 ON public.admission_applications;
 CREATE POLICY tenant_scope_v2 ON public.admission_applications
   FOR ALL TO authenticated
-  USING (public.auth_user_role() = 'super_admin' OR school_id::text = public.auth_school_id()::text)
-  WITH CHECK (public.auth_user_role() = 'super_admin' OR school_id::text = public.auth_school_id()::text);
+  USING (public.auth_user_role() = 'super_admin' OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text))
+  WITH CHECK (public.auth_user_role() = 'super_admin' OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text));
 
 DROP POLICY IF EXISTS assignment_submissions_super_admin ON public.assignment_submissions;
 DROP POLICY IF EXISTS assignment_submissions_tenant_access ON public.assignment_submissions;
