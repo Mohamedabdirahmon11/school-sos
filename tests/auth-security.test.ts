@@ -14,3 +14,15 @@ test('session expiry fails closed for malformed or missing database timestamps',
     assert.equal(isSessionExpiryValid(value, now), false, `rejected ${String(value)}`);
   }
 });
+
+test('Super Admin routes require an authenticated Super Admin', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const routePattern = /apiRouter\\.(get|post|put|patch|delete)\\(\\s*'([^']+)'([\\s\\S]{0,260}?)=>/gi;
+  const routes = [...apiSource.matchAll(routePattern)];
+  const superAdminRoutes = routes.filter(match => match[2].startsWith('/superadmin/'));
+  assert.ok(superAdminRoutes.length > 0, 'Super Admin route list is discoverable');
+  for (const route of superAdminRoutes) {
+    assert.match(route[3], /requireAuth/, `${route[1].toUpperCase()} ${route[2]} requires authentication`);
+    assert.match(route[3], /requireSuperAdmin/, `${route[1].toUpperCase()} ${route[2]} requires Super Admin role`);
+  }
+});
