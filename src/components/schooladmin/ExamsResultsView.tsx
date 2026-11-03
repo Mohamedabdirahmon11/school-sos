@@ -58,8 +58,8 @@ export const ExamsResultsView: React.FC = () => {
     if (!school) return;
     setIsLoading(true);
     Promise.all([
-      ApiClient.getClasses(),
-      ApiClient.getSubjects(),
+      ApiClient.getAllClasses(),
+      ApiClient.getAllSubjects(),
       ApiClient.getExamConfig()
     ]).then(([cls, subs, conf]) => {
       setClasses(cls);
