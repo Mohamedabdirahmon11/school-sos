@@ -2528,7 +2528,14 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
 
 apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
-  void sendDatabasePage(req, res, 'teachers', { school_id: school.id });
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
+    : '';
+  const searchFilter = search
+    ? ['full_name', 'staff_id', 'phone', 'department', 'qualification', 'status']
+      .map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  void sendDatabasePage(req, res, 'teachers', { school_id: school.id }, searchFilter);
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
