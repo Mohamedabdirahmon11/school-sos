@@ -292,6 +292,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 ) : (
                   students.map(s => {
                     const isSelected = selectedStudent?.id === s.id;
+                    // Older/imported rows may omit this derived field; never let one row crash the screen.
+                    const feeStatus = typeof s.feeStatus === 'string' ? s.feeStatus.trim() : '';
+                    const normalizedFeeStatus = feeStatus.toLowerCase();
                     return (
                       <tr
                         key={s.id}
@@ -309,11 +312,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-4 py-3 font-mono text-[#64748B]">{s.fatherPhone}</td>
                         <td className="px-4 py-3">
                           <span className={`text-[11px] font-semibold ${
-                            s.feeStatus === 'paid' ? 'text-emerald-700' :
-                            s.feeStatus === 'partial' ? 'text-amber-700' :
-                            'text-rose-700'
+                            normalizedFeeStatus === 'paid' ? 'text-emerald-700' :
+                            normalizedFeeStatus === 'partial' ? 'text-amber-700' :
+                            normalizedFeeStatus === 'unpaid' ? 'text-rose-700' :
+                            'text-slate-500'
                           }`}>
-                            {s.feeStatus.toUpperCase()}
+                            {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
