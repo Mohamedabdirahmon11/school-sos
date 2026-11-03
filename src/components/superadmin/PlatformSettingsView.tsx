@@ -41,7 +41,7 @@ export const PlatformSettingsView: React.FC = () => {
     try {
       const updated = await ApiClient.updateSettings(settings);
       setSettings(updated);
-      setNotice('Platform configuration saved. If 2FA was enabled, sign out and sign in again to complete enrollment.');
+      setNotice('Platform configuration saved and live across all tenants.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       alert(err.message);
@@ -280,7 +280,7 @@ export const PlatformSettingsView: React.FC = () => {
           <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]">
             <div>
               <p className="font-semibold text-[#132A29]">Enable 2FA feature</p>
-              <p className="text-[11px] text-[#64748B]">When enabled, Super Admins must enroll an authenticator and enter its code at every sign-in.</p>
+              <p className="text-[11px] text-[#64748B]">Off by default. When enabled, the retained Super Admin TOTP setup and verification endpoints are available.</p>
             </div>
             <input
               type="checkbox"
