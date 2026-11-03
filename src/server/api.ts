@@ -3293,7 +3293,7 @@ apiRouter.get('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, re
 apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
-  if (typeof body.name !== 'string' || !body.name.trim() || !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(body.feeType) || !Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0 || !['monthly', 'annual', 'one_time'].includes(body.cadence)) {
+  if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120 || !['monthly_tuition, 'annual_registration', 'bus', 'custom'].includes(body.feeType) || !Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0 || Number(body.amount) > 9999999999.99 || !['monthly', 'annual', 'one_time'].includes(body.cadence)) {
     res.status(400).json({ error: 'Enter a fee name, supported category, positive amount, and valid billing cadence.' }); return;
   }
   const hasGradeRange = body.minGrade !== undefined || body.maxGrade !== undefined;
@@ -3327,9 +3327,9 @@ apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin
     .filter(key => Object.prototype.hasOwnProperty.call(body, key))
     .map(key => [key, body[key]]));
   const next = { ...existing, ...updates };
-  if (typeof next.name !== 'string' || !next.name.trim() ||
-      !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(next.feeType) ||
-      !Number.isFinite(Number(next.amount)) || Number(next.amount) <= 0 ||
+  if (typeof next.name !== 'string' || !next.name.trim() || next.name.trim().length > 120 ||
+      !['monthly_tuition, 'annual_registration', 'bus', 'custom'].includes(next.feeType) ||
+      !Number.isFinite(Number(next.amount)) || Number(next.amount) <= 0 || Number(next.amount) > 9999999999.99 ||
       !['monthly', 'annual', 'one_time'].includes(next.cadence) ||
       (next.isActive !== undefined && typeof next.isActive !== 'boolean')) {
     res.status(400).json({ error: 'Fee name, category, positive amount, billing cadence, or active status is invalid.' }); return;
@@ -3388,6 +3388,7 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireAccountantO
   const payment = await db.voidFeePayment(req.params.paymentId, school.id, user.id, reason);
   if (!payment) { res.status(409).json({ error: 'Payment was not found or has already been voided.' }); return; }
   db.logAudit({ action: 'FEE_PAYMENT_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided receipt ${payment.receiptNumber}. Reason: ${reason}`, severity: 'warning' });
+  await db.flush();
   res.json(payment);
 });
 
@@ -3401,7 +3402,7 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
   const due = Number(amountDue);
   const paid = Number(amountPaid);
   if (typeof studentId !== 'string' || !studentId.trim() ||
-      !Number.isFinite(due) || due <= 0 || amountPaid === undefined || !Number.isFinite(paid) || paid < 0 ||
+      !Number.isFinite(due) || due <= 0 || due > 9999999999.99 || amountPaid === undefined || !Number.isFinite(paid) || paid < 0 || paid > 9999999999.99 ||
       !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(resolvedFeeType) ||
       (academicYear !== undefined && (typeof academicYear !== 'string' || !academicYear.trim() || academicYear.length > 20)) ||
       (month !== undefined && (typeof month !== 'string' || !month.trim() || month.length > 40)) ||
@@ -3433,7 +3434,10 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
 
 apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+  const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00.000Z`)) || new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) !== date) {
+    res.status(400).json({ error: 'Income report date must be a real YYYY-MM-DD date.' }); return;
+  }
   res.json(await db.getDailyIncomeReport(school.id, date));
 });
 
@@ -3445,10 +3449,12 @@ const payrollAmounts = (items: unknown): { lines: Array<{ label: string; amount:
   for (const item of items) {
     const label = typeof (item as any)?.label === 'string' ? (item as any).label.trim() : '';
     const amount = Number((item as any)?.amount);
-    if (!label || label.length > 100 || !Number.isFinite(amount) || amount < 0) return null;
+    if (!label || label.length > 100 || !Number.isFinite(amount) || amount < 0 || amount > 9999999999.99) return null;
     lines.push({ label, amount });
   }
-  return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0) };
+  const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  if (!Number.isFinite(total) || total > 9999999999.99) return null;
+  return { lines, total };
 };
 
 apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3489,7 +3495,7 @@ apiRouter.post('/payroll', requireAuth, requireAccountantOrSuperAdmin, requireSc
     if (seen.has(employee.userId) || existing.some(record => record.userId === employee.userId)) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
     seen.add(employee.userId);
     const allowances = payrollAmounts(selection.allowances); const deductions = payrollAmounts(selection.deductions);
-    if (!allowances || !deductions || !Number.isFinite(employee.salary) || employee.salary < 0 || deductions.total > employee.salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
+    if (!allowances || !deductions || !Number.isFinite(employee.salary) || employee.salary < 0 || employee.salary > 9999999999.99 || !Number.isFinite(employee.salary + allowances.total - deductions.total) || employee.salary + allowances.total - deductions.total > 9999999999.99 || deductions.total > employee.salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
     prepared.push({ schoolId: school.id, userId: employee.userId, staffId: employee.id, staffName: employee.name, payrollMonth: month, baseSalary: employee.salary,
       allowances: allowances.lines, allowanceTotal: allowances.total, deductions: deductions.lines, deductionTotal: deductions.total,
       netSalary: employee.salary + allowances.total - deductions.total, status: 'draft', createdBy: user.id });
