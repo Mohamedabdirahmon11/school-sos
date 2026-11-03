@@ -38,6 +38,13 @@ export const TeachersView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
 
+  const filteredTeachers = teachers.filter(teacher => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification]
+      .some(value => String(value || '').toLowerCase().includes(query));
+  });
+
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
@@ -103,9 +110,20 @@ export const TeachersView: React.FC = () => {
       )}
       {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Give these sign-in details to the teacher. They are shown only now: <strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong></div>}
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative block w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+          <input type="search" value={search} onChange={event => setSearch(event.target.value)}
+            placeholder="Search this page by teacher name, ID, phone or department"
+            aria-label="Search teachers on this page"
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
+        </label>
+        <span className="text-xs text-[#64748B]">{filteredTeachers.length} of {teachers.length} teachers on this page</span>
+      </div>
+
       {/* Teachers Directory Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {teachers.map(t => (
+        {filteredTeachers.map(t => (
           <div key={t.id} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
             <div className="flex items-start justify-between">
               <div>
@@ -123,7 +141,7 @@ export const TeachersView: React.FC = () => {
               <p className="text-[11px] font-mono text-[#0F766E]">Teacher ID: {t.staffId || t.id}</p>
               <p className="flex items-center gap-2 font-mono">
                 <Phone className="w-3.5 h-3.5 text-[#64748B]" />
-                <span>{t.phone}</span>
+                <span>{t.phone || 'Phone not provided'}</span>
               </p>
               <p className="text-[11px] text-[#64748B] pt-1">
                 Base Salary: <strong className="font-mono text-[#132A29]">${t.monthlySalary} / month</strong>
@@ -131,6 +149,11 @@ export const TeachersView: React.FC = () => {
             </div>
           </div>
         ))}
+        {filteredTeachers.length === 0 && (
+          <div className="col-span-full rounded-xl border border-dashed border-[#CBD5E1] bg-white p-8 text-center text-sm text-[#64748B]">
+            {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
+          </div>
+        )}
       </div>
       <PaginationControls info={pageInfo} onPage={setPage} />
 
