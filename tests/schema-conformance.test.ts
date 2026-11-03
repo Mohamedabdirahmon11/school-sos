@@ -28,7 +28,8 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['direct_messages', { id: 'm1', schoolId: 's1', senderId: 'u1', senderName: 'Teacher', senderRole: 'teacher', recipientId: 'u2', recipientName: 'Parent', recipientRole: 'parent', content: 'Hello', timestamp: '2026-09-01T00:00:00Z', isRead: false }],
   ['fee_payments', { id: 'p1', schoolId: 's1', studentId: 'st1', receiptNumber: 'R-1', academicYear: '2026', month: 'September', feeType: 'custom', feeStructureId: 'fs1', idempotencyKey: 'key-1', amountDue: 10, amountPaid: 10, remainingAmount: 0, paymentMethod: 'Cash', status: 'paid', date: '2026-09-01', recordedBy: 'u1' }],
   ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }],
-  ['inventory_items', { id: 'inv1', schoolId: 's1', assetTag: 'ASSET-001', itemName: 'Laptop', quantity: 2, roomLocation: 'Lab 1', condition: 'good', value: 25000, createdAt: '2026-11-03T00:00:00Z', updatedAt: '2026-11-03T00:00:00Z' }]
+  ['inventory_items', { id: 'inv1', schoolId: 's1', assetTag: 'ASSET-001', itemName: 'Laptop', quantity: 2, roomLocation: 'Lab 1', condition: 'good', value: 25000, createdAt: '2026-11-03T00:00:00Z', updatedAt: '2026-11-03T00:00:00Z' }],
+  ['discipline_records', { id: 'dis1', schoolId: 's1', studentId: 'st1', incidentDate: '2026-11-03', infractionType: 'Disruption', description: 'Classroom disruption', severity: 'minor', actionTaken: 'Counselling', reportedBy: 'u1', parentNotified: false }]
 ];
 
 test('inventory migration enforces school scope, unique asset tags and bounded asset values', () => {
@@ -44,6 +45,20 @@ test('inventory migration enforces school scope, unique asset tags and bounded a
   assert.ok(apiSource.includes("apiRouter.get('/school/inventory'"), 'inventory read endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.post('/school/inventory'"), 'inventory create endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.delete('/school/inventory/:itemId'"), 'inventory delete endpoint is registered');
+});
+
+test('discipline migration validates school-owned student records and admin-only access', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/026_discipline_records.sql', import.meta.url), 'utf8');
+  const columns = definitions.get('discipline_records');
+  assert.ok(columns?.has('student_id') && columns.has('incident_date') && columns.has('severity') && columns.has('reported_by'));
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.discipline_records/);
+  assert.match(migration, /student_id VARCHAR\(64\) NOT NULL REFERENCES public\.students\(id\)/);
+  assert.match(migration, /severity IN \('minor','moderate','severe'\)/);
+  assert.match(migration, /auth_user_role\(\) = 'school_admin'/);
+  assert.match(migration, /ALTER TABLE public\.discipline_records ENABLE ROW LEVEL SECURITY/);
+  assert.ok(apiSource.includes("apiRouter.get('/school/discipline'"), 'discipline read endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.post('/school/discipline'"), 'discipline create endpoint is registered');
+  assert.ok(apiSource.includes("apiRouter.delete('/school/discipline/:recordId'"), 'discipline delete endpoint is registered');
 });
 
 test('domain write payloads map to real schema columns and satisfy required columns', () => {
