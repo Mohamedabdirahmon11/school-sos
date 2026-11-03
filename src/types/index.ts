@@ -183,7 +183,7 @@ export interface Teacher {
   userId: string;
   staffId?: string;
   fullName: string;
-  email: string;
+  email?: string;
   phone: string;
   gender: 'male' | 'female';
   qualification: string;
