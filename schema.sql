@@ -614,6 +614,9 @@ CREATE TABLE IF NOT EXISTS public.fee_receipt_sequences (
 );
 
 ALTER TABLE public.fee_receipt_sequences ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS fee_receipt_sequences_deny_client ON public.fee_receipt_sequences;
+CREATE POLICY fee_receipt_sequences_deny_client ON public.fee_receipt_sequences
+  FOR ALL TO authenticated USING (false) WITH CHECK (false);
 REVOKE ALL ON TABLE public.fee_receipt_sequences FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.fee_receipt_sequences TO service_role;
 
