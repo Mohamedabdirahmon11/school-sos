@@ -34,7 +34,7 @@ export const AdmissionsView: React.FC = () => {
     try {
       const [rows, classRows] = await Promise.all([
         ApiClient.request<AdmissionApplication[]>('/school/admissions'),
-        ApiClient.getClasses()
+        ApiClient.getAllClasses()
       ]);
       setApplications(rows);
       setClasses(classRows);
