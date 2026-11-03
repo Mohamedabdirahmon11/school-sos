@@ -131,7 +131,7 @@ class MemoryQuery implements PromiseLike<any> {
 }
 
 export class InMemorySupabase {
-  readonly supportsSeparateAuthQueries = true;
+  supportsSeparateAuthQueries = true;
   private tables = new Map<string, any[]>();
 
   rows(table: string): any[] {
