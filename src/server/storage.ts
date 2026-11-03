@@ -2911,20 +2911,33 @@ class StorageEngine {
   }
 
   public async createTicket(ticketData: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt' | 'messages'>, initialMessage: string): Promise<SupportTicket> {
-    const ticketCount = await this.queryPage('support_tickets', { school_id: ticketData.schoolId }, 1, 1);
+    const roles = ['super_admin', 'school_admin', 'accountant', 'teacher', 'parent', 'student'];
+    if (!ticketData || typeof ticketData !== 'object' ||
+        (ticketData.schoolId !== undefined && (typeof ticketData.schoolId !== 'string' || !ticketData.schoolId.trim() || ticketData.schoolId.length > 64)) ||
+        typeof ticketData.createdByUserId !== 'string' || !ticketData.createdByUserId.trim() || ticketData.createdByUserId.length > 64 ||
+        typeof ticketData.createdByName !== 'string' || !ticketData.createdByName.trim() || ticketData.createdByName.trim().length > 255 ||
+        !roles.includes(ticketData.createdByRole) ||
+        typeof ticketData.subject !== 'string' || !ticketData.subject.trim() || ticketData.subject.trim().length > 255 ||
+        typeof ticketData.description !== 'string' || !ticketData.description.trim() || ticketData.description.trim().length > 10000 ||
+        !['low', 'medium', 'high', 'urgent'].includes(ticketData.priority) ||
+        typeof initialMessage !== 'string' || !initialMessage.trim() || initialMessage.trim().length > 10000 ||
+        (ticketData.schoolName !== undefined && (typeof ticketData.schoolName !== 'string' || ticketData.schoolName.length > 255))) {
+      throw new Error('Support ticket details are invalid.');
+    }
     const now = new Date().toISOString();
-    const count = ticketCount.total + 1001;
     const ticket: SupportTicket = {
       ...ticketData,
-      id: `tik-${Date.now()}`,
-      ticketNumber: `TIK-${count}`,
+      subject: ticketData.subject.trim(),
+      description: ticketData.description.trim(),
+      id: `tik-${randomUUID()}`,
+      ticketNumber: `TIK-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
       status: 'open',
       messages: [{
-        id: `msg-${Date.now()}`,
+        id: `msg-${randomUUID()}`,
         senderId: ticketData.createdByUserId,
         senderName: ticketData.createdByName,
         senderRole: ticketData.createdByRole,
-        content: initialMessage,
+        content: initialMessage.trim(),
         timestamp: now
       }],
       createdAt: now,
@@ -2936,19 +2949,33 @@ class StorageEngine {
   }
 
   public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string, allowedCreatorUserId?: string): Promise<SupportTicket | null> {
-    await this.queryRows<SupportTicket>('support_tickets', { id: ticketId, school_id: schoolId });
-    const ticket = this.data.tickets.find(t => t.id === ticketId && (!schoolId || t.schoolId === schoolId) && (!allowedCreatorUserId || t.createdByUserId === allowedCreatorUserId));
+    if (typeof ticketId !== 'string' || !ticketId.trim() || ticketId.length > 64 ||
+        (schoolId !== undefined && (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64)) ||
+        (allowedCreatorUserId !== undefined && (typeof allowedCreatorUserId !== 'string' || !allowedCreatorUserId.trim() || allowedCreatorUserId.length > 64)) ||
+        !reply || typeof reply !== 'object' ||
+        typeof reply.senderId !== 'string' || !reply.senderId.trim() || reply.senderId.length > 64 ||
+        typeof reply.senderName !== 'string' || !reply.senderName.trim() || reply.senderName.trim().length > 255 ||
+        !['super_admin', 'school_admin', 'accountant', 'teacher', 'parent', 'student'].includes(reply.senderRole) ||
+        typeof reply.content !== 'string' || !reply.content.trim() || reply.content.trim().length > 5000) {
+      throw new Error('Support reply details are invalid.');
+    }
+    await this.queryRows<SupportTicket>('support_tickets', { id: ticketId.trim(), school_id: schoolId });
+    const ticket = this.data.tickets.find(t => t.id === ticketId.trim() && (!schoolId || t.schoolId === schoolId) && (!allowedCreatorUserId || t.createdByUserId === allowedCreatorUserId));
     if (!ticket) return null;
+    if (!Array.isArray(ticket.messages)) ticket.messages = [];
+    if (ticket.messages.length >= 500) throw new Error('This support ticket has reached its reply limit.');
     const now = new Date().toISOString();
     ticket.messages.push({
-      id: `msg-${Date.now()}`,
-      ...reply,
+      id: `msg-${randomUUID()}`,
+      senderId: reply.senderId.trim(),
+      senderName: reply.senderName.trim(),
+      senderRole: reply.senderRole,
+      content: reply.content.trim(),
       timestamp: now
     });
     ticket.updatedAt = now;
-    if (reply.senderRole === 'super_admin') {
-      ticket.status = 'in_progress';
-    }
+    if (reply.senderRole === 'super_admin') ticket.status = 'in_progress';
+    else if (ticket.status === 'resolved' || ticket.status === 'closed') ticket.status = 'open';
     this.save();
     return ticket;
   }
