@@ -2074,3 +2074,22 @@ ALTER TABLE public.health_records ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.health_records FROM anon;
 
 NOTIFY pgrst, 'reload schema';
+
+-- Communication credentials and recipient data are restricted to school admins.
+DROP POLICY IF EXISTS communication_settings_admin_access ON public.communication_settings;
+CREATE POLICY communication_settings_admin_access ON public.communication_settings AS RESTRICTIVE FOR ALL TO authenticated
+  USING (public.auth_user_role() = 'super_admin'
+    OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text))
+  WITH CHECK (public.auth_user_role() = 'super_admin'
+    OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text));
+
+DROP POLICY IF EXISTS communication_queue_admin_access ON public.communication_queue;
+CREATE POLICY communication_queue_admin_access ON public.communication_queue AS RESTRICTIVE FOR ALL TO authenticated
+  USING (public.auth_user_role() = 'super_admin'
+    OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text))
+  WITH CHECK (public.auth_user_role() = 'super_admin'
+    OR (public.auth_user_role() = 'school_admin' AND school_id::text = public.auth_school_id()::text));
+REVOKE ALL ON public.communication_settings FROM anon;
+REVOKE ALL ON public.communication_queue FROM anon;
+
+NOTIFY pgrst, 'reload schema';
