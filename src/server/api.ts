@@ -2418,6 +2418,18 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
+apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  const studentId = String(req.params.id || '');
+  if (!studentId || !await canAccessStudentRecord(user, studentId)) {
+    res.status(403).json({ error: 'You do not have access to this student record.' });
+    return;
+  }
+  const student = await db.getStudentById(studentId, (req as any).school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+  res.json(sanitizeStudent(student));
+});
+
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const { firstName, middleName, lastName, gender, classId } = req.body || {};
