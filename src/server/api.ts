@@ -3923,7 +3923,7 @@ apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireS
     });
     const student = await db.getStudentById(studentId, school.id);
     db.logAudit({
-      action: 'DISCIPLINE_RECORD_CREATED', category: 'student', schoolId: school.id, schoolName: school.name,
+      action: 'DISCIPLINE_RECORD_CREATED', category: 'academics', schoolId: school.id, schoolName: school.name,
       userId: user.id, userName: user.fullName, userRole: user.role,
       details: `Created discipline record ${record.id} for a student in this school.`, severity: 'warning'
     });
@@ -3945,7 +3945,7 @@ apiRouter.delete('/school/discipline/:recordId', requireAuth, requireSchoolConte
   if (success) {
     const user = (req as any).user as User;
     db.logAudit({
-      action: 'DISCIPLINE_RECORD_DELETED', category: 'student', schoolId: school.id, schoolName: school.name,
+      action: 'DISCIPLINE_RECORD_DELETED', category: 'academics', schoolId: school.id, schoolName: school.name,
       userId: user.id, userName: user.fullName, userRole: user.role,
       details: `Deleted discipline record ${recordId}.`, severity: 'warning'
     });
