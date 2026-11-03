@@ -20,7 +20,7 @@
     "test:report-cards": "tsx --test tests/report-cards.test.ts",
     "test:admissions": "tsx --test tests/admissions-http.test.ts",
     "test:import": "tsx --test tests/import-http.test.ts",
-    "test:storage": "tsx --test tests/storage-supabase.test.ts tests/no-json-runtime.test.ts",
+    "test:storage": "tsx --test tests/storage-performance.test.ts tests/no-json-runtime.test.ts",
     "test:schema": "tsx tests/schema-idempotency.test.ts",
     "audit:routes": "tsx scripts/check-route-parity.ts",
     "audit:rls": "tsx scripts/check-rls-source.ts",
