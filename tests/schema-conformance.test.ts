@@ -39,6 +39,7 @@ test('inventory migration enforces school scope, unique asset tags and bounded a
   assert.match(migration, /UNIQUE INDEX IF NOT EXISTS uq_inventory_items_school_asset_tag/);
   assert.match(migration, /quantity BETWEEN 0 AND 1000000/);
   assert.match(migration, /inventory_items_tenant_scope/);
+  assert.match(migration, /auth_user_role\(\) = 'school_admin'/);
   assert.match(migration, /ALTER TABLE public\.inventory_items ENABLE ROW LEVEL SECURITY/);
   assert.ok(apiSource.includes("apiRouter.get('/school/inventory'"), 'inventory read endpoint is registered');
   assert.ok(apiSource.includes("apiRouter.post('/school/inventory'"), 'inventory create endpoint is registered');
