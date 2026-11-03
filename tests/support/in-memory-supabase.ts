@@ -162,6 +162,25 @@ export class InMemorySupabase {
   failNextBulkImport() { this.failBulkImport = true; }
 
   async rpc(name: string, args?: any) {
+    if (name === 'schoolos_next_fee_receipt') {
+      const schoolId = String(args?.p_school_id || '');
+      const academicYear = String(args?.p_academic_year || '');
+      if (!schoolId || !academicYear) return { data: null, error: { message: 'School and academic year are required.' } };
+      const sequenceRows = this.rows('fee_receipt_sequences');
+      const sequenceId = `${schoolId}:${academicYear}`;
+      const existing = sequenceRows.find(row => row.id === sequenceId);
+      const maxReceipt = this.rows('fee_payments')
+        .filter(row => (row.schoolId ?? row.school_id) === schoolId && (row.academicYear ?? row.academic_year) === academicYear)
+        .reduce((max, row) => {
+          const receipt = String(row.receiptNumber ?? row.receipt_number ?? '');
+          const suffix = receipt.match(/(\\d+)$/)?.[1];
+          return suffix ? Math.max(max, Number(suffix) || 0) : max;
+        }, 0);
+      const nextValue = Math.max(Number(existing?.nextValue || 0) + 1, maxReceipt + 1);
+      if (existing) existing.nextValue = nextValue;
+      else sequenceRows.push({ id: sequenceId, schoolId, academicYear, nextValue });
+      return { data: nextValue, error: null };
+    }
     if (name !== 'schoolos_bulk_import') return { data: null, error: null };
     if (this.failBulkImport) {
       this.failBulkImport = false;
