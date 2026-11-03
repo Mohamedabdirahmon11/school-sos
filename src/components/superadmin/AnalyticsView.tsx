@@ -8,41 +8,21 @@ import { ApiClient } from '../../services/api.ts';
 import { BarChart3, Download, TrendingUp, Users, DollarSign, CalendarCheck, FileText } from 'lucide-react';
 
 export const AnalyticsView: React.FC = () => {
-  const [schools, setSchools] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const schools = analytics?.schools || [];
+  const totalStudents = Number(analytics?.totalStudents) || 0;
+  const totalTeachers = Number(analytics?.totalTeachers) || 0;
+  const activeUsers = Number(analytics?.activeUsers30Days) || 0;
+  const totalInvoiced = Number(analytics?.totalPaidBillings) || 0;
+  const activeSchools = Number(analytics?.activeSchools) || 0;
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [sList, iList, uList] = await Promise.all([
-          ApiClient.getSchools(),
-          ApiClient.getInvoices(),
-          ApiClient.getGlobalUsers()
-        ]);
-        setSchools(sList);
-        setInvoices(iList);
-        setUsers(uList);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
+    ApiClient.getPlatformAnalytics()
+      .then(setAnalytics)
+      .catch(error => console.error(error))
+      .finally(() => setIsLoading(false));
   }, []);
-
-  const totalStudents = schools.reduce((sum, school) => sum + (Number(school.studentCount) || 0), 0);
-  const totalTeachers = schools.reduce((sum, school) => sum + (Number(school.teacherCount) || 0), 0);
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const activeUsers = users.filter(user => {
-    const lastLogin = Date.parse(user.lastLoginAt || '');
-    return Number.isFinite(lastLogin) && lastLogin >= cutoff;
-  }).length;
-  const paidInvoices = invoices.filter(invoice => invoice.status === 'paid');
-  const totalInvoiced = paidInvoices.reduce((sum, invoice) => sum + (Number(invoice.amount) || 0), 0);
-  const activeSchools = schools.filter(school => school.subscription?.status === 'active').length;
 
   // Export Analytics CSV
   const handleExportCSV = () => {
