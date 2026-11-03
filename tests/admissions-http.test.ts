@@ -268,7 +268,7 @@ test('student profile updates validate phones and keep parent/student login link
   const updatedResponse = await fetch(`${baseUrl}/students/${first.id}`, {
     method: 'PUT', headers,
     body: JSON.stringify({
-      id: 'forged-student-id', schoolId: 'other-school',
+      id: 'forged-student-id', schoolId: school.id,
       fatherPhone: '+15550007306', motherPhone: '+15550007307',
       studentPhone: '+15550007308'
     })
