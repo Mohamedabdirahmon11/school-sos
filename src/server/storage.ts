@@ -1499,7 +1499,7 @@ class StorageEngine {
 
     const updated: Student = { ...this.data.students[idx], ...updates, id, schoolId: tenantId };
     this.data.students[idx] = updated;
-    const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/[\\s()-]/g, '') : '';
+    const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : '';
     const newParentPhones = new Set([updated.fatherPhone, updated.motherPhone].map(normalizePhone).filter(Boolean));
     const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
 
