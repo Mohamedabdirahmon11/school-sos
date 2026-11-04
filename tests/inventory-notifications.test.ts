@@ -69,6 +69,8 @@ test('broadcast feeds are tenant- and audience-scoped; scheduled broadcasts are 
   assert.match(storage, /item\.audience === 'teachers'/);
   assert.match(storage, /publishDueBroadcasts/);
   assert.match(api, /apiRouter\.get\('\/broadcasts'/);
+  assert.match(api, /timeZone: school\.timezone \|\| 'Africa\/Addis_Ababa'/);
+  assert.match(api, /const date = typeof req\.query\.date === 'string' \? req\.query\.date : schoolLocalDate/);
   assert.match(api, /apiRouter\.post\('\/superadmin\/broadcasts\/:id\/send'/);
   assert.match(worker, /publishDueBroadcasts\(\)/);
 });
