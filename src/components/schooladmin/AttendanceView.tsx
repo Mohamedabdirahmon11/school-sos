@@ -24,23 +24,16 @@ import {
 } from 'lucide-react';
 
 const schoolLocalDate = (timeZone?: string) => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timeZone || 'Africa/Addis_Ababa',
-    year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-};
-
-const normalizeWhatsAppNumber = (phone?: string) => {
-  if (!phone) return null;
-  const raw = phone.trim();
-  // wa.me requires the full international number without "+" or punctuation.
-  if (!raw.startsWith('+') && !raw.startsWith('00')) return null;
-  const digits = raw.startsWith('00')
-    ? raw.slice(2).replace(/\D/g, '')
-    : raw.slice(1).replace(/\D/g, '');
-  return digits.length >= 8 && digits.length <= 15 ? digits : null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
 };
 
 export const AttendanceView: React.FC = () => {
