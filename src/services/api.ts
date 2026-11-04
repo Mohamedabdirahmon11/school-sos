@@ -651,14 +651,14 @@ export class ApiClient {
   }
 
   public static async getLibraryBooks(schoolId?: string) {
-    return this.request<any[]>('/school/library').catch(() => []);
+    return this.request<any[]>('/school/library');
   }
 
   public static async addLibraryBook(data: any, schoolId?: string) {
     return this.request<any>('/school/library', {
       method: 'POST',
       body: JSON.stringify(data)
-    }).catch(() => data);
+    });
   }
 
   public static async getTransportRoutes(schoolId?: string) {
