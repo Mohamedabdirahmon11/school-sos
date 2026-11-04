@@ -245,3 +245,25 @@ test('fee payment voiding is atomic, school-scoped, and service-role only', () =
     assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
   }
 });
+
+
+test('fee installments are updated atomically and idempotently under a row lock', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/051_atomic_fee_installments.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'schoolos_apply_fee_installment(',
+    'RETURNS public.fee_payments',
+    'SECURITY DEFINER',
+    "SET search_path = ''",
+    'WHERE id = p_payment_id AND school_id = p_school_id',
+    'FOR UPDATE',
+    'payment_row.idempotency_keys',
+    'next_paid := payment_row.amount_paid + p_amount_paid',
+    'next_paid > payment_row.amount_due',
+    'idempotency_keys = CASE',
+    'REVOKE ALL ON FUNCTION public.schoolos_apply_fee_installment',
+    'GRANT EXECUTE ON FUNCTION public.schoolos_apply_fee_installment(VARCHAR, VARCHAR, NUMERIC, VARCHAR, TEXT, VARCHAR) TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `fee installment migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
