@@ -3846,6 +3846,7 @@ apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperA
     field, body[field] === undefined ? current[field] : body[field].trim()
   ])) as Record<typeof optionalCredentials[number], string | undefined>;
   const willBeActive = body.isActive === undefined ? current.isActive : body.isActive;
+  if (willBeActive && provider === 'none') { res.status(400).json({ error: 'Select and configure an active notification provider first.' }); return; }
   if (willBeActive && provider === 'twilio' && (!effective.apiKey || !effective.apiSecret || !effective.senderId)) {
     res.status(400).json({ error: 'Twilio activation requires Account SID, Auth Token, and sender number.' }); return;
   }
