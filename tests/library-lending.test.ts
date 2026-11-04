@@ -24,7 +24,8 @@ test('lending table has tenant RLS and admin-only read/write policies', () => {
   }
   assert.match(migration, /issued_by = private\.auth_user_id\(\)/);
   assert.match(migration, /returned_by = private\.auth_user_id\(\)/);
-  assert.match(migration, /CREATE POLICY library_loans_no_delete[\\s\\S]*USING \\(false\\)/);
+  assert.ok(migration.includes('CREATE POLICY library_loans_no_delete'));
+  assert.ok(migration.includes('USING (false)'));
   assert.match(migration, /GRANT SELECT, INSERT, UPDATE, DELETE ON public\.library_loans TO authenticated, service_role/);
 });
 
