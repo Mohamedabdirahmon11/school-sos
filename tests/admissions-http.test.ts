@@ -391,3 +391,60 @@ test('concurrent attendance submissions converge on one daily row without automa
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
   ).length, 0, 're-saving an absent status must not queue automatic alerts');
 });
+
+
+test('school backup restore previews tenant-scoped rows and requires explicit matching confirmation', async () => {
+  const event = {
+    id: 'backup-restore-event-1', school_id: school.id,
+    title: 'Backup Event', description: 'Restore verification',
+    start_date: '2026-11-04', end_date: '2026-11-04',
+    type: 'event', created_at: new Date().toISOString()
+  };
+  memory.rows('school_events').push(event);
+  const backup = await storage.db.generateSchoolBackup(school.id);
+  assert.ok(backup);
+  assert.equal(backup.school.id, school.id);
+  assert.equal(backup.tables.school_events.length, 1);
+  memory.replaceRows('school_events', []);
+
+  const previewResponse = await fetch(`${baseUrl}/school/backup/restore/preview`, {
+    method: 'POST', headers, body: JSON.stringify({ backup })
+  });
+  assert.equal(previewResponse.status, 200, await previewResponse.clone().text());
+  const preview = await previewResponse.json();
+  assert.equal(preview.mode, 'merge');
+  assert.equal(preview.counts.school_events, 1);
+  assert.ok(preview.previewHash);
+  assert.ok(preview.excluded.includes('users and login credentials'));
+
+  const noConfirmation = await fetch(`${baseUrl}/school/backup/restore`, {
+    method: 'POST', headers, body: JSON.stringify({ backup, previewHash: preview.previewHash })
+  });
+  assert.equal(noConfirmation.status, 400);
+
+  const tampered = structuredClone(backup);
+  tampered.tables.school_events[0].title = 'Tampered after preview';
+  const staleConfirmation = await fetch(`${baseUrl}/school/backup/restore`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ backup: tampered, previewHash: preview.previewHash, confirm: true })
+  });
+  assert.equal(staleConfirmation.status, 409);
+
+  const crossSchool = structuredClone(backup);
+  crossSchool.school.id = 'another-school';
+  const crossPreview = await fetch(`${baseUrl}/school/backup/restore/preview`, {
+    method: 'POST', headers, body: JSON.stringify({ backup: crossSchool })
+  });
+  assert.equal(crossPreview.status, 400);
+
+  const restoredResponse = await fetch(`${baseUrl}/school/backup/restore`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ backup, previewHash: preview.previewHash, confirm: true })
+  });
+  assert.equal(restoredResponse.status, 200, await restoredResponse.clone().text());
+  const restored = await restoredResponse.json();
+  assert.equal(restored.ok, true);
+  assert.equal(restored.mode, 'merge');
+  assert.equal(memory.rows('school_events').some(row => row.id === event.id), true);
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'SCHOOL_BACKUP_RESTORED'), true);
+});
