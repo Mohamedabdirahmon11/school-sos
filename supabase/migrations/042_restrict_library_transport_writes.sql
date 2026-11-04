@@ -2,6 +2,10 @@
 -- Existing tenant_scope_v2 policies remain responsible for school isolation.
 BEGIN;
 
+ALTER TABLE public.library_books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transport_routes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bus_assignments ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS library_books_admin_insert ON public.library_books;
 CREATE POLICY library_books_admin_insert ON public.library_books AS RESTRICTIVE
   FOR INSERT TO authenticated
