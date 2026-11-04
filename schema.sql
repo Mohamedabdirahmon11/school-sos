@@ -1251,6 +1251,23 @@ CREATE POLICY library_books_school_scope ON public.library_books AS RESTRICTIVE
 REVOKE ALL ON public.library_books FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.library_books TO authenticated;
 
+-- Transport routes and bus assignments are tenant-readable but server-write-only.
+DROP POLICY IF EXISTS transport_routes_school_read ON public.transport_routes;
+CREATE POLICY transport_routes_school_read ON public.transport_routes
+  FOR SELECT TO authenticated
+  USING (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text);
+
+DROP POLICY IF EXISTS transport_routes_school_scope ON public.transport_routes;
+CREATE POLICY transport_routes_school_scope ON public.transport_routes AS RESTRICTIVE
+  FOR SELECT TO authenticated
+  USING (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text);
+
+REVOKE ALL ON public.transport_routes FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.transport_routes TO authenticated;
+
+REVOKE ALL ON public.bus_assignments FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.bus_assignments TO authenticated;
+
 -- Restrictive role policies prevent the permissive tenant policies above from
 -- granting students or parents write access through the public API.
 DO $$
