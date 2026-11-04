@@ -413,8 +413,8 @@ export const SchoolSettingsView: React.FC = () => {
     setRestorePreview(null);
     setRestoreFileName('');
     if (!file) return;
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Backup file is too large. Please select a JSON file smaller than 20 MB.');
+    if (file.size > 9 * 1024 * 1024) {
+      setError('Backup file is too large. Please select a JSON file smaller than 9 MB.');
       return;
     }
     try {
