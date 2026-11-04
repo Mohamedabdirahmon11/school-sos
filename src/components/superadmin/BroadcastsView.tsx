@@ -46,17 +46,22 @@ export const BroadcastsView: React.FC = () => {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !message) return;
+    if (!title.trim() || !message.trim()) return;
+    const scheduleDate = sendOption === 'schedule' ? new Date(scheduledFor) : null;
+    if (scheduleDate && (Number.isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now())) {
+      setNotice('Choose a future date and time for the scheduled broadcast.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await ApiClient.sendBroadcast({
-        title,
-        message,
+        title: title.trim(),
+        message: message.trim(),
         audience,
         targetSchoolId: audience === 'one_school' ? targetSchoolId : undefined,
         sendNow: sendOption === 'now',
-        scheduledFor: sendOption === 'schedule' ? scheduledFor : undefined
+        scheduledFor: scheduleDate ? scheduleDate.toISOString() : undefined
       });
 
       setTitle('');
