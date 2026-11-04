@@ -17,10 +17,11 @@ test('discipline records are tied to a student and school by a composite foreign
 });
 
 test('discipline incidents are protected by school-admin RLS and explicit Data API grants', () => {
-  assert.match(migration, /ALTER TABLE public\.discipline_incidents ENABLE ROW LEVEL SECURITY/);
-  for (const command of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
-    assert.match(migration, new RegExp('CREATE POLICY discipline_incidents_' + (command === 'SELECT' ? 'read' : command.toLowerCase()) + '[\\s\\S]*FOR ' + command + ' TO authenticated'));
-  }
+  assert.ok(migration.includes('ALTER TABLE public.discipline_incidents ENABLE ROW LEVEL SECURITY'));
+  assert.ok(migration.includes('CREATE POLICY discipline_incidents_read ON public.discipline_incidents FOR SELECT TO authenticated'));
+  assert.ok(migration.includes('CREATE POLICY discipline_incidents_insert ON public.discipline_incidents FOR INSERT TO authenticated'));
+  assert.ok(migration.includes('CREATE POLICY discipline_incidents_update ON public.discipline_incidents FOR UPDATE TO authenticated'));
+  assert.ok(migration.includes('CREATE POLICY discipline_incidents_delete ON public.discipline_incidents FOR DELETE TO authenticated'));
   assert.match(migration, /private\.auth_school_id\(\)/);
   assert.match(migration, /private\.auth_user_role\(\) = 'school_admin'/);
   assert.match(migration, /GRANT SELECT, INSERT, UPDATE, DELETE ON public\.discipline_incidents TO authenticated, service_role/);
