@@ -135,7 +135,7 @@ export const ReportsView: React.FC = () => {
             </div>
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-blue-900">
-            {summary?.attendanceRate || 100}%
+            {summary?.attendanceRate ?? 0}%
           </div>
           <p className="text-[11px] text-blue-700 font-medium mt-1">Present student sessions ratio</p>
         </div>
@@ -150,7 +150,7 @@ export const ReportsView: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-emerald-900">
             {summary?.passRate == null ? '—' : `${summary.passRate}%`}
           </div>
-          <p className="text-[11px] text-emerald-700 font-medium mt-1">Scored &ge; 50% in verified exams</p>
+          <p className="text-[11px] text-emerald-700 font-medium mt-1">Scored at or above the school's configured pass mark in approved exams</p>
         </div>
       </div>
 
