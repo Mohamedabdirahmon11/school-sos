@@ -12,6 +12,7 @@ const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url
 const broadcastsUi = readFileSync(new URL('../src/components/superadmin/BroadcastsView.tsx', import.meta.url), 'utf8');
 const inventoryUi = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
 const auditUi = readFileSync(new URL('../src/components/superadmin/SupportAuditView.tsx', import.meta.url), 'utf8');
+const sidebarUi = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -121,6 +122,10 @@ test('inventory screen uses the persistent item API and stock movement ledger', 
   assert.match(inventoryUi, /ApiClient\.createInventoryTransaction\(/);
   assert.match(inventoryUi, /Movement history/);
   assert.match(inventoryUi, /Low stock/);
+  assert.match(inventoryUi, /handleToggleInventoryItem/);
+  assert.match(inventoryUi, /Archive/);
+  assert.match(inventoryUi, /Reactivate/);
+  assert.match(sidebarUi, /sch_inventory.*t\('inventory'\)/);
 });
 
 test('audit CSV export downloads the complete server-side export, not only the visible page', () => {
