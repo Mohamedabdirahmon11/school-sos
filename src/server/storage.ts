@@ -3278,8 +3278,9 @@ class StorageEngine {
     const school = await this.getSchoolById(schoolId);
     if (!school) return null;
 
-    // Include every tenant-owned table, not just the original core-school
-    // collections. Each query is explicitly scoped to this school ID.
+    // Include the supported tenant-owned business tables. Credential-bearing
+    // legacy provider settings and active login sessions are intentionally excluded.
+    // Each query is explicitly scoped to this school ID.
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
       'audit_logs', 'bus_assignments', 'class_subjects', 'classes', 'communication_queue',
