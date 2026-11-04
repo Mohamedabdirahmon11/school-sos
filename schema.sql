@@ -1014,7 +1014,7 @@ CREATE TABLE IF NOT EXISTS library_books (
   title VARCHAR(255) NOT NULL,
   author VARCHAR(255),
   isbn VARCHAR(50),
-  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+  quantity INTEGER NOT NULL DEFAULT 1 CONSTRAINT library_books_quantity_nonnegative CHECK (quantity >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_school_isbn_unique
