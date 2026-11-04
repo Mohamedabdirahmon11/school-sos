@@ -185,7 +185,7 @@ export const SupportAuditView: React.FC = () => {
                   <div
                     key={m.id}
                     className={`p-3 rounded-lg border ${
-                      m.senderRole === 'Super Admin'
+                      m.senderRole === 'super_admin'
                         ? 'bg-[#F0FDFA] border-[#CCFBF1] text-[#132A29]'
                         : 'bg-[#F8FAFC] border-[#E2E8F0] text-[#334155]'
                     }`}
