@@ -64,7 +64,7 @@ test('broadcast feeds are tenant- and audience-scoped; scheduled broadcasts are 
 
 test('reports exclude voided payments and use active student attendance denominators', () => {
   const migration = readFileSync(new URL('../supabase/migrations/037_reports_exclude_voided_and_inactive_records.sql', import.meta.url), 'utf8');
-  assert.match(migration, /status IN \\('present', 'late'\\)/);
+  assert.ok(migration.includes("status IN ('present', 'late')"));
   assert.match(migration, /status = 'excused'/);
   assert.match(migration, /active_student\.status = 'active'/);
   assert.match(migration, /WHERE school_id = p_school_id AND voided_at IS NULL/);
