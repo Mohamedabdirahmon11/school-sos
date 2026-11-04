@@ -161,7 +161,7 @@ test('admission approval is idempotent under concurrent requests and rolls back 
     method: 'POST', headers
   });
   assert.equal(crossSchoolApproval.status, 400);
-  assert.equal(memory.rows('students').some(row => row.studentId === 'STD-ADMIT-ADMISSION'), false);
+  assert.equal(memory.rows('students').some(row => (row.schoolId ?? row.school_id) === school.id && (row.firstName ?? row.first_name) === 'Cross'), false);
 });
 
 test('student creation whitelists profile fields, enforces capacity and protects other-school parent PINs', async () => {
