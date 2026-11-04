@@ -111,6 +111,33 @@ test('admission approval is idempotent under concurrent requests and rolls back 
     && (row.schoolId ?? row.school_id) === school.id
     && row.studentId === 'STD-ADMIT-' + rollbackApplication.id.slice(-8).toUpperCase()
   ).length, 0, 'A failed transaction must not leave a student login.');
+  const capacityClass = storage.db.createClass({
+    schoolId: school.id, name: 'Admissions Capacity Class', gradeLevel: 4,
+    section: 'A', roomNumber: '', capacity: 1, monthlyFee: 0
+  });
+  storage.db.createStudent({
+    schoolId: school.id, studentId: 'CAPACITY-EXISTING',
+    firstName: 'Existing', middleName: '', lastName: 'Pupil', gender: 'male',
+    admissionDate: today, fatherPhone: '+15550007811', motherPhone: '',
+    classId: capacityClass.id, section: 'A', status: 'active'
+  } as any);
+  await storage.db.flush();
+  const capacityApplication = await createApplication('Capacity');
+  // Move this pending application to the deliberately full class in the
+  // in-memory fixture; the RPC must re-check capacity under the class lock.
+  const capacityRow = memory.rows('admission_applications').find(row => row.id === capacityApplication.id);
+  assert.ok(capacityRow);
+  capacityRow.classId = capacityClass.id;
+  capacityRow.class_id = capacityClass.id;
+  const fullClassApproval = await fetch(`${baseUrl}/school/admissions/${capacityApplication.id}/approve`, {
+    method: 'POST', headers
+  });
+  assert.equal(fullClassApproval.status, 409);
+  assert.equal(capacityRow.status, 'pending');
+  assert.equal(memory.rows('students').filter(row =>
+    (row.schoolId ?? row.school_id) === school.id
+    && (row.classId ?? row.class_id) === capacityClass.id
+  ).length, 1, 'A full class must not receive another admission.');
 });
 
 test('student creation whitelists profile fields, enforces capacity and protects other-school parent PINs', async () => {
