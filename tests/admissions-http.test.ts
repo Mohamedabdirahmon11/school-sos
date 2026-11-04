@@ -501,6 +501,17 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   });
   assert.equal(staleConfirmation.status, 409);
 
+  const expiredPreview = await fetch(`${baseUrl}/school/backup/restore`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      backup,
+      previewToken: preview.previewToken,
+      previewedAt: preview.previewedAt - 11 * 60 * 1000,
+      confirm: true
+    })
+  });
+  assert.equal(expiredPreview.status, 409, 'Restore previews older than ten minutes must expire.');
+
   const crossSchool = structuredClone(backup);
   crossSchool.school.id = 'another-school';
   const crossPreview = await fetch(`${baseUrl}/school/backup/restore/preview`, {
