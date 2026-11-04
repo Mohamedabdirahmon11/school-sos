@@ -1448,7 +1448,7 @@ export const SchoolSettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: FREE ADMIN WHATSAPP */}
+      {/* TAB 4: MANUAL ADMIN WHATSAPP */}
       {activeTab === 'sms' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-4">
           <div>
