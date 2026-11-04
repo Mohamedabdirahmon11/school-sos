@@ -14,7 +14,7 @@ test('inventory movements are tenant-bound, serialized, and cannot create negati
   assert.match(migration033, /item_row\.quantity_on_hand \+ delta < 0/);
   assert.match(migration033, /INSERT INTO public\.inventory_transactions/);
   assert.match(migration033, /GRANT EXECUTE ON FUNCTION public\.schoolos_adjust_inventory[\s\S]*TO service_role/);
-  assert.match(api, /schoolId: school\.id, itemId: req\.params\.id/);
+  assert.match(api, /schoolId:\\s*school\\.id,\\s*itemId:\\s*req\\.params\\.id/);
   assert.match(api, /body\.quantityOnHand !== undefined && Number\(body\.quantityOnHand\) !== 0/);
 });
 
