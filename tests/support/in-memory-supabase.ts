@@ -246,8 +246,10 @@ export class InMemorySupabase {
             const key = row.id ?? row.schoolId ?? row.school_id;
             const existing = this.rows(table).find(current => String(current.id ?? current.schoolId ?? current.school_id) === String(key));
             if (existing && String(existing.schoolId ?? existing.school_id) !== String(payload.school_id)) throw new Error(`Backup table ${table} conflicts with another school.`);
-            if (existing) Object.assign(existing, { ...row, schoolId: existing.schoolId ?? row.schoolId, school_id: existing.school_id ?? row.school_id });
-            else this.rows(table).push({ ...row });
+            const safeRow = { ...row };
+            for (const secret of ['pinHash', 'pin_hash', 'pin', 'passwordHash', 'password_hash', 'twoFactorSecret', 'two_factor_secret', 'pendingTwoFactorSecret', 'pending_two_factor_secret', 'recoveryCodes', 'recovery_codes', 'apiKey', 'api_key', 'apiSecret', 'api_secret', 'webhookUrl', 'webhook_url', 'failedLoginAttempts', 'failed_login_attempts', 'lockedUntil', 'locked_until']) delete safeRow[secret];
+            if (existing) Object.assign(existing, { ...safeRow, schoolId: existing.schoolId ?? row.schoolId, school_id: existing.school_id ?? row.school_id });
+            else this.rows(table).push({ ...safeRow });
           }
           restored[table] = incoming.length;
           if (this.failBackupRestore && table === 'school_events') {
