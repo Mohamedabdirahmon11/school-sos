@@ -3338,7 +3338,7 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
     res.status(400).json({ error: 'classId is required.' });
     return;
   }
-  if (!canReadClassResults(req, res, classId)) return;
+  if (!await canReadClassResults(req, res, classId)) return;
   res.json(await db.getClassYearlyRankings(school.id, classId));
 });
 
