@@ -3312,9 +3312,20 @@ async function canReadClassResults(req: Request, res: Response, classId: string)
     res.status(403).json({ error: 'Results access is limited to school staff.' });
     return false;
   }
-  if (user.role === 'teacher' && !(await getTeacherAssignedClassIds(school.id, user.id)).includes(classId)) {
-    res.status(403).json({ error: 'You may only access results for your actively assigned classes.' });
-    return false;
+  if (user.role === 'teacher') {
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const [classSubjects, teacherSubjects] = teacher.items.length
+      ? await Promise.all([
+          queryAllRows('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 'subject_id'),
+          queryAllRows('class_subjects', { school_id: school.id, class_id: classId, teacher_id: teacher.items[0].id, is_active: 'true' }, 'subject_id')
+        ])
+      : [[], []];
+    const allSubjectIds = new Set(classSubjects.map((item: any) => item.subjectId));
+    const ownSubjectIds = new Set(teacherSubjects.map((item: any) => item.subjectId));
+    if (!allSubjectIds.size || [...allSubjectIds].some(subjectId => !ownSubjectIds.has(subjectId))) {
+      res.status(403).json({ error: 'Class rankings include every subject; teachers must be assigned to all active subjects in the class.' });
+      return false;
+    }
   }
   return true;
 }
