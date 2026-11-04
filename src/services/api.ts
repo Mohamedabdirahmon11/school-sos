@@ -29,8 +29,6 @@ import {
   SupportTicket,
   AuditLog,
   SuperAdminSettings,
-  CommunicationSettings,
-  CommunicationQueueItem,
   StaffPayrollRecord
 } from '../types/index.ts';
 
@@ -895,35 +893,6 @@ export class ApiClient {
     return this.request<ReportCardDesign>('/report-card/design', {
       method: 'PUT',
       body: JSON.stringify(design)
-    });
-  }
-
-  // Communication
-  public static async getCommunicationSettings() {
-    return this.request<CommunicationSettings>('/communication/settings');
-  }
-
-  public static async updateCommunicationSettings(settings: Partial<CommunicationSettings>) {
-    return this.request<CommunicationSettings>('/communication/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings)
-    });
-  }
-
-  public static async getCommunicationQueue(params?: any) {
-    return this.request<CommunicationQueueItem[]>(`/communication/queue${this.pageQuery(params)}`);
-  }
-
-  public static async retryQueuedNotification(id: string) {
-    return this.request<CommunicationQueueItem>(`/communication/queue/${encodeURIComponent(id)}/retry`, {
-      method: 'POST'
-    });
-  }
-
-  public static async sendQueuedNotification(data: any) {
-    return this.request<CommunicationQueueItem>('/communication/send', {
-      method: 'POST',
-      body: JSON.stringify(data)
     });
   }
 
