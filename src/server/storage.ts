@@ -40,7 +40,7 @@ import {
   CommunicationQueueItem
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -118,6 +118,30 @@ const authContextCache = new Map<string, CachedAuthContext>();
 const schoolContextCache = new Map<string, { school: School; expiresAt: number }>();
 const branchListCache = new Map<string, { branches: SchoolBranch[]; expiresAt: number }>();
 const noticeCountCache = new Map<string, { count: number; expiresAt: number }>();
+
+const COMMUNICATION_SECRET_PREFIX = 'enc:v1:';
+function communicationSecretKey(): Buffer {
+  const master = process.env.COMMUNICATION_CREDENTIALS_KEY || process.env.SESSION_SECRET || '';
+  if (master.length < 32) throw new Error('Set COMMUNICATION_CREDENTIALS_KEY or a SESSION_SECRET of at least 32 characters to protect notification credentials.');
+  return createHash('sha256').update(master).digest();
+}
+function encryptCommunicationSecret(value?: string): string | undefined {
+  if (!value) return value;
+  if (value.startsWith(COMMUNICATION_SECRET_PREFIX)) return value;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', communicationSecretKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return COMMUNICATION_SECRET_PREFIX + [iv.toString('hex'), cipher.getAuthTag().toString('hex'), encrypted.toString('hex')].join(':');
+}
+function decryptCommunicationSecret(value?: string): string | undefined {
+  if (!value || !value.startsWith(COMMUNICATION_SECRET_PREFIX)) return value;
+  const [ivHex, tagHex, encryptedHex] = value.slice(COMMUNICATION_SECRET_PREFIX.length).split(':');
+  if (!ivHex || !tagHex || !encryptedHex) throw new Error('Stored notification credentials are malformed.');
+  const decipher = createDecipheriv('aes-256-gcm', communicationSecretKey(), Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]).toString('utf8');
+}
+
 
 // Avoid writing the session row on every API request. The signed cookie is
 // refreshed each request, while the database expiry is extended at most once
@@ -2706,7 +2730,20 @@ class StorageEngine {
       this.save();
       await this.flush();
     }
-    return s;
+    let upgraded = false;
+    for (const field of ['apiKey', 'apiSecret'] as const) {
+      const value = s[field];
+      if (value && !value.startsWith(COMMUNICATION_SECRET_PREFIX)) {
+        s[field] = encryptCommunicationSecret(value);
+        upgraded = true;
+      }
+    }
+    if (upgraded) { this.save(); await this.flush(); }
+    return {
+      ...s,
+      apiKey: decryptCommunicationSecret(s.apiKey),
+      apiSecret: decryptCommunicationSecret(s.apiSecret)
+    };
   }
 
   public async getPublicCommunicationSettings(schoolId: string): Promise<Record<string, any>> {
@@ -2722,14 +2759,21 @@ class StorageEngine {
   public async updateCommunicationSettings(schoolId: string, updates: Partial<CommunicationSettings>): Promise<CommunicationSettings> {
     const s = await this.getCommunicationSettings(schoolId);
     const idx = this.data.communicationSettings.findIndex(cs => cs.id === s.id);
+    const protectedUpdates = { ...updates };
+    if (protectedUpdates.apiKey !== undefined) protectedUpdates.apiKey = encryptCommunicationSecret(protectedUpdates.apiKey);
+    if (protectedUpdates.apiSecret !== undefined) protectedUpdates.apiSecret = encryptCommunicationSecret(protectedUpdates.apiSecret);
     this.data.communicationSettings[idx] = {
       ...this.data.communicationSettings[idx],
-      ...updates,
+      ...protectedUpdates,
       updatedAt: new Date().toISOString()
     };
     this.save();
     await this.flush();
-    return this.data.communicationSettings[idx];
+    return {
+      ...this.data.communicationSettings[idx],
+      apiKey: decryptCommunicationSecret(this.data.communicationSettings[idx].apiKey),
+      apiSecret: decryptCommunicationSecret(this.data.communicationSettings[idx].apiSecret)
+    };
   }
 
   public async queueNotification(
