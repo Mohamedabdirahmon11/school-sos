@@ -1407,7 +1407,7 @@ export const SchoolSettingsView: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-[#132A29]">SMS & WhatsApp Provider Integration</h2>
             <p className="text-xs text-[#64748B] mt-0.5">
-              Connect SMS gateways for automated parent absence alerts, fee reminders, and announcements.
+              Send SMS and WhatsApp through a configured provider. Messages are marked sent only after the provider accepts them.
             </p>
           </div>
 
@@ -1449,6 +1449,17 @@ export const SchoolSettingsView: React.FC = () => {
                   />
                 </div>
                 <div>
+                  <label className="block font-semibold text-[#334155] mb-1">Gateway API Endpoint URL</label>
+                  <input
+                    type="url"
+                    value={commSettings.webhookUrl || ''}
+                    placeholder="https://your-provider-api.example"
+                    onChange={e => setCommSettings({ ...commSettings, webhookUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                  />
+                  <p className="text-[11px] text-[#64748B] mt-1">Required for Infobip and Local Gateway. Use the HTTPS API base URL for Infobip or the HTTPS send endpoint for a local gateway. Twilio uses its fixed API endpoint.</p>
+                </div>
+                <div>
                   <label className="block font-semibold text-[#334155] mb-1">Sender ID / Brand Name</label>
                   <input
                     type="text"
@@ -1466,7 +1477,7 @@ export const SchoolSettingsView: React.FC = () => {
                     className="rounded text-[#0F766E] focus:ring-[#0F766E]"
                   />
                   <span className="font-semibold text-[#132A29]">
-                    Enable provider configuration (messages remain queued; live delivery is not connected)
+                    Enable live sending through the selected provider (provider acceptance is not a handset delivery receipt)
                   </span>
                 </label>
               </>
@@ -1487,7 +1498,7 @@ export const SchoolSettingsView: React.FC = () => {
             <h3 className="text-sm font-bold text-[#132A29]">Notification Queue</h3>
             {queueItems.length === 0 ? <p className="text-xs text-[#64748B]">No queued notifications.</p> : queueItems.map(item => (
               <article key={item.id} className="rounded-lg border border-[#E2E8F0] p-3 text-xs">
-                <div className="flex justify-between gap-3"><strong>{item.recipientName} ┬╖ {item.channel.toUpperCase()}</strong><span className="capitalize">{item.status === 'queued' ? 'Queued ┬╖ not sent' : item.status}</span></div>
+                <div className="flex justify-between gap-3"><strong>{item.recipientName} ┬╖ {item.channel.toUpperCase()}</strong><span className="capitalize">{item.status === 'queued' ? 'Queued ┬╖ not sent' : item.status === 'sent' ? 'Accepted by provider' : 'Failed'}</span></div>
                 <p className="mt-1 text-[#64748B]">{item.content}</p>
               </article>
             ))}
