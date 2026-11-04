@@ -131,6 +131,12 @@ test('notices accept only bounded content and authenticated author metadata', as
   });
   assert.equal(invalid.status, 400);
 
+  const invalidDate = await fetch(`${baseUrl}/notices`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ title: 'Date format', content: 'Notice', audience: 'all', publishDate: new Date().toISOString() })
+  });
+  assert.equal(invalidDate.status, 400);
+
   const created = await fetch(`${baseUrl}/notices`, {
     method: 'POST', headers: adminHeaders,
     body: JSON.stringify({
@@ -164,7 +170,7 @@ test('notices accept only bounded content and authenticated author metadata', as
   assert.equal(invalidUpdate.status, 400);
   const update = await fetch(`${baseUrl}/notices/${notice.id}`, {
     method: 'PUT', headers: adminHeaders,
-    body: JSON.stringify({ title: 'Updated', content: 'Updated content', audience: 'all', isPinned: false })
+    body: JSON.stringify({ title: 'Updated', content: 'Updated content', audience: 'all', isPinned: false, publishDate: new Date().toISOString().slice(0, 10) })
   });
   assert.equal(update.status, 200);
 });
