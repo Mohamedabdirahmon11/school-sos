@@ -1411,6 +1411,7 @@ export const SchoolSettingsView: React.FC = () => {
                 <option value="none">Disabled (Store in queue only)</option>
                 <option value="twilio">Twilio Programmable SMS / WhatsApp</option>
                 <option value="infobip">Infobip Enterprise Gateway</option>
+                <option value="whatsapp_business">WhatsApp Business Cloud API</option>
                 <option value="local_gateway">Local Telecom HTTP Gateway</option>
               </select>
             </div>
@@ -1421,20 +1422,40 @@ export const SchoolSettingsView: React.FC = () => {
                   <label className="block font-semibold text-[#334155] mb-1">API Key / Account SID</label>
                   <input
                     type="password"
+                    placeholder={commSettings.apiKeyConfigured ? 'Saved securely — leave blank to keep' : 'Enter provider API key'}
                     value={commSettings.apiKey || ''}
                     onChange={e => setCommSettings({ ...commSettings, apiKey: e.target.value })}
                     className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   />
+                  {commSettings.apiKeyConfigured && <p className="text-[11px] text-emerald-700 mt-1">A key is saved and encrypted. Leave this field blank to keep it.</p>}
                 </div>
                 <div>
                   <label className="block font-semibold text-[#334155] mb-1">API Secret / Auth Token</label>
                   <input
                     type="password"
+                    placeholder={commSettings.apiSecretConfigured ? 'Saved securely — leave blank to keep' : 'Enter provider secret if required'}
                     value={commSettings.apiSecret || ''}
                     onChange={e => setCommSettings({ ...commSettings, apiSecret: e.target.value })}
                     className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   />
+                  {commSettings.apiSecretConfigured && <p className="text-[11px] text-emerald-700 mt-1">A secret is saved and encrypted. Leave this field blank to keep it.</p>}
                 </div>
+                {commSettings.provider === 'infobip' && (
+                  <div>
+                    <label className="block font-semibold text-[#334155] mb-1">Infobip HTTPS Base URL</label>
+                    <input
+                      type="url"
+                      placeholder={commSettings.webhookConfigured ? 'Saved base URL — leave blank to keep' : 'https://xxxxx.api.infobip.com'}
+                      value={commSettings.webhookUrl || ''}
+                      onChange={e => setCommSettings({ ...commSettings, webhookUrl: e.target.value })}
+                      className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                    />
+                    {commSettings.webhookConfigured && <p className="text-[11px] text-emerald-700 mt-1">A base URL is saved. Leave blank to keep it.</p>}
+                  </div>
+                )}
+                {commSettings.provider === 'local_gateway' && (
+                  <p className="text-[11px] text-[#64748B]">The local gateway endpoint and optional token must be configured on the production server with SCHOOL_OS_LOCAL_GATEWAY_URL and SCHOOL_OS_LOCAL_GATEWAY_TOKEN.</p>
+                )}
                 <div>
                   <label className="block font-semibold text-[#334155] mb-1">Sender ID / Brand Name</label>
                   <input
@@ -1474,8 +1495,28 @@ export const SchoolSettingsView: React.FC = () => {
             <h3 className="text-sm font-bold text-[#132A29]">Notification Queue</h3>
             {queueItems.length === 0 ? <p className="text-xs text-[#64748B]">No queued notifications.</p> : queueItems.map(item => (
               <article key={item.id} className="rounded-lg border border-[#E2E8F0] p-3 text-xs">
-                <div className="flex justify-between gap-3"><strong>{item.recipientName} ┬╖ {item.channel.toUpperCase()}</strong><span className="capitalize">{item.status === 'queued' ? 'Queued ┬╖ not sent' : item.status}</span></div>
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <strong>{item.recipientName} · {item.channel.toUpperCase()}</strong>
+                    <span className="ml-2 capitalize">{item.status === 'queued' ? 'Queued · not sent' : item.status}</span>
+                    <p className="text-[10px] text-[#64748B] mt-1">Attempts: {item.attemptCount}/{item.maxAttempts}</p>
+                  </div>
+                  {item.status === 'failed' && (
+                    <button type="button" onClick={async () => {
+                      try {
+                        const retried = await ApiClient.retryQueuedNotification(item.id);
+                        setQueueItems(previous => previous.map(row => row.id === retried.id ? retried : row));
+                        setNotice('Notification queued for retry.');
+                      } catch (err: any) {
+                        setNotice(err.message || 'Unable to retry this notification.');
+                      }
+                    }} className="px-3 py-1 rounded border border-[#CBD5E1] text-[#0F766E] font-semibold hover:bg-[#F0FDFA]">
+                      Retry
+                    </button>
+                  )}
+                </div>
                 <p className="mt-1 text-[#64748B]">{item.content}</p>
+                {item.errorMessage && <p className="mt-1 text-rose-700">{item.errorMessage}</p>}
               </article>
             ))}
             <PaginationControls info={queuePageInfo} onPage={setQueuePage} />
