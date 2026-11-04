@@ -35,9 +35,20 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   assert.deepEqual(firstSemester.map(mark => mark.percentage), [90, 70, 60, 40]);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], smallExamMarks: 21 }], 'teacher-1'), /configured maximums/);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], bigExamMarks: -1 }], 'teacher-1'), /configured maximums/);
-  await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', marks, 'teacher-1');
+  const secondSemester = await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', marks, 'teacher-1');
   await db.flush();
 
+  const unapprovedSemesterRanks = await db.getClassSemesterRankings(school.id, source.id, 'Semester 1');
+  assert.equal(unapprovedSemesterRanks.every(row => row.subjectCount === 0), true, 'submitted marks must not affect official semester rankings');
+  const unapprovedYearlyRanks = await db.getClassYearlyRankings(school.id, source.id);
+  assert.equal(unapprovedYearlyRanks.every(row => row.subjectResults.length === 0), true, 'draft/submitted marks must not affect official yearly rankings');
+
+  const approved = db.approveMarks(school.id, [...firstSemester, ...secondSemester].map(mark => mark.id), 'admin-1');
+  assert.equal(approved.length, 8);
+  await db.flush();
+
+  const semesterRanks = await db.getClassSemesterRankings(school.id, source.id, 'Semester 1');
+  assert.deepEqual(semesterRanks.map(row => row.averagePercentage), [90, 70, 60, 40]);
   const rankings = await db.getClassYearlyRankings(school.id, source.id);
   assert.deepEqual(rankings.map(row => row.yearlyRank), [1, 2, 3, 4]);
   assert.deepEqual(rankings.map(row => row.isPass), [true, true, true, false]);
