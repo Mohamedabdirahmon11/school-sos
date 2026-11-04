@@ -13,8 +13,6 @@ test('notification and communication tables restrict authenticated writes to sch
   assert.ok(schema.includes("table_name || '_admin_insert'"));
   assert.ok(schema.includes("table_name || '_admin_update'"));
   assert.ok(schema.includes("table_name || '_admin_delete'"));
-  for (const table of ['communication_settings', 'notification_templates', 'communication_queue']) {
-  }
   assert.ok(migration.includes('AS RESTRICTIVE'));
   assert.ok(migration.includes("private.auth_user_role() IN (''school_admin'', ''super_admin'')"));
   assert.ok(!/^DO \$$/m.test(schema), 'fresh-install schema DO blocks must use valid dollar quoting');
