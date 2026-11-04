@@ -98,7 +98,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setNotice('Transport routes could not be loaded. Check your school access and database connection.');
     });
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
-    ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
+    ApiClient.getBusAssignments().then(setBusAssignments).catch(error => {
+      console.error(error);
+      setNotice('Bus assignments could not be loaded. Check your transport management access.');
+    });
     ApiClient.getHealthRecords().then(setHealthLogs).catch(error => {
       console.error(error);
       setNotice('Clinic records could not be loaded. Only school administrators can access health information.');
@@ -482,7 +485,19 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               return <div key={item.id} className="flex items-center justify-between gap-3 text-xs border border-[#E2E8F0] rounded-lg p-3">
                 <span>{student ? `${student.firstName} ${student.lastName}` : item.studentId} · {route?.name || item.routeId}</span>
                 <span className="font-mono">{formatMoney(item.feeAmount, school?.currency)}</span>
-                <button type="button" disabled={isReadOnly} onClick={async () => { await ApiClient.removeBusAssignment(item.studentId); setBusAssignments(current => current.filter(row => row.id !== item.id)); }} className="text-rose-700 disabled:opacity-40">Remove</button>
+                <button type="button" disabled={isReadOnly} onClick={async () => {
+                  try {
+                    const result = await ApiClient.removeBusAssignment(item.studentId);
+                    if (result.success) {
+                      setBusAssignments(current => current.filter(row => row.id !== item.id));
+                      setNotice('Bus assignment removed.');
+                    } else {
+                      setNotice('Bus assignment was not found.');
+                    }
+                  } catch (error: any) {
+                    setNotice(error?.message || 'Bus assignment could not be removed.');
+                  }
+                }} className="text-rose-700 disabled:opacity-40">Remove</button>
               </div>;
             })}
           </section>
