@@ -23,6 +23,9 @@ test('notification queue uses atomic claims, bounded attempts, delayed retry, an
   assert.match(migration034, /attempt_count < max_attempts/);
   assert.match(migration034, /interval '1 minute'/);
   assert.match(migration034, /interval '5 minutes'/);
+  const migration036 = readFileSync(new URL('../supabase/migrations/036_recover_stale_notification_worker_claims.sql', import.meta.url), 'utf8');
+  assert.match(migration036, /status = 'processing'/);
+  assert.match(migration036, /last_attempt_at < now\(\) - interval '5 minutes'/);
   assert.match(migration034, /WHERE id = p_id AND school_id = p_school_id AND status = 'failed'/);
   assert.match(storage, /schoolos_claim_communication_queue/);
   assert.match(storage, /schoolos_complete_communication_queue/);
