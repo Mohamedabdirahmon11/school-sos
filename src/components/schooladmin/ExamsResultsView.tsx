@@ -169,8 +169,8 @@ export const ExamsResultsView: React.FC = () => {
     }
 
     try {
-      await ApiClient.approveMarks(pendingIds);
-      setNotice(`Approved and permanently locked ${pendingIds.length} mark records!`);
+      const result = await ApiClient.approveMarks(pendingIds);
+      setNotice(`Approved and permanently locked ${result.approvedCount} mark records.`);
       await loadClassData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
