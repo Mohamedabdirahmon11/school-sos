@@ -54,6 +54,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   // Discipline State
   const [disciplineLogs, setDisciplineLogs] = useState<any[]>([]);
+  const [disciplineLoading, setDisciplineLoading] = useState(false);
+  const [disciplineSaving, setDisciplineSaving] = useState(false);
+  const [disciplineError, setDisciplineError] = useState<string | null>(null);
+  const [incidentStudentId, setIncidentStudentId] = useState('');
+  const [incidentDate, setIncidentDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [infractionType, setInfractionType] = useState('');
+  const [incidentSeverity, setIncidentSeverity] = useState<'low' | 'medium' | 'high'>('low');
+  const [actionTaken, setActionTaken] = useState('');
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [parentContacted, setParentContacted] = useState(false);
 
   // Health State
   const [healthLogs] = useState<any[]>([]);
@@ -92,6 +102,37 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
   }, [school]);
+
+  useEffect(() => {
+    if (!school || activeModule !== 'discipline') return;
+    let cancelled = false;
+    setDisciplineLoading(true);
+    setDisciplineError(null);
+    ApiClient.getDisciplineIncidents()
+      .then(rows => { if (!cancelled) setDisciplineLogs(rows); })
+      .catch((err: any) => { if (!cancelled) setDisciplineError(err.message || 'Unable to load discipline records.'); })
+      .finally(() => { if (!cancelled) setDisciplineLoading(false); });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
+
+  const handleAddDisciplineIncident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || !incidentStudentId || !infractionType.trim()) return;
+    setDisciplineSaving(true);
+    setDisciplineError(null);
+    try {
+      const created = await ApiClient.addDisciplineIncident({
+        studentId: incidentStudentId, incidentDate, infractionType: infractionType.trim(),
+        severity: incidentSeverity, actionTaken: actionTaken.trim(), notes: incidentNotes.trim() || undefined,
+        parentContacted
+      });
+      setDisciplineLogs(rows => [created, ...rows]);
+      setInfractionType(''); setActionTaken(''); setIncidentNotes(''); setParentContacted(false);
+      setNotice('Discipline incident saved securely.');
+    } catch (err: any) {
+      setDisciplineError(err.message || 'Unable to save discipline record.');
+    } finally { setDisciplineSaving(false); }
+  };
 
   useEffect(() => {
     if (!school || activeModule !== 'inventory') return;
@@ -412,32 +453,57 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span>Discipline & Behaviour Incidents</span>
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Date</th>
-                  <th className="px-4 py-2.5">Student</th>
-                  <th className="px-4 py-2.5">Infraction</th>
-                  <th className="px-4 py-2.5">Severity</th>
-                  <th className="px-4 py-2.5">Action Taken</th>
-                  <th className="px-4 py-2.5">Parent Notified</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {disciplineLogs.map(d => (
-                  <tr key={d.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
-                    <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
-                    <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (SMS)' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {disciplineError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{disciplineError}</div>}
+          {!isReadOnly && <form onSubmit={handleAddDisciplineIncident} className="grid grid-cols-1 md:grid-cols-3 gap-3 border-b border-[#E2E8F0] pb-4">
+            <label className="text-xs font-medium text-[#475569]">Student
+              <select required value={incidentStudentId} onChange={e => setIncidentStudentId(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2">
+                <option value="">Select student</option>
+                {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-medium text-[#475569]">Incident date
+              <input required type="date" value={incidentDate} onChange={e => setIncidentDate(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" />
+            </label>
+            <label className="text-xs font-medium text-[#475569]">Incident type
+              <input required maxLength={160} value={infractionType} onChange={e => setInfractionType(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" placeholder="e.g. Late arrival" />
+            </label>
+            <label className="text-xs font-medium text-[#475569]">Severity
+              <select value={incidentSeverity} onChange={e => setIncidentSeverity(e.target.value as 'low' | 'medium' | 'high')} className="mt-1 w-full rounded border border-[#CBD5E1] p-2">
+                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+              </select>
+            </label>
+            <label className="text-xs font-medium text-[#475569]">Action taken
+              <input maxLength={1000} value={actionTaken} onChange={e => setActionTaken(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" placeholder="Counselling, warning…" />
+            </label>
+            <label className="text-xs font-medium text-[#475569]">Notes
+              <input maxLength={2000} value={incidentNotes} onChange={e => setIncidentNotes(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[#475569]"><input type="checkbox" checked={parentContacted} onChange={e => setParentContacted(e.target.checked)} /> Parent contacted manually</label>
+            <div className="md:col-span-2 flex items-end"><button type="submit" disabled={disciplineSaving || !incidentStudentId || !infractionType.trim()} className="rounded bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{disciplineSaving ? 'Saving…' : 'Save incident'}</button></div>
+          </form>}
+          {disciplineLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading discipline records…</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
+                  <tr><th className="px-4 py-2.5">Date</th><th className="px-4 py-2.5">Student</th><th className="px-4 py-2.5">Incident</th><th className="px-4 py-2.5">Severity</th><th className="px-4 py-2.5">Action</th><th className="px-4 py-2.5">Parent contact</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E8F0]">
+                  {disciplineLogs.map(d => {
+                    const student = students.find(row => row.id === d.studentId);
+                    return <tr key={d.id} className="hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
+                      <td className="px-4 py-2.5 font-semibold text-[#132A29]">{student ? `${student.firstName} ${student.lastName}` : d.studentId}</td>
+                      <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
+                      <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
+                      <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken || '—'}</td>
+                      <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentContacted ? 'Contacted' : 'Not yet'}</td>
+                    </tr>;
+                  })}
+                  {!disciplineLogs.length && <tr><td colSpan={6} className="p-6 text-center text-[#64748B]">No discipline incidents recorded.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
