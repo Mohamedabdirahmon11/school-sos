@@ -1357,6 +1357,22 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Only school administrators may create, edit, or delete school calendar events.
+-- Tenant scope remains enforced by tenant_scope_v2; SELECT access is unchanged.
+DROP POLICY IF EXISTS school_events_admin_insert ON public.school_events;
+CREATE POLICY school_events_admin_insert ON public.school_events AS RESTRICTIVE
+  FOR INSERT TO authenticated
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS school_events_admin_update ON public.school_events;
+CREATE POLICY school_events_admin_update ON public.school_events AS RESTRICTIVE
+  FOR UPDATE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS school_events_admin_delete ON public.school_events;
+CREATE POLICY school_events_admin_delete ON public.school_events AS RESTRICTIVE
+  FOR DELETE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+
 -- Only school administrators may mutate library, transport, or bus assignment records.
 -- These are RESTRICTIVE write policies so the broad tenant read policy cannot grant writes.
 -- Keep lending copies consistent even when two issue requests race.
