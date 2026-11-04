@@ -2994,6 +2994,46 @@ class StorageEngine {
     return this.queryRows<PlatformBroadcast>('platform_broadcasts', {});
   }
 
+  public async getSchoolBroadcasts(schoolId: string, role: string): Promise<PlatformBroadcast[]> {
+    const rows: PlatformBroadcast[] = [];
+    for (let page = 1;; page += 1) {
+      const result = await this.queryPage<PlatformBroadcast>(
+        'platform_broadcasts', {}, page, 100,
+        `or(target_school_id.eq.${schoolId},target_school_id.is.null)`
+      );
+      rows.push(...result.items);
+      if (rows.length >= result.total || !result.items.length) break;
+    }
+    return rows.filter(item => item.status === 'sent' && (
+      item.audience === 'all_schools' ||
+      item.audience === 'school_admins' && role === 'school_admin' ||
+      item.audience === 'teachers' && role === 'teacher' ||
+      item.audience === 'one_school' && item.targetSchoolId === schoolId
+    )).sort((a,b) => String(b.sentAt || b.createdAt).localeCompare(String(a.sentAt || a.createdAt)));
+  }
+
+  public async publishBroadcast(id: string): Promise<PlatformBroadcast | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('platform_broadcasts')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', id).in('status', ['draft','scheduled']).select('*').maybeSingle();
+    this.recordQuery('platform_broadcasts', 'publish', startedAt);
+    if (error) throw new Error(error.message || 'Unable to publish broadcast.');
+    return data ? fromSupabaseRow(data, 'platform_broadcasts') as PlatformBroadcast : null;
+  }
+
+  public async publishDueBroadcasts(): Promise<number> {
+    const due = await this.queryPage<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' }, 1, 100, undefined, '*');
+    const now = Date.now();
+    let published = 0;
+    for (const item of due.items) {
+      if (item.scheduledFor && Date.parse(item.scheduledFor) <= now && await this.publishBroadcast(item.id)) published += 1;
+    }
+    return published;
+  }
+
   public async createBroadcast(bData: Omit<PlatformBroadcast, 'id' | 'createdAt'>): Promise<PlatformBroadcast> {
     const b: PlatformBroadcast = {
       ...bData,
