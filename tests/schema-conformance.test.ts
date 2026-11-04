@@ -56,9 +56,8 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
   assert.match(sql, /schoolos_adjust_inventory/i);
   assert.match(sql, /schoolos_claim_communication_queue/i);
   assert.match(sql, /schoolos_complete_communication_queue/i);
-  assert.match(sql, /status IN \\('present', 'late'\\)/i);
+  assert.match(sql, /status IN \('present', 'late'\)/i);
   assert.match(sql, /status = 'excused'/i);
-  assert.match(sql, /schoolos_adjust_inventory/i);
   assert.match(apiSource, /apiRouter\.post\('\/inventory\/:id\/transactions'/);
   assert.match(apiSource, /await db\.exportAuditLogsCSV\(\)/);
   for (const [table, payload] of fixtures.filter(([name]) => ['students', 'teachers', 'staff_members'].includes(name))) {
