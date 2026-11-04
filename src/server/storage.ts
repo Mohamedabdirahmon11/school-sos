@@ -423,6 +423,20 @@ class StorageEngine {
     }
   }
 
+  public async approveAdmissionAtomically(payload: Record<string, unknown>): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic admission approval is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_approve_admission', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_approve_admission', 'call', startedAt);
+    if (error) {
+      const message = error.message || 'Admission approval transaction failed.';
+      const wrapped = new Error(message);
+      Object.assign(wrapped, { code: error.code });
+      throw wrapped;
+    }
+  }
+
   public async bulkImportStudents(payload: Record<string, unknown>): Promise<void> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic bulk import is unavailable.');
