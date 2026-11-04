@@ -7,8 +7,8 @@ Re-running the schema and migrations is intended to be safe, but take a database
 1. Create a Supabase project.
 2. In the project dashboard, open **SQL Editor** and click **New query**.
 3. Open the repository-root file `schema.sql` (not `supabase/schema.sql`), copy its entire contents into the SQL Editor, and run it.
-4. Apply all migration files in numeric order from `supabase/migrations/`, from `001_*.sql` through `026_*.sql`. All migrations are kept in this one directory so Supabase CLI and reviewers can discover them consistently.
-5. Run `scripts/check-rls.sql` in a new SQL Editor tab and review the results before opening the application.
+4. Apply every migration file present in `supabase/migrations/` in numeric order. The current branch includes migrations through `053`; do not assume the numbering is contiguous or stop at an older migration number.
+5. Run `scripts/check-rls.sql` and `scripts/check-database-readiness.sql` in separate SQL Editor tabs. Every check should pass before using the corresponding feature. Migrations `052` and `053` add atomic admission approval and safe school backup restore RPCs.
 
 Do not skip migrations or run them out of numeric order. The schema and migration files are the source of truth for a fresh database; the migration history in an existing project should match these files.
 
@@ -39,4 +39,11 @@ npm run lint
 npm test
 npm run audit:rls
 npm run audit:routes
+npm run build
+```
+
+For local development after the required migrations and environment variables are ready, run:
+
+```bash
+npm run dev
 ```
