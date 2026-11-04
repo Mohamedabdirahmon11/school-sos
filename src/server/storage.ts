@@ -3152,9 +3152,11 @@ class StorageEngine {
     };
   }
 
-  public getLibraryBooks(schoolId: string): any[] {
-    this.data.libraryBooks = this.data.libraryBooks || [];
-    return this.data.libraryBooks.filter(b => b.schoolId === schoolId);
+  public async getLibraryBooks(schoolId: string): Promise<any[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load library books.');
+    }
+    return this.queryRows<any>('library_books', { school_id: schoolId.trim() });
   }
 
   public addLibraryBook(book: any): any {
