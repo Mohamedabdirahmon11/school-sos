@@ -1375,7 +1375,7 @@ CREATE POLICY school_events_admin_delete ON public.school_events AS RESTRICTIVE
 
 -- Communication settings, notification templates, and queued messages contain
 -- operational or recipient data; only school admins may mutate them.
-DO $
+DO $$
 DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
