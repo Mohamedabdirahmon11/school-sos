@@ -298,7 +298,7 @@ test('student profile updates validate phones and keep parent/student login link
   assert.ok(newMother?.pin && verifyPin(first.initialPin, newMother.pin));
 });
 
-test('concurrent attendance submissions converge on one daily row and one alert per parent', async () => {
+test('concurrent attendance submissions converge on one daily row without automatic parent SMS', async () => {
   const created = await fetch(`${baseUrl}/students`, {
     method: 'POST', headers,
     body: JSON.stringify({
@@ -333,11 +333,11 @@ test('concurrent attendance submissions converge on one daily row and one alert 
   const alerts = memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
   );
-  assert.equal(alerts.length, 2, 'one idempotent queued alert per distinct parent phone');
+  assert.equal(alerts.length, 0, 'absence alerts are sent manually from the administrator WhatsApp session, not queued as SMS');
 
   const repeated = await submit();
   assert.equal(repeated.status, 200, await repeated.clone().text());
   assert.equal(memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
-  ).length, 2, 're-saving an absent status must not queue duplicate alerts');
+  ).length, 0, 're-saving an absent status must not queue automatic alerts');
 });
