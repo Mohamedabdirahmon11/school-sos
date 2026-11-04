@@ -2989,10 +2989,12 @@ class StorageEngine {
     return ticket;
   }
 
-  public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string, allowedCreatorUserId?: string): Promise<SupportTicket | null> {
+  public async replyTicket(ticketId: string, reply: { senderId: string; senderName: string; senderRole: string; content: string }, schoolId?: string, allowedCreatorUserId?: string, status?: SupportTicket['status']): Promise<SupportTicket | null> {
+    const allowedStatuses: SupportTicket['status'][] = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
     if (typeof ticketId !== 'string' || !ticketId.trim() || ticketId.length > 64 ||
         (schoolId !== undefined && (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64)) ||
         (allowedCreatorUserId !== undefined && (typeof allowedCreatorUserId !== 'string' || !allowedCreatorUserId.trim() || allowedCreatorUserId.length > 64)) ||
+        (status !== undefined && (!allowedStatuses.includes(status) || reply?.senderRole !== 'super_admin')) ||
         !reply || typeof reply !== 'object' ||
         typeof reply.senderId !== 'string' || !reply.senderId.trim() || reply.senderId.length > 64 ||
         typeof reply.senderName !== 'string' || !reply.senderName.trim() || reply.senderName.trim().length > 255 ||
@@ -3015,7 +3017,8 @@ class StorageEngine {
       timestamp: now
     });
     ticket.updatedAt = now;
-    if (reply.senderRole === 'super_admin') ticket.status = 'in_progress';
+    if (status !== undefined) ticket.status = status;
+    else if (reply.senderRole === 'super_admin') ticket.status = 'in_progress';
     else if (ticket.status === 'resolved' || ticket.status === 'closed') ticket.status = 'open';
     this.save();
     return ticket;
