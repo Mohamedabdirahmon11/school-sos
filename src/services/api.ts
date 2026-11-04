@@ -778,7 +778,12 @@ export class ApiClient {
   }
 
   public static async recordDailyAttendance(classId: string, date: string, records: any[]) {
-    return this.request<{ success: boolean; count: number; records: AttendanceRecord[] }>('/attendance', {
+    return this.request<{
+      success: boolean;
+      count: number;
+      records: AttendanceRecord[];
+      notifications: { queued: number; sent: number; failed: number };
+    }>('/attendance', {
       method: 'POST',
       body: JSON.stringify({ classId, date, records })
     });
