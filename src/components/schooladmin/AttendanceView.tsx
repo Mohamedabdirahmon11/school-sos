@@ -38,8 +38,8 @@ const normalizeWhatsAppNumber = (phone?: string) => {
   // wa.me requires the full international number without "+" or punctuation.
   if (!raw.startsWith('+') && !raw.startsWith('00')) return null;
   const digits = raw.startsWith('00')
-    ? raw.slice(2).replace(/\\D/g, '')
-    : raw.slice(1).replace(/\\D/g, '');
+    ? raw.slice(2).replace(/\D/g, '')
+    : raw.slice(1).replace(/\D/g, '');
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 };
 
