@@ -204,3 +204,23 @@ test('inventory policies avoid overlapping SELECT permissions and index every in
   assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_update[\s\S]*?FOR UPDATE TO authenticated/i);
   assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_delete[\s\S]*?FOR DELETE TO authenticated/i);
 });
+
+
+test('database class-capacity guards serialize student enrollment and capacity edits', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/049_enforce_class_capacity.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'private.enforce_student_class_capacity()',
+    'private.prevent_class_capacity_below_enrollment()',
+    'FROM public.classes',
+    'FOR UPDATE',
+    'v_enrolled >= v_capacity',
+    'NEW.capacity < v_enrolled',
+    'BEFORE INSERT OR UPDATE OF school_id, class_id ON public.students',
+    'BEFORE UPDATE OF capacity ON public.classes',
+    'REVOKE ALL ON FUNCTION private.enforce_student_class_capacity()',
+    'GRANT EXECUTE ON FUNCTION private.enforce_student_class_capacity() TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `capacity migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
