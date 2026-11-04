@@ -1274,7 +1274,7 @@ DECLARE
     'school_branches', 'classes', 'subjects', 'students', 'teachers',
     'timetable_slots', 'timetable_settings', 'teacher_unavailability', 'attendance_records', 'exam_configs', 'student_marks',
     'promotions', 'fee_structures', 'fee_payments', 'report_card_templates',
-    'communication_queue', 'school_notices',
+    'school_notices',
     'school_events', 'assignments', 'assignment_submissions', 'admission_applications'
   ];
 BEGIN
@@ -1383,7 +1383,7 @@ CREATE POLICY school_events_admin_delete ON public.school_events AS RESTRICTIVE
 DO $$
 DECLARE table_name text;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
+  FOREACH table_name IN ARRAY ARRAY['notification_templates', ] LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_insert', table_name);
     EXECUTE format(
       'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
@@ -1640,7 +1640,7 @@ ALTER TABLE communication_queue ENABLE ROW LEVEL SECURITY;
 DO $schoolos$
 DECLARE table_name text;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
+  FOREACH table_name IN ARRAY ARRAY['notification_templates', ] LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_insert', table_name);
     EXECUTE format(
       'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
@@ -3223,7 +3223,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'subscription_invoices', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'communication_queue', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;
