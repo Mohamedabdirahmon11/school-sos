@@ -13,6 +13,7 @@ const broadcastsUi = readFileSync(new URL('../src/components/superadmin/Broadcas
 const inventoryUi = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
 const auditUi = readFileSync(new URL('../src/components/superadmin/SupportAuditView.tsx', import.meta.url), 'utf8');
 const sidebarUi = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
+const attendanceUi = readFileSync(new URL('../src/components/schooladmin/AttendanceView.tsx', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -133,4 +134,17 @@ test('audit CSV export downloads the complete server-side export, not only the v
   assert.match(auditUi, /response\.blob\(\)/);
   assert.match(storage, /Prevent spreadsheet formula execution/);
   assert.match(api, /exportAuditLogsCSV\(\)/);
+});
+
+
+test('absence attendance rows prepare a parent WhatsApp chat without sending automatically', () => {
+  assert.match(attendanceUi, /https:\/\/wa\.me\//);
+  assert.match(attendanceUi, /normalizeWhatsAppNumber/);
+  assert.match(attendanceUi, /window\.open\(url, '_blank'/);
+  assert.match(attendanceUi, /encodeURIComponent\(message\)/);
+  assert.match(attendanceUi, /state\.status === 'absent'/);
+  assert.match(attendanceUi, /Fadlan nala soo xiriir/);
+  assert.match(attendanceUi, /school\?\.phone/);
+  assert.match(settingsUi, /Official Telephone \/ WhatsApp maamulka/);
+  assert.match(settingsUi, /riix Send/);
 });
