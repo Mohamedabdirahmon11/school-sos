@@ -1433,6 +1433,14 @@ apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (_
   res.json(await db.getBroadcasts());
 });
 
+apiRouter.post('/superadmin/broadcasts/:id/send', requireAuth, requireSuperAdmin, async (req, res) => {
+  const user = (req as any).user as User;
+  const broadcast = await db.publishBroadcast(req.params.id);
+  if (!broadcast) { res.status(404).json({ error: 'Only draft or scheduled broadcasts can be sent.' }); return; }
+  db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+  res.json(broadcast);
+});
+
 apiRouter.get('/superadmin/invoices', requireAuth, requireSuperAdmin, async (_req, res) => {
   res.json(await db.getSubscriptionInvoices());
 });
@@ -3893,6 +3901,12 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
 // ==============================================================================
 // 10. NOTICES, MESSAGES, SUPPORT & SCHOOL BACKUP
 // ==============================================================================
+
+apiRouter.get('/broadcasts', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  res.json(await db.getSchoolBroadcasts(school.id, user.role));
+});
 
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
