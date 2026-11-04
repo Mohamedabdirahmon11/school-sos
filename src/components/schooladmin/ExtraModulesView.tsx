@@ -62,8 +62,26 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
   const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null);
 
-  // Inventory State
+  // Inventory state
   const [inventory, setInventory] = useState<any[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [inventoryName, setInventoryName] = useState('');
+  const [inventorySku, setInventorySku] = useState('');
+  const [inventoryCategory, setInventoryCategory] = useState('General');
+  const [inventoryUnit, setInventoryUnit] = useState('unit');
+  const [inventoryReorderLevel, setInventoryReorderLevel] = useState('0');
+  const [inventoryUnitCost, setInventoryUnitCost] = useState('0');
+  const [inventoryLocation, setInventoryLocation] = useState('');
+  const [inventorySaving, setInventorySaving] = useState(false);
+  const [movementItemId, setMovementItemId] = useState('');
+  const [movementType, setMovementType] = useState<'stock_in' | 'stock_out' | 'adjustment'>('stock_in');
+  const [movementQuantity, setMovementQuantity] = useState('1');
+  const [movementUnitCost, setMovementUnitCost] = useState('0');
+  const [movementReference, setMovementReference] = useState('');
+  const [movementNote, setMovementNote] = useState('');
+  const [inventoryTransactions, setInventoryTransactions] = useState<any[]>([]);
+  const [movementSaving, setMovementSaving] = useState(false);
 
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -74,6 +92,78 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
   }, [school]);
+
+  useEffect(() => {
+    if (!school || activeModule !== 'inventory') return;
+    let cancelled = false;
+    setInventoryLoading(true);
+    setInventoryError(null);
+    ApiClient.getInventoryItems()
+      .then(items => {
+        if (cancelled) return;
+        setInventory(items);
+        setMovementItemId(current => current || items[0]?.id || '');
+      })
+      .catch((err: any) => { if (!cancelled) setInventoryError(err.message || 'Unable to load inventory.'); })
+      .finally(() => { if (!cancelled) setInventoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
+
+  useEffect(() => {
+    if (activeModule !== 'inventory' || !movementItemId) { setInventoryTransactions([]); return; }
+    let cancelled = false;
+    ApiClient.getInventoryTransactions(movementItemId)
+      .then(rows => { if (!cancelled) setInventoryTransactions(rows); })
+      .catch((err: any) => { if (!cancelled) setInventoryError(err.message || 'Unable to load stock history.'); });
+    return () => { cancelled = true; };
+  }, [activeModule, movementItemId]);
+
+  const handleCreateInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || !inventoryName.trim()) return;
+    setInventorySaving(true);
+    setInventoryError(null);
+    try {
+      const created = await ApiClient.createInventoryItem({
+        name: inventoryName.trim(), sku: inventorySku.trim() || undefined,
+        category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
+        reorderLevel: Number(inventoryReorderLevel), unitCost: Number(inventoryUnitCost),
+        location: inventoryLocation.trim() || undefined
+      });
+      setInventory(items => [created, ...items]);
+      setMovementItemId(created.id);
+      setInventoryName(''); setInventorySku(''); setInventoryLocation('');
+      setNotice('Inventory item created. Record opening stock using a stock-in movement.');
+    } catch (err: any) {
+      setInventoryError(err.message || 'Unable to create inventory item.');
+    } finally { setInventorySaving(false); }
+  };
+
+  const handleInventoryMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || !movementItemId) return;
+    const quantity = Number(movementQuantity), unitCost = Number(movementUnitCost);
+    if (!Number.isFinite(quantity) || quantity === 0 || !Number.isFinite(unitCost) || unitCost < 0 ||
+        (movementType !== 'adjustment' && quantity < 0)) {
+      setInventoryError('Enter a non-zero quantity and a non-negative unit cost. Stock-in/out quantities must be positive.');
+      return;
+    }
+    setMovementSaving(true); setInventoryError(null);
+    try {
+      await ApiClient.createInventoryTransaction(movementItemId, {
+        transactionType: movementType, quantity, unitCost,
+        reference: movementReference.trim() || undefined, note: movementNote.trim() || undefined
+      });
+      const [items, transactions] = await Promise.all([
+        ApiClient.getInventoryItems(), ApiClient.getInventoryTransactions(movementItemId)
+      ]);
+      setInventory(items); setInventoryTransactions(transactions);
+      setMovementQuantity('1'); setMovementReference(''); setMovementNote('');
+      setNotice('Stock movement recorded successfully.');
+    } catch (err: any) {
+      setInventoryError(err.message || 'Unable to record stock movement.');
+    } finally { setMovementSaving(false); }
+  };
 
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,38 +516,56 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
       {/* 6. INVENTORY MODULE */}
       {activeModule === 'inventory' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-[#0F766E]" />
-            <span>School Assets & Equipment Register</span>
-          </h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Asset Tag</th>
-                  <th className="px-4 py-2.5">Item Description</th>
-                  <th className="px-4 py-2.5">Quantity</th>
-                  <th className="px-4 py-2.5">Location</th>
-                  <th className="px-4 py-2.5">Condition</th>
-                  <th className="px-4 py-2.5">Estimated Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {inventory.map(i => (
-                  <tr key={i.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-mono font-bold text-[#0F766E]">{i.assetTag}</td>
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{i.itemName}</td>
-                    <td className="px-4 py-2.5 font-mono">{i.quantity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{i.roomLocation}</td>
-                    <td className="px-4 py-2.5 capitalize text-emerald-700 font-medium">{i.condition}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold">${i.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-5">
+          <section className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2"><Boxes className="w-4 h-4 text-[#0F766E]" /> Inventory & Stock Ledger</h2>
+              <span className="text-xs text-[#64748B]">{inventory.length} items</span>
+            </div>
+            {inventoryError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{inventoryError}</div>}
+            <form onSubmit={handleCreateInventoryItem} className="grid grid-cols-1 md:grid-cols-4 gap-3 border-b border-[#E2E8F0] pb-4">
+              <label className="text-xs font-medium text-[#475569]">Item name<input required maxLength={160} value={inventoryName} onChange={e=>setInventoryName(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" placeholder="e.g. Exercise books" /></label>
+              <label className="text-xs font-medium text-[#475569]">SKU / asset code<input maxLength={80} value={inventorySku} onChange={e=>setInventorySku(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="text-xs font-medium text-[#475569]">Category<input maxLength={100} value={inventoryCategory} onChange={e=>setInventoryCategory(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="text-xs font-medium text-[#475569]">Unit<input maxLength={40} value={inventoryUnit} onChange={e=>setInventoryUnit(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" placeholder="piece, box, pack" /></label>
+              <label className="text-xs font-medium text-[#475569]">Reorder level<input type="number" min="0" step="0.01" value={inventoryReorderLevel} onChange={e=>setInventoryReorderLevel(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="text-xs font-medium text-[#475569]">Unit cost<input type="number" min="0" step="0.01" value={inventoryUnitCost} onChange={e=>setInventoryUnitCost(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="text-xs font-medium text-[#475569]">Storage location<input maxLength={160} value={inventoryLocation} onChange={e=>setInventoryLocation(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <div className="flex items-end"><button type="submit" disabled={isReadOnly||inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inventorySaving?'Saving…':'Add inventory item'}</button></div>
+            </form>
+            {inventoryLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading inventory…</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F8FAFC] text-[#64748B]"><tr><th className="p-2">Item</th><th className="p-2">SKU</th><th className="p-2">Category</th><th className="p-2">On hand</th><th className="p-2">Reorder at</th><th className="p-2">Unit cost</th><th className="p-2">Location</th><th className="p-2">Status</th></tr></thead>
+                  <tbody className="divide-y divide-[#E2E8F0]">
+                    {inventory.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
+                      <td className="p-2 font-semibold text-[#132A29]">{item.name}</td><td className="p-2 font-mono">{item.sku||'—'}</td><td className="p-2">{item.category}</td>
+                      <td className="p-2 font-mono">{item.quantityOnHand} {item.unit}</td><td className="p-2 font-mono">{item.reorderLevel}</td><td className="p-2 font-mono">{item.unitCost}</td><td className="p-2">{item.location||'—'}</td>
+                      <td className="p-2"><span className={item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
+                    </tr>)}
+                    {!inventory.length&&<tr><td colSpan={8} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <form onSubmit={handleInventoryMovement} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
+              <h3 className="text-sm font-bold text-[#132A29]">Record stock movement</h3>
+              <label className="block text-xs font-medium text-[#475569]">Inventory item<select required value={movementItemId} onChange={e=>setMovementItemId(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2"><option value="">Select item</option>{inventory.filter(i=>i.isActive).map(i=><option key={i.id} value={i.id}>{i.name} · {i.quantityOnHand} {i.unit}</option>)}</select></label>
+              <label className="block text-xs font-medium text-[#475569]">Movement type<select value={movementType} onChange={e=>setMovementType(e.target.value as any)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2"><option value="stock_in">Stock in</option><option value="stock_out">Stock out</option><option value="adjustment">Adjustment (+/-)</option></select></label>
+              <label className="block text-xs font-medium text-[#475569]">Quantity<input required type="number" step="0.01" value={movementQuantity} onChange={e=>setMovementQuantity(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="block text-xs font-medium text-[#475569]">Unit cost (optional)<input type="number" min="0" step="0.01" value={movementUnitCost} onChange={e=>setMovementUnitCost(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
+              <label className="block text-xs font-medium text-[#475569]">Reference<input maxLength={160} value={movementReference} onChange={e=>setMovementReference(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" placeholder="Invoice or issue reference" /></label>
+              <label className="block text-xs font-medium text-[#475569]">Note<textarea maxLength={2000} value={movementNote} onChange={e=>setMovementNote(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" rows={2} /></label>
+              <button type="submit" disabled={isReadOnly||movementSaving||!movementItemId} className="rounded bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{movementSaving?'Saving…':'Save stock movement'}</button>
+              <p className="text-[11px] text-[#64748B]">Stock in/out uses positive quantities. Adjustment accepts a positive or negative quantity. The database prevents stock from becoming negative.</p>
+            </form>
+            <section className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
+              <h3 className="text-sm font-bold text-[#132A29]">Movement history</h3>
+              {!movementItemId?<p className="text-xs text-[#64748B]">Select an item to view its ledger.</p>:inventoryTransactions.length===0?<p className="text-xs text-[#64748B]">No stock movements recorded for this item.</p>:<div className="max-h-96 overflow-y-auto space-y-2">{inventoryTransactions.map(tx=><article key={tx.id} className="rounded border border-[#E2E8F0] p-3 text-xs"><div className="flex justify-between gap-2"><strong className="capitalize">{String(tx.transactionType).replace('_',' ')}</strong><span className="font-mono">{tx.quantityDelta>0?'+':''}{tx.quantityDelta}</span></div><p className="text-[#64748B] mt-1">Balance: {tx.quantityBefore} → {tx.quantityAfter} · {tx.createdAt?new Date(tx.createdAt).toLocaleString():''}</p>{tx.note&&<p className="mt-1">{tx.note}</p>}</article>)}</div>}
+            </section>
+          </section>
         </div>
       )}
 
