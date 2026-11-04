@@ -356,13 +356,14 @@ export const AttendanceView: React.FC = () => {
               <tbody className="divide-y divide-[#F1F5F9]">
                 {visibleStudents.map(std => {
                   const state = attendanceMap[std.id] || { status: 'present', note: '' };
+                  const validParentWhatsApp = parentWhatsAppNumber(std);
                   return (
                     <tr key={std.id} className="hover:bg-[#F8FAFC]">
                       <td className="py-3 px-4 font-mono font-medium text-[#475569]">{std.studentId}</td>
                       <td className="py-3 px-4 font-semibold text-[#132A29]">
                         {std.firstName} {std.middleName} {std.lastName}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || std.motherPhone || 'N/A'}</td>
+                      <td className="py-3 px-4 font-mono text-[#64748B]">{validParentWhatsApp ? `+${validParentWhatsApp}` : (std.fatherPhone || std.motherPhone || 'N/A')}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
                           <button
@@ -430,14 +431,14 @@ export const AttendanceView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => openAbsentStudentWhatsApp(std)}
-                            disabled={isReadOnly || !parentWhatsAppNumber(std)}
+                            disabled={isReadOnly || !validParentWhatsApp}
                             title="Open WhatsApp chat with the parent and prepare the absence message"
                             className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                           </button>
                         ) : <span className="text-[11px] text-[#94A3B8]">—</span>}
-                        {state.status === 'absent' && !parentWhatsAppNumber(std) && (
+                        {state.status === 'absent' && !validParentWhatsApp && (
                           <p className="mt-1 max-w-40 text-[10px] text-amber-700">Ku qor waalidka lambarka +country code.</p>
                         )}
                       </td>
