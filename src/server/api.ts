@@ -3560,6 +3560,13 @@ apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperA
     if (typeof payload.isActive !== 'boolean') { res.status(400).json({ error: 'Gateway activation must be true or false.' }); return; }
     updates.isActive = payload.isActive;
   }
+  if (payload.defaultChannel !== undefined) {
+    if (!['sms', 'whatsapp'].includes(payload.defaultChannel)) {
+      res.status(400).json({ error: 'Default notification channel must be SMS or WhatsApp.' });
+      return;
+    }
+    updates.defaultChannel = payload.defaultChannel;
+  }
   for (const key of ['apiKey', 'apiSecret'] as const) {
     if (payload[key] !== undefined) {
       if (typeof payload[key] !== 'string' || !payload[key].trim() || payload[key].length > 512) {
