@@ -36,6 +36,9 @@ const schoolLocalDate = (timeZone?: string) => {
   }
 };
 
+const parentWhatsAppNumber = (student: Student) =>
+  normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
+
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -145,8 +148,7 @@ export const AttendanceView: React.FC = () => {
   };
 
   const openAbsentStudentWhatsApp = (student: Student) => {
-    const parentPhone = student.fatherPhone || student.motherPhone;
-    const whatsappNumber = normalizeWhatsAppNumber(parentPhone);
+    const whatsappNumber = parentWhatsAppNumber(student);
     if (!whatsappNumber) {
       setNotice('Waalidka lambarkiisa u qor qaabka caalamiga ah, tusaale +2519XXXXXXXX, kadib WhatsApp fur.');
       return;
@@ -413,7 +415,7 @@ export const AttendanceView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => openAbsentStudentWhatsApp(std)}
-                            disabled={isReadOnly || !normalizeWhatsAppNumber(std.fatherPhone || std.motherPhone)}
+                            disabled={isReadOnly || !parentWhatsAppNumber(std)}
                             title="Open WhatsApp chat with the parent and prepare the absence message"
                             className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:opacity-40"
                           >
