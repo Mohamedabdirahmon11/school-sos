@@ -252,12 +252,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     setLibraryError(null);
     try {
       const loan = await ApiClient.issueLibraryLoan({ bookId: loanBookId, studentId: loanStudentId, dueDate: loanDueDate });
-      setLibraryLoans(rows => {
-        const next = [loan, ...rows];
-        const firstAvailable = books.find(book => next.filter(item => item.bookId === book.id && item.status === 'issued').length < Number(book.quantity || 0));
-        setLoanBookId(firstAvailable?.id || '');
-        return next;
-      });
+      const nextLoans = [loan, ...libraryLoans];
+      setLibraryLoans(nextLoans);
+      const firstAvailable = books.find(book => nextLoans.filter(item => item.bookId === book.id && item.status === 'issued').length < Number(book.quantity || 0));
+      setLoanBookId(firstAvailable?.id || '');
       setLoanStudentId('');
       setNotice('Book issued to student.');
     } catch (err: any) {
