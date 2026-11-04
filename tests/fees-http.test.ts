@@ -158,6 +158,12 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.ok(memory.rows('fee_payments').find(row => row.id === partial.body.id)?.voided_at,
     'voided receipt state must be persisted before the HTTP response completes');
   assert.equal((await fetch(`${baseUrl}/fees/payments/${partial.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Trying a second reversal' }) })).status, 409);
+  const concurrentVoids = await Promise.all([
+    fetch(`${baseUrl}/fees/payments/${bus.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Duplicate reversal attempt A' }) }),
+    fetch(`${baseUrl}/fees/payments/${bus.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Duplicate reversal attempt B' }) })
+  ]);
+  assert.deepEqual(concurrentVoids.map(response => response.status).sort(), [200, 409],
+    'only one concurrent request may void the same receipt');
   const invalidVoid = await fetch(`${baseUrl}/fees/payments/${unpaid.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'no' }) });
   assert.equal(invalidVoid.status, 400);
 
