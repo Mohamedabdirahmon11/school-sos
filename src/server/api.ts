@@ -4241,7 +4241,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     previewToken,
     counts,
     totalRows: Object.values(counts).reduce((sum, count) => sum + count, 0),
-    excluded: ['users and login credentials', 'school profile/settings', 'school subscription/billing records', 'platform broadcasts', 'audit history', 'active sessions'],
+    excluded: ['users and login credentials', 'student PIN hashes', 'legacy paid-provider credentials', 'school profile/settings', 'school subscription/billing records', 'platform broadcasts', 'audit history', 'active sessions'],
     warning: 'This is a merge restore: matching records will be updated, missing records will be inserted, and records absent from the backup will NOT be deleted. A separate explicit confirmation is required.'
   });
 });
