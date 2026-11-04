@@ -63,6 +63,56 @@ test('admissions create, reject and approve flows persist; approval enrolls once
   assert.equal(memory.rows('audit_logs').filter(row => String(row.action).startsWith('ADMISSION_APPLICATION_')).length, 4);
 });
 
+test('admission approval is idempotent under concurrent requests and rolls back partial writes', async () => {
+  const isolatedClass = storage.db.createClass({
+    schoolId: school.id, name: 'Admission Atomic Class', gradeLevel: 3,
+    section: 'A', roomNumber: '', capacity: 3, monthlyFee: 0
+  });
+  await storage.db.flush();
+  const createApplication = async (firstName: string) => {
+    const response = await fetch(`${baseUrl}/school/admissions`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        firstName, lastName: 'Atomic', gender: 'female',
+        gradeApplying: 'Grade 3', classId: isolatedClass.id,
+        fatherPhone: '+15550007801', motherPhone: ''
+      })
+    });
+    assert.equal(response.status, 201, await response.clone().text());
+    return response.json();
+  };
+
+  const concurrentApplication = await createApplication('Concurrent');
+  const approve = () => fetch(`${baseUrl}/school/admissions/${concurrentApplication.id}/approve`, {
+    method: 'POST', headers
+  });
+  const [first, second] = await Promise.all([approve(), approve()]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 409]);
+  const enrolled = memory.rows('students').filter(row =>
+    (row.schoolId ?? row.school_id) === school.id
+    && (row.classId ?? row.class_id) === isolatedClass.id
+  );
+  assert.equal(enrolled.length, 1);
+
+  const rollbackApplication = await createApplication('Rollback');
+  memory.failNextAdmissionApproval();
+  const failed = await fetch(`${baseUrl}/school/admissions/${rollbackApplication.id}/approve`, {
+    method: 'POST', headers
+  });
+  assert.equal(failed.status, 500);
+  const rollbackRows = memory.rows('admission_applications').filter(row => row.id === rollbackApplication.id);
+  assert.equal(rollbackRows[0]?.status, 'pending');
+  assert.equal(memory.rows('students').filter(row =>
+    (row.schoolId ?? row.school_id) === school.id
+    && (row.classId ?? row.class_id) === isolatedClass.id
+  ).length, 1, 'A failed transaction must not leave a partial student row.');
+  assert.equal(memory.rows('users').filter(row =>
+    String(row.id).startsWith('usr-student-')
+    && (row.schoolId ?? row.school_id) === school.id
+    && row.studentId === 'STD-ADMIT-' + rollbackApplication.id.slice(-8).toUpperCase()
+  ).length, 0, 'A failed transaction must not leave a student login.');
+});
+
 test('student creation whitelists profile fields, enforces capacity and protects other-school parent PINs', async () => {
   const create = (body: Record<string, unknown>) => fetch(`${baseUrl}/students`, {
     method: 'POST', headers, body: JSON.stringify(body)
