@@ -50,3 +50,14 @@ test('communication API never returns stored provider secrets and audit export i
   assert.match(api, /const csv = await db\.exportAuditLogsCSV\(\)/);
   assert.ok(storage.includes('if (/^\\s*[=+@-]/.test(text))'));
 });
+
+test('broadcast feeds are tenant- and audience-scoped; scheduled broadcasts are published by the worker', () => {
+  assert.match(storage, /target_school_id\.eq\.\$\{schoolId\},target_school_id\.is\.null/);
+  assert.match(storage, /item\.status === 'sent'/);
+  assert.match(storage, /item\.audience === 'school_admins'/);
+  assert.match(storage, /item\.audience === 'teachers'/);
+  assert.match(storage, /publishDueBroadcasts/);
+  assert.match(api, /apiRouter\.get\('\/broadcasts'/);
+  assert.match(api, /apiRouter\.post\('\/superadmin\/broadcasts\/:id\/send'/);
+  assert.match(worker, /publishDueBroadcasts\(\)/);
+});
