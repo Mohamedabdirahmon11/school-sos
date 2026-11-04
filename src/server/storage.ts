@@ -3021,6 +3021,8 @@ class StorageEngine {
     for (const table of schoolTables) {
       tables[table] = await this.queryRows(table, { school_id: schoolId });
     }
+    // Platform broadcasts can target one tenant without carrying school_id.
+    tables.platform_broadcasts = await this.queryRows('platform_broadcasts', { target_school_id: schoolId });
 
     return {
       backupDate: new Date().toISOString(),
