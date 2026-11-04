@@ -39,6 +39,17 @@ export interface SessionPayload {
 // 1. Password & PIN Hashing (Scrypt)
 // -------------------------------------------------------------
 
+export function passwordPolicyError(password: unknown): string | null {
+  if (typeof password !== 'string' || password.length < 12) {
+    return 'Password must contain at least 12 characters.';
+  }
+  if (password.length > 128) return 'Password must not exceed 128 characters.';
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Password must include uppercase and lowercase letters and at least one number.';
+  }
+  return null;
+}
+
 export function hashPassword(password: string): string {
   if (!password) return '';
   const salt = crypto.randomBytes(16).toString('hex');
