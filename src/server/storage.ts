@@ -2920,31 +2920,40 @@ class StorageEngine {
   }
 
   public async markInvoicePaid(id: string): Promise<SubscriptionInvoice | null> {
+    const client = this.testClient || supabase;
+    if (!this.testClient && client && typeof client.rpc === 'function') {
+      const startedAt = performance.now();
+      const { data, error } = await client.rpc('schoolos_mark_subscription_invoice_paid', { p_invoice_id: id });
+      this.recordQuery('rpc:schoolos_mark_subscription_invoice_paid', 'call', startedAt);
+      if (error) throw new Error(error.message || 'Invoice payment could not be completed.');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return null;
+      const invoice = fromSupabaseRow(row, 'subscription_invoices') as SubscriptionInvoice;
+      await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+      schoolContextCache.delete(invoice.schoolId);
+      await this.getSchoolById(invoice.schoolId);
+      return invoice;
+    }
+
+    // In-memory test adapter fallback; production always uses the atomic RPC above.
     await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
     const inv = this.data.invoices.find(invoice => invoice.id === id);
     if (!inv) return null;
-    // Repeated payment confirmation must not extend the same subscription twice.
     if (inv.status === 'paid') return inv;
-
     inv.status = 'paid';
     inv.paidDate = new Date().toISOString().slice(0, 10);
     inv.receiptNumber = `SUB-REC-${new Date().getUTCFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
-
-    // Extend from the later of today or the current expiry date.
     const school = await this.getSchoolById(inv.schoolId);
     if (school?.subscription) {
       school.subscription.status = 'active';
       const now = new Date();
       const currentExpiry = Date.parse(String(school.subscription.validUntil || ''));
-      const validUntil = Number.isFinite(currentExpiry) && currentExpiry > now.getTime()
-        ? new Date(currentExpiry)
-        : new Date(now);
+      const validUntil = Number.isFinite(currentExpiry) && currentExpiry > now.getTime() ? new Date(currentExpiry) : new Date(now);
       if (inv.cadence === 'yearly') validUntil.setFullYear(validUntil.getFullYear() + 1);
       else if (inv.cadence === 'monthly') validUntil.setMonth(validUntil.getMonth() + 1);
       school.subscription.validUntil = validUntil.toISOString();
       this.updateSchool(school.id, { subscription: school.subscription });
     }
-
     this.save();
     await this.flush();
     return inv;
