@@ -6,6 +6,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/NoticesEventsView.tsx', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/046_school_events_admin_write_policies.sql', import.meta.url), 'utf8');
 
 test('school event endpoints are tenant-scoped and write-restricted', () => {
   assert.ok(api.includes("apiRouter.get('/school/events', requireAuth, requireSchoolContext"));
@@ -29,4 +30,9 @@ test('school events UI surfaces API errors and hides write actions from non-admi
   assert.ok(ui.includes("ApiClient.request<SchoolEvent[]>('/school/events'),"));
   assert.ok(ui.includes('role="alert"'));
   assert.ok(schema.includes('CREATE TABLE IF NOT EXISTS school_events'));
+  for (const action of ['insert', 'update', 'delete']) {
+    assert.ok(migration.includes('school_events_admin_' + action));
+  }
+  assert.ok(migration.includes('AS RESTRICTIVE'));
+  assert.ok(migration.includes("private.auth_user_role() IN ('school_admin', 'super_admin')"));
 });
