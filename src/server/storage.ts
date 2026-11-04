@@ -1969,13 +1969,17 @@ class StorageEngine {
   // -------------------------------------------------------------
   // EXAMS & RESULTS: Small Exam + Big Exam -> Percentage Only
   // -------------------------------------------------------------
-  public getExamConfig(schoolId: string, academicYear?: string): ExamConfig {
-    const schoolYear = this.data.schools.find(school => school.id === schoolId)?.academicYear;
-    const yr = academicYear || schoolYear || this.data.settings.academicYearName || '2026-2027';
-    let conf = this.data.examConfigs.find(ec => ec.schoolId === schoolId && ec.academicYear === yr);
+  public async getExamConfig(schoolId: string, academicYear?: string): Promise<ExamConfig> {
+    // Flush pending writes before reading so a config created earlier in this
+    // request is visible to the new database-backed read.
+    await this.flush();
+    const school = academicYear ? null : await this.getSchoolById(schoolId);
+    const yr = academicYear || school?.academicYear || this.data.settings.academicYearName || '2026-2027';
+    const rows = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+    let conf = rows.find(item => item.schoolId === schoolId && item.academicYear === yr);
     if (!conf) {
       conf = {
-        id: `ec-${schoolId}-${Date.now()}`,
+        id: `ec-${schoolId}-${yr}`,
         schoolId,
         academicYear: yr,
         smallExamName: 'Small Exam',
@@ -1987,27 +1991,36 @@ class StorageEngine {
       };
       this.data.examConfigs.push(conf);
       this.save();
+      try {
+        await this.flush();
+      } catch (error) {
+        // Another request may have inserted the unique school/year row first.
+        const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+        if (persisted.length) return persisted[0];
+        throw error;
+      }
     }
     return conf;
   }
 
-  public updateExamConfig(schoolId: string, updates: Partial<ExamConfig>): ExamConfig {
-    const nextSmallMax = updates.smallExamMax ?? this.getExamConfig(schoolId).smallExamMax;
-    const nextBigMax = updates.bigExamMax ?? this.getExamConfig(schoolId).bigExamMax;
-    const nextPassMark = updates.passMarkPercentage ?? this.getExamConfig(schoolId).passMarkPercentage;
+  public async updateExamConfig(schoolId: string, updates: Partial<ExamConfig>): Promise<ExamConfig> {
+    const schoolYear = updates.academicYear || (await this.getSchoolById(schoolId))?.academicYear;
+    const conf = await this.getExamConfig(schoolId, schoolYear);
+    const nextSmallMax = updates.smallExamMax ?? conf.smallExamMax;
+    const nextBigMax = updates.bigExamMax ?? conf.bigExamMax;
+    const nextPassMark = updates.passMarkPercentage ?? conf.passMarkPercentage;
     if (![nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0) || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
       throw new Error('Exam maximum marks must be positive numbers and pass mark must be between 0 and 100.');
     }
-    const schoolYear = this.data.schools.find(school => school.id === schoolId)?.academicYear;
-    const yr = updates.academicYear || schoolYear || this.data.settings.academicYearName || '2026-2027';
-    let conf = this.getExamConfig(schoolId, yr);
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
+    if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
     this.data.examConfigs[idx] = {
       ...this.data.examConfigs[idx],
       ...updates,
       updatedAt: new Date().toISOString()
     };
     this.save();
+    await this.flush();
     return this.data.examConfigs[idx];
   }
 
@@ -2028,7 +2041,7 @@ class StorageEngine {
     submittedBy: string
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
-    const config = this.getExamConfig(schoolId);
+    const config = await this.getExamConfig(schoolId);
     const maxTotal = (config.smallExamMax || 10) + (config.bigExamMax || 10);
     for (const mark of marks) {
       if (!Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) || mark.smallExamMarks < 0 || mark.bigExamMarks < 0 || mark.smallExamMarks > config.smallExamMax || mark.bigExamMarks > config.bigExamMax) {
@@ -2157,7 +2170,7 @@ class StorageEngine {
     const students = await this.getStudents(schoolId, classId);
     const sem1Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 1');
     const sem2Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 2');
-    const config = this.getExamConfig(schoolId);
+    const config = await this.getExamConfig(schoolId);
     const subjects = await this.getSubjects(schoolId);
 
     const yearlyResults = students.map(student => {
@@ -2262,7 +2275,7 @@ class StorageEngine {
       promotion.yearlyRank = rank.rank;
       if (promotion.adminOverride) promotion.notes = `ADMIN OVERRIDE: ${promotion.notes!.trim()}`;
     }
-    const config = this.getExamConfig(schoolId);
+    const config = await this.getExamConfig(schoolId);
     const yrFrom = config.academicYear;
     const [startYr, endYr] = yrFrom.split('-').map(Number);
     const yrTo = `${startYr + 1}-${endYr + 1}`;
@@ -2892,11 +2905,8 @@ class StorageEngine {
   // -------------------------------------------------------------
   // SUBSCRIPTION INVOICES (PLATFORM OWNER REVENUE)
   // -------------------------------------------------------------
-  public getSubscriptionInvoices(schoolId?: string): SubscriptionInvoice[] {
-    if (schoolId) {
-      return this.data.invoices.filter(i => i.schoolId === schoolId);
-    }
-    return this.data.invoices;
+  public async getSubscriptionInvoices(schoolId?: string): Promise<SubscriptionInvoice[]> {
+    return this.queryRows<SubscriptionInvoice>('subscription_invoices', schoolId ? { school_id: schoolId } : {});
   }
 
   public createSubscriptionInvoice(invData: Omit<SubscriptionInvoice, 'id'>): SubscriptionInvoice {
@@ -2910,18 +2920,25 @@ class StorageEngine {
   }
 
   public async markInvoicePaid(id: string): Promise<SubscriptionInvoice | null> {
-    const inv = this.data.invoices.find(i => i.id === id);
+    await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+    const inv = this.data.invoices.find(invoice => invoice.id === id);
     if (!inv) return null;
+    // Repeated payment confirmation must not extend the same subscription twice.
+    if (inv.status === 'paid') return inv;
+
     inv.status = 'paid';
-    inv.paidDate = new Date().toISOString().split('T')[0];
-    inv.receiptNumber = `SUB-REC-${Date.now().toString().slice(-6)}`;
-    
-    // Also extend or activate the school's subscription
+    inv.paidDate = new Date().toISOString().slice(0, 10);
+    inv.receiptNumber = `SUB-REC-${new Date().getUTCFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    // Extend from the later of today or the current expiry date.
     const school = await this.getSchoolById(inv.schoolId);
-    if (school) {
+    if (school?.subscription) {
       school.subscription.status = 'active';
       const now = new Date();
-      const validUntil = new Date(now);
+      const currentExpiry = Date.parse(String(school.subscription.validUntil || ''));
+      const validUntil = Number.isFinite(currentExpiry) && currentExpiry > now.getTime()
+        ? new Date(currentExpiry)
+        : new Date(now);
       if (inv.cadence === 'yearly') validUntil.setFullYear(validUntil.getFullYear() + 1);
       else if (inv.cadence === 'monthly') validUntil.setMonth(validUntil.getMonth() + 1);
       school.subscription.validUntil = validUntil.toISOString();
