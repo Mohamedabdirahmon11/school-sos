@@ -1998,6 +1998,12 @@ CREATE INDEX IF NOT EXISTS inventory_transactions_school_created_idx
   ON public.inventory_transactions (school_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_transactions_item_created_idx
   ON public.inventory_transactions (item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_items_created_by_idx
+  ON public.inventory_items (created_by);
+CREATE INDEX IF NOT EXISTS inventory_transactions_item_school_idx
+  ON public.inventory_transactions (item_id, school_id);
+CREATE INDEX IF NOT EXISTS inventory_transactions_performed_by_idx
+  ON public.inventory_transactions (performed_by);
 ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inventory_items_school_read ON public.inventory_items;
@@ -2005,10 +2011,19 @@ CREATE POLICY inventory_items_school_read ON public.inventory_items
   FOR SELECT TO authenticated
   USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
 DROP POLICY IF EXISTS inventory_items_school_write ON public.inventory_items;
-CREATE POLICY inventory_items_school_write ON public.inventory_items
-  FOR ALL TO authenticated
+DROP POLICY IF EXISTS inventory_items_school_insert ON public.inventory_items;
+DROP POLICY IF EXISTS inventory_items_school_update ON public.inventory_items;
+DROP POLICY IF EXISTS inventory_items_school_delete ON public.inventory_items;
+CREATE POLICY inventory_items_school_insert ON public.inventory_items
+  FOR INSERT TO authenticated
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
+CREATE POLICY inventory_items_school_update ON public.inventory_items
+  FOR UPDATE TO authenticated
   USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
+CREATE POLICY inventory_items_school_delete ON public.inventory_items
+  FOR DELETE TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
 DROP POLICY IF EXISTS inventory_transactions_school_read ON public.inventory_transactions;
 CREATE POLICY inventory_transactions_school_read ON public.inventory_transactions
   FOR SELECT TO authenticated
