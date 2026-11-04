@@ -435,7 +435,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
-        </div>
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-bold text-[#132A29]">Issue a book</h3>
@@ -485,6 +484,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </>
             )}
           </section>
+        </div>
       )}
 
       {/* 2. TRANSPORT MODULE */}
@@ -845,19 +845,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                 />
               </div>
-              <div>
-                <label className="block font-medium">Bus Capacity (students)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  step="1"
-                  required
-                  value={routeCapacity}
-                  onChange={e => setRouteCapacity(Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 1)))}
-                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                />
-              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -916,6 +903,19 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block font-medium">Bus Capacity (students)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  step="1"
+                  required
+                  value={routeCapacity}
+                  onChange={e => setRouteCapacity(Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 1)))}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
