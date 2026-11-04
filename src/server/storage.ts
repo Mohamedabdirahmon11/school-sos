@@ -3212,8 +3212,7 @@ class StorageEngine {
       driverPhone: route.driverPhone.trim(),
       stops: [...route.stops],
       feeAmount: route.feeAmount,
-      active: route.active,
-      createdAt: new Date().toISOString()
+      active: route.active
     };
     this.data.transportRoutes.push(newRoute);
     this.save();
