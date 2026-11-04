@@ -4254,7 +4254,7 @@ apiRouter.delete('/school/health-records/:recordId', requireAuth, requireSchoolC
   res.json({ success });
 });
 
-apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/transport', requireAuth, requireSchoolContext, requireTransportManageAccess, async (req, res) => {
   const school = (req as any).school;
   res.setHeader('Cache-Control', 'no-store');
   res.json(await db.getTransportRoutes(school.id));
@@ -4329,7 +4329,7 @@ apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireTr
   res.status(201).json(route);
 });
 
-apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, requireTransportManageAccess, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getBusAssignments(school.id));
 });
