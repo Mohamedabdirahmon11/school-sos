@@ -68,7 +68,7 @@ async function deliver(item: CommunicationQueueItem, settings: CommunicationSett
   throw new Error('Unsupported notification provider.');
 }
 
-let timer: NodeJS.Timeout | undefined;
+// Provider adapters remain for compatibility but are intentionally never invoked.\nvoid deliver;\n\nlet timer: NodeJS.Timeout | undefined;
 let active = false;
 let lastBroadcastSweep = 0;
 
