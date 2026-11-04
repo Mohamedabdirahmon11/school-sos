@@ -1274,7 +1274,7 @@ DECLARE
     'school_branches', 'classes', 'subjects', 'students', 'teachers',
     'timetable_slots', 'timetable_settings', 'teacher_unavailability', 'attendance_records', 'exam_configs', 'student_marks',
     'promotions', 'fee_structures', 'fee_payments', 'report_card_templates',
-    'communication_settings', 'communication_queue', 'school_notices',
+    'communication_queue', 'school_notices',
     'school_events', 'assignments', 'assignment_submissions', 'admission_applications'
   ];
 BEGIN
@@ -3270,6 +3270,7 @@ BEGIN
        AND table_name = v_table
        AND column_name <> ALL(v_primary_keys)
        AND column_name <> 'school_id'
+       AND column_name NOT IN ('pin_hash', 'password_hash', 'two_factor_secret', 'pending_two_factor_secret', 'recovery_codes', 'api_key', 'api_secret', 'webhook_url')
        AND is_generated = 'NEVER';
 
     IF v_update_set IS NULL THEN
