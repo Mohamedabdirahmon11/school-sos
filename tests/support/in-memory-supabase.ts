@@ -181,6 +181,30 @@ export class InMemorySupabase {
       else sequenceRows.push({ id: sequenceId, schoolId, academicYear, nextValue });
       return { data: nextValue, error: null };
     }
+    if (name === 'schoolos_apply_fee_installment') {
+      const payment = this.rows('fee_payments').find(row =>
+        String(row.id) === String(args?.p_payment_id)
+        && String(row.schoolId ?? row.school_id) === String(args?.p_school_id)
+      );
+      if (!payment || payment.voidedAt || payment.voided_at) return { data: null, error: { message: 'The fee installment was not found or has been voided.' } };
+      const keys = payment.idempotencyKeys ?? payment.idempotency_keys ?? [];
+      const key = args?.p_idempotency_key || null;
+      if (key && (payment.idempotencyKey === key || payment.idempotency_key === key || keys.includes(key))) return { data: payment, error: null };
+      const amountDue = Number(payment.amountDue ?? payment.amount_due);
+      const amountPaid = Number(payment.amountPaid ?? payment.amount_paid) + Number(args?.p_amount_paid || 0);
+      if (String(payment.status) === 'paid') return { data: null, error: { message: 'This fee is already fully paid for the selected billing period.' } };
+      if (amountPaid > amountDue) return { data: null, error: { message: 'Cash paid cannot exceed the remaining fee balance.' } };
+      const remaining = amountDue - amountPaid;
+      const status = remaining === 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+      const nextKeys = key ? [...keys, key] : keys;
+      const notes = args?.p_notes ? [payment.notes, String(args.p_notes).trim()].filter(Boolean).join(' · ') : payment.notes;
+      Object.assign(payment, {
+        amountPaid, amount_paid: amountPaid, remainingAmount: remaining, remaining_amount: remaining,
+        status, date: new Date().toISOString().slice(0, 10), recordedBy: args?.p_recorded_by, recorded_by: args?.p_recorded_by,
+        idempotencyKeys: nextKeys, idempotency_keys: nextKeys, notes
+      });
+      return { data: payment, error: null };
+    }
     if (name === 'schoolos_void_fee_payment') {
       const payment = this.rows('fee_payments').find(row =>
         String(row.id) === String(args?.p_payment_id)
