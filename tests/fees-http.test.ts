@@ -98,6 +98,17 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(partialRetry.response.status, 201);
   assert.equal(partialRetry.body.id, partial.body.id);
   assert.equal(partialRetry.body.amountPaid, 30);
+  const [installmentA, installmentB] = await Promise.all([
+    postPayment({ ...partialPayload, amountPaid: 20, idempotencyKey: 'fee-test-installment-a' }),
+    postPayment({ ...partialPayload, amountPaid: 15, idempotencyKey: 'fee-test-installment-b' })
+  ]);
+  assert.equal(installmentA.response.status, 201);
+  assert.equal(installmentB.response.status, 201);
+  assert.equal(installmentA.body.id, partial.body.id);
+  assert.equal(installmentB.body.id, partial.body.id);
+  assert.equal(installmentB.body.amountPaid, 65, 'parallel distinct installments must both be applied');
+  const installmentRetry = await postPayment({ ...partialPayload, amountPaid: 15, idempotencyKey: 'fee-test-installment-b' });
+  assert.equal(installmentRetry.body.amountPaid, 65, 'retries must not apply an installment twice');
 
   const unpaid = await postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'October 2026', feeType: 'monthly_tuition', amountDue: 1, amountPaid: 0 });
   assert.equal(unpaid.response.status, 201);
