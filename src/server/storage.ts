@@ -1943,7 +1943,6 @@ class StorageEngine {
         a.date === date
       );
 
-      const previousStatus = existingIdx >= 0 ? this.data.attendance[existingIdx].status : undefined;
       if (existingIdx >= 0) {
         this.data.attendance[existingIdx].status = rec.status;
         this.data.attendance[existingIdx].note = rec.note;
