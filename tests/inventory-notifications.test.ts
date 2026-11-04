@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const migration033 = readFileSync(new URL('../supabase/migrations/033_inventory_items_and_atomic_stock_movements.sql', import.meta.url), 'utf8');
+const migration034 = readFileSync(new URL('../supabase/migrations/034_notification_queue_retry_worker.sql', import.meta.url), 'utf8');
+const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+const worker = readFileSync(new URL('../src/server/notification-worker.ts', import.meta.url), 'utf8');
+
+test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
+  assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
+  assert.match(migration033, /FOR UPDATE/);
+  assert.match(migration033, /item_row\.quantity_on_hand \+ delta < 0/);
+  assert.match(migration033, /INSERT INTO public\.inventory_transactions/);
+  assert.match(migration033, /GRANT EXECUTE ON FUNCTION public\.schoolos_adjust_inventory[\s\S]*TO service_role/);
+  assert.match(api, /schoolId: school\.id, itemId: req\.params\.id/);
+  assert.match(api, /body\.quantityOnHand !== undefined && Number\(body\.quantityOnHand\) !== 0/);
+});
+
+test('notification queue uses atomic claims, bounded attempts, delayed retry, and school-scoped manual retry', () => {
+  assert.match(migration034, /FOR UPDATE SKIP LOCKED/);
+  assert.match(migration034, /attempt_count < max_attempts/);
+  assert.match(migration034, /interval '1 minute'/);
+  assert.match(migration034, /interval '5 minutes'/);
+  assert.match(migration034, /WHERE id = p_id AND school_id = p_school_id AND status = 'failed'/);
+  assert.match(storage, /schoolos_claim_communication_queue/);
+  assert.match(storage, /schoolos_complete_communication_queue/);
+  assert.match(storage, /schoolos_retry_communication_queue/);
+  assert.match(api, /communication\/queue\/:id\/retry/);
+});
+
+test('notification worker uses fixed provider hosts, international numbers, and bounded network timeouts', () => {
+  assert.match(worker, /AbortSignal\.timeout\(15_000\)/);
+  assert.match(worker, /api\.twilio\.com/);
+  assert.match(worker, /api\\\.infobip\\\.com/);
+  assert.match(worker, /graph\.facebook\.com/);
+  assert.match(worker, /SCHOOL_OS_LOCAL_GATEWAY_URL/);
+  assert.match(worker, /target\.protocol !== 'https:'/);
+  assert.match(worker, /phone must be in international format/i);
+});
+
+test('communication API never returns stored provider secrets and audit export is awaited', () => {
+  assert.match(storage, /apiKeyConfigured: Boolean\(settings\.apiKey\)/);
+  assert.match(storage, /apiSecretConfigured: Boolean\(settings\.apiSecret\)/);
+  assert.match(api, /getPublicCommunicationSettings\(school\.id\)/);
+  assert.match(api, /const csv = await db\.exportAuditLogsCSV\(\)/);
+  assert.match(storage, /if \(\^?\/\^\\s\*\[=\+@-\]/);
+});
