@@ -861,6 +861,12 @@ export class ApiClient {
     return this.request<CommunicationQueueItem[]>(`/communication/queue${this.pageQuery(params)}`);
   }
 
+  public static async retryQueuedNotification(id: string) {
+    return this.request<CommunicationQueueItem>(`/communication/queue/${encodeURIComponent(id)}/retry`, {
+      method: 'POST'
+    });
+  }
+
   public static async sendQueuedNotification(data: any) {
     return this.request<CommunicationQueueItem>('/communication/send', {
       method: 'POST',
