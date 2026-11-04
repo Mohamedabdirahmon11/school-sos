@@ -1395,7 +1395,7 @@ BEGIN
       table_name || '_admin_delete', table_name
     );
   END LOOP;
-END $;
+END $$;
 
 -- Only school administrators may mutate library, transport, or bus assignment records.
 -- These are RESTRICTIVE write policies so the broad tenant read policy cannot grant writes.
