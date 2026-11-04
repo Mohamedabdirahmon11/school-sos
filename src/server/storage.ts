@@ -1988,6 +1988,7 @@ class StorageEngine {
     }
 
     this.save();
+    await this.flush();
     return results;
   }
 
