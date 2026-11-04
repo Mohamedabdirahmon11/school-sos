@@ -4,7 +4,7 @@
  * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
  * 3. Report Card Designer (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
- * 4. SMS / WhatsApp Notification Gateway (Provider credentials, queue status)
+ * 4. Free administrator-owned WhatsApp messaging
  * 5. School Backup & Data Safety (Full JSON backup download, CSV exports)
  */
 
@@ -115,8 +115,6 @@ export const SchoolSettingsView: React.FC = () => {
 
   // Report Card Designer State
   const [design, setDesign] = useState<ReportCardDesign | null>(null);
-
-  // SMS / WhatsApp Gateway State
 
   useEffect(() => {
     if (!school) return;
@@ -469,7 +467,7 @@ export const SchoolSettingsView: React.FC = () => {
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            SMS / WhatsApp
+            WhatsApp (Free)
           </button>
           <button
             type="button"
