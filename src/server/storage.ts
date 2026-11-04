@@ -3025,10 +3025,10 @@ class StorageEngine {
   }
 
   public async publishDueBroadcasts(): Promise<number> {
-    const due = await this.queryPage<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' }, 1, 100, undefined, '*');
+    const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
     const now = Date.now();
     let published = 0;
-    for (const item of due.items) {
+    for (const item of scheduled) {
       if (item.scheduledFor && Date.parse(item.scheduledFor) <= now && await this.publishBroadcast(item.id)) published += 1;
     }
     return published;
