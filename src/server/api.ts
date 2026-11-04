@@ -449,6 +449,26 @@ async function requireLibraryManageAccess(req: Request, res: Response, next: () 
   res.status(403).json({ error: 'Library management permission required.' });
 }
 
+async function requireTransportManageAccess(req: Request, res: Response, next: () => void) {
+  const user = (req as any).user as User;
+  if (!user) {
+    res.status(401).json({ error: 'Authentication required.' });
+    return;
+  }
+  if (user.role === 'super_admin' || user.role === 'school_admin') {
+    next();
+    return;
+  }
+  if (user.role === 'accountant' && user.schoolId) {
+    const staffAccount = await getStaffForRequest(req, user.id, user.schoolId);
+    if (staffAccount?.status === 'active' && staffAccount.permissions?.includes('transport_manage')) {
+      next();
+      return;
+    }
+  }
+  res.status(403).json({ error: 'Transport management permission required.' });
+}
+
 function requireAccountantOrSuperAdmin(req: Request, res: Response, next: () => void) {
   const user = (req as any).user as User;
   if (!user || !['accountant', 'super_admin'].includes(user.role)) {
@@ -571,7 +591,7 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
         : path.startsWith('/attendance') && isWrite ? 'attendance_manage'
           : (path.startsWith('/marks') || path.startsWith('/exams') || path.startsWith('/rankings')) && isWrite ? 'grades_manage'
             : path.startsWith('/school/library') ? 'library_manage'
-              : path.startsWith('/transport') ? 'transport_manage'
+              : (path.startsWith('/school/transport') || path.startsWith('/bus/assignments')) ? 'transport_manage'
         : (path.startsWith('/reports') || path.startsWith('/school/reports')) ? 'reports_export'
                   : null;
     if (requiredPermission) {
@@ -4236,6 +4256,7 @@ apiRouter.delete('/school/health-records/:recordId', requireAuth, requireSchoolC
 
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  res.setHeader('Cache-Control', 'no-store');
   res.json(await db.getTransportRoutes(school.id));
 });
 
@@ -4273,7 +4294,7 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json(updated);
 });
 
-apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
+apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireTransportManageAccess, (req, res) => {
   const school = (req as any).school;
   const payload = req.body;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -4313,7 +4334,7 @@ apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, async (req,
   res.json(await db.getBusAssignments(school.id));
 });
 
-apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.put('/bus/assignments/:studentId', requireAuth, requireTransportManageAccess, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const studentId = typeof req.params.studentId === 'string' ? req.params.studentId.trim() : '';
   const routeId = req.body && typeof req.body === 'object' && !Array.isArray(req.body) && typeof req.body.routeId === 'string'
@@ -4330,7 +4351,7 @@ apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSu
   }
 });
 
-apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireTransportManageAccess, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const studentId = typeof req.params.studentId === 'string' ? req.params.studentId.trim() : '';
   if (!studentId || studentId.length > 64) {
