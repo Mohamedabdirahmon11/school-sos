@@ -83,8 +83,9 @@ WITH checks AS (
     to_regprocedure('public.schoolos_claim_communication_queue()') IS NOT NULL
       AND to_regprocedure('public.schoolos_complete_communication_queue(character varying,boolean,text,character varying)') IS NOT NULL
       AND to_regprocedure('public.schoolos_retry_communication_queue(character varying,character varying)') IS NOT NULL
-      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='communication_queue' AND column_name='attempt_count'),
-    'Apply migrations 034 and 036 before enabling the production notification worker.'
+      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='communication_queue' AND column_name='attempt_count')
+      AND EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='comm_status_enum' AND e.enumlabel='processing'),
+    'Apply migrations 034, 036, and 038 before enabling the production notification worker.'
   UNION ALL
   SELECT 'Dashboard attendance and fee metrics RPC exists',
     to_regprocedure('public.school_dashboard_summary(character varying)') IS NOT NULL,
