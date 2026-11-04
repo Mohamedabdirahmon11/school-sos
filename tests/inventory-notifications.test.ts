@@ -47,6 +47,10 @@ test('communication API never returns stored provider secrets and audit export i
   assert.match(storage, /apiKeyConfigured: Boolean\(settings\.apiKey\)/);
   assert.match(storage, /apiSecretConfigured: Boolean\(settings\.apiSecret\)/);
   assert.match(api, /getPublicCommunicationSettings\(school\.id\)/);
+  assert.match(api, /Twilio activation requires Account SID/);
+  assert.match(api, /Infobip activation requires an API key/);
+  assert.match(api, /WhatsApp Business activation requires an access token/);
+  assert.match(api, /SCHOOL_OS_LOCAL_GATEWAY_URL/);
   assert.match(api, /const csv = await db\.exportAuditLogsCSV\(\)/);
   assert.ok(storage.includes('if (/^\\s*[=+@-]/.test(text))'));
 });
