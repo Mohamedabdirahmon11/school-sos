@@ -11,6 +11,7 @@ import { apiRouter } from './src/server/api.ts';
 import { apiErrorHandler } from './src/server/async-errors.ts';
 import { apiNotFound, createLoginRateLimiter, getTrustProxyHops, securityHeaders } from './src/server/security-middleware.ts';
 import { assertProductionAssets } from './src/server/production-assets.ts';
+import { startNotificationWorker } from './src/server/notification-worker.ts';
 import { db, initializeStorage } from './src/server/storage.ts';
 import path from 'node:path';
 
@@ -28,6 +29,7 @@ async function startServer() {
   if (isProduction) assertProductionAssets(distPath);
 
   await initializeStorage();
+  if (isProduction) startNotificationWorker();
   const supabaseRoundTrip = await db.checkSupabaseHealth();
   if (!supabaseRoundTrip.ok) throw new Error('Supabase health check failed during startup. Verify Supabase connectivity and schema access.');
   console.info(`[supabase-startup] connectivity=ok roundTrip=${supabaseRoundTrip.roundTripMs}ms`);
