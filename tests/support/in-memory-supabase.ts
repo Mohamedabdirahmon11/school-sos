@@ -159,9 +159,11 @@ export class InMemorySupabase {
   from(table: string) { return new MemoryQuery(this, table); }
   private failBulkImport = false;
   private failAdmissionApproval = false;
+  private failBackupRestore = false;
 
   failNextBulkImport() { this.failBulkImport = true; }
   failNextAdmissionApproval() { this.failAdmissionApproval = true; }
+  failNextBackupRestore() { this.failBackupRestore = true; }
 
   async rpc(name: string, args?: any) {
     if (name === 'schoolos_next_fee_receipt') {
@@ -248,6 +250,10 @@ export class InMemorySupabase {
             else this.rows(table).push({ ...row });
           }
           restored[table] = incoming.length;
+          if (this.failBackupRestore && table === 'school_events') {
+            this.failBackupRestore = false;
+            throw new Error('Simulated backup restore failure for rollback test.');
+          }
         }
         this.rows('audit_logs').push({
           id: 'audit-backup-restore-' + Date.now(), action: 'SCHOOL_BACKUP_RESTORED',
