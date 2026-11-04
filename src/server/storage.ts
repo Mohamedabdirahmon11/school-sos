@@ -3053,14 +3053,14 @@ class StorageEngine {
     const escapeCell = (value: unknown): string => {
       let text = value == null ? '' : String(value);
       // Prevent spreadsheet formula execution when opening exported audit data.
-      if (/^[\\s]*[=+@\\-]/.test(text)) text = `'${text}`;
+      if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
       return `"${text.replace(/"/g, '""')}"`;
     };
     const rows = logs.map(log => [
       log.timestamp, log.action, log.category, log.severity,
       log.userName, log.userRole, log.schoolName, log.details
     ].map(escapeCell));
-    return [headers.map(escapeCell).join(','), ...rows.map(row => row.join(','))].join('\\r\\n');
+    return [headers.map(escapeCell).join(','), ...rows.map(row => row.join(','))].join('\r\n');
   }
 
   // -------------------------------------------------------------
