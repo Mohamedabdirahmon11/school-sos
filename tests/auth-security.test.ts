@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isSessionExpiryValid } from '../src/server/auth-security.ts';
+import { isSessionExpiryValid, passwordPolicyError } from '../src/server/auth-security.ts';
 
 test('session expiry accepts only a valid future ISO timestamp', () => {
   const now = Date.parse('2026-11-03T12:00:00.000Z');
@@ -31,4 +31,14 @@ test('Super Admin routes require an authenticated Super Admin', () => {
     assert.match(route[3], /requireAuth/, `${route[1].toUpperCase()} ${route[2]} requires authentication`);
     assert.match(route[3], /requireSuperAdmin/, `${route[1].toUpperCase()} ${route[2]} requires Super Admin role`);
   }
+});
+
+test('password policy requires 12 characters, mixed case, and a number', () => {
+  assert.equal(passwordPolicyError('Abcdefghij12'), null);
+  assert.match(passwordPolicyError('Short1A') || '', /12 characters/);
+  assert.match(passwordPolicyError('alllowercase123') || '', /uppercase and lowercase/);
+  assert.match(passwordPolicyError('ALLUPPERCASE123') || '', /uppercase and lowercase/);
+  assert.match(passwordPolicyError('NoDigitsAtAllAA') || '', /at least one number/);
+  assert.match(passwordPolicyError('Abcdefghij123'.repeat(10)) || '', /128 characters/);
+  assert.match(passwordPolicyError(undefined) || '', /12 characters/);
 });
