@@ -18,6 +18,7 @@ import {
   Save, 
   CheckCircle2, 
   Send,
+  MessageCircle,
   Search,
   Filter
 } from 'lucide-react';
@@ -29,6 +30,17 @@ const schoolLocalDate = (timeZone?: string) => {
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+};
+
+const normalizeWhatsAppNumber = (phone?: string) => {
+  if (!phone) return null;
+  const raw = phone.trim();
+  // wa.me requires the full international number without "+" or punctuation.
+  if (!raw.startsWith('+') && !raw.startsWith('00')) return null;
+  const digits = raw.startsWith('00')
+    ? raw.slice(2).replace(/\\D/g, '')
+    : raw.slice(1).replace(/\\D/g, '');
+  return digits.length >= 8 && digits.length <= 15 ? digits : null;
 };
 
 export const AttendanceView: React.FC = () => {
@@ -139,6 +151,26 @@ export const AttendanceView: React.FC = () => {
     }));
   };
 
+  const openAbsentStudentWhatsApp = (student: Student) => {
+    const parentPhone = student.fatherPhone || student.motherPhone;
+    const whatsappNumber = normalizeWhatsAppNumber(parentPhone);
+    if (!whatsappNumber) {
+      setNotice('Waalidka lambarkiisa u qor qaabka caalamiga ah, tusaale +2519XXXXXXXX, kadib WhatsApp fur.');
+      return;
+    }
+    const studentName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
+    const className = classes.find(item => item.id === selectedClassId)?.name || '';
+    const message = [
+      'Asc,',
+      `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${date}, dugsiga ka maqnaa.`,
+      className ? `Fasalka: ${className}.` : '',
+      'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
+      school?.name || ''
+    ].filter(Boolean).join('\\n');
+    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const handleSaveAttendance = async () => {
     if (!selectedClassId || isReadOnly) return;
     if (school?.attendanceRules?.requireExcusedReason) {
@@ -159,7 +191,7 @@ export const AttendanceView: React.FC = () => {
       }));
 
       await ApiClient.recordDailyAttendance(selectedClassId, date, records);
-      setNotice('Daily attendance recorded successfully! Absent notifications queued for parents.');
+      setNotice('Attendance saved. Ardayda maqneyd, riix badhanka WhatsApp si aad fariin ugu dirto waalid kasta.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to save attendance.');
@@ -307,6 +339,7 @@ export const AttendanceView: React.FC = () => {
                   <th className="py-3 px-4">Parent Phone</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4">Attendance Note</th>
+                  <th className="py-3 px-4">Parent WhatsApp</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -380,6 +413,22 @@ export const AttendanceView: React.FC = () => {
                           disabled={isReadOnly}
                           className="w-full text-xs px-2.5 py-1 border border-[#CBD5E1] rounded focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
                         />
+                      </td>
+                      <td className="py-3 px-4">
+                        {state.status === 'absent' ? (
+                          <button
+                            type="button"
+                            onClick={() => openAbsentStudentWhatsApp(std)}
+                            disabled={isReadOnly || !normalizeWhatsAppNumber(std.fatherPhone || std.motherPhone)}
+                            title="Open WhatsApp chat with the parent and prepare the absence message"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                          </button>
+                        ) : <span className="text-[11px] text-[#94A3B8]">—</span>}
+                        {state.status === 'absent' && !normalizeWhatsAppNumber(std.fatherPhone || std.motherPhone) && (
+                          <p className="mt-1 max-w-40 text-[10px] text-amber-700">Ku qor waalidka lambarka +country code.</p>
+                        )}
                       </td>
                     </tr>
                   );
