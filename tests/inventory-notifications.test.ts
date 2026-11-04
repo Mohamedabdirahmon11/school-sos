@@ -10,6 +10,8 @@ const worker = readFileSync(new URL('../src/server/notification-worker.ts', impo
 const settingsUi = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
 const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const broadcastsUi = readFileSync(new URL('../src/components/superadmin/BroadcastsView.tsx', import.meta.url), 'utf8');
+const inventoryUi = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
+const auditUi = readFileSync(new URL('../src/components/superadmin/SupportAuditView.tsx', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -107,4 +109,23 @@ test('broadcast composer and API agree on immediate and scheduled delivery', () 
   assert.match(broadcastsUi, /sendNow: sendOption === 'now'/);
   assert.match(broadcastsUi, /scheduleDate\.toISOString\(\)/);
   assert.match(broadcastsUi, /Retry loading/);
+});
+
+
+test('inventory screen uses the persistent item API and stock movement ledger', () => {
+  assert.match(apiClient, /getInventoryItems\(\)/);
+  assert.match(apiClient, /createInventoryItem\(/);
+  assert.match(apiClient, /createInventoryTransaction\(/);
+  assert.match(inventoryUi, /ApiClient\.getInventoryItems\(\)/);
+  assert.match(inventoryUi, /ApiClient\.createInventoryItem\(/);
+  assert.match(inventoryUi, /ApiClient\.createInventoryTransaction\(/);
+  assert.match(inventoryUi, /Movement history/);
+  assert.match(inventoryUi, /Low stock/);
+});
+
+test('audit CSV export downloads the complete server-side export, not only the visible page', () => {
+  assert.match(auditUi, /\/api\/superadmin\/audit-logs\/export-csv/);
+  assert.match(auditUi, /response\.blob\(\)/);
+  assert.match(storage, /Prevent spreadsheet formula execution/);
+  assert.match(api, /exportAuditLogsCSV\(\)/);
 });
