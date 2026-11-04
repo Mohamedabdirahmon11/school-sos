@@ -4207,7 +4207,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'Choose a valid backup file belonging to this school.' });
     return;
   }
-  if (!['1.0.0', '1.1.0'].includes(String(backup.version || ''))) {
+  if (!['1.0.0', '1.1.0', '1.2.0'].includes(String(backup.version || ''))) {
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
