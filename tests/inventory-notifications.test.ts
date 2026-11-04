@@ -7,6 +7,8 @@ const migration034 = readFileSync(new URL('../supabase/migrations/034_notificati
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const worker = readFileSync(new URL('../src/server/notification-worker.ts', import.meta.url), 'utf8');
+const settingsUi = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
+const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -87,4 +89,13 @@ test('notification processing enum and retry completion use the database enum ty
   assert.match(migration038, /ADD VALUE IF NOT EXISTS 'processing'/);
   assert.match(migration039, /END\)::public\.comm_status_enum/);
   assert.match(migration039, /GRANT EXECUTE ON FUNCTION public\.schoolos_complete_communication_queue/);
+});
+
+test('school settings UI supports safe credential updates and manual retries', () => {
+  assert.match(settingsUi, /apiKeyConfigured/);
+  assert.match(settingsUi, /apiSecretConfigured/);
+  assert.match(settingsUi, /whatsapp_business/);
+  assert.match(settingsUi, /Infobip HTTPS Base URL/);
+  assert.match(settingsUi, /retryQueuedNotification/);
+  assert.match(apiClient, /communication\/queue\//);
 });
