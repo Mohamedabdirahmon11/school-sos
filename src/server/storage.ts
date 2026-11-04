@@ -3268,18 +3268,27 @@ class StorageEngine {
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
       'audit_logs', 'bus_assignments', 'class_subjects', 'classes', 'communication_queue',
-      'communication_settings', 'direct_messages', 'exam_configs', 'fee_payments', 'fee_ranges',
-      'fee_receipt_sequences', 'fee_structures', 'inventory_items', 'inventory_transactions', 'library_books', 'notice_reads',
+      'communication_settings', 'direct_messages', 'discipline_incidents', 'exam_configs',
+      'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
+      'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
       'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
       'school_subscriptions', 'staff_members', 'student_marks', 'students', 'subjects',
       'subscription_invoices', 'support_tickets', 'teacher_unavailability', 'teachers',
-      'timetable_settings', 'timetable_slots', 'transport_routes', 'user_sessions', 'users'
+      'timetable_settings', 'timetable_slots', 'transport_routes', 'users'
     ];
     const tables: Record<string, any[]> = {};
     for (const table of schoolTables) {
       tables[table] = await this.queryRows(table, { school_id: schoolId });
     }
+    // Backups must never export credential material or active login sessions.
+    tables.users = tables.users.map((user: any) => {
+      const {
+        passwordHash, pinHash, twoFactorSecret, pendingTwoFactorSecret, recoveryCodes,
+        failedLoginAttempts, lockedUntil, ...safeUser
+      } = user;
+      return safeUser;
+    });
     // Platform broadcasts can target one tenant without carrying school_id.
     tables.platform_broadcasts = await this.queryRows('platform_broadcasts', { target_school_id: schoolId });
 
