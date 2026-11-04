@@ -475,9 +475,15 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
     res.status(404).json({ error: 'Class not found in this school.' });
     return false;
   }
-  if (user.role === 'teacher' && !user.assignedClassIds?.includes(classId)) {
-    res.status(403).json({ error: 'You may only access your assigned classes.' });
-    return false;
+  if (user.role === 'teacher') {
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const assignment = teacher.items.length
+      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
+      : { items: [] as any[] };
+    if (!assignment.items.length) {
+      res.status(403).json({ error: 'You may only access your actively assigned classes.' });
+      return false;
+    }
   }
   return true;
 }
@@ -486,7 +492,14 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
   const student = await db.getStudentById(studentId, user.schoolId);
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
   if (user.role === 'super_admin' || user.role === 'school_admin' || user.role === 'accountant') return true;
-  if (user.role === 'teacher') return Boolean(user.assignedClassIds?.includes(student.classId));
+  if (user.role === 'teacher') {
+    const teacher = await db.queryPage('teachers', { school_id: student.schoolId, user_id: user.id }, 1, 1, undefined, 'id');
+    if (!teacher.items.length) return false;
+    const assignment = await db.queryPage('class_subjects', {
+      school_id: student.schoolId, teacher_id: teacher.items[0].id, class_id: student.classId, is_active: 'true'
+    }, 1, 1, undefined, 'id');
+    return assignment.items.length > 0;
+  }
   if (user.role === 'parent') {
     const parentPhones = [user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone));
     return Boolean(user.linkedStudentIds?.includes(student.id) || parentPhones.includes(student.fatherPhone || '') || parentPhones.includes(student.motherPhone || ''));
