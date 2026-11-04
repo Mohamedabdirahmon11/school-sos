@@ -58,5 +58,5 @@ test('library catalogue enforces non-negative quantity and school-local unique I
   assert.match(isbnMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_school_isbn_unique/);
   assert.match(isbnMigration, /lower\(btrim\(isbn\)\)/);
   assert.match(api, /error\?\.code === '23505'/);
-  assert.match(schema, /quantity INTEGER NOT NULL DEFAULT 1 CHECK \(quantity >= 0\)/);
+  assert.match(schema, /quantity INTEGER NOT NULL DEFAULT 1 CONSTRAINT library_books_quantity_nonnegative CHECK \(quantity >= 0\)/);
 });
