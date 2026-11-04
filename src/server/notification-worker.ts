@@ -80,15 +80,9 @@ async function processOne(): Promise<void> {
       lastBroadcastSweep = Date.now();
       await db.publishDueBroadcasts();
     }
-    const item = await db.claimCommunicationQueueItem();
-    if (!item) return;
-    try {
-      const settings = await db.getCommunicationSettings(item.schoolId);
-      const result = await deliver(item, settings);
-      await db.completeCommunicationQueueItem(item.id, true, undefined, result.messageId);
-    } catch (error: any) {
-      await db.completeCommunicationQueueItem(item.id, false, String(error?.message || 'Provider delivery failed.'));
-    }
+    // SchoolOS uses the administrator's own WhatsApp session for parent messaging.
+    // Never dispatch SMS/WhatsApp through paid provider APIs from the background worker.
+    // Broadcast publishing above remains enabled; notification queue items are not auto-sent.
   } catch (error: any) {
     console.error(`[notification-worker] ${String(error?.message || 'Queue processing failed.')}`);
   } finally {
