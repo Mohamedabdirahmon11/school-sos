@@ -2717,6 +2717,58 @@ class StorageEngine {
   }
 
   // -------------------------------------------------------------
+  // SCHOOL EVENTS
+  // -------------------------------------------------------------
+  public async getEvents(schoolId: string): Promise<SchoolEvent[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64) {
+      throw new Error('A valid school is required to load events.');
+    }
+    const events = await this.queryRows<SchoolEvent>('school_events', { school_id: schoolId.trim() });
+    return events.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title));
+  }
+
+  public createEvent(eventData: Omit<SchoolEvent, 'id'>): SchoolEvent {
+    const validDate = (value: unknown): value is string => {
+      if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (!eventData || typeof eventData !== 'object' ||
+        typeof eventData.schoolId !== 'string' || !eventData.schoolId.trim() || eventData.schoolId.length > 64 ||
+        typeof eventData.title !== 'string' || !eventData.title.trim() || eventData.title.trim().length > 255 ||
+        typeof eventData.description !== 'string' || eventData.description.length > 10000 ||
+        !validDate(eventData.startDate) || !validDate(eventData.endDate) || eventData.endDate < eventData.startDate ||
+        !['event', 'holiday', 'exam', 'meeting'].includes(eventData.type)) {
+      throw new Error('Event details are invalid. Check the title, description, dates and event type.');
+    }
+    const event: SchoolEvent = {
+      id: `evt-${randomUUID()}`,
+      schoolId: eventData.schoolId.trim(),
+      title: eventData.title.trim(),
+      description: eventData.description.trim(),
+      startDate: eventData.startDate,
+      endDate: eventData.endDate,
+      type: eventData.type
+    };
+    this.data.events.push(event);
+    this.save();
+    return event;
+  }
+
+  public async deleteEvent(schoolId: string, eventId: string): Promise<boolean> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof eventId !== 'string' || !eventId.trim() || eventId.length > 64) {
+      throw new Error('A valid school and event ID are required.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    await this.getEvents(scopedSchoolId);
+    const before = this.data.events.length;
+    this.data.events = this.data.events.filter(event => !(event.id === eventId.trim() && event.schoolId === scopedSchoolId));
+    if (this.data.events.length !== before) this.save();
+    return this.data.events.length !== before;
+  }
+
+  // -------------------------------------------------------------
   // NOTICES & DIRECT MESSAGES & BROADCASTS
   // -------------------------------------------------------------
   public async getNotices(schoolId: string): Promise<SchoolNotice[]> {
