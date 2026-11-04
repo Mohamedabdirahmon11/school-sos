@@ -158,8 +158,10 @@ export class InMemorySupabase {
   replaceRows(table: string, rows: any[]) { this.tables.set(table, rows); }
   from(table: string) { return new MemoryQuery(this, table); }
   private failBulkImport = false;
+  private failAdmissionApproval = false;
 
   failNextBulkImport() { this.failBulkImport = true; }
+  failNextAdmissionApproval() { this.failAdmissionApproval = true; }
 
   async rpc(name: string, args?: any) {
     if (name === 'schoolos_next_fee_receipt') {
@@ -292,6 +294,10 @@ export class InMemorySupabase {
               linkedStudentIds: [payload.student_record_id], isBlocked: false, failedLoginAttempts: 0
             });
           }
+        }
+        if (this.failAdmissionApproval) {
+          this.failAdmissionApproval = false;
+          throw new Error('Simulated failure before admission commit.');
         }
         application.status = 'approved';
         application.studentId = payload.student_id;
