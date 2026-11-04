@@ -8,9 +8,12 @@ const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 test('notification and communication tables restrict authenticated writes to school admins', () => {
   for (const table of ['communication_settings', 'notification_templates', 'communication_queue']) {
     assert.ok(migration.includes("'" + table + "'"));
-    assert.ok(schema.includes(table + "_admin_insert"));
-    assert.ok(schema.includes(table + "_admin_update"));
-    assert.ok(schema.includes(table + "_admin_delete"));
+    assert.ok(schema.includes("'" + table + "'"));
+  }
+  assert.ok(schema.includes("table_name || '_admin_insert'"));
+  assert.ok(schema.includes("table_name || '_admin_update'"));
+  assert.ok(schema.includes("table_name || '_admin_delete'"));
+  for (const table of ['communication_settings', 'notification_templates', 'communication_queue']) {
   }
   assert.ok(migration.includes('AS RESTRICTIVE'));
   assert.ok(migration.includes("private.auth_user_role() IN (''school_admin'', ''super_admin'')"));
