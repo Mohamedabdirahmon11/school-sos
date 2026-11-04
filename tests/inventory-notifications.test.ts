@@ -9,6 +9,7 @@ const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url
 const worker = readFileSync(new URL('../src/server/notification-worker.ts', import.meta.url), 'utf8');
 const settingsUi = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
 const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
+const broadcastsUi = readFileSync(new URL('../src/components/superadmin/BroadcastsView.tsx', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -98,4 +99,12 @@ test('school settings UI supports safe credential updates and manual retries', (
   assert.match(settingsUi, /Infobip HTTPS Base URL/);
   assert.match(settingsUi, /retryQueuedNotification/);
   assert.match(apiClient, /communication\/queue\//);
+});
+
+test('broadcast composer and API agree on immediate and scheduled delivery', () => {
+  assert.match(api, /body\.sendNow === true \? 'draft' : body\.sendNow === false \? 'scheduled'/);
+  assert.match(api, /immediate \? await db\.publishBroadcast\(created\.id\) : created/);
+  assert.match(broadcastsUi, /sendNow: sendOption === 'now'/);
+  assert.match(broadcastsUi, /scheduleDate\.toISOString\(\)/);
+  assert.match(broadcastsUi, /Retry loading/);
 });
