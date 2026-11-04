@@ -464,6 +464,15 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   assert.equal(backup.tables.communication_settings, undefined, 'Legacy provider credentials must not be included in a school backup.');
   assert.ok(backup.tables.students.every((row: any) => !('pinHash' in row) && !('pin' in row)), 'Student PIN hashes must not be exported.');
   assert.ok(backup.tables.users.every((row: any) => !('passwordHash' in row) && !('pinHash' in row) && !('pin' in row) && !('twoFactorSecret' in row) && !('recoveryCodes' in row)), 'User credentials and 2FA secrets must not be exported.');
+  const protectedStudentBackupRow = backup.tables.students[0];
+  const protectedStudentId = protectedStudentBackupRow?.id;
+  const protectedStudentLiveRow = memory.rows('students').find(row => row.id === protectedStudentId);
+  const protectedPinHash = protectedStudentLiveRow?.pin_hash ?? protectedStudentLiveRow?.pinHash;
+  if (protectedStudentBackupRow) {
+    // A hand-crafted backup must not be able to inject credential material.
+    protectedStudentBackupRow.pinHash = 'attacker-controlled-pin-hash';
+    protectedStudentBackupRow.pin_hash = 'attacker-controlled-pin-hash';
+  }
   memory.replaceRows('school_events', []);
 
   const previewResponse = await fetch(`${baseUrl}/school/backup/restore/preview`, {
@@ -514,5 +523,9 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   assert.equal(restored.ok, true);
   assert.equal(restored.mode, 'merge');
   assert.equal(memory.rows('school_events').some(row => row.id === event.id), true);
+  if (protectedStudentId) {
+    const restoredStudent = memory.rows('students').find(row => row.id === protectedStudentId);
+    assert.equal(restoredStudent?.pin_hash ?? restoredStudent?.pinHash, protectedPinHash, 'Restore must never overwrite or inject a student PIN hash.');
+  }
   assert.equal(memory.rows('audit_logs').some(row => row.action === 'SCHOOL_BACKUP_RESTORED'), true);
 });
