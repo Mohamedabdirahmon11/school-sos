@@ -462,8 +462,8 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   assert.equal(backup.school.id, school.id);
   assert.equal(backup.tables.school_events.length, 1);
   assert.equal(backup.tables.communication_settings, undefined, 'Legacy provider credentials must not be included in a school backup.');
-  assert.ok(backup.tables.students.every((row: any) => !('pinHash' in row) && !('pin' in row)), 'Student PIN hashes must not be exported.');
-  assert.ok(backup.tables.users.every((row: any) => !('passwordHash' in row) && !('pinHash' in row) && !('pin' in row) && !('twoFactorSecret' in row) && !('recoveryCodes' in row)), 'User credentials and 2FA secrets must not be exported.');
+  assert.ok(backup.tables.students.every((row: any) => !('pinHash' in row) && !('pin_hash' in row) && !('pin' in row)), 'Student PIN hashes must not be exported.');
+  assert.ok(backup.tables.users.every((row: any) => !('passwordHash' in row) && !('password_hash' in row) && !('pinHash' in row) && !('pin_hash' in row) && !('pin' in row) && !('twoFactorSecret' in row) && !('two_factor_secret' in row) && !('recoveryCodes' in row) && !('recovery_codes' in row)), 'User credentials and 2FA secrets must not be exported.');
   const protectedStudentBackupRow = backup.tables.students[0];
   const protectedStudentId = protectedStudentBackupRow?.id;
   const protectedStudentLiveRow = memory.rows('students').find(row => row.id === protectedStudentId);
