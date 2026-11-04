@@ -91,6 +91,7 @@ interface DatabaseSchema {
   transportRoutes: any[];
   inventoryItems: any[];
   inventoryTransactions: any[];
+  disciplineIncidents: any[];
 }
 
 interface StorageContext {
@@ -265,6 +266,7 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
   assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
   transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', inventory_transactions: 'inventoryTransactions',
+  discipline_incidents: 'disciplineIncidents',
   fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
@@ -368,6 +370,7 @@ class StorageEngine {
       transportRoutes: [],
       inventoryItems: [],
       inventoryTransactions: [],
+      disciplineIncidents: [],
       lockoutCounters: {}
     };
   }
@@ -595,7 +598,7 @@ class StorageEngine {
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
-      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes],
+      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['discipline_incidents', snapshot.disciplineIncidents],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
@@ -3276,6 +3279,29 @@ class StorageEngine {
       version: '1.0.0',
       data
     };
+  }
+
+  public async getDisciplineIncidents(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('discipline_incidents', { school_id: schoolId });
+    return rows.filter(row => row.schoolId === schoolId)
+      .sort((a, b) => String(b.incidentDate).localeCompare(String(a.incidentDate)));
+  }
+
+  public async addDisciplineIncident(input: {
+    schoolId: string; studentId: string; incidentDate: string; infractionType: string;
+    severity: 'low' | 'medium' | 'high'; actionTaken: string; notes?: string;
+    parentContacted?: boolean; recordedBy: string;
+  }): Promise<any> {
+    const student = await this.getStudentById(input.studentId, input.schoolId);
+    if (!student || student.schoolId !== input.schoolId) throw new Error('Choose a student from this school.');
+    const incident = {
+      id: randomUUID(), ...input, notes: input.notes?.trim() || null,
+      parentContacted: input.parentContacted === true, createdAt: new Date().toISOString()
+    };
+    this.data.disciplineIncidents.push(incident);
+    this.save();
+    await this.flush();
+    return incident;
   }
 
   public async getLibraryBooks(schoolId: string): Promise<any[]> {
