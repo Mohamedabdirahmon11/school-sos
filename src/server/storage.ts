@@ -2837,18 +2837,19 @@ class StorageEngine {
     if (changed) this.save();
   }
 
-  public getBroadcasts(): PlatformBroadcast[] {
-    return this.data.broadcasts;
+  public async getBroadcasts(): Promise<PlatformBroadcast[]> {
+    return this.queryRows<PlatformBroadcast>('platform_broadcasts', {});
   }
 
-  public createBroadcast(bData: Omit<PlatformBroadcast, 'id' | 'createdAt'>): PlatformBroadcast {
+  public async createBroadcast(bData: Omit<PlatformBroadcast, 'id' | 'createdAt'>): Promise<PlatformBroadcast> {
     const b: PlatformBroadcast = {
       ...bData,
-      id: `brd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `brd-${randomUUID()}`,
       createdAt: new Date().toISOString()
     };
     this.data.broadcasts.push(b);
     this.save();
+    await this.flush();
     return b;
   }
 
@@ -2984,17 +2985,17 @@ class StorageEngine {
   public async exportAuditLogsCSV(schoolId?: string): Promise<string> {
     const logs = await this.getAuditLogs(schoolId);
     const headers = ['Timestamp', 'Action', 'Category', 'Severity', 'User Name', 'Role', 'School Name', 'Details'];
-    const rows = logs.map(l => [
-      `"${l.timestamp}"`,
-      `"${l.action}"`,
-      `"${l.category}"`,
-      `"${l.severity}"`,
-      `"${(l.userName || '').replace(/"/g, '""')}"`,
-      `"${l.userRole}"`,
-      `"${(l.schoolName || '').replace(/"/g, '""')}"`,
-      `"${(l.details || '').replace(/"/g, '""')}"`
-    ]);
-    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const escapeCell = (value: unknown): string => {
+      let text = value == null ? '' : String(value);
+      // Prevent spreadsheet formula execution when opening exported audit data.
+      if (/^[\\s]*[=+@\\-]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = logs.map(log => [
+      log.timestamp, log.action, log.category, log.severity,
+      log.userName, log.userRole, log.schoolName, log.details
+    ].map(escapeCell));
+    return [headers.map(escapeCell).join(','), ...rows.map(row => row.join(','))].join('\\r\\n');
   }
 
   // -------------------------------------------------------------
