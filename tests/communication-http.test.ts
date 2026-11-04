@@ -79,6 +79,51 @@ test('communication gateway secrets are never returned and tenant identity canno
   assert.equal(Object.hasOwn(rereadBody, 'apiSecret'), false);
 });
 
+test('direct messages enforce role pairing, participant scope and bounded storage', async () => {
+  const invalidRole = await fetch(`${baseUrl}/messages`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ recipientId: teacher.id, content: 'x'.repeat(5001) })
+  });
+  assert.equal(invalidRole.status, 400);
+
+  const created = await fetch(`${baseUrl}/messages`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ recipientId: teacher.id, content: 'Please review the attendance report.' })
+  });
+  assert.equal(created.status, 201, await created.clone().text());
+  const message = await created.json() as any;
+  assert.equal(message.schoolId, school.id);
+  assert.equal(message.senderId, admin.id);
+  assert.equal(message.recipientId, teacher.id);
+  assert.equal(message.isRead, false);
+  assert.match(message.id, /^msg-[0-9a-f-]{36}$/i);
+
+  const forbiddenPair = await fetch(`${baseUrl}/messages`, {
+    method: 'POST', headers: { Cookie: teacherCookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipientId: admin.id, content: 'This role pairing is not allowed.' })
+  });
+  assert.equal(forbiddenPair.status, 403);
+
+  const selfMessage = await fetch(`${baseUrl}/messages`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ recipientId: admin.id, content: 'Do not send to self.' })
+  });
+  assert.equal(selfMessage.status, 404);
+
+  const read = await fetch(`${baseUrl}/messages/read`, {
+    method: 'POST', headers: { Cookie: teacherCookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contactId: admin.id })
+  });
+  assert.equal(read.status, 200);
+  const teacherMessages = await storage.db.getMessages(school.id, teacher.id);
+  assert.equal(teacherMessages.find((item: any) => item.id === message.id)?.isRead, true);
+
+  assert.throws(() => storage.db.sendMessage({
+    schoolId: school.id, senderId: admin.id, senderName: admin.fullName, senderRole: 'school_admin',
+    recipientId: teacher.id, recipientName: teacher.fullName, recipientRole: 'teacher', content: 'x'.repeat(5001)
+  } as any), /Direct message details are invalid/);
+});
+
 test('notices accept only bounded content and authenticated author metadata', async () => {
   const invalid = await fetch(`${baseUrl}/notices`, {
     method: 'POST', headers: adminHeaders,
