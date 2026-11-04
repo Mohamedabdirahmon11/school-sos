@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, CommunicationSettings, CommunicationQueueItem, ExamConfig, GradingBand } from '../../types/index.ts';
+import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { 
@@ -117,10 +117,6 @@ export const SchoolSettingsView: React.FC = () => {
   const [design, setDesign] = useState<ReportCardDesign | null>(null);
 
   // SMS / WhatsApp Gateway State
-  const [commSettings, setCommSettings] = useState<CommunicationSettings | null>(null);
-  const [queueItems, setQueueItems] = useState<CommunicationQueueItem[]>([]);
-  const [queuePageInfo, setQueuePageInfo] = useState<PageInfo | null>(null);
-  const [queuePage, setQueuePage] = useState(1);
 
   useEffect(() => {
     if (!school) return;
@@ -128,11 +124,6 @@ export const SchoolSettingsView: React.FC = () => {
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
       .catch((err: any) => setBranchError(err.message || 'Failed to load campus branches.'));
     ApiClient.getReportCardDesign().then(setDesign);
-    ApiClient.getCommunicationSettings().then(setCommSettings);
-    ApiClient.getCommunicationQueue({ page: queuePage, pageSize: 20 }).then(items => {
-      setQueueItems(items);
-      setQueuePageInfo((items as any).pagination || null);
-    });
     ApiClient.getExamConfig().then(setExamConfig).catch(() => setExamConfig(null));
     ApiClient.getTimetableSettings().then(settings => setTimetableSettings({
       firstPeriodStart: settings.firstPeriodStart,
@@ -140,7 +131,7 @@ export const SchoolSettingsView: React.FC = () => {
       breakAfterPeriod: settings.breakAfterPeriod,
       breakMinutes: settings.breakMinutes
     }));
-  }, [school, queuePage]);
+  }, [school]);
 
   // Save Identity
   const handleSaveIdentity = async (e: React.FormEvent) => {
@@ -386,23 +377,6 @@ export const SchoolSettingsView: React.FC = () => {
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setNotice(err.message || 'Image upload failed.');
-    }
-  };
-
-  // Save SMS Gateway Settings
-  const handleSaveComm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isReadOnly || !commSettings) return;
-    setIsSaving(true);
-    try {
-      const updated = await ApiClient.updateCommunicationSettings(commSettings);
-      setCommSettings(updated);
-      setNotice('SMS / WhatsApp Gateway settings saved successfully!');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setNotice(err.message || 'Failed to save gateway.');
-    } finally {
-      setIsSaving(false);
     }
   };
 
