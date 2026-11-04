@@ -3852,7 +3852,7 @@ apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperA
   if (willBeActive && provider === 'infobip') {
     let base: URL | null = null;
     try { base = new URL(effective.webhookUrl || ''); } catch { /* validated below */ }
-    if (!effective.apiKey || !effective.senderId || !base || base.protocol !== 'https:' || !/(^|\\.)api\\.infobip\\.com$/i.test(base.hostname)) {
+    if (!effective.apiKey || !effective.senderId || !base || base.protocol !== 'https:' || !/(^|\.)api\.infobip\.com$/i.test(base.hostname)) {
       res.status(400).json({ error: 'Infobip activation requires an API key, sender ID, and official HTTPS api.infobip.com base URL.' }); return;
     }
   }
