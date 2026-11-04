@@ -38,6 +38,7 @@ test('discipline API validates incident input and restricts routes to school adm
 test('discipline UI loads and saves real API records without claiming SMS delivery', () => {
   assert.match(storage, /discipline_incidents: 'disciplineIncidents'/);
   assert.match(storage, /\['discipline_incidents', snapshot\.disciplineIncidents\]/);
+  assert.match(storage, /\['disciplineIncidents', 'discipline_incidents'\]/);
   assert.match(ui, /ApiClient\.getDisciplineIncidents\(\)/);
   assert.match(ui, /ApiClient\.addDisciplineIncident\(/);
   assert.match(ui, /Parent contacted manually/);
