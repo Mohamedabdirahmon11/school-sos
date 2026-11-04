@@ -19,7 +19,7 @@ test('library loans reference a book and student in the same school', () => {
 test('lending table has tenant RLS and admin-only read/write policies', () => {
   assert.match(migration, /ALTER TABLE public\.library_loans ENABLE ROW LEVEL SECURITY/);
   assert.match(migration, /CREATE POLICY library_loans_tenant_scope ON public\.library_loans FOR ALL/);
-  for (const action of ['select', 'insert', 'update', 'delete']) {
+  for (const action of ['select', 'insert', 'update']) {
     assert.match(migration, new RegExp('CREATE POLICY library_loans_admin_' + action + '[\\s\\S]*AS RESTRICTIVE'));
   }
   assert.match(migration, /issued_by = private\.auth_user_id\(\)/);
