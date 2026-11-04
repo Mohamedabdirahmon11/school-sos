@@ -44,13 +44,15 @@ export const NoticesEventsView: React.FC = () => {
   const [editingNotice, setEditingNotice] = useState<SchoolNotice | null>(null);
   const [noticeClassId, setNoticeClassId] = useState('');
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const canManageEvents = user?.role === 'school_admin' || user?.role === 'super_admin';
 
   const fetchData = async () => {
     if (!school) return;
     setLoading(true);
+    setError(null);
     try {
       const [eventsList, noticesList, classList] = await Promise.all([
-        ApiClient.request<SchoolEvent[]>('/school/events').catch(() => []),
+        ApiClient.request<SchoolEvent[]>('/school/events'),
         ApiClient.getNotices({ page: noticePage, pageSize: 20 }).catch(() => []),
         ApiClient.request<Array<{ id: string; name: string }>>('/classes').catch(() => [])
       ]);
@@ -158,16 +160,18 @@ export const NoticesEventsView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {activeTab === 'notices' && user?.role === 'school_admin' && <button onClick={() => { setEditingNotice(null); setShowNoticeModal(true); }} className="px-3.5 py-2 bg-[#0F766E] text-white text-xs font-semibold rounded-lg"><Plus className="w-3.5 h-3.5 inline mr-1" />{t('add_notice')}</button>}
-          <button
+          {activeTab === 'notices' && canManageEvents && <button onClick={() => { setEditingNotice(null); setShowNoticeModal(true); }} className="px-3.5 py-2 bg-[#0F766E] text-white text-xs font-semibold rounded-lg"><Plus className="w-3.5 h-3.5 inline mr-1" />{t('add_notice')}</button>}
+          {canManageEvents && <button
             onClick={() => setShowEventModal(true)}
             className="px-3.5 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Event / Holiday</span>
-          </button>
+          </button>}
         </div>
       </div>
+
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200">
@@ -231,12 +235,13 @@ export const NoticesEventsView: React.FC = () => {
                       >
                         {ev.type}
                       </span>
-                      <button
+                      {canManageEvents && <button
                         onClick={() => handleDeleteEvent(ev.id)}
                         className="text-slate-400 hover:text-red-600 p-1 rounded"
+                        aria-label={`Delete ${ev.title}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </button>}
                     </div>
                     <h3 className="text-sm font-bold text-slate-800">{ev.title}</h3>
                     {ev.description && (
@@ -287,7 +292,7 @@ export const NoticesEventsView: React.FC = () => {
                   <span className="text-xs text-slate-400">
                     {new Date(n.publishDate).toLocaleDateString()}
                   </span>
-                  {user?.role === 'school_admin' && <span className="flex gap-2"><button onClick={() => editNotice(n)} aria-label={t('edit_notice')} className="text-xs text-teal-700">{t('edit_notice')}</button><button onClick={() => handleArchiveNotice(n)} aria-label={t('archive_notice')} className="text-xs text-red-600">{t('archive_notice')}</button></span>}
+                  {canManageEvents && <span className="flex gap-2"><button onClick={() => editNotice(n)} aria-label={t('edit_notice')} className="text-xs text-teal-700">{t('edit_notice')}</button><button onClick={() => handleArchiveNotice(n)} aria-label={t('archive_notice')} className="text-xs text-red-600">{t('archive_notice')}</button></span>}
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">{n.title}</h3>
                 <p className="text-xs text-slate-700 whitespace-pre-wrap">{n.content}</p>
