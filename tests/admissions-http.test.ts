@@ -437,6 +437,14 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   });
   assert.equal(crossPreview.status, 400);
 
+  memory.failNextBackupRestore();
+  const failedRestore = await fetch(`${baseUrl}/school/backup/restore`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ backup, previewHash: preview.previewHash, confirm: true })
+  });
+  assert.equal(failedRestore.status, 500);
+  assert.equal(memory.rows('school_events').some(row => row.id === event.id), false, 'Failed restore must roll back all earlier row writes.');
+
   const restoredResponse = await fetch(`${baseUrl}/school/backup/restore`, {
     method: 'POST', headers,
     body: JSON.stringify({ backup, previewHash: preview.previewHash, confirm: true })
