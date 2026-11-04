@@ -2994,19 +2994,41 @@ class StorageEngine {
   public async generateSchoolBackup(schoolId: string) {
     const school = await this.getSchoolById(schoolId);
     if (!school) return null;
+
+    // Include every tenant-owned table, not just the original core-school
+    // collections. Each query is explicitly scoped to this school ID.
+    const schoolTables = [
+      'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
+      'audit_logs', 'bus_assignments', 'class_subjects', 'classes', 'communication_queue',
+      'communication_settings', 'direct_messages', 'exam_configs', 'fee_payments', 'fee_ranges',
+      'fee_receipt_sequences', 'fee_structures', 'library_books', 'notice_reads',
+      'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
+      'report_card_templates', 'school_branches', 'school_events', 'school_notices',
+      'school_subscriptions', 'staff_members', 'student_marks', 'students', 'subjects',
+      'subscription_invoices', 'support_tickets', 'teacher_unavailability', 'teachers',
+      'timetable_settings', 'timetable_slots', 'transport_routes', 'user_sessions', 'users'
+    ];
+    const tables: Record<string, any[]> = {};
+    for (const table of schoolTables) {
+      tables[table] = await this.queryRows(table, { school_id: schoolId });
+    }
+
     return {
       backupDate: new Date().toISOString(),
+      version: '1.1.0',
       school,
-      branches: await this.getBranches(schoolId),
-      classes: await this.getClasses(schoolId),
-      subjects: await this.getSubjects(schoolId),
-      teachers: await this.getTeachers(schoolId),
-      students: await this.getStudents(schoolId),
-      attendance: await this.getSchoolAttendance(schoolId),
-      marks: await this.getSchoolMarks(schoolId),
-      feeStructures: await this.getFeeStructures(schoolId),
-      feePayments: await this.getFeePayments(schoolId),
-      reportCardDesign: await this.getReportCardDesign(schoolId)
+      tables,
+      // Keep the original top-level properties for existing restore/download consumers.
+      branches: tables.school_branches,
+      classes: tables.classes,
+      subjects: tables.subjects,
+      teachers: tables.teachers,
+      students: tables.students,
+      attendance: tables.attendance_records,
+      marks: tables.student_marks,
+      feeStructures: tables.fee_structures,
+      feePayments: tables.fee_payments,
+      reportCardDesign: tables.report_card_templates
     };
   }
 
