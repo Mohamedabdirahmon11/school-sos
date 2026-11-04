@@ -661,6 +661,21 @@ export class ApiClient {
     });
   }
 
+  public static async getLibraryLoans() {
+    return this.request<any[]>('/school/library/loans');
+  }
+
+  public static async issueLibraryLoan(data: { bookId: string; studentId: string; dueDate: string }) {
+    return this.request<any>('/school/library/loans', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async returnLibraryLoan(loanId: string) {
+    return this.request<any>(`/school/library/loans/${encodeURIComponent(loanId)}/return`, { method: 'PUT' });
+  }
+
   public static async getTransportRoutes(schoolId?: string) {
     return this.request<any[]>('/school/transport');
   }
