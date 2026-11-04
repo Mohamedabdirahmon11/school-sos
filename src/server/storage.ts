@@ -2716,6 +2716,37 @@ class StorageEngine {
     return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId.trim() });
   }
 
+  public async updateCommunicationQueueStatus(
+    schoolId: string,
+    messageId: string,
+    status: CommunicationQueueItem['status'],
+    errorMessage?: string,
+    sentAt?: string
+  ): Promise<CommunicationQueueItem> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof messageId !== 'string' || !messageId.trim() || messageId.length > 64 ||
+        !['queued', 'sent', 'failed'].includes(status) ||
+        (errorMessage !== undefined && (typeof errorMessage !== 'string' || errorMessage.length > 500)) ||
+        (sentAt !== undefined && (typeof sentAt !== 'string' || Number.isNaN(Date.parse(sentAt))))) {
+      throw new Error('Notification status update is invalid.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    const rows = await this.getCommunicationQueue(scopedSchoolId);
+    const existing = rows.find(item => item.id === messageId.trim() && item.schoolId === scopedSchoolId);
+    if (!existing) throw new Error('Notification was not found for this school.');
+    const updated: CommunicationQueueItem = {
+      ...existing,
+      status,
+      ...(errorMessage ? { errorMessage: errorMessage.trim() } : { errorMessage: undefined }),
+      ...(status === 'sent' ? { sentAt: sentAt || new Date().toISOString() } : { sentAt: undefined })
+    };
+    const index = this.data.communicationQueue.findIndex(item => item.id === updated.id && item.schoolId === scopedSchoolId);
+    if (index < 0) throw new Error('Notification was not found in the school queue.');
+    this.data.communicationQueue[index] = updated;
+    this.save();
+    return updated;
+  }
+
   // -------------------------------------------------------------
   // SCHOOL EVENTS
   // -------------------------------------------------------------
