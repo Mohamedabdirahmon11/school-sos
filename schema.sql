@@ -988,6 +988,26 @@ CREATE TABLE IF NOT EXISTS admission_applications (
 );
 CREATE INDEX IF NOT EXISTS idx_admission_applications_school_status ON admission_applications(school_id, status, applied_date DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_students_id_school_unique ON students(id, school_id);
+
+CREATE TABLE IF NOT EXISTS discipline_incidents (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  student_id VARCHAR(64) NOT NULL,
+  incident_date DATE NOT NULL,
+  infraction_type VARCHAR(160) NOT NULL,
+  severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high')),
+  action_taken TEXT NOT NULL DEFAULT '',
+  notes TEXT,
+  parent_contacted BOOLEAN NOT NULL DEFAULT FALSE,
+  recorded_by VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT discipline_incidents_student_school_fk
+    FOREIGN KEY (student_id, school_id) REFERENCES students(id, school_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_discipline_school_date ON discipline_incidents(school_id, incident_date DESC);
+CREATE INDEX IF NOT EXISTS idx_discipline_student ON discipline_incidents(student_id, school_id);
+
 CREATE TABLE IF NOT EXISTS library_books (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -1072,6 +1092,21 @@ CREATE INDEX IF NOT EXISTS idx_invoices_paid_date ON subscription_invoices(statu
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
+
+ALTER TABLE discipline_incidents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS discipline_incidents_read ON discipline_incidents;
+CREATE POLICY discipline_incidents_read ON discipline_incidents FOR SELECT TO authenticated
+USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
+DROP POLICY IF EXISTS discipline_incidents_insert ON discipline_incidents;
+CREATE POLICY discipline_incidents_insert ON discipline_incidents FOR INSERT TO authenticated
+WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS discipline_incidents_update ON discipline_incidents;
+CREATE POLICY discipline_incidents_update ON discipline_incidents FOR UPDATE TO authenticated
+USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
+WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS discipline_incidents_delete ON discipline_incidents;
+CREATE POLICY discipline_incidents_delete ON discipline_incidents FOR DELETE TO authenticated
+USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
 
 -- Enable RLS on all tenant-specific tables
 ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
