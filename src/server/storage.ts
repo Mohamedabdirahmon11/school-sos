@@ -88,6 +88,7 @@ interface DatabaseSchema {
   lockoutCounterRows: any[];
   lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
   libraryBooks: any[];
+  libraryLoans: any[];
   transportRoutes: any[];
   inventoryItems: any[];
   inventoryTransactions: any[];
@@ -264,7 +265,7 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   communication_settings: 'communicationSettings', communication_queue: 'communicationQueue', school_notices: 'notices',
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
-  assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
+  assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks', library_loans: 'libraryLoans',
   transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', inventory_transactions: 'inventoryTransactions',
   discipline_incidents: 'disciplineIncidents',
   fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
@@ -367,6 +368,7 @@ class StorageEngine {
       restoreTestRecords: [],
       lockoutCounterRows: [],
       libraryBooks: [],
+      libraryLoans: [],
       transportRoutes: [],
       inventoryItems: [],
       inventoryTransactions: [],
@@ -464,7 +466,7 @@ class StorageEngine {
       ['notices', 'school_notices'], ['events', 'school_events'], ['messages', 'direct_messages'],
       ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
-      ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
+      ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['libraryLoans', 'library_loans'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['inventoryItems', 'inventory_items'], ['inventoryTransactions', 'inventory_transactions'], ['notificationTemplates', 'notification_templates'],
       ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters'], ['disciplineIncidents', 'discipline_incidents']
@@ -3320,6 +3322,50 @@ class StorageEngine {
     this.save();
     await this.flush();
     return newBook;
+  }
+
+  public async getLibraryLoans(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('library_loans', { school_id: schoolId });
+    return rows.filter(loan => loan.schoolId === schoolId)
+      .sort((a, b) => String(b.issuedAt).localeCompare(String(a.issuedAt)));
+  }
+
+  public async issueLibraryLoan(input: {
+    schoolId: string; bookId: string; studentId: string; dueDate: string; issuedBy: string;
+  }): Promise<any> {
+    const [books, loans, student] = await Promise.all([
+      this.getLibraryBooks(input.schoolId),
+      this.getLibraryLoans(input.schoolId),
+      this.getStudentById(input.studentId, input.schoolId)
+    ]);
+    const book = books.find(row => row.id === input.bookId);
+    if (!book) throw new Error('Choose a book from this school.');
+    if (!student || student.schoolId !== input.schoolId) throw new Error('Choose a student from this school.');
+    const activeLoans = loans.filter(row => row.bookId === input.bookId && row.status === 'issued').length;
+    if (activeLoans >= Number(book.quantity || 0)) throw new Error('No available copies of this book.');
+    const loan = {
+      id: randomUUID(), schoolId: input.schoolId, bookId: input.bookId,
+      studentId: input.studentId, dueDate: input.dueDate,
+      issuedAt: new Date().toISOString(), issuedBy: input.issuedBy,
+      status: 'issued', returnedAt: null, returnedBy: null
+    };
+    this.data.libraryLoans.push(loan);
+    this.save();
+    await this.flush();
+    return loan;
+  }
+
+  public async returnLibraryLoan(schoolId: string, loanId: string, returnedBy: string): Promise<any> {
+    const loans = await this.getLibraryLoans(schoolId);
+    const loan = loans.find(row => row.id === loanId && row.schoolId === schoolId);
+    if (!loan) throw new Error('Library loan was not found in this school.');
+    if (loan.status !== 'issued') throw new Error('This book has already been returned.');
+    loan.status = 'returned';
+    loan.returnedAt = new Date().toISOString();
+    loan.returnedBy = returnedBy;
+    this.save();
+    await this.flush();
+    return loan;
   }
 
   public async getTransportRoutes(schoolId: string): Promise<any[]> {
