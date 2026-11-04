@@ -297,5 +297,6 @@ test('daily attendance waits for database persistence before returning success',
 
 test('school backup restore rejects single-column foreign keys that cross school boundaries', () => {
   assert.match(backupRestoreMigration, /FOR v_fk IN[\\s\\S]*target_row\\.school_id = \\$2[\\s\\S]*references a record outside this school/);
+  assert.match(backupRestoreMigration, /v_fk_scope := CASE[\\s\\S]*target_row\\.role::text = ''super_admin''/);
   assert.match(sql, /FOR v_fk IN[\\s\\S]*target_row\\.school_id = \\$2[\\s\\S]*references a record outside this school/);
 });
