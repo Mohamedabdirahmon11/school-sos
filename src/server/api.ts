@@ -4354,8 +4354,9 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
     const book = await db.addLibraryBook({ title, author, isbn, quantity, schoolId: school.id });
     res.status(201).json(book);
   } catch (error: any) {
-    if (String(error?.message || '').includes('ISBN already exists')) {
-      res.status(409).json({ error: error.message });
+    if (error?.code === '23505' || String(error?.message || '').includes('ISBN already exists') ||
+        String(error?.message || '').includes('idx_library_books_school_isbn_unique')) {
+      res.status(409).json({ error: 'A book with this ISBN already exists in this school.' });
       return;
     }
     throw error;
