@@ -196,10 +196,10 @@ test('inventory policies avoid overlapping SELECT permissions and index every in
     'FOR UPDATE TO authenticated',
     'FOR DELETE TO authenticated'
   ]) assert.ok(migration.includes(fragment), `inventory hardening migration includes ${fragment}`);
-  assert.doesNotMatch(migration, /CREATE POLICY inventory_items_school_write[\\s\\S]*?FOR ALL/i);
+  assert.doesNotMatch(migration, /CREATE POLICY inventory_items_school_write[\s\S]*?FOR ALL/i);
   const schemaPolicies = sql.slice(sql.indexOf('DROP POLICY IF EXISTS inventory_items_school_read'));
-  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_read[\\s\\S]*?FOR SELECT TO authenticated/i);
-  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_insert[\\s\\S]*?FOR INSERT TO authenticated/i);
-  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_update[\\s\\S]*?FOR UPDATE TO authenticated/i);
-  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_delete[\\s\\S]*?FOR DELETE TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_read[\s\S]*?FOR SELECT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_insert[\s\S]*?FOR INSERT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_update[\s\S]*?FOR UPDATE TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_delete[\s\S]*?FOR DELETE TO authenticated/i);
 });
