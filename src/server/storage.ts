@@ -1969,26 +1969,7 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // Notify only on a transition into absent; repeated saves must not spam parents.
-      if (rec.status === 'absent' && previousStatus !== 'absent') {
-        const student = await this.getStudentById(rec.studentId, schoolId);
-        const parentPhones = [...new Map([student?.fatherPhone, student?.motherPhone]
-          .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
-          .map(phone => [phone.replace(/[\s()-]/g, ''), phone.trim()] as const)).values()];
-        if (student) {
-          for (const parentPhone of parentPhones) {
-            await this.queueNotification({
-              schoolId,
-              recipientPhone: parentPhone,
-              recipientName: `Parent of ${student.firstName}`,
-              studentId: student.id,
-              messageType: 'attendance_absent',
-              channel: 'sms',
-              content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
-            }, `attendance-absent:${schoolId}:${student.id}:${date}:${parentPhone.replace(/[\s()-]/g, '')}`);
-          }
-        }
-      }
+
     }
 
     this.save();
