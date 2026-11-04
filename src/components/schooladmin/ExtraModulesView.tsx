@@ -366,7 +366,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <Library className="w-4 h-4 text-[#0F766E]" />
-              <span>Library Catalogue & Lending Register</span>
+              <span>Library Catalogue</span>
             </h2>
             <button
               onClick={() => setShowAddBookModal(true)}
@@ -391,7 +391,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <tbody className="divide-y divide-[#E2E8F0]">
                 {books.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
+                    <td colSpan={4} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
                   </tr>
                 ) : (
                   books.map(b => (
@@ -794,6 +794,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 <input
                   type="number"
                   min="1"
+                  max="100000"
                   required
                   value={bookCopies}
                   onChange={e => setBookCopies(parseInt(e.target.value, 10) || 1)}
