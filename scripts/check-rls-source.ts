@@ -29,7 +29,9 @@ const specificRules = [
   ['school_notices', 'school_notices_admin_update'],
   ['school_notices', 'school_notices_admin_delete'],
   ['support_tickets', 'support_tickets_owner_scope'],
-  ['library_books', 'library_books_school_scope']
+  ['library_books', 'library_books_school_scope'],
+  ['transport_routes', 'transport_routes_school_scope'],
+  ['bus_assignments', 'bus_assignments_student_scope']
 ];
 
 let failed = false;
