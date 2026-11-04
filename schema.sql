@@ -1021,6 +1021,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_school_isbn_unique
   ON library_books(school_id, lower(btrim(isbn)))
   WHERE isbn IS NOT NULL AND btrim(isbn) <> '';
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_id_school_unique ON library_books(id, school_id);
+
+CREATE TABLE IF NOT EXISTS library_loans (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  book_id VARCHAR(64) NOT NULL,
+  student_id VARCHAR(64) NOT NULL,
+  due_date DATE NOT NULL,
+  issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  issued_by VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  status VARCHAR(20) NOT NULL DEFAULT 'issued' CHECK (status IN ('issued', 'returned')),
+  returned_at TIMESTAMPTZ,
+  returned_by VARCHAR(64) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT library_loans_book_school_fk FOREIGN KEY (book_id, school_id)
+    REFERENCES library_books(id, school_id) ON DELETE RESTRICT,
+  CONSTRAINT library_loans_student_school_fk FOREIGN KEY (student_id, school_id)
+    REFERENCES students(id, school_id) ON DELETE RESTRICT,
+  CONSTRAINT library_loans_return_state_check CHECK (
+    (status = 'issued' AND returned_at IS NULL AND returned_by IS NULL) OR
+    (status = 'returned' AND returned_at IS NOT NULL AND returned_by IS NOT NULL)
+  )
+);
+CREATE INDEX IF NOT EXISTS idx_library_loans_school_status_due ON library_loans(school_id, status, due_date);
+CREATE INDEX IF NOT EXISTS idx_library_loans_book_status ON library_loans(book_id, school_id, status);
+CREATE INDEX IF NOT EXISTS idx_library_loans_student ON library_loans(student_id, school_id);
+
 CREATE TABLE IF NOT EXISTS transport_routes (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
