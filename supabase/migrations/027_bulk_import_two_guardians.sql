@@ -1,16 +1,19 @@
 -- Keep bulk student imports aligned with the two-guardian student model.
--- Existing parent PIN hashes are preserved when new siblings are imported.
-CREATE OR REPLACE FUNCTION schoolos_bulk_import(p_payload JSONB) RETURNS VOID
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+-- Preserve parent PIN hashes when new siblings are imported, and retain the
+-- hardened empty search_path established by migration 025.
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.schoolos_bulk_import(p_payload JSONB) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
-  INSERT INTO classes (id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee)
+  INSERT INTO public.classes (id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee)
   SELECT id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee
   FROM jsonb_to_recordset(COALESCE(p_payload->'classes', '[]'::jsonb)) AS x(
     id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, grade_level INTEGER,
     section VARCHAR, room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
   );
 
-  INSERT INTO students (id, school_id, branch_id, student_id, first_name, middle_name, last_name, gender,
+  INSERT INTO public.students (id, school_id, branch_id, student_id, first_name, middle_name, last_name, gender,
     admission_date, date_of_birth, student_phone, father_phone, mother_phone, class_id, section, status, pin_hash)
   SELECT id, school_id, branch_id, student_id, first_name, middle_name, last_name, gender,
     CURRENT_DATE, date_of_birth, student_phone, father_phone, mother_phone, class_id, section, 'active', pin_hash
@@ -20,9 +23,9 @@ BEGIN
     father_phone VARCHAR, mother_phone VARCHAR, class_id VARCHAR, section VARCHAR, pin_hash TEXT
   );
 
-  INSERT INTO users (id, school_id, branch_id, role, full_name, phone, parent_phone, student_id,
+  INSERT INTO public.users (id, school_id, branch_id, role, full_name, phone, parent_phone, student_id,
     linked_student_ids, pin_hash, password_hash, is_blocked, failed_login_attempts)
-  SELECT id, school_id, branch_id, role::user_role_enum, full_name, phone, parent_phone, student_id,
+  SELECT id, school_id, branch_id, role::public.user_role_enum, full_name, phone, parent_phone, student_id,
     linked_student_ids, pin_hash, '', false, 0
   FROM jsonb_to_recordset(COALESCE(p_payload->'users', '[]'::jsonb)) AS x(
     id VARCHAR, school_id VARCHAR, branch_id VARCHAR, role VARCHAR, full_name VARCHAR, phone VARCHAR,
@@ -31,18 +34,18 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET
     linked_student_ids = EXCLUDED.linked_student_ids,
     pin_hash = CASE
-      WHEN users.pin_hash IS NULL OR users.pin_hash = '' THEN EXCLUDED.pin_hash
-      ELSE users.pin_hash
+      WHEN public.users.pin_hash IS NULL OR public.users.pin_hash = '' THEN EXCLUDED.pin_hash
+      ELSE public.users.pin_hash
     END,
     full_name = CASE
-      WHEN users.role = 'parent' AND users.full_name = '' THEN EXCLUDED.full_name
-      ELSE users.full_name
+      WHEN public.users.role = 'parent' AND public.users.full_name = '' THEN EXCLUDED.full_name
+      ELSE public.users.full_name
     END,
-    phone = CASE WHEN users.phone IS NULL OR users.phone = '' THEN EXCLUDED.phone ELSE users.phone END,
-    parent_phone = CASE WHEN users.parent_phone IS NULL OR users.parent_phone = '' THEN EXCLUDED.parent_phone ELSE users.parent_phone END;
+    phone = CASE WHEN public.users.phone IS NULL OR public.users.phone = '' THEN EXCLUDED.phone ELSE public.users.phone END,
+    parent_phone = CASE WHEN public.users.parent_phone IS NULL OR public.users.parent_phone = '' THEN EXCLUDED.parent_phone ELSE public.users.parent_phone END;
 
-  INSERT INTO audit_logs (id, action, category, school_id, school_name, user_id, user_name, user_role, details, severity)
-  SELECT id, action, category, school_id, school_name, user_id, user_name, user_role::user_role_enum, details, 'info'
+  INSERT INTO public.audit_logs (id, action, category, school_id, school_name, user_id, user_name, user_role, details, severity)
+  SELECT id, action, category, school_id, school_name, user_id, user_name, user_role::public.user_role_enum, details, 'info'
   FROM jsonb_to_recordset(COALESCE(p_payload->'audit_logs', '[]'::jsonb)) AS x(
     id VARCHAR, action VARCHAR, category VARCHAR, school_id VARCHAR, school_name VARCHAR,
     user_id VARCHAR, user_name VARCHAR, user_role VARCHAR, details TEXT
@@ -50,5 +53,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION schoolos_bulk_import(JSONB) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION schoolos_bulk_import(JSONB) TO service_role;
+REVOKE ALL ON FUNCTION public.schoolos_bulk_import(JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_bulk_import(JSONB) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
