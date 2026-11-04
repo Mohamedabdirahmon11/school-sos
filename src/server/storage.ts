@@ -3282,7 +3282,7 @@ class StorageEngine {
     // legacy provider settings and active login sessions are intentionally excluded.
     // Each query is explicitly scoped to this school ID.
     const schoolTables = [
-      'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
+      'admission_applications', 'assignments', 'attendance_records',
       'bus_assignments', 'class_subjects', 'classes',
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
