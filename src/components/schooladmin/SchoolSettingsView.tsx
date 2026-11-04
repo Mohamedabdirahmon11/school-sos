@@ -631,13 +631,15 @@ export const SchoolSettingsView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Official Telephone</label>
+                <label className="block font-semibold text-[#334155] mb-1">Official Telephone / WhatsApp maamulka</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
+                  placeholder="+2519XXXXXXXX"
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                 />
+                <p className="mt-1 text-[10px] text-[#64748B]">Geli lambarka rasmiga ah qaabka +country code. Fariimaha maqnaanshaha waxaa laga diyaarinayaa WhatsApp-ka maamulka ee ku jira qalabkan; maamuluhu ayaa riixaya Send.</p>
               </div>
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Official Email</label>
@@ -1396,7 +1398,7 @@ export const SchoolSettingsView: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-[#132A29]">SMS & WhatsApp Provider Integration</h2>
             <p className="text-xs text-[#64748B] mt-0.5">
-              Connect SMS gateways for automated parent absence alerts, fee reminders, and announcements.
+              SMS providers are used for supported automated notices. For student absence WhatsApp messages, the attendance register opens the parent's chat in the administrator's signed-in WhatsApp account; the administrator reviews and presses Send.
             </p>
           </div>
 
