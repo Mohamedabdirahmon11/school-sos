@@ -1401,11 +1401,16 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   const audiences = ['all_schools', 'school_admins', 'teachers', 'one_school'];
+  const status = body.status || (body.sendNow === true ? 'draft' : body.sendNow === false ? 'scheduled' : undefined);
+  const immediate = body.sendNow === true;
   const statuses = ['draft', 'scheduled'];
+  if (body.sendNow !== undefined && typeof body.sendNow !== 'boolean') {
+    res.status(400).json({ error: 'sendNow must be true or false.' }); return;
+  }
   if (!title || title.length > 160 || !message || message.length > 5000 ||
-      !audiences.includes(body.audience) || !statuses.includes(body.status) ||
+      !audiences.includes(body.audience) || !statuses.includes(status) ||
       (body.audience === 'one_school' && (typeof body.targetSchoolId !== 'string' || !body.targetSchoolId.trim()))) {
-    res.status(400).json({ error: 'Provide a valid title, message, audience, status, and target school when required.' });
+    res.status(400).json({ error: 'Provide a valid title, message, audience, send option, and target school when required.' });
     return;
   }
   if (body.audience === 'one_school' && !(await db.getSchoolById(body.targetSchoolId.trim()))) {
@@ -1413,7 +1418,7 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (
     return;
   }
   let scheduledFor: string | undefined;
-  if (body.status === 'scheduled') {
+  if (status === 'scheduled') {
     const parsed = typeof body.scheduledFor === 'string' ? new Date(body.scheduledFor) : new Date('');
     if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
       res.status(400).json({ error: 'Scheduled broadcasts require a future scheduledFor timestamp.' });
@@ -1421,12 +1426,18 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (
     }
     scheduledFor = parsed.toISOString();
   }
-  const b = await db.createBroadcast({
-    title, message, audience: body.audience, status: body.status,
+  const created = await db.createBroadcast({
+    title, message, audience: body.audience, status,
     ...(body.audience === 'one_school' ? { targetSchoolId: body.targetSchoolId.trim() } : {}),
     ...(scheduledFor ? { scheduledFor } : {})
   });
-  res.status(201).json(b);
+  const broadcast = immediate ? await db.publishBroadcast(created.id) : created;
+  if (!broadcast) { res.status(503).json({ error: 'Broadcast was created but could not be published.' }); return; }
+  if (immediate) {
+    const user = (req as any).user as User;
+    db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+  }
+  res.status(201).json(broadcast);
 });
 
 apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (_req, res) => {
