@@ -551,7 +551,7 @@ export const SchoolSettingsView: React.FC = () => {
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            WhatsApp (Free)
+            WhatsApp (Manual)
           </button>
           <button
             type="button"
@@ -1452,9 +1452,9 @@ export const SchoolSettingsView: React.FC = () => {
       {activeTab === 'sms' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-4">
           <div>
-            <h2 className="text-base font-bold text-[#132A29]">WhatsApp-ka maamulka — bilaash</h2>
+            <h2 className="text-base font-bold text-[#132A29]">WhatsApp-ka maamulka — provider la'aan</h2>
             <p className="text-xs text-[#64748B] mt-1">
-              SchoolOS wuxuu isticmaalaa WhatsApp-ka caadiga ah ee maamuluhu ku galay qalabkiisa. Fariinta waalidka waa la diyaarinayaa, chat-ka ayaana furmaya; maamuluhu ayaa hubinaya kadibna riixaya Send.
+              SchoolOS wuxuu furaa WhatsApp-ka maamuluhu ku galay qalabkiisa; provider lacag leh ama auto-send looma baahna. Internet/data iyo shuruudaha WhatsApp way khuseeyaan, mana ballanqaadi karno in adeegga WhatsApp mar walba bilaash ahaan doono. Fariinta waalidka waa la diyaarinayaa, maamuluhuna wuu hubinayaa kadibna Send ayuu riixayaa.
             </p>
           </div>
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-2">
