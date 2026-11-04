@@ -129,7 +129,7 @@ test('notice read receipts use school-scoped unique keys and self-only RLS', () 
   assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_notice_reads_user/);
   assert.match(migration, /notice_reads_self_scope/);
   assert.match(migration, /notice_reads_self_insert/);
-  assert.match(sql, /user_id = auth_user_id\(\)/);
+  assert.match(sql, /user_id = private.auth_user_id()/);
 });
 
 test('paged-list projections contain only columns that exist in schema.sql', () => {
