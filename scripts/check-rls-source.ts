@@ -46,9 +46,9 @@ for (const file of migrationFiles) auditIdempotency(fs.readFileSync(`supabase/mi
 
 const helperFunctions = ['auth_user_id', 'auth_school_id', 'auth_user_role', 'auth_can_access_student', 'auth_can_access_class'];
 const firstPolicyIndex = schema.search(/\bCREATE\s+POLICY\b/i);
-const undefinedHelpers = helperFunctions.filter(name => !schema.includes(`CREATE OR REPLACE FUNCTION ${name}(`));
+const undefinedHelpers = helperFunctions.filter(name => !schema.includes(`CREATE OR REPLACE FUNCTION private.${name}(`));
 const lateHelpers = helperFunctions.filter(name => {
-  const definitionIndex = schema.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+  const definitionIndex = schema.indexOf(`CREATE OR REPLACE FUNCTION private.${name}(`);
   return definitionIndex === -1 || (firstPolicyIndex !== -1 && definitionIndex > firstPolicyIndex);
 });
 const helperOrderOk = undefinedHelpers.length === 0 && lateHelpers.length === 0;
@@ -79,7 +79,10 @@ const tableOrderOk = earlyTableReferences.length === 0;
 console.log(`${tableOrderOk ? 'PASS' : 'FAIL'} schema statements reference tables only after creation${tableOrderOk ? '' : ` (${[...new Set(earlyTableReferences)].join('; ')})`}`);
 if (!tableOrderOk) failed = true;
 
-const migrationTables = new Set([...migration.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase()));
+const migrationTables = new Set(migrationFiles.flatMap(file =>
+  [...fs.readFileSync(`supabase/migrations/${file}`, 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS\\s+(?:public\\.)?([a-z_][a-z0-9_]*)/gi)]
+    .map(match => match[1].toLowerCase())
+));
 const tableMapStart = storage.indexOf('const tableMap:');
 const tableMapEnd = storage.indexOf('];', tableMapStart);
 const tableMapSource = storage.slice(tableMapStart, tableMapEnd);
