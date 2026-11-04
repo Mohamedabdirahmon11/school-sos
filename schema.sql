@@ -1373,6 +1373,30 @@ CREATE POLICY school_events_admin_delete ON public.school_events AS RESTRICTIVE
   FOR DELETE TO authenticated
   USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
 
+-- Communication settings, notification templates, and queued messages contain
+-- operational or recipient data; only school admins may mutate them.
+DO $
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_insert', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_insert', table_name
+    );
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_update', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING (private.auth_user_role() IN (''school_admin'', ''super_admin'')) WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_update', table_name
+    );
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_delete', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR DELETE TO authenticated USING (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_delete', table_name
+    );
+  END LOOP;
+END $;
+
 -- Only school administrators may mutate library, transport, or bus assignment records.
 -- These are RESTRICTIVE write policies so the broad tenant read policy cannot grant writes.
 -- Keep lending copies consistent even when two issue requests race.
