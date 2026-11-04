@@ -406,6 +406,7 @@ export const SchoolSettingsView: React.FC = () => {
     try {
       const updated = await ApiClient.updateCommunicationSettings({
         provider: commSettings.provider,
+        defaultChannel: commSettings.defaultChannel || 'sms',
         isActive: commSettings.isActive,
         senderId: commSettings.senderId || '',
         webhookUrl: commSettings.webhookUrl || '',
@@ -1453,6 +1454,17 @@ export const SchoolSettingsView: React.FC = () => {
                 <option value="twilio">Twilio Programmable SMS / WhatsApp</option>
                 <option value="infobip">Infobip Enterprise Gateway</option>
                 <option value="local_gateway">Local Telecom HTTP Gateway</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-[#334155] mb-1">Default channel for automatic parent alerts</label>
+              <select
+                value={commSettings.defaultChannel || 'sms'}
+                onChange={e => setCommSettings({ ...commSettings, defaultChannel: e.target.value as 'sms' | 'whatsapp' })}
+                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+              >
+                <option value="sms">SMS</option>
+                <option value="whatsapp">WhatsApp</option>
               </select>
             </div>
 
