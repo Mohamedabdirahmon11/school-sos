@@ -146,6 +146,17 @@ function decryptCommunicationSecret(value?: string): string | undefined {
 // Avoid writing the session row on every API request. The signed cookie is
 // refreshed each request, while the database expiry is extended at most once
 // per minute (or 5% of shorter session lifetimes).
+export function calculateSubscriptionGraceEnd(
+  validUntil: string | Date,
+  schoolGraceDays: number | undefined,
+  platformGraceDays = 7
+): Date {
+  const configuredDays = typeof schoolGraceDays === 'number' && Number.isFinite(schoolGraceDays)
+    ? Math.max(0, schoolGraceDays)
+    : Math.max(0, Number(platformGraceDays) || 0);
+  return new Date(new Date(validUntil).getTime() + configuredDays * 24 * 60 * 60 * 1000);
+}
+
 export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt: string, now = Date.now()): boolean {
   const current = Date.parse(currentExpiresAt);
   const requested = Date.parse(requestedExpiresAt);
@@ -779,7 +790,7 @@ class StorageEngine {
       }
 
       const validUntil = new Date(sub.validUntil);
-      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays ?? 7) * 24 * 60 * 60 * 1000);
+      const graceEnd = calculateSubscriptionGraceEnd(sub.validUntil, sub.graceDays, this.data.settings.graceDays);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
       if (now > graceEnd && this.data.settings.readOnlyAfterExpiry !== false && sub.status !== 'read_only') {
