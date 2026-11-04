@@ -274,7 +274,7 @@ test('attendance queues and sends one parent alert on the first absent transitio
   const configured = await fetch(`${baseUrl}/communication/settings`, {
     method: 'PUT', headers: adminHeaders,
     body: JSON.stringify({
-      provider: 'twilio', isActive: true,
+      provider: 'twilio', defaultChannel: 'whatsapp', isActive: true,
       apiKey: 'AC0123456789abcdef0123456789abcdef',
       apiSecret: 'test-auth-token', senderId: '+15005550006'
     })
@@ -283,10 +283,12 @@ test('attendance queues and sends one parent alert on the first absent transitio
 
   const originalFetch = globalThis.fetch;
   let providerCalls = 0;
+  const providerBodies: string[] = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (url.startsWith('https://api.twilio.com/')) {
       providerCalls += 1;
+      providerBodies.push(String(init?.body || ''));
       return new Response(JSON.stringify({ sid: 'SM0123456789abcdef0123456789abcdef' }), {
         status: 201, headers: { 'Content-Type': 'application/json' }
       });
@@ -308,6 +310,9 @@ test('attendance queues and sends one parent alert on the first absent transitio
     assert.equal(firstResult.notifications.queued, 0);
     assert.equal(firstResult.notifications.failed, 0);
     assert.equal(providerCalls, 1);
+    const attendanceAlert = new URLSearchParams(providerBodies[0]);
+    assert.equal(attendanceAlert.get('To'), 'whatsapp:+251911234567');
+    assert.equal(attendanceAlert.get('From'), 'whatsapp:+15005550006');
 
     const second = await fetch(`${baseUrl}/attendance`, {
       method: 'POST', headers: adminHeaders, body: JSON.stringify(payload)
