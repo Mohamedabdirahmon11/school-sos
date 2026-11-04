@@ -167,7 +167,7 @@ export const AttendanceView: React.FC = () => {
       'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
       school?.name || '',
       school?.phone ? `Xiriirka dugsiga: ${school.phone}` : ''
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
