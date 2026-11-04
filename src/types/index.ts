@@ -481,6 +481,9 @@ export interface CommunicationSettings {
   apiSecret?: string;
   senderId?: string;
   webhookUrl?: string;
+  apiKeyConfigured?: boolean;
+  apiSecretConfigured?: boolean;
+  webhookConfigured?: boolean;
   isActive: boolean;
   updatedAt: string;
 }
