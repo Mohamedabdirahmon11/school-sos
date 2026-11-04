@@ -1,4 +1,4 @@
-# Free administrator-owned WhatsApp absence messages
+# Administrator-owned WhatsApp absence messages
 
 SchoolOS opens the administrator's existing WhatsApp account for absence notifications. No paid SMS/WhatsApp provider, Cloud API subscription, provider credentials, or automatic background sender is required. The administrator still needs internet access; normal mobile-data charges and WhatsApp's current terms and availability apply, so this is not a promise that WhatsApp will remain free forever.
 
