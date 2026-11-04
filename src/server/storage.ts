@@ -2420,11 +2420,21 @@ class StorageEngine {
   }
 
   public async voidFeePayment(id: string, schoolId: string, userId: string, reason: string): Promise<FeePayment | null> {
-    await this.queryRows<FeePayment>('fee_payments', { id, school_id: schoolId });
-    const payment = this.data.feePayments.find(item => item.id === id && item.schoolId === schoolId);
-    if (!payment || payment.voidedAt) return null;
-    Object.assign(payment, { voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason });
-    this.save();
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic payment voiding is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_void_fee_payment', {
+      p_payment_id: id,
+      p_school_id: schoolId,
+      p_user_id: userId,
+      p_reason: reason
+    });
+    this.recordQuery('rpc:schoolos_void_fee_payment', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to void this payment.');
+    if (!data) return null;
+    const payment = fromSupabaseRow(data, 'fee_payments') as FeePayment;
+    const cachedIndex = this.data.feePayments.findIndex(item => item.id === id && item.schoolId === schoolId);
+    if (cachedIndex >= 0) this.data.feePayments[cachedIndex] = payment;
     return payment;
   }
 
