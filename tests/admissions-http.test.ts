@@ -138,6 +138,30 @@ test('admission approval is idempotent under concurrent requests and rolls back 
     (row.schoolId ?? row.school_id) === school.id
     && (row.classId ?? row.class_id) === capacityClass.id
   ).length, 1, 'A full class must not receive another admission.');
+  const otherSchool = storage.db.createSchool({
+    name: 'Admissions Other Tenant', code: 'OTHERADM', address: '', city: '', phone: '',
+    email: 'other-admissions@example.test', currency: 'USD', academicYear: '2026-2027',
+    currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: today, validUntil: '2099-12-31', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const otherClass = storage.db.createClass({
+    schoolId: otherSchool.id, name: 'Foreign Class', gradeLevel: 5,
+    section: 'A', roomNumber: '', capacity: 20, monthlyFee: 0
+  });
+  await storage.db.flush();
+  memory.rows('admission_applications').push({
+    id: 'cross-school-admission', school_id: school.id,
+    first_name: 'Cross', middle_name: '', last_name: 'Tenant',
+    gender: 'male', grade_applying: 'Grade 5', class_id: otherClass.id,
+    father_phone: '+15550007899', mother_phone: '',
+    applied_date: today, status: 'pending', student_id: null,
+    created_at: new Date().toISOString()
+  });
+  const crossSchoolApproval = await fetch(`${baseUrl}/school/admissions/cross-school-admission/approve`, {
+    method: 'POST', headers
+  });
+  assert.equal(crossSchoolApproval.status, 400);
+  assert.equal(memory.rows('students').some(row => row.studentId === 'STD-ADMIT-ADMISSION'), false);
 });
 
 test('student creation whitelists profile fields, enforces capacity and protects other-school parent PINs', async () => {
