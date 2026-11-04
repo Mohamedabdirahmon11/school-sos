@@ -52,7 +52,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   attendance_records: 'id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at',
   school_notices: 'id,school_id,title,content,audience,class_id,is_active,is_pinned,publish_date,author_name,author_role,created_at',
   direct_messages: 'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read',
-  communication_queue: 'id,school_id,recipient_phone,recipient_name,student_id,message_type,channel,content,status,error_message,created_at,sent_at',
+  communication_queue: 'id,school_id,recipient_phone,recipient_name,student_id,message_type,channel,content,status,error_message,attempt_count,max_attempts,next_attempt_at,last_attempt_at,provider_message_id,created_at,sent_at',
   support_tickets: 'id,ticket_number,school_id,school_name,created_by_user_id,created_by_name,created_by_role,subject,description,priority,status,messages,created_at,updated_at',
   audit_logs: 'id,timestamp,action,category,school_id,school_name,user_id,user_name,user_role,details,ip_address,severity',
   users: 'id,school_id,role,full_name,email,phone,staff_id,student_id,parent_phone,must_change_password,is_blocked,failed_login_attempts,locked_until,permissions,assigned_class_ids,assigned_subject_ids,linked_student_ids,branch_id,created_at,last_login_at'
