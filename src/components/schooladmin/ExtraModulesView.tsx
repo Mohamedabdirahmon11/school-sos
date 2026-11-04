@@ -58,6 +58,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [routeFee, setRouteFee] = useState(25);
+  const [routeCapacity, setRouteCapacity] = useState(40);
 
   // Discipline State
   const [disciplineLogs, setDisciplineLogs] = useState<any[]>([]);
@@ -313,6 +314,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         driverName,
         driverPhone,
         feeAmount: routeFee,
+        capacity: routeCapacity,
         active: true,
         stops: []
       }, school?.id);
@@ -322,6 +324,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setDriverName('');
       setVehicleNumber('');
       setDriverPhone('');
+      setRouteCapacity(40);
       setNotice('Transport route added.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -511,12 +514,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Driver Name</th>
                   <th className="px-4 py-2.5">Driver Phone</th>
                   <th className="px-4 py-2.5">Monthly Fee</th>
+                  <th className="px-4 py-2.5">Seats</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {routes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
+                    <td colSpan={6} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
                 ) : (
                   routes.map(r => (
@@ -526,6 +530,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="px-4 py-2.5 text-[#334155]">{r.driverName}</td>
                       <td className="px-4 py-2.5 font-mono text-[#64748B]">{r.driverPhone}</td>
                       <td className="px-4 py-2.5 font-mono font-bold text-emerald-700">{formatMoney(r.feeAmount, school?.currency)}</td>
+                      <td className="px-4 py-2.5 font-mono">{busAssignments.filter(item => item.routeId === r.id && item.active !== false).length} / {r.capacity || 40}</td>
                     </tr>
                   ))
                 )}
@@ -541,7 +546,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </select>
               <select value={assignmentRouteId} onChange={e => setAssignmentRouteId(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
                 <option value="">Select route</option>
-                {routes.filter(route => route.active !== false).map(route => <option key={route.id} value={route.id}>{route.name}</option>)}
+                {routes.filter(route => route.active !== false).map(route => {
+                  const occupied = busAssignments.filter(item => item.routeId === route.id && item.active !== false && item.studentId !== assignmentStudentId).length;
+                  return <option key={route.id} value={route.id}>{route.name} · {occupied}/{route.capacity || 40}</option>;
+                })}
               </select>
               <button type="button" onClick={handleAssignBus} disabled={isReadOnly || !assignmentStudentId || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">Assign</button>
             </div>
@@ -834,6 +842,19 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   required
                   value={bookCopies}
                   onChange={e => setBookCopies(parseInt(e.target.value, 10) || 1)}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                />
+              </div>
+              <div>
+                <label className="block font-medium">Bus Capacity (students)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  step="1"
+                  required
+                  value={routeCapacity}
+                  onChange={e => setRouteCapacity(Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 1)))}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                 />
               </div>
