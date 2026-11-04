@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
+const ui = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
+const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+
+test('library API errors are not converted into empty or fake successful catalogue data', () => {
+  const getBooks = apiClient.slice(apiClient.indexOf('public static async getLibraryBooks'), apiClient.indexOf('public static async getTransportRoutes'));
+  assert.doesNotMatch(getBooks, /\.catch\(\(\) => \[\]\)/);
+  assert.doesNotMatch(getBooks, /\.catch\(\(\) => data\)/);
+});
+
+test('library catalogue sends and displays the database quantity field', () => {
+  assert.match(ui, /quantity: bookCopies/);
+  assert.match(ui, /\{b\.quantity\}/);
+  assert.doesNotMatch(ui, /b\.availableCopies|b\.totalCopies/);
+  assert.match(api, /const quantity = Number\(body\.quantity \?\? 1\)/);
+  assert.match(storage, /quantity: number/);
+});
+
+test('transport route form captures fields supported by the API', () => {
+  assert.match(ui, /value=\{vehicleNumber\}/);
+  assert.match(ui, /value=\{driverPhone\}/);
+  assert.match(ui, /vehicleNumber,/);
+  assert.match(ui, /driverPhone,/);
+  assert.match(api, /const vehicleNumber = typeof body\.vehicleNumber/);
+  assert.match(api, /const driverPhone = typeof body\.driverPhone/);
+});
+
+test('library and transport load errors are visible to the administrator', () => {
+  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load library books\.'/);
+  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport routes\.'/);
+  assert.match(ui, /role="alert"/);
+});
