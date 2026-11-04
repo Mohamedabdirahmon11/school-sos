@@ -2597,10 +2597,11 @@ class StorageEngine {
 
     return students.map(student => {
       const studentClass = classes.find(c => c.id === student.classId);
-      const studentPayments = payments.filter(p => p.studentId === student.id);
-      const totalPaid = studentPayments.filter(payment => !payment.voidedAt).reduce((acc, p) => acc + (p.amountPaid || 0), 0);
-      const totalDue = studentPayments.reduce((acc, p) => acc + (p.amountDue || 0), 0);
-      const totalRemaining = studentPayments.reduce((acc, p) => acc + (p.voidedAt ? p.amountDue || 0 : p.remainingAmount || 0), 0);
+      // Voided receipts are excluded from all arrears calculations.
+      const studentPayments = payments.filter(p => p.studentId === student.id && !p.voidedAt);
+      const totalPaid = studentPayments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
+      const totalDue = studentPayments.reduce((acc, p) => acc + (Number(p.amountDue) || 0), 0);
+      const totalRemaining = studentPayments.reduce((acc, p) => acc + (Number(p.remainingAmount) || 0), 0);
 
       return {
         student,
