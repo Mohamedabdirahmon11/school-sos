@@ -1812,7 +1812,6 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
       }).format(new Date());
       const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId));
       const present = today.filter((item: any) => item.status === 'present').length;
-      const studentIds = new Set(scopedStudents.map((student: any) => student.id));
       const scopedNotices = notices.items.filter((notice: any) => !notice.classId || classIds.includes(notice.classId));
       res.json({
         stats: {
