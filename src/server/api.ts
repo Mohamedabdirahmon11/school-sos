@@ -1871,16 +1871,18 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
         timeZone: school.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit'
       }).format(new Date());
       const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId));
-      const present = today.filter((item: any) => item.status === 'present').length;
+      const attended = today.filter((item: any) => item.status === 'present' || item.status === 'late').length;
+      const excused = today.filter((item: any) => item.status === 'excused').length;
+      const attendanceDenominator = Math.max(0, scopedStudents.length - excused);
       const scopedNotices = notices.items.filter((notice: any) => !notice.classId || classIds.includes(notice.classId));
       res.json({
         stats: {
           totalStudents: scopedStudents.length,
           totalTeachers: 1,
-          attendanceRate: scopedStudents.length ? Math.round(present * 100 / scopedStudents.length) : 0
+          attendanceRate: attendanceDenominator ? Math.round(attended * 100 / attendanceDenominator) : 0
         },
         totalClasses: classIds.length,
-        todayAttendance: present,
+        todayAttendance: attended,
         recentStudents: scopedStudents
           .slice()
           .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
