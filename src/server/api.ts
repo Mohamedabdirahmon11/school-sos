@@ -4362,6 +4362,41 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
   }
 });
 
+apiRouter.get('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  res.json(await db.getDisciplineIncidents(school.id));
+});
+
+apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
+  const incidentDate = typeof body.incidentDate === 'string' ? body.incidentDate.trim() : '';
+  const infractionType = typeof body.infractionType === 'string' ? body.infractionType.trim() : '';
+  const severity = body.severity;
+  const actionTaken = typeof body.actionTaken === 'string' ? body.actionTaken.trim() : '';
+  const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+  if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(incidentDate) ||
+      !infractionType || infractionType.length > 160 ||
+      !['low', 'medium', 'high'].includes(severity) ||
+      actionTaken.length > 1000 || notes.length > 2000 ||
+      (body.parentContacted !== undefined && typeof body.parentContacted !== 'boolean')) {
+    res.status(400).json({ error: 'Discipline incident details are invalid.' });
+    return;
+  }
+  const parsedDate = new Date(`${incidentDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== incidentDate) {
+    res.status(400).json({ error: 'Incident date is invalid.' });
+    return;
+  }
+  const incident = await db.addDisciplineIncident({
+    schoolId: school.id, studentId, incidentDate, infractionType, severity,
+    actionTaken, notes, parentContacted: body.parentContacted === true, recordedBy: user.id
+  });
+  res.status(201).json(incident);
+});
+
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
