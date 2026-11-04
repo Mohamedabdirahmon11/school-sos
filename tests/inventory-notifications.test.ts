@@ -107,6 +107,9 @@ test('parent notifications use the administrator WhatsApp session with no paid a
   assert.match(settingsUi, /WhatsApp-ka maamulka — bilaash/);
   assert.match(settingsUi, /school\?\.phone/);
   assert.match(settingsUi, /maamulka ayaa mar kasta riixaya Send/);
+  assert.match(settingsUi, /openManualWhatsApp/);
+  assert.match(settingsUi, /Fariin WhatsApp cusub u dir waalid/);
+  assert.match(settingsUi, /WhatsApp messages \(admin sends\)/);
   assert.match(attendanceUi, /https:\/\/wa\.me\//);
   assert.match(attendanceUi, /parentWhatsAppNumber/);
   assert.doesNotMatch(storage, /attendance-absent:/);
