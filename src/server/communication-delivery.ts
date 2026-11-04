@@ -61,7 +61,7 @@ async function deliverInfobip(settings: CommunicationSettings, item: Communicati
   const sender = settings.senderId?.trim() || '';
   if (!apiKey || !sender) throw new Error('Infobip requires an API key and an approved sender ID.');
   const endpoint = requireHttpsEndpoint(settings.webhookUrl, 'Infobip');
-  if (!endpoint.hostname.endsWith('infobip.com')) throw new Error('Infobip endpoint must use an infobip.com HTTPS host.');
+  if (!(endpoint.hostname === 'infobip.com' || endpoint.hostname.endsWith('.infobip.com'))) throw new Error('Infobip endpoint must use an infobip.com HTTPS host.');
   const url = new URL(item.channel === 'whatsapp' ? '/whatsapp/1/message/text' : '/sms/2/text/advanced', endpoint.origin);
   const body = item.channel === 'whatsapp'
     ? { from: sender, to: normalizePhone(item.recipientPhone), content: { text: item.content } }
@@ -75,6 +75,13 @@ async function deliverInfobip(settings: CommunicationSettings, item: Communicati
 
 async function deliverLocalGateway(settings: CommunicationSettings, item: CommunicationQueueItem): Promise<void> {
   const endpoint = requireHttpsEndpoint(settings.webhookUrl, 'Local gateway');
+  const allowedHosts = (process.env.COMMUNICATION_GATEWAY_ALLOWLIST || '')
+    .split(',')
+    .map(host => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowedHosts.includes(endpoint.hostname.toLowerCase())) {
+    throw new Error('Local gateway host is not allowlisted by the server administrator.');
+  }
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
   if (settings.apiKey) headers.Authorization = `Bearer ${settings.apiKey.trim()}`;
   if (settings.apiSecret) headers['X-Gateway-Secret'] = settings.apiSecret.trim();
