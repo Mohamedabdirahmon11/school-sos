@@ -1898,7 +1898,8 @@ class StorageEngine {
     classId: string,
     date: string,
     records: { studentId: string; status: 'present' | 'absent' | 'late' | 'excused'; note?: string }[],
-    recordedBy: string
+    recordedBy: string,
+    onNotificationQueued?: (item: CommunicationQueueItem) => void
   ): Promise<AttendanceRecord[]> {
     await this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId, date });
     const results: AttendanceRecord[] = [];
@@ -1935,12 +1936,16 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // Notify a parent only when the record first transitions into absent.
-      if (rec.status === 'absent' && !wasAlreadyAbsent) {
+      // Queue one parent alert only when attendance first transitions into absent.
+      const school = this.data.schools.find(item => item.id === schoolId);
+      const preferences = school?.notificationPreferences;
+      const attendanceAlertsEnabled = preferences?.attendanceAlerts !== false && preferences?.sms !== false;
+      if (rec.status === 'absent' && !wasAlreadyAbsent && attendanceAlertsEnabled) {
         const student = await this.getStudentById(rec.studentId, schoolId);
-        const parentPhone = student?.fatherPhone || student?.motherPhone;
+        const parentPhone = [student?.fatherPhone, student?.motherPhone]
+          .find(phone => typeof phone === 'string' && /^\+?[0-9][0-9\s().-]{5,48}$/.test(phone.trim()));
         if (student && parentPhone) {
-          await this.queueNotification({
+          const queued = await this.queueNotification({
             schoolId,
             recipientPhone: parentPhone,
             recipientName: `Parent of ${student.firstName}`,
@@ -1949,6 +1954,7 @@ class StorageEngine {
             channel: 'sms',
             content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
           });
+          onNotificationQueued?.(queued);
         }
       }
     }
