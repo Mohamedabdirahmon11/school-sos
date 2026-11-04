@@ -2540,16 +2540,23 @@ class StorageEngine {
       && (paymentData.feeType !== 'custom' || item.feeStructureId === matching?.id)
     );
     if (installmentRecord) {
-      if (installmentRecord.status === 'paid') throw new Error('This fee is already fully paid for the selected billing period.');
-      const cumulativePaid = installmentRecord.amountPaid + paymentData.amountPaid;
-      if (cumulativePaid > installmentRecord.amountDue) throw new Error('Cash paid cannot exceed the remaining fee balance.');
-      installmentRecord.amountPaid = cumulativePaid;
-      installmentRecord.remainingAmount = installmentRecord.amountDue - cumulativePaid;
-      installmentRecord.status = installmentRecord.remainingAmount === 0 ? 'paid' : 'partial';
-      installmentRecord.date = new Date().toISOString().split('T')[0];
-      installmentRecord.recordedBy = paymentData.recordedBy;
-      if (paymentData.idempotencyKey) installmentRecord.idempotencyKeys = [...(installmentRecord.idempotencyKeys || []), paymentData.idempotencyKey];
-      if (paymentData.notes) installmentRecord.notes = [installmentRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
+      const client = this.testClient || supabase;
+      if (!client || typeof client.rpc !== 'function') throw new Error('Atomic fee installment updates are unavailable.');
+      const startedAt = performance.now();
+      const { data, error } = await client.rpc('schoolos_apply_fee_installment', {
+        p_payment_id: installmentRecord.id,
+        p_school_id: paymentData.schoolId,
+        p_amount_paid: paymentData.amountPaid,
+        p_recorded_by: paymentData.recordedBy,
+        p_notes: paymentData.notes || null,
+        p_idempotency_key: paymentData.idempotencyKey || null
+      });
+      this.recordQuery('rpc:schoolos_apply_fee_installment', 'call', startedAt);
+      if (error) throw new Error(error.message || 'Unable to apply this fee installment.');
+      if (!data) throw new Error('The fee installment could not be found or has been voided.');
+      const updatedPayment = fromSupabaseRow(data, 'fee_payments') as FeePayment;
+      const cachedIndex = this.data.feePayments.findIndex(item => item.id === installmentRecord.id && item.schoolId === paymentData.schoolId);
+      if (cachedIndex >= 0) this.data.feePayments[cachedIndex] = updatedPayment;
       this.logAudit({
         action: 'FEE_INSTALLMENT_RECORDED',
         category: 'finance',
@@ -2557,12 +2564,11 @@ class StorageEngine {
         userId: paymentData.recordedBy,
         userName: 'Cashier / Accountant',
         userRole: 'accountant',
-        details: `Collected an additional ${paymentData.feeType} installment for student ID ${student.id} (${paymentData.month}). Balance: ${installmentRecord.remainingAmount}.`,
+        details: `Collected an additional ${paymentData.feeType} installment for student ID ${student.id} (${paymentData.month}). Balance: ${updatedPayment.remainingAmount}.`,
         severity: 'info'
       });
-      this.save();
       await this.flush();
-      return installmentRecord;
+      return updatedPayment;
     }
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
