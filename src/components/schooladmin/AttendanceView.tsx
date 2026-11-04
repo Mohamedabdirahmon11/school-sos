@@ -36,6 +36,17 @@ const schoolLocalDate = (timeZone?: string) => {
   }
 };
 
+const normalizeWhatsAppNumber = (phone?: string | null): string | null => {
+  const value = phone?.trim();
+  if (!value) return null;
+  const digits = value.startsWith('00')
+    ? value.slice(2).replace(/\\D/g, '')
+    : value.startsWith('+')
+      ? value.slice(1).replace(/\\D/g, '')
+      : '';
+  return digits.length >= 8 && digits.length <= 15 ? digits : null;
+};
+
 const parentWhatsAppNumber = (student: Student) =>
   normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
 
@@ -347,7 +358,7 @@ export const AttendanceView: React.FC = () => {
                       <td className="py-3 px-4 font-semibold text-[#132A29]">
                         {std.firstName} {std.middleName} {std.lastName}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || 'N/A'}</td>
+                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || std.motherPhone || 'N/A'}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
                           <button
@@ -422,7 +433,7 @@ export const AttendanceView: React.FC = () => {
                             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                           </button>
                         ) : <span className="text-[11px] text-[#94A3B8]">—</span>}
-                        {state.status === 'absent' && !normalizeWhatsAppNumber(std.fatherPhone || std.motherPhone) && (
+                        {state.status === 'absent' && !parentWhatsAppNumber(std) && (
                           <p className="mt-1 max-w-40 text-[10px] text-amber-700">Ku qor waalidka lambarka +country code.</p>
                         )}
                       </td>
