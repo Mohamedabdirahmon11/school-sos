@@ -1633,6 +1633,32 @@ CREATE POLICY communication_queue_admin_scope ON communication_queue AS RESTRICT
 DROP POLICY IF EXISTS notification_templates_admin_scope ON notification_templates;
 CREATE POLICY notification_templates_admin_scope ON notification_templates AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() IN ('super_admin','school_admin'));
+
+-- Restrict writes to notification configuration and queue tables on fresh installs.
+ALTER TABLE communication_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE communication_queue ENABLE ROW LEVEL SECURITY;
+DO $
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_insert', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_insert', table_name
+    );
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_update', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING (private.auth_user_role() IN (''school_admin'', ''super_admin'')) WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_update', table_name
+    );
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_delete', table_name);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR DELETE TO authenticated USING (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
+      table_name || '_admin_delete', table_name
+    );
+  END LOOP;
+END $;
 DROP POLICY IF EXISTS staff_members_role_scope ON staff_members;
 CREATE POLICY staff_members_role_scope ON staff_members AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() IN ('super_admin','school_admin','accountant') OR user_id = private.auth_user_id());
