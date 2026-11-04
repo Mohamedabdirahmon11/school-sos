@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
@@ -291,4 +292,10 @@ test('daily attendance waits for database persistence before returning success',
   const end = storage.indexOf('// EXAMS & RESULTS', start);
   const method = storage.slice(start, end);
   assert.match(method, /this\.save\(\);\s*await this\.flush\(\);\s*return results;/);
+});
+
+
+test('school backup restore rejects single-column foreign keys that cross school boundaries', () => {
+  assert.match(backupRestoreMigration, /FOR v_fk IN[\\s\\S]*target_row\\.school_id = \\$2[\\s\\S]*references a record outside this school/);
+  assert.match(sql, /FOR v_fk IN[\\s\\S]*target_row\\.school_id = \\$2[\\s\\S]*references a record outside this school/);
 });
