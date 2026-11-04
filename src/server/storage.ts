@@ -1951,7 +1951,7 @@ class StorageEngine {
             recipientName: `Parent of ${student.firstName}`,
             studentId: student.id,
             messageType: 'attendance_absent',
-            channel: 'sms',
+            channel: (await this.getCommunicationSettings(schoolId)).defaultChannel || 'sms',
             content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
           });
           onNotificationQueued?.(queued);
@@ -2631,6 +2631,7 @@ class StorageEngine {
         id: `cs-${scopedSchoolId}`,
         schoolId: scopedSchoolId,
         provider: 'none',
+        defaultChannel: 'sms',
         isActive: false,
         updatedAt: new Date().toISOString()
       };
@@ -2647,6 +2648,9 @@ class StorageEngine {
     const allowedProviders = ['twilio', 'infobip', 'local_gateway', 'whatsapp_business', 'none'];
     if (updates.provider !== undefined && !allowedProviders.includes(updates.provider)) throw new Error('Choose a supported notification provider.');
     if (updates.isActive !== undefined && typeof updates.isActive !== 'boolean') throw new Error('Gateway activation must be true or false.');
+    if (updates.defaultChannel !== undefined && !['sms', 'whatsapp'].includes(updates.defaultChannel)) {
+      throw new Error('Default notification channel must be SMS or WhatsApp.');
+    }
     for (const key of ['apiKey', 'apiSecret'] as const) {
       const value = updates[key];
       if (value !== undefined && (typeof value !== 'string' || !value.trim() || value.length > 512)) {
@@ -2665,6 +2669,7 @@ class StorageEngine {
     const updated: CommunicationSettings = {
       ...current,
       provider: updates.provider ?? current.provider,
+      defaultChannel: updates.defaultChannel ?? current.defaultChannel ?? 'sms',
       isActive: (updates.provider === 'none') ? false : (updates.isActive ?? current.isActive),
       ...(updates.apiKey !== undefined ? { apiKey: updates.apiKey.trim() } : {}),
       ...(updates.apiSecret !== undefined ? { apiSecret: updates.apiSecret.trim() } : {}),
