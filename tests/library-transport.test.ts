@@ -34,14 +34,14 @@ test('transport route form captures fields supported by the API', () => {
 });
 
 test('library and transport load errors are visible to the administrator', () => {
-  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load library books\.'/);
+  assert.match(ui, /setLibraryError\(err\.message \|\| 'Unable to load library catalogue and lending records\.'/);
   assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport routes\.'/);
   assert.match(ui, /role="alert"/);
 });
 
 test('library, transport, and bus assignment writes are restricted to administrators', () => {
   for (const table of ['library_books', 'transport_routes', 'bus_assignments']) {
-    assert.match(migration, new RegExp('ALTER TABLE public\\\\.' + table + ' ENABLE ROW LEVEL SECURITY'));
+    assert.ok(migration.includes(`ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`));
     for (const action of ['insert', 'update', 'delete']) {
       const policy = `${table}_admin_${action}`;
       assert.ok(migration.includes(`DROP POLICY IF EXISTS ${policy}`), `migration drops old ${policy}`);
