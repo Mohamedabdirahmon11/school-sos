@@ -28,6 +28,8 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['direct_messages', { id: 'm1', schoolId: 's1', senderId: 'u1', senderName: 'Teacher', senderRole: 'teacher', recipientId: 'u2', recipientName: 'Parent', recipientRole: 'parent', content: 'Hello', timestamp: '2026-09-01T00:00:00Z', isRead: false }],
   ['fee_payments', { id: 'p1', schoolId: 's1', studentId: 'st1', receiptNumber: 'R-1', academicYear: '2026', month: 'September', feeType: 'custom', feeStructureId: 'fs1', idempotencyKey: 'key-1', amountDue: 10, amountPaid: 10, remainingAmount: 0, paymentMethod: 'Cash', status: 'paid', date: '2026-09-01', recordedBy: 'u1' }],
   ['fee_receipt_sequences', { id: 's1:2026-2027', schoolId: 's1', academicYear: '2026-2027', nextValue: 1 }],
+  ['inventory_items', { id: 'inv1', schoolId: 's1', name: 'Exercise books', category: 'Stationery', unit: 'pack', quantityOnHand: 12, reorderLevel: 3, unitCost: 2.5, isActive: true }],
+  ['inventory_transactions', { id: 'itx1', schoolId: 's1', itemId: 'inv1', transactionType: 'stock_in', quantityDelta: 12, quantityBefore: 0, quantityAfter: 12, unitCost: 2.5 }],
   ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }]
 ];
 
@@ -49,6 +51,13 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
   assert.match(sql, /payment_method\s+VARCHAR\(20\)\s+NOT NULL DEFAULT 'Cash' CHECK\s*\(payment_method = 'Cash'\)/i);
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
   assert.ok(definitions.has('payroll_records'), 'payroll persistence is represented in the schema');
+  assert.ok(definitions.has('inventory_items'), 'inventory item persistence is represented in the schema');
+  assert.ok(definitions.has('inventory_transactions'), 'inventory stock ledger is represented in the schema');
+  assert.match(sql, /schoolos_adjust_inventory/i);
+  assert.match(sql, /schoolos_claim_communication_queue/i);
+  assert.match(sql, /schoolos_complete_communication_queue/i);
+  assert.match(apiSource, /apiRouter\.post\('\/inventory\/:id\/transactions'/);
+  assert.match(apiSource, /await db\.exportAuditLogsCSV\(\)/);
   for (const [table, payload] of fixtures.filter(([name]) => ['students', 'teachers', 'staff_members'].includes(name))) {
     const mapped = mapStorageRowToDatabase(table, payload);
     const columns = definitions.get(table)!;
