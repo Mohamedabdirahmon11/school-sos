@@ -2749,16 +2749,55 @@ class StorageEngine {
     const item: CommunicationQueueItem = {
       ...itemData,
       id,
-      // Queueing is not proof of delivery. A delivery worker must mark it sent
-      // only after the provider confirms successful transmission.
+      // Queueing is not proof of delivery; only the provider worker can mark it sent.
       status: 'queued',
-      errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Stored in queue as not sent.',
+      attemptCount: 0,
+      maxAttempts: 5,
+      nextAttemptAt: new Date().toISOString(),
+      errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Waiting for provider setup.',
       createdAt: new Date().toISOString()
     };
 
     this.data.communicationQueue.push(item);
     this.save();
+    await this.flush();
     return item;
+  }
+
+  public async claimCommunicationQueueItem(): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') return null;
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_claim_communication_queue');
+    this.recordQuery('rpc:schoolos_claim_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to claim a notification.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
+  }
+
+  public async completeCommunicationQueueItem(id: string, success: boolean, errorMessage?: string, providerMessageId?: string): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Notification delivery status is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_complete_communication_queue', {
+      p_id: id, p_success: success, p_error_message: errorMessage || null,
+      p_provider_message_id: providerMessageId || null
+    });
+    this.recordQuery('rpc:schoolos_complete_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update notification delivery status.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
+  }
+
+  public async retryCommunicationQueueItem(schoolId: string, id: string): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Notification retry is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_retry_communication_queue', { p_id: id, p_school_id: schoolId });
+    this.recordQuery('rpc:schoolos_retry_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to retry notification.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
   }
 
   public async getCommunicationQueue(schoolId: string): Promise<CommunicationQueueItem[]> {
