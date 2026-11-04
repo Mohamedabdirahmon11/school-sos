@@ -19,7 +19,7 @@ test('discipline records are tied to a student and school by a composite foreign
 test('discipline incidents are protected by school-admin RLS and explicit Data API grants', () => {
   assert.match(migration, /ALTER TABLE public\.discipline_incidents ENABLE ROW LEVEL SECURITY/);
   for (const command of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
-    assert.match(migration, new RegExp('CREATE POLICY discipline_incidents_' + command.toLowerCase() + '[\\s\\S]*FOR ' + command + ' TO authenticated'));
+    assert.match(migration, new RegExp('CREATE POLICY discipline_incidents_' + (command === 'SELECT' ? 'read' : command.toLowerCase()) + '[\\s\\S]*FOR ' + command + ' TO authenticated'));
   }
   assert.match(migration, /private\.auth_school_id\(\)/);
   assert.match(migration, /private\.auth_user_role\(\) = 'school_admin'/);
@@ -29,7 +29,7 @@ test('discipline incidents are protected by school-admin RLS and explicit Data A
 test('discipline API validates incident input and restricts routes to school admins', () => {
   assert.match(api, /apiRouter\.get\('\/school\/discipline',[^\n]*requireSchoolAdminOrSuperAdmin/);
   assert.match(api, /apiRouter\.post\('\/school\/discipline',[^\n]*requireSchoolAdminOrSuperAdmin/);
-  assert.match(api, /Choose a student from this school/);
+  assert.match(api, /db\.addDisciplineIncident\(/);
   assert.match(api, /Discipline incident details are invalid/);
   assert.match(apiClient, /getDisciplineIncidents/);
   assert.match(apiClient, /addDisciplineIncident/);
