@@ -1782,7 +1782,14 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
   if (!['school_admin', 'super_admin', 'teacher'].includes(role || '')) { res.status(403).json({ error: 'This role cannot view class details.' }); return; }
-  if (role === 'teacher' && !(await getTeacherAssignedClassIds(school.id, (req as any).user.id)).includes(String(req.params.id))) { res.status(403).json({ error: 'Teacher class scope does not include this class.' }); return; }
+  let teacherId: string | null = null;
+  if (role === 'teacher') {
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: (req as any).user.id }, 1, 1, undefined, 'id');
+    teacherId = teacher.items[0]?.id || null;
+    if (!teacherId || !(await getTeacherAssignedClassIds(school.id, (req as any).user.id)).includes(String(req.params.id))) {
+      res.status(403).json({ error: 'Teacher class scope does not include this class.' }); return;
+    }
+  }
   const klass = await db.getClassById(req.params.id, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
   const search = String(req.query.search || '').trim().replace(/[,.()]/g, ' ').slice(0, 60);
@@ -1793,16 +1800,18 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
     db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
     db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
   ]);
-  const subjectIds = [...new Set(assignments.items.map((item: any) => item.subjectId))];
-  const teacherIds = [...new Set(assignments.items.map((item: any) => item.teacherId).filter(Boolean))];
+  const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
+  const visibleTimetable = teacherId ? timetable.items.filter((item: any) => item.teacherId === teacherId) : timetable.items;
+  const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
+  const teacherIds = [...new Set(visibleAssignments.map((item: any) => item.teacherId).filter(Boolean))];
   const [subjectRows, teacherRows] = await Promise.all([
     subjectIds.length ? db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects) : Promise.resolve({ items: [] as any[] }),
     teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.teachers) : Promise.resolve({ items: [] as any[] })
   ]);
   const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
   const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
-  const classSubjects = assignments.items.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
-  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: timetable.items, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
+  const classSubjects = visibleAssignments.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
+  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
 });
 
 apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req, res) => {
