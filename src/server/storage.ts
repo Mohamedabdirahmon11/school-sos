@@ -2161,7 +2161,7 @@ class StorageEngine {
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
-    const marks = await this.getMarks(schoolId, classId, undefined, semester);
+    const marks = (await this.getMarks(schoolId, classId, undefined, semester)).filter(mark => mark.status === 'approved');
 
     const rankings = students.map(student => {
       const studentMarks = marks.filter(m => m.studentId === student.id);
@@ -2193,8 +2193,8 @@ class StorageEngine {
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
   public async getClassYearlyRankings(schoolId: string, classId: string) {
     const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 1');
-    const sem2Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 2');
+    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
+    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
     const config = await this.getExamConfig(schoolId);
     const subjects = await this.getSubjects(schoolId);
 
