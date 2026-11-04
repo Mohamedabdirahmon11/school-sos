@@ -70,11 +70,16 @@ async function deliver(item: CommunicationQueueItem, settings: CommunicationSett
 
 let timer: NodeJS.Timeout | undefined;
 let active = false;
+let lastBroadcastSweep = 0;
 
 async function processOne(): Promise<void> {
   if (active) return;
   active = true;
   try {
+    if (Date.now() - lastBroadcastSweep >= 30_000) {
+      lastBroadcastSweep = Date.now();
+      await db.publishDueBroadcasts();
+    }
     const item = await db.claimCommunicationQueueItem();
     if (!item) return;
     try {
