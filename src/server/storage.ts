@@ -2580,7 +2580,7 @@ class StorageEngine {
   // Daily cash income report
   public async getDailyIncomeReport(schoolId: string, date: string) {
     const payments = (await this.getFeePayments(schoolId)).filter(f => f.date === date && !f.voidedAt && Number(f.amountPaid) > 0);
-    const totalCollected = payments.reduce((acc, p) => acc + (p.amountPaid || 0), 0);
+    const totalCollected = payments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
     return {
       date,
       totalCollected,
