@@ -33,6 +33,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   
   // Library State
   const [books, setBooks] = useState<any[]>([]);
+  const [libraryLoans, setLibraryLoans] = useState<any[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [librarySaving, setLibrarySaving] = useState(false);
+  const [loanBookId, setLoanBookId] = useState('');
+  const [loanStudentId, setLoanStudentId] = useState('');
+  const [loanDueDate, setLoanDueDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
   const [showAddBookModal, setShowAddBookModal] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
   const [bookAuthor, setBookAuthor] = useState('');
@@ -94,6 +101,23 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const [notice, setNotice] = useState<string | null>(null);
   const [moduleError, setModuleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!school || activeModule !== 'library') return;
+    let cancelled = false;
+    setLibraryLoading(true);
+    setLibraryError(null);
+    Promise.all([ApiClient.getLibraryBooks(school.id), ApiClient.getLibraryLoans()])
+      .then(([bookRows, loanRows]) => {
+        if (cancelled) return;
+        setBooks(bookRows);
+        setLibraryLoans(loanRows);
+        setLoanBookId(current => current || bookRows[0]?.id || '');
+      })
+      .catch((err: any) => { if (!cancelled) setLibraryError(err.message || 'Unable to load library catalogue and lending records.'); })
+      .finally(() => { if (!cancelled) setLibraryLoading(false); });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
 
   useEffect(() => {
     if (!school) return;
@@ -217,6 +241,38 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     } catch (err: any) {
       setInventoryError(err.message || 'Unable to record stock movement.');
     } finally { setMovementSaving(false); }
+  };
+
+  const handleIssueLibraryLoan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || !loanBookId || !loanStudentId || !loanDueDate) return;
+    setLibrarySaving(true);
+    setLibraryError(null);
+    try {
+      const loan = await ApiClient.issueLibraryLoan({ bookId: loanBookId, studentId: loanStudentId, dueDate: loanDueDate });
+      setLibraryLoans(rows => [loan, ...rows]);
+      setLoanStudentId('');
+      setNotice('Book issued to student.');
+    } catch (err: any) {
+      setLibraryError(err.message || 'Unable to issue this book.');
+    } finally {
+      setLibrarySaving(false);
+    }
+  };
+
+  const handleReturnLibraryLoan = async (loanId: string) => {
+    if (isReadOnly) return;
+    setLibrarySaving(true);
+    setLibraryError(null);
+    try {
+      const returned = await ApiClient.returnLibraryLoan(loanId);
+      setLibraryLoans(rows => rows.map(row => row.id === returned.id ? returned : row));
+      setNotice('Book return recorded.');
+    } catch (err: any) {
+      setLibraryError(err.message || 'Unable to record book return.');
+    } finally {
+      setLibrarySaving(false);
+    }
   };
 
   const handleAddBook = async (e: React.FormEvent) => {
@@ -372,6 +428,55 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             </table>
           </div>
         </div>
+          <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-bold text-[#132A29]">Issue a book</h3>
+              <span className="text-[11px] text-[#64748B]">Available copies are calculated from active loans.</span>
+            </div>
+            {libraryError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{libraryError}</div>}
+            {libraryLoading ? <p role="status" className="py-3 text-center text-xs text-[#64748B]">Loading lending records…</p> : (
+              <>
+                <form onSubmit={handleIssueLibraryLoan} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <select required value={loanBookId} onChange={e => setLoanBookId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
+                    <option value="">Select available book</option>
+                    {books.map(book => {
+                      const active = libraryLoans.filter(loan => loan.bookId === book.id && loan.status === 'issued').length;
+                      const available = Math.max(0, Number(book.quantity || 0) - active);
+                      return available > 0 ? <option key={book.id} value={book.id}>{book.title} · {available} available</option> : null;
+                    })}
+                  </select>
+                  <select required value={loanStudentId} onChange={e => setLoanStudentId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
+                    <option value="">Select student</option>
+                    {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
+                  </select>
+                  <input required type="date" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)} value={loanDueDate} onChange={e => setLoanDueDate(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg" aria-label="Due date" />
+                  <button type="submit" disabled={isReadOnly || librarySaving || !loanBookId || !loanStudentId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">{librarySaving ? 'Saving…' : 'Issue book'}</button>
+                </form>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#F8FAFC] text-[#64748B] border-b border-[#E2E8F0]">
+                      <tr><th className="px-3 py-2">Book</th><th className="px-3 py-2">Student</th><th className="px-3 py-2">Issued</th><th className="px-3 py-2">Due</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Action</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E8F0]">
+                      {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : libraryLoans.map(loan => {
+                        const book = books.find(row => row.id === loan.bookId);
+                        const student = students.find(row => row.id === loan.studentId);
+                        const overdue = loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+                        return <tr key={loan.id}>
+                          <td className="px-3 py-2 font-medium">{book?.title || 'Book record unavailable'}</td>
+                          <td className="px-3 py-2">{student ? `${student.firstName} ${student.lastName}` : loan.studentId}</td>
+                          <td className="px-3 py-2 font-mono">{String(loan.issuedAt || '').slice(0, 10)}</td>
+                          <td className="px-3 py-2 font-mono">{loan.dueDate}</td>
+                          <td className="px-3 py-2">{loan.status === 'returned' ? <span className="text-emerald-700">Returned</span> : overdue ? <span className="font-semibold text-rose-700">Overdue</span> : <span className="text-amber-700">Issued</span>}</td>
+                          <td className="px-3 py-2">{loan.status === 'issued' && <button type="button" disabled={isReadOnly || librarySaving} onClick={() => handleReturnLibraryLoan(loan.id)} className="text-[#0F766E] font-semibold disabled:opacity-50">Mark returned</button>}</td>
+                        </tr>;
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
       )}
 
       {/* 2. TRANSPORT MODULE */}
