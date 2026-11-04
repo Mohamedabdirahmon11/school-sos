@@ -222,6 +222,93 @@ export class InMemorySupabase {
       });
       return { data: payment, error: null };
     }
+    if (name === 'schoolos_approve_admission') {
+      const payload = args?.p_payload || {};
+      const tables = ['admission_applications', 'classes', 'students', 'users', 'audit_logs'];
+      const snapshots = new Map<string, any[]>(tables.map(table => [table, structuredClone(this.rows(table))] as [string, any[]]));
+      const field = (row: any, camel: string, snake: string) => row?.[camel] ?? row?.[snake];
+      try {
+        const application = this.rows('admission_applications').find(row =>
+          String(row.id) === String(payload.application_id)
+          && String(field(row, 'schoolId', 'school_id')) === String(payload.school_id)
+        );
+        if (!application) throw new Error('Admission application not found.');
+        if (field(application, 'status', 'status') !== 'pending') throw new Error('Admission application has already been processed.');
+        const classId = field(application, 'classId', 'class_id');
+        const klass = this.rows('classes').find(row =>
+          String(row.id) === String(classId)
+          && String(field(row, 'schoolId', 'school_id')) === String(payload.school_id)
+          && field(row, 'isArchived', 'is_archived') !== true
+        );
+        if (!klass) throw new Error('The selected class is unavailable or belongs to another school.');
+        const enrolled = this.rows('students').filter(row =>
+          String(field(row, 'schoolId', 'school_id')) === String(payload.school_id)
+          && String(field(row, 'classId', 'class_id')) === String(classId)
+          && field(row, 'status', 'status') === 'active'
+        ).length;
+        if (enrolled >= Number(field(klass, 'capacity', 'capacity') ?? 40)) throw new Error('The selected class has reached capacity.');
+        const camelize = (row: Record<string, any>) => Object.fromEntries(
+          Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_m, letter) => letter.toUpperCase()), value])
+        );
+        const student = camelize({
+          id: payload.student_record_id, school_id: payload.school_id,
+          branch_id: field(klass, 'branchId', 'branch_id') || null,
+          student_id: payload.student_id, first_name: field(application, 'firstName', 'first_name'),
+          middle_name: field(application, 'middleName', 'middle_name') || '',
+          last_name: field(application, 'lastName', 'last_name'),
+          gender: field(application, 'gender', 'gender'),
+          admission_date: new Date().toISOString().slice(0, 10),
+          father_phone: field(application, 'fatherPhone', 'father_phone') || '',
+          mother_phone: field(application, 'motherPhone', 'mother_phone') || null,
+          class_id: classId, section: field(klass, 'section', 'section') || 'A',
+          status: 'active', pin_hash: payload.pin_hash
+        });
+        this.rows('students').push(student);
+        this.rows('users').push(camelize({
+          id: payload.student_user_id, school_id: payload.school_id, role: 'student',
+          full_name: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          phone: student.fatherPhone || student.motherPhone, student_id: payload.student_id,
+          password_hash: '', pin_hash: payload.pin_hash, is_blocked: false, failed_login_attempts: 0
+        }));
+        const parentPhones = [...new Set([student.fatherPhone, student.motherPhone].filter(Boolean).map((p: string) => p.trim()))];
+        for (const phone of parentPhones) {
+          const normalize = (value: string) => value.replace(/[\\s()-]/g, '');
+          const existing = this.rows('users').find(row =>
+            String(field(row, 'schoolId', 'school_id')) === String(payload.school_id)
+            && field(row, 'role', 'role') === 'parent'
+            && [field(row, 'phone', 'phone'), field(row, 'parentPhone', 'parent_phone')].some((value: string) => value && normalize(value) === normalize(phone))
+          );
+          if (existing) {
+            const links = field(existing, 'linkedStudentIds', 'linked_student_ids') || [];
+            if (!links.includes(payload.student_record_id)) existing.linkedStudentIds = [...links, payload.student_record_id];
+            if (!existing.phone) existing.phone = phone;
+            if (!existing.parentPhone) existing.parentPhone = phone;
+          } else {
+            this.rows('users').push({
+              id: 'usr-parent-' + payload.student_record_id + '-' + this.rows('users').length,
+              schoolId: payload.school_id, role: 'parent',
+              fullName: 'Parent of ' + student.firstName, phone, parentPhone: phone,
+              passwordHash: '', pinHash: payload.pin_hash,
+              linkedStudentIds: [payload.student_record_id], isBlocked: false, failedLoginAttempts: 0
+            });
+          }
+        }
+        application.status = 'approved';
+        application.studentId = payload.student_id;
+        this.rows('audit_logs').push({
+          id: 'audit-admission-' + payload.student_record_id,
+          action: 'ADMISSION_APPLICATION_APPROVED', category: 'school',
+          schoolId: payload.school_id, userId: payload.approved_by,
+          userName: payload.approved_by_name, userRole: payload.approved_by_role,
+          details: 'Admission application ' + payload.application_id + ' approved.',
+          severity: 'info', timestamp: new Date().toISOString()
+        });
+        return { data: { status: 'approved', student_id: payload.student_id }, error: null };
+      } catch (error) {
+        for (const [table, rows] of snapshots) this.replaceRows(table, rows);
+        return { data: null, error: { message: error instanceof Error ? error.message : 'Atomic admission approval failed.' } };
+      }
+    }
     if (name !== 'schoolos_bulk_import') return { data: null, error: null };
     if (this.failBulkImport) {
       this.failBulkImport = false;
