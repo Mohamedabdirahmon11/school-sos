@@ -4211,7 +4211,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","communication_settings","school_events","subscription_invoices","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","communication_queue","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;
@@ -4254,7 +4254,7 @@ apiRouter.post('/school/backup/restore', requireAuth, requireSchoolAdminOrSuperA
     res.status(400).json({ error: 'Explicit confirmation is required before restoring a backup.' });
     return;
   }
-  if (!['1.0.0', '1.1.0'].includes(String(backup?.version || ''))) {
+  if (!['1.0.0', '1.1.0', '1.2.0'].includes(String(backup?.version || ''))) {
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
