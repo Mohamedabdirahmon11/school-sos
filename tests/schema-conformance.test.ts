@@ -181,3 +181,25 @@ test('SECURITY DEFINER functions are schema-qualified and restricted to the serv
   }
   assert.match(migration, /SET search_path = ''/);
 });
+
+
+test('inventory policies avoid overlapping SELECT permissions and index every inventory foreign key', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/040_inventory_policy_and_fk_indexes.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'CREATE INDEX IF NOT EXISTS inventory_items_created_by_idx',
+    'CREATE INDEX IF NOT EXISTS inventory_transactions_item_school_idx',
+    'CREATE INDEX IF NOT EXISTS inventory_transactions_performed_by_idx',
+    'CREATE POLICY inventory_items_school_insert',
+    'CREATE POLICY inventory_items_school_update',
+    'CREATE POLICY inventory_items_school_delete',
+    'FOR INSERT TO authenticated',
+    'FOR UPDATE TO authenticated',
+    'FOR DELETE TO authenticated'
+  ]) assert.ok(migration.includes(fragment), `inventory hardening migration includes ${fragment}`);
+  assert.doesNotMatch(migration, /CREATE POLICY inventory_items_school_write[\\s\\S]*?FOR ALL/i);
+  const schemaPolicies = sql.slice(sql.indexOf('DROP POLICY IF EXISTS inventory_items_school_read'));
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_read[\\s\\S]*?FOR SELECT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_insert[\\s\\S]*?FOR INSERT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_update[\\s\\S]*?FOR UPDATE TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_delete[\\s\\S]*?FOR DELETE TO authenticated/i);
+});
