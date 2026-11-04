@@ -68,6 +68,27 @@ WITH checks AS (
         AND acl.grantee IN (0, 'anon'::regrole::oid, 'authenticated'::regrole::oid)
     ),
     'Only the intended trusted server role should execute privileged database functions.'
+  UNION ALL
+  SELECT 'Private RLS helper schema exists',
+    to_regprocedure('private.auth_school_id()') IS NOT NULL,
+    'Apply the private-schema RLS helper migration.'
+  UNION ALL
+  SELECT 'Inventory tables and stock adjustment RPC exist',
+    to_regclass('public.inventory_items') IS NOT NULL
+      AND to_regclass('public.inventory_transactions') IS NOT NULL
+      AND to_regprocedure('public.schoolos_adjust_inventory(character varying,character varying,character varying,numeric,numeric,character varying,text,character varying)') IS NOT NULL,
+    'Apply migration 033 before using the inventory module.'
+  UNION ALL
+  SELECT 'Notification retry worker RPCs and attempt columns exist',
+    to_regprocedure('public.schoolos_claim_communication_queue()') IS NOT NULL
+      AND to_regprocedure('public.schoolos_complete_communication_queue(character varying,boolean,text,character varying)') IS NOT NULL
+      AND to_regprocedure('public.schoolos_retry_communication_queue(character varying,character varying)') IS NOT NULL
+      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='communication_queue' AND column_name='attempt_count'),
+    'Apply migrations 034 and 036 before enabling the production notification worker.'
+  UNION ALL
+  SELECT 'Dashboard attendance and fee metrics RPC exists',
+    to_regprocedure('public.school_dashboard_summary(character varying)') IS NOT NULL,
+    'Apply the current report calculation migrations.'
 )
 SELECT check_name, CASE WHEN passed THEN 'PASS' ELSE 'FAIL' END AS status, details
 FROM checks
