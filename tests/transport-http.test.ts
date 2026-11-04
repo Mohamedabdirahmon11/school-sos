@@ -95,10 +95,10 @@ test('transport routes persist using schema columns and remain tenant-scoped', a
   assert.equal(routesA[0].id, routeA.id);
 
   const teacherList = await fetch(`${baseUrl}/school/transport`, { headers: { Cookie: teacherACookie } });
-  assert.equal(teacherList.status, 200);
-  const teacherRoutes = await teacherList.json() as any[];
-  assert.equal(teacherRoutes.length, 1);
-  assert.equal(teacherRoutes[0].schoolId, schoolA.id);
+  assert.equal(teacherList.status, 403);
+
+  const teacherAssignments = await fetch(`${baseUrl}/bus/assignments`, { headers: { Cookie: teacherACookie } });
+  assert.equal(teacherAssignments.status, 403);
 
   const forbiddenWrite = await fetch(`${baseUrl}/school/transport`, {
     method: 'POST', headers: headers(teacherACookie),
