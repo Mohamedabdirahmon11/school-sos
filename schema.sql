@@ -1248,6 +1248,36 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Only school administrators may mutate library, transport, or bus assignment records.
+-- These are RESTRICTIVE write policies so the broad tenant read policy cannot grant writes.
+DROP POLICY IF EXISTS library_books_admin_insert ON library_books;
+CREATE POLICY library_books_admin_insert ON library_books AS RESTRICTIVE
+  FOR INSERT TO authenticated
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS library_books_admin_update ON library_books;
+CREATE POLICY library_books_admin_update ON library_books AS RESTRICTIVE
+  FOR UPDATE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS library_books_admin_delete ON library_books;
+CREATE POLICY library_books_admin_delete ON library_books AS RESTRICTIVE
+  FOR DELETE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+
+DROP POLICY IF EXISTS transport_routes_admin_insert ON transport_routes;
+CREATE POLICY transport_routes_admin_insert ON transport_routes AS RESTRICTIVE
+  FOR INSERT TO authenticated
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS transport_routes_admin_update ON transport_routes;
+CREATE POLICY transport_routes_admin_update ON transport_routes AS RESTRICTIVE
+  FOR UPDATE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS transport_routes_admin_delete ON transport_routes;
+CREATE POLICY transport_routes_admin_delete ON transport_routes AS RESTRICTIVE
+  FOR DELETE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+
 DROP POLICY IF EXISTS users_role_read ON users;
 CREATE POLICY users_role_read ON users AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() = 'super_admin' OR id = private.auth_user_id() OR
