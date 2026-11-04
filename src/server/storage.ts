@@ -2912,7 +2912,7 @@ class StorageEngine {
   public createSubscriptionInvoice(invData: Omit<SubscriptionInvoice, 'id'>): SubscriptionInvoice {
     const invoice: SubscriptionInvoice = {
       ...invData,
-      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+      id: `inv-${randomUUID()}`
     };
     this.data.invoices.push(invoice);
     this.save();
