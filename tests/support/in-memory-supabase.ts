@@ -181,6 +181,23 @@ export class InMemorySupabase {
       else sequenceRows.push({ id: sequenceId, schoolId, academicYear, nextValue });
       return { data: nextValue, error: null };
     }
+    if (name === 'schoolos_void_fee_payment') {
+      const payment = this.rows('fee_payments').find(row =>
+        String(row.id) === String(args?.p_payment_id)
+        && String(row.schoolId ?? row.school_id) === String(args?.p_school_id)
+      );
+      if (!payment || payment.voidedAt || payment.voided_at) return { data: null, error: null };
+      const now = new Date().toISOString();
+      Object.assign(payment, {
+        voidedAt: now,
+        voided_at: now,
+        voidedBy: args?.p_user_id,
+        voided_by: args?.p_user_id,
+        voidReason: String(args?.p_reason || '').trim(),
+        void_reason: String(args?.p_reason || '').trim()
+      });
+      return { data: payment, error: null };
+    }
     if (name !== 'schoolos_bulk_import') return { data: null, error: null };
     if (this.failBulkImport) {
       this.failBulkImport = false;
