@@ -2859,17 +2859,46 @@ class StorageEngine {
   }
 
   public async getMessages(schoolId: string, userId: string): Promise<DirectMessage[]> {
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof userId !== 'string' || !userId.trim() || userId.length > 64) {
+      throw new Error('Message access scope is invalid.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    const scopedUserId = userId.trim();
     const [sent, received] = await Promise.all([
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, sender_id: userId }),
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, recipient_id: userId })
+      this.queryRows<DirectMessage>('direct_messages', { school_id: scopedSchoolId, sender_id: scopedUserId }),
+      this.queryRows<DirectMessage>('direct_messages', { school_id: scopedSchoolId, recipient_id: scopedUserId })
     ]);
     return [...new Map([...sent, ...received].map(message => [message.id, message])).values()];
   }
 
   public sendMessage(msgData: Omit<DirectMessage, 'id' | 'timestamp' | 'isRead'>): DirectMessage {
+    const allowedRoles: Record<string, string[]> = {
+      school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'],
+      teacher: ['parent'], parent: ['teacher', 'student'], student: ['parent']
+    };
+    if (!msgData || typeof msgData !== 'object' ||
+        typeof msgData.schoolId !== 'string' || !msgData.schoolId.trim() || msgData.schoolId.length > 64 ||
+        typeof msgData.senderId !== 'string' || !msgData.senderId.trim() || msgData.senderId.length > 64 ||
+        typeof msgData.recipientId !== 'string' || !msgData.recipientId.trim() || msgData.recipientId.length > 64 ||
+        msgData.senderId.trim() === msgData.recipientId.trim() ||
+        typeof msgData.senderName !== 'string' || !msgData.senderName.trim() || msgData.senderName.trim().length > 255 ||
+        typeof msgData.recipientName !== 'string' || !msgData.recipientName.trim() || msgData.recipientName.trim().length > 255 ||
+        !['super_admin', 'school_admin', 'accountant', 'teacher', 'parent', 'student'].includes(msgData.senderRole) ||
+        !['super_admin', 'school_admin', 'accountant', 'teacher', 'parent', 'student'].includes(msgData.recipientRole) ||
+        !(allowedRoles[msgData.senderRole] || []).includes(msgData.recipientRole) ||
+        typeof msgData.content !== 'string' || !msgData.content.trim() || msgData.content.trim().length > 5000) {
+      throw new Error('Direct message details are invalid.');
+    }
     const message: DirectMessage = {
       ...msgData,
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      schoolId: msgData.schoolId.trim(),
+      senderId: msgData.senderId.trim(),
+      recipientId: msgData.recipientId.trim(),
+      senderName: msgData.senderName.trim(),
+      recipientName: msgData.recipientName.trim(),
+      content: msgData.content.trim(),
+      id: `msg-${randomUUID()}`,
       timestamp: new Date().toISOString(),
       isRead: false
     };
@@ -2879,10 +2908,22 @@ class StorageEngine {
   }
 
   public async markMessagesRead(schoolId: string, userId: string, contactId: string): Promise<void> {
-    await this.getMessages(schoolId, userId);
+    if (typeof schoolId !== 'string' || !schoolId.trim() || schoolId.length > 64 ||
+        typeof userId !== 'string' || !userId.trim() || userId.length > 64 ||
+        typeof contactId !== 'string' || !contactId.trim() || contactId.length > 64 ||
+        userId.trim() === contactId.trim()) {
+      throw new Error('Message read scope is invalid.');
+    }
+    const scopedSchoolId = schoolId.trim();
+    const scopedUserId = userId.trim();
+    const scopedContactId = contactId.trim();
+    await this.getMessages(scopedSchoolId, scopedUserId);
     let changed = false;
     this.data.messages = this.data.messages.map(message => {
-      if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) { changed = true; return { ...message, isRead: true }; }
+      if (message.schoolId === scopedSchoolId && message.senderId === scopedContactId && message.recipientId === scopedUserId && !message.isRead) {
+        changed = true;
+        return { ...message, isRead: true };
+      }
       return message;
     });
     if (changed) this.save();
