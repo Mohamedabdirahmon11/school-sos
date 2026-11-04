@@ -238,7 +238,7 @@ CREATE TABLE IF NOT EXISTS classes (
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   branch_id VARCHAR(64) REFERENCES school_branches(id) ON DELETE SET NULL,
   name VARCHAR(100) NOT NULL,
-  grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 1 AND 12),
+  grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 0 AND 12),
   section VARCHAR(20) NOT NULL DEFAULT 'A',
   room_number VARCHAR(50),
   capacity INTEGER NOT NULL DEFAULT 40,
