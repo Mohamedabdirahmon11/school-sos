@@ -435,7 +435,7 @@ export const SchoolSettingsView: React.FC = () => {
   const handleConfirmRestore = async () => {
     if (!restoreBackup || !restorePreview || isReadOnly) return;
     const confirmed = window.confirm(
-      'Restore this backup into the current school? Matching records will be updated and missing records inserted. Records not present in the backup will NOT be deleted. User credentials, billing and audit history are excluded.'
+      'Restore this backup into the current school? Matching records will be updated and missing records inserted. Records not present in the backup will NOT be deleted. User credentials, student PIN hashes, legacy provider secrets, billing and audit history are excluded.'
     );
     if (!confirmed) return;
     setIsRestoring(true);
