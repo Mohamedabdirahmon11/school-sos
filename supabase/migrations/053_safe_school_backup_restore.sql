@@ -10,7 +10,11 @@ AS $$
   SELECT COALESCE(
     jsonb_object_agg(lower(regexp_replace(key, '([A-Z])', E'_\\1', 'g')), value),
     '{}'::jsonb
-  )
+  ) - ARRAY[
+    'pin_hash', 'password_hash', 'two_factor_secret', 'pending_two_factor_secret',
+    'recovery_codes', 'failed_login_attempts', 'locked_until',
+    'api_key', 'api_secret', 'webhook_url'
+  ]
   FROM jsonb_each(COALESCE(p_row, '{}'::jsonb));
 $$;
 
