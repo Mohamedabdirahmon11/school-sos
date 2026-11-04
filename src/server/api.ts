@@ -3184,6 +3184,10 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
       res.status(400).json({ error: 'Attendance notes must be text of at most 500 characters.' });
       return;
     }
+    if (record.status === 'excused' && school.attendanceRules?.requireExcusedReason && !(typeof record.note === 'string' && record.note.trim())) {
+      res.status(400).json({ error: 'A reason is required for every excused attendance record.' });
+      return;
+    }
     seenStudentIds.add(record.studentId.trim());
   }
   const normalizedRecords = records.map(record => ({
