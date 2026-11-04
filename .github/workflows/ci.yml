@@ -2,9 +2,13 @@ name: SchoolOS CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/schoolos-audit-2026-11-03
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
