@@ -3283,7 +3283,7 @@ class StorageEngine {
     // Each query is explicitly scoped to this school ID.
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
-      'audit_logs', 'bus_assignments', 'class_subjects', 'classes', ,
+      'bus_assignments', 'class_subjects', 'classes',
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
@@ -3291,30 +3291,14 @@ class StorageEngine {
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
       'staff_members', 'student_marks', 'students', 'subjects',
       'support_tickets', 'teacher_unavailability', 'teachers',
-      'timetable_settings', 'timetable_slots', 'transport_routes', 'users'
+      'timetable_settings', 'timetable_slots', 'transport_routes'
     ];
     const tables: Record<string, any[]> = {};
     for (const table of schoolTables) {
       tables[table] = await this.queryRows(table, { school_id: schoolId });
     }
-    // Backups must never export credential material or active login sessions.
-    tables.users = tables.users.map((user: any) => {
-      const {
-        passwordHash, password_hash, pinHash, pin_hash, pin,
-        twoFactorSecret, two_factor_secret, pendingTwoFactorSecret, pending_two_factor_secret,
-        recoveryCodes, recovery_codes, failedLoginAttempts, failed_login_attempts,
-        lockedUntil, locked_until, ...safeUser
-      } = user;
-      return safeUser;
-    });
-    // Student PIN hashes are authentication material too; they must never leave
-    // the database in a downloadable school backup.
-    tables.students = tables.students.map((student: any) => {
-      const { pinHash, pin_hash, pin, ...safeStudent } = student;
-      return safeStudent;
-    });
-    // Platform broadcasts can target one tenant without carrying school_id.
-    tables.platform_broadcasts = await this.queryRows('platform_broadcasts', { target_school_id: schoolId });
+    // Authentication records, audit history, platform broadcasts, billing,
+    // provider secrets, and active sessions are intentionally never exported.
 
     return {
       backupDate: new Date().toISOString(),
