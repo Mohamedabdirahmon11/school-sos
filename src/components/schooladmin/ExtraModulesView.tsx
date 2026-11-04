@@ -93,13 +93,15 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [movementSaving, setMovementSaving] = useState(false);
 
   const [notice, setNotice] = useState<string | null>(null);
+  const [moduleError, setModuleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!school) return;
-    ApiClient.getLibraryBooks(school.id).then(setBooks).catch(console.error);
-    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
-    ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch(console.error);
-    ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
+    setModuleError(null);
+    ApiClient.getLibraryBooks(school.id).then(setBooks).catch((err: any) => setModuleError(err.message || 'Unable to load library books.'));
+    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch((err: any) => setModuleError(err.message || 'Unable to load transport routes.'));
+    ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch((err: any) => setModuleError(err.message || 'Unable to load students for transport.'));
+    ApiClient.getBusAssignments().then(setBusAssignments).catch((err: any) => setModuleError(err.message || 'Unable to load bus assignments.'));
   }, [school]);
 
   useEffect(() => {
@@ -222,17 +224,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     if (!bookTitle || !bookAuthor) return;
     try {
       const b = await ApiClient.addLibraryBook({
-        title: bookTitle,
-        author: bookAuthor,
+        title: bookTitle.trim(),
+        author: bookAuthor.trim(),
         isbn: bookIsbn.trim(),
-        totalCopies: bookCopies,
-        availableCopies: bookCopies,
-        shelfLocation: 'Section B'
+        quantity: bookCopies
       }, school?.id);
       setBooks(prev => [...prev, b]);
       setShowAddBookModal(false);
       setBookTitle('');
       setBookAuthor('');
+      setBookIsbn('');
       setNotice('Book added to library catalogue.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -258,6 +259,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setShowAddRouteModal(false);
       setRouteName('');
       setDriverName('');
+      setVehicleNumber('');
+      setDriverPhone('');
       setNotice('Transport route added.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -319,6 +322,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           <span>{notice}</span>
         </div>
       )}
+      {moduleError && <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800">{moduleError}</div>}
 
       {/* 1. LIBRARY MODULE */}
       {activeModule === 'library' && (
@@ -346,13 +350,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Author</th>
                   <th className="px-4 py-2.5">ISBN</th>
                   <th className="px-4 py-2.5">Copies</th>
-                  <th className="px-4 py-2.5">Location</th>
+                  
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {books.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
+                    <td colSpan={4} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
                   </tr>
                 ) : (
                   books.map(b => (
@@ -360,8 +364,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{b.title}</td>
                       <td className="px-4 py-2.5 text-[#475569]">{b.author}</td>
                       <td className="px-4 py-2.5 font-mono text-[#64748B]">{b.isbn}</td>
-                      <td className="px-4 py-2.5 font-mono">{b.availableCopies} / {b.totalCopies}</td>
-                      <td className="px-4 py-2.5 text-[#64748B]">{b.shelfLocation}</td>
+                      <td className="px-4 py-2.5 font-mono">{b.quantity}</td>
                     </tr>
                   ))
                 )}
@@ -704,6 +707,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 />
               </div>
               <div>
+                <label className="block font-medium">ISBN (optional)</label>
+                <input
+                  type="text"
+                  maxLength={50}
+                  value={bookIsbn}
+                  onChange={e => setBookIsbn(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                />
+              </div>
+              <div>
                 <label className="block font-medium">Number of Copies</label>
                 <input
                   type="number"
@@ -753,6 +766,28 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-medium">Vehicle Plate</label>
+                  <input
+                    type="text"
+                    maxLength={80}
+                    value={vehicleNumber}
+                    onChange={e => setVehicleNumber(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium">Driver Phone</label>
+                  <input
+                    type="tel"
+                    maxLength={50}
+                    value={driverPhone}
+                    onChange={e => setDriverPhone(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className="block font-medium">Driver Name</label>
                   <input
                     type="text"
@@ -766,7 +801,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <label className="block font-medium">Monthly Bus Fee ({school?.currency || 'ETB'})</label>
                   <input
                     type="number"
-                    min="5"
+                    min="0"
                     required
                     value={routeFee}
                     onChange={e => setRouteFee(parseFloat(e.target.value) || 20)}
