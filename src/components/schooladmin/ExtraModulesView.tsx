@@ -93,7 +93,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       console.error(error);
       setNotice('Library catalogue could not be loaded. Check your school access and database connection.');
     });
-    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
+    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(error => {
+      console.error(error);
+      setNotice('Transport routes could not be loaded. Check your school access and database connection.');
+    });
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
     ApiClient.getHealthRecords().then(setHealthLogs).catch(error => {
@@ -150,7 +153,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setRoutes(prev => [...prev, r]);
       setShowAddRouteModal(false);
       setRouteName('');
+      setVehicleNumber('');
       setDriverName('');
+      setDriverPhone('');
+      setRouteFee(25);
       setNotice('Transport route added.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
