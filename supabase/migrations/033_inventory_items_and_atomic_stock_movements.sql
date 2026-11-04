@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
   created_by varchar(80) REFERENCES public.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT inventory_items_school_sku_unique UNIQUE (school_id, sku)
+  CONSTRAINT inventory_items_school_sku_unique UNIQUE (school_id, sku),
+  CONSTRAINT inventory_items_id_school_unique UNIQUE (id, school_id)
 );
 CREATE INDEX IF NOT EXISTS inventory_items_school_active_idx
   ON public.inventory_items (school_id, is_active, name);
