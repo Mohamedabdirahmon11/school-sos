@@ -1,6 +1,6 @@
 # Free administrator-owned WhatsApp absence messages
 
-SchoolOS uses the school's administrator-owned WhatsApp account for absence notifications. This workflow is free and does not require Twilio, Infobip, WhatsApp Business Cloud API, API credentials, or an automatic background sender.
+SchoolOS opens the administrator's existing WhatsApp account for absence notifications. No paid SMS/WhatsApp provider, Cloud API subscription, provider credentials, or automatic background sender is required. The administrator still needs internet access; normal mobile-data charges and WhatsApp's current terms and availability apply, so this is not a promise that WhatsApp will remain free forever.
 
 ## Setup
 
@@ -22,6 +22,6 @@ The saved school number is the school's contact number shown in SchoolOS. It doe
 
 - The administrator's currently signed-in WhatsApp account is the sender.
 - SchoolOS does not send WhatsApp messages automatically.
-- No paid messaging provider or API is called.
+- No paid messaging provider or messaging API is called.
 - The administrator reviews and confirms every message inside WhatsApp.
 - If the parent phone number is missing or invalid, update the student's parent/guardian contact before using the WhatsApp action.
