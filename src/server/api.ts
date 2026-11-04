@@ -4363,6 +4363,61 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
   }
 });
 
+apiRouter.get('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  res.json(await db.getLibraryLoans(school.id));
+});
+
+apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const bookId = typeof body.bookId === 'string' ? body.bookId.trim() : '';
+  const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
+  const dueDate = typeof body.dueDate === 'string' ? body.dueDate.trim() : '';
+  const parsedDueDate = new Date(`${dueDate}T00:00:00.000Z`);
+  const today = new Date().toISOString().slice(0, 10);
+  if (!bookId || !studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) ||
+      Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate || dueDate < today) {
+    res.status(400).json({ error: 'Select a book, student and a valid due date that is today or later.' });
+    return;
+  }
+  try {
+    const loan = await db.issueLibraryLoan({ schoolId: school.id, bookId, studentId, dueDate, issuedBy: user.id });
+    res.status(201).json(loan);
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    if (message.includes('No available copies')) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    if (message.includes('Choose a book') || message.includes('Choose a student')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    throw error;
+  }
+});
+
+apiRouter.put('/school/library/loans/:loanId/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  try {
+    res.json(await db.returnLibraryLoan(school.id, req.params.loanId, user.id));
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    if (message.includes('not found')) {
+      res.status(404).json({ error: message });
+      return;
+    }
+    if (message.includes('already been returned')) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    throw error;
+  }
+});
+
 apiRouter.get('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getDisciplineIncidents(school.id));
