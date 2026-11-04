@@ -45,5 +45,5 @@ test('communication API never returns stored provider secrets and audit export i
   assert.match(storage, /apiSecretConfigured: Boolean\(settings\.apiSecret\)/);
   assert.match(api, /getPublicCommunicationSettings\(school\.id\)/);
   assert.match(api, /const csv = await db\.exportAuditLogsCSV\(\)/);
-  assert.match(storage, /if \(\^?\/\^\\s\*\[=\+@-\]/);
+  assert.ok(storage.includes('if (/^\\s*[=+@-]/.test(text))'));
 });
