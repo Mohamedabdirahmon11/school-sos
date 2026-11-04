@@ -2733,7 +2733,7 @@ class StorageEngine {
   }
 
   public async queueNotification(
-    itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>,
+    itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status' | 'attemptCount' | 'maxAttempts' | 'nextAttemptAt' | 'lastAttemptAt' | 'providerMessageId'>,
     idempotencyKey?: string
   ): Promise<CommunicationQueueItem> {
     const id = idempotencyKey
