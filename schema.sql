@@ -1077,7 +1077,7 @@ CREATE OR REPLACE FUNCTION private.enforce_bus_assignment_capacity()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public, private
-AS $
+AS $function$
 DECLARE
   route_capacity integer;
   active_assignments integer;
@@ -1110,7 +1110,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$function$;
 
 DROP TRIGGER IF EXISTS bus_assignment_capacity_guard ON public.bus_assignments;
 CREATE TRIGGER bus_assignment_capacity_guard
@@ -1121,7 +1121,7 @@ CREATE OR REPLACE FUNCTION private.prevent_bus_capacity_below_assignments()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public, private
-AS $
+AS $function$
 DECLARE
   active_assignments integer;
 BEGIN
@@ -1133,7 +1133,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$function$;
 
 DROP TRIGGER IF EXISTS transport_route_capacity_guard ON public.transport_routes;
 CREATE TRIGGER transport_route_capacity_guard
