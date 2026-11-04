@@ -3841,8 +3841,18 @@ apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextFo
   const user = (req as any).user as User;
   const ticketId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+  const requestedStatus = req.body?.status;
+  const allowedStatuses = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
   if (!ticketId || ticketId.length > 64 || !content || content.length > 5000) {
     res.status(400).json({ error: 'A valid ticket ID and reply of 1–5000 characters are required.' });
+    return;
+  }
+  if (requestedStatus !== undefined && user.role !== 'super_admin') {
+    res.status(403).json({ error: 'Only Super Admin can change a support ticket status.' });
+    return;
+  }
+  if (requestedStatus !== undefined && !allowedStatuses.includes(requestedStatus)) {
+    res.status(400).json({ error: 'Support ticket status is invalid.' });
     return;
   }
   try {
@@ -3851,7 +3861,7 @@ apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextFo
       senderName: user.fullName,
       senderRole: user.role,
       content
-    }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
+    }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id, requestedStatus);
     if (!ticket) {
       res.status(404).json({ error: 'Ticket not found.' });
       return;
