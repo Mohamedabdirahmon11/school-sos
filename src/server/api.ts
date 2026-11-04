@@ -20,7 +20,7 @@ import {
   sanitizeUsers,
   sanitizeStudent,
   sanitizeStudents,
-  verifyPassword,
+  verifyPassword,\n  passwordPolicyError,
   verifyPin,
   hashPassword,
   generate2FASecret,
@@ -1115,8 +1115,9 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   const { newPassword } = req.body;
 
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    res.status(400).json({ error: 'New password must be at least 8 characters.' });
+  const passwordError = passwordPolicyError(newPassword);
+  if (passwordError) {
+    res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' });
     return;
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
@@ -1158,7 +1159,8 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
   if (newPassword !== undefined && newPassword !== '') {
-    if (typeof newPassword !== 'string' || newPassword.length < 8) { res.status(400).json({ error: 'New password must be at least 8 characters.' }); return; }
+    const passwordError = passwordPolicyError(newPassword);
+    if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
     if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
   }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
