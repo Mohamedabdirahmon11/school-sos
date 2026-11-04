@@ -3854,6 +3854,15 @@ apiRouter.get('/communication/queue', requireAuth, requireSchoolContext, require
   void sendDatabasePage(req, res, 'communication_queue', { school_id: school.id });
 });
 
+apiRouter.post('/communication/queue/:id/retry', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const item = await db.retryCommunicationQueueItem(school.id, req.params.id);
+  if (!item) { res.status(404).json({ error: 'Only failed notifications in this school can be retried.' }); return; }
+  db.logAudit({ action: 'NOTIFICATION_RETRY_REQUESTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Queued notification ${item.id} for a new delivery attempt.`, severity: 'warning' });
+  res.json(item);
+});
+
 apiRouter.post('/communication/send', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
