@@ -123,6 +123,13 @@ export const SchoolSettingsView: React.FC = () => {
   const [queueItems, setQueueItems] = useState<CommunicationQueueItem[]>([]);
   const [queuePageInfo, setQueuePageInfo] = useState<PageInfo | null>(null);
   const [queuePage, setQueuePage] = useState(1);
+  const [notificationForm, setNotificationForm] = useState({
+    recipientName: '', recipientPhone: '', channel: 'sms' as 'sms' | 'whatsapp',
+    messageType: 'custom' as 'attendance_absent' | 'fee_due' | 'notice' | 'exam_result' | 'custom',
+    content: ''
+  });
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [notificationNotice, setNotificationNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!school) return;
@@ -414,6 +421,29 @@ export const SchoolSettingsView: React.FC = () => {
       setNotice(err.message || 'Failed to save gateway.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || isSendingNotification) return;
+    setIsSendingNotification(true);
+    setNotificationNotice(null);
+    try {
+      const sent = await ApiClient.sendQueuedNotification(notificationForm);
+      setQueueItems(current => [sent, ...current.filter(item => item.id !== sent.id)].slice(0, 20));
+      setNotificationForm(current => ({ ...current, recipientName: '', recipientPhone: '', content: '' }));
+      setNotificationNotice(sent.status === 'sent'
+        ? 'The provider accepted this message. Final handset delivery depends on provider status.'
+        : 'Message saved in the queue. It has not been sent because no active provider is configured.');
+    } catch (error: any) {
+      setNotificationNotice(error.message || 'The notification could not be sent.');
+      try {
+        const refreshed = await ApiClient.getCommunicationQueue({ page: queuePage, pageSize: 20 });
+        setQueueItems(refreshed);
+      } catch { /* Preserve the delivery error shown above. */ }
+    } finally {
+      setIsSendingNotification(false);
     }
   };
 
@@ -1494,6 +1524,61 @@ export const SchoolSettingsView: React.FC = () => {
               </button>
             </div>
           </form>
+          <section className="border-t border-[#E2E8F0] pt-5 space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#132A29]">Send SMS / WhatsApp</h3>
+              <p className="text-[11px] text-[#64748B]">Send a message to a parent or guardian. The queue records whether the provider accepted it.</p>
+            </div>
+            <form onSubmit={handleSendNotification} className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Recipient name</label>
+                <input required maxLength={150} value={notificationForm.recipientName}
+                  onChange={e => setNotificationForm(current => ({ ...current, recipientName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Parent phone (international format)</label>
+                <input required type="tel" maxLength={50} placeholder="+2519..."
+                  value={notificationForm.recipientPhone}
+                  onChange={e => setNotificationForm(current => ({ ...current, recipientPhone: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Channel</label>
+                <select value={notificationForm.channel}
+                  onChange={e => setNotificationForm(current => ({ ...current, channel: e.target.value as 'sms' | 'whatsapp' }))}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Message type</label>
+                <select value={notificationForm.messageType}
+                  onChange={e => setNotificationForm(current => ({ ...current, messageType: e.target.value as typeof current.messageType }))}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                  <option value="custom">General message</option>
+                  <option value="attendance_absent">Attendance alert</option>
+                  <option value="fee_due">Fee reminder</option>
+                  <option value="notice">School notice</option>
+                  <option value="exam_result">Exam result</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block font-semibold text-[#334155] mb-1">Message (maximum 2,000 characters)</label>
+                <textarea required maxLength={2000} rows={3} value={notificationForm.content}
+                  onChange={e => setNotificationForm(current => ({ ...current, content: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+              </div>
+              <div className="md:col-span-2 flex items-center justify-between gap-3">
+                {notificationNotice && <p role="status" className="text-[11px] text-[#475569]">{notificationNotice}</p>}
+                <button type="submit" disabled={isReadOnly || isSendingNotification}
+                  className="ml-auto px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold disabled:opacity-50">
+                  {isSendingNotification ? 'Sending…' : 'Send notification'}
+                </button>
+              </div>
+            </form>
+          </section>
           <section className="border-t border-[#E2E8F0] pt-5 space-y-3">
             <h3 className="text-sm font-bold text-[#132A29]">Notification Queue</h3>
             {queueItems.length === 0 ? <p className="text-xs text-[#64748B]">No queued notifications.</p> : queueItems.map(item => (
