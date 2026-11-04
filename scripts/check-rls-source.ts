@@ -28,7 +28,8 @@ const specificRules = [
   ['school_notices', 'school_notices_admin_insert'],
   ['school_notices', 'school_notices_admin_update'],
   ['school_notices', 'school_notices_admin_delete'],
-  ['support_tickets', 'support_tickets_owner_scope']
+  ['support_tickets', 'support_tickets_owner_scope'],
+  ['library_books', 'library_books_school_scope']
 ];
 
 let failed = false;
