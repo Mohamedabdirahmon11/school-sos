@@ -41,12 +41,17 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   const rankings = await db.getClassYearlyRankings(school.id, source.id);
   assert.deepEqual(rankings.map(row => row.yearlyRank), [1, 2, 3, 4]);
   assert.deepEqual(rankings.map(row => row.isPass), [true, true, true, false]);
+  const undersizedTarget = db.createClass({ schoolId: school.id, name: 'Small Grade 2', gradeLevel: 2, section: 'B', roomNumber: '', capacity: 2, monthlyFee: 0 });
   const payload = rankings.map((row, index) => ({
     studentId: row.student.id, classFromId: source.id, classToId: index < 3 ? target.id : source.id,
     yearlyPercentage: row.yearlyPercentage, yearlyRank: row.yearlyRank, decision: index < 3 ? 'promoted' as const : 'repeated' as const,
     adminOverride: index === 2, notes: index === 2 ? 'School board decision' : `Rank ${row.yearlyRank}`
   }));
   await assert.rejects(() => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, adminOverride: false })), 'admin-1'), /reason is required/);
+  await assert.rejects(
+    () => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, classToId: row.decision === 'promoted' ? undersizedTarget.id : row.classToId })), 'admin-1'),
+    /does not have enough capacity/
+  );
   const confirmed = await db.confirmYearEndPromotions(school.id, source.id, 2, payload, 'admin-1');
   assert.equal(confirmed.length, 4);
   assert.equal(confirmed[2].yearlyPercentage, 60);
