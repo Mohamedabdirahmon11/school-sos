@@ -3841,6 +3841,27 @@ apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperA
       return;
     }
   }
+  const current = await db.getCommunicationSettings(school.id);
+  const effective = Object.fromEntries(optionalCredentials.map(field => [
+    field, body[field] === undefined ? current[field] : body[field].trim()
+  ])) as Record<typeof optionalCredentials[number], string | undefined>;
+  const willBeActive = body.isActive === undefined ? current.isActive : body.isActive;
+  if (willBeActive && provider === 'twilio' && (!effective.apiKey || !effective.apiSecret || !effective.senderId)) {
+    res.status(400).json({ error: 'Twilio activation requires Account SID, Auth Token, and sender number.' }); return;
+  }
+  if (willBeActive && provider === 'infobip') {
+    let base: URL | null = null;
+    try { base = new URL(effective.webhookUrl || ''); } catch { /* validated below */ }
+    if (!effective.apiKey || !effective.senderId || !base || base.protocol !== 'https:' || !/(^|\\.)api\\.infobip\\.com$/i.test(base.hostname)) {
+      res.status(400).json({ error: 'Infobip activation requires an API key, sender ID, and official HTTPS api.infobip.com base URL.' }); return;
+    }
+  }
+  if (willBeActive && provider === 'whatsapp_business' && (!effective.apiKey || !effective.senderId)) {
+    res.status(400).json({ error: 'WhatsApp Business activation requires an access token and phone-number ID.' }); return;
+  }
+  if (willBeActive && provider === 'local_gateway' && !process.env.SCHOOL_OS_LOCAL_GATEWAY_URL) {
+    res.status(400).json({ error: 'Configure SCHOOL_OS_LOCAL_GATEWAY_URL on the server before enabling the local gateway.' }); return;
+  }
   const updated = await db.updateCommunicationSettings(school.id, {
     provider,
     ...(body.isActive === undefined ? {} : { isActive: body.isActive }),
