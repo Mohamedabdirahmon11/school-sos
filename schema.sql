@@ -902,9 +902,6 @@ CREATE TABLE IF NOT EXISTS fee_ranges (
 );
 CREATE INDEX IF NOT EXISTS idx_fee_ranges_school_grades ON fee_ranges(school_id,min_grade,max_grade);
 
-CREATE INDEX IF NOT EXISTS idx_bus_assignments_route_school ON bus_assignments(route_id, school_id);
-CREATE INDEX IF NOT EXISTS idx_bus_assignments_student_school ON bus_assignments(student_id, school_id);
-
 CREATE TABLE IF NOT EXISTS bus_assignments (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -914,6 +911,8 @@ CREATE TABLE IF NOT EXISTS bus_assignments (
   active BOOLEAN NOT NULL DEFAULT true,
   UNIQUE (school_id,student_id)
 );
+CREATE INDEX IF NOT EXISTS idx_bus_assignments_route_school ON bus_assignments(route_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_bus_assignments_student_school ON bus_assignments(student_id, school_id);
 
 CREATE TABLE IF NOT EXISTS notification_templates (
   id VARCHAR(64) PRIMARY KEY,
