@@ -224,3 +224,24 @@ test('database class-capacity guards serialize student enrollment and capacity e
     assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
   }
 });
+
+
+test('fee payment voiding is atomic, school-scoped, and service-role only', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/050_atomic_fee_payment_void.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'schoolos_void_fee_payment(',
+    'RETURNS public.fee_payments',
+    'SECURITY DEFINER',
+    "SET search_path = ''",
+    'WHERE id = p_payment_id',
+    'AND school_id = p_school_id',
+    'FOR UPDATE',
+    'payment_row.voided_at IS NOT NULL',
+    'SET voided_at = now()',
+    'REVOKE ALL ON FUNCTION public.schoolos_void_fee_payment',
+    'GRANT EXECUTE ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `fee void migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
