@@ -660,6 +660,32 @@ export class ApiClient {
     });
   }
 
+  public static async getInventoryItems() {
+    return this.request<any[]>('/inventory');
+  }
+
+  public static async createInventoryItem(data: {
+    name: string; sku?: string; category?: string; unit?: string;
+    reorderLevel?: number; unitCost?: number; location?: string; notes?: string;
+  }) {
+    return this.request<any>('/inventory', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async updateInventoryItem(id: string, data: Record<string, unknown>) {
+    return this.request<any>(`/inventory/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public static async getInventoryTransactions(id: string) {
+    return this.request<any[]>(`/inventory/${encodeURIComponent(id)}/transactions`);
+  }
+
+  public static async createInventoryTransaction(id: string, data: {
+    transactionType: 'stock_in' | 'stock_out' | 'adjustment';
+    quantity: number; unitCost?: number; reference?: string; note?: string;
+  }) {
+    return this.request<any>(`/inventory/${encodeURIComponent(id)}/transactions`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
   public static async getBusAssignments() {
     return this.request<any[]>('/bus/assignments');
   }
