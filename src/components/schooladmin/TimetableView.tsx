@@ -181,7 +181,11 @@ export const TimetableView: React.FC = () => {
           </select>
           <select
             value={selectedClassId}
-            onChange={e => setSelectedClassId(e.target.value)}
+            onChange={e => {
+              const nextClassId = e.target.value;
+              setSelectedClassId(nextClassId);
+              setRoomNumber(classes.find(klass => klass.id === nextClassId)?.roomNumber || '');
+            }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155] font-medium"
           >
             {classes.map(c => (
