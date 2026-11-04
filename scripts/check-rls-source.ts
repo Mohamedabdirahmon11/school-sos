@@ -80,7 +80,7 @@ console.log(`${tableOrderOk ? 'PASS' : 'FAIL'} schema statements reference table
 if (!tableOrderOk) failed = true;
 
 const migrationTables = new Set(migrationFiles.flatMap(file =>
-  [...fs.readFileSync(`supabase/migrations/${file}`, 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS\\s+(?:public\\.)?([a-z_][a-z0-9_]*)/gi)]
+  [...fs.readFileSync(`supabase/migrations/${file}`, 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)]
     .map(match => match[1].toLowerCase())
 ));
 const tableMapStart = storage.indexOf('const tableMap:');
