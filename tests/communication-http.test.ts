@@ -261,6 +261,66 @@ test('configured Twilio sends SMS and WhatsApp and records only provider accepta
   }
 });
 
+test('attendance queues and sends one parent alert on the first absent transition', async () => {
+  const klass = storage.db.createClass({
+    schoolId: school.id, name: 'Grade 1 A', gradeLevel: 1, section: 'A',
+    roomNumber: '1', capacity: 30, monthlyFee: 0
+  } as any);
+  const student = storage.db.createStudent({
+    schoolId: school.id, studentId: 'STD-COMMS-001', firstName: 'Amina',
+    middleName: '', lastName: 'Test', gender: 'female', admissionDate: '2026-01-01',
+    fatherPhone: '+251911234567', classId: klass.id, status: 'active'
+  } as any);
+  const configured = await fetch(`${baseUrl}/communication/settings`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({
+      provider: 'twilio', isActive: true,
+      apiKey: 'AC0123456789abcdef0123456789abcdef',
+      apiSecret: 'test-auth-token', senderId: '+15005550006'
+    })
+  });
+  assert.equal(configured.status, 200);
+
+  const originalFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.startsWith('https://api.twilio.com/')) {
+      providerCalls += 1;
+      return new Response(JSON.stringify({ sid: 'SM0123456789abcdef0123456789abcdef' }), {
+        status: 201, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    return originalFetch(input, init);
+  }) as typeof fetch;
+
+  try {
+    const payload = {
+      classId: klass.id, date: '2026-11-03',
+      records: [{ studentId: student.id, status: 'absent', note: '' }]
+    };
+    const first = await fetch(`${baseUrl}/attendance`, {
+      method: 'POST', headers: adminHeaders, body: JSON.stringify(payload)
+    });
+    assert.equal(first.status, 200, await first.clone().text());
+    const firstResult = await first.json() as any;
+    assert.equal(firstResult.notifications.sent, 1);
+    assert.equal(firstResult.notifications.queued, 0);
+    assert.equal(firstResult.notifications.failed, 0);
+    assert.equal(providerCalls, 1);
+
+    const second = await fetch(`${baseUrl}/attendance`, {
+      method: 'POST', headers: adminHeaders, body: JSON.stringify(payload)
+    });
+    assert.equal(second.status, 200, await second.clone().text());
+    const secondResult = await second.json() as any;
+    assert.equal(secondResult.notifications.sent, 0);
+    assert.equal(providerCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('notification requests remain queued when no provider is configured', async () => {
   const disabled = await fetch(`${baseUrl}/communication/settings`, {
     method: 'PUT', headers: adminHeaders,
