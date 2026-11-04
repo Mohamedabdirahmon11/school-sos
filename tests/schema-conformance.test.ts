@@ -267,3 +267,19 @@ test('fee installments are updated atomically and idempotently under a row lock'
     assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
   }
 });
+
+
+test('school backups include newer tenant modules but exclude credentials and active sessions', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async generateSchoolBackup');
+  const end = storage.indexOf('public async generatePlatformBackup', start);
+  const backup = storage.slice(start, end);
+  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions']) {
+    assert.ok(backup.includes(`'${table}'`), `school backup includes ${table}`);
+  }
+  assert.doesNotMatch(backup, /'user_sessions'/, 'school backups do not contain active login sessions');
+  for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
+    assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
+  }
+  assert.match(backup, /tables\.users = tables\.users\.map/);
+});
