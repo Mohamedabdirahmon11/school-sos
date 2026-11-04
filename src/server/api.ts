@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
-import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
@@ -4227,7 +4227,9 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     }
     counts[table] = rows.length;
   }
-  const previewHash = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
+  const previewedAt = Date.now();
+  const previewDigest = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
+  const previewToken = createHmac('sha256', process.env.SESSION_SECRET || '').update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     schoolId: school.id,
@@ -4235,7 +4237,8 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     backupDate: backup.backupDate || null,
     version: backup.version,
     mode: 'merge',
-    previewHash,
+    previewedAt,
+    previewToken,
     counts,
     totalRows: Object.values(counts).reduce((sum, count) => sum + count, 0),
     excluded: ['users and login credentials', 'school profile/settings', 'school subscription/billing records', 'platform broadcasts', 'audit history', 'active sessions'],
@@ -4259,9 +4262,16 @@ apiRouter.post('/school/backup/restore', requireAuth, requireSchoolAdminOrSuperA
     res.status(400).json({ error: 'Choose a valid backup file belonging to this school.' });
     return;
   }
-  const previewHash = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
-  if (typeof req.body?.previewHash !== 'string' || req.body.previewHash !== previewHash) {
-    res.status(409).json({ error: 'Backup changed after preview. Preview it again before confirming.' });
+  const previewedAt = Number(req.body?.previewedAt);
+  const previewDigest = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
+  const expectedPreviewToken = createHmac('sha256', process.env.SESSION_SECRET || '').update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
+  const suppliedPreviewToken = req.body?.previewToken;
+  const previewIsFresh = Number.isSafeInteger(previewedAt) && previewedAt <= Date.now() && Date.now() - previewedAt <= 10 * 60 * 1000;
+  const previewTokenIsValid = typeof suppliedPreviewToken === 'string'
+    && /^[a-f0-9]{64}$/i.test(suppliedPreviewToken)
+    && timingSafeEqual(Buffer.from(expectedPreviewToken, 'hex'), Buffer.from(suppliedPreviewToken, 'hex'));
+  if (!previewIsFresh || !previewTokenIsValid) {
+    res.status(409).json({ error: 'Backup changed or its preview expired. Preview it again before confirming.' });
     return;
   }
   const restored = await db.restoreSchoolBackup({
