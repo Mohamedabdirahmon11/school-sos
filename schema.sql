@@ -3084,7 +3084,7 @@ BEGIN
           ) AS parent_phones(phone_value)
          WHERE phone_value IS NOT NULL
       ) AS unique_parent_phones
-     ORDER BY regexp_replace(phone_value, '[[:space:]()-]', '', 'g')
+     ORDER BY regexp_replace(phone_value, '[[:space:]()-]', '', 'g'), phone_value
   LOOP
     IF v_parent_phone IS NULL THEN
       CONTINUE;
@@ -3099,7 +3099,7 @@ BEGIN
          regexp_replace(COALESCE(phone, ''), '[[:space:]()\-]', '', 'g') = v_normalized_phone
          OR regexp_replace(COALESCE(parent_phone, ''), '[[:space:]()\-]', '', 'g') = v_normalized_phone
        )
-     ORDER BY created_at
+     ORDER BY created_at, id
      LIMIT 1
      FOR UPDATE;
 
