@@ -1478,6 +1478,20 @@ CREATE POLICY transport_routes_admin_delete ON transport_routes AS RESTRICTIVE
   FOR DELETE TO authenticated
   USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
 
+DROP POLICY IF EXISTS bus_assignments_admin_insert ON bus_assignments;
+CREATE POLICY bus_assignments_admin_insert ON bus_assignments AS RESTRICTIVE
+  FOR INSERT TO authenticated
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS bus_assignments_admin_update ON bus_assignments;
+CREATE POLICY bus_assignments_admin_update ON bus_assignments AS RESTRICTIVE
+  FOR UPDATE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
+  WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS bus_assignments_admin_delete ON bus_assignments;
+CREATE POLICY bus_assignments_admin_delete ON bus_assignments AS RESTRICTIVE
+  FOR DELETE TO authenticated
+  USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+
 DROP POLICY IF EXISTS users_role_read ON users;
 CREATE POLICY users_role_read ON users AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() = 'super_admin' OR id = private.auth_user_id() OR
