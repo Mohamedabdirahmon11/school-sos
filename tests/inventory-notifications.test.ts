@@ -33,7 +33,7 @@ test('notification queue uses atomic claims, bounded attempts, delayed retry, an
 test('notification worker uses fixed provider hosts, international numbers, and bounded network timeouts', () => {
   assert.match(worker, /AbortSignal\.timeout\(15_000\)/);
   assert.match(worker, /api\.twilio\.com/);
-  assert.match(worker, /api\\\.infobip\\\.com/);
+  assert.ok(worker.includes('api\\.infobip\\.com'));
   assert.match(worker, /graph\.facebook\.com/);
   assert.match(worker, /SCHOOL_OS_LOCAL_GATEWAY_URL/);
   assert.match(worker, /target\.protocol !== 'https:'/);
