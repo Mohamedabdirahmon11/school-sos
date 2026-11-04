@@ -43,3 +43,9 @@ test('discipline UI loads and saves real API records without claiming SMS delive
   assert.match(ui, /Parent contacted manually/);
   assert.doesNotMatch(ui, /Yes \(SMS\)/);
 });
+
+test('discipline incident creation attributes the record to the authenticated administrator', () => {
+  assert.match(api, /recordedBy: user\.id/);
+  assert.match(api, /res\.status\(201\)\.json\(incident\)/);
+  assert.match(storage, /Choose a student from this school/);
+});
