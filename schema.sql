@@ -902,6 +902,9 @@ CREATE TABLE IF NOT EXISTS fee_ranges (
 );
 CREATE INDEX IF NOT EXISTS idx_fee_ranges_school_grades ON fee_ranges(school_id,min_grade,max_grade);
 
+CREATE INDEX IF NOT EXISTS idx_bus_assignments_route_school ON bus_assignments(route_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_bus_assignments_student_school ON bus_assignments(student_id, school_id);
+
 CREATE TABLE IF NOT EXISTS bus_assignments (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -1007,6 +1010,7 @@ CREATE TABLE IF NOT EXISTS discipline_incidents (
 );
 CREATE INDEX IF NOT EXISTS idx_discipline_school_date ON discipline_incidents(school_id, incident_date DESC);
 CREATE INDEX IF NOT EXISTS idx_discipline_student ON discipline_incidents(student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_discipline_incidents_recorded_by ON discipline_incidents(recorded_by);
 
 CREATE TABLE IF NOT EXISTS library_books (
   id VARCHAR(64) PRIMARY KEY,
@@ -1046,6 +1050,8 @@ CREATE TABLE IF NOT EXISTS library_loans (
 CREATE INDEX IF NOT EXISTS idx_library_loans_school_status_due ON library_loans(school_id, status, due_date);
 CREATE INDEX IF NOT EXISTS idx_library_loans_book_status ON library_loans(book_id, school_id, status);
 CREATE INDEX IF NOT EXISTS idx_library_loans_student ON library_loans(student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_library_loans_issued_by ON library_loans(issued_by);
+CREATE INDEX IF NOT EXISTS idx_library_loans_returned_by ON library_loans(returned_by);
 
 CREATE TABLE IF NOT EXISTS transport_routes (
   id VARCHAR(64) PRIMARY KEY,
