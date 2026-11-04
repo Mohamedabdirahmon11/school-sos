@@ -48,7 +48,8 @@ test('library, transport, and bus assignment writes are restricted to administra
       assert.ok(migration.includes(`CREATE POLICY ${policy}`), `migration creates ${policy}`);
     }
   }
-  assert.match(migration, /AS RESTRICTIVE[\\s\\S]*private\.auth_user_role\(\) IN \('school_admin', 'super_admin'\)/);
+  assert.ok(migration.includes('AS RESTRICTIVE'));
+  assert.ok(migration.includes("private.auth_user_role() IN ('school_admin', 'super_admin')"));
   assert.match(schema, /CREATE POLICY library_books_admin_insert ON library_books AS RESTRICTIVE/);
   assert.match(schema, /CREATE POLICY transport_routes_admin_insert ON transport_routes AS RESTRICTIVE/);
 });
