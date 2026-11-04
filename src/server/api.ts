@@ -4200,6 +4200,78 @@ apiRouter.get('/school/backup', requireAuth, requireSchoolAdminOrSuperAdmin, req
   });
   res.json(await db.generateSchoolBackup(school.id));
 });
+apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const backup = req.body?.backup;
+  if (!backup || typeof backup !== 'object' || backup.school?.id !== school.id || !backup.tables || typeof backup.tables !== 'object') {
+    res.status(400).json({ error: 'Choose a valid backup file belonging to this school.' });
+    return;
+  }
+  if (!['1.0.0', '1.1.0'].includes(String(backup.version || ''))) {
+    res.status(400).json({ error: 'This backup version is not supported.' });
+    return;
+  }
+  const allowed = new Set(['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'assignments', 'assignment_submissions', 'attendance_records', 'audit_logs', 'bus_assignments', 'class_subjects', 'communication_queue', 'communication_settings', 'direct_messages', 'discipline_incidents', 'exam_configs', 'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items', 'inventory_transactions', 'library_books', 'library_loans', 'notice_reads', 'notification_templates', 'payroll_records', 'promotion_history', 'promotions', 'report_card_templates', 'school_events', 'school_notices', 'student_marks', 'subscription_invoices', 'support_tickets', 'teacher_unavailability', 'timetable_settings', 'timetable_slots', 'transport_routes']);
+  const counts: Record<string, number> = {};
+  for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
+    if (!allowed.has(table)) continue;
+    if (!Array.isArray(rows)) {
+      res.status(400).json({ error: `Backup table ${table} is not a valid row list.` });
+      return;
+    }
+    for (const row of rows as any[]) {
+      if (!row || typeof row !== 'object' || (row.schoolId ?? row.school_id) !== school.id) {
+        res.status(400).json({ error: `Backup table ${table} contains data outside this school.` });
+        return;
+      }
+    }
+    counts[table] = rows.length;
+  }
+  const previewHash = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    schoolId: school.id,
+    schoolName: school.name,
+    backupDate: backup.backupDate || null,
+    version: backup.version,
+    mode: 'merge',
+    previewHash,
+    counts,
+    totalRows: Object.values(counts).reduce((sum, count) => sum + count, 0),
+    excluded: ['users and login credentials', 'school subscription/billing records', 'platform broadcasts', 'active sessions'],
+    warning: 'This is a merge restore: matching records will be updated, missing records will be inserted, and records absent from the backup will NOT be deleted. A separate explicit confirmation is required.'
+  });
+});
+
+apiRouter.post('/school/backup/restore', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const backup = req.body?.backup;
+  if (req.body?.confirm !== true) {
+    res.status(400).json({ error: 'Explicit confirmation is required before restoring a backup.' });
+    return;
+  }
+  if (!backup || typeof backup !== 'object' || backup.school?.id !== school.id || !backup.tables || typeof backup.tables !== 'object') {
+    res.status(400).json({ error: 'Choose a valid backup file belonging to this school.' });
+    return;
+  }
+  const previewHash = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
+  if (typeof req.body?.previewHash !== 'string' || req.body.previewHash !== previewHash) {
+    res.status(409).json({ error: 'Backup changed after preview. Preview it again before confirming.' });
+    return;
+  }
+  const restored = await db.restoreSchoolBackup({
+    confirm: true,
+    school_id: school.id,
+    backup,
+    approved_by: user.id,
+    approved_by_name: user.fullName,
+    approved_by_role: user.role
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, ...restored });
+});
+
 
 // ==============================================================================
 // 6. GLOBAL USERS & USER MANAGEMENT
