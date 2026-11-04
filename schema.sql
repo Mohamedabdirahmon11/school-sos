@@ -3074,10 +3074,15 @@ BEGIN
     v_student_id, '', v_pin_hash, FALSE, 0
   );
 
-  FOREACH v_parent_phone IN ARRAY ARRAY[
-    NULLIF(btrim(v_application.father_phone), ''),
-    NULLIF(btrim(v_application.mother_phone), '')
-  ] LOOP
+  FOR v_parent_phone IN
+    SELECT DISTINCT phone_value
+      FROM (VALUES
+        (NULLIF(btrim(v_application.father_phone), '')),
+        (NULLIF(btrim(v_application.mother_phone), ''))
+      ) AS parent_phones(phone_value)
+     WHERE phone_value IS NOT NULL
+     ORDER BY regexp_replace(phone_value, '[[:space:]()-]', '', 'g')
+  LOOP
     IF v_parent_phone IS NULL THEN
       CONTINUE;
     END IF;
