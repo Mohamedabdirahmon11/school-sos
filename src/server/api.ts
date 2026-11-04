@@ -3610,16 +3610,24 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
       const safeError = deliveryError instanceof Error
         ? deliveryError.message.slice(0, 500)
         : 'The notification provider could not accept this message.';
-      const failed = await db.updateCommunicationQueueStatus(school.id, item.id, 'failed', safeError);
-      await db.flush();
-      res.status(502).json(failed);
+      try {
+        const failed = await db.updateCommunicationQueueStatus(school.id, item.id, 'failed', safeError);
+        await db.flush();
+        res.status(502).json(failed);
+      } catch {
+        res.status(503).json({ error: 'The provider rejected the message, but its failed status could not be saved. Check the notification queue.' });
+      }
       return;
     }
 
     // Provider acceptance is recorded as sent; it is not a handset delivery receipt.
-    const accepted = await db.updateCommunicationQueueStatus(school.id, item.id, 'sent', undefined, new Date().toISOString());
-    await db.flush();
-    res.status(201).json(accepted);
+    try {
+      const accepted = await db.updateCommunicationQueueStatus(school.id, item.id, 'sent', undefined, new Date().toISOString());
+      await db.flush();
+      res.status(201).json(accepted);
+    } catch {
+      res.status(503).json({ error: 'The provider accepted the message, but its status could not be saved. Check the provider dashboard before retrying.' });
+    }
   } catch (error: any) {
     res.status(400).json({ error: error?.message || 'Notification could not be queued.' });
   }
