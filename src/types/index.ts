@@ -494,8 +494,13 @@ export interface CommunicationQueueItem {
   messageType: 'attendance_absent' | 'fee_due' | 'notice' | 'exam_result' | 'custom';
   channel: 'sms' | 'whatsapp';
   content: string;
-  status: 'queued' | 'sent' | 'failed';
+  status: 'queued' | 'processing' | 'sent' | 'failed';
   errorMessage?: string;
+  attemptCount: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  lastAttemptAt?: string;
+  providerMessageId?: string;
   createdAt: string;
   sentAt?: string;
 }
