@@ -283,3 +283,12 @@ test('school backups include newer tenant modules but exclude credentials and ac
   }
   assert.match(backup, /tables\.users = tables\.users\.map/);
 });
+
+
+test('daily attendance waits for database persistence before returning success', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async recordDailyAttendance');
+  const end = storage.indexOf('// EXAMS & RESULTS', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /this\.save\(\);\s*await this\.flush\(\);\s*return results;/);
+});
