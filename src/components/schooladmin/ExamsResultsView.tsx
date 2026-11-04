@@ -162,7 +162,7 @@ export const ExamsResultsView: React.FC = () => {
   // Admin Approve All Submitted Marks
   const handleApproveAll = async () => {
     if (isReadOnly) return;
-    const pendingIds = marks.filter(m => m.status === 'submitted' || m.status === 'draft').map(m => m.id);
+    const pendingIds = marks.filter(m => m.status === 'submitted').map(m => m.id);
     if (pendingIds.length === 0) {
       setNotice('No pending marks to approve.');
       return;
