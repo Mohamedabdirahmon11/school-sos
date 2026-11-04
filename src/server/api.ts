@@ -35,6 +35,7 @@ import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImpor
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
 import { getSchoolLocalDate } from '../lib/school-date.ts';
+import { deliverCommunication } from './communication-delivery.ts';
 
 export const apiRouter = Router();
 
@@ -3590,12 +3591,35 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
     return;
   }
   try {
+    const settings = await db.getCommunicationSettings(school.id);
     const item = await db.queueNotification({
       schoolId: school.id, recipientPhone, recipientName, studentId,
       messageType: payload.messageType, channel: payload.channel, content: payload.content.trim()
     });
     await db.flush();
-    res.status(201).json(item);
+
+    // Keep messages queued when no provider is configured. Never imply delivery.
+    if (!settings.isActive || settings.provider === 'none') {
+      res.status(201).json(item);
+      return;
+    }
+
+    try {
+      await deliverCommunication(settings, item);
+    } catch (deliveryError: any) {
+      const safeError = deliveryError instanceof Error
+        ? deliveryError.message.slice(0, 500)
+        : 'The notification provider could not accept this message.';
+      const failed = await db.updateCommunicationQueueStatus(school.id, item.id, 'failed', safeError);
+      await db.flush();
+      res.status(502).json(failed);
+      return;
+    }
+
+    // Provider acceptance is recorded as sent; it is not a handset delivery receipt.
+    const accepted = await db.updateCommunicationQueueStatus(school.id, item.id, 'sent', undefined, new Date().toISOString());
+    await db.flush();
+    res.status(201).json(accepted);
   } catch (error: any) {
     res.status(400).json({ error: error?.message || 'Notification could not be queued.' });
   }
