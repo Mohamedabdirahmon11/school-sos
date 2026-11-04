@@ -6,6 +6,8 @@ const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url
 const ui = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/042_restrict_library_transport_writes.sql', import.meta.url), 'utf8');
+const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 
 test('library API errors are not converted into empty or fake successful catalogue data', () => {
   const getBooks = apiClient.slice(apiClient.indexOf('public static async getLibraryBooks'), apiClient.indexOf('public static async getTransportRoutes'));
@@ -34,4 +36,17 @@ test('library and transport load errors are visible to the administrator', () =>
   assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load library books\.'/);
   assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport routes\.'/);
   assert.match(ui, /role="alert"/);
+});
+
+test('library, transport, and bus assignment writes are restricted to administrators', () => {
+  for (const table of ['library_books', 'transport_routes', 'bus_assignments']) {
+    for (const action of ['insert', 'update', 'delete']) {
+      const policy = `${table}_admin_${action}`;
+      assert.ok(migration.includes(`DROP POLICY IF EXISTS ${policy}`), `migration drops old ${policy}`);
+      assert.ok(migration.includes(`CREATE POLICY ${policy}`), `migration creates ${policy}`);
+    }
+  }
+  assert.match(migration, /AS RESTRICTIVE[\\s\\S]*private\.auth_user_role\(\) IN \('school_admin', 'super_admin'\)/);
+  assert.match(schema, /CREATE POLICY library_books_admin_insert ON library_books AS RESTRICTIVE/);
+  assert.match(schema, /CREATE POLICY transport_routes_admin_insert ON transport_routes AS RESTRICTIVE/);
 });
