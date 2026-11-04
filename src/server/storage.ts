@@ -477,9 +477,9 @@ class StorageEngine {
       ['timetableSettings', 'timetable_settings'], ['teacherUnavailability', 'teacher_unavailability'],
       ['examConfigs', 'exam_configs'], ['marks', 'student_marks'], ['promotions', 'promotions'],
       ['feeStructures', 'fee_structures'], ['feePayments', 'fee_payments'], ['reportCardDesigns', 'report_card_templates'],
-      ['communicationSettings', 'communication_settings'], ['communicationQueue', 'communication_queue'],
+      ['communicationSettings', ], ['communicationQueue', ],
       ['notices', 'school_notices'], ['events', 'school_events'], ['messages', 'direct_messages'],
-      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
+      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', ],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['libraryLoans', 'library_loans'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
@@ -490,7 +490,7 @@ class StorageEngine {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
       if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql and check service-role access. ${error.message}`);
     }
-    for (const table of ['super_admin_settings', 'school_subscriptions', 'fee_receipt_sequences']) {
+    for (const table of ['super_admin_settings', 'fee_receipt_sequences']) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
       if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql. ${error.message}`);
     }
@@ -604,16 +604,16 @@ class StorageEngine {
     const tables: Array<[string, any[]]> = [
       ['plans', snapshot.plans],
       ['schools', snapshot.schools.map(({ subscription: _subscription, ...school }) => school)],
-      ['school_subscriptions', snapshot.schools.filter(school => school.subscription).map(school => ({ id: school.id, schoolId: school.id, ...school.subscription }))],
+      [snapshot.schools.filter(school => school.subscription).map(school => ({ id: school.id, schoolId: school.id, ...school.subscription }))],
       ['school_branches', snapshot.branches], ['users', snapshot.users], ['user_sessions', snapshot.sessions],
       ['classes', snapshot.classes], ['subjects', snapshot.subjects], ['students', snapshot.students], ['teachers', snapshot.teachers],
       ['timetable_slots', snapshot.timetable], ['attendance_records', snapshot.attendance], ['exam_configs', snapshot.examConfigs],
       ['student_marks', snapshot.marks], ['promotions', snapshot.promotions], ['promotion_history', snapshot.promotionHistory],
       ['fee_structures', snapshot.feeStructures], ['fee_payments', snapshot.feePayments], ['report_card_templates', snapshot.reportCardDesigns],
       ['fee_ranges', snapshot.feeRanges], ['bus_assignments', snapshot.busAssignments], ['notification_templates', snapshot.notificationTemplates],
-      ['communication_settings', snapshot.communicationSettings], ['communication_queue', snapshot.communicationQueue],
+      [snapshot.communicationSettings], [snapshot.communicationQueue],
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
-      ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
+      ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], [snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
       ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['discipline_incidents', snapshot.disciplineIncidents],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
@@ -885,7 +885,7 @@ class StorageEngine {
   public async getSchools(): Promise<School[]> {
     const [schools, subscriptions] = await Promise.all([
       this.queryRows<School>('schools', {}),
-      this.queryRows<any>('school_subscriptions', {})
+      this.queryRows<any>({})
     ]);
     return schools.map(school => ({ ...school, subscription: subscriptions.find(item => item.schoolId === school.id), branches: [] }));
   }
@@ -898,7 +898,7 @@ class StorageEngine {
     }
     const [schools, subscriptions] = await Promise.all([
       this.queryRows<School>('schools', { id }),
-      this.queryRows<any>('school_subscriptions', { school_id: id })
+      this.queryRows<any>({ school_id: id })
     ]);
     const s = schools[0];
     if (!s) return null;
@@ -915,7 +915,7 @@ class StorageEngine {
     const s = (await this.queryRows<School>('schools', { code: code.trim().toUpperCase() }))[0];
     if (!s) return null;
     const [[subscription], branches] = await Promise.all([
-      this.queryRows<any>('school_subscriptions', { school_id: s.id }),
+      this.queryRows<any>({ school_id: s.id }),
       this.queryRows<SchoolBranch>('school_branches', { school_id: s.id })
     ]);
     return {
@@ -2770,7 +2770,7 @@ class StorageEngine {
   // COMMUNICATION & SMS / WHATSAPP QUEUE
   // -------------------------------------------------------------
   public async getCommunicationSettings(schoolId: string): Promise<CommunicationSettings> {
-    await this.queryRows<CommunicationSettings>('communication_settings', { school_id: schoolId });
+    await this.queryRows<CommunicationSettings>({ school_id: schoolId });
     let s = this.data.communicationSettings.find(cs => cs.schoolId === schoolId);
     if (!s) {
       s = {
@@ -2838,7 +2838,7 @@ class StorageEngine {
       ? `msg-q-${createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 32)}`
       : `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     if (idempotencyKey) {
-      const existing = (await this.queryRows<CommunicationQueueItem>('communication_queue', { id, school_id: itemData.schoolId }))[0];
+      const existing = (await this.queryRows<CommunicationQueueItem>({ id, school_id: itemData.schoolId }))[0];
       if (existing) return existing;
     }
     const settings = await this.getCommunicationSettings(itemData.schoolId);
@@ -2870,7 +2870,7 @@ class StorageEngine {
     this.recordQuery('rpc:schoolos_claim_communication_queue', 'call', startedAt);
     if (error) throw new Error(error.message || 'Unable to claim a notification.');
     const row = Array.isArray(data) ? data[0] : data;
-    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
   }
 
   public async completeCommunicationQueueItem(id: string, success: boolean, errorMessage?: string, providerMessageId?: string): Promise<CommunicationQueueItem | null> {
@@ -2884,7 +2884,7 @@ class StorageEngine {
     this.recordQuery('rpc:schoolos_complete_communication_queue', 'call', startedAt);
     if (error) throw new Error(error.message || 'Unable to update notification delivery status.');
     const row = Array.isArray(data) ? data[0] : data;
-    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
   }
 
   public async retryCommunicationQueueItem(schoolId: string, id: string): Promise<CommunicationQueueItem | null> {
@@ -2895,11 +2895,11 @@ class StorageEngine {
     this.recordQuery('rpc:schoolos_retry_communication_queue', 'call', startedAt);
     if (error) throw new Error(error.message || 'Unable to retry notification.');
     const row = Array.isArray(data) ? data[0] : data;
-    return row ? fromSupabaseRow(row, 'communication_queue') as CommunicationQueueItem : null;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
   }
 
   public async getCommunicationQueue(schoolId: string): Promise<CommunicationQueueItem[]> {
-    return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId });
+    return this.queryRows<CommunicationQueueItem>({ school_id: schoolId });
   }
 
   // -------------------------------------------------------------
@@ -3180,7 +3180,7 @@ class StorageEngine {
   // SUBSCRIPTION INVOICES (PLATFORM OWNER REVENUE)
   // -------------------------------------------------------------
   public async getSubscriptionInvoices(schoolId?: string): Promise<SubscriptionInvoice[]> {
-    return this.queryRows<SubscriptionInvoice>('subscription_invoices', schoolId ? { school_id: schoolId } : {});
+    return this.queryRows<SubscriptionInvoice>(schoolId ? { school_id: schoolId } : {});
   }
 
   public createSubscriptionInvoice(invData: Omit<SubscriptionInvoice, 'id'>): SubscriptionInvoice {
@@ -3202,15 +3202,15 @@ class StorageEngine {
       if (error) throw new Error(error.message || 'Invoice payment could not be completed.');
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return null;
-      const invoice = fromSupabaseRow(row, 'subscription_invoices') as SubscriptionInvoice;
-      await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+      const invoice = fromSupabaseRow(row, ) as SubscriptionInvoice;
+      await this.queryRows<SubscriptionInvoice>({ id });
       schoolContextCache.delete(invoice.schoolId);
       await this.getSchoolById(invoice.schoolId);
       return invoice;
     }
 
     // In-memory test adapter fallback; production always uses the atomic RPC above.
-    await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+    await this.queryRows<SubscriptionInvoice>({ id });
     const inv = this.data.invoices.find(invoice => invoice.id === id);
     if (!inv) return null;
     if (inv.status === 'paid') return inv;
@@ -3283,14 +3283,14 @@ class StorageEngine {
     // Each query is explicitly scoped to this school ID.
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
-      'audit_logs', 'bus_assignments', 'class_subjects', 'classes', 'communication_queue',
+      'audit_logs', 'bus_assignments', 'class_subjects', 'classes', ,
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
       'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
-      'school_subscriptions', 'staff_members', 'student_marks', 'students', 'subjects',
-      'subscription_invoices', 'support_tickets', 'teacher_unavailability', 'teachers',
+      'staff_members', 'student_marks', 'students', 'subjects',
+      'support_tickets', 'teacher_unavailability', 'teachers',
       'timetable_settings', 'timetable_slots', 'transport_routes', 'users'
     ];
     const tables: Record<string, any[]> = {};
