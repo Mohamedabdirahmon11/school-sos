@@ -65,7 +65,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE comm_status_enum AS ENUM ('queued', 'sent', 'failed');
+  CREATE TYPE comm_status_enum AS ENUM ('queued', 'processing', 'sent', 'failed');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
@@ -3156,3 +3156,7 @@ REVOKE ALL ON FUNCTION public.school_dashboard_summary(VARCHAR) FROM PUBLIC, ano
 GRANT EXECUTE ON FUNCTION public.school_dashboard_summary(VARCHAR) TO service_role;
 NOTIFY pgrst, 'reload schema';
 COMMIT;
+
+-- Canonical notification processing status migration.
+-- The delivery worker needs an explicit processing lease state while it sends.
+ALTER TYPE public.comm_status_enum ADD VALUE IF NOT EXISTS 'processing';
