@@ -8,6 +8,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/042_restrict_library_transport_writes.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const isbnMigration = readFileSync(new URL('../supabase/migrations/043_library_isbn_constraints.sql', import.meta.url), 'utf8');
 
 test('library API errors are not converted into empty or fake successful catalogue data', () => {
   const getBooks = apiClient.slice(apiClient.indexOf('public static async getLibraryBooks'), apiClient.indexOf('public static async getTransportRoutes'));
@@ -50,4 +51,12 @@ test('library, transport, and bus assignment writes are restricted to administra
   assert.match(migration, /AS RESTRICTIVE[\\s\\S]*private\.auth_user_role\(\) IN \('school_admin', 'super_admin'\)/);
   assert.match(schema, /CREATE POLICY library_books_admin_insert ON library_books AS RESTRICTIVE/);
   assert.match(schema, /CREATE POLICY transport_routes_admin_insert ON transport_routes AS RESTRICTIVE/);
+});
+
+test('library catalogue enforces non-negative quantity and school-local unique ISBNs', () => {
+  assert.match(isbnMigration, /CHECK \(quantity >= 0\)/);
+  assert.match(isbnMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_school_isbn_unique/);
+  assert.match(isbnMigration, /lower\(btrim\(isbn\)\)/);
+  assert.match(api, /error\?\.code === '23505'/);
+  assert.match(schema, /quantity INTEGER NOT NULL DEFAULT 1 CHECK \(quantity >= 0\)/);
 });
