@@ -31,7 +31,8 @@ const specificRules = [
   ['support_tickets', 'support_tickets_owner_scope'],
   ['library_books', 'library_books_school_scope'],
   ['transport_routes', 'transport_routes_school_scope'],
-  ['bus_assignments', 'bus_assignments_student_scope']
+  ['bus_assignments', 'bus_assignments_student_scope'],
+  ['school_events', 'school_events_school_scope']
 ];
 
 let failed = false;
