@@ -15,6 +15,8 @@ test('notification and communication tables restrict authenticated writes to sch
   }
   assert.ok(migration.includes('AS RESTRICTIVE'));
   assert.ok(migration.includes("private.auth_user_role() IN (''school_admin'', ''super_admin'')"));
+  assert.ok(!/^DO \\$\s*$/m.test(schema), 'fresh-install schema DO blocks must use valid dollar quoting');
+  assert.ok(!/^END \\$;$/m.test(schema), 'fresh-install schema DO blocks must close valid dollar quotes');
 });
 
 test('background worker never dispatches paid SMS or WhatsApp providers', () => {
