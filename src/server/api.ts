@@ -588,6 +588,7 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
           : (path.startsWith('/marks') || path.startsWith('/exams') || path.startsWith('/rankings')) && isWrite ? 'grades_manage'
             : path.startsWith('/library') ? 'library_manage'
               : path.startsWith('/transport') ? 'transport_manage'
+              : path.startsWith('/inventory') ? 'inventory_manage'
         : (path.startsWith('/reports') || path.startsWith('/school/reports')) ? 'reports_export'
                   : null;
     if (requiredPermission) {
@@ -3765,6 +3766,50 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
 // ==============================================================================
 // 9. COMMUNICATION & NOTIFICATIONS QUEUE
 // ==============================================================================
+
+// INVENTORY
+apiRouter.get('/inventory', requireAuth, requireSchoolContext, async (req,res) => {
+ const user=(req as any).user as User, school=(req as any).school as School;
+ if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory access is restricted.'});return;}
+ res.json(await db.getInventoryItems(school.id));
+});
+apiRouter.post('/inventory', requireAuth, requireSchoolContext, async(req,res)=>{
+ const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
+ if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
+ const name=typeof body.name==='string'?body.name.trim():'', sku=typeof body.sku==='string'?body.sku.trim():'';
+ const category=typeof body.category==='string'?body.category.trim():'General', unit=typeof body.unit==='string'?body.unit.trim():'unit';
+ const reorderLevel=Number(body.reorderLevel??0), unitCost=Number(body.unitCost??0);
+ if(!name||name.length>160||sku.length>80||!category||category.length>100||!unit||unit.length>40||!Number.isFinite(reorderLevel)||reorderLevel<0||!Number.isFinite(unitCost)||unitCost<0||(body.quantityOnHand!==undefined&&Number(body.quantityOnHand)!==0)){res.status(400).json({error:'Enter valid item details. Opening stock must be recorded as a stock-in transaction.'});return;}
+ try{const item=await db.createInventoryItem({schoolId:school.id,name,sku:sku||null,category,unit,quantityOnHand:0,reorderLevel,unitCost,location:typeof body.location==='string'?body.location.trim().slice(0,160):null,notes:typeof body.notes==='string'?body.notes.trim().slice(0,2000):null,isActive:true,createdBy:user.id});
+ db.logAudit({action:'INVENTORY_ITEM_CREATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Created inventory item ${name}.`,severity:'info'});res.status(201).json(item);
+ }catch(error:any){res.status(error?.code==='23505'||/duplicate/i.test(String(error?.message))?409:503).json({error:'Unable to create inventory item. Check whether its SKU is already in use.'});}
+});
+apiRouter.put('/inventory/:id', requireAuth, requireSchoolContext, async(req,res)=>{
+ const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
+ if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
+ const updates:Record<string,any>={};
+ for(const [field,max] of [['name',160],['sku',80],['category',100],['unit',40],['location',160],['notes',2000]] as const){if(body[field]!==undefined){if(typeof body[field]!=='string'||body[field].trim().length>max||(['name','category','unit'].includes(field)&&!body[field].trim())){res.status(400).json({error:`Invalid ${field} value.`});return;}updates[field]=body[field].trim()||null;}}
+ for(const field of ['reorderLevel','unitCost'] as const){if(body[field]!==undefined){const value=Number(body[field]);if(!Number.isFinite(value)||value<0){res.status(400).json({error:`${field} must be non-negative.`});return;}updates[field]=value;}}
+ if(body.isActive!==undefined){if(typeof body.isActive!=='boolean'){res.status(400).json({error:'isActive must be boolean.'});return;}updates.isActive=body.isActive;}
+ if(!Object.keys(updates).length){res.status(400).json({error:'At least one editable field is required.'});return;}
+ try{const item=await db.updateInventoryItem(school.id,req.params.id,updates);if(!item){res.status(404).json({error:'Inventory item not found.'});return;}db.logAudit({action:'INVENTORY_ITEM_UPDATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Updated inventory item ${item.name}.`,severity:'info'});res.json(item);}
+ catch{res.status(503).json({error:'Unable to update this inventory item.'});}
+});
+apiRouter.get('/inventory/:id/transactions', requireAuth, requireSchoolContext, async(req,res)=>{
+ const user=(req as any).user as User, school=(req as any).school as School;
+ if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory access is restricted.'});return;}
+ const item=(await db.getInventoryItems(school.id)).find((row:any)=>row.id===req.params.id);if(!item){res.status(404).json({error:'Inventory item not found.'});return;}
+ res.json((await db.getInventoryTransactions(school.id,item.id)).sort((a:any,b:any)=>String(b.createdAt).localeCompare(String(a.createdAt))));
+});
+apiRouter.post('/inventory/:id/transactions', requireAuth, requireSchoolContext, async(req,res)=>{
+ const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
+ if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
+ const transactionType=body.transactionType, quantity=Number(body.quantity), unitCost=Number(body.unitCost??0);
+ if(!['stock_in','stock_out','adjustment'].includes(transactionType)||!Number.isFinite(quantity)||quantity===0||(transactionType!=='adjustment'&&quantity<0)||!Number.isFinite(unitCost)||unitCost<0||(typeof body.reference==='string'&&body.reference.length>160)||(typeof body.note==='string'&&body.note.length>2000)){res.status(400).json({error:'Provide a valid movement type, non-zero quantity, and non-negative unit cost.'});return;}
+ try{const movement=await db.adjustInventoryStock({schoolId:school.id,itemId:req.params.id,transactionType,quantity,unitCost,reference:typeof body.reference==='string'?body.reference.trim():undefined,note:typeof body.note==='string'?body.note.trim():undefined,performedBy:user.id});
+ db.logAudit({action:'INVENTORY_STOCK_MOVED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Recorded ${transactionType} movement for inventory item ${req.params.id}.`,severity:'info'});res.status(201).json(movement);
+ }catch(error:any){const message=String(error?.message||'');res.status(/insufficient stock/i.test(message)?409:/not found/i.test(message)?404:400).json({error:/insufficient stock/i.test(message)?'There is not enough stock for this movement.':/not found/i.test(message)?'Inventory item not found.':'Unable to record this stock movement.'});}
+});
 
 apiRouter.get('/communication/settings', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
