@@ -1878,7 +1878,8 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
       const localDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: school.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit'
       }).format(new Date());
-      const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId));
+      const activeStudentIds = new Set(scopedStudents.map((student: any) => student.id));
+      const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId) && activeStudentIds.has(item.studentId));
       const attended = today.filter((item: any) => item.status === 'present' || item.status === 'late').length;
       const excused = today.filter((item: any) => item.status === 'excused').length;
       const attendanceDenominator = Math.max(0, scopedStudents.length - excused);
