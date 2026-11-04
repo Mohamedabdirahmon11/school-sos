@@ -1392,137 +1392,29 @@ export const SchoolSettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: SMS / WHATSAPP GATEWAY */}
-      {activeTab === 'sms' && commSettings && (
-        <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
+      {/* TAB 4: FREE ADMIN WHATSAPP */}
+      {activeTab === 'sms' && (
+        <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-4">
           <div>
-            <h2 className="text-base font-bold text-[#132A29]">SMS & WhatsApp Provider Integration</h2>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              SMS providers are used for supported automated notices. For student absence WhatsApp messages, the attendance register opens the parent's chat in the administrator's signed-in WhatsApp account; the administrator reviews and presses Send.
+            <h2 className="text-base font-bold text-[#132A29]">WhatsApp-ka maamulka — bilaash</h2>
+            <p className="text-xs text-[#64748B] mt-1">
+              SchoolOS wuxuu isticmaalaa WhatsApp-ka caadiga ah ee maamuluhu ku galay qalabkiisa. Fariinta waalidka waa la diyaarinayaa, chat-ka ayaana furmaya; maamuluhu ayaa hubinaya kadibna riixaya Send.
             </p>
           </div>
-
-          <form onSubmit={handleSaveComm} className="space-y-4 text-xs">
-            <div>
-              <label className="block font-semibold text-[#334155] mb-1">Notification Provider</label>
-              <select
-                value={commSettings.provider}
-                onChange={e => setCommSettings({ ...commSettings, provider: e.target.value as any })}
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-              >
-                <option value="none">Disabled (Store in queue only)</option>
-                <option value="twilio">Twilio Programmable SMS / WhatsApp</option>
-                <option value="infobip">Infobip Enterprise Gateway</option>
-                <option value="whatsapp_business">WhatsApp Business Cloud API</option>
-                <option value="local_gateway">Local Telecom HTTP Gateway</option>
-              </select>
-            </div>
-
-            {commSettings.provider !== 'none' && (
-              <>
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">API Key / Account SID</label>
-                  <input
-                    type="password"
-                    placeholder={commSettings.apiKeyConfigured ? 'Saved securely — leave blank to keep' : 'Enter provider API key'}
-                    value={commSettings.apiKey || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiKey: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                  {commSettings.apiKeyConfigured && <p className="text-[11px] text-emerald-700 mt-1">A key is saved and encrypted. Leave this field blank to keep it.</p>}
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">API Secret / Auth Token</label>
-                  <input
-                    type="password"
-                    placeholder={commSettings.apiSecretConfigured ? 'Saved securely — leave blank to keep' : 'Enter provider secret if required'}
-                    value={commSettings.apiSecret || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiSecret: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                  {commSettings.apiSecretConfigured && <p className="text-[11px] text-emerald-700 mt-1">A secret is saved and encrypted. Leave this field blank to keep it.</p>}
-                </div>
-                {commSettings.provider === 'infobip' && (
-                  <div>
-                    <label className="block font-semibold text-[#334155] mb-1">Infobip HTTPS Base URL</label>
-                    <input
-                      type="url"
-                      placeholder={commSettings.webhookConfigured ? 'Saved base URL — leave blank to keep' : 'https://xxxxx.api.infobip.com'}
-                      value={commSettings.webhookUrl || ''}
-                      onChange={e => setCommSettings({ ...commSettings, webhookUrl: e.target.value })}
-                      className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                    />
-                    {commSettings.webhookConfigured && <p className="text-[11px] text-emerald-700 mt-1">A base URL is saved. Leave blank to keep it.</p>}
-                  </div>
-                )}
-                {commSettings.provider === 'local_gateway' && (
-                  <p className="text-[11px] text-[#64748B]">The local gateway endpoint and optional token must be configured on the production server with SCHOOL_OS_LOCAL_GATEWAY_URL and SCHOOL_OS_LOCAL_GATEWAY_TOKEN.</p>
-                )}
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">Sender ID / Brand Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. SCHOOLOS"
-                    value={commSettings.senderId || ''}
-                    onChange={e => setCommSettings({ ...commSettings, senderId: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono uppercase"
-                  />
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer pt-2">
-                  <input
-                    type="checkbox"
-                    checked={commSettings.isActive}
-                    onChange={e => setCommSettings({ ...commSettings, isActive: e.target.checked })}
-                    className="rounded text-[#0F766E] focus:ring-[#0F766E]"
-                  />
-                  <span className="font-semibold text-[#132A29]">
-                    Activate live dispatch (Unchecked messages stay queued as "not sent")
-                  </span>
-                </label>
-              </>
-            )}
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                disabled={isReadOnly || isSaving}
-                className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"
-              >
-                <Save className="w-3.5 h-3.5" />
-                Save Gateway
-              </button>
-            </div>
-          </form>
-          <section className="border-t border-[#E2E8F0] pt-5 space-y-3">
-            <h3 className="text-sm font-bold text-[#132A29]">Notification Queue</h3>
-            {queueItems.length === 0 ? <p className="text-xs text-[#64748B]">No queued notifications.</p> : queueItems.map(item => (
-              <article key={item.id} className="rounded-lg border border-[#E2E8F0] p-3 text-xs">
-                <div className="flex justify-between items-start gap-3">
-                  <div>
-                    <strong>{item.recipientName} · {item.channel.toUpperCase()}</strong>
-                    <span className="ml-2 capitalize">{item.status === 'queued' ? 'Queued · not sent' : item.status}</span>
-                    <p className="text-[10px] text-[#64748B] mt-1">Attempts: {item.attemptCount}/{item.maxAttempts}</p>
-                  </div>
-                  {item.status === 'failed' && (
-                    <button type="button" onClick={async () => {
-                      try {
-                        const retried = await ApiClient.retryQueuedNotification(item.id);
-                        setQueueItems(previous => previous.map(row => row.id === retried.id ? retried : row));
-                        setNotice('Notification queued for retry.');
-                      } catch (err: any) {
-                        setNotice(err.message || 'Unable to retry this notification.');
-                      }
-                    }} className="px-3 py-1 rounded border border-[#CBD5E1] text-[#0F766E] font-semibold hover:bg-[#F0FDFA]">
-                      Retry
-                    </button>
-                  )}
-                </div>
-                <p className="mt-1 text-[#64748B]">{item.content}</p>
-                {item.errorMessage && <p className="mt-1 text-rose-700">{item.errorMessage}</p>}
-              </article>
-            ))}
-            <PaginationControls info={queuePageInfo} onPage={setQueuePage} />
-          </section>
+          <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-2">
+            <p className="text-xs font-semibold text-teal-900">Lambarka WhatsApp-ka diraha</p>
+            <p className="text-sm font-mono text-teal-900">{school?.phone || 'Weli lama diiwaangelin'}</p>
+            <p className="text-[11px] text-teal-800">
+              Lambarkan ku qor School Settings → Identity → School Phone, qaabka caalamiga ah (+251...). Waa inuu la mid noqdaa WhatsApp-ka maamuluhu ku jiro.
+            </p>
+          </div>
+          <ul className="list-disc pl-5 text-xs text-[#475569] space-y-1">
+            <li>Ma jiro Twilio, Infobip ama WhatsApp Business API.</li>
+            <li>Ma jiro lacag fariin kasta ah oo SchoolOS laga bixiyo.</li>
+            <li>Internet iyo WhatsApp account shaqaynaya ayaa loo baahan yahay.</li>
+            <li>Fariin si toos ah looma diro; maamulka ayaa mar kasta riixaya Send.</li>
+          </ul>
+          <p className="text-[11px] text-[#64748B]">Si lambarka loo beddelo, gal qaybta Identity oo cusboonaysii School Phone.</p>
         </div>
       )}
 
