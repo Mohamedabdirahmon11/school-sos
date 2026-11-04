@@ -8,7 +8,7 @@ IMMUTABLE
 SET search_path = ''
 AS $$
   SELECT COALESCE(
-    jsonb_object_agg(lower(regexp_replace(key, '([A-Z])', '_\\1', 'g')), value),
+    jsonb_object_agg(lower(regexp_replace(key, '([A-Z])', E'_\\1', 'g')), value),
     '{}'::jsonb
   )
   FROM jsonb_each(COALESCE(p_row, '{}'::jsonb));
@@ -63,7 +63,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'assignments', 'assignment_submissions', 'attendance_records', 'audit_logs', 'bus_assignments', 'class_subjects', 'communication_queue', 'communication_settings', 'direct_messages', 'discipline_incidents', 'exam_configs', 'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items', 'inventory_transactions', 'library_books', 'library_loans', 'notice_reads', 'notification_templates', 'payroll_records', 'promotion_history', 'promotions', 'report_card_templates', 'school_events', 'school_notices', 'student_marks', 'subscription_invoices', 'support_tickets', 'teacher_unavailability', 'timetable_settings', 'timetable_slots', 'transport_routes'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'communication_settings', 'school_events', 'subscription_invoices', 'support_tickets', 'audit_logs', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'communication_queue', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;
@@ -104,7 +104,7 @@ BEGIN
     SELECT string_agg(format('%I', key_name), ', '),
            string_agg(format('current_row.%I = incoming.%I', key_name, key_name), ' AND ')
       INTO v_pk_columns, v_pk_join
-      FROM unnest(v_primary_keys) AS key_name;
+      FROM unnest(v_primary_keys) AS pk(key_name);
 
     EXECUTE format(
       'SELECT EXISTS (SELECT 1 FROM public.%I current_row JOIN jsonb_populate_recordset(NULL::public.%I, $1) incoming ON %s WHERE current_row.school_id IS DISTINCT FROM $2)',
