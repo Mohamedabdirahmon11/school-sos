@@ -103,12 +103,15 @@ test('notification processing enum and retry completion use the database enum ty
   assert.match(migration039, /GRANT EXECUTE ON FUNCTION public\.schoolos_complete_communication_queue/);
 });
 
-test('school settings UI supports safe credential updates and manual retries', () => {
-  assert.match(settingsUi, /apiKeyConfigured/);
-  assert.match(settingsUi, /apiSecretConfigured/);
-  assert.match(settingsUi, /whatsapp_business/);
-  assert.match(settingsUi, /Infobip HTTPS Base URL/);
-  assert.match(settingsUi, /retryQueuedNotification/);
+test('parent notifications use the administrator WhatsApp session with no paid automatic dispatch', () => {
+  assert.match(settingsUi, /WhatsApp-ka maamulka — bilaash/);
+  assert.match(settingsUi, /school\?\.phone/);
+  assert.match(settingsUi, /maamulka ayaa mar kasta riixaya Send/);
+  assert.match(attendanceUi, /https:\/\/wa\.me\//);
+  assert.match(attendanceUi, /parentWhatsAppNumber/);
+  assert.doesNotMatch(storage, /attendance-absent:/);
+  assert.match(worker, /notification queue items are not auto-sent/);
+  assert.doesNotMatch(worker, /claimCommunicationQueueItem\(\)/);
   assert.match(apiClient, /communication\/queue\//);
 });
 
