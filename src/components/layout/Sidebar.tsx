@@ -122,7 +122,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
         { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
         { id: 'sch_reports', label: t('reports_export'), icon: BarChart3 },
-        { id: 'sch_payroll', label: t('payroll_management'), icon: Wallet }
+        { id: 'sch_payroll', label: t('payroll_management'), icon: Wallet },
+        { id: 'sch_inventory', label: t('inventory'), icon: Boxes }
       ];
     }
 
