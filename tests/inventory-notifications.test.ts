@@ -76,3 +76,11 @@ test('communication credentials are AES-GCM encrypted before persistence', () =>
   assert.match(storage, /COMMUNICATION_SECRET_PREFIX/);
   assert.match(storage, /decryptCommunicationSecret/);
 });
+
+test('notification processing enum and retry completion use the database enum type', () => {
+  const migration038 = readFileSync(new URL('../supabase/migrations/038_add_processing_notification_status.sql', import.meta.url), 'utf8');
+  const migration039 = readFileSync(new URL('../supabase/migrations/039_cast_notification_status_enum_in_retry_rpc.sql', import.meta.url), 'utf8');
+  assert.match(migration038, /ADD VALUE IF NOT EXISTS 'processing'/);
+  assert.match(migration039, /END\)::public\.comm_status_enum/);
+  assert.match(migration039, /GRANT EXECUTE ON FUNCTION public\.schoolos_complete_communication_queue/);
+});
