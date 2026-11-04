@@ -54,6 +54,21 @@ const normalizeWhatsAppNumber = (phone?: string | null): string | null => {
 const parentWhatsAppNumber = (student: Student) =>
   normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
 
+const getSchoolLocalDate = (timeZone?: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Africa/Addis_Ababa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
