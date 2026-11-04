@@ -3118,15 +3118,15 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
   const studentRecordId = randomUUID();
   try {
     await db.approveAdmissionAtomically({
-    application_id: application.id,
-    school_id: school.id,
-    student_id: studentId,
-    student_record_id: studentRecordId,
-    student_user_id: `usr-student-${studentRecordId}`,
-    pin_hash: hashPin(initialPin),
-    approved_by: (req as any).user.id,
-    approved_by_name: (req as any).user.fullName,
-    approved_by_role: (req as any).user.role
+      application_id: application.id,
+      school_id: school.id,
+      student_id: studentId,
+      student_record_id: studentRecordId,
+      student_user_id: `usr-student-${studentRecordId}`,
+      pin_hash: hashPin(initialPin),
+      approved_by: (req as any).user.id,
+      approved_by_name: (req as any).user.fullName,
+      approved_by_role: (req as any).user.role
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Admission approval failed.';
