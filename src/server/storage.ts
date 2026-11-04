@@ -3326,6 +3326,17 @@ class StorageEngine {
     };
   }
 
+  public async restoreSchoolBackup(payload: Record<string, unknown>): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Safe school backup restore is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_restore_school_backup', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_restore_school_backup', 'call', startedAt);
+    if (error) throw new Error(error.message || 'School backup restore failed.');
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
+    return data;
+  }
+
   public async generatePlatformBackup() {
     const data = this.createEmptySchema();
     for (const [table, key] of Object.entries(TABLE_DATA_KEYS)) {
