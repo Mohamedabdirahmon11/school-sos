@@ -2970,18 +2970,19 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   await db.flush();
 
   const communicationSettings = await db.getCommunicationSettings(school.id);
+  let deliveryResults = queuedNotifications;
   if (communicationSettings.isActive && communicationSettings.provider !== 'none') {
     // Bound concurrency so a large class cannot create an unbounded provider burst.
+    deliveryResults = [];
     for (let index = 0; index < queuedNotifications.length; index += 5) {
       const batch = queuedNotifications.slice(index, index + 5);
-      await Promise.all(batch.map(item => deliverQueuedNotification(school.id, item, communicationSettings)));
+      deliveryResults.push(...await Promise.all(batch.map(item => deliverQueuedNotification(school.id, item, communicationSettings))));
     }
     await db.flush();
   }
 
-  const notificationStatuses = queuedNotifications.reduce((summary, item) => {
-    const current = db.data.communicationQueue.find(row => row.id === item.id && row.schoolId === school.id) || item;
-    summary[current.status] += 1;
+  const notificationStatuses = deliveryResults.reduce((summary, item) => {
+    summary[item.status] += 1;
     return summary;
   }, { queued: 0, sent: 0, failed: 0 });
   res.json({ success: true, count: saved.length, records: saved, notifications: notificationStatuses });
