@@ -2871,6 +2871,32 @@ class StorageEngine {
   }
 
   // -------------------------------------------------------------
+  // SCHOOL EVENTS
+  // -------------------------------------------------------------
+  public async getEvents(schoolId: string): Promise<SchoolEvent[]> {
+    const events = await this.queryRows<SchoolEvent>('school_events', { school_id: schoolId });
+    return events.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title));
+  }
+
+  public async createEvent(eventData: Omit<SchoolEvent, 'id'>): Promise<SchoolEvent> {
+    const event: SchoolEvent = { ...eventData, id: `evt-${randomUUID()}` };
+    this.data.events.push(event);
+    this.save();
+    await this.flush();
+    return event;
+  }
+
+  public async deleteEvent(id: string, schoolId: string): Promise<boolean> {
+    await this.queryRows<SchoolEvent>('school_events', { id, school_id: schoolId });
+    const index = this.data.events.findIndex(event => event.id === id && event.schoolId === schoolId);
+    if (index < 0) return false;
+    this.data.events.splice(index, 1);
+    this.save();
+    await this.flush();
+    return true;
+  }
+
+  // -------------------------------------------------------------
   // NOTICES & DIRECT MESSAGES & BROADCASTS
   // -------------------------------------------------------------
   public async getNotices(schoolId: string): Promise<SchoolNotice[]> {
