@@ -48,11 +48,12 @@ export const NoticesEventsView: React.FC = () => {
   const fetchData = async () => {
     if (!school) return;
     setLoading(true);
+    setError(null);
     try {
       const [eventsList, noticesList, classList] = await Promise.all([
-        ApiClient.request<SchoolEvent[]>('/school/events').catch(() => []),
-        ApiClient.getNotices({ page: noticePage, pageSize: 20 }).catch(() => []),
-        ApiClient.request<Array<{ id: string; name: string }>>('/classes').catch(() => [])
+        ApiClient.request<SchoolEvent[]>('/school/events'),
+        ApiClient.getNotices({ page: noticePage, pageSize: 20 }),
+        ApiClient.request<Array<{ id: string; name: string }>>('/classes')
       ]);
       setEvents(eventsList);
       setNotices(noticesList);
