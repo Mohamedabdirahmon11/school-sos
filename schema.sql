@@ -3075,12 +3075,15 @@ BEGIN
   );
 
   FOR v_parent_phone IN
-    SELECT DISTINCT phone_value
-      FROM (VALUES
-        (NULLIF(btrim(v_application.father_phone), '')),
-        (NULLIF(btrim(v_application.mother_phone), ''))
-      ) AS parent_phones(phone_value)
-     WHERE phone_value IS NOT NULL
+    SELECT phone_value
+      FROM (
+        SELECT DISTINCT phone_value
+          FROM (VALUES
+            (NULLIF(btrim(v_application.father_phone), '')),
+            (NULLIF(btrim(v_application.mother_phone), ''))
+          ) AS parent_phones(phone_value)
+         WHERE phone_value IS NOT NULL
+      ) AS unique_parent_phones
      ORDER BY regexp_replace(phone_value, '[[:space:]()-]', '', 'g')
   LOOP
     IF v_parent_phone IS NULL THEN
