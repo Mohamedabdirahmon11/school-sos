@@ -4504,9 +4504,11 @@ apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSc
   const driverName = typeof body.driverName === 'string' ? body.driverName.trim() : '';
   const driverPhone = typeof body.driverPhone === 'string' ? body.driverPhone.trim() : '';
   const feeAmount = Number(body.feeAmount ?? body.monthlyFee ?? 0);
+  const capacity = Number(body.capacity ?? 40);
   const stops = body.stops ?? [];
   if (!name || name.length > 150 || routeNumber.length > 50 || vehicleNumber.length > 80 ||
       driverName.length > 150 || driverPhone.length > 50 || !Number.isFinite(feeAmount) || feeAmount < 0 ||
+      !Number.isInteger(capacity) || capacity < 1 || capacity > 1000 ||
       !Array.isArray(stops) || stops.length > 100 ||
       stops.some((stop: unknown) => typeof stop !== 'string' || !stop.trim() || stop.length > 150) ||
       (body.active !== undefined && typeof body.active !== 'boolean')) {
@@ -4515,7 +4517,7 @@ apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSc
   }
   const route = await db.addTransportRoute({
     name, routeNumber, vehicleNumber, driverName, driverPhone,
-    stops: stops.map((stop: string) => stop.trim()), feeAmount,
+    stops: stops.map((stop: string) => stop.trim()), feeAmount, capacity,
     active: body.active !== false, schoolId: school.id
   });
   res.status(201).json(route);
@@ -4531,7 +4533,8 @@ apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSu
   try {
     res.json(await db.setBusAssignment(school.id, req.params.studentId, String(req.body?.routeId || '')));
   } catch (error: any) {
-    res.status(400).json({ error: error.message || 'Bus assignment could not be saved.' });
+    const message = error?.message || 'Bus assignment could not be saved.';
+    res.status(String(message).toLowerCase().includes('full') ? 409 : 400).json({ error: message });
   }
 });
 
