@@ -1395,13 +1395,41 @@ apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSupe
   res.json(updated);
 });
 
-apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, (req, res) => {
-  const b = db.createBroadcast(req.body);
+apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (req, res) => {
+  const body = req.body || {};
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+  const audiences = ['all_schools', 'school_admins', 'teachers', 'one_school'];
+  const statuses = ['draft', 'scheduled'];
+  if (!title || title.length > 160 || !message || message.length > 5000 ||
+      !audiences.includes(body.audience) || !statuses.includes(body.status) ||
+      (body.audience === 'one_school' && (typeof body.targetSchoolId !== 'string' || !body.targetSchoolId.trim()))) {
+    res.status(400).json({ error: 'Provide a valid title, message, audience, status, and target school when required.' });
+    return;
+  }
+  if (body.audience === 'one_school' && !(await db.getSchoolById(body.targetSchoolId.trim()))) {
+    res.status(400).json({ error: 'The selected target school does not exist.' });
+    return;
+  }
+  let scheduledFor: string | undefined;
+  if (body.status === 'scheduled') {
+    const parsed = typeof body.scheduledFor === 'string' ? new Date(body.scheduledFor) : new Date('');
+    if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+      res.status(400).json({ error: 'Scheduled broadcasts require a future scheduledFor timestamp.' });
+      return;
+    }
+    scheduledFor = parsed.toISOString();
+  }
+  const b = await db.createBroadcast({
+    title, message, audience: body.audience, status: body.status,
+    ...(body.audience === 'one_school' ? { targetSchoolId: body.targetSchoolId.trim() } : {}),
+    ...(scheduledFor ? { scheduledFor } : {})
+  });
   res.status(201).json(b);
 });
 
-apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, (_req, res) => {
-  res.json(db.getBroadcasts());
+apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json(await db.getBroadcasts());
 });
 
 apiRouter.get('/superadmin/invoices', requireAuth, requireSuperAdmin, async (_req, res) => {
@@ -1421,8 +1449,8 @@ apiRouter.get('/superadmin/audit-logs', requireAuth, requireSuperAdmin, (req, re
   void sendDatabasePage(req, res, 'audit_logs', {});
 });
 
-apiRouter.get('/superadmin/audit-logs/export-csv', requireAuth, requireSuperAdmin, (_req, res) => {
-  const csv = db.exportAuditLogsCSV();
+apiRouter.get('/superadmin/audit-logs/export-csv', requireAuth, requireSuperAdmin, async (_req, res) => {
+  const csv = await db.exportAuditLogsCSV();
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="audit_logs.csv"');
   res.setHeader('Cache-Control', 'no-store');
