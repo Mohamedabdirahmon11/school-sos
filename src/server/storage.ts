@@ -467,7 +467,7 @@ class StorageEngine {
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['inventoryItems', 'inventory_items'], ['inventoryTransactions', 'inventory_transactions'], ['notificationTemplates', 'notification_templates'],
-      ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
+      ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters'], ['disciplineIncidents', 'discipline_incidents']
     ];
     for (const [, table] of tableMap) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
