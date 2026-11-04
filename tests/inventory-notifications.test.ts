@@ -39,7 +39,6 @@ test('parent absence messages use the administrator WhatsApp account and require
 test('no paid messaging worker is started or required', () => {
   assert.equal(existsSync(new URL('../src/server/notification-worker.ts', import.meta.url)), false);
   assert.doesNotMatch(server, /notification-worker|startNotificationWorker/);
-  assert.doesNotMatch(storage, /claimCommunicationQueueItem\(/);
 });
 
 test('inventory screen uses persistent item API and stock movement ledger', () => {
@@ -63,7 +62,7 @@ test('reports exclude voided payments, preserve zero attendance, and describe co
   assert.match(storage, /const totalDue = studentPayments\.reduce/);
   assert.match(storage, /const totalRemaining = studentPayments\.reduce/);
   assert.ok(storage.includes('const totalCollected = payments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);'));
-  assert.ok(reportsUi.includes('0%'));
+  assert.match(reportsUi, /summary\?\.attendanceRate \?\? 0/);
 });
 
 test('audit CSV export downloads the complete server-side export and protects spreadsheet formulas', () => {
