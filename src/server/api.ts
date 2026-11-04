@@ -1382,8 +1382,8 @@ apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin, (_req, r
   res.json(db.getBroadcasts());
 });
 
-apiRouter.get('/superadmin/invoices', requireAuth, requireSuperAdmin, (_req, res) => {
-  res.json(db.getSubscriptionInvoices());
+apiRouter.get('/superadmin/invoices', requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json(await db.getSubscriptionInvoices());
 });
 
 apiRouter.post('/superadmin/invoices/:id/pay', requireAuth, requireSuperAdmin, async (req, res) => {
@@ -1824,7 +1824,7 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
       school_id: school.id,
       academic_year: school.academicYear
     }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
-    const examConfig = db.getExamConfig(school.id, school.academicYear);
+    const examConfig = await db.getExamConfig(school.id, school.academicYear);
     const passMark = Number(examConfig.passMarkPercentage) || 50;
     const result: Record<string, unknown> = {
       studentCount: Number(stats.totalStudents) || 0,
@@ -2134,9 +2134,12 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
   let classIds: string[] | null = null;
   let studentIds: string[] | null = null;
 
+  let teacherSubjectPairs: Set<string> | null = null;
   if (role === 'teacher') {
-    const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
-    classIds = [...new Set([...(user.assignedClassIds || []), ...((own.items[0] as any)?.assignedClasses || [])])];
+    const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const teaching = own.items.length ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: own.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id') : { items: [] as any[] };
+    teacherSubjectPairs = new Set(teaching.items.map((item: any) => `${item.classId}::${item.subjectId}`));
+    classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
   } else if (role === 'parent' || role === 'student') {
     studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
     if (role === 'student') {
@@ -2152,6 +2155,7 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
 
   if (classIds && !classIds.length) { res.json([]); return; }
   const assignments = await db.queryPage('assignments', { school_id: school.id, class_id: classIds || undefined }, 1, 100, undefined, '*');
+  const visibleAssignments = teacherSubjectPairs ? assignments.items.filter((item: any) => teacherSubjectPairs!.has(`${item.classId}::${item.subjectId}`)) : assignments.items;
   const submissions = studentIds?.length
     ? await db.queryPage('assignment_submissions', { school_id: school.id, student_id: studentIds }, 1, 100, undefined, '*')
     : { items: [] as any[] };
@@ -2159,12 +2163,12 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
   for (const submission of [...submissions.items].sort((a: any, b: any) => String(b.submittedAt).localeCompare(String(a.submittedAt)))) {
     if (!submissionByAssignment.has(submission.assignmentId)) submissionByAssignment.set(submission.assignmentId, submission);
   }
-  const subjectIds = [...new Set(assignments.items.map((item: any) => item.subjectId))];
+  const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
   const subjects = subjectIds.length
     ? await db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, 'id,name,code')
     : { items: [] as any[] };
   const subjectNames = new Map(subjects.items.map((item: any) => [item.id, item.name]));
-  res.json(assignments.items
+  res.json(visibleAssignments
     .map((item: any) => ({
       ...item,
       subjectName: subjectNames.get(item.subjectId) || item.subjectId,
@@ -3074,17 +3078,17 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
 // 6. EXAMS & RESULTS: SMALL + BIG EXAM -> PERCENTAGE ONLY
 // ==============================================================================
 
-apiRouter.get('/exams/config', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/exams/config', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(db.getExamConfig(school.id));
+  res.json(await db.getExamConfig(school.id, school.academicYear));
 });
 
-apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
+apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   try {
     const updates = sanitizeExamConfigSettings(req.body);
-    const updated = db.updateExamConfig(school.id, updates);
+    const updated = await db.updateExamConfig(school.id, updates);
     db.logAudit({
       action: 'EXAM_CONFIG_UPDATED',
       category: 'academics',
@@ -3111,7 +3115,15 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       res.status(403).json({ error: 'You do not have access to this student results record.' });
       return;
     }
-    const marks = await db.getStudentMarks(school.id, studentId as string);
+    let marks = await db.getStudentMarks(school.id, studentId as string);
+    if (normalizeRole(user.role) === 'teacher') {
+      const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+      if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
+      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
+      const student = await db.getStudentById(studentId as string, school.id);
+      const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
+      marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+    }
     const subjectIds = [...new Set(marks.map(mark => mark.subjectId))];
     const subjects = subjectIds.length
       ? await db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, 'id,name,code')
@@ -3124,9 +3136,13 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     res.status(400).json({ error: 'classId is required' });
     return;
   }
-  if (user.role === 'teacher' && !user.assignedClassIds?.includes(classId as string)) {
-    res.status(403).json({ error: 'You may only access marks for your assigned classes.' });
-    return;
+  if (user.role === 'teacher') {
+    if (!subjectId) { res.status(400).json({ error: 'subjectId is required for teacher results access.' }); return; }
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const assignment = teacher.items.length
+      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id')
+      : { items: [] as any[] };
+    if (!assignment.items.length) { res.status(403).json({ error: 'You may only access marks for your assigned class and subject.' }); return; }
   }
   if (user.role === 'parent' || user.role === 'student') {
     res.status(403).json({ error: 'A student ID is required for this results request.' });
@@ -4056,9 +4072,11 @@ apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async 
 // Batch Invoices Generation (Super Admin)
 apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, async (_req, res) => {
   const schools = await db.getSchools();
-  const plans = db.getPlans();
+  const [plans, existingInvoices] = await Promise.all([Promise.resolve(db.getPlans()), db.getSubscriptionInvoices()]);
+  const existingUnpaidSchools = new Set(existingInvoices.filter(invoice => invoice.status === 'unpaid').map(invoice => invoice.schoolId));
   let generated = 0;
   for (const s of schools) {
+    if (existingUnpaidSchools.has(s.id)) continue;
     const p = plans.find(plan => plan.id === s.subscription?.plan);
     const amount = s.subscription?.cadence === 'yearly' ? (p?.yearlyPrice || 890) : (p?.monthlyPrice || 89);
     db.createSubscriptionInvoice({
@@ -4067,7 +4085,7 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
       plan: s.subscription?.plan || 'standard',
       cadence: s.subscription?.cadence || 'monthly',
       amount,
-      invoiceNumber: `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`,
+      invoiceNumber: `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`,
       currency: db.getSettings().platformCurrency,
       issuedDate: new Date().toISOString().split('T')[0],
       status: 'unpaid',
@@ -4075,6 +4093,7 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
     });
     generated++;
   }
+  await db.flush();
   res.json({ success: true, count: generated });
 });
 
