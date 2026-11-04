@@ -638,6 +638,18 @@ export class ApiClient {
     return { stats: { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], recentPayments: [], notices: [] };
   }
 
+  public static async getDisciplineIncidents() {
+    return this.request<any[]>('/school/discipline');
+  }
+
+  public static async addDisciplineIncident(data: {
+    studentId: string; incidentDate: string; infractionType: string;
+    severity: 'low' | 'medium' | 'high'; actionTaken: string; notes?: string;
+    parentContacted?: boolean;
+  }) {
+    return this.request<any>('/school/discipline', { method: 'POST', body: JSON.stringify(data) });
+  }
+
   public static async getLibraryBooks(schoolId?: string) {
     return this.request<any[]>('/school/library').catch(() => []);
   }
