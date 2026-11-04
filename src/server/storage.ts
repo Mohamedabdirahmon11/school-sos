@@ -89,6 +89,8 @@ interface DatabaseSchema {
   lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
   libraryBooks: any[];
   transportRoutes: any[];
+  inventoryItems: any[];
+  inventoryTransactions: any[];
 }
 
 interface StorageContext {
@@ -227,7 +229,8 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
   assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
-  transport_routes: 'transportRoutes', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
+  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', inventory_transactions: 'inventoryTransactions',
+  fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
@@ -328,6 +331,8 @@ class StorageEngine {
       lockoutCounterRows: [],
       libraryBooks: [],
       transportRoutes: [],
+      inventoryItems: [],
+      inventoryTransactions: [],
       lockoutCounters: {}
     };
   }
@@ -423,7 +428,7 @@ class StorageEngine {
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
-      ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['notificationTemplates', 'notification_templates'],
+      ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['inventoryItems', 'inventory_items'], ['inventoryTransactions', 'inventory_transactions'], ['notificationTemplates', 'notification_templates'],
       ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
     ];
     for (const [, table] of tableMap) {
@@ -3076,7 +3081,7 @@ class StorageEngine {
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
       'audit_logs', 'bus_assignments', 'class_subjects', 'classes', 'communication_queue',
       'communication_settings', 'direct_messages', 'exam_configs', 'fee_payments', 'fee_ranges',
-      'fee_receipt_sequences', 'fee_structures', 'library_books', 'notice_reads',
+      'fee_receipt_sequences', 'fee_structures', 'inventory_items', 'inventory_transactions', 'library_books', 'notice_reads',
       'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
       'school_subscriptions', 'staff_members', 'student_marks', 'students', 'subjects',
