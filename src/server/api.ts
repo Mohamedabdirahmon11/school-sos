@@ -1791,13 +1791,59 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
     return;
   }
   try {
-    const summary = await db.getSchoolDashboardSummary((req as any).school.id);
+    const school = (req as any).school as School;
+    if (role === 'teacher') {
+      const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+      if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
+      const teaching = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
+      const classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
+      if (!classIds.length) {
+        res.json({ stats: { totalStudents: 0, totalTeachers: 1, attendanceRate: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], notices: [] });
+        return;
+      }
+      const [allStudents, allAttendance, notices] = await Promise.all([
+        db.getStudents(school.id),
+        db.getSchoolAttendance(school.id),
+        db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, 1, 100, undefined, 'id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role')
+      ]);
+      const scopedStudents = allStudents.filter((student: any) => classIds.includes(student.classId) && student.status === 'active');
+      const localDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: school.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+      const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId));
+      const present = today.filter((item: any) => item.status === 'present').length;
+      const studentIds = new Set(scopedStudents.map((student: any) => student.id));
+      const scopedNotices = notices.items.filter((notice: any) => !notice.classId || classIds.includes(notice.classId));
+      res.json({
+        stats: {
+          totalStudents: scopedStudents.length,
+          totalTeachers: 1,
+          attendanceRate: scopedStudents.length ? Math.round(present * 100 / scopedStudents.length) : 0
+        },
+        totalClasses: classIds.length,
+        todayAttendance: present,
+        recentStudents: scopedStudents
+          .slice()
+          .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+          .slice(0, 5)
+          .map((student: any) => ({
+            id: student.id, studentId: student.studentId, firstName: student.firstName,
+            middleName: student.middleName, lastName: student.lastName, classId: student.classId,
+            admissionDate: student.admissionDate
+          })),
+        notices: scopedNotices
+          .filter((notice: any) => !notice.publishDate || notice.publishDate <= localDate)
+          .slice(0, 3)
+      });
+      return;
+    }
+    const summary = await db.getSchoolDashboardSummary(school.id);
     if (role === 'accountant' || role === 'super_admin') {
       res.json(summary);
       return;
     }
 
-    // School admins and teachers may see academic dashboard data, never finance data.
+    // School admins may see academic dashboard data, never finance data.
     const redactFinance = (value: any): any => {
       if (Array.isArray(value)) return value.map(redactFinance);
       if (!value || typeof value !== 'object') return value;
