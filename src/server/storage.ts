@@ -2631,6 +2631,59 @@ class StorageEngine {
   }
 
   // -------------------------------------------------------------
+  // INVENTORY
+  // -------------------------------------------------------------
+  public async getInventoryItems(schoolId: string): Promise<any[]> {
+    return this.queryRows('inventory_items', { school_id: schoolId });
+  }
+
+  public async getInventoryTransactions(schoolId: string, itemId?: string): Promise<any[]> {
+    return this.queryRows('inventory_transactions', { school_id: schoolId, item_id: itemId });
+  }
+
+  public async createInventoryItem(input: Record<string, any>): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const payload = toSupabaseRow({ ...input, id: `inv-${randomUUID()}` }, 'inventory_items');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('inventory_items').insert(payload).select('*').single();
+    this.recordQuery('inventory_items', 'insert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to create inventory item.');
+    return fromSupabaseRow(data, 'inventory_items');
+  }
+
+  public async updateInventoryItem(schoolId: string, itemId: string, updates: Record<string, any>): Promise<any | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const payload = toSupabaseRow(updates, 'inventory_items');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('inventory_items')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId).eq('id', itemId).select('*').maybeSingle();
+    this.recordQuery('inventory_items', 'update', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update inventory item.');
+    return data ? fromSupabaseRow(data, 'inventory_items') : null;
+  }
+
+  public async adjustInventoryStock(input: {
+    schoolId: string; itemId: string; transactionType: string; quantity: number;
+    unitCost?: number; reference?: string; note?: string; performedBy?: string;
+  }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Inventory stock adjustment is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_adjust_inventory', {
+      p_school_id: input.schoolId, p_item_id: input.itemId,
+      p_transaction_type: input.transactionType, p_quantity: input.quantity,
+      p_unit_cost: input.unitCost ?? 0, p_reference: input.reference ?? null,
+      p_note: input.note ?? null, p_performed_by: input.performedBy ?? null
+    });
+    this.recordQuery('rpc:schoolos_adjust_inventory', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to adjust inventory stock.');
+    return fromSupabaseRow(data, 'inventory_transactions');
+  }
+
+  // -------------------------------------------------------------
   // COMMUNICATION & SMS / WHATSAPP QUEUE
   // -------------------------------------------------------------
   public async getCommunicationSettings(schoolId: string): Promise<CommunicationSettings> {
@@ -2646,8 +2699,19 @@ class StorageEngine {
       };
       this.data.communicationSettings.push(s);
       this.save();
+      await this.flush();
     }
     return s;
+  }
+
+  public async getPublicCommunicationSettings(schoolId: string): Promise<Record<string, any>> {
+    const settings = await this.getCommunicationSettings(schoolId);
+    return {
+      id: settings.id, schoolId: settings.schoolId, provider: settings.provider,
+      senderId: settings.senderId, isActive: settings.isActive, updatedAt: settings.updatedAt,
+      apiKeyConfigured: Boolean(settings.apiKey), apiSecretConfigured: Boolean(settings.apiSecret),
+      webhookConfigured: Boolean(settings.webhookUrl)
+    };
   }
 
   public async updateCommunicationSettings(schoolId: string, updates: Partial<CommunicationSettings>): Promise<CommunicationSettings> {
@@ -2659,6 +2723,7 @@ class StorageEngine {
       updatedAt: new Date().toISOString()
     };
     this.save();
+    await this.flush();
     return this.data.communicationSettings[idx];
   }
 
