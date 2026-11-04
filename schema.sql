@@ -1260,7 +1260,17 @@ CREATE POLICY transport_routes_school_read ON public.transport_routes
 DROP POLICY IF EXISTS transport_routes_school_scope ON public.transport_routes;
 CREATE POLICY transport_routes_school_scope ON public.transport_routes AS RESTRICTIVE
   FOR SELECT TO authenticated
-  USING (auth_user_role() = 'super_admin' OR school_id::text = auth_school_id()::text);
+  USING (auth_user_role() = 'super_admin' OR
+    (school_id::text = auth_school_id()::text AND (
+      auth_user_role() = 'school_admin' OR
+      (auth_user_role() = 'accountant' AND EXISTS (
+        SELECT 1 FROM public.staff_members sm
+        WHERE sm.user_id = auth_user_id()
+          AND sm.school_id::text = transport_routes.school_id::text
+          AND sm.status = 'active'
+          AND 'transport_manage' = ANY(sm.permissions)
+      ))
+    )));
 
 REVOKE ALL ON public.transport_routes FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.transport_routes TO authenticated;
