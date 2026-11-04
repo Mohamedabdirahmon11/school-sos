@@ -1638,7 +1638,7 @@ CREATE POLICY notification_templates_admin_scope ON notification_templates AS RE
 ALTER TABLE communication_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE communication_queue ENABLE ROW LEVEL SECURITY;
-DO $
+DO $schoolos$
 DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
@@ -1658,7 +1658,7 @@ BEGIN
       table_name || '_admin_delete', table_name
     );
   END LOOP;
-END $;
+END $schoolos$;
 DROP POLICY IF EXISTS staff_members_role_scope ON staff_members;
 CREATE POLICY staff_members_role_scope ON staff_members AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() IN ('super_admin','school_admin','accountant') OR user_id = private.auth_user_id());
