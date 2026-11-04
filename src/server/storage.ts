@@ -3315,7 +3315,7 @@ class StorageEngine {
 
     return {
       backupDate: new Date().toISOString(),
-      version: '1.1.0',
+      version: '1.2.0',
       school,
       tables,
       // Keep the original top-level properties for existing restore/download consumers.
