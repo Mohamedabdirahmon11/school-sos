@@ -3813,7 +3813,7 @@ apiRouter.post('/inventory/:id/transactions', requireAuth, requireSchoolContext,
 
 apiRouter.get('/communication/settings', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
-  res.json(await db.getCommunicationSettings(school.id));
+  res.json(await db.getPublicCommunicationSettings(school.id));
 });
 
 apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -3846,7 +3846,7 @@ apiRouter.put('/communication/settings', requireAuth, requireSchoolAdminOrSuperA
     details: `Updated notification gateway to ${updated.provider} (${updated.isActive ? 'active' : 'inactive'}).`,
     severity: 'info'
   });
-  res.json(updated);
+  res.json(await db.getPublicCommunicationSettings(school.id));
 });
 
 apiRouter.get('/communication/queue', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
