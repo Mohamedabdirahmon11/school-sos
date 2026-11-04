@@ -115,6 +115,9 @@ export const SchoolSettingsView: React.FC = () => {
 
   // Report Card Designer State
   const [design, setDesign] = useState<ReportCardDesign | null>(null);
+  const [whatsappRecipientPhone, setWhatsappRecipientPhone] = useState('');
+  const [whatsappRecipientName, setWhatsappRecipientName] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
 
   useEffect(() => {
     if (!school) return;
@@ -376,6 +379,24 @@ export const SchoolSettingsView: React.FC = () => {
     } catch (err: any) {
       setNotice(err.message || 'Image upload failed.');
     }
+  };
+
+  const openManualWhatsApp = () => {
+    const digits = whatsappRecipientPhone.trim().replace(/\D/g, '').replace(/^00/, '');
+    if (digits.length < 8 || digits.length > 15) {
+      setNotice('Geli lambarka waalidka qaabka caalamiga ah, tusaale +2519XXXXXXXX.');
+      return;
+    }
+    const message = [
+      whatsappRecipientName.trim() ? `Asc ${whatsappRecipientName.trim()},` : 'Asc,',
+      whatsappMessage.trim(),
+      school?.name || ''
+    ].filter(Boolean).join('\n');
+    if (!whatsappMessage.trim()) {
+      setNotice('Fadlan qor fariinta aad rabto inaad u dirto waalidka.');
+      return;
+    }
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
 
   // Download School Backup JSON
@@ -853,7 +874,7 @@ export const SchoolSettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {([
                 ['email', 'Email notifications'],
-                ['sms', 'SMS notifications'],
+                ['sms', 'WhatsApp messages (admin sends)'],
                 ['inApp', 'In-app notifications'],
                 ['attendanceAlerts', 'Attendance alerts'],
                 ['feeReminders', 'Fee reminders'],
@@ -1387,6 +1408,21 @@ export const SchoolSettingsView: React.FC = () => {
             <li>Fariin si toos ah looma diro; maamulka ayaa mar kasta riixaya Send.</li>
           </ul>
           <p className="text-[11px] text-[#64748B]">Si lambarka loo beddelo, gal qaybta Identity oo cusboonaysii School Phone.</p>
+          <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+            <h3 className="text-sm font-bold text-[#132A29]">Fariin WhatsApp cusub u dir waalid</h3>
+            <label className="block text-xs font-semibold text-[#334155]">Lambarka WhatsApp-ka waalidka
+              <input type="tel" value={whatsappRecipientPhone} onChange={e => setWhatsappRecipientPhone(e.target.value)} placeholder="+2519XXXXXXXX" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
+            </label>
+            <label className="block text-xs font-semibold text-[#334155]">Magaca waalidka (ikhtiyaari)
+              <input type="text" value={whatsappRecipientName} onChange={e => setWhatsappRecipientName(e.target.value)} placeholder="Magaca waalidka" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+            </label>
+            <label className="block text-xs font-semibold text-[#334155]">Fariinta
+              <textarea rows={4} maxLength={1600} value={whatsappMessage} onChange={e => setWhatsappMessage(e.target.value)} placeholder="Qor fariinta aad rabto inaad u dirto waalidka..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+            </label>
+            <button type="button" onClick={openManualWhatsApp} className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" /> Fur WhatsApp-ka maamulka
+            </button>
+          </div>
         </div>
       )}
 
