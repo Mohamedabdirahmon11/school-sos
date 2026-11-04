@@ -44,9 +44,9 @@ DROP POLICY IF EXISTS library_loans_admin_update ON public.library_loans;
 CREATE POLICY library_loans_admin_update ON public.library_loans AS RESTRICTIVE FOR UPDATE TO authenticated
   USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
   WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin') AND returned_by = private.auth_user_id());
-DROP POLICY IF EXISTS library_loans_admin_delete ON public.library_loans;
-CREATE POLICY library_loans_admin_delete ON public.library_loans AS RESTRICTIVE FOR DELETE TO authenticated
-  USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS library_loans_no_delete ON public.library_loans;
+CREATE POLICY library_loans_no_delete ON public.library_loans AS RESTRICTIVE FOR DELETE TO authenticated
+  USING (false);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.library_loans TO authenticated, service_role;
 
