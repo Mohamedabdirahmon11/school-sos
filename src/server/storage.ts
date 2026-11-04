@@ -3299,15 +3299,17 @@ class StorageEngine {
     // Backups must never export credential material or active login sessions.
     tables.users = tables.users.map((user: any) => {
       const {
-        passwordHash, pinHash, pin, twoFactorSecret, pendingTwoFactorSecret, recoveryCodes,
-        failedLoginAttempts, lockedUntil, ...safeUser
+        passwordHash, password_hash, pinHash, pin_hash, pin,
+        twoFactorSecret, two_factor_secret, pendingTwoFactorSecret, pending_two_factor_secret,
+        recoveryCodes, recovery_codes, failedLoginAttempts, failed_login_attempts,
+        lockedUntil, locked_until, ...safeUser
       } = user;
       return safeUser;
     });
     // Student PIN hashes are authentication material too; they must never leave
     // the database in a downloadable school backup.
     tables.students = tables.students.map((student: any) => {
-      const { pinHash, pin, ...safeStudent } = student;
+      const { pinHash, pin_hash, pin, ...safeStudent } = student;
       return safeStudent;
     });
     // Platform broadcasts can target one tenant without carrying school_id.
