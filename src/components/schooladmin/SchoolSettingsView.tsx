@@ -73,6 +73,11 @@ export const SchoolSettingsView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [restoreBackup, setRestoreBackup] = useState<any | null>(null);
+  const [restorePreview, setRestorePreview] = useState<any | null>(null);
+  const [restoreFileName, setRestoreFileName] = useState('');
+  const [isRestoring, setIsRestoring] = useState(false);
+
 
   // Identity Form State
   const [name, setName] = useState(school?.name || '');
@@ -397,6 +402,63 @@ export const SchoolSettingsView: React.FC = () => {
       return;
     }
     window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleRestoreFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setError(null);
+    setNotice(null);
+    setRestoreBackup(null);
+    setRestorePreview(null);
+    setRestoreFileName('');
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Backup file is too large. Please select a JSON file smaller than 20 MB.');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(await file.text());
+      const preview = await ApiClient.request('/school/backup/restore/preview', {
+        method: 'POST',
+        body: JSON.stringify({ backup: parsed })
+      });
+      setRestoreBackup(parsed);
+      setRestorePreview(preview);
+      setRestoreFileName(file.name);
+      setNotice('Backup preview is ready. Review the row counts and exclusions before confirming.');
+    } catch (err: any) {
+      setError(err.message || 'The selected backup could not be validated.');
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreBackup || !restorePreview || isReadOnly) return;
+    const confirmed = window.confirm(
+      'Restore this backup into the current school? Matching records will be updated and missing records inserted. Records not present in the backup will NOT be deleted. User credentials, billing and audit history are excluded.'
+    );
+    if (!confirmed) return;
+    setIsRestoring(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await ApiClient.request('/school/backup/restore', {
+        method: 'POST',
+        body: JSON.stringify({
+          backup: restoreBackup,
+          previewHash: restorePreview.previewHash,
+          confirm: true
+        })
+      });
+      setNotice('School backup merge restore completed successfully.');
+      setRestoreBackup(null);
+      setRestorePreview(null);
+      setRestoreFileName('');
+    } catch (err: any) {
+      setError(err.message || 'School backup restore failed. No partial restore was saved.');
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   // Download School Backup JSON
@@ -1452,6 +1514,46 @@ export const SchoolSettingsView: React.FC = () => {
               <Download className="w-3.5 h-3.5" />
               Download School Backup
             </button>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div>
+              <h4 className="font-bold text-xs text-slate-900">Restore a School Backup</h4>
+              <p className="text-[11px] text-slate-600 mt-1">
+                Select a JSON backup to validate it first. Nothing is changed until you review the preview and confirm.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 bg-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-100">
+              <Download className="w-3.5 h-3.5 rotate-180" />
+              Choose Backup JSON
+              <input type="file" accept="application/json,.json" onChange={handleRestoreFile} className="sr-only" disabled={isReadOnly || isRestoring} />
+            </label>
+            {restoreFileName && <p className="text-xs text-slate-600">Selected: {restoreFileName}</p>}
+            {restorePreview && (
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-800">Preview for {restorePreview.schoolName}</span>
+                  <span className="text-xs font-bold text-slate-700">{restorePreview.totalRows} rows</span>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {Object.entries(restorePreview.counts || {}).map(([table, count]) => (
+                    <div key={table} className="flex justify-between gap-3 text-[11px] text-slate-600">
+                      <span>{table.replace(/_/g, ' ')}</span><span className="font-mono">{count as number}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-amber-800 bg-amber-50 rounded-md p-2">{restorePreview.warning}</p>
+                <p className="text-[11px] text-slate-600">Not restored: {(restorePreview.excluded || []).join(', ')}.</p>
+                <button
+                  type="button"
+                  onClick={handleConfirmRestore}
+                  disabled={isReadOnly || isRestoring}
+                  className="px-4 py-2 bg-amber-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                >
+                  {isRestoring ? 'Restoring...' : 'Confirm & Restore Backup'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
