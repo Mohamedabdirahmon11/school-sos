@@ -1014,9 +1014,12 @@ CREATE TABLE IF NOT EXISTS library_books (
   title VARCHAR(255) NOT NULL,
   author VARCHAR(255),
   isbn VARCHAR(50),
-  quantity INTEGER NOT NULL DEFAULT 1,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_library_books_school_isbn_unique
+  ON library_books(school_id, lower(btrim(isbn)))
+  WHERE isbn IS NOT NULL AND btrim(isbn) <> '';
 
 CREATE TABLE IF NOT EXISTS transport_routes (
   id VARCHAR(64) PRIMARY KEY,
