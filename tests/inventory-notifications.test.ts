@@ -82,6 +82,7 @@ test('reports exclude voided payments and use active student attendance denomina
   assert.match(storage, /studentPayments = payments\.filter\(p => p\.studentId === student\.id && !p\.voidedAt\)/);
   assert.match(storage, /const totalDue = studentPayments\.reduce/);
   assert.match(storage, /const totalRemaining = studentPayments\.reduce/);
+  assert.match(storage, /const totalCollected = payments\\.reduce\\(\\(acc, p\\) => acc \\+ \\(Number\\(p\\.amountPaid\\) \\|\\| 0\\), 0\\)/);
 });
 
 test('communication credentials are AES-GCM encrypted before persistence', () => {
