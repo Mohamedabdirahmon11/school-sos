@@ -2,8 +2,8 @@ import type { CommunicationQueueItem, CommunicationSettings } from '../types/ind
 import { db } from './storage.ts';
 
 function normalizedPhone(value: string): string {
-  const phone = value.replace(/[\\s()-]/g, '');
-  if (!/^\\+?[1-9]\\d{7,14}$/.test(phone)) throw new Error('Recipient phone must be in international format.');
+  const phone = value.replace(/[\s()-]/g, '');
+  if (!/^\+?[1-9]\d{7,14}$/.test(phone)) throw new Error('Recipient phone must be in international format.');
   return phone;
 }
 
@@ -31,12 +31,12 @@ async function deliver(item: CommunicationQueueItem, settings: CommunicationSett
     if (!settings.apiKey || !settings.senderId || !settings.webhookUrl) throw new Error('Infobip requires an API key, sender ID, and approved base URL.');
     let base: URL;
     try { base = new URL(settings.webhookUrl); } catch { throw new Error('Infobip base URL is invalid.'); }
-    if (base.protocol !== 'https:' || !/(^|\\.)api\\.infobip\\.com$/i.test(base.hostname)) throw new Error('Infobip base URL must use an official HTTPS api.infobip.com host.');
+    if (base.protocol !== 'https:' || !/(^|\.)api\.infobip\.com$/i.test(base.hostname)) throw new Error('Infobip base URL must use an official HTTPS api.infobip.com host.');
     const whatsapp = item.channel === 'whatsapp';
     const endpoint = whatsapp ? '/whatsapp/1/message/text' : '/sms/2/text/advanced';
     const payload = whatsapp
-      ? { messages: [{ from: settings.senderId, to: phone.replace(/^\\+/, ''), content: { text: item.content } }] }
-      : { messages: [{ from: settings.senderId, destinations: [{ to: phone.replace(/^\\+/, '') }], text: item.content }] };
+      ? { messages: [{ from: settings.senderId, to: phone.replace(/^\+/, ''), content: { text: item.content } }] }
+      : { messages: [{ from: settings.senderId, destinations: [{ to: phone.replace(/^\+/, '') }], text: item.content }] };
     return postProvider(new URL(endpoint, base).toString(), {
       method: 'POST', headers: { Authorization: `App ${settings.apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload)
@@ -46,10 +46,10 @@ async function deliver(item: CommunicationQueueItem, settings: CommunicationSett
     if (item.channel !== 'whatsapp') throw new Error('WhatsApp Business Cloud only supports WhatsApp messages.');
     if (!settings.apiKey || !settings.senderId) throw new Error('WhatsApp Business requires an access token and phone-number ID.');
     const version = process.env.WHATSAPP_GRAPH_API_VERSION || 'v23.0';
-    if (!/^v\\d+\\.\\d+$/.test(version)) throw new Error('WhatsApp Graph API version is invalid.');
+    if (!/^v\d+\.\d+$/.test(version)) throw new Error('WhatsApp Graph API version is invalid.');
     return postProvider(`https://graph.facebook.com/${version}/${encodeURIComponent(settings.senderId)}/messages`, {
       method: 'POST', headers: { Authorization: `Bearer ${settings.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone.replace(/^\\+/, ''), type: 'text', text: { preview_url: false, body: item.content } })
+      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone.replace(/^\+/, ''), type: 'text', text: { preview_url: false, body: item.content } })
     });
   }
   if (settings.provider === 'local_gateway') {
