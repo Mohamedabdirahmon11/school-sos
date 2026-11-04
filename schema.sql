@@ -1057,9 +1057,11 @@ CREATE TABLE IF NOT EXISTS transport_routes (
   driver_phone VARCHAR(50),
   stops JSONB NOT NULL DEFAULT '[]'::JSONB,
   fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
-  capacity INTEGER NOT NULL DEFAULT 40 CHECK (capacity BETWEEN 1 AND 1000),
   active BOOLEAN NOT NULL DEFAULT true
 );
+ALTER TABLE transport_routes ADD COLUMN IF NOT EXISTS capacity INTEGER NOT NULL DEFAULT 40;
+ALTER TABLE transport_routes DROP CONSTRAINT IF EXISTS transport_routes_capacity_check;
+ALTER TABLE transport_routes ADD CONSTRAINT transport_routes_capacity_check CHECK (capacity BETWEEN 1 AND 1000);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_students_id_school_unique ON students(id, school_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transport_routes_id_school_unique ON transport_routes(id, school_id);
