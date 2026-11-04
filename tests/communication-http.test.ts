@@ -182,7 +182,91 @@ test('only school administrators can read gateway settings and recipient queue',
   assert.equal(queue.status, 403);
 });
 
-test('notification requests are validated and never marked sent without a delivery worker', async () => {
+test('configured Twilio sends SMS and WhatsApp and records only provider acceptance', async () => {
+  const accountSid = 'AC0123456789abcdef0123456789abcdef';
+  const authToken = 'test-auth-token';
+  const originalFetch = globalThis.fetch;
+  const providerRequests: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.startsWith('https://api.twilio.com/')) {
+      providerRequests.push({ url, init });
+      const body = String(init?.body || '');
+      if (body.includes('Body=provider-rejects')) {
+        return new Response(JSON.stringify({ message: 'private provider response must not leak' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ sid: 'SM0123456789abcdef0123456789abcdef', status: 'queued' }), {
+        status: 201, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    return originalFetch(input, init);
+  }) as typeof fetch;
+
+  try {
+    const configured = await fetch(`${baseUrl}/communication/settings`, {
+      method: 'PUT', headers: adminHeaders,
+      body: JSON.stringify({
+        provider: 'twilio', isActive: true, apiKey: accountSid,
+        apiSecret: authToken, senderId: '+15005550006'
+      })
+    });
+    assert.equal(configured.status, 200);
+
+    const sms = await fetch(`${baseUrl}/communication/send`, {
+      method: 'POST', headers: adminHeaders,
+      body: JSON.stringify({
+        recipientPhone: '+251911234567', recipientName: 'Parent',
+        messageType: 'custom', channel: 'sms', content: 'Attendance reminder'
+      })
+    });
+    assert.equal(sms.status, 201, await sms.clone().text());
+    const smsItem = await sms.json() as any;
+    assert.equal(smsItem.status, 'sent');
+    assert.ok(smsItem.sentAt);
+    const smsForm = new URLSearchParams(String(providerRequests[0]?.init?.body));
+    assert.equal(smsForm.get('To'), '+251911234567');
+    assert.equal(smsForm.get('From'), '+15005550006');
+    assert.equal(smsForm.get('Body'), 'Attendance reminder');
+    assert.equal((providerRequests[0]?.init?.headers as any)?.Authorization,
+      `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`);
+
+    const whatsapp = await fetch(`${baseUrl}/communication/send`, {
+      method: 'POST', headers: adminHeaders,
+      body: JSON.stringify({
+        recipientPhone: '+251911234567', recipientName: 'Parent',
+        messageType: 'custom', channel: 'whatsapp', content: 'WhatsApp reminder'
+      })
+    });
+    assert.equal(whatsapp.status, 201, await whatsapp.clone().text());
+    const whatsappForm = new URLSearchParams(String(providerRequests[1]?.init?.body));
+    assert.equal(whatsappForm.get('To'), 'whatsapp:+251911234567');
+    assert.equal(whatsappForm.get('From'), 'whatsapp:+15005550006');
+
+    const rejected = await fetch(`${baseUrl}/communication/send`, {
+      method: 'POST', headers: adminHeaders,
+      body: JSON.stringify({
+        recipientPhone: '+251911234567', recipientName: 'Parent',
+        messageType: 'custom', channel: 'sms', content: 'provider-rejects'
+      })
+    });
+    assert.equal(rejected.status, 502);
+    const failedItem = await rejected.json() as any;
+    assert.equal(failedItem.status, 'failed');
+    assert.match(failedItem.errorMessage, /HTTP 400/);
+    assert.equal(failedItem.errorMessage.includes('private provider response'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('notification requests remain queued when no provider is configured', async () => {
+  const disabled = await fetch(`${baseUrl}/communication/settings`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({ provider: 'none', isActive: false })
+  });
+  assert.equal(disabled.status, 200);
   const invalid = await fetch(`${baseUrl}/communication/send`, {
     method: 'POST', headers: adminHeaders,
     body: JSON.stringify({ recipientPhone: 'bad', recipientName: 'Parent', messageType: 'custom', channel: 'sms', content: 'Hello' })
