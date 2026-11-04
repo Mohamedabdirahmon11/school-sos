@@ -165,7 +165,8 @@ export const AttendanceView: React.FC = () => {
       `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${date}, dugsiga ka maqnaa.`,
       className ? `Fasalka: ${className}.` : '',
       'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
-      school?.name || ''
+      school?.name || '',
+      school?.phone ? `Xiriirka dugsiga: ${school.phone}` : ''
     ].filter(Boolean).join('\\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
