@@ -429,6 +429,26 @@ function requireSchoolAdminOrSuperAdmin(req: Request, res: Response, next: () =>
   next();
 }
 
+async function requireLibraryManageAccess(req: Request, res: Response, next: () => void) {
+  const user = (req as any).user as User;
+  if (!user) {
+    res.status(401).json({ error: 'Authentication required.' });
+    return;
+  }
+  if (user.role === 'super_admin' || user.role === 'school_admin') {
+    next();
+    return;
+  }
+  if (user.role === 'accountant' && user.schoolId) {
+    const staffAccount = await getStaffForRequest(req, user.id, user.schoolId);
+    if (staffAccount?.status === 'active' && staffAccount.permissions?.includes('library_manage')) {
+      next();
+      return;
+    }
+  }
+  res.status(403).json({ error: 'Library management permission required.' });
+}
+
 function requireAccountantOrSuperAdmin(req: Request, res: Response, next: () => void) {
   const user = (req as any).user as User;
   if (!user || !['accountant', 'super_admin'].includes(user.role)) {
@@ -550,7 +570,7 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
       : (path.startsWith('/admissions') || path.startsWith('/school/admissions')) ? 'admissions_manage'
         : path.startsWith('/attendance') && isWrite ? 'attendance_manage'
           : (path.startsWith('/marks') || path.startsWith('/exams') || path.startsWith('/rankings')) && isWrite ? 'grades_manage'
-            : path.startsWith('/library') ? 'library_manage'
+            : path.startsWith('/school/library') ? 'library_manage'
               : path.startsWith('/transport') ? 'transport_manage'
         : (path.startsWith('/reports') || path.startsWith('/school/reports')) ? 'reports_export'
                   : null;
@@ -3994,12 +4014,13 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
 });
 
 // Extra Modules: Library & Transport
-apiRouter.get('/school/library', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/school/library', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(db.getLibraryBooks(school.id));
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await db.getLibraryBooks(school.id));
 });
 
-apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, (req, res) => {
+apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireLibraryManageAccess, (req, res) => {
   const school = (req as any).school;
   const payload = req.body;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
