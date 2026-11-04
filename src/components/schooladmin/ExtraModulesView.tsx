@@ -102,7 +102,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       .then(items => {
         if (cancelled) return;
         setInventory(items);
-        setMovementItemId(current => current || items[0]?.id || '');
+        setMovementItemId(items[0]?.id || '');
       })
       .catch((err: any) => { if (!cancelled) setInventoryError(err.message || 'Unable to load inventory.'); })
       .finally(() => { if (!cancelled) setInventoryLoading(false); });
@@ -137,6 +137,18 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     } catch (err: any) {
       setInventoryError(err.message || 'Unable to create inventory item.');
     } finally { setInventorySaving(false); }
+  };
+
+  const handleToggleInventoryItem = async (item: any) => {
+    if (isReadOnly) return;
+    setInventoryError(null);
+    try {
+      const updated = await ApiClient.updateInventoryItem(item.id, { isActive: !item.isActive });
+      setInventory(rows => rows.map(row => row.id === item.id ? updated : row));
+      setNotice(updated.isActive ? 'Inventory item reactivated.' : 'Inventory item archived.');
+    } catch (err: any) {
+      setInventoryError(err.message || 'Unable to update inventory item.');
+    }
   };
 
   const handleInventoryMovement = async (e: React.FormEvent) => {
@@ -536,14 +548,15 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             {inventoryLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading inventory…</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F8FAFC] text-[#64748B]"><tr><th className="p-2">Item</th><th className="p-2">SKU</th><th className="p-2">Category</th><th className="p-2">On hand</th><th className="p-2">Reorder at</th><th className="p-2">Unit cost</th><th className="p-2">Location</th><th className="p-2">Status</th></tr></thead>
+                  <thead className="bg-[#F8FAFC] text-[#64748B]"><tr><th className="p-2">Item</th><th className="p-2">SKU</th><th className="p-2">Category</th><th className="p-2">On hand</th><th className="p-2">Reorder at</th><th className="p-2">Unit cost</th><th className="p-2">Location</th><th className="p-2">Status</th><th className="p-2">Manage</th></tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
                     {inventory.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
                       <td className="p-2 font-semibold text-[#132A29]">{item.name}</td><td className="p-2 font-mono">{item.sku||'—'}</td><td className="p-2">{item.category}</td>
                       <td className="p-2 font-mono">{item.quantityOnHand} {item.unit}</td><td className="p-2 font-mono">{item.reorderLevel}</td><td className="p-2 font-mono">{item.unitCost}</td><td className="p-2">{item.location||'—'}</td>
-                      <td className="p-2"><span className={item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
+                      <td className="p-2"><span className={!item.isActive?'text-slate-500':item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{!item.isActive?'Archived':item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
+                      <td className="p-2"><button type="button" disabled={isReadOnly} onClick={()=>void handleToggleInventoryItem(item)} className="font-semibold text-[#0F766E] disabled:opacity-50">{item.isActive?'Archive':'Reactivate'}</button></td>
                     </tr>)}
-                    {!inventory.length&&<tr><td colSpan={8} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
+                    {!inventory.length&&<tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
                   </tbody>
                 </table>
               </div>
