@@ -89,7 +89,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   useEffect(() => {
     if (!school) return;
-    ApiClient.getLibraryBooks(school.id).then(setBooks).catch(console.error);
+    ApiClient.getLibraryBooks(school.id).then(setBooks).catch(error => {
+      console.error(error);
+      setNotice('Library catalogue could not be loaded. Check your school access and database connection.');
+    });
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch(console.error);
     ApiClient.getAllStudents().then(setStudents).catch(console.error);
     ApiClient.getBusAssignments().then(setBusAssignments).catch(console.error);
@@ -121,6 +124,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setShowAddBookModal(false);
       setBookTitle('');
       setBookAuthor('');
+      setBookIsbn('');
+      setBookCopies(5);
       setNotice('Book added to library catalogue.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -771,6 +776,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   required
                   value={bookAuthor}
                   onChange={e => setBookAuthor(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block font-medium">ISBN (optional)</label>
+                <input
+                  type="text"
+                  maxLength={50}
+                  value={bookIsbn}
+                  onChange={e => setBookIsbn(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
               </div>
