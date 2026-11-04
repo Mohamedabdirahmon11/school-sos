@@ -3602,6 +3602,73 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
 });
 
 // ==============================================================================
+// SCHOOL EVENTS
+// ==============================================================================
+
+apiRouter.get('/school/events', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await db.getEvents(school.id));
+});
+
+apiRouter.post('/school/events', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'Provide valid event details.' });
+    return;
+  }
+  const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const description = payload.description === undefined ? '' : payload.description;
+  const startDate = payload.startDate;
+  const endDate = payload.endDate;
+  const type = payload.type;
+  const isValidDate = (value: unknown): value is string => {
+    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+  if (!title || title.length > 255 ||
+      typeof description !== 'string' || description.length > 10000 ||
+      !isValidDate(startDate) || !isValidDate(endDate) || endDate < startDate ||
+      !['event', 'holiday', 'exam', 'meeting'].includes(type)) {
+    res.status(400).json({ error: 'Event title, description, date range or event type is invalid.' });
+    return;
+  }
+  const event = db.createEvent({ schoolId: school.id, title, description: description.trim(), startDate, endDate, type });
+  db.logAudit({
+    action: 'SCHOOL_EVENT_CREATED', category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: `Created school event "${title}" (${startDate} to ${endDate}).`, severity: 'info'
+  });
+  await db.flush();
+  res.status(201).json(event);
+});
+
+apiRouter.delete('/school/events/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const eventId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+  if (!eventId || eventId.length > 64) {
+    res.status(400).json({ error: 'A valid event ID is required.' });
+    return;
+  }
+  const deleted = await db.deleteEvent(school.id, eventId);
+  if (!deleted) {
+    res.status(404).json({ error: 'Event not found.' });
+    return;
+  }
+  db.logAudit({
+    action: 'SCHOOL_EVENT_DELETED', category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: `Deleted school event ${eventId}.`, severity: 'warning'
+  });
+  await db.flush();
+  res.json({ success: true });
+});
+
+// ==============================================================================
 // 10. NOTICES, MESSAGES, SUPPORT & SCHOOL BACKUP
 // ==============================================================================
 
