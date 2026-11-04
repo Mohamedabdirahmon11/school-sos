@@ -2570,3 +2570,314 @@ INSERT INTO audit_logs (
   'log-sys-init-01', 'SYSTEM_INITIALIZATION', 'security', 'system', 'SchoolOS Platform Engine', 'super_admin',
   'SchoolOS Database initialized successfully with default plans and system settings.', 'info'
 ) ON CONFLICT (id) DO NOTHING;
+
+
+-- Canonical schema includes the applied billing, inventory, and notification migrations.
+-- Settle platform subscription invoices atomically and idempotently.
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.schoolos_mark_subscription_invoice_paid(p_invoice_id VARCHAR)
+RETURNS public.subscription_invoices
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  invoice_row public.subscription_invoices%ROWTYPE;
+  receipt_code VARCHAR(80);
+BEGIN
+  SELECT * INTO invoice_row
+  FROM public.subscription_invoices
+  WHERE id = p_invoice_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  IF invoice_row.status = 'paid' THEN
+    RETURN invoice_row;
+  END IF;
+
+  receipt_code := 'SUB-REC-' || to_char(CURRENT_DATE, 'YYYY') || '-' ||
+    upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+
+  UPDATE public.subscription_invoices
+  SET status = 'paid',
+      paid_date = CURRENT_DATE,
+      receipt_number = receipt_code
+  WHERE id = p_invoice_id
+  RETURNING * INTO invoice_row;
+
+  UPDATE public.school_subscriptions
+  SET status = 'active',
+      valid_until = CASE
+        WHEN invoice_row.cadence = 'lifetime' THEN NULL
+        WHEN invoice_row.cadence = 'yearly' THEN
+          GREATEST(COALESCE(valid_until, now()), now()) + interval '1 year'
+        WHEN invoice_row.cadence = 'monthly' THEN
+          GREATEST(COALESCE(valid_until, now()), now()) + interval '1 month'
+        ELSE valid_until
+      END,
+      price_paid = COALESCE(price_paid, 0) + invoice_row.amount,
+      last_billed_date = now(),
+      updated_at = now()
+  WHERE school_id = invoice_row.school_id;
+
+  RETURN invoice_row;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.schoolos_mark_subscription_invoice_paid(VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_mark_subscription_invoice_paid(VARCHAR) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+
+-- Prevent concurrent invoice generation from creating multiple unpaid invoices
+-- for the same school. A new invoice can be generated after the prior one is paid.
+BEGIN;
+CREATE UNIQUE INDEX IF NOT EXISTS subscription_invoices_one_unpaid_per_school
+  ON public.subscription_invoices (school_id)
+  WHERE status = 'unpaid';
+COMMIT;
+
+-- Lifetime subscriptions remain active without changing their required valid_until
+-- value; the schema intentionally keeps that column NOT NULL.
+BEGIN;
+CREATE OR REPLACE FUNCTION public.schoolos_mark_subscription_invoice_paid(p_invoice_id VARCHAR)
+RETURNS public.subscription_invoices
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  invoice_row public.subscription_invoices%ROWTYPE;
+  receipt_code VARCHAR(80);
+BEGIN
+  SELECT * INTO invoice_row
+  FROM public.subscription_invoices
+  WHERE id = p_invoice_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF invoice_row.status = 'paid' THEN RETURN invoice_row; END IF;
+
+  receipt_code := 'SUB-REC-' || to_char(CURRENT_DATE, 'YYYY') || '-' ||
+    upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+  UPDATE public.subscription_invoices
+  SET status = 'paid', paid_date = CURRENT_DATE, receipt_number = receipt_code
+  WHERE id = p_invoice_id
+  RETURNING * INTO invoice_row;
+
+  UPDATE public.school_subscriptions
+  SET status = 'active',
+      valid_until = CASE
+        WHEN invoice_row.cadence = 'lifetime' THEN valid_until
+        WHEN invoice_row.cadence = 'yearly' THEN GREATEST(valid_until, now()) + interval '1 year'
+        WHEN invoice_row.cadence = 'monthly' THEN GREATEST(valid_until, now()) + interval '1 month'
+        ELSE valid_until
+      END,
+      price_paid = COALESCE(price_paid, 0) + invoice_row.amount,
+      last_billed_date = now(),
+      updated_at = now()
+  WHERE school_id = invoice_row.school_id;
+  RETURN invoice_row;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_mark_subscription_invoice_paid(VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_mark_subscription_invoice_paid(VARCHAR) TO service_role;
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- P2: introduce tenant-scoped inventory with atomic stock movement history.
+BEGIN;
+CREATE TABLE IF NOT EXISTS public.inventory_items (
+  id varchar(80) PRIMARY KEY,
+  school_id varchar(80) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  name varchar(160) NOT NULL,
+  sku varchar(80),
+  category varchar(100) NOT NULL DEFAULT 'General',
+  unit varchar(40) NOT NULL DEFAULT 'unit',
+  quantity_on_hand numeric(14,2) NOT NULL DEFAULT 0 CHECK (quantity_on_hand >= 0),
+  reorder_level numeric(14,2) NOT NULL DEFAULT 0 CHECK (reorder_level >= 0),
+  unit_cost numeric(14,2) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
+  location varchar(160),
+  notes text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_by varchar(80) REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT inventory_items_school_sku_unique UNIQUE (school_id, sku),
+  CONSTRAINT inventory_items_id_school_unique UNIQUE (id, school_id)
+);
+CREATE INDEX IF NOT EXISTS inventory_items_school_active_idx
+  ON public.inventory_items (school_id, is_active, name);
+CREATE TABLE IF NOT EXISTS public.inventory_transactions (
+  id varchar(80) PRIMARY KEY,
+  school_id varchar(80) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  item_id varchar(80) NOT NULL REFERENCES public.inventory_items(id) ON DELETE RESTRICT,
+  transaction_type varchar(20) NOT NULL CHECK (transaction_type IN ('stock_in','stock_out','adjustment')),
+  quantity_delta numeric(14,2) NOT NULL CHECK (quantity_delta <> 0),
+  quantity_before numeric(14,2) NOT NULL CHECK (quantity_before >= 0),
+  quantity_after numeric(14,2) NOT NULL CHECK (quantity_after >= 0),
+  unit_cost numeric(14,2) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
+  reference varchar(160),
+  note text,
+  performed_by varchar(80) REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT inventory_transaction_item_school_fk
+    FOREIGN KEY (item_id, school_id) REFERENCES public.inventory_items(id, school_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS inventory_transactions_school_created_idx
+  ON public.inventory_transactions (school_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_transactions_item_created_idx
+  ON public.inventory_transactions (item_id, created_at DESC);
+ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inventory_items_school_read ON public.inventory_items;
+CREATE POLICY inventory_items_school_read ON public.inventory_items
+  FOR SELECT TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS inventory_items_school_write ON public.inventory_items;
+CREATE POLICY inventory_items_school_write ON public.inventory_items
+  FOR ALL TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
+DROP POLICY IF EXISTS inventory_transactions_school_read ON public.inventory_transactions;
+CREATE POLICY inventory_transactions_school_read ON public.inventory_transactions
+  FOR SELECT TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+CREATE OR REPLACE FUNCTION public.schoolos_adjust_inventory(
+  p_school_id varchar,
+  p_item_id varchar,
+  p_transaction_type varchar,
+  p_quantity numeric,
+  p_unit_cost numeric DEFAULT 0,
+  p_reference varchar DEFAULT NULL,
+  p_note text DEFAULT NULL,
+  p_performed_by varchar DEFAULT NULL
+) RETURNS public.inventory_transactions
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  item_row public.inventory_items%ROWTYPE;
+  delta numeric(14,2);
+  result_row public.inventory_transactions%ROWTYPE;
+BEGIN
+  IF p_transaction_type NOT IN ('stock_in','stock_out','adjustment') OR p_quantity IS NULL OR p_quantity = 0 THEN
+    RAISE EXCEPTION 'Invalid inventory movement.';
+  END IF;
+  IF p_transaction_type IN ('stock_in','stock_out') AND p_quantity < 0 THEN
+    RAISE EXCEPTION 'Stock-in and stock-out quantities must be positive.';
+  END IF;
+  IF p_unit_cost IS NULL OR p_unit_cost < 0 THEN RAISE EXCEPTION 'Unit cost cannot be negative.'; END IF;
+  SELECT * INTO item_row FROM public.inventory_items
+    WHERE id = p_item_id AND school_id = p_school_id AND is_active = true
+    FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Inventory item not found.'; END IF;
+  delta := CASE WHEN p_transaction_type = 'stock_out' THEN -p_quantity ELSE p_quantity END;
+  IF item_row.quantity_on_hand + delta < 0 THEN RAISE EXCEPTION 'Insufficient stock.'; END IF;
+  UPDATE public.inventory_items
+    SET quantity_on_hand = quantity_on_hand + delta,
+        unit_cost = CASE WHEN p_unit_cost > 0 THEN p_unit_cost ELSE unit_cost END,
+        updated_at = now()
+    WHERE id = p_item_id AND school_id = p_school_id;
+  INSERT INTO public.inventory_transactions (
+    id, school_id, item_id, transaction_type, quantity_delta,
+    quantity_before, quantity_after, unit_cost, reference, note, performed_by
+  ) VALUES (
+    'itx-' || replace(gen_random_uuid()::text, '-', ''), p_school_id, p_item_id,
+    p_transaction_type, delta, item_row.quantity_on_hand,
+    item_row.quantity_on_hand + delta, COALESCE(NULLIF(p_unit_cost, 0), item_row.unit_cost),
+    NULLIF(p_reference, ''), NULLIF(p_note, ''), p_performed_by
+  ) RETURNING * INTO result_row;
+  RETURN result_row;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_adjust_inventory(varchar,varchar,varchar,numeric,numeric,varchar,text,varchar) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_adjust_inventory(varchar,varchar,varchar,numeric,numeric,varchar,text,varchar) TO service_role;
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- P2: durable notification attempts, delayed retries, and safe worker claims.
+BEGIN;
+ALTER TABLE public.communication_queue
+  ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  ADD COLUMN IF NOT EXISTS max_attempts integer NOT NULL DEFAULT 5 CHECK (max_attempts BETWEEN 1 AND 10),
+  ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS last_attempt_at timestamptz,
+  ADD COLUMN IF NOT EXISTS provider_message_id varchar(200);
+CREATE INDEX IF NOT EXISTS communication_queue_due_idx
+  ON public.communication_queue (next_attempt_at, created_at)
+  WHERE status = 'queued';
+CREATE OR REPLACE FUNCTION public.schoolos_claim_communication_queue()
+RETURNS SETOF public.communication_queue
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH candidate AS (
+    SELECT id FROM public.communication_queue
+    WHERE status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= now()
+    ORDER BY next_attempt_at, created_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
+  )
+  UPDATE public.communication_queue AS q
+  SET status = 'processing', attempt_count = q.attempt_count + 1,
+      last_attempt_at = now(), error_message = NULL
+  WHERE q.id = (SELECT id FROM candidate)
+  RETURNING q.*;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.schoolos_complete_communication_queue(
+  p_id varchar, p_success boolean, p_error_message text DEFAULT NULL,
+  p_provider_message_id varchar DEFAULT NULL
+) RETURNS public.communication_queue
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  result_row public.communication_queue%ROWTYPE;
+BEGIN
+  UPDATE public.communication_queue AS q
+  SET status = CASE WHEN p_success THEN 'sent'
+                    WHEN q.attempt_count >= q.max_attempts THEN 'failed'
+                    ELSE 'queued' END,
+      sent_at = CASE WHEN p_success THEN now() ELSE q.sent_at END,
+      provider_message_id = CASE WHEN p_success THEN p_provider_message_id ELSE q.provider_message_id END,
+      error_message = CASE WHEN p_success THEN NULL ELSE left(COALESCE(p_error_message, 'Provider delivery failed.'), 1000) END,
+      next_attempt_at = CASE WHEN p_success OR q.attempt_count >= q.max_attempts THEN q.next_attempt_at
+        ELSE now() + CASE q.attempt_count
+          WHEN 1 THEN interval '1 minute'
+          WHEN 2 THEN interval '5 minutes'
+          WHEN 3 THEN interval '15 minutes'
+          ELSE interval '1 hour' END END
+  WHERE q.id = p_id AND q.status = 'processing'
+  RETURNING q.* INTO result_row;
+  RETURN result_row;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.schoolos_retry_communication_queue(p_id varchar, p_school_id varchar)
+RETURNS public.communication_queue
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  result_row public.communication_queue%ROWTYPE;
+BEGIN
+  UPDATE public.communication_queue
+  SET status = 'queued', attempt_count = 0, next_attempt_at = now(),
+      last_attempt_at = NULL, error_message = NULL
+  WHERE id = p_id AND school_id = p_school_id AND status = 'failed'
+  RETURNING * INTO result_row;
+  RETURN result_row;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_claim_communication_queue() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_complete_communication_queue(varchar,boolean,text,varchar) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_retry_communication_queue(varchar,varchar) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_claim_communication_queue() TO service_role;
+GRANT EXECUTE ON FUNCTION public.schoolos_complete_communication_queue(varchar,boolean,text,varchar) TO service_role;
+GRANT EXECUTE ON FUNCTION public.schoolos_retry_communication_queue(varchar,varchar) TO service_role;
+NOTIFY pgrst, 'reload schema';
+COMMIT;
