@@ -79,13 +79,19 @@ WITH checks AS (
       AND to_regprocedure('public.schoolos_adjust_inventory(character varying,character varying,character varying,numeric,numeric,character varying,text,character varying)') IS NOT NULL,
     'Apply migration 033 before using the inventory module.'
   UNION ALL
-  SELECT 'Notification retry worker RPCs and attempt columns exist',
-    to_regprocedure('public.schoolos_claim_communication_queue()') IS NOT NULL
-      AND to_regprocedure('public.schoolos_complete_communication_queue(character varying,boolean,text,character varying)') IS NOT NULL
-      AND to_regprocedure('public.schoolos_retry_communication_queue(character varying,character varying)') IS NOT NULL
-      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='communication_queue' AND column_name='attempt_count')
-      AND EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='comm_status_enum' AND e.enumlabel='processing'),
-    'Apply migrations 034, 036, and 038 before enabling the production notification worker.'
+  SELECT 'Atomic admission approval RPC exists',
+    to_regprocedure('public.schoolos_approve_admission(jsonb)') IS NOT NULL,
+    'Apply migration 052_atomic_admission_approval.sql before approving admissions.'
+  UNION ALL
+  SELECT 'Safe school backup restore RPC exists',
+    to_regprocedure('public.schoolos_restore_school_backup(jsonb)') IS NOT NULL,
+    'Apply migration 053_safe_school_backup_restore.sql before restoring a school backup.'
+  UNION ALL
+  SELECT 'Administrator-owned WhatsApp contact settings exist',
+    to_regclass('public.schools') IS NOT NULL
+      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='schools' AND column_name='phone')
+      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='schools' AND column_name='notification_preferences'),
+    'Parents are contacted manually from the administrator-owned WhatsApp account; no paid provider worker is required.'
   UNION ALL
   SELECT 'Dashboard attendance and fee metrics RPC exists',
     to_regprocedure('public.school_dashboard_summary(character varying)') IS NOT NULL,
