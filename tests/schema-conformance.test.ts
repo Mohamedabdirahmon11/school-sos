@@ -47,6 +47,7 @@ test('domain write payloads map to real schema columns and satisfy required colu
 });
 
 test('schema checks exercised by student, teacher, fee and messaging writes are represented', () => {
+  assert.match(sql, /grade_level\\s+INTEGER\\s+NOT NULL\\s+CHECK\\s*\\(grade_level BETWEEN 0 AND 12\\)/i);
   assert.match(sql, /gender\s+VARCHAR\(10\)\s+NOT NULL\s+CHECK\s*\(gender IN \('male', 'female'\)\)/i);
   assert.match(sql, /payment_method\s+VARCHAR\(20\)\s+NOT NULL DEFAULT 'Cash' CHECK\s*\(payment_method = 'Cash'\)/i);
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
