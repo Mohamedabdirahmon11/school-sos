@@ -648,6 +648,7 @@ CREATE TABLE IF NOT EXISTS communication_settings (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL UNIQUE REFERENCES schools(id) ON DELETE CASCADE,
   provider VARCHAR(50) NOT NULL DEFAULT 'none',
+  default_channel VARCHAR(20) NOT NULL DEFAULT 'sms' CHECK (default_channel IN ('sms', 'whatsapp')),
   api_key TEXT,
   api_secret TEXT,
   sender_id VARCHAR(50),
