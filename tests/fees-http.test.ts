@@ -181,7 +181,7 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const incomeResponse = await fetch(`${baseUrl}/fees/daily-income?date=${today}`, { headers });
   assert.equal(incomeResponse.status, 200);
   const income = await incomeResponse.json();
-  assert.equal(income.paymentCount, 5, 'zero-cash unpaid receipts are not counted as daily collections');
-  assert.ok(income.payments.every((payment: any) => payment.amountPaid > 0));
-  assert.equal(income.totalCollected, 97);
+  assert.equal(income.paymentCount, 4, 'zero-cash and voided receipts are not counted as daily collections');
+  assert.ok(income.payments.every((payment: any) => payment.amountPaid > 0 && !payment.voidedAt));
+  assert.equal(income.totalCollected, 72);
 });
