@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
@@ -3108,6 +3108,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
   const school = (req as any).school;
   const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
   if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+  if (application.status !== 'pending') { res.status(409).json({ error: 'This application has already been processed.' }); return; }
 
   // The RPC locks both the pending application and class row, then inserts the
   // student, student login, parent links and audit record in one transaction.
@@ -3115,7 +3116,8 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
   const initialPin = randomInt(1000, 10000).toString();
   const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
   const studentRecordId = randomUUID();
-  await db.approveAdmissionAtomically({
+  try {
+    await db.approveAdmissionAtomically({
     application_id: application.id,
     school_id: school.id,
     student_id: studentId,
@@ -3125,7 +3127,13 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdmin
     approved_by: (req as any).user.id,
     approved_by_name: (req as any).user.fullName,
     approved_by_role: (req as any).user.role
-  });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Admission approval failed.';
+    if (/already been processed|reached capacity/i.test(message)) { res.status(409).json({ error: message }); return; }
+    if (/class is unavailable|another school/i.test(message)) { res.status(400).json({ error: message }); return; }
+    throw error;
+  }
 
   const student = await db.getStudentById(studentRecordId, school.id);
   if (!student) throw new Error('Admission was approved but the newly enrolled student could not be reloaded.');
