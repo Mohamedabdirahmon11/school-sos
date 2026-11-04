@@ -962,6 +962,7 @@ class StorageEngine {
       id: `cs-${id}`,
       schoolId: id,
       provider: 'none',
+      defaultChannel: 'sms',
       isActive: false,
       updatedAt: now
     });
