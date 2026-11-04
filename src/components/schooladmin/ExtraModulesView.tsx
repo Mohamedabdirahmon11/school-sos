@@ -66,7 +66,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [parentContacted, setParentContacted] = useState(false);
 
   // Health State
-  const [healthLogs] = useState<any[]>([]);
 
   // Payroll State
   const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
@@ -509,36 +508,15 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
       {/* 4. HEALTH / CLINIC MODULE */}
       {activeModule === 'health' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <HeartPulse className="w-4 h-4 text-rose-600" />
-            <span>School Clinic & Health Visits</span>
+            <span>School Clinic & Health Records</span>
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Date</th>
-                  <th className="px-4 py-2.5">Student</th>
-                  <th className="px-4 py-2.5">Reported Symptoms</th>
-                  <th className="px-4 py-2.5">Treatment Given</th>
-                  <th className="px-4 py-2.5">Attending Nurse</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {healthLogs.length ? healthLogs.map(h => (
-                  <tr key={h.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{h.visitDate}</td>
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{h.studentName}</td>
-                    <td className="px-4 py-2.5 text-[#334155]">{h.symptoms}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{h.treatment}</td>
-                    <td className="px-4 py-2.5 text-[#0F766E] font-medium">{h.nurseName}</td>
-                  </tr>
-                )) : (
-                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>No health visits have been recorded.</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-2">
+            <p className="font-semibold">Clinic records are not enabled yet.</p>
+            <p>This section is intentionally unavailable until a dedicated health-record database, restricted staff permissions, and audit controls are in place. SchoolOS is not currently collecting or storing clinic visit details here.</p>
+            <p>Do not enter private medical information in another SchoolOS field as a workaround.</p>
           </div>
         </div>
       )}
