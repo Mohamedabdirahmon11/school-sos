@@ -730,6 +730,11 @@ CREATE TABLE IF NOT EXISTS communication_queue (
   content TEXT NOT NULL,
   status comm_status_enum NOT NULL DEFAULT 'queued',
   error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts BETWEEN 1 AND 10),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_attempt_at TIMESTAMPTZ,
+  provider_message_id VARCHAR(200),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   sent_at TIMESTAMPTZ
 );
