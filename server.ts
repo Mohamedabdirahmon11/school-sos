@@ -10,9 +10,9 @@ import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './src/server/api.ts';
 import { apiErrorHandler } from './src/server/async-errors.ts';
 import { apiNotFound, createLoginRateLimiter, getTrustProxyHops, securityHeaders } from './src/server/security-middleware.ts';
+import { assertProductionAssets } from './src/server/production-assets.ts';
 import { db, initializeStorage } from './src/server/storage.ts';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
 
 if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
 
@@ -22,6 +22,10 @@ async function startServer() {
   if (missingEnv.length) {
     throw new Error(`Missing required environment variables: ${missingEnv.join(', ')}. Set them in .env before starting SchoolOS.`);
   }
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const distPath = path.resolve(process.cwd(), 'dist');
+  if (isProduction) assertProductionAssets(distPath);
 
   await initializeStorage();
   const supabaseRoundTrip = await db.checkSupabaseHealth();
@@ -40,7 +44,6 @@ async function startServer() {
 
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-  const isProduction = process.env.NODE_ENV === 'production';
 
   app.disable('x-powered-by');
   app.set('trust proxy', getTrustProxyHops(process.env.NODE_ENV, process.env.TRUST_PROXY_HOPS));
@@ -73,14 +76,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Production mode: Serve built static files
-    const distPath = path.resolve(process.cwd(), 'dist');
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get('*', (_req, res) => {
-        res.sendFile(path.resolve(distPath, 'index.html'));
-      });
-    }
+    // Production mode: the complete frontend build was validated before database initialization.
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
