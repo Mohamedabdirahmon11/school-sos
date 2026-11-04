@@ -3926,7 +3926,7 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
   const messageTypes = ['attendance_absent', 'fee_due', 'notice', 'exam_result', 'custom'];
   if (recipientPhone.length < 3 || recipientPhone.length > 50 || !recipientName || recipientName.length > 120 ||
       !content || content.length > 1600 || !messageTypes.includes(body.messageType) ||
-      !['sms', 'whatsapp'].includes(body.channel) ||
+      body.channel !== 'whatsapp' ||
       (body.studentId !== undefined && (typeof body.studentId !== 'string' || body.studentId.length > 64))) {
     res.status(400).json({ error: 'Recipient, message type, channel and message content are required and must be valid.' });
     return;
