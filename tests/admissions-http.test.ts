@@ -452,10 +452,18 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
     type: 'event', created_at: new Date().toISOString()
   };
   memory.rows('school_events').push(event);
+  memory.rows('communication_settings').push({
+    id: 'legacy-provider-settings', school_id: school.id,
+    provider: 'legacy', api_key: 'must-not-export', api_secret: 'must-not-export',
+    webhook_url: 'https://example.invalid/secret', is_active: true
+  });
   const backup = await storage.db.generateSchoolBackup(school.id);
   assert.ok(backup);
   assert.equal(backup.school.id, school.id);
   assert.equal(backup.tables.school_events.length, 1);
+  assert.equal(backup.tables.communication_settings, undefined, 'Legacy provider credentials must not be included in a school backup.');
+  assert.ok(backup.tables.students.every((row: any) => !('pinHash' in row) && !('pin' in row)), 'Student PIN hashes must not be exported.');
+  assert.ok(backup.tables.users.every((row: any) => !('passwordHash' in row) && !('pinHash' in row) && !('pin' in row) && !('twoFactorSecret' in row) && !('recoveryCodes' in row)), 'User credentials and 2FA secrets must not be exported.');
   memory.replaceRows('school_events', []);
 
   const previewResponse = await fetch(`${baseUrl}/school/backup/restore/preview`, {
