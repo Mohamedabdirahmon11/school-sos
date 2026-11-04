@@ -23,12 +23,18 @@ WITH checks AS (
     'A table with RLS but no policy is inaccessible to API roles; review intentional deny-only tables.'
   UNION ALL
   SELECT
-    'No direct table grants to anon/authenticated',
+    'Direct table grants are limited to explicitly reviewed RLS-protected tables',
     NOT EXISTS (
       SELECT 1 FROM information_schema.role_table_grants
-      WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated')
+      WHERE table_schema = 'public' AND grantee = 'anon'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM information_schema.role_table_grants
+      WHERE table_schema = 'public'
+        AND grantee = 'authenticated'
+        AND table_name NOT IN ('discipline_incidents', 'library_loans')
     ),
-    'This app accesses Supabase through its server-side service-role client.'
+    'Authenticated grants are intentional only for discipline_incidents and library_loans, whose RLS policies restrict tenant access and administrator actions; anon has no direct table grants.'
   UNION ALL
   SELECT
     'SECURITY DEFINER functions use a hardened search_path',
