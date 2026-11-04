@@ -4227,9 +4227,14 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     }
     counts[table] = rows.length;
   }
+  const previewSecret = process.env.SESSION_SECRET;
+  if (!previewSecret) {
+    res.status(503).json({ error: 'Backup restore signing is unavailable until SESSION_SECRET is configured.' });
+    return;
+  }
   const previewedAt = Date.now();
   const previewDigest = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
-  const previewToken = createHmac('sha256', process.env.SESSION_SECRET || '').update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
+  const previewToken = createHmac('sha256', previewSecret).update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     schoolId: school.id,
@@ -4262,9 +4267,14 @@ apiRouter.post('/school/backup/restore', requireAuth, requireSchoolAdminOrSuperA
     res.status(400).json({ error: 'Choose a valid backup file belonging to this school.' });
     return;
   }
+  const previewSecret = process.env.SESSION_SECRET;
+  if (!previewSecret) {
+    res.status(503).json({ error: 'Backup restore signing is unavailable until SESSION_SECRET is configured.' });
+    return;
+  }
   const previewedAt = Number(req.body?.previewedAt);
   const previewDigest = createHash('sha256').update(JSON.stringify({ schoolId: school.id, backup })).digest('hex');
-  const expectedPreviewToken = createHmac('sha256', process.env.SESSION_SECRET || '').update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
+  const expectedPreviewToken = createHmac('sha256', previewSecret).update(`${school.id}:${previewDigest}:${previewedAt}`).digest('hex');
   const suppliedPreviewToken = req.body?.previewToken;
   const previewIsFresh = Number.isSafeInteger(previewedAt) && previewedAt <= Date.now() && Date.now() - previewedAt <= 10 * 60 * 1000;
   const previewTokenIsValid = typeof suppliedPreviewToken === 'string'
