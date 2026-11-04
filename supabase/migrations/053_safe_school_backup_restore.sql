@@ -34,6 +34,9 @@ DECLARE
   v_snake_rows JSONB;
   v_row JSONB;
   v_table TEXT;
+  v_fk RECORD;
+  v_fk_join TEXT;
+  v_fk_nonnull TEXT;
   v_school_id VARCHAR(64);
   v_user_id VARCHAR(64);
   v_user_name TEXT;
@@ -89,6 +92,63 @@ BEGIN
     SELECT jsonb_agg(public.schoolos_backup_json_snake(value))
       INTO v_snake_rows
       FROM jsonb_array_elements(v_rows);
+
+    -- A school-scoped row must not reference another school's record
+    -- through a legacy single-column FK. Composite (id, school_id) FKs
+    -- already enforce this and are intentionally skipped here.
+    FOR v_fk IN
+      SELECT target.relname AS target_table,
+             array_agg(source_column.attname ORDER BY key_pair.ordinality) AS source_columns,
+             array_agg(target_column.attname ORDER BY key_pair.ordinality) AS target_columns
+        FROM pg_constraint fk
+        JOIN pg_class source ON source.oid = fk.conrelid
+        JOIN pg_namespace source_ns ON source_ns.oid = source.relnamespace
+        JOIN pg_class target ON target.oid = fk.confrelid
+        JOIN pg_namespace target_ns ON target_ns.oid = target.relnamespace
+        JOIN LATERAL unnest(fk.conkey, fk.confkey) WITH ORDINALITY
+          AS key_pair(source_attnum, target_attnum, ordinality) ON TRUE
+        JOIN pg_attribute source_column
+          ON source_column.attrelid = source.oid AND source_column.attnum = key_pair.source_attnum
+        JOIN pg_attribute target_column
+          ON target_column.attrelid = target.oid AND target_column.attnum = key_pair.target_attnum
+       WHERE fk.contype = 'f'
+         AND source_ns.nspname = 'public'
+         AND source.relname = v_table
+         AND target_ns.nspname = 'public'
+         AND EXISTS (
+           SELECT 1 FROM information_schema.columns target_scope
+            WHERE target_scope.table_schema = 'public'
+              AND target_scope.table_name = target.relname
+              AND target_scope.column_name = 'school_id'
+         )
+         AND NOT EXISTS (
+           SELECT 1
+             FROM unnest(fk.conkey, fk.confkey) AS scope_pair(source_attnum, target_attnum)
+             JOIN pg_attribute scope_source
+               ON scope_source.attrelid = source.oid AND scope_source.attnum = scope_pair.source_attnum
+             JOIN pg_attribute scope_target
+               ON scope_target.attrelid = target.oid AND scope_target.attnum = scope_pair.target_attnum
+            WHERE scope_source.attname = 'school_id'
+              AND scope_target.attname = 'school_id'
+         )
+       GROUP BY target.relname, fk.oid
+    LOOP
+      SELECT string_agg(format('incoming.%I = target_row.%I', source_column, target_column), ' AND '),
+             string_agg(format('incoming.%I IS NOT NULL', source_column), ' AND ')
+        INTO v_fk_join, v_fk_nonnull
+        FROM unnest(v_fk.source_columns, v_fk.target_columns)
+          AS fk_columns(source_column, target_column);
+
+      EXECUTE format(
+        'SELECT EXISTS (SELECT 1 FROM jsonb_populate_recordset(NULL::public.%I, $1) AS incoming WHERE %s AND NOT EXISTS (SELECT 1 FROM public.%I AS target_row WHERE %s AND target_row.school_id = $2))',
+        v_table, v_fk_nonnull, v_fk.target_table, v_fk_join
+      ) INTO v_conflict USING v_snake_rows, v_school_id;
+
+      IF v_conflict THEN
+        RAISE EXCEPTION 'Backup table % references a record outside this school through %.',
+          v_table, v_fk.target_table;
+      END IF;
+    END LOOP;
 
     SELECT array_agg(kcu.column_name ORDER BY kcu.ordinal_position)
       INTO v_primary_keys
