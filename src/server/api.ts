@@ -11,7 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, TimetableSlot, StaffPayrollRecord, CommunicationSettings, SchoolNotice } from '../types/index.ts';
+import { User, UserRole, School, TimetableSlot, StaffPayrollRecord, CommunicationSettings, CommunicationQueueItem, SchoolNotice } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -2965,8 +2965,26 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     return;
   }
 
-  const saved = await db.recordDailyAttendance(school.id, classId, date, records, user.id);
-  res.json({ success: true, count: saved.length, records: saved });
+  const queuedNotifications: CommunicationQueueItem[] = [];
+  const saved = await db.recordDailyAttendance(school.id, classId, date, records, user.id, item => queuedNotifications.push(item));
+  await db.flush();
+
+  const communicationSettings = await db.getCommunicationSettings(school.id);
+  if (communicationSettings.isActive && communicationSettings.provider !== 'none') {
+    // Bound concurrency so a large class cannot create an unbounded provider burst.
+    for (let index = 0; index < queuedNotifications.length; index += 5) {
+      const batch = queuedNotifications.slice(index, index + 5);
+      await Promise.all(batch.map(item => deliverQueuedNotification(school.id, item, communicationSettings)));
+    }
+    await db.flush();
+  }
+
+  const notificationStatuses = queuedNotifications.reduce((summary, item) => {
+    const current = db.data.communicationQueue.find(row => row.id === item.id && row.schoolId === school.id) || item;
+    summary[current.status] += 1;
+    return summary;
+  }, { queued: 0, sent: 0, failed: 0 });
+  res.json({ success: true, count: saved.length, records: saved, notifications: notificationStatuses });
 });
 
 // ==============================================================================
@@ -3499,6 +3517,23 @@ const sanitizeCommunicationSettings = (settings: CommunicationSettings) => {
   };
 };
 
+const deliverQueuedNotification = async (
+  schoolId: string,
+  item: CommunicationQueueItem,
+  settings: CommunicationSettings
+): Promise<CommunicationQueueItem> => {
+  if (!settings.isActive || settings.provider === 'none') return item;
+  try {
+    await deliverCommunication(settings, item);
+    return await db.updateCommunicationQueueStatus(schoolId, item.id, 'sent', undefined, new Date().toISOString());
+  } catch (deliveryError: any) {
+    const safeError = deliveryError instanceof Error
+      ? deliveryError.message.slice(0, 500)
+      : 'The notification provider could not accept this message.';
+    return db.updateCommunicationQueueStatus(schoolId, item.id, 'failed', safeError);
+  }
+};
+
 apiRouter.get('/communication/settings', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const settings = await db.getCommunicationSettings(school.id);
@@ -3604,30 +3639,19 @@ apiRouter.post('/communication/send', requireAuth, requireSchoolContext, require
       return;
     }
 
+    let delivered: CommunicationQueueItem;
     try {
-      await deliverCommunication(settings, item);
-    } catch (deliveryError: any) {
-      const safeError = deliveryError instanceof Error
-        ? deliveryError.message.slice(0, 500)
-        : 'The notification provider could not accept this message.';
-      try {
-        const failed = await db.updateCommunicationQueueStatus(school.id, item.id, 'failed', safeError);
-        await db.flush();
-        res.status(502).json(failed);
-      } catch {
-        res.status(503).json({ error: 'The provider rejected the message, but its failed status could not be saved. Check the notification queue.' });
-      }
+      delivered = await deliverQueuedNotification(school.id, item, settings);
+      await db.flush();
+    } catch {
+      res.status(503).json({ error: 'The provider response was received, but notification status could not be saved. Check the provider dashboard before retrying.' });
       return;
     }
-
-    // Provider acceptance is recorded as sent; it is not a handset delivery receipt.
-    try {
-      const accepted = await db.updateCommunicationQueueStatus(school.id, item.id, 'sent', undefined, new Date().toISOString());
-      await db.flush();
-      res.status(201).json(accepted);
-    } catch {
-      res.status(503).json({ error: 'The provider accepted the message, but its status could not be saved. Check the provider dashboard before retrying.' });
+    if (delivered.status === 'failed') {
+      res.status(502).json(delivered);
+      return;
     }
+    res.status(201).json(delivered);
   } catch (error: any) {
     res.status(400).json({ error: error?.message || 'Notification could not be queued.' });
   }
