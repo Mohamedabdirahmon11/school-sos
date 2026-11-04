@@ -4376,7 +4376,10 @@ apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requi
   const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
   const dueDate = typeof body.dueDate === 'string' ? body.dueDate.trim() : '';
   const parsedDueDate = new Date(`${dueDate}T00:00:00.000Z`);
-  const today = new Date().toISOString().slice(0, 10);
+  let today = new Date().toISOString().slice(0, 10);
+  try {
+    today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  } catch { /* Fall back to UTC when a legacy school timezone is invalid. */ }
   if (!bookId || !studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) ||
       Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate || dueDate < today) {
     res.status(400).json({ error: 'Select a book, student and a valid due date that is today or later.' });
