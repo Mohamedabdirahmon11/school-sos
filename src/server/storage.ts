@@ -3372,7 +3372,7 @@ class StorageEngine {
     return this.queryRows<any>('transport_routes', { school_id: schoolId });
   }
 
-  public async addTransportRoute(route: { schoolId: string; name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; active?: boolean }): Promise<any> {
+  public async addTransportRoute(route: { schoolId: string; name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; capacity?: number; active?: boolean }): Promise<any> {
     await this.queryRows<any>('transport_routes', { school_id: route.schoolId });
     const { vehicleNumber, ...fields } = route;
     const newRoute = {
@@ -3381,6 +3381,7 @@ class StorageEngine {
       vehicleNumber: vehicleNumber || null,
       stops: Array.isArray(route.stops) ? route.stops : [],
       feeAmount: Number(route.feeAmount),
+      capacity: Number(route.capacity ?? 40),
       active: route.active !== false,
       createdAt: new Date().toISOString()
     };
@@ -3398,8 +3399,17 @@ class StorageEngine {
     const student = await this.getStudentById(studentId, schoolId);
     const route = (await this.getTransportRoutes(schoolId)).find(item => item.id === routeId && item.active !== false);
     await this.getBusAssignments(schoolId);
-    if (!student || student.schoolId !== schoolId || !route) throw new Error('Choose a student and active route from this school.');
+    if (!student || student.schoolId !== schoolId || student.status !== 'active' || !route) {
+      throw new Error('Choose an active student and active route from this school.');
+    }
     const existing = this.data.busAssignments.find(item => item.schoolId === schoolId && item.studentId === studentId);
+    const activeOnRoute = this.data.busAssignments.filter(item =>
+      item.schoolId === schoolId && item.routeId === routeId && item.active !== false && item.studentId !== studentId
+    ).length;
+    const routeCapacity = Number(route.capacity || 40);
+    if (activeOnRoute >= routeCapacity) {
+      throw new Error('This bus route is full. Increase its capacity or choose another route.');
+    }
     const assignment = {
       ...(existing || {}), id: existing?.id || `bus-${studentId}`, schoolId, studentId, routeId,
       feeAmount: Number(route.feeAmount || 0), active: true
