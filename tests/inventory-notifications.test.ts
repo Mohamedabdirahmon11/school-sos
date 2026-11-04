@@ -12,6 +12,7 @@ const attendanceUi = readFileSync(new URL('../src/components/schooladmin/Attenda
 const reportsUi = readFileSync(new URL('../src/components/schooladmin/ReportsView.tsx', import.meta.url), 'utf8');
 const auditUi = readFileSync(new URL('../src/components/superadmin/SupportAuditView.tsx', import.meta.url), 'utf8');
 const manualGuide = readFileSync(new URL('../docs/notification-providers.md', import.meta.url), 'utf8');
+const apiClient = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -39,6 +40,9 @@ test('parent absence messages use the administrator WhatsApp account and require
 test('no paid messaging worker is started or required', () => {
   assert.equal(existsSync(new URL('../src/server/notification-worker.ts', import.meta.url)), false);
   assert.doesNotMatch(server, /notification-worker|startNotificationWorker/);
+  assert.doesNotMatch(api, /apiRouter\\.(?:get|put|post)\\(['\"]\\/communication\\/(?:settings|queue|send)/);
+  assert.doesNotMatch(api, /Twilio activation|Infobip activation|WhatsApp Business activation/);
+  assert.doesNotMatch(apiClient, /\\/communication\\/(?:settings|queue|send)/);
 });
 
 test('inventory screen uses persistent item API and stock movement ledger', () => {
