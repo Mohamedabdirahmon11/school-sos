@@ -414,11 +414,12 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   const preview = await previewResponse.json();
   assert.equal(preview.mode, 'merge');
   assert.equal(preview.counts.school_events, 1);
-  assert.ok(preview.previewHash);
+  assert.ok(preview.previewToken);
+  assert.ok(preview.previewedAt);
   assert.ok(preview.excluded.includes('users and login credentials'));
 
   const noConfirmation = await fetch(`${baseUrl}/school/backup/restore`, {
-    method: 'POST', headers, body: JSON.stringify({ backup, previewHash: preview.previewHash })
+    method: 'POST', headers, body: JSON.stringify({ backup, previewToken: preview.previewToken, previewedAt: preview.previewedAt })
   });
   assert.equal(noConfirmation.status, 400);
 
@@ -426,7 +427,7 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   tampered.tables.school_events[0].title = 'Tampered after preview';
   const staleConfirmation = await fetch(`${baseUrl}/school/backup/restore`, {
     method: 'POST', headers,
-    body: JSON.stringify({ backup: tampered, previewHash: preview.previewHash, confirm: true })
+    body: JSON.stringify({ backup: tampered, previewToken: preview.previewToken, previewedAt: preview.previewedAt, confirm: true })
   });
   assert.equal(staleConfirmation.status, 409);
 
@@ -440,14 +441,14 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   memory.failNextBackupRestore();
   const failedRestore = await fetch(`${baseUrl}/school/backup/restore`, {
     method: 'POST', headers,
-    body: JSON.stringify({ backup, previewHash: preview.previewHash, confirm: true })
+    body: JSON.stringify({ backup, previewToken: preview.previewToken, previewedAt: preview.previewedAt, confirm: true })
   });
   assert.equal(failedRestore.status, 500);
   assert.equal(memory.rows('school_events').some(row => row.id === event.id), false, 'Failed restore must roll back all earlier row writes.');
 
   const restoredResponse = await fetch(`${baseUrl}/school/backup/restore`, {
     method: 'POST', headers,
-    body: JSON.stringify({ backup, previewHash: preview.previewHash, confirm: true })
+    body: JSON.stringify({ backup, previewToken: preview.previewToken, previewedAt: preview.previewedAt, confirm: true })
   });
   assert.equal(restoredResponse.status, 200, await restoredResponse.clone().text());
   const restored = await restoredResponse.json();
