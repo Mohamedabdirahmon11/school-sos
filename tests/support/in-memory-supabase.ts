@@ -269,43 +269,6 @@ export class InMemorySupabase {
         return { data: null, error: { message: error instanceof Error ? error.message : 'Backup restore failed.' } };
       }
     }
-    if (name === 'schoolos_restore_school_backup') {
-      const payload = args?.p_payload || {};
-      const backup = payload.backup || {};
-      if (payload.confirm !== true || backup.school?.id !== payload.school_id || !backup.tables || typeof backup.tables !== 'object') {
-        return { data: null, error: { message: 'A confirmed school backup belonging to this school is required.' } };
-      }
-      const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","school_events","support_tickets","audit_logs","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
-      const names = [...allowed];
-      const snapshots = new Map<string, any[]>(names.concat(['audit_logs']).map(table => [table, structuredClone(this.rows(table))] as [string, any[]]));
-      const restored: Record<string, number> = {};
-      try {
-        for (const table of names) {
-          const incoming = backup.tables[table];
-          if (incoming == null) continue;
-          if (!Array.isArray(incoming)) throw new Error('Backup table ' + table + ' must be an array.');
-          for (const row of incoming) {
-            if (!row || (row.schoolId ?? row.school_id) !== payload.school_id) throw new Error('Backup table ' + table + ' contains a row outside this school.');
-            const key = row.id ?? row.schoolId ?? row.school_id;
-            const existing = this.rows(table).find(current => String(current.id ?? current.schoolId ?? current.school_id) === String(key));
-            if (existing && String(existing.schoolId ?? existing.school_id) !== String(payload.school_id)) throw new Error('Backup table ' + table + ' conflicts with another school.');
-            if (existing) Object.assign(existing, { ...row, schoolId: existing.schoolId ?? row.schoolId, school_id: existing.school_id ?? row.school_id });
-            else this.rows(table).push({ ...row });
-          }
-          restored[table] = incoming.length;
-        }
-        this.rows('audit_logs').push({
-          id: 'audit-backup-restore-' + Date.now(), action: 'SCHOOL_BACKUP_RESTORED',
-          category: 'security', schoolId: payload.school_id, userId: payload.approved_by,
-          userName: payload.approved_by_name, userRole: payload.approved_by_role,
-          details: 'School backup merge restore completed.', severity: 'warning'
-        });
-        return { data: { school_id: payload.school_id, mode: 'merge', restored }, error: null };
-      } catch (error) {
-        for (const [table, rows] of snapshots) this.replaceRows(table, rows);
-        return { data: null, error: { message: error instanceof Error ? error.message : 'Backup restore failed.' } };
-      }
-    }
     if (name === 'schoolos_approve_admission') {
       const payload = args?.p_payload || {};
       const tables = ['admission_applications', 'classes', 'students', 'users', 'audit_logs'];
