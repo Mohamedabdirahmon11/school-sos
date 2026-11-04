@@ -146,5 +146,5 @@ test('absence attendance rows prepare a parent WhatsApp chat without sending aut
   assert.match(attendanceUi, /Fadlan nala soo xiriir/);
   assert.match(attendanceUi, /school\?\.phone/);
   assert.match(settingsUi, /Official Telephone \/ WhatsApp maamulka/);
-  assert.match(settingsUi, /riix Send/);
+  assert.match(settingsUi, /riixaya Send/);
 });
