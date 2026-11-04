@@ -3193,6 +3193,7 @@ DECLARE
   v_fk RECORD;
   v_fk_join TEXT;
   v_fk_nonnull TEXT;
+  v_fk_scope TEXT;
   v_school_id VARCHAR(64);
   v_user_id VARCHAR(64);
   v_user_name TEXT;
@@ -3295,9 +3296,18 @@ BEGIN
         FROM unnest(v_fk.source_columns, v_fk.target_columns)
           AS fk_columns(source_column, target_column);
 
+      -- A global super-admin user may legitimately be the actor on a
+      -- school-owned message or support record; all other references must
+      -- resolve to a row owned by this school.
+      v_fk_scope := CASE
+        WHEN v_fk.target_table = 'users'
+          THEN '(target_row.school_id = $2 OR (target_row.school_id IS NULL AND target_row.role::text = ''super_admin''))'
+        ELSE 'target_row.school_id = $2'
+      END;
+
       EXECUTE format(
-        'SELECT EXISTS (SELECT 1 FROM jsonb_populate_recordset(NULL::public.%I, $1) AS incoming WHERE %s AND NOT EXISTS (SELECT 1 FROM public.%I AS target_row WHERE %s AND target_row.school_id = $2))',
-        v_table, v_fk_nonnull, v_fk.target_table, v_fk_join
+        'SELECT EXISTS (SELECT 1 FROM jsonb_populate_recordset(NULL::public.%I, $1) AS incoming WHERE %s AND NOT EXISTS (SELECT 1 FROM public.%I AS target_row WHERE %s AND %s))',
+        v_table, v_fk_nonnull, v_fk.target_table, v_fk_join, v_fk_scope
       ) INTO v_conflict USING v_snake_rows, v_school_id;
 
       IF v_conflict THEN
