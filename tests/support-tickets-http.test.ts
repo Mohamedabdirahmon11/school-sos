@@ -25,15 +25,18 @@ const school = storage.db.createSchool({
 const admin = storage.db.createUser({ schoolId: school.id, role: 'school_admin', fullName: 'Support Admin', email: 'support-admin@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 const teacherA = storage.db.createUser({ schoolId: school.id, role: 'teacher', fullName: 'Teacher A', email: 'teacher-a-support@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 const teacherB = storage.db.createUser({ schoolId: school.id, role: 'teacher', fullName: 'Teacher B', email: 'teacher-b-support@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
+const superAdmin = storage.db.createUser({ role: 'super_admin', fullName: 'Platform Admin', email: 'platform-support@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 
 function cookieFor(user: any, sessionId: string) {
   const expiresAt = Date.now() + 60_000;
-  storage.db.createSession({ id: sessionId, userId: user.id, userRole: user.role, schoolId: school.id, ipAddress: '127.0.0.1', userAgent: 'support-test', createdAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString() });
-  return `schoolos_session=${auth.createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: school.id, createdAt: Date.now(), expiresAt })}`;
+  const sessionSchoolId = user.schoolId;
+  storage.db.createSession({ id: sessionId, userId: user.id, userRole: user.role, schoolId: sessionSchoolId, ipAddress: '127.0.0.1', userAgent: 'support-test', createdAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString() });
+  return `schoolos_session=${auth.createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: sessionSchoolId, createdAt: Date.now(), expiresAt })}`;
 }
 const adminCookie = cookieFor(admin, 'support-admin-session');
 const teacherACookie = cookieFor(teacherA, 'support-teacher-a-session');
 const teacherBCookie = cookieFor(teacherB, 'support-teacher-b-session');
+const superAdminCookie = cookieFor(superAdmin, 'support-platform-admin-session');
 const app = express(); app.use(express.json()); app.use(cookieParser());
 const { apiRouter } = await import('../src/server/api.ts'); app.use('/api', apiRouter);
 const server = app.listen(0); await new Promise<void>(resolve => server.once('listening', resolve));
@@ -85,6 +88,23 @@ test('support tickets validate content, bind author metadata, and remain availab
   assert.equal(ownList.length, 1);
   assert.equal(ownList[0].id, ticketA.id);
   assert.equal(ownTickets.headers.get('cache-control'), 'no-store');
+
+  const forbiddenStatusChange = await fetch(`${baseUrl}/support/tickets/${ticketA.id}/reply`, {
+    method: 'POST', headers: headers(adminCookie), body: JSON.stringify({ content: 'Trying to change status', status: 'closed' })
+  });
+  assert.equal(forbiddenStatusChange.status, 403);
+
+  const resolved = await fetch(`${baseUrl}/support/tickets/${ticketA.id}/reply`, {
+    method: 'POST', headers: headers(superAdminCookie), body: JSON.stringify({ content: 'Issue resolved.', status: 'resolved' })
+  });
+  assert.equal(resolved.status, 200);
+  const resolvedTicket = await resolved.json() as any;
+  assert.equal(resolvedTicket.status, 'resolved');
+
+  const invalidStatus = await fetch(`${baseUrl}/support/tickets/${ticketA.id}/reply`, {
+    method: 'POST', headers: headers(superAdminCookie), body: JSON.stringify({ content: 'Bad status.', status: 'archived' })
+  });
+  assert.equal(invalidStatus.status, 400);
 
   const otherReply = await fetch(`${baseUrl}/support/tickets/${ticketB.id}/reply`, {
     method: 'POST', headers: headers(teacherACookie), body: JSON.stringify({ content: 'Not my ticket' })
