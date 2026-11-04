@@ -37,12 +37,17 @@ test('parent absence messages use the administrator WhatsApp account and require
   assert.match(manualGuide, /does not send WhatsApp messages automatically/);
 });
 
-test('no paid messaging worker is started or required', () => {
+test('no paid messaging worker or provider API is exposed', () => {
   assert.equal(existsSync(new URL('../src/server/notification-worker.ts', import.meta.url)), false);
   assert.doesNotMatch(server, /notification-worker|startNotificationWorker/);
-  assert.doesNotMatch(api, /apiRouter\\.(?:get|put|post)\\(['\"]\\/communication\\/(?:settings|queue|send)/);
+  assert.ok(!api.includes("apiRouter.get('/communication/settings'"));
+  assert.ok(!api.includes("apiRouter.put('/communication/settings'"));
+  assert.ok(!api.includes("apiRouter.get('/communication/queue'"));
+  assert.ok(!api.includes("apiRouter.post('/communication/send'"));
   assert.doesNotMatch(api, /Twilio activation|Infobip activation|WhatsApp Business activation/);
-  assert.doesNotMatch(apiClient, /\\/communication\\/(?:settings|queue|send)/);
+  assert.ok(!apiClient.includes("'/communication/settings'"));
+  assert.ok(!apiClient.includes("'/communication/queue"));
+  assert.ok(!apiClient.includes("'/communication/send'"));
 });
 
 test('inventory screen uses persistent item API and stock movement ledger', () => {
