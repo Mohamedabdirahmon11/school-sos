@@ -14,8 +14,8 @@ test('bus assignments are constrained to the same school as both student and rou
   assert.match(migration, /FOREIGN KEY \(route_id, school_id\)[\s\S]*REFERENCES public\.transport_routes\(id, school_id\)/);
   assert.match(schema, /bus_assignments_student_school_fkey/);
   assert.match(schema, /bus_assignments_route_school_fkey/);
-  assert.match(schema, /AS \\$function\\$[\\s\\S]*enforce_bus_assignment_capacity/);
-  assert.match(schema, /AS \\$function\\$[\\s\\S]*prevent_bus_capacity_below_assignments/);
+  assert.match(schema, /AS \$function\$[\s\S]*enforce_bus_assignment_capacity/);
+  assert.match(schema, /AS \$function\$[\s\S]*prevent_bus_capacity_below_assignments/);
 });
 
 test('route capacity is validated and concurrent assignments serialize on the route row', () => {
