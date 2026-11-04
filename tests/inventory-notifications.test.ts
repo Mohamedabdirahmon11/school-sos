@@ -14,6 +14,7 @@ const inventoryUi = readFileSync(new URL('../src/components/schooladmin/ExtraMod
 const auditUi = readFileSync(new URL('../src/components/superadmin/SupportAuditView.tsx', import.meta.url), 'utf8');
 const sidebarUi = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
 const attendanceUi = readFileSync(new URL('../src/components/schooladmin/AttendanceView.tsx', import.meta.url), 'utf8');
+const reportsUi = readFileSync(new URL('../src/components/schooladmin/ReportsView.tsx', import.meta.url), 'utf8');
 
 test('inventory movements are tenant-bound, serialized, and cannot create negative stock', () => {
   assert.match(migration033, /FOREIGN KEY \(item_id, school_id\) REFERENCES public\.inventory_items\(id, school_id\)/);
@@ -75,7 +76,7 @@ test('broadcast feeds are tenant- and audience-scoped; scheduled broadcasts are 
   assert.match(worker, /publishDueBroadcasts\(\)/);
 });
 
-test('reports exclude voided payments and use active student attendance denominators', () => {
+test('reports exclude voided payments, preserve zero attendance, and describe configured pass marks', () => {
   const migration = readFileSync(new URL('../supabase/migrations/037_reports_exclude_voided_and_inactive_records.sql', import.meta.url), 'utf8');
   assert.ok(migration.includes("status IN ('present', 'late')"));
   assert.match(migration, /status = 'excused'/);
