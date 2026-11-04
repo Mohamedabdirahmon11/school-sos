@@ -446,7 +446,8 @@ export const SchoolSettingsView: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({
           backup: restoreBackup,
-          previewHash: restorePreview.previewHash,
+          previewToken: restorePreview.previewToken,
+          previewedAt: restorePreview.previewedAt,
           confirm: true
         })
       });
