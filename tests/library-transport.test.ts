@@ -40,6 +40,7 @@ test('library and transport load errors are visible to the administrator', () =>
 
 test('library, transport, and bus assignment writes are restricted to administrators', () => {
   for (const table of ['library_books', 'transport_routes', 'bus_assignments']) {
+    assert.match(migration, new RegExp('ALTER TABLE public\\\\.' + table + ' ENABLE ROW LEVEL SECURITY'));
     for (const action of ['insert', 'update', 'delete']) {
       const policy = `${table}_admin_${action}`;
       assert.ok(migration.includes(`DROP POLICY IF EXISTS ${policy}`), `migration drops old ${policy}`);
