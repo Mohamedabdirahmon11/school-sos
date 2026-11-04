@@ -151,8 +151,14 @@ export const AttendanceView: React.FC = () => {
         note: attendanceMap[std.id]?.note || ''
       }));
 
-      await ApiClient.recordDailyAttendance(selectedClassId, date, records);
-      setNotice('Daily attendance recorded successfully! Absent notifications queued for parents.');
+      const result = await ApiClient.recordDailyAttendance(selectedClassId, date, records);
+      const { queued, sent, failed } = result.notifications || { queued: 0, sent: 0, failed: 0 };
+      const notificationSummary = [
+        sent ? `${sent} accepted by provider` : '',
+        queued ? `${queued} queued, not sent` : '',
+        failed ? `${failed} failed` : ''
+      ].filter(Boolean).join(', ');
+      setNotice(`Daily attendance saved successfully.${notificationSummary ? ` Parent notifications: ${notificationSummary}.` : ''}`);
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to save attendance.');
