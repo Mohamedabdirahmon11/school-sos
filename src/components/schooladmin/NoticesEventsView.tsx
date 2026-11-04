@@ -117,7 +117,10 @@ export const NoticesEventsView: React.FC = () => {
         audience: noticeAudience,
         classId: noticeAudience === 'class' ? noticeClassId : undefined,
         isPinned: noticePinned,
-        publishDate: new Date().toISOString()
+        publishDate: (() => {
+          const today = new Date();
+          return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        })()
       };
       if (editingNotice) await ApiClient.updateNotice(editingNotice.id, noticePayload);
       else await ApiClient.createNotice(noticePayload);
