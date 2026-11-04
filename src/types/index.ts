@@ -477,6 +477,7 @@ export interface CommunicationSettings {
   id: string;
   schoolId: string;
   provider: 'twilio' | 'infobip' | 'local_gateway' | 'whatsapp_business' | 'none';
+  defaultChannel: 'sms' | 'whatsapp';
   apiKey?: string;
   apiSecret?: string;
   apiKeyConfigured?: boolean;
