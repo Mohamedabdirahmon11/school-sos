@@ -3956,6 +3956,55 @@ apiRouter.get('/broadcasts', requireAuth, requireSchoolContext, async (req, res)
   res.json(await db.getSchoolBroadcasts(school.id, user.role));
 });
 
+apiRouter.get('/school/events', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  res.json(await db.getEvents(school.id));
+});
+
+apiRouter.post('/school/events', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const startDate = typeof body.startDate === 'string' ? body.startDate : '';
+  const endDate = typeof body.endDate === 'string' ? body.endDate : '';
+  const type = body.type;
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (!title || title.length > 200 || description.length > 5000 ||
+      !validDate(startDate) || !validDate(endDate) || endDate < startDate ||
+      !['holiday', 'exam', 'event', 'meeting'].includes(type)) {
+    res.status(400).json({ error: 'Provide a valid event title, type, and date range.' });
+    return;
+  }
+  const event = await db.createEvent({
+    schoolId: school.id, title, ...(description ? { description } : {}),
+    startDate, endDate, type
+  });
+  db.logAudit({
+    action: 'SCHOOL_EVENT_CREATED', category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: `Created school event ${title} (${startDate} to ${endDate}).`, severity: 'info'
+  });
+  res.status(201).json(event);
+});
+
+apiRouter.delete('/school/events/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const deleted = await db.deleteEvent(req.params.id, school.id);
+  if (!deleted) {
+    res.status(404).json({ error: 'School event not found.' });
+    return;
+  }
+  db.logAudit({
+    action: 'SCHOOL_EVENT_DELETED', category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: `Deleted school event ${req.params.id}.`, severity: 'warning'
+  });
+  res.status(204).end();
+});
+
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
