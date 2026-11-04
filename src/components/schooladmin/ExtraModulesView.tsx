@@ -112,7 +112,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         if (cancelled) return;
         setBooks(bookRows);
         setLibraryLoans(loanRows);
-        setLoanBookId(current => current || bookRows[0]?.id || '');
+        const firstAvailable = bookRows.find(book => loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0));
+        setLoanBookId(current => bookRows.some(book => book.id === current &&
+          loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0))
+          ? current : firstAvailable?.id || '');
       })
       .catch((err: any) => { if (!cancelled) setLibraryError(err.message || 'Unable to load library catalogue and lending records.'); })
       .finally(() => { if (!cancelled) setLibraryLoading(false); });
@@ -122,7 +125,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   useEffect(() => {
     if (!school) return;
     setModuleError(null);
-    ApiClient.getLibraryBooks(school.id).then(setBooks).catch((err: any) => setModuleError(err.message || 'Unable to load library books.'));
     ApiClient.getTransportRoutes(school.id).then(setRoutes).catch((err: any) => setModuleError(err.message || 'Unable to load transport routes.'));
     ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch((err: any) => setModuleError(err.message || 'Unable to load students for transport.'));
     ApiClient.getBusAssignments().then(setBusAssignments).catch((err: any) => setModuleError(err.message || 'Unable to load bus assignments.'));
@@ -250,7 +252,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     setLibraryError(null);
     try {
       const loan = await ApiClient.issueLibraryLoan({ bookId: loanBookId, studentId: loanStudentId, dueDate: loanDueDate });
-      setLibraryLoans(rows => [loan, ...rows]);
+      setLibraryLoans(rows => {
+        const next = [loan, ...rows];
+        const firstAvailable = books.find(book => next.filter(item => item.bookId === book.id && item.status === 'issued').length < Number(book.quantity || 0));
+        setLoanBookId(firstAvailable?.id || '');
+        return next;
+      });
       setLoanStudentId('');
       setNotice('Book issued to student.');
     } catch (err: any) {
