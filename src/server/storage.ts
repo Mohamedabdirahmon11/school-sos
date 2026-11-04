@@ -435,6 +435,7 @@ class StorageEngine {
       Object.assign(wrapped, { code: error.code });
       throw wrapped;
     }
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
   }
 
   public async bulkImportStudents(payload: Record<string, unknown>): Promise<void> {
