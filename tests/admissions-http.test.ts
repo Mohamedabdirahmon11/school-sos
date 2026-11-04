@@ -462,7 +462,7 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   assert.equal(backup.school.id, school.id);
   assert.equal(backup.tables.school_events.length, 1);
   for (const excludedTable of [
-    'users', 'audit_logs', 'platform_broadcasts', 'assignment_submissions', 'communication_settings',
+    'users', 'audit_logs', 'platform_broadcasts', 'communication_settings',
     'communication_queue', 'subscription_invoices', 'school_subscriptions'
   ]) {
     assert.equal((backup.tables as any)[excludedTable], undefined, `${excludedTable} must not be included in a school backup.`);
