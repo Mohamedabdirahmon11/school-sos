@@ -191,9 +191,6 @@ export const ExamsResultsView: React.FC = () => {
             <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
             {t('exams_results')}
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
-          </p>
         </div>
 
         {/* View Switcher Tabs */}
