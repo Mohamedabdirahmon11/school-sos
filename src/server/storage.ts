@@ -3217,7 +3217,7 @@ class StorageEngine {
       if (error) throw new Error(error.message || 'Invoice payment could not be completed.');
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return null;
-      const invoice = fromSupabaseRow(row, ) as SubscriptionInvoice;
+      const invoice = fromSupabaseRow(row, 'subscription_invoices') as SubscriptionInvoice;
       await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
       schoolContextCache.delete(invoice.schoolId);
       await this.getSchoolById(invoice.schoolId);
