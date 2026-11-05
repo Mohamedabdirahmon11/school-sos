@@ -58,12 +58,12 @@ if (!helperOrderOk) failed = true;
 // Only inspect executable static SQL. Comments and quoted literals can contain ordinary
 // English words such as "references a" that are not SQL foreign-key declarations.
 const staticSchema = schema
-  .replace(/--[^\\n]*/g, '')
-  .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '')
+  .replace(/--[^\n]*/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/'(?:''|[^'])*'/g, "''")
-  .split('\\n')
+  .split('\n')
   .filter(line => !line.includes('%I'))
-  .join('\\n');
+  .join('\n');
 const tableCreationPositions = new Map<string, number>();
 for (const match of staticSchema.matchAll(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)) {
   if (!tableCreationPositions.has(match[1].toLowerCase())) tableCreationPositions.set(match[1].toLowerCase(), match.index!);
