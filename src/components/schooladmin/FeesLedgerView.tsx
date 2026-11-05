@@ -211,7 +211,7 @@ export const FeesLedgerView: React.FC = () => {
 
   if (feeLoad.error) return <ErrorState error={feeLoad.error} onRetry={feeLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -332,7 +332,7 @@ export const FeesLedgerView: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-[#132A29]">
+                <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
                   <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                     <tr>
                       <th className="py-3 px-4">Receipt #</th>
@@ -864,7 +864,7 @@ export const FeesLedgerView: React.FC = () => {
               </div>
 
               {/* Payment Item Breakdown */}
-              <table className="w-full text-xs text-left border-t border-b border-[#E2E8F0] my-2">
+              <table className="w-full min-w-[640px] text-xs text-left border-t border-b border-[#E2E8F0] my-2">
                 <thead>
                   <tr className="border-b border-[#E2E8F0] text-[11px] uppercase text-[#64748B]">
                     <th className="py-2">Description</th>
