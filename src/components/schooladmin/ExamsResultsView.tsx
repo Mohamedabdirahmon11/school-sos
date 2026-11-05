@@ -465,6 +465,9 @@ export const ExamsResultsView: React.FC = () => {
               <p className="text-xs text-[#64748B]">
                 Class results calculated as average percentages across all curriculum subjects.
               </p>
+              <p className="mt-1 text-xs font-semibold text-[#0F766E]">
+                Class: {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'Select a class'}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <select
@@ -575,6 +578,9 @@ export const ExamsResultsView: React.FC = () => {
               </h2>
               <p className="text-xs text-[#64748B]">
                 Combines both semesters to produce yearly subject percentages and final class ranking.
+              </p>
+              <p className="mt-1 text-xs font-semibold text-[#0F766E]">
+                Class: {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'Select a class'}
               </p>
             </div>
             <div className="flex items-center gap-2">
