@@ -67,13 +67,9 @@ export const ReportsView: React.FC = () => {
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]"></p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">
             Reports & Export
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            
-          </p>
         </div>
         <button
           onClick={fetchSummary}
