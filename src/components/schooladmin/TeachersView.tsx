@@ -104,7 +104,6 @@ export const TeachersView: React.FC = () => {
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
           <p className="mt-1 text-sm text-[#71817d]">
             Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
@@ -154,7 +153,6 @@ export const TeachersView: React.FC = () => {
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Subjects</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Classes</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Phone</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Salary</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Status</th>
               </tr>
             </thead>
@@ -169,7 +167,6 @@ export const TeachersView: React.FC = () => {
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
-                  <td className="px-4 py-3 font-mono text-[#132A29]">${t.monthlySalary} / month</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
                   </td>
@@ -177,7 +174,7 @@ export const TeachersView: React.FC = () => {
               ))}
               {filteredTeachers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#64748B]">
                     {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
                   </td>
                 </tr>
