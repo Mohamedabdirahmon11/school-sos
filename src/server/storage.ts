@@ -3109,8 +3109,23 @@ class StorageEngine {
     const now = Date.now();
     let published = 0;
     for (const item of scheduled) {
-      if (item.scheduledFor && Date.parse(item.scheduledFor) <= now && await this.publishBroadcast(item.id)) published += 1;
+      if (!item.scheduledFor || Date.parse(item.scheduledFor) > now) continue;
+      // publishBroadcast uses an atomic status filter so multiple server instances
+      // cannot publish or audit the same scheduled broadcast twice.
+      const broadcast = await this.publishBroadcast(item.id);
+      if (!broadcast) continue;
+      this.logAudit({
+        action: 'PLATFORM_BROADCAST_AUTO_PUBLISHED',
+        category: 'security',
+        userId: 'system',
+        userName: 'SchoolOS Scheduler',
+        userRole: 'super_admin',
+        details: `Automatically published scheduled platform broadcast ${broadcast.id}.`,
+        severity: 'warning'
+      });
+      published += 1;
     }
+    if (published > 0) await this.flush();
     return published;
   }
 
