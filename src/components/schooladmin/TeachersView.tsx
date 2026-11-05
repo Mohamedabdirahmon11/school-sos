@@ -125,7 +125,7 @@ export const TeachersView: React.FC = () => {
           <span>{notice}</span>
         </div>
       )}
-      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Give these sign-in details to the teacher. They are shown only now: <strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong></div>}
+      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><p>Give these sign-in details to the teacher. They are shown only now:</p><strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong><div className="mt-3 flex gap-2"><button type="button" onClick={() => void navigator.clipboard.writeText(initialPassword)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Copy ID & PIN</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Print ID & PIN</button><button type="button" onClick={() => setInitialPassword('')} className="rounded-lg border border-amber-300 bg-white px-3 py-2">Close</button></div></div>}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-sm">
