@@ -389,6 +389,10 @@ export const SchoolSettingsView: React.FC = () => {
   };
 
   const openManualWhatsApp = () => {
+    if (!normalizeWhatsAppNumber(school?.phone)) {
+      setNotice('Marka hore kaydi lambarka WhatsApp-ka maamulka ee School Settings → Identity, kuna gal WhatsApp lambarkaas.');
+      return;
+    }
     const digits = normalizeWhatsAppNumber(whatsappRecipientPhone);
     if (!digits) {
       setNotice('Geli lambarka waalidka qaabka caalamiga ah, tusaale +2519XXXXXXXX.');
