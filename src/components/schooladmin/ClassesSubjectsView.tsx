@@ -120,11 +120,7 @@ export const ClassesSubjectsView: React.FC = () => {
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Academic management</p>
-        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & subjects</h1>
-        <p className="mt-1 text-sm text-[#71817d]">
-          Configure KG–Grade 12 classes, sections, room assignments, and curriculum subjects
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & Subjects</h1>
       </div>
 
       {notice && (
