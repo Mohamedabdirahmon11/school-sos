@@ -6,23 +6,36 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { PhoneCall, Search, MessageSquare, ExternalLink, GraduationCap } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export const ParentsView: React.FC = () => {
   const { school } = useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!school) return;
-    ApiClient.getSchoolStudents({ schoolId: school.id }).then(setStudents).finally(() => setIsLoading(false));
+    ApiClient.getSchoolStudents({ schoolId: school.id }).then(setStudents).catch((error: any) => setLoadError(error?.message || 'Could not load parent contacts.')).finally(() => setIsLoading(false));
   }, [school]);
 
-  const filtered = students.filter(s => 
-    s.fatherPhone?.includes(search) ||
-    s.motherPhone?.includes(search) ||
-    `${s.firstName} ${s.middleName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())
+  const parentRows = students.reduce((groups: Array<{ phone: string; children: Set<string>; classes: Set<string> }>, student) => {
+    const child = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
+    const contacts = [student.fatherPhone, student.motherPhone].filter((phone: string | undefined) => Boolean(phone));
+    contacts.forEach((phone: string) => {
+      const normalized = phone.replace(/\\s+/g, '').trim();
+      if (!normalized) return;
+      let group = groups.find(item => item.phone === normalized);
+      if (!group) { group = { phone: normalized, children: new Set<string>(), classes: new Set<string>() }; groups.push(group); }
+      if (child) group.children.add(child);
+      if (student.className) group.classes.add(student.className);
+    });
+    return groups;
+  }, []);
+  const filtered = parentRows.filter(row =>
+    row.phone.includes(search.trim()) ||
+    Array.from(row.children).some(child => child.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -31,9 +44,6 @@ export const ParentsView: React.FC = () => {
         <h1 className="text-3xl font-bold tracking-tight text-[#102522]">
           Parents & Contacts
         </h1>
-        <p className="text-sm text-[#71817d]">
-          
-        </p>
       </div>
 
       <div className="bg-white p-3 rounded-xl border border-[#E2E8F0]">
@@ -51,61 +61,30 @@ export const ParentsView: React.FC = () => {
 
       <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
+          <table className="w-full min-w-[620px] text-left text-xs">
             <thead className="bg-[#f6faf8] text-[#71817d] font-semibold border-b border-[#e6efec]">
               <tr>
                 <th className="px-4 py-3">Parent</th>
-                <th className="px-4 py-3">Class</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Children</th>
                 <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-[#64748B]">No parent records found.</td>
+              {isLoading ? (
+                <tr><td colSpan={4} className="p-8 text-center text-[#64748B]">Loading parent contacts...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={4} className="p-8 text-center text-rose-700">{loadError}</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={4} className="p-8 text-center text-[#64748B]">No parent records found.</td></tr>
+              ) : filtered.map(row => (
+                <tr key={row.phone} className="hover:bg-[#F8FAFC]">
+                  <td className="px-4 py-3 font-medium text-[#132A29]">Parent</td>
+                  <td className="px-4 py-3 font-mono text-[#132A29]">{row.phone}</td>
+                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.children).join(', ')}</td>
+                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.classes).join(', ') || '—'}</td>
                 </tr>
-              ) : (
-                filtered.map(s => (
-                  <tr key={s.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-[#132A29] block">{s.firstName} {s.middleName} {s.lastName}</span>
-                      <span className="font-mono text-[10px] text-[#64748B]">{s.studentId}</span>
-                    </td>
-                    <td className="px-4 py-3 text-[#334155]">{s.className}</td>
-                    <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.fatherPhone}</td>
-                    <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.motherPhone}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
-                        s.feeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}>
-                        {s.feeStatus || 'NOT SET'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => alert(`Initiating direct SMS/Call to father at ${s.fatherPhone}`)}
-                          className="px-2.5 py-1 text-xs text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] rounded border border-[#CCFBF1] transition-colors"
-                        >
-                          Call / SMS
-                        </button>
-                        <a
-                          href={`https://wa.me/${s.fatherPhone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors flex items-center gap-1"
-                        >
-                          <span>WhatsApp</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
