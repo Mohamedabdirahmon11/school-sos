@@ -29,10 +29,10 @@ export const ParentsView: React.FC = () => {
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-[#102522]">
-          Parents & guardians
+          Parents & Contacts
         </h1>
         <p className="text-sm text-[#71817d]">
-          Direct contact directory, linked enrolled siblings, and communication channels
+          
         </p>
       </div>
 
@@ -54,12 +54,12 @@ export const ParentsView: React.FC = () => {
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="bg-[#f6faf8] text-[#71817d] font-semibold border-b border-[#e6efec]">
               <tr>
-                <th className="px-4 py-3">Enrolled Child (Student)</th>
+                <th className="px-4 py-3">Parent</th>
                 <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Father Phone</th>
-                <th className="px-4 py-3">Mother Phone</th>
-                <th className="px-4 py-3">Fee Status</th>
-                <th className="px-4 py-3 text-right">Direct Communication</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Children</th>
+                <th className="px-4 py-3">Class</th>
+                <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
