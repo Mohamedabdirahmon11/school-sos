@@ -440,6 +440,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 { id: 'overview', label: 'Overview' },
                 { id: 'attendance', label: 'Attendance' },
                 { id: 'results', label: 'Results' },
+                { id: 'fees', label: 'Fees' },
                 { id: 'documents', label: 'Documents' },
                 { id: 'notes', label: 'Notes' }
               ].map(t => (
