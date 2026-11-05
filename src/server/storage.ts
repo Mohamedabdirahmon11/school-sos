@@ -3294,8 +3294,19 @@ class StorageEngine {
       'timetable_settings', 'timetable_slots', 'transport_routes'
     ];
     const tables: Record<string, any[]> = {};
+    const sensitiveBackupFields = [
+      'passwordHash', 'password_hash', 'pinHash', 'pin_hash', 'pin',
+      'twoFactorSecret', 'two_factor_secret', 'pendingTwoFactorSecret', 'pending_two_factor_secret',
+      'recoveryCodes', 'recovery_codes', 'apiKey', 'api_key', 'apiSecret', 'api_secret',
+      'webhookUrl', 'webhook_url'
+    ];
     for (const table of schoolTables) {
-      tables[table] = await this.queryRows(table, { school_id: schoolId });
+      const rows = await this.queryRows(table, { school_id: schoolId });
+      tables[table] = rows.map((row: Record<string, any>) => {
+        const safeRow = { ...row };
+        for (const field of sensitiveBackupFields) delete safeRow[field];
+        return safeRow;
+      });
     }
     // Authentication records, audit history, platform broadcasts, billing,
     // provider secrets, and active sessions are intentionally never exported.
