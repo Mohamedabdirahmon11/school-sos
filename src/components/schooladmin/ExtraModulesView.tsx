@@ -139,11 +139,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Campus Extension Modules
+            Library & Campus Services
           </h1>
-          <p className="text-xs text-[#64748B]">
-            Library, Transport, Discipline, Clinic, Staff Payroll, and Assets
-          </p>
         </div>
 
         {/* Module Switcher Tabs */}
