@@ -15,10 +15,14 @@ export const PlansBillingView: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<SubscriptionInvoice | null>(null);
   const [editingPlan, setEditingPlan] = useState<PlanConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const [plansData, invoicesData] = await Promise.all([
         ApiClient.getPlans(),
@@ -27,7 +31,7 @@ export const PlansBillingView: React.FC = () => {
       setPlans(plansData);
       setInvoices(invoicesData);
     } catch (err: any) {
-      console.error(err);
+      setLoadError(err.message || 'Unable to load plans and subscription invoices.');
     } finally {
       setIsLoading(false);
     }
@@ -38,24 +42,32 @@ export const PlansBillingView: React.FC = () => {
   }, []);
 
   const handleGenerateInvoices = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
     try {
       const res = await ApiClient.generateBatchInvoices();
-      setNotice(`Generated ${res.generatedCount} monthly invoices without duplicates.`);
+      setNotice(`Generated ${res.generatedCount} invoices. Skipped ${res.skippedOpenInvoiceCount} schools with open invoices, ${res.skippedLifetimeCount} lifetime subscriptions, and ${res.skippedInvalidPricingCount} schools with missing or invalid plan pricing.`);
       await fetchData();
-      setTimeout(() => setNotice(null), 4000);
+      setTimeout(() => setNotice(null), 6000);
     } catch (err: any) {
-      alert(err.message);
+      setNotice(err.message || 'Unable to generate subscription invoices.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const handlePayInvoice = async (id: string) => {
+    if (payingInvoiceId) return;
+    setPayingInvoiceId(id);
     try {
       await ApiClient.payInvoice(id);
       setNotice('Invoice marked as paid and receipt generated. School validity automatically extended.');
       await fetchData();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
-      alert(err.message);
+      setNotice(err.message || 'Invoice payment could not be completed.');
+    } finally {
+      setPayingInvoiceId(null);
     }
   };
 
@@ -74,6 +86,13 @@ export const PlansBillingView: React.FC = () => {
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading plans and invoices…</div>;
+  if (loadError) return (
+    <div className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800" role="alert">
+      <p className="font-semibold">Plans and invoices could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void fetchData()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -88,10 +107,11 @@ export const PlansBillingView: React.FC = () => {
         </div>
         <button
           onClick={handleGenerateInvoices}
-          className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+          disabled={isGenerating}
+          className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Sparkles className="w-4 h-4" />
-          <span>Generate Invoices (Batch)</span>
+          <span>{isGenerating ? 'Generating…' : 'Generate Invoices (Batch)'}</span>
         </button>
       </div>
 
@@ -218,9 +238,10 @@ export const PlansBillingView: React.FC = () => {
                         {inv.status !== 'paid' && (
                           <button
                             onClick={() => handlePayInvoice(inv.id)}
-                            className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded transition-colors"
+                            disabled={payingInvoiceId !== null}
+                            className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            Mark Paid
+                            {payingInvoiceId === inv.id ? 'Processing…' : 'Mark Paid'}
                           </button>
                         )}
                         <button
