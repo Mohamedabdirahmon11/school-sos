@@ -283,7 +283,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         {/* Students Table */}
         <div className={`bg-white rounded-xl border border-[#E2E8F0] overflow-hidden ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                 <tr>
                   <th className="px-4 py-3">Student ID</th>
@@ -324,11 +324,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-4 py-3 capitalize text-[#64748B]">{s.gender}</td>
                         <td className="px-4 py-3 font-mono text-[#64748B]">{s.fatherPhone}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-[11px] font-semibold ${
-                            normalizedFeeStatus === 'paid' ? 'text-emerald-700' :
-                            normalizedFeeStatus === 'partial' ? 'text-amber-700' :
-                            normalizedFeeStatus === 'unpaid' ? 'text-rose-700' :
-                            'text-slate-500'
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                            normalizedFeeStatus === 'partial' ? 'bg-amber-100 text-amber-800' :
+                            normalizedFeeStatus === 'unpaid' ? 'bg-rose-100 text-rose-800' :
+                            'bg-slate-100 text-slate-600'
                           }`}>
                             {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
