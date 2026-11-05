@@ -40,3 +40,11 @@ test('plan edits validate prices and limits without allowing plan ID changes', (
   assert.ok(storage.includes('{ ...this.data.plans[idx], ...updates, id: this.data.plans[idx].id }'));
   assert.ok(api.includes('SUBSCRIPTION_PLAN_UPDATED'));
 });
+
+test('invoice settlement uses the atomic idempotent database function and records an audit event', () => {
+  const paymentMigration = readFileSync(new URL('../supabase/migrations/032_fix_lifetime_subscription_invoice_settlement.sql', import.meta.url), 'utf8');
+  assert.ok(storage.includes("client.rpc('schoolos_mark_subscription_invoice_paid'"));
+  assert.match(paymentMigration, /IF invoice_row\.status = 'paid' THEN RETURN invoice_row/);
+  assert.match(paymentMigration, /WHEN invoice_row\.cadence = 'lifetime' THEN valid_until/);
+  assert.ok(api.includes('SUBSCRIPTION_INVOICE_PAID'));
+});
