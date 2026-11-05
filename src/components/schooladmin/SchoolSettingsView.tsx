@@ -428,11 +428,8 @@ export const SchoolSettingsView: React.FC = () => {
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
-            {t('school_settings')} & Administration
+            School Settings
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
-            Configure institutional identity, report card designs, multi-branch campuses, and notification gateways.
-          </p>
         </div>
 
         {/* Tab Switcher */}
