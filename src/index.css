@@ -362,7 +362,6 @@
 @media (max-width: 767px) {
   .school-admin-design main > div { padding: 18px 14px 24px; }
   .school-admin-design main h1 { font-size: 20px; }
-  .school-admin-design main table { min-width: 620px; }
   .school-admin-design main button { min-height: 38px; }
   .school-admin-design main [role="dialog"] {
     max-width: calc(100vw - 20px);
