@@ -215,7 +215,7 @@ export const TimetableView: React.FC = () => {
       <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable_times')}</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end text-xs">
-          <label className="space-y-1"><span>{t('timetable_start_time')}</span><input type="time" value={settings.firstPeriodStart} onChange={e => setSettings(prev => ({ ...prev, firstPeriodStart: e.target.value }))} className="w-full border rounded px-2 py-1.5" /></label>
+          <label className="space-y-1"><span>{t('timetable_start_time')}</span><input type="time" value={settings.firstPeriodStart} onChange={e => setSettings(prev => ({ ...prev, firstPeriodStart: e.target.value }))} className="w-full border border-[#DCE7E4] rounded-lg px-3 py-2 text-xs text-[#102522] focus:outline-none focus:ring-2 focus:ring-[#0E8078]/20 focus:border-[#0E8078]" /></label>
           <label className="space-y-1"><span>{t('timetable_period_minutes')}</span><input type="number" min="20" max="120" value={settings.periodMinutes} onChange={e => setSettings(prev => ({ ...prev, periodMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
           <label className="space-y-1"><span>{t('timetable_break_after')}</span><select value={settings.breakAfterPeriod} onChange={e => setSettings(prev => ({ ...prev, breakAfterPeriod: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5">{[1,2,3,4,5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
           <label className="space-y-1"><span>{t('timetable_break_minutes')}</span><input type="number" min="0" max="120" value={settings.breakMinutes} onChange={e => setSettings(prev => ({ ...prev, breakMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
@@ -226,7 +226,7 @@ export const TimetableView: React.FC = () => {
       <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable_unavailability')}</h2>
         <div className="flex flex-wrap gap-2 items-center text-xs">
-          <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="border rounded px-2 py-1.5">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
+          <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="border border-[#DCE7E4] rounded-lg px-3 py-2 text-xs text-[#102522] bg-white focus:outline-none focus:ring-2 focus:ring-[#0E8078]/20 focus:border-[#0E8078]">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
           {days.map(day => periods.filter(period => day !== 'Friday' || period <= 5).map(period => {
             const unavailable = unavailableSlots.some(item => item.teacherId === selectedTeacherId && item.dayOfWeek === day && item.periodNumber === period);
             return <label key={`${day}-${period}`} className="inline-flex items-center gap-1 rounded border px-2 py-1"><input type="checkbox" checked={unavailable} disabled={isReadOnly} onChange={e => handleAvailability(day, period, e.target.checked)} />{day.slice(0, 3)} P{period}</label>;
@@ -237,7 +237,7 @@ export const TimetableView: React.FC = () => {
       {/* Grid Timetable Table */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full min-w-[850px] text-left text-xs border-collapse">
             <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
               <tr>
                 <th className="px-3 py-3 border-r border-[#E2E8F0] w-28">Day / Period</th>
