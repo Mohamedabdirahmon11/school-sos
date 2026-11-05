@@ -1383,7 +1383,7 @@ CREATE POLICY school_events_admin_delete ON public.school_events AS RESTRICTIVE
 DO $$
 DECLARE table_name text;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['notification_templates', ] LOOP
+  FOREACH table_name IN ARRAY ARRAY['communication_settings', 'notification_templates', 'communication_queue'] LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', table_name || '_admin_insert', table_name);
     EXECUTE format(
       'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (private.auth_user_role() IN (''school_admin'', ''super_admin''))',
