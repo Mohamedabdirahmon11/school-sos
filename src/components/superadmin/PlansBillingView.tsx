@@ -50,7 +50,7 @@ export const PlansBillingView: React.FC = () => {
       await fetchData();
       setTimeout(() => setNotice(null), 6000);
     } catch (err: any) {
-      setNotice(err.message || 'Unable to generate subscription invoices.');
+      alert(err.message || 'Unable to generate subscription invoices.');
     } finally {
       setIsGenerating(false);
     }
@@ -65,7 +65,7 @@ export const PlansBillingView: React.FC = () => {
       await fetchData();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
-      setNotice(err.message || 'Invoice payment could not be completed.');
+      alert(err.message || 'Invoice payment could not be completed.');
     } finally {
       setPayingInvoiceId(null);
     }
