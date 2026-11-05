@@ -27,6 +27,7 @@ export function normalizeSchoolDashboardData(data: unknown) {
     stats: {
       totalStudents: number(rawStats.totalStudents),
       totalTeachers: number(rawStats.totalTeachers),
+      totalClasses: number(rawStats.totalClasses ?? value.totalClasses),
       attendanceRate: number(rawStats.attendanceRate),
       todayCollection: number(rawStats.feesThisMonth ?? rawStats.todayCollection ?? rawStats.totalCollected),
       totalOutstanding: number(rawStats.totalOutstanding ?? rawStats.outstandingFees),
@@ -54,7 +55,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
   if (error) return <ErrorState error={error} onRetry={retry}/>;
 
   const result = normalizeSchoolDashboardData(data);
-  const { totalStudents, totalTeachers, attendanceRate, todayCollection, totalOutstanding } = result.stats;
+  const { totalStudents, totalTeachers, totalClasses, attendanceRate, todayCollection, totalOutstanding } = result.stats;
   const currency = school?.currency || 'ETB';
   const hasTrend = result.attendanceTrend.length > 0;
   const maxTrend = Math.max(1, ...result.attendanceTrend.map((item: DashboardRecord) => Number(item.rate ?? item.attendanceRate ?? item.present) || 0));
@@ -73,7 +74,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
       <Metric label="Students" value={totalStudents.toLocaleString()} onClick={()=>onNavigate('sch_students')}/>
       <Metric label="Teachers" value={totalTeachers.toLocaleString()} onClick={()=>onNavigate('sch_teachers')}/>
       <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Today" onClick={()=>onNavigate('sch_attendance')}/>
-      <Metric label="Fees this month" value={formatMoney(collected, currency)} hint="Collected" onClick={()=>onNavigate('sch_fees')}/>
+      <Metric label="Classes" value={totalClasses.toLocaleString()} hint="Active classes" onClick={()=>onNavigate('sch_classes')}/>
     </section>
 
     <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
