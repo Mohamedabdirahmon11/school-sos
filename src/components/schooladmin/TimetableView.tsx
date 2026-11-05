@@ -164,9 +164,6 @@ export const TimetableView: React.FC = () => {
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
             Timetable
           </h1>
-          <p className="text-xs text-[#64748B]">
-            
-          </p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
