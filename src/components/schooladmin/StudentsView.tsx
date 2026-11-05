@@ -28,7 +28,8 @@ import {
   MessageSquare, 
   X, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -48,6 +49,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [studentDetails, setStudentDetails] = useState<any | null>(null);
   const [activeProfileTab, setActiveProfileTab] = useState<'overview' | 'attendance' | 'results' | 'fees' | 'documents' | 'notes'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: '', middleName: '', lastName: '', gender: 'male' as 'male' | 'female',
+    admissionDate: '', studentPhone: '', fatherPhone: '', motherPhone: '',
+    classId: '', status: 'active' as Student['status']
+  });
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -121,6 +128,45 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       setModalError(err.message || 'Failed to admit student');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openEditStudent = () => {
+    if (!selectedStudent || isReadOnly) return;
+    setModalError(null);
+    setEditForm({
+      firstName: selectedStudent.firstName || '',
+      middleName: selectedStudent.middleName || '',
+      lastName: selectedStudent.lastName || '',
+      gender: selectedStudent.gender === 'female' ? 'female' : 'male',
+      admissionDate: String(selectedStudent.admissionDate || '').slice(0, 10),
+      studentPhone: selectedStudent.studentPhone || '',
+      fatherPhone: selectedStudent.fatherPhone || '',
+      motherPhone: selectedStudent.motherPhone || '',
+      classId: selectedStudent.classId || '',
+      status: selectedStudent.status || 'active'
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent || isReadOnly) return;
+    setModalError(null);
+    setIsSubmitting(true);
+    try {
+      const updated = await ApiClient.updateStudent(selectedStudent.id, editForm);
+      setSelectedStudent(updated);
+      const details = await ApiClient.getStudentDetails(updated.id, school?.id, true);
+      setStudentDetails(details);
+      await fetchStudents();
+      setShowEditModal(false);
+      setNotice('Student details updated successfully.');
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) {
+      setModalError(err.message || 'Could not update student details.');
     } finally {
       setIsSubmitting(false);
     }
@@ -376,7 +422,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   {selectedStudent.firstName} {selectedStudent.middleName} {selectedStudent.lastName}
                 </h2>
                 <p className="text-xs text-[#64748B]">{selectedStudent.className}</p>
-                <button type="button" onClick={handleResetPin} className="mt-2 text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={openEditStudent} disabled={isReadOnly} className="inline-flex items-center gap-1 text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-40">
+                    <Pencil className="h-3 w-3" /> Edit details
+                  </button>
+                  <button type="button" onClick={handleResetPin} disabled={isReadOnly} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-40">Reset PIN</button>
+                </div>
               </div>
               <button onClick={() => setSelectedStudent(null)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-4 h-4" />
@@ -528,6 +579,67 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       </div>
 
       {pinSlip && <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-xl"><h2 className="text-base font-bold text-[#132A29]">Student and parent PIN slip</h2><p className="mt-3 text-sm">{pinSlip.studentName}</p><p className="text-xs text-[#64748B]">{pinSlip.studentId}</p><p className="mt-4 text-xl font-mono font-bold tracking-widest">{pinSlip.pin}</p><p className="mt-2 text-xs text-[#64748B]">This PIN works for the student and linked parent login. It is shown once. Print or share securely now.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => window.print()} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold">Print PIN slip</button><button onClick={() => setPinSlip(null)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs">Close</button></div></div></div>}
+
+      {showEditModal && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleUpdateStudent} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+              <div>
+                <h2 className="text-base font-bold text-[#132A29]">Edit Student Details</h2>
+                <p className="mt-1 text-xs text-[#64748B]">{selectedStudent.studentId}</p>
+              </div>
+              <button type="button" onClick={() => setShowEditModal(false)} aria-label="Close edit student form" className="text-[#64748B] hover:text-[#132A29]"><X className="h-5 w-5" /></button>
+            </div>
+            {modalError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">{modalError}</div>}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {([
+                ['firstName', 'First Name'],
+                ['middleName', 'Father Name'],
+                ['lastName', 'Grandfather']
+              ] as const).map(([field, label]) => (
+                <label key={field} className="block text-xs font-medium text-[#334155]">{label} *
+                  <input required value={editForm[field]} onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-medium text-[#334155]">Gender
+                <select value={editForm.gender} onChange={e => setEditForm(prev => ({ ...prev, gender: e.target.value as 'male' | 'female' }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  <option value="male">Male</option><option value="female">Female</option>
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-[#334155]">Admission Date
+                <input required type="date" value={editForm.admissionDate} onChange={e => setEditForm(prev => ({ ...prev, admissionDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="block text-xs font-medium text-[#334155]">Class
+                <select required value={editForm.classId} onChange={e => setEditForm(prev => ({ ...prev, classId: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-[#334155]">Status
+                <select value={editForm.status} onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value as Student['status'] }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  <option value="active">Active</option><option value="inactive">Inactive</option><option value="graduated">Graduated</option><option value="transferred">Transferred</option>
+                </select>
+              </label>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-medium text-[#334155]">Father Phone *
+                <input required type="tel" value={editForm.fatherPhone} onChange={e => setEditForm(prev => ({ ...prev, fatherPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+              </label>
+              <label className="block text-xs font-medium text-[#334155]">Mother Phone
+                <input type="tel" value={editForm.motherPhone} onChange={e => setEditForm(prev => ({ ...prev, motherPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+              </label>
+              <label className="block text-xs font-medium text-[#334155] sm:col-span-2">Student Phone
+                <input type="tel" value={editForm.studentPhone} onChange={e => setEditForm(prev => ({ ...prev, studentPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[#E2E8F0] pt-3">
+              <button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs">Cancel</button>
+              <button type="submit" disabled={isSubmitting || isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{isSubmitting ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* ADMISSION FORM MODAL (Three-Part Name, NO Date of Birth) */}
       {showAddModal && (
