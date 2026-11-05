@@ -105,9 +105,6 @@ export const TeachersView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
