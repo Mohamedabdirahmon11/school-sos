@@ -217,7 +217,7 @@ export const FeesLedgerView: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
             <Banknote className="h-7 w-7 text-[#0e8078]" />
-            Fees & payments
+            Fees & Payments
           </h1>
         </div>
 
