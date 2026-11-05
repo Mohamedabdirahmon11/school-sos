@@ -241,7 +241,7 @@ export const LoginView: React.FC = () => {
                   <div className="mt-1">
                     <input
                       type="password"
-                      maxLength={6}
+                      maxLength={4}
                       required
                       value={pin}
                       onChange={e => setPin(e.target.value)}
@@ -289,7 +289,7 @@ export const LoginView: React.FC = () => {
                   <div className="mt-1">
                     <input
                       type="password"
-                      maxLength={6}
+                      maxLength={4}
                       required
                       value={pin}
                       onChange={e => setPin(e.target.value)}
