@@ -35,8 +35,9 @@ export const ParentsView: React.FC = () => {
   }, []);
   const filtered = parentRows.filter(row =>
     row.phone.includes(search.trim()) ||
-    Array.from(row.children).some(child => child.toLowerCase().includes(search.toLowerCase()))
-  );
+    Array.from(row.children).some(child => child.toLowerCase().includes(search.toLowerCase())) ||
+    Array.from(row.classes).some(className => className.toLowerCase().includes(search.toLowerCase()))
+  ).sort((a, b) => Array.from(a.classes).sort()[0]?.localeCompare(Array.from(b.classes).sort()[0] || '') || a.phone.localeCompare(b.phone));
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
@@ -51,7 +52,7 @@ export const ParentsView: React.FC = () => {
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search by student name or parent phone..."
+            placeholder="Search by class, student name or parent phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
@@ -81,8 +82,8 @@ export const ParentsView: React.FC = () => {
                 <tr key={row.phone} className="hover:bg-[#F8FAFC]">
                   <td className="px-4 py-3 font-medium text-[#132A29]">Parent</td>
                   <td className="px-4 py-3 font-mono text-[#132A29]">{row.phone}</td>
-                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.children).join(', ')}</td>
-                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.classes).join(', ') || '—'}</td>
+                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.children).sort((a, b) => a.localeCompare(b)).join(', ')}</td>
+                  <td className="px-4 py-3 text-[#334155]">{Array.from(row.classes).sort((a, b) => a.localeCompare(b)).join(', ') || '—'}</td>
                 </tr>
               ))}
             </tbody>
