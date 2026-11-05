@@ -32,8 +32,7 @@ export const TeachersView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [department, setDepartment] = useState('Sciences');
-  const [qualification, setQualification] = useState('B.Ed / B.Sc');
+    const [qualification, setQualification] = useState('B.Ed / B.Sc');
   const [monthlySalary, setMonthlySalary] = useState(550);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -41,7 +40,7 @@ export const TeachersView: React.FC = () => {
   const filteredTeachers = teachers.filter(teacher => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
-    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification]
+    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.qualification]
       .some(value => String(value || '').toLowerCase().includes(query));
   });
 
@@ -79,7 +78,6 @@ export const TeachersView: React.FC = () => {
         fullName,
         phone,
         gender,
-        department,
         qualification,
         monthlySalary,
         assignedClasses: selectedClassId ? [selectedClassId] : [],
@@ -133,7 +131,7 @@ export const TeachersView: React.FC = () => {
         <label className="relative block w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <input type="search" value={search} onChange={event => setSearch(event.target.value)}
-            placeholder="Search this page by teacher name, ID, phone or department"
+            placeholder="Search this page by teacher name, ID or phone"
             aria-label="Search teachers on this page"
             className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
         </label>
@@ -158,7 +156,7 @@ export const TeachersView: React.FC = () => {
                 <tr key={t.id} className="hover:bg-[#F5FAF8]">
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[#132A29]">{t.fullName}</p>
-                    <p className="mt-0.5 text-[11px] text-[#64748B]">{t.department} · {t.qualification}</p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">{t.qualification}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">ID: {t.staffId || t.id}</p>
                   </td>
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
@@ -230,18 +228,8 @@ export const TeachersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Department</label>
-                  <select
-                    value={department}
-                    onChange={e => setDepartment(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-                  >
-                    <option value="Sciences">Sciences</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Languages">Languages</option>
-                    <option value="Social Studies">Social Studies</option>
-                    <option value="Islamic Studies">Islamic Studies</option>
-                  </select>
+                  <label className="block font-medium text-[#334155]">Assigned Subject</label>
+                  <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"><option value="">Select subject</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
                 </div>
                 <div>
                   <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
