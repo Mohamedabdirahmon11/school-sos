@@ -37,6 +37,6 @@ test('plan edits validate prices and limits without allowing plan ID changes', (
   assert.ok(api.includes('Number.isFinite(value)'));
   assert.ok(api.includes('Number.isInteger(value)'));
   assert.ok(api.includes('Provide at least one supported plan price or limit to update.'));
-  assert.ok(storage.includes('{ ...this.data.plans[idx], ...updates, id }'));
+  assert.ok(storage.includes('{ ...this.data.plans[idx], ...updates, id: this.data.plans[idx].id }'));
   assert.ok(api.includes('SUBSCRIPTION_PLAN_UPDATED'));
 });
