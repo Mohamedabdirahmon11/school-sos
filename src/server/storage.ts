@@ -479,7 +479,7 @@ class StorageEngine {
       ['feeStructures', 'fee_structures'], ['feePayments', 'fee_payments'], ['reportCardDesigns', 'report_card_templates'],
       ['communicationSettings', 'communication_settings'], ['communicationQueue', 'communication_queue'],
       ['notices', 'school_notices'], ['events', 'school_events'], ['messages', 'direct_messages'],
-      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', ],
+      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'],
       ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'], ['invoices', 'subscription_invoices'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['libraryLoans', 'library_loans'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
@@ -615,7 +615,7 @@ class StorageEngine {
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
-      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['discipline_incidents', snapshot.disciplineIncidents],
+      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['library_loans', snapshot.libraryLoans], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems], ['inventory_transactions', snapshot.inventoryTransactions], ['discipline_incidents', snapshot.disciplineIncidents],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
@@ -3210,7 +3210,7 @@ class StorageEngine {
     }
 
     // In-memory test adapter fallback; production always uses the atomic RPC above.
-    await this.queryRows<SubscriptionInvoice>({ id });
+    await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
     const inv = this.data.invoices.find(invoice => invoice.id === id);
     if (!inv) return null;
     if (inv.status === 'paid') return inv;
