@@ -1,287 +1,97 @@
 /**
- * School Admin Core Dashboard
- * Real campus metrics, today's attendance rate, daily collection, outstanding fees, notices, quick actions
+ * School Admin Dashboard — reference-led layout with school-scoped live metrics.
  */
-
 import React from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { 
-  GraduationCap, 
-  UserCheck, 
-  CalendarCheck, 
-  CreditCard, 
-  TrendingUp, 
-  UserPlus, 
-  DollarSign, 
-  Clock, 
-  BellRing,
-  ArrowRight,
-  ShieldAlert
-} from 'lucide-react';
+import { GraduationCap, Users, CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface SchoolDashboardProps {
   onNavigate: (view: string) => void;
   onOpenAddStudent: () => void;
 }
 
+type DashboardRecord = Record<string, any>;
+
 export function normalizeSchoolDashboardData(data: unknown) {
-  const value = data && typeof data === 'object' ? data as Record<string, any> : {};
-  const rawStats = value.stats && typeof value.stats === 'object' ? value.stats : {};
-  const numeric = (input: unknown) => {
-    const result = Number(input);
-    return Number.isFinite(result) ? result : 0;
+  const value: DashboardRecord = data && typeof data === 'object' ? data as DashboardRecord : {};
+  const rawStats: DashboardRecord = value.stats && typeof value.stats === 'object' ? value.stats : {};
+  const number = (input: unknown) => {
+    const parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : 0;
   };
   return {
     stats: {
-      totalStudents: numeric(rawStats.totalStudents),
-      totalTeachers: numeric(rawStats.totalTeachers),
-      attendanceRate: numeric(rawStats.attendanceRate),
-      todayCollection: 0,
-      totalOutstanding: 0
+      totalStudents: number(rawStats.totalStudents),
+      totalTeachers: number(rawStats.totalTeachers),
+      attendanceRate: number(rawStats.attendanceRate),
+      todayCollection: number(rawStats.todayCollection ?? rawStats.feesThisMonth ?? rawStats.totalCollected),
+      totalOutstanding: number(rawStats.totalOutstanding ?? rawStats.outstandingFees),
     },
-    recentPayments: [],
-    notices: Array.isArray(value.notices) ? value.notices : []
+    recentPayments: Array.isArray(value.recentPayments) ? value.recentPayments : [],
+    notices: Array.isArray(value.notices) ? value.notices : [],
+    attendanceTrend: Array.isArray(value.attendanceTrend) ? value.attendanceTrend : [],
+    absentStudents: Array.isArray(value.absentStudents) ? value.absentStudents : [],
+    recentActivity: Array.isArray(value.recentActivity) ? value.recentActivity : [],
   };
 }
 
+const Metric = ({ label, value, hint, icon: Icon, onClick }: { label: string; value: React.ReactNode; hint: string; icon: React.ElementType; onClick?: () => void }) => (
+  <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#dce7e4] bg-white p-5 text-left shadow-[0_2px_8px_rgba(16,37,34,.025)] transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="flex items-center justify-between gap-3 text-sm text-[#627571]"><span>{label}</span><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e8f4f1] text-[#0e8078]"><Icon size={18}/></span></div>
+    <div className="mt-2 text-3xl font-bold tracking-tight text-[#102522]">{value}</div>
+    <div className="mt-1 text-xs text-[#71817d]">{hint}</div>
+  </button>
+);
+
 export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, onOpenAddStudent }) => {
-  const { school, isReadOnly, t } = useAuth();
-  const { data, loading, error, retry } = useApi(
-    () => ApiClient.getSchoolDashboard(school?.id),
-    [school?.id],
-    Boolean(school)
-  );
+  const { school, isReadOnly } = useAuth();
+  const { data, loading, error, retry } = useApi(() => ApiClient.getSchoolDashboard(school?.id), [school?.id], Boolean(school));
+  if (loading) return <div className="space-y-5 p-6"><div className="h-10 w-1/3 animate-pulse rounded-xl bg-slate-200"/><div className="grid gap-4 md:grid-cols-4">{[1,2,3,4].map(x=><div key={x} className="h-32 animate-pulse rounded-2xl bg-white"/>)}</div><div className="h-72 animate-pulse rounded-2xl bg-white"/></div>;
+  if (error) return <ErrorState error={error} onRetry={retry}/>;
 
-  if (loading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="h-8 bg-slate-200 rounded w-1/4 animate-pulse"></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 bg-white rounded-xl border border-slate-200 p-4 animate-pulse"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) return <ErrorState error={error} onRetry={retry} />;
-
-  const safeData = normalizeSchoolDashboardData(data);
-  const { stats, recentPayments, notices } = safeData;
-  const { totalStudents, totalTeachers, attendanceRate, todayCollection, totalOutstanding } = stats;
+  const result = normalizeSchoolDashboardData(data);
+  const { totalStudents, totalTeachers, attendanceRate, todayCollection, totalOutstanding } = result.stats;
   const currency = school?.currency || 'ETB';
+  const hasTrend = result.attendanceTrend.length > 0;
+  const maxTrend = Math.max(1, ...result.attendanceTrend.map((item: DashboardRecord) => Number(item.rate ?? item.attendanceRate ?? item.present) || 0));
+  const collected = Math.max(0, todayCollection);
+  const outstanding = Math.max(0, totalOutstanding);
+  const totalFees = collected + outstanding;
+  const collectedPercent = totalFees > 0 ? Math.round(collected / totalFees * 100) : 0;
 
-  return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Welcome Banner & Quick Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            {school?.name || 'School Dashboard'}
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            {school?.academicYear} · {school?.currentSemester} · Campus Code: <span className="font-mono">{school?.code}</span>
-          </p>
-        </div>
+  return <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
+    <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div><p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">School overview</p><h1 className="text-3xl font-bold tracking-tight text-[#102522]">Dashboard</h1><p className="mt-1 text-sm text-[#71817d]">{school?.name || 'Your school'}{school?.academicYear ? ` · ${school.academicYear}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}</p></div>
+      <div className="flex flex-wrap gap-2"><button onClick={()=>onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f7faf9]"><CreditCard size={16}/>Record payment</button><button onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"><UserPlus size={16}/>Add student</button></div>
+    </section>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={onOpenAddStudent}
-            disabled={isReadOnly}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Admit Student</span>
-          </button>
-        </div>
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Metric label="Students" value={totalStudents.toLocaleString()} hint="Enrolled at this school" icon={GraduationCap} onClick={()=>onNavigate('sch_students')}/>
+      <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="School teaching staff" icon={Users} onClick={()=>onNavigate('sch_teachers')}/>
+      <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Present students today" icon={CalendarCheck} onClick={()=>onNavigate('sch_attendance')}/>
+      <Metric label="Fees collected" value={formatMoney(collected, currency)} hint="Collection reported by dashboard" icon={Wallet} onClick={()=>onNavigate('sch_fees')}/>
+    </section>
+
+    <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
+        <div className="mb-5 flex items-start justify-between"><div><h2 className="font-bold text-[#102522]">Attendance this week</h2><p className="mt-1 text-xs text-[#71817d]">Daily attendance trend from school records</p></div><button onClick={()=>onNavigate('sch_attendance')} className="text-xs font-semibold text-[#0e8078]">View register <ArrowRight className="ml-1 inline" size={14}/></button></div>
+        {hasTrend ? <div className="flex h-52 items-end gap-3 border-b border-[#e5eeeb] px-1">{result.attendanceTrend.map((item: DashboardRecord, index: number)=><div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[11px] font-semibold text-[#627571]">{Number(item.rate ?? item.attendanceRate ?? item.present) || 0}%</span><div className="w-full max-w-[76px] rounded-t-xl bg-[#bfe3da]" style={{height:`${Math.max(4, Math.min(100, (Number(item.rate ?? item.attendanceRate ?? item.present) || 0) / maxTrend * 100))}%`}}/><span className="text-[11px] text-[#71817d]">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0,3) : `Day ${index+1}`)}</span></div>)}</div> : <div className="flex h-52 flex-col items-center justify-center rounded-xl bg-[#f6faf8] text-center"><CalendarCheck className="mb-2 text-[#0e8078]" size={26}/><p className="text-sm font-semibold text-[#18312d]">Weekly trend is not available yet</p><p className="mt-1 max-w-sm text-xs text-[#71817d]">Once daily attendance history is returned by the dashboard API, it will appear here.</p></div>}
       </div>
-
-      {/* 4 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div
-          onClick={() => onNavigate('sch_students')}
-          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
-        >
-          <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Enrolled Students</span>
-            <GraduationCap className="w-4 h-4 text-[#0F766E]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-[#132A29]">{totalStudents}</span>
-            <span className="text-xs text-emerald-600 font-medium">Active</span>
-          </div>
-          <p className="text-[11px] text-[#64748B] mt-1">Student directory & profiles</p>
-        </div>
-
-        <div 
-          onClick={() => onNavigate('sch_teachers')}
-          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
-        >
-          <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Teaching Faculty</span>
-            <UserCheck className="w-4 h-4 text-[#0F766E]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-[#132A29]">{totalTeachers}</span>
-            <span className="text-xs text-emerald-600 font-medium">Appointed</span>
-          </div>
-          <p className="text-[11px] text-[#64748B] mt-1">Subject & class assignments</p>
-        </div>
-
-        <div 
-          onClick={() => onNavigate('sch_attendance')}
-          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
-        >
-          <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Today's Attendance</span>
-            <CalendarCheck className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-[#132A29]">{attendanceRate}%</span>
-            <span className="text-xs text-emerald-600 font-medium">Present</span>
-          </div>
-          <p className="text-[11px] text-[#64748B] mt-1">Daily register & absentee alerts</p>
-        </div>
-
-        <div hidden
-          onClick={() => onNavigate('sch_fees')}
-          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
-        >
-          <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Today's Collections</span>
-            <DollarSign className="w-4 h-4 text-[#0F766E]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-[#132A29]">
-              ${todayCollection.toLocaleString()}
-            </span>
-            <span className="text-xs text-[#64748B]">{currency}</span>
-          </div>
-          <p className="text-[11px] text-[#64748B] mt-1">
-            Outstanding: ${totalOutstanding.toLocaleString()}
-          </p>
-        </div>
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
+        <h2 className="font-bold text-[#102522]">Fee collection</h2><p className="mt-1 text-xs text-[#71817d]">Collected vs outstanding amounts</p>
+        {totalFees > 0 ? <div className="mt-6 flex flex-col items-center gap-5 sm:flex-row"><div className="relative grid h-40 w-40 shrink-0 place-items-center rounded-full" style={{background:`conic-gradient(#0e8078 ${collectedPercent}%, #f5c24d 0)`}}><div className="grid h-28 w-28 place-items-center rounded-full bg-white"><div className="text-center"><div className="text-2xl font-bold text-[#102522]">{collectedPercent}%</div><div className="text-[10px] text-[#71817d]">collected</div></div></div></div><div className="space-y-4 text-sm"><div><div className="mb-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#0e8078]"/>Collected</div><strong className="pl-5 text-[#102522]">{formatMoney(collected,currency)}</strong></div><div><div className="mb-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#f5c24d]"/>Outstanding</div><strong className="pl-5 text-[#102522]">{formatMoney(outstanding,currency)}</strong></div></div></div> : <div className="mt-6 flex h-40 flex-col items-center justify-center rounded-xl bg-[#f6faf8] text-center"><Wallet className="mb-2 text-[#0e8078]" size={26}/><p className="text-sm font-semibold text-[#18312d]">Fee summary not available</p><p className="mt-1 text-xs text-[#71817d]">No collection totals were supplied by the dashboard API.</p></div>}
+        <button onClick={()=>onNavigate('sch_fees')} className="mt-5 w-full rounded-xl border border-[#d5e2de] px-4 py-2.5 text-sm font-semibold text-[#0e8078] hover:bg-[#f6faf8]">Open fee ledger</button>
       </div>
+    </section>
 
-      {/* Center Layout: Left is Recent Fee Transactions, Right is Notices */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Recent Fee Payments Table */}
-        <div hidden className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden lg:col-span-2 shadow-xs">
-          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-[#132A29]">Recent Fee Payments</h2>
-              <p className="text-[11px] text-[#64748B]">Latest school tuition and transport receipts</p>
-            </div>
-            <button
-              onClick={() => onNavigate('sch_fees')}
-              className="text-xs font-semibold text-[#0F766E] hover:underline"
-            >
-              Full Ledger →
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-3">Receipt #</th>
-                  <th className="px-4 py-3">Student ID</th>
-                  <th className="px-4 py-3">Amount Paid</th>
-                  <th className="px-4 py-3">Method</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {recentPayments.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#64748B]">
-                      No payments recorded yet. Click "Record Payment" to log fee collections.
-                    </td>
-                  </tr>
-                ) : (
-                  recentPayments.map((p: any, index: number) => (
-                    <tr key={p?.id ?? index} className="hover:bg-[#F8FAFC]">
-                      <td className="px-4 py-3 font-mono font-medium text-[#132A29]">{p?.receiptNumber || '—'}</td>
-                      <td className="px-4 py-3 font-mono text-[#64748B]">{p?.studentId || '—'}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-[#132A29]">
-                        {formatMoney(Number(p?.amountPaid) || 0, currency)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-[#334155]">{p?.paymentMethod || '—'}</span>
-                        {p?.referenceNumber && (
-                          <span className="block text-[10px] font-mono text-[#64748B]">{p.referenceNumber}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[11px] font-semibold ${
-                          p?.status === 'paid' ? 'text-emerald-700' :
-                          p?.status === 'partial' ? 'text-amber-700' :
-                          'text-red-700'
-                        }`}>
-                          {(p?.status || 'unpaid').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-[#64748B]">
-                        {typeof p?.date === 'string' ? p.date.split('T')[0] : '—'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Notices Board Widget */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs lg:col-span-1">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
-            <div>
-              <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-1.5">
-                <BellRing className="w-4 h-4 text-[#0F766E]" />
-                <span>Notice Board</span>
-              </h2>
-              <p className="text-[11px] text-[#64748B]">Announcements & circulars</p>
-            </div>
-            <button
-              onClick={() => onNavigate('sch_notices')}
-              className="text-xs text-[#0F766E] hover:underline font-semibold"
-            >
-              Manage
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {notices.length === 0 ? (
-              <p className="text-xs text-[#64748B] text-center py-6">
-                No active notices published.
-              </p>
-            ) : (
-              notices.slice(0, 3).map((n: any, index: number) => (
-                <div key={n?.id ?? index} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#132A29]">{n?.title || '—'}</span>
-                    {n?.isPinned && (
-                      <span className="text-[10px] font-mono text-amber-700 font-bold uppercase">Pinned</span>
-                    )}
-                  </div>
-                  <p className="text-[#475569] line-clamp-2 leading-relaxed">{n?.content || ''}</p>
-                  <p className="text-[10px] text-[#64748B] font-mono pt-1">
-                    {typeof n?.publishDate === 'string' ? n.publishDate.split('T')[0] : '—'} · By {n?.authorName || '—'}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
+    <section className="grid gap-5 lg:grid-cols-3">
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-5"><div className="mb-4 flex items-center gap-2"><AlertCircle className="text-[#c58b20]" size={18}/><h2 className="font-bold text-[#102522]">Needs attention</h2></div>{result.absentStudents.length ? result.absentStudents.slice(0,4).map((student: DashboardRecord,index:number)=><div key={student.id ?? index} className="border-b border-[#e8efed] py-3 last:border-0"><p className="text-sm font-semibold text-[#18312d]">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-[#71817d]">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? `${student.daysAbsent} days absent` : 'Absent today'}</p></div>) : <p className="py-8 text-center text-sm text-[#71817d]">No absence alerts supplied today.</p>}</div>
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-5"><h2 className="mb-4 font-bold text-[#102522]">Quick actions</h2><div className="grid grid-cols-2 gap-3">{[{label:'Mark attendance',icon:ClipboardCheck,view:'sch_attendance'},{label:'Record payment',icon:CreditCard,view:'sch_fees'},{label:'Post notice',icon:BellRing,view:'sch_notices'},{label:'New admission',icon:UserPlus,view:'sch_students'}].map(item=><button key={item.view} onClick={()=>item.view==='sch_students'?onOpenAddStudent():onNavigate(item.view)} className="flex min-h-20 flex-col items-start justify-between rounded-xl border border-[#dce7e4] p-3 text-left text-sm font-semibold text-[#18312d] hover:border-[#0e8078] hover:bg-[#f6faf8]"><item.icon className="text-[#0e8078]" size={19}/>{item.label}</button>)}</div></div>
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-[#102522]">Recent activity</h2><button onClick={()=>onNavigate('sch_notices')} className="text-xs font-semibold text-[#0e8078]">View all</button></div>{result.recentActivity.length ? result.recentActivity.slice(0,4).map((item:DashboardRecord,index:number)=><div key={item.id ?? index} className="border-b border-[#e8efed] py-3 last:border-0"><p className="text-sm font-semibold text-[#18312d]">{item.title ?? item.description ?? item.type ?? 'Activity'}</p><p className="mt-1 text-xs text-[#71817d]">{item.detail ?? item.name ?? item.date ?? ''}</p></div>) : result.notices.slice(0,4).map((notice:DashboardRecord,index:number)=><div key={notice.id ?? index} className="border-b border-[#e8efed] py-3 last:border-0"><p className="text-sm font-semibold text-[#18312d]">{notice.title ?? 'School notice'}</p><p className="mt-1 line-clamp-2 text-xs text-[#71817d]">{notice.content ?? ''}</p></div>)}{!result.recentActivity.length && !result.notices.length && <p className="py-8 text-center text-sm text-[#71817d]">No recent activity available.</p>}</div>
+    </section>
+  </div>;
 };
