@@ -873,7 +873,7 @@ class StorageEngine {
   public updatePlan(id: string, updates: Partial<PlanConfig>): PlanConfig | null {
     const idx = this.data.plans.findIndex(p => p.id === id);
     if (idx === -1) return null;
-    this.data.plans[idx] = { ...this.data.plans[idx], ...updates };
+    this.data.plans[idx] = { ...this.data.plans[idx], ...updates, id };
     this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
     this.save();
     return this.data.plans[idx];
