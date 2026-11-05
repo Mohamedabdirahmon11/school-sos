@@ -174,7 +174,7 @@ export const AttendanceView: React.FC = () => {
   const visibleStudents = searchQuery.trim() ? filteredStudents.slice((page - 1) * 20, page * 20) : pageStudents;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -217,7 +217,7 @@ export const AttendanceView: React.FC = () => {
       )}
 
       {/* Control Bar: Class, Date */}
-      <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm sm:grid-cols-2 md:grid-cols-3">
         <div>
           <label className="block text-xs font-semibold text-[#475569] mb-1">Select Class</label>
           <select
@@ -281,7 +281,7 @@ export const AttendanceView: React.FC = () => {
       </div>
 
       {/* Daily Attendance Student Register Table */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[#DCE7E4] bg-white shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-xs text-[#64748B]">Loading student attendance register...</div>
         ) : filteredStudents.length === 0 ? (
@@ -290,7 +290,7 @@ export const AttendanceView: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-[#132A29]">
+            <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>
                   <th className="py-3 px-4">Student ID</th>
