@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
+import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { 
   Building2, 
   Palette, 
@@ -145,6 +146,7 @@ export const SchoolSettingsView: React.FC = () => {
     if (isReadOnly || !school) return;
     setError(null);
     if (!name.trim()) { setError('Official school name is required.'); return; }
+    if (phone.trim() && !normalizeWhatsAppNumber(phone)) { setError('Official Telephone / WhatsApp must use an international number such as +2519XXXXXXXX.'); return; }
     if (!/^#[0-9a-f]{6}$/i.test(brandColor)) { setError('Brand color must be a six-digit hex color such as #0F766E.'); return; }
     const capacity = Number(defaultClassCapacity);
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) { setError('Default class capacity must be a whole number between 1 and 500.'); return; }
@@ -387,8 +389,8 @@ export const SchoolSettingsView: React.FC = () => {
   };
 
   const openManualWhatsApp = () => {
-    const digits = whatsappRecipientPhone.trim().replace(/\D/g, '').replace(/^00/, '');
-    if (digits.length < 8 || digits.length > 15) {
+    const digits = normalizeWhatsAppNumber(whatsappRecipientPhone);
+    if (!digits) {
       setNotice('Geli lambarka waalidka qaabka caalamiga ah, tusaale +2519XXXXXXXX.');
       return;
     }
