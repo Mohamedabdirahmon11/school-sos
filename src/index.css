@@ -317,3 +317,81 @@
     border-radius: 18px;
   }
 }
+
+
+/* Final component sizing pass to mirror the supplied desktop admin screens:
+   compact headings, restrained cards, dense list rows, and consistent actions. */
+.school-admin-design main > div {
+  width: 100%;
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 26px 32px 32px;
+}
+.school-admin-design main h1 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.school-admin-design main h2 {
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.school-admin-design main .rounded-2xl,
+.school-admin-design main .rounded-xl {
+  border-radius: 13px;
+}
+.school-admin-design main .shadow-sm,
+.school-admin-design main .shadow-xs {
+  box-shadow: 0 1px 3px rgba(16,37,34,.045);
+}
+.school-admin-design main button {
+  min-height: 34px;
+  font-size: 12px;
+  border-radius: 9px;
+}
+.school-admin-design main button svg { flex-shrink: 0; }
+.school-admin-design main table thead th {
+  padding: 11px 14px;
+  background: #f7faf9;
+  color: #61736f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.school-admin-design main table tbody td {
+  padding: 12px 14px;
+  font-size: 12px;
+}
+.school-admin-design main .overflow-hidden.rounded-2xl,
+.school-admin-design main .overflow-hidden.rounded-xl {
+  border: 1px solid var(--admin-line);
+}
+.school-admin-design main input,
+.school-admin-design main select,
+.school-admin-design main textarea {
+  min-height: 36px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  font-size: 12px;
+}
+.school-admin-design main label {
+  color: #536762;
+  font-size: 12px;
+  font-weight: 600;
+}
+.school-admin-design main [role="dialog"] {
+  border-radius: 16px;
+}
+@media (min-width: 768px) {
+  .school-admin-design main > div { padding: 26px 32px 32px; }
+}
+@media (max-width: 767px) {
+  .school-admin-design main > div { padding: 18px 14px 24px; }
+  .school-admin-design main h1 { font-size: 20px; }
+  .school-admin-design main .grid { min-width: 0; }
+  .school-admin-design main table { min-width: 620px; }
+  .school-admin-design main button { min-height: 38px; }
+}
