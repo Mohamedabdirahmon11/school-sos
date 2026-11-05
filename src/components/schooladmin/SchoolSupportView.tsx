@@ -21,15 +21,20 @@ export const SchoolSupportView: React.FC = () => {
   const [priority, setPriority] = useState<any>('medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchTickets = async () => {
     if (!school) return;
+    setIsLoading(true); setLoadError(null);
     try {
       const all = await ApiClient.getTickets({ page, pageSize: 20 });
       setPageInfo((all as any).pagination || null);
       setTickets(all.filter(t => t.schoolId === school.id));
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setLoadError(err.message || 'Unable to load support tickets.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -85,9 +90,10 @@ export const SchoolSupportView: React.FC = () => {
       )}
 
       {/* Tickets List */}
+      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{loadError} <button type="button" onClick={() => void fetchTickets()} className="ml-2 font-semibold underline">Retry</button></div>}
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         <div className="divide-y divide-[#E2E8F0]">
-          {tickets.length === 0 ? (
+          {isLoading ? <div role="status" className="p-8 text-center text-xs text-[#64748B]">Loading support tickets…</div> : tickets.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#64748B]">
               <LifeBuoy className="w-8 h-8 text-[#0F766E]/40 mx-auto mb-2" />
               <p className="font-semibold text-[#132A29]">No active tickets</p>
