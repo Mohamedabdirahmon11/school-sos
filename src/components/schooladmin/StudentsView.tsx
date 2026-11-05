@@ -48,6 +48,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [studentDetails, setStudentDetails] = useState<any | null>(null);
   const [activeProfileTab, setActiveProfileTab] = useState<'overview' | 'attendance' | 'results' | 'fees' | 'documents' | 'notes'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -124,6 +126,26 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const openStudentEditor = () => {
+    if (!selectedStudent || isReadOnly) return;
+    setModalError(null);
+    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
+    setShowEditModal(true);
+  };
+  const handleSaveStudent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedStudent) return;
+    setModalError(null);
+    try {
+      const updated = await ApiClient.updateStudent(selectedStudent.id, editForm);
+      setShowEditModal(false);
+      setNotice('Student information updated successfully.');
+      await fetchStudents();
+      await loadStudentDetails({ ...selectedStudent, ...updated, ...editForm });
+      window.setTimeout(() => setNotice(null), 3500);
+    } catch (error: any) { setModalError(error?.message || 'Unable to update student information.'); }
   };
 
   const handleResetPin = async () => {
@@ -349,7 +371,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   {selectedStudent.firstName} {selectedStudent.middleName} {selectedStudent.lastName}
                 </h2>
                 <p className="text-xs text-[#64748B]">{selectedStudent.className}</p>
-                <button type="button" onClick={handleResetPin} className="mt-2 text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button>
+                <div className="mt-2 flex flex-wrap gap-3"><button type="button" disabled={isReadOnly} onClick={openStudentEditor} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-50">Edit student</button><button type="button" onClick={handleResetPin} className="text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button></div>
               </div>
               <button onClick={() => setSelectedStudent(null)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-4 h-4" />
@@ -502,6 +524,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
       {pinSlip && <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-xl"><h2 className="text-base font-bold text-[#132A29]">Student and parent PIN slip</h2><p className="mt-3 text-sm">{pinSlip.studentName}</p><p className="text-xs text-[#64748B]">{pinSlip.studentId}</p><p className="mt-4 text-xl font-mono font-bold tracking-widest">{pinSlip.pin}</p><p className="mt-2 text-xs text-[#64748B]">This PIN works for the student and linked parent login. It is shown once. Print or share securely now.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => window.print()} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold">Print PIN slip</button><button onClick={() => setPinSlip(null)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs">Close</button></div></div></div>}
 
+      {showEditModal && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSaveStudent} className="max-h-[90vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-xl border bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Edit student information</h2><button type="button" onClick={() => setShowEditModal(false)} aria-label="Close"><X className="h-5 w-5"/></button></div>
+            {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{modalError}</p>}
+            {['firstName','middleName','lastName'].map((field,index) => <label key={field} className="block text-xs font-medium">{['First name','Father name','Grandfather name'][index]}<input required value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <label className="block text-xs font-medium">Gender<select value={editForm.gender} onChange={e => setEditForm((value:any) => ({...value,gender:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
+            <label className="block text-xs font-medium">Class<select required value={editForm.classId} onChange={e => setEditForm((value:any) => ({...value,classId:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}</select></label>
+            {['studentPhone','fatherPhone','motherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Father phone','Mother phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <div className="flex justify-end gap-2 border-t pt-3"><button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button type="submit" disabled={isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></div>
+          </form>
+        </div>
+      )}
       {/* ADMISSION FORM MODAL (Three-Part Name, NO Date of Birth) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
