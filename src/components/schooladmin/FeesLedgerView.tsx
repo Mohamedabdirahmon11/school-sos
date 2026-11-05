@@ -211,15 +211,15 @@ export const FeesLedgerView: React.FC = () => {
 
   if (feeLoad.error) return <ErrorState error={feeLoad.error} onRetry={feeLoad.retry} />;
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
-            <Banknote className="w-6 h-6 text-[#0F766E]" />
-            Student Cash Fees & Billing Ledger
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
+            <Banknote className="h-7 w-7 text-[#0e8078]" />
+            Fees & payments
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
+          <p className="mt-1 text-sm text-[#71817d]">
             Cash-only collections, class-range fee structures, instant receipts, and daily reconciliation.
           </p>
         </div>
@@ -229,7 +229,7 @@ export const FeesLedgerView: React.FC = () => {
             type="button"
             onClick={() => setShowStructureModal(true)}
             disabled={isReadOnly}
-            className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]"
           >
             <Sliders className="w-3.5 h-3.5" />
             Class-Range Fees
@@ -238,7 +238,7 @@ export const FeesLedgerView: React.FC = () => {
             type="button"
             onClick={() => setShowRecordModal(true)}
             disabled={isReadOnly || students.length === 0}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"
           >
             <Plus className="w-3.5 h-3.5" />
             Record Cash Payment
