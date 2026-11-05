@@ -28,7 +28,7 @@ export function normalizeSchoolDashboardData(data: unknown) {
       totalStudents: number(rawStats.totalStudents),
       totalTeachers: number(rawStats.totalTeachers),
       attendanceRate: number(rawStats.attendanceRate),
-      todayCollection: number(rawStats.todayCollection ?? rawStats.feesThisMonth ?? rawStats.totalCollected),
+      todayCollection: number(rawStats.feesThisMonth ?? rawStats.todayCollection ?? rawStats.totalCollected),
       totalOutstanding: number(rawStats.totalOutstanding ?? rawStats.outstandingFees),
     },
     recentPayments: Array.isArray(value.recentPayments) ? value.recentPayments : [],
@@ -65,7 +65,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
 
   return <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
     <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">School overview</p><h1 className="text-3xl font-bold tracking-tight text-[#102522]">Dashboard</h1><p className="mt-1 text-sm text-[#71817d]">{school?.name || 'Your school'}{school?.academicYear ? ` · ${school.academicYear}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}</p></div>
+      <div><h1 className="text-3xl font-bold tracking-tight text-[#102522]">Dashboard</h1><p className="mt-1 text-sm text-[#71817d]">{school?.name || 'Your school'}{school?.academicYear ? ` · ${school.academicYear}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}</p></div>
       <div className="flex flex-wrap gap-2"><button onClick={()=>onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f7faf9]"><CreditCard size={16}/>Record payment</button><button onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"><UserPlus size={16}/>Add student</button></div>
     </section>
 
@@ -73,12 +73,12 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
       <Metric label="Students" value={totalStudents.toLocaleString()} hint="Enrolled at this school" icon={GraduationCap} onClick={()=>onNavigate('sch_students')}/>
       <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="School teaching staff" icon={Users} onClick={()=>onNavigate('sch_teachers')}/>
       <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Present students today" icon={CalendarCheck} onClick={()=>onNavigate('sch_attendance')}/>
-      <Metric label="Fees collected" value={formatMoney(collected, currency)} hint="Collection reported by dashboard" icon={Wallet} onClick={()=>onNavigate('sch_fees')}/>
+      <Metric label="Fees this month" value={formatMoney(collected, currency)} hint="Collected" icon={Wallet} onClick={()=>onNavigate('sch_fees')}/>
     </section>
 
     <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
       <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
-        <div className="mb-5 flex items-start justify-between"><div><h2 className="font-bold text-[#102522]">Attendance this week</h2><p className="mt-1 text-xs text-[#71817d]">Daily attendance trend from school records</p></div><button onClick={()=>onNavigate('sch_attendance')} className="text-xs font-semibold text-[#0e8078]">View register <ArrowRight className="ml-1 inline" size={14}/></button></div>
+        <div className="mb-5 flex items-start justify-between"><div><h2 className="font-bold text-[#102522]">Attendance this week</h2></div></div>
         {hasTrend ? <div className="flex h-52 items-end gap-3 border-b border-[#e5eeeb] px-1">{result.attendanceTrend.map((item: DashboardRecord, index: number)=><div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[11px] font-semibold text-[#627571]">{Number(item.rate ?? item.attendanceRate ?? item.present) || 0}%</span><div className="w-full max-w-[76px] rounded-t-xl bg-[#bfe3da]" style={{height:`${Math.max(4, Math.min(100, (Number(item.rate ?? item.attendanceRate ?? item.present) || 0) / maxTrend * 100))}%`}}/><span className="text-[11px] text-[#71817d]">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0,3) : `Day ${index+1}`)}</span></div>)}</div> : <div className="flex h-52 flex-col items-center justify-center rounded-xl bg-[#f6faf8] text-center"><CalendarCheck className="mb-2 text-[#0e8078]" size={26}/><p className="text-sm font-semibold text-[#18312d]">Weekly trend is not available yet</p><p className="mt-1 max-w-sm text-xs text-[#71817d]">Once daily attendance history is returned by the dashboard API, it will appear here.</p></div>}
       </div>
       <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
