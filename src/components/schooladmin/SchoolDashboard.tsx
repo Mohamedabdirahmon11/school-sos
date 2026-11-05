@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { GraduationCap, Users, CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
+import { UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface SchoolDashboardProps {
   onNavigate: (view: string) => void;
@@ -39,11 +39,11 @@ export function normalizeSchoolDashboardData(data: unknown) {
   };
 }
 
-const Metric = ({ label, value, hint, icon: Icon, onClick }: { label: string; value: React.ReactNode; hint: string; icon: React.ElementType; onClick?: () => void }) => (
+const Metric = ({ label, value, hint, onClick }: { label: string; value: React.ReactNode; hint?: string; onClick?: () => void }) => (
   <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#dce7e4] bg-white p-5 text-left shadow-[0_2px_8px_rgba(16,37,34,.025)] transition hover:-translate-y-0.5 hover:shadow-md">
-    <div className="flex items-center justify-between gap-3 text-sm text-[#627571]"><span>{label}</span><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e8f4f1] text-[#0e8078]"><Icon size={18}/></span></div>
+    <div className="text-sm text-[#627571]">{label}</div>
     <div className="mt-2 text-3xl font-bold tracking-tight text-[#102522]">{value}</div>
-    <div className="mt-1 text-xs text-[#71817d]">{hint}</div>
+    {hint && <div className="mt-1 inline-flex rounded-full bg-[#d9f2e9] px-2.5 py-1 text-[11px] font-semibold text-[#08734f]">{hint}</div>}
   </button>
 );
 
@@ -70,10 +70,10 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     </section>
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Students" value={totalStudents.toLocaleString()} hint="Enrolled at this school" icon={GraduationCap} onClick={()=>onNavigate('sch_students')}/>
-      <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="School teaching staff" icon={Users} onClick={()=>onNavigate('sch_teachers')}/>
-      <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Present students today" icon={CalendarCheck} onClick={()=>onNavigate('sch_attendance')}/>
-      <Metric label="Fees this month" value={formatMoney(collected, currency)} hint="Collected" icon={Wallet} onClick={()=>onNavigate('sch_fees')}/>
+      <Metric label="Students" value={totalStudents.toLocaleString()} onClick={()=>onNavigate('sch_students')}/>
+      <Metric label="Teachers" value={totalTeachers.toLocaleString()} onClick={()=>onNavigate('sch_teachers')}/>
+      <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Today" onClick={()=>onNavigate('sch_attendance')}/>
+      <Metric label="Fees this month" value={formatMoney(collected, currency)} hint="Collected" onClick={()=>onNavigate('sch_fees')}/>
     </section>
 
     <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
