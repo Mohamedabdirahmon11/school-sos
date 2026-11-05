@@ -178,14 +178,10 @@ export const AttendanceView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Daily operations</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
             <CalendarCheck className="h-7 w-7 text-[#0e8078]" />
             {t('attendance')}
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. Absent students automatically trigger parent notifications.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
