@@ -11,3 +11,13 @@ test('role labels normalize at the authentication boundary to the six canonical 
   assert.equal(normalizeRole('Pupil'), 'student');
   assert.equal(normalizeRole('unknown'), null);
 });
+
+import { staffHasPermission } from '../src/lib/staff-permissions.ts';
+
+test('staff permissions require an active staff record and an explicit grant', () => {
+  assert.equal(staffHasPermission({ status: 'active', permissions: ['library_manage'] }, 'library_manage'), true);
+  assert.equal(staffHasPermission({ status: 'inactive', permissions: ['library_manage'] }, 'library_manage'), false);
+  assert.equal(staffHasPermission({ status: 'active', permissions: ['fees_manage'] }, 'library_manage'), false);
+  assert.equal(staffHasPermission(null, 'library_manage'), false);
+  assert.equal(staffHasPermission({ status: 'active', permissions: 'library_manage' }, 'library_manage'), false);
+});

@@ -33,8 +33,14 @@ const unpaidStudent = storage.db.createStudent({ schoolId: school.id, studentId:
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'monthly_tuition', name: 'Grade 2 tuition range', minGrade: 2, maxGrade: 3, amount: 120, cadence: 'monthly', isActive: true });
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'monthly_tuition', name: 'Grade 1 tuition range', minGrade: 1, maxGrade: 1, amount: 80, cadence: 'monthly', isActive: true });
 storage.db.createFeeStructure({ schoolId: school.id, feeType: 'annual_registration', name: 'Annual registration', amount: 50, cadence: 'annual', isActive: true });
-const route = storage.db.addTransportRoute({ schoolId: school.id, name: 'North Route', feeAmount: 25, active: true });
+const route = await storage.db.addTransportRoute({ schoolId: school.id, name: 'North Route', feeAmount: 25, active: true });
 await storage.db.flush();
+const persistedStudent = await storage.db.getStudentById(partialStudent.id, school.id);
+assert.ok(persistedStudent, 'the created student must be readable from the test database');
+assert.equal(persistedStudent?.schoolId, school.id);
+const persistedRoutes = await storage.db.getTransportRoutes(school.id);
+assert.ok(persistedRoutes.some(item => item.id === route.id && item.schoolId === school.id && item.active !== false),
+  `the created transport route must be readable from the test database: ${JSON.stringify(persistedRoutes)}`);
 await storage.db.setBusAssignment(school.id, partialStudent.id, route.id);
 await storage.db.flush();
 
@@ -63,9 +69,23 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   };
   const invalidStructure = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Invalid grades', feeType: 'custom', minGrade: 13, maxGrade: 14, amount: 10, cadence: 'one_time', isActive: true }) });
   assert.equal(invalidStructure.status, 400);
+  const oversizedStructure = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Oversized amount', feeType: 'custom', amount: 10000000000, cadence: 'one_time', isActive: true }) });
+  assert.equal(oversizedStructure.status, 400);
   const structureResponse = await fetch(`${baseUrl}/fees/structures`, { method: 'POST', headers, body: JSON.stringify({ name: 'Science activity', feeType: 'custom', amount: 35, cadence: 'one_time', isActive: true }) });
   assert.equal(structureResponse.status, 201);
   const activityFee = await structureResponse.json() as any;
+  const loadedFeeStructures = await storage.db.getFeeStructures(school.id);
+  assert.ok(loadedFeeStructures.some(item => item.id === activityFee.id),
+    `new fee structure must be visible to the next request; response=${JSON.stringify(activityFee)}, loaded=${JSON.stringify(loadedFeeStructures)}, raw=${JSON.stringify(memory.rows('fee_structures'))}`);
+  const tamperedStructure = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, {
+    method: 'PUT', headers, body: JSON.stringify({ id: 'forged-id', schoolId: 'another-school', amount: 35 })
+  });
+  const tamperedBody = await tamperedStructure.text();
+  assert.equal(tamperedStructure.status, 200, tamperedBody);
+  const protectedStructure = JSON.parse(tamperedBody) as any;
+  assert.equal(protectedStructure.id, activityFee.id, 'fee structure ID cannot be overwritten');
+  assert.equal(protectedStructure.schoolId, school.id, 'fee structure tenant cannot be overwritten');
+  assert.equal(protectedStructure.amount, 35);
 
   const partialPayload = { studentId: partialStudent.id, academicYear: '2026-2027', month: 'October 2026', feeType: 'monthly_tuition', amountDue: 1, amountPaid: 30, idempotencyKey: 'fee-test-payment-retry-1' };
   const partial = await postPayment(partialPayload);
@@ -78,6 +98,17 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(partialRetry.response.status, 201);
   assert.equal(partialRetry.body.id, partial.body.id);
   assert.equal(partialRetry.body.amountPaid, 30);
+  const [installmentA, installmentB] = await Promise.all([
+    postPayment({ ...partialPayload, amountPaid: 20, idempotencyKey: 'fee-test-installment-a' }),
+    postPayment({ ...partialPayload, amountPaid: 15, idempotencyKey: 'fee-test-installment-b' })
+  ]);
+  assert.equal(installmentA.response.status, 201);
+  assert.equal(installmentB.response.status, 201);
+  assert.equal(installmentA.body.id, partial.body.id);
+  assert.equal(installmentB.body.id, partial.body.id);
+  assert.equal(installmentB.body.amountPaid, 65, 'parallel distinct installments must both be applied');
+  const installmentRetry = await postPayment({ ...partialPayload, amountPaid: 15, idempotencyKey: 'fee-test-installment-b' });
+  assert.equal(installmentRetry.body.amountPaid, 65, 'retries must not apply an installment twice');
 
   const unpaid = await postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'October 2026', feeType: 'monthly_tuition', amountDue: 1, amountPaid: 0 });
   assert.equal(unpaid.response.status, 201);
@@ -104,7 +135,7 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(registrationRetry.body.amountPaid, 50);
   const duplicateRegistration = await postPayment({ studentId: partialStudent.id, academicYear: '2026-2027', month: '2026-2027', feeType: 'annual_registration', amountDue: 50, amountPaid: 1 });
   assert.equal(duplicateRegistration.response.status, 400);
-  assert.match(duplicateRegistration.body.error, /already paid/i);
+  assert.match(duplicateRegistration.body.error, /already (?:fully )?paid/i);
 
   const customPayload = { studentId: partialStudent.id, academicYear: '2026-2027', month: '2026-2027', feeType: 'custom', feeStructureId: activityFee.id, amountDue: 1, amountPaid: 10, idempotencyKey: 'fee-test-custom-concurrent-1' };
   const [customFirst, customRetry] = await Promise.all([postPayment(customPayload), postPayment(customPayload)]);
@@ -118,13 +149,15 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(customReceiptPdf.status, 200);
   assert.equal(customReceiptPdf.headers.get('content-type'), 'application/pdf');
   assert.ok(Buffer.from(await customReceiptPdf.arrayBuffer()).toString('latin1').includes('Science activity'));
+  const deleteReferencedFee = await fetch(`${baseUrl}/fees/structures/${activityFee.id}`, { method: 'DELETE', headers });
+  assert.equal(deleteReferencedFee.status, 409, 'fee structures used by historical payments must be retained');
   const [parallelReceiptA, parallelReceiptB] = await Promise.all([
     postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'November 2026', feeType: 'monthly_tuition', amountDue: 80, amountPaid: 5, idempotencyKey: 'fee-test-parallel-a' }),
-    postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'November 2026', feeType: 'monthly_tuition', amountDue: 80, amountPaid: 7, idempotencyKey: 'fee-test-parallel-b' })
+    postPayment({ studentId: unpaidStudent.id, academicYear: '2026-2027', month: 'December 2026', feeType: 'monthly_tuition', amountDue: 80, amountPaid: 7, idempotencyKey: 'fee-test-parallel-b' })
   ]);
   assert.equal(parallelReceiptA.response.status, 201);
   assert.equal(parallelReceiptB.response.status, 201);
-  assert.notEqual(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, 'parallel payments receive unique receipts');
+  assert.notEqual(parallelReceiptA.body.receiptNumber, parallelReceiptB.body.receiptNumber, `parallel payments receive unique receipts; sequences=${JSON.stringify(memory.rows('fee_receipt_sequences'))}; payments=${JSON.stringify([parallelReceiptA.body, parallelReceiptB.body])}`);
   const invalidCustom = await postPayment({ ...customPayload, idempotencyKey: 'fee-test-custom-invalid-1', feeStructureId: 'fee-from-another-school' });
   assert.equal(invalidCustom.response.status, 400);
   assert.match(invalidCustom.body.error, /active custom fee/i);
@@ -133,7 +166,15 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.equal(voidResponse.status, 200);
   const voided = await voidResponse.json() as any;
   assert.equal(voided.voidReason, 'Cash entered against wrong student');
+  assert.ok(memory.rows('fee_payments').find(row => row.id === partial.body.id)?.voided_at,
+    'voided receipt state must be persisted before the HTTP response completes');
   assert.equal((await fetch(`${baseUrl}/fees/payments/${partial.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Trying a second reversal' }) })).status, 409);
+  const concurrentVoids = await Promise.all([
+    fetch(`${baseUrl}/fees/payments/${bus.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Duplicate reversal attempt A' }) }),
+    fetch(`${baseUrl}/fees/payments/${bus.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Duplicate reversal attempt B' }) })
+  ]);
+  assert.deepEqual(concurrentVoids.map(response => response.status).sort(), [200, 409],
+    'only one concurrent request may void the same receipt');
   const invalidVoid = await fetch(`${baseUrl}/fees/payments/${unpaid.body.id}/void`, { method: 'POST', headers, body: JSON.stringify({ reason: 'no' }) });
   assert.equal(invalidVoid.status, 400);
 
@@ -146,9 +187,12 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   const arrears = await arrearsResponse.json();
   assert.deepEqual(arrears.map((row: any) => row.student.id).sort(), [partialStudent.id, unpaidStudent.id].sort());
 
+  const invalidIncomeDate = await fetch(`${baseUrl}/fees/daily-income?date=not-a-date`, { headers });
+  assert.equal(invalidIncomeDate.status, 400);
   const incomeResponse = await fetch(`${baseUrl}/fees/daily-income?date=${today}`, { headers });
   assert.equal(incomeResponse.status, 200);
   const income = await incomeResponse.json();
-  assert.equal(income.paymentCount, 6);
-  assert.equal(income.totalCollected, 97);
+  assert.equal(income.paymentCount, 4, 'zero-cash and voided receipts are not counted as daily collections');
+  assert.ok(income.payments.every((payment: any) => payment.amountPaid > 0 && !payment.voidedAt));
+  assert.equal(income.totalCollected, 72);
 });

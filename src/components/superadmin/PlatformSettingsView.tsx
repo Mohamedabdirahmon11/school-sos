@@ -196,7 +196,7 @@ export const PlatformSettingsView: React.FC = () => {
                 min="0"
                 max="60"
                 value={settings.graceDays}
-                onChange={e => setSettings({ ...settings, graceDays: parseInt(e.target.value, 10) || 7 })}
+                onChange={e => { const value = e.target.value; setSettings({ ...settings, graceDays: value === '' ? 0 : Math.min(60, Math.max(0, Number.parseInt(value, 10) || 0)) }); }}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E]"
               />
             </div>

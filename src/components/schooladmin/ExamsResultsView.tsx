@@ -80,7 +80,7 @@ export const ExamsResultsView: React.FC = () => {
     if (!selectedClassId) return;
     try {
       const [stdList, existingMarks] = await Promise.all([
-        ApiClient.getStudents(selectedClassId),
+        ApiClient.getAllStudents(selectedClassId),
         ApiClient.getMarks(selectedClassId, selectedSubjectId || undefined, selectedSemester)
       ]);
 
@@ -162,15 +162,15 @@ export const ExamsResultsView: React.FC = () => {
   // Admin Approve All Submitted Marks
   const handleApproveAll = async () => {
     if (isReadOnly) return;
-    const pendingIds = marks.filter(m => m.status === 'submitted' || m.status === 'draft').map(m => m.id);
+    const pendingIds = marks.filter(m => m.status === 'submitted').map(m => m.id);
     if (pendingIds.length === 0) {
       setNotice('No pending marks to approve.');
       return;
     }
 
     try {
-      await ApiClient.approveMarks(pendingIds);
-      setNotice(`Approved and permanently locked ${pendingIds.length} mark records!`);
+      const result = await ApiClient.approveMarks(pendingIds);
+      setNotice(`Approved and permanently locked ${result.approvedCount} mark records.`);
       await loadClassData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {

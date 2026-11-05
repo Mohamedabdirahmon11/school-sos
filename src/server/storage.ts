@@ -40,7 +40,7 @@ import {
   CommunicationQueueItem
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
-import { randomInt, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -88,7 +88,11 @@ interface DatabaseSchema {
   lockoutCounterRows: any[];
   lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
   libraryBooks: any[];
+  libraryLoans: any[];
   transportRoutes: any[];
+  inventoryItems: any[];
+  inventoryTransactions: any[];
+  disciplineIncidents: any[];
 }
 
 interface StorageContext {
@@ -117,9 +121,44 @@ const schoolContextCache = new Map<string, { school: School; expiresAt: number }
 const branchListCache = new Map<string, { branches: SchoolBranch[]; expiresAt: number }>();
 const noticeCountCache = new Map<string, { count: number; expiresAt: number }>();
 
+const COMMUNICATION_SECRET_PREFIX = 'enc:v1:';
+function communicationSecretKey(): Buffer {
+  const master = process.env.COMMUNICATION_CREDENTIALS_KEY || process.env.SESSION_SECRET || '';
+  if (master.length < 32) throw new Error('Set COMMUNICATION_CREDENTIALS_KEY or a SESSION_SECRET of at least 32 characters to protect notification credentials.');
+  return createHash('sha256').update(master).digest();
+}
+function encryptCommunicationSecret(value?: string): string | undefined {
+  if (!value) return value;
+  if (value.startsWith(COMMUNICATION_SECRET_PREFIX)) return value;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', communicationSecretKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return COMMUNICATION_SECRET_PREFIX + [iv.toString('hex'), cipher.getAuthTag().toString('hex'), encrypted.toString('hex')].join(':');
+}
+function decryptCommunicationSecret(value?: string): string | undefined {
+  if (!value || !value.startsWith(COMMUNICATION_SECRET_PREFIX)) return value;
+  const [ivHex, tagHex, encryptedHex] = value.slice(COMMUNICATION_SECRET_PREFIX.length).split(':');
+  if (!ivHex || !tagHex || !encryptedHex) throw new Error('Stored notification credentials are malformed.');
+  const decipher = createDecipheriv('aes-256-gcm', communicationSecretKey(), Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]).toString('utf8');
+}
+
+
 // Avoid writing the session row on every API request. The signed cookie is
 // refreshed each request, while the database expiry is extended at most once
 // per minute (or 5% of shorter session lifetimes).
+export function calculateSubscriptionGraceEnd(
+  validUntil: string | Date,
+  schoolGraceDays: number | undefined,
+  platformGraceDays = 7
+): Date {
+  const configuredDays = typeof schoolGraceDays === 'number' && Number.isFinite(schoolGraceDays)
+    ? Math.max(0, schoolGraceDays)
+    : Math.max(0, Number(platformGraceDays) || 0);
+  return new Date(new Date(validUntil).getTime() + configuredDays * 24 * 60 * 60 * 1000);
+}
+
 export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt: string, now = Date.now()): boolean {
   const current = Date.parse(currentExpiresAt);
   const requested = Date.parse(requestedExpiresAt);
@@ -226,14 +265,23 @@ const TABLE_DATA_KEYS: Record<string, keyof DatabaseSchema> = {
   communication_settings: 'communicationSettings', communication_queue: 'communicationQueue', school_notices: 'notices',
   school_events: 'events', direct_messages: 'messages', platform_broadcasts: 'broadcasts', support_tickets: 'tickets',
   subscription_invoices: 'invoices', audit_logs: 'auditLogs', assignments: 'assignments',
-  assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks',
-  transport_routes: 'transportRoutes', fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
+  assignment_submissions: 'assignmentSubmissions', staff_members: 'staffMembers', payroll_records: 'payrollRecords', admission_applications: 'admissionApplications', library_books: 'libraryBooks', library_loans: 'libraryLoans',
+  transport_routes: 'transportRoutes', inventory_items: 'inventoryItems', inventory_transactions: 'inventoryTransactions',
+  discipline_incidents: 'disciplineIncidents',
+  fee_ranges: 'feeRanges', bus_assignments: 'busAssignments',
   notification_templates: 'notificationTemplates', promotion_history: 'promotionHistory',
   restore_test_records: 'restoreTestRecords', lockout_counters: 'lockoutCounterRows'
 };
 
-function fromSupabaseRow(row: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(Object.entries(row).map(([key, value]) => [DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase()), value]));
+function fromSupabaseRow(row: Record<string, any>, table = ''): Record<string, any> {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    // Both users.pin and students.pinHash share the database pin_hash column.
+    // The reverse alias must therefore be resolved with the source table.
+    const field = key === 'pin_hash' && table === 'users'
+      ? 'pin'
+      : DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+    return [field, value];
+  }));
 }
 
 export function mapStorageRowToDatabase(table: string, row: Record<string, any>): Record<string, any> {
@@ -320,7 +368,11 @@ class StorageEngine {
       restoreTestRecords: [],
       lockoutCounterRows: [],
       libraryBooks: [],
+      libraryLoans: [],
       transportRoutes: [],
+      inventoryItems: [],
+      inventoryTransactions: [],
+      disciplineIncidents: [],
       lockoutCounters: {}
     };
   }
@@ -371,6 +423,21 @@ class StorageEngine {
     }
   }
 
+  public async approveAdmissionAtomically(payload: Record<string, unknown>): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic admission approval is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_approve_admission', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_approve_admission', 'call', startedAt);
+    if (error) {
+      const message = error.message || 'Admission approval transaction failed.';
+      const wrapped = new Error(message);
+      Object.assign(wrapped, { code: error.code });
+      throw wrapped;
+    }
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
+  }
+
   public async bulkImportStudents(payload: Record<string, unknown>): Promise<void> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic bulk import is unavailable.');
@@ -383,7 +450,7 @@ class StorageEngine {
   public async initialize(clientOverride?: any): Promise<void> {
     const client = clientOverride || this.testClient || supabase;
     if (!client || (!isSupabaseConfigured && !clientOverride && !this.testClient)) {
-      throw new Error('Supabase storage is unavailable. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run supabase/schema.sql.');
+      throw new Error('Supabase storage is unavailable. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run schema.sql.');
     }
 
     // Keep the explicitly installed test adapter persistent for unit tests.
@@ -412,20 +479,20 @@ class StorageEngine {
       ['feeStructures', 'fee_structures'], ['feePayments', 'fee_payments'], ['reportCardDesigns', 'report_card_templates'],
       ['communicationSettings', 'communication_settings'], ['communicationQueue', 'communication_queue'],
       ['notices', 'school_notices'], ['events', 'school_events'], ['messages', 'direct_messages'],
-      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', 'subscription_invoices'],
-      ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
-      ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['transportRoutes', 'transport_routes'],
+      ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'],
+      ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'], ['invoices', 'subscription_invoices'],
+      ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['libraryLoans', 'library_loans'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
-      ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['notificationTemplates', 'notification_templates'],
-      ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters']
+      ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['inventoryItems', 'inventory_items'], ['inventoryTransactions', 'inventory_transactions'], ['notificationTemplates', 'notification_templates'],
+      ['promotionHistory', 'promotion_history'], ['restoreTestRecords', 'restore_test_records'], ['lockoutCounterRows', 'lockout_counters'], ['disciplineIncidents', 'discipline_incidents']
     ];
     for (const [, table] of tableMap) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
-      if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql and check service-role access. ${error.message}`);
+      if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql and check service-role access. ${error.message}`);
     }
-    for (const table of ['super_admin_settings', 'school_subscriptions']) {
+    for (const table of ['super_admin_settings', 'fee_receipt_sequences']) {
       const { error } = await client.from(table).select(primaryKeyColumn(table), { count: 'exact', head: true });
-      if (error) throw new Error(`Unable to read Supabase table "${table}". Run supabase/schema.sql. ${error.message}`);
+      if (error) throw new Error(`Unable to read Supabase table "${table}". Run schema.sql. ${error.message}`);
     }
     const context = await this.createRequestContext();
     await this.contexts.run(context, async () => {
@@ -548,7 +615,7 @@ class StorageEngine {
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
-      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes],
+      ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['library_loans', snapshot.libraryLoans], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems], ['inventory_transactions', snapshot.inventoryTransactions], ['discipline_incidents', snapshot.disciplineIncidents],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
@@ -577,7 +644,7 @@ class StorageEngine {
     const { data, error, count } = await query.range((safePage - 1) * safeSize, safePage * safeSize - 1);
     this.recordQuery(table, 'select-page', startedAt);
     if (error) throw new Error('Unable to load paginated Supabase list "' + table + '": ' + error.message);
-    return { items: (data || []).map((row: any) => fromSupabaseRow(row)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
+    return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
   private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
@@ -743,10 +810,10 @@ class StorageEngine {
       }
 
       const validUntil = new Date(sub.validUntil);
-      const graceEnd = new Date(validUntil.getTime() + (sub.graceDays || 7) * 24 * 60 * 60 * 1000);
+      const graceEnd = calculateSubscriptionGraceEnd(sub.validUntil, sub.graceDays, this.data.settings.graceDays);
 
       if (!Number.isFinite(validUntil.getTime())) continue;
-      if (now > graceEnd && sub.status !== 'read_only') {
+      if (now > graceEnd && this.data.settings.readOnlyAfterExpiry !== false && sub.status !== 'read_only') {
         sub.status = 'read_only';
         this.updateSchool(school.id, { subscription: sub });
         this.logAudit({
@@ -806,7 +873,7 @@ class StorageEngine {
   public updatePlan(id: string, updates: Partial<PlanConfig>): PlanConfig | null {
     const idx = this.data.plans.findIndex(p => p.id === id);
     if (idx === -1) return null;
-    this.data.plans[idx] = { ...this.data.plans[idx], ...updates };
+    this.data.plans[idx] = { ...this.data.plans[idx], ...updates, id: this.data.plans[idx].id };
     this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
     this.save();
     return this.data.plans[idx];
@@ -1244,9 +1311,11 @@ class StorageEngine {
   }
 
   // Sessions
-  public createSession(session: UserSession): void {
+  public async createSession(session: UserSession): Promise<void> {
     this.data.sessions.push(session);
     this.save();
+    // Do not issue a cookie until its backing database session is durable.
+    await this.flush();
   }
 
   public async getSessionById(id: string): Promise<UserSession | null> {
@@ -1295,7 +1364,7 @@ class StorageEngine {
     if (!data?.user) return null;
     const { user: joinedUser, ...session } = data;
     const { school: joinedSchool, ...user } = joinedUser;
-    const normalizedUser = fromSupabaseRow(user) as User;
+    const normalizedUser = fromSupabaseRow(user, 'users') as User;
     const normalizedSession = fromSupabaseRow(session) as UserSession;
     this.cacheQueryRows('users', [normalizedUser]);
     this.cacheQueryRows('user_sessions', [normalizedSession]);
@@ -1327,6 +1396,7 @@ class StorageEngine {
     session.expiresAt = expiresAt;
     session.lastActivityAt = new Date().toISOString();
     this.save();
+    await this.flush();
   }
 
   public async revokeSession(id: string): Promise<boolean> {
@@ -1335,6 +1405,7 @@ class StorageEngine {
     this.data.sessions = this.data.sessions.filter(session => session.id !== id);
     if (previous === this.data.sessions.length) return false;
     this.save();
+    await this.flush();
     return true;
   }
 
@@ -1362,8 +1433,11 @@ class StorageEngine {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const rawPin = studentData.pin || randomInt(1000, 10000).toString();
     const pinHash = hashPin(rawPin);
+    // Keep the plaintext PIN out of the persisted student row. It is returned
+    // separately once to the authorized creator, never stored in the database.
+    const { pin: _rawPin, ...studentFields } = studentData;
     const student: Student = {
-      ...studentData,
+      ...studentFields,
       id,
       pinHash,
       createdAt: new Date().toISOString()
@@ -1387,34 +1461,40 @@ class StorageEngine {
     };
     this.data.users.push(studentUser);
 
-    // If father or mother phone provided, check or create parent user linked to student
-    if (student.fatherPhone) {
-      const existingParent = this.data.users.find(u => 
-        u.schoolId === student.schoolId && 
-        u.role === 'parent' && 
-        u.phone === student.fatherPhone
+    // Create or link a parent account for each distinct parent phone.
+    // Keep an existing parent's PIN unchanged so adding a sibling never locks
+    // the parent out; a new parent starts with this student's initial PIN.
+    const parentPhones = [...new Set([student.fatherPhone, student.motherPhone]
+      .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
+      .map(phone => phone.trim()))];
+    const normalizePhone = (phone: string) => phone.replace(/[\s()-]/g, '');
+    for (const parentPhone of parentPhones) {
+      const normalizedPhone = normalizePhone(parentPhone);
+      const existingParent = this.data.users.find(user =>
+        user.schoolId === student.schoolId &&
+        user.role === 'parent' &&
+        [user.phone, user.parentPhone].some(value => Boolean(value) && normalizePhone(value!) === normalizedPhone)
       );
       if (existingParent) {
         existingParent.linkedStudentIds = existingParent.linkedStudentIds || [];
-        if (!existingParent.linkedStudentIds.includes(id)) {
-          existingParent.linkedStudentIds.push(id);
-        }
+        if (!existingParent.linkedStudentIds.includes(id)) existingParent.linkedStudentIds.push(id);
+        if (!existingParent.phone) existingParent.phone = parentPhone;
+        if (!existingParent.parentPhone) existingParent.parentPhone = parentPhone;
       } else {
-        const parentUser: User = {
-          id: `usr-parent-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        this.data.users.push({
+          id: `usr-parent-${randomUUID()}`,
           schoolId: student.schoolId,
           role: 'parent',
           fullName: `Parent of ${student.firstName}`,
-          phone: student.fatherPhone,
-          parentPhone: student.fatherPhone,
+          phone: parentPhone,
+          parentPhone,
           passwordHash: '',
-          pin: pinHash, // Parent gets student's initial PIN
+          pin: pinHash,
           linkedStudentIds: [id],
           isBlocked: false,
           failedLoginAttempts: 0,
           createdAt: new Date().toISOString()
-        };
-        this.data.users.push(parentUser);
+        });
       }
     }
 
@@ -1423,6 +1503,9 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
+    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\d{4}$/.test(customPin))) {
+      throw new Error('Student PIN must contain exactly four digits.');
+    }
     const student = await this.getStudentById(studentId, schoolId);
     if (!student) return null;
     await Promise.all([
@@ -1437,6 +1520,7 @@ class StorageEngine {
     // The PIN is the shared credential for a student's and their linked parent's login.
     const familyPhones = [student.studentPhone, student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
     const linkedUsers = this.data.users.filter(user =>
+      user.schoolId === student.schoolId &&
       ['student', 'parent'].includes(user.role) &&
       (user.studentId === student.studentId || user.id === `usr-student-${student.id}` || user.linkedStudentIds?.includes(student.id) || familyPhones.includes(user.phone || ''))
     );
@@ -1462,28 +1546,121 @@ class StorageEngine {
   }
 
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
-    await this.getStudentById(id, schoolId || updates.schoolId);
-    const idx = this.data.students.findIndex(s => s.id === id);
-    if (idx === -1) return null;
-    this.data.students[idx] = { ...this.data.students[idx], ...updates };
-    this.save();
-    return this.data.students[idx];
-  }
+    let current = this.data.students.find(student => student.id === id && (!schoolId || student.schoolId === schoolId));
+    if (!current) current = await this.getStudentById(id, schoolId || updates.schoolId) || undefined;
+    if (!current) return null;
+    const tenantId = schoolId || current.schoolId;
+    const parentContactsChanged = updates.fatherPhone !== undefined || updates.motherPhone !== undefined;
+    const studentLoginChanged = updates.firstName !== undefined || updates.middleName !== undefined ||
+      updates.lastName !== undefined || updates.studentPhone !== undefined ||
+      updates.fatherPhone !== undefined || updates.branchId !== undefined;
 
+    // Only hydrate related rows when those relationships actually change.
+    // This avoids re-reading stale database rows during multi-student promotion.
+    await Promise.all([
+      ...(parentContactsChanged ? [this.getStudents(tenantId), this.getUsers(tenantId, 'parent')] : []),
+      ...(studentLoginChanged ? [this.getUsers(tenantId, 'student')] : [])
+    ]);
+
+    const idx = this.data.students.findIndex(student => student.id === id && student.schoolId === tenantId);
+    if (idx < 0) return null;
+    const updated: Student = { ...this.data.students[idx], ...updates, id, schoolId: tenantId };
+    this.data.students[idx] = updated;
+
+    if (parentContactsChanged) {
+      const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : '';
+      const newParentPhones = new Set([updated.fatherPhone, updated.motherPhone].map(normalizePhone).filter(Boolean));
+      const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
+
+      // Reconcile parent links without removing siblings or changing an existing
+      // parent's PIN. This also repairs links for older parent records.
+      for (const parent of parentUsers) {
+        const contactPhones = new Set([parent.phone, parent.parentPhone].map(normalizePhone).filter(Boolean));
+        const matchingSiblings = this.data.students.filter(student =>
+          student.schoolId === tenantId && student.id !== id &&
+          [student.fatherPhone, student.motherPhone].some(phone => contactPhones.has(normalizePhone(phone)))
+        );
+        const linkedIds = new Set(parent.linkedStudentIds || []);
+        if ([...newParentPhones].some(phone => contactPhones.has(phone))) linkedIds.add(id);
+        else linkedIds.delete(id);
+        for (const sibling of matchingSiblings) linkedIds.add(sibling.id);
+        if (linkedIds.size || parent.linkedStudentIds) parent.linkedStudentIds = [...linkedIds];
+      }
+
+      const studentAccount = this.data.users.find(user =>
+        user.schoolId === tenantId && user.role === 'student' &&
+        (user.id === `usr-student-${id}` || user.studentId === updated.studentId)
+      );
+      const parentPin = updated.pinHash || studentAccount?.pin || '';
+      for (const phone of newParentPhones) {
+        const parent = parentUsers.find(user =>
+          [user.phone, user.parentPhone].some(value => normalizePhone(value) === phone)
+        );
+        if (parent) {
+          parent.linkedStudentIds = [...new Set([...(parent.linkedStudentIds || []), id])];
+          if (!parent.phone) parent.phone = phone;
+          if (!parent.parentPhone) parent.parentPhone = phone;
+        } else {
+          const createdParent: User = {
+            id: `usr-parent-${randomUUID()}`,
+            schoolId: tenantId,
+            role: 'parent',
+            fullName: `Parent of ${updated.firstName}`,
+            phone,
+            parentPhone: phone,
+            passwordHash: '',
+            pin: parentPin,
+            linkedStudentIds: [id],
+            isBlocked: false,
+            failedLoginAttempts: 0,
+            createdAt: new Date().toISOString()
+          };
+          this.data.users.push(createdParent);
+          parentUsers.push(createdParent);
+        }
+      }
+    }
+
+    if (studentLoginChanged) {
+      const studentAccount = this.data.users.find(user =>
+        user.schoolId === tenantId && user.role === 'student' &&
+        (user.id === `usr-student-${id}` || user.studentId === updated.studentId)
+      );
+      if (studentAccount) {
+        studentAccount.fullName = `${updated.firstName} ${updated.middleName} ${updated.lastName}`.trim();
+        studentAccount.phone = updated.studentPhone || updated.fatherPhone || '';
+        studentAccount.branchId = updated.branchId;
+      }
+    }
+
+    this.save();
+    return updated;
+  }
   public async deleteStudent(id: string, schoolId?: string): Promise<boolean> {
     const student = await this.getStudentById(id, schoolId);
     if (!student) return false;
     await Promise.all([
       this.queryRows<StudentMark>('student_marks', { school_id: student.schoolId, student_id: id }),
       this.queryRows<AttendanceRecord>('attendance_records', { school_id: student.schoolId, student_id: id }),
-      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id })
+      this.queryRows<FeePayment>('fee_payments', { school_id: student.schoolId, student_id: id }),
+      this.getUsers(student.schoolId, 'student'),
+      this.getUsers(student.schoolId, 'parent')
     ]);
     const len = this.data.students.length;
-    this.data.students = this.data.students.filter(s => s.id !== id);
+    this.data.students = this.data.students.filter(s => s.id !== id || s.schoolId !== student.schoolId);
     if (this.data.students.length < len) {
-      this.data.marks = this.data.marks.filter(m => m.studentId !== id);
-      this.data.attendance = this.data.attendance.filter(a => a.studentId !== id);
-      this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id);
+      this.data.marks = this.data.marks.filter(m => m.studentId !== id || m.schoolId !== student.schoolId);
+      this.data.attendance = this.data.attendance.filter(a => a.studentId !== id || a.schoolId !== student.schoolId);
+      this.data.feePayments = this.data.feePayments.filter(f => f.studentId !== id || f.schoolId !== student.schoolId);
+      // Remove the deleted student's sign-in and detach only this child from
+      // parent accounts; siblings and their access remain untouched.
+      this.data.users = this.data.users.filter(user => {
+        if (user.schoolId !== student.schoolId) return true;
+        if (user.role === 'student' && (user.studentId === student.studentId || user.id === `usr-student-${id}`)) return false;
+        if (user.role !== 'parent' || !user.linkedStudentIds?.includes(id)) return true;
+        user.linkedStudentIds = user.linkedStudentIds.filter(linkedId => linkedId !== id);
+        return true;
+      });
       this.save();
       return true;
     }
@@ -1804,8 +1981,11 @@ class StorageEngine {
         this.data.attendance[existingIdx].recordedAt = now;
         results.push(this.data.attendance[existingIdx]);
       } else {
+        // A stable ID makes simultaneous submissions converge on the same
+        // row as well as respecting the database's natural-key unique index.
+        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
         const newRecord: AttendanceRecord = {
-          id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
           schoolId,
           classId,
           studentId: rec.studentId,
@@ -1819,37 +1999,28 @@ class StorageEngine {
         results.push(newRecord);
       }
 
-      // If absent, automatically queue parent SMS notification if communication is enabled
-      if (rec.status === 'absent') {
-        const student = await this.getStudentById(rec.studentId, schoolId);
-        if (student && student.fatherPhone) {
-          await this.queueNotification({
-            schoolId,
-            recipientPhone: student.fatherPhone,
-            recipientName: `Parent of ${student.firstName}`,
-            studentId: student.id,
-            messageType: 'attendance_absent',
-            channel: 'sms',
-            content: `Notice: ${student.firstName} ${student.lastName} was marked absent on ${date}. Please contact the school if you have any questions.`
-          });
-        }
-      }
+
     }
 
     this.save();
+    await this.flush();
     return results;
   }
 
   // -------------------------------------------------------------
   // EXAMS & RESULTS: Small Exam + Big Exam -> Percentage Only
   // -------------------------------------------------------------
-  public getExamConfig(schoolId: string, academicYear?: string): ExamConfig {
-    const schoolYear = this.data.schools.find(school => school.id === schoolId)?.academicYear;
-    const yr = academicYear || schoolYear || this.data.settings.academicYearName || '2026-2027';
-    let conf = this.data.examConfigs.find(ec => ec.schoolId === schoolId && ec.academicYear === yr);
+  public async getExamConfig(schoolId: string, academicYear?: string): Promise<ExamConfig> {
+    // Flush pending writes before reading so a config created earlier in this
+    // request is visible to the new database-backed read.
+    await this.flush();
+    const school = academicYear ? null : await this.getSchoolById(schoolId);
+    const yr = academicYear || school?.academicYear || this.data.settings.academicYearName || '2026-2027';
+    const rows = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+    let conf = rows.find(item => item.schoolId === schoolId && item.academicYear === yr);
     if (!conf) {
       conf = {
-        id: `ec-${schoolId}-${Date.now()}`,
+        id: `ec-${schoolId}-${yr}`,
         schoolId,
         academicYear: yr,
         smallExamName: 'Small Exam',
@@ -1861,27 +2032,36 @@ class StorageEngine {
       };
       this.data.examConfigs.push(conf);
       this.save();
+      try {
+        await this.flush();
+      } catch (error) {
+        // Another request may have inserted the unique school/year row first.
+        const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+        if (persisted.length) return persisted[0];
+        throw error;
+      }
     }
     return conf;
   }
 
-  public updateExamConfig(schoolId: string, updates: Partial<ExamConfig>): ExamConfig {
-    const nextSmallMax = updates.smallExamMax ?? this.getExamConfig(schoolId).smallExamMax;
-    const nextBigMax = updates.bigExamMax ?? this.getExamConfig(schoolId).bigExamMax;
-    const nextPassMark = updates.passMarkPercentage ?? this.getExamConfig(schoolId).passMarkPercentage;
+  public async updateExamConfig(schoolId: string, updates: Partial<ExamConfig>): Promise<ExamConfig> {
+    const schoolYear = updates.academicYear || (await this.getSchoolById(schoolId))?.academicYear;
+    const conf = await this.getExamConfig(schoolId, schoolYear);
+    const nextSmallMax = updates.smallExamMax ?? conf.smallExamMax;
+    const nextBigMax = updates.bigExamMax ?? conf.bigExamMax;
+    const nextPassMark = updates.passMarkPercentage ?? conf.passMarkPercentage;
     if (![nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0) || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
       throw new Error('Exam maximum marks must be positive numbers and pass mark must be between 0 and 100.');
     }
-    const schoolYear = this.data.schools.find(school => school.id === schoolId)?.academicYear;
-    const yr = updates.academicYear || schoolYear || this.data.settings.academicYearName || '2026-2027';
-    let conf = this.getExamConfig(schoolId, yr);
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
+    if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
     this.data.examConfigs[idx] = {
       ...this.data.examConfigs[idx],
       ...updates,
       updatedAt: new Date().toISOString()
     };
     this.save();
+    await this.flush();
     return this.data.examConfigs[idx];
   }
 
@@ -1902,7 +2082,7 @@ class StorageEngine {
     submittedBy: string
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
-    const config = this.getExamConfig(schoolId);
+    const config = await this.getExamConfig(schoolId);
     const maxTotal = (config.smallExamMax || 10) + (config.bigExamMax || 10);
     for (const mark of marks) {
       if (!Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) || mark.smallExamMarks < 0 || mark.bigExamMarks < 0 || mark.smallExamMarks > config.smallExamMax || mark.bigExamMarks > config.bigExamMax) {
@@ -1969,7 +2149,7 @@ class StorageEngine {
     const approved: StudentMark[] = [];
 
     for (const id of markIds) {
-      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId);
+      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId && m.status === 'submitted');
       if (idx >= 0) {
         this.data.marks[idx].status = 'approved';
         this.data.marks[idx].approvedBy = approvedBy;
@@ -1997,7 +2177,7 @@ class StorageEngine {
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
-    const marks = await this.getMarks(schoolId, classId, undefined, semester);
+    const marks = (await this.getMarks(schoolId, classId, undefined, semester)).filter(mark => mark.status === 'approved');
 
     const rankings = students.map(student => {
       const studentMarks = marks.filter(m => m.studentId === student.id);
@@ -2029,9 +2209,9 @@ class StorageEngine {
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
   public async getClassYearlyRankings(schoolId: string, classId: string) {
     const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 1');
-    const sem2Marks = await this.getMarks(schoolId, classId, undefined, 'Semester 2');
-    const config = this.getExamConfig(schoolId);
+    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
+    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
+    const config = await this.getExamConfig(schoolId);
     const subjects = await this.getSubjects(schoolId);
 
     const yearlyResults = students.map(student => {
@@ -2118,6 +2298,7 @@ class StorageEngine {
     if (!sourceClass) throw new Error('Promotion source class was not found in this school.');
     const rankings = await this.getClassYearlyRankings(schoolId, classId);
     const rankByStudent = new Map(rankings.map((row, index) => [row.student.id, { ...row, rank: index + 1 }]));
+    const targetClasses = new Map<string, SchoolClass>();
     if (new Set(promotions.map(row => row.studentId)).size !== promotions.length || promotions.length !== rankings.length) {
       throw new Error('Confirmations must include each student in the selected class exactly once.');
     }
@@ -2130,13 +2311,33 @@ class StorageEngine {
         throw new Error('A reason is required for an administrator promotion override.');
       }
       if (promotion.decision === 'promoted') {
-        if (!promotion.classToId || !(await this.getClassById(promotion.classToId, schoolId))) throw new Error('Target class must belong to this school.');
+        if (!promotion.classToId) throw new Error('Target class must belong to this school.');
+        const targetClass = await this.getClassById(promotion.classToId, schoolId);
+        if (!targetClass || targetClass.isArchived) throw new Error('Target class must be an active class in this school.');
+        targetClasses.set(targetClass.id, targetClass);
       }
       promotion.yearlyPercentage = rank.yearlyPercentage;
       promotion.yearlyRank = rank.rank;
       if (promotion.adminOverride) promotion.notes = `ADMIN OVERRIDE: ${promotion.notes!.trim()}`;
     }
-    const config = this.getExamConfig(schoolId);
+
+    const incomingByClass = new Map<string, number>();
+    const outgoingByClass = new Map<string, number>();
+    for (const promotion of promotions) {
+      if (promotion.decision !== 'promoted' || !promotion.classToId || promotion.classToId === promotion.classFromId) continue;
+      incomingByClass.set(promotion.classToId, (incomingByClass.get(promotion.classToId) || 0) + 1);
+      outgoingByClass.set(promotion.classFromId, (outgoingByClass.get(promotion.classFromId) || 0) + 1);
+    }
+    for (const [targetClassId, incomingCount] of incomingByClass) {
+      const targetClass = targetClasses.get(targetClassId)!;
+      const currentCount = await this.queryPage('students', { school_id: schoolId, class_id: targetClassId }, 1, 1, undefined, 'id');
+      const outgoingCount = outgoingByClass.get(targetClassId) || 0;
+      if (currentCount.total - outgoingCount + incomingCount > targetClass.capacity) {
+        throw new Error(`Target class ${targetClass.name} does not have enough capacity for this promotion.`);
+      }
+    }
+
+    const config = await this.getExamConfig(schoolId);
     const yrFrom = config.academicYear;
     const [startYr, endYr] = yrFrom.split('-').map(Number);
     const yrTo = `${startYr + 1}-${endYr + 1}`;
@@ -2165,7 +2366,11 @@ class StorageEngine {
 
       // If promoted to next class, update student record
       if (p.decision === 'promoted' && p.classToId) {
-        await this.updateStudent(p.studentId, { classId: p.classToId }, schoolId);
+        const targetClass = targetClasses.get(p.classToId);
+        await this.updateStudent(p.studentId, {
+          classId: p.classToId,
+          branchId: (targetClass?.branchId ?? null) as any
+        }, schoolId);
       }
     }
 
@@ -2231,11 +2436,21 @@ class StorageEngine {
   }
 
   public async voidFeePayment(id: string, schoolId: string, userId: string, reason: string): Promise<FeePayment | null> {
-    await this.queryRows<FeePayment>('fee_payments', { id, school_id: schoolId });
-    const payment = this.data.feePayments.find(item => item.id === id && item.schoolId === schoolId);
-    if (!payment || payment.voidedAt) return null;
-    Object.assign(payment, { voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason });
-    this.save();
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic payment voiding is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_void_fee_payment', {
+      p_payment_id: id,
+      p_school_id: schoolId,
+      p_user_id: userId,
+      p_reason: reason
+    });
+    this.recordQuery('rpc:schoolos_void_fee_payment', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to void this payment.');
+    if (!data) return null;
+    const payment = fromSupabaseRow(data, 'fee_payments') as FeePayment;
+    const cachedIndex = this.data.feePayments.findIndex(item => item.id === id && item.schoolId === schoolId);
+    if (cachedIndex >= 0) this.data.feePayments[cachedIndex] = payment;
     return payment;
   }
 
@@ -2280,6 +2495,21 @@ class StorageEngine {
     }
   }
 
+  private async nextFeeReceiptSequence(schoolId: string, academicYear: string): Promise<number> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Unique fee receipt numbering is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_next_fee_receipt', {
+      p_school_id: schoolId,
+      p_academic_year: academicYear
+    });
+    this.recordQuery('rpc:schoolos_next_fee_receipt', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to allocate a unique fee receipt number.');
+    const sequence = Number(data);
+    if (!Number.isSafeInteger(sequence) || sequence < 1) throw new Error('Database returned an invalid fee receipt sequence.');
+    return sequence;
+  }
+
   private async recordCashFeePaymentInternal(paymentData: {
     schoolId: string; studentId: string; academicYear: string; month: string;
     feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom'; amountDue: number; amountPaid: number;
@@ -2312,31 +2542,54 @@ class StorageEngine {
     if (!Number.isFinite(paymentData.amountDue) || !Number.isFinite(paymentData.amountPaid) || paymentData.amountDue < 0 || paymentData.amountPaid < 0 || paymentData.amountPaid > paymentData.amountDue) {
       throw new Error('Payment amounts must be valid, non-negative values and cash paid cannot exceed the amount due.');
     }
-    const registrationRecord = paymentData.feeType === 'annual_registration'
-      ? this.data.feePayments.find(item => item.schoolId === paymentData.schoolId && item.studentId === student.id && item.feeType === 'annual_registration' && item.academicYear === paymentData.academicYear && !item.voidedAt)
-      : undefined;
-    if (registrationRecord) {
-      if (registrationRecord.status === 'paid') throw new Error('The annual registration fee is already paid for this student and academic year.');
-      const cumulativePaid = registrationRecord.amountPaid + paymentData.amountPaid;
-      if (cumulativePaid > registrationRecord.amountDue) throw new Error('Cash paid cannot exceed the remaining registration balance.');
-      registrationRecord.amountPaid = cumulativePaid;
-      registrationRecord.remainingAmount = registrationRecord.amountDue - cumulativePaid;
-      registrationRecord.status = registrationRecord.remainingAmount === 0 ? 'paid' : 'partial';
-      registrationRecord.date = new Date().toISOString().split('T')[0];
-      registrationRecord.recordedBy = paymentData.recordedBy;
-      if (paymentData.idempotencyKey) registrationRecord.idempotencyKeys = [...(registrationRecord.idempotencyKeys || []), paymentData.idempotencyKey];
-      if (paymentData.notes) registrationRecord.notes = [registrationRecord.notes, paymentData.notes].filter(Boolean).join(' · ');
-      this.logAudit({ action: 'REGISTRATION_FEE_INSTALLMENT', category: 'finance', schoolId: paymentData.schoolId, userId: paymentData.recordedBy, userName: 'Cashier / Accountant', userRole: 'accountant', details: `Collected an additional registration-fee installment for student ID ${student.id}. Balance: ${registrationRecord.remainingAmount}.`, severity: 'info' });
-      this.save();
+    const installmentUsesMonth = paymentData.feeType === 'monthly_tuition'
+      || paymentData.feeType === 'bus'
+      || (paymentData.feeType === 'custom' && matching?.cadence === 'monthly');
+    const installmentRecord = this.data.feePayments.find(item =>
+      item.schoolId === paymentData.schoolId
+      && item.studentId === student.id
+      && item.feeType === paymentData.feeType
+      && item.academicYear === paymentData.academicYear
+      && !item.voidedAt
+      && (!installmentUsesMonth || item.month === paymentData.month)
+      && (paymentData.feeType !== 'custom' || item.feeStructureId === matching?.id)
+    );
+    if (installmentRecord) {
+      const client = this.testClient || supabase;
+      if (!client || typeof client.rpc !== 'function') throw new Error('Atomic fee installment updates are unavailable.');
+      const startedAt = performance.now();
+      const { data, error } = await client.rpc('schoolos_apply_fee_installment', {
+        p_payment_id: installmentRecord.id,
+        p_school_id: paymentData.schoolId,
+        p_amount_paid: paymentData.amountPaid,
+        p_recorded_by: paymentData.recordedBy,
+        p_notes: paymentData.notes || null,
+        p_idempotency_key: paymentData.idempotencyKey || null
+      });
+      this.recordQuery('rpc:schoolos_apply_fee_installment', 'call', startedAt);
+      if (error) throw new Error(error.message || 'Unable to apply this fee installment.');
+      if (!data) throw new Error('The fee installment could not be found or has been voided.');
+      const updatedPayment = fromSupabaseRow(data, 'fee_payments') as FeePayment;
+      const cachedIndex = this.data.feePayments.findIndex(item => item.id === installmentRecord.id && item.schoolId === paymentData.schoolId);
+      if (cachedIndex >= 0) this.data.feePayments[cachedIndex] = updatedPayment;
+      this.logAudit({
+        action: 'FEE_INSTALLMENT_RECORDED',
+        category: 'finance',
+        schoolId: paymentData.schoolId,
+        userId: paymentData.recordedBy,
+        userName: 'Cashier / Accountant',
+        userRole: 'accountant',
+        details: `Collected an additional ${paymentData.feeType} installment for student ID ${student.id} (${paymentData.month}). Balance: ${updatedPayment.remainingAmount}.`,
+        severity: 'info'
+      });
       await this.flush();
-      return registrationRecord;
+      return updatedPayment;
     }
     const remaining = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
     const status = remaining === 0 ? 'paid' : paymentData.amountPaid > 0 ? 'partial' : 'unpaid';
     const school = await this.getSchoolById(paymentData.schoolId);
-    const paymentCount = await this.queryPage('fee_payments', { school_id: paymentData.schoolId }, 1, 1);
-    const receiptCount = paymentCount.total + 1;
-    const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptCount).padStart(4, '0')}`;
+    const receiptSequence = await this.nextFeeReceiptSequence(paymentData.schoolId, paymentData.academicYear);
+    const receiptNumber = `REC-${school?.code || 'SCH'}-${paymentData.academicYear.split('-')[0]}-${String(receiptSequence).padStart(4, '0')}`;
 
     const payment: FeePayment = {
       id: `fee-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -2379,8 +2632,8 @@ class StorageEngine {
 
   // Daily cash income report
   public async getDailyIncomeReport(schoolId: string, date: string) {
-    const payments = (await this.getFeePayments(schoolId)).filter(f => f.date === date && !f.voidedAt);
-    const totalCollected = payments.reduce((acc, p) => acc + (p.amountPaid || 0), 0);
+    const payments = (await this.getFeePayments(schoolId)).filter(f => f.date === date && !f.voidedAt && Number(f.amountPaid) > 0);
+    const totalCollected = payments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
     return {
       date,
       totalCollected,
@@ -2397,10 +2650,11 @@ class StorageEngine {
 
     return students.map(student => {
       const studentClass = classes.find(c => c.id === student.classId);
-      const studentPayments = payments.filter(p => p.studentId === student.id);
-      const totalPaid = studentPayments.filter(payment => !payment.voidedAt).reduce((acc, p) => acc + (p.amountPaid || 0), 0);
-      const totalDue = studentPayments.reduce((acc, p) => acc + (p.amountDue || 0), 0);
-      const totalRemaining = studentPayments.reduce((acc, p) => acc + (p.voidedAt ? p.amountDue || 0 : p.remainingAmount || 0), 0);
+      // Voided receipts are excluded from all arrears calculations.
+      const studentPayments = payments.filter(p => p.studentId === student.id && !p.voidedAt);
+      const totalPaid = studentPayments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
+      const totalDue = studentPayments.reduce((acc, p) => acc + (Number(p.amountDue) || 0), 0);
+      const totalRemaining = studentPayments.reduce((acc, p) => acc + (Number(p.remainingAmount) || 0), 0);
 
       return {
         student,
@@ -2460,6 +2714,59 @@ class StorageEngine {
   }
 
   // -------------------------------------------------------------
+  // INVENTORY
+  // -------------------------------------------------------------
+  public async getInventoryItems(schoolId: string): Promise<any[]> {
+    return this.queryRows('inventory_items', { school_id: schoolId });
+  }
+
+  public async getInventoryTransactions(schoolId: string, itemId?: string): Promise<any[]> {
+    return this.queryRows('inventory_transactions', { school_id: schoolId, item_id: itemId });
+  }
+
+  public async createInventoryItem(input: Record<string, any>): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const payload = toSupabaseRow({ ...input, id: `inv-${randomUUID()}` }, 'inventory_items');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('inventory_items').insert(payload).select('*').single();
+    this.recordQuery('inventory_items', 'insert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to create inventory item.');
+    return fromSupabaseRow(data, 'inventory_items');
+  }
+
+  public async updateInventoryItem(schoolId: string, itemId: string, updates: Record<string, any>): Promise<any | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const payload = toSupabaseRow(updates, 'inventory_items');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('inventory_items')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId).eq('id', itemId).select('*').maybeSingle();
+    this.recordQuery('inventory_items', 'update', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update inventory item.');
+    return data ? fromSupabaseRow(data, 'inventory_items') : null;
+  }
+
+  public async adjustInventoryStock(input: {
+    schoolId: string; itemId: string; transactionType: string; quantity: number;
+    unitCost?: number; reference?: string; note?: string; performedBy?: string;
+  }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Inventory stock adjustment is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_adjust_inventory', {
+      p_school_id: input.schoolId, p_item_id: input.itemId,
+      p_transaction_type: input.transactionType, p_quantity: input.quantity,
+      p_unit_cost: input.unitCost ?? 0, p_reference: input.reference ?? null,
+      p_note: input.note ?? null, p_performed_by: input.performedBy ?? null
+    });
+    this.recordQuery('rpc:schoolos_adjust_inventory', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to adjust inventory stock.');
+    return fromSupabaseRow(data, 'inventory_transactions');
+  }
+
+  // -------------------------------------------------------------
   // COMMUNICATION & SMS / WHATSAPP QUEUE
   // -------------------------------------------------------------
   public async getCommunicationSettings(schoolId: string): Promise<CommunicationSettings> {
@@ -2475,42 +2782,150 @@ class StorageEngine {
       };
       this.data.communicationSettings.push(s);
       this.save();
+      await this.flush();
     }
-    return s;
+    let upgraded = false;
+    for (const field of ['apiKey', 'apiSecret'] as const) {
+      const value = s[field];
+      if (value && !value.startsWith(COMMUNICATION_SECRET_PREFIX)) {
+        s[field] = encryptCommunicationSecret(value);
+        upgraded = true;
+      }
+    }
+    if (upgraded) { this.save(); await this.flush(); }
+    return {
+      ...s,
+      apiKey: decryptCommunicationSecret(s.apiKey),
+      apiSecret: decryptCommunicationSecret(s.apiSecret)
+    };
+  }
+
+  public async getPublicCommunicationSettings(schoolId: string): Promise<Record<string, any>> {
+    const settings = await this.getCommunicationSettings(schoolId);
+    return {
+      id: settings.id, schoolId: settings.schoolId, provider: settings.provider,
+      senderId: settings.senderId, isActive: settings.isActive, updatedAt: settings.updatedAt,
+      apiKeyConfigured: Boolean(settings.apiKey), apiSecretConfigured: Boolean(settings.apiSecret),
+      webhookConfigured: Boolean(settings.webhookUrl)
+    };
   }
 
   public async updateCommunicationSettings(schoolId: string, updates: Partial<CommunicationSettings>): Promise<CommunicationSettings> {
     const s = await this.getCommunicationSettings(schoolId);
     const idx = this.data.communicationSettings.findIndex(cs => cs.id === s.id);
+    const protectedUpdates = { ...updates };
+    if (protectedUpdates.apiKey !== undefined) protectedUpdates.apiKey = encryptCommunicationSecret(protectedUpdates.apiKey);
+    if (protectedUpdates.apiSecret !== undefined) protectedUpdates.apiSecret = encryptCommunicationSecret(protectedUpdates.apiSecret);
     this.data.communicationSettings[idx] = {
       ...this.data.communicationSettings[idx],
-      ...updates,
+      ...protectedUpdates,
       updatedAt: new Date().toISOString()
     };
     this.save();
-    return this.data.communicationSettings[idx];
+    await this.flush();
+    return {
+      ...this.data.communicationSettings[idx],
+      apiKey: decryptCommunicationSecret(this.data.communicationSettings[idx].apiKey),
+      apiSecret: decryptCommunicationSecret(this.data.communicationSettings[idx].apiSecret)
+    };
   }
 
-  public async queueNotification(itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status'>): Promise<CommunicationQueueItem> {
+  public async queueNotification(
+    itemData: Omit<CommunicationQueueItem, 'id' | 'createdAt' | 'status' | 'attemptCount' | 'maxAttempts' | 'nextAttemptAt' | 'lastAttemptAt' | 'providerMessageId'>,
+    idempotencyKey?: string
+  ): Promise<CommunicationQueueItem> {
+    const id = idempotencyKey
+      ? `msg-q-${createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 32)}`
+      : `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    if (idempotencyKey) {
+      const existing = (await this.queryRows<CommunicationQueueItem>('communication_queue', { id, school_id: itemData.schoolId }))[0];
+      if (existing) return existing;
+    }
     const settings = await this.getCommunicationSettings(itemData.schoolId);
     const isConfigured = settings.isActive && settings.provider !== 'none';
 
     const item: CommunicationQueueItem = {
       ...itemData,
-      id: `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      status: isConfigured ? 'sent' : 'queued',
-      errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Stored in queue as not sent.',
-      createdAt: new Date().toISOString(),
-      sentAt: isConfigured ? new Date().toISOString() : undefined
+      id,
+      // Queueing is not proof of delivery; only the provider worker can mark it sent.
+      status: 'queued',
+      attemptCount: 0,
+      maxAttempts: 5,
+      nextAttemptAt: new Date().toISOString(),
+      errorMessage: isConfigured ? undefined : 'No active SMS/WhatsApp provider configured. Waiting for provider setup.',
+      createdAt: new Date().toISOString()
     };
 
     this.data.communicationQueue.push(item);
     this.save();
+    await this.flush();
     return item;
+  }
+
+  public async claimCommunicationQueueItem(): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') return null;
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_claim_communication_queue');
+    this.recordQuery('rpc:schoolos_claim_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to claim a notification.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
+  }
+
+  public async completeCommunicationQueueItem(id: string, success: boolean, errorMessage?: string, providerMessageId?: string): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Notification delivery status is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_complete_communication_queue', {
+      p_id: id, p_success: success, p_error_message: errorMessage || null,
+      p_provider_message_id: providerMessageId || null
+    });
+    this.recordQuery('rpc:schoolos_complete_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update notification delivery status.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
+  }
+
+  public async retryCommunicationQueueItem(schoolId: string, id: string): Promise<CommunicationQueueItem | null> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Notification retry is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_retry_communication_queue', { p_id: id, p_school_id: schoolId });
+    this.recordQuery('rpc:schoolos_retry_communication_queue', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to retry notification.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, ) as CommunicationQueueItem : null;
   }
 
   public async getCommunicationQueue(schoolId: string): Promise<CommunicationQueueItem[]> {
     return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId });
+  }
+
+  // -------------------------------------------------------------
+  // SCHOOL EVENTS
+  // -------------------------------------------------------------
+  public async getEvents(schoolId: string): Promise<SchoolEvent[]> {
+    const events = await this.queryRows<SchoolEvent>('school_events', { school_id: schoolId });
+    return events.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title));
+  }
+
+  public async createEvent(eventData: Omit<SchoolEvent, 'id'>): Promise<SchoolEvent> {
+    const event: SchoolEvent = { ...eventData, id: `evt-${randomUUID()}` };
+    this.data.events.push(event);
+    this.save();
+    await this.flush();
+    return event;
+  }
+
+  public async deleteEvent(id: string, schoolId: string): Promise<boolean> {
+    await this.queryRows<SchoolEvent>('school_events', { id, school_id: schoolId });
+    const index = this.data.events.findIndex(event => event.id === id && event.schoolId === schoolId);
+    if (index < 0) return false;
+    this.data.events.splice(index, 1);
+    this.save();
+    await this.flush();
+    return true;
   }
 
   // -------------------------------------------------------------
@@ -2655,18 +3070,74 @@ class StorageEngine {
     if (changed) this.save();
   }
 
-  public getBroadcasts(): PlatformBroadcast[] {
-    return this.data.broadcasts;
+  public async getBroadcasts(): Promise<PlatformBroadcast[]> {
+    return this.queryRows<PlatformBroadcast>('platform_broadcasts', {});
   }
 
-  public createBroadcast(bData: Omit<PlatformBroadcast, 'id' | 'createdAt'>): PlatformBroadcast {
+  public async getSchoolBroadcasts(schoolId: string, role: string): Promise<PlatformBroadcast[]> {
+    const rows: PlatformBroadcast[] = [];
+    for (let page = 1;; page += 1) {
+      const result = await this.queryPage<PlatformBroadcast>(
+        'platform_broadcasts', {}, page, 100,
+        `or(target_school_id.eq.${schoolId},target_school_id.is.null)`
+      );
+      rows.push(...result.items);
+      if (rows.length >= result.total || !result.items.length) break;
+    }
+    return rows.filter(item => item.status === 'sent' && (
+      item.audience === 'all_schools' ||
+      item.audience === 'school_admins' && role === 'school_admin' ||
+      item.audience === 'teachers' && role === 'teacher' ||
+      item.audience === 'one_school' && item.targetSchoolId === schoolId
+    )).sort((a,b) => String(b.sentAt || b.createdAt).localeCompare(String(a.sentAt || a.createdAt)));
+  }
+
+  public async publishBroadcast(id: string): Promise<PlatformBroadcast | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('platform_broadcasts')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', id).in('status', ['draft','scheduled']).select('*').maybeSingle();
+    this.recordQuery('platform_broadcasts', 'publish', startedAt);
+    if (error) throw new Error(error.message || 'Unable to publish broadcast.');
+    return data ? fromSupabaseRow(data, 'platform_broadcasts') as PlatformBroadcast : null;
+  }
+
+  public async publishDueBroadcasts(): Promise<number> {
+    const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
+    const now = Date.now();
+    let published = 0;
+    for (const item of scheduled) {
+      if (!item.scheduledFor || Date.parse(item.scheduledFor) > now) continue;
+      // publishBroadcast uses an atomic status filter so multiple server instances
+      // cannot publish or audit the same scheduled broadcast twice.
+      const broadcast = await this.publishBroadcast(item.id);
+      if (!broadcast) continue;
+      this.logAudit({
+        action: 'PLATFORM_BROADCAST_AUTO_PUBLISHED',
+        category: 'security',
+        userId: 'system',
+        userName: 'SchoolOS Scheduler',
+        userRole: 'super_admin',
+        details: `Automatically published scheduled platform broadcast ${broadcast.id}.`,
+        severity: 'warning'
+      });
+      published += 1;
+    }
+    if (published > 0) await this.flush();
+    return published;
+  }
+
+  public async createBroadcast(bData: Omit<PlatformBroadcast, 'id' | 'createdAt'>): Promise<PlatformBroadcast> {
     const b: PlatformBroadcast = {
       ...bData,
-      id: `brd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `brd-${randomUUID()}`,
       createdAt: new Date().toISOString()
     };
     this.data.broadcasts.push(b);
     this.save();
+    await this.flush();
     return b;
   }
 
@@ -2723,17 +3194,14 @@ class StorageEngine {
   // -------------------------------------------------------------
   // SUBSCRIPTION INVOICES (PLATFORM OWNER REVENUE)
   // -------------------------------------------------------------
-  public getSubscriptionInvoices(schoolId?: string): SubscriptionInvoice[] {
-    if (schoolId) {
-      return this.data.invoices.filter(i => i.schoolId === schoolId);
-    }
-    return this.data.invoices;
+  public async getSubscriptionInvoices(schoolId?: string): Promise<SubscriptionInvoice[]> {
+    return this.queryRows<SubscriptionInvoice>('subscription_invoices', schoolId ? { school_id: schoolId } : {});
   }
 
   public createSubscriptionInvoice(invData: Omit<SubscriptionInvoice, 'id'>): SubscriptionInvoice {
     const invoice: SubscriptionInvoice = {
       ...invData,
-      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+      id: `inv-${randomUUID()}`
     };
     this.data.invoices.push(invoice);
     this.save();
@@ -2741,24 +3209,40 @@ class StorageEngine {
   }
 
   public async markInvoicePaid(id: string): Promise<SubscriptionInvoice | null> {
-    const inv = this.data.invoices.find(i => i.id === id);
+    const client = this.testClient || supabase;
+    if (!this.testClient && client && typeof client.rpc === 'function') {
+      const startedAt = performance.now();
+      const { data, error } = await client.rpc('schoolos_mark_subscription_invoice_paid', { p_invoice_id: id });
+      this.recordQuery('rpc:schoolos_mark_subscription_invoice_paid', 'call', startedAt);
+      if (error) throw new Error(error.message || 'Invoice payment could not be completed.');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return null;
+      const invoice = fromSupabaseRow(row, 'subscription_invoices') as SubscriptionInvoice;
+      await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+      schoolContextCache.delete(invoice.schoolId);
+      await this.getSchoolById(invoice.schoolId);
+      return invoice;
+    }
+
+    // In-memory test adapter fallback; production always uses the atomic RPC above.
+    await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
+    const inv = this.data.invoices.find(invoice => invoice.id === id);
     if (!inv) return null;
+    if (inv.status === 'paid') return inv;
     inv.status = 'paid';
-    inv.paidDate = new Date().toISOString().split('T')[0];
-    inv.receiptNumber = `SUB-REC-${Date.now().toString().slice(-6)}`;
-    
-    // Also extend or activate the school's subscription
+    inv.paidDate = new Date().toISOString().slice(0, 10);
+    inv.receiptNumber = `SUB-REC-${new Date().getUTCFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const school = await this.getSchoolById(inv.schoolId);
-    if (school) {
+    if (school?.subscription) {
       school.subscription.status = 'active';
       const now = new Date();
-      const validUntil = new Date(now);
+      const currentExpiry = Date.parse(String(school.subscription.validUntil || ''));
+      const validUntil = Number.isFinite(currentExpiry) && currentExpiry > now.getTime() ? new Date(currentExpiry) : new Date(now);
       if (inv.cadence === 'yearly') validUntil.setFullYear(validUntil.getFullYear() + 1);
       else if (inv.cadence === 'monthly') validUntil.setMonth(validUntil.getMonth() + 1);
       school.subscription.validUntil = validUntil.toISOString();
       this.updateSchool(school.id, { subscription: school.subscription });
     }
-
     this.save();
     await this.flush();
     return inv;
@@ -2789,17 +3273,17 @@ class StorageEngine {
   public async exportAuditLogsCSV(schoolId?: string): Promise<string> {
     const logs = await this.getAuditLogs(schoolId);
     const headers = ['Timestamp', 'Action', 'Category', 'Severity', 'User Name', 'Role', 'School Name', 'Details'];
-    const rows = logs.map(l => [
-      `"${l.timestamp}"`,
-      `"${l.action}"`,
-      `"${l.category}"`,
-      `"${l.severity}"`,
-      `"${(l.userName || '').replace(/"/g, '""')}"`,
-      `"${l.userRole}"`,
-      `"${(l.schoolName || '').replace(/"/g, '""')}"`,
-      `"${(l.details || '').replace(/"/g, '""')}"`
-    ]);
-    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const escapeCell = (value: unknown): string => {
+      let text = value == null ? '' : String(value);
+      // Prevent spreadsheet formula execution when opening exported audit data.
+      if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = logs.map(log => [
+      log.timestamp, log.action, log.category, log.severity,
+      log.userName, log.userRole, log.schoolName, log.details
+    ].map(escapeCell));
+    return [headers.map(escapeCell).join(','), ...rows.map(row => row.join(','))].join('\r\n');
   }
 
   // -------------------------------------------------------------
@@ -2808,20 +3292,68 @@ class StorageEngine {
   public async generateSchoolBackup(schoolId: string) {
     const school = await this.getSchoolById(schoolId);
     if (!school) return null;
+
+    // Include the supported tenant-owned business tables. Credential-bearing
+    // legacy provider settings and active login sessions are intentionally excluded.
+    // Each query is explicitly scoped to this school ID.
+    const schoolTables = [
+      'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
+      'bus_assignments', 'class_subjects', 'classes',
+      'direct_messages', 'discipline_incidents', 'exam_configs',
+      'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
+      'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
+      'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
+      'report_card_templates', 'school_branches', 'school_events', 'school_notices',
+      'staff_members', 'student_marks', 'students', 'subjects',
+      'support_tickets', 'teacher_unavailability', 'teachers',
+      'timetable_settings', 'timetable_slots', 'transport_routes'
+    ];
+    const tables: Record<string, any[]> = {};
+    const sensitiveBackupFields = [
+      'passwordHash', 'password_hash', 'pinHash', 'pin_hash', 'pin',
+      'twoFactorSecret', 'two_factor_secret', 'pendingTwoFactorSecret', 'pending_two_factor_secret',
+      'recoveryCodes', 'recovery_codes', 'apiKey', 'api_key', 'apiSecret', 'api_secret',
+      'webhookUrl', 'webhook_url'
+    ];
+    for (const table of schoolTables) {
+      const rows = await this.queryRows(table, { school_id: schoolId });
+      tables[table] = rows.map((row: Record<string, any>) => {
+        const safeRow = { ...row };
+        for (const field of sensitiveBackupFields) delete safeRow[field];
+        return safeRow;
+      });
+    }
+    // Authentication records, audit history, platform broadcasts, billing,
+    // provider secrets, and active sessions are intentionally never exported.
+
     return {
       backupDate: new Date().toISOString(),
+      version: '1.2.0',
       school,
-      branches: await this.getBranches(schoolId),
-      classes: await this.getClasses(schoolId),
-      subjects: await this.getSubjects(schoolId),
-      teachers: await this.getTeachers(schoolId),
-      students: await this.getStudents(schoolId),
-      attendance: await this.getSchoolAttendance(schoolId),
-      marks: await this.getSchoolMarks(schoolId),
-      feeStructures: await this.getFeeStructures(schoolId),
-      feePayments: await this.getFeePayments(schoolId),
-      reportCardDesign: await this.getReportCardDesign(schoolId)
+      tables,
+      // Keep the original top-level properties for existing restore/download consumers.
+      branches: tables.school_branches,
+      classes: tables.classes,
+      subjects: tables.subjects,
+      teachers: tables.teachers,
+      students: tables.students,
+      attendance: tables.attendance_records,
+      marks: tables.student_marks,
+      feeStructures: tables.fee_structures,
+      feePayments: tables.fee_payments,
+      reportCardDesign: tables.report_card_templates
     };
+  }
+
+  public async restoreSchoolBackup(payload: Record<string, unknown>): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Safe school backup restore is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_restore_school_backup', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_restore_school_backup', 'call', startedAt);
+    if (error) throw new Error(error.message || 'School backup restore failed.');
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
+    return data;
   }
 
   public async generatePlatformBackup() {
@@ -2848,36 +3380,111 @@ class StorageEngine {
     };
   }
 
-  public getLibraryBooks(schoolId: string): any[] {
-    this.data.libraryBooks = this.data.libraryBooks || [];
-    return this.data.libraryBooks.filter(b => b.schoolId === schoolId);
+  public async getDisciplineIncidents(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('discipline_incidents', { school_id: schoolId });
+    return rows.filter(row => row.schoolId === schoolId)
+      .sort((a, b) => String(b.incidentDate).localeCompare(String(a.incidentDate)));
   }
 
-  public addLibraryBook(book: any): any {
-    this.data.libraryBooks = this.data.libraryBooks || [];
-    const newBook = { id: `bk-${Date.now()}`, ...book, createdAt: new Date().toISOString() };
+  public async addDisciplineIncident(input: {
+    schoolId: string; studentId: string; incidentDate: string; infractionType: string;
+    severity: 'low' | 'medium' | 'high'; actionTaken: string; notes?: string;
+    parentContacted?: boolean; recordedBy: string;
+  }): Promise<any> {
+    const student = await this.getStudentById(input.studentId, input.schoolId);
+    if (!student || student.schoolId !== input.schoolId) throw new Error('Choose a student from this school.');
+    const incident = {
+      id: randomUUID(), ...input, notes: input.notes?.trim() || null,
+      parentContacted: input.parentContacted === true, createdAt: new Date().toISOString()
+    };
+    this.data.disciplineIncidents.push(incident);
+    this.save();
+    await this.flush();
+    return incident;
+  }
+
+  public async getLibraryBooks(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('library_books', { school_id: schoolId });
+    return rows.filter(book => book.schoolId === schoolId);
+  }
+
+  public async addLibraryBook(book: { schoolId: string; title: string; author?: string; isbn?: string; quantity: number }): Promise<any> {
+    const rows = await this.queryRows<any>('library_books', { school_id: book.schoolId });
+    const isbn = String(book.isbn || '').trim();
+    if (isbn && rows.some(existing => String(existing.isbn || '').trim().toLowerCase() === isbn.toLowerCase())) {
+      throw new Error('A book with this ISBN already exists in this school.');
+    }
+    const newBook = { id: `bk-${Date.now()}`, ...book, isbn: isbn || null, createdAt: new Date().toISOString() };
     this.data.libraryBooks.push(newBook);
     this.save();
+    await this.flush();
     return newBook;
+  }
+
+  public async getLibraryLoans(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('library_loans', { school_id: schoolId });
+    return rows.filter(loan => loan.schoolId === schoolId)
+      .sort((a, b) => String(b.issuedAt).localeCompare(String(a.issuedAt)));
+  }
+
+  public async issueLibraryLoan(input: {
+    schoolId: string; bookId: string; studentId: string; dueDate: string; issuedBy: string;
+  }): Promise<any> {
+    const [books, loans, student] = await Promise.all([
+      this.getLibraryBooks(input.schoolId),
+      this.getLibraryLoans(input.schoolId),
+      this.getStudentById(input.studentId, input.schoolId)
+    ]);
+    const book = books.find(row => row.id === input.bookId);
+    if (!book) throw new Error('Choose a book from this school.');
+    if (!student || student.schoolId !== input.schoolId) throw new Error('Choose a student from this school.');
+    const activeLoans = loans.filter(row => row.bookId === input.bookId && row.status === 'issued').length;
+    if (activeLoans >= Number(book.quantity || 0)) throw new Error('No available copies of this book.');
+    const loan = {
+      id: randomUUID(), schoolId: input.schoolId, bookId: input.bookId,
+      studentId: input.studentId, dueDate: input.dueDate,
+      issuedAt: new Date().toISOString(), issuedBy: input.issuedBy,
+      status: 'issued', returnedAt: null, returnedBy: null
+    };
+    this.data.libraryLoans.push(loan);
+    this.save();
+    await this.flush();
+    return loan;
+  }
+
+  public async returnLibraryLoan(schoolId: string, loanId: string, returnedBy: string): Promise<any> {
+    const loans = await this.getLibraryLoans(schoolId);
+    const loan = loans.find(row => row.id === loanId && row.schoolId === schoolId);
+    if (!loan) throw new Error('Library loan was not found in this school.');
+    if (loan.status !== 'issued') throw new Error('This book has already been returned.');
+    loan.status = 'returned';
+    loan.returnedAt = new Date().toISOString();
+    loan.returnedBy = returnedBy;
+    this.save();
+    await this.flush();
+    return loan;
   }
 
   public async getTransportRoutes(schoolId: string): Promise<any[]> {
     return this.queryRows<any>('transport_routes', { school_id: schoolId });
   }
 
-  public addTransportRoute(route: any): any {
-    this.data.transportRoutes = this.data.transportRoutes || [];
-    const { routeName, monthlyFee, ...fields } = route;
+  public async addTransportRoute(route: { schoolId: string; name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; capacity?: number; active?: boolean }): Promise<any> {
+    await this.queryRows<any>('transport_routes', { school_id: route.schoolId });
+    const { vehicleNumber, ...fields } = route;
     const newRoute = {
       id: `tr-${Date.now()}`, ...fields,
-      name: route.name || routeName,
-      routeNumber: route.routeNumber || route.vehicleNumber,
-      feeAmount: Number(route.feeAmount ?? monthlyFee ?? 0),
+      routeNumber: route.routeNumber || vehicleNumber || null,
+      vehicleNumber: vehicleNumber || null,
+      stops: Array.isArray(route.stops) ? route.stops : [],
+      feeAmount: Number(route.feeAmount),
+      capacity: Number(route.capacity ?? 40),
       active: route.active !== false,
       createdAt: new Date().toISOString()
     };
     this.data.transportRoutes.push(newRoute);
     this.save();
+    await this.flush();
     return newRoute;
   }
 
@@ -2889,8 +3496,17 @@ class StorageEngine {
     const student = await this.getStudentById(studentId, schoolId);
     const route = (await this.getTransportRoutes(schoolId)).find(item => item.id === routeId && item.active !== false);
     await this.getBusAssignments(schoolId);
-    if (!student || student.schoolId !== schoolId || !route) throw new Error('Choose a student and active route from this school.');
+    if (!student || student.schoolId !== schoolId || student.status !== 'active' || !route) {
+      throw new Error('Choose an active student and active route from this school.');
+    }
     const existing = this.data.busAssignments.find(item => item.schoolId === schoolId && item.studentId === studentId);
+    const activeOnRoute = this.data.busAssignments.filter(item =>
+      item.schoolId === schoolId && item.routeId === routeId && item.active !== false && item.studentId !== studentId
+    ).length;
+    const routeCapacity = Number(route.capacity || 40);
+    if (activeOnRoute >= routeCapacity) {
+      throw new Error('This bus route is full. Increase its capacity or choose another route.');
+    }
     const assignment = {
       ...(existing || {}), id: existing?.id || `bus-${studentId}`, schoolId, studentId, routeId,
       feeAmount: Number(route.feeAmount || 0), active: true

@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
-const sql = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
-for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
+for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
   const columns = new Map<string, { required: boolean; hasDefault: boolean }>();
   for (const line of match[2].split('\n')) {
     const column = line.trim().match(/^([a-z][a-z0-9_]*)\s+([A-Z][A-Z0-9_]*(?:\([^)]*\))?(?:\[\])?)(.*)$/i);
@@ -27,6 +28,9 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['school_notices', { id: 'n1', schoolId: 's1', title: 'Notice', content: 'Text', audience: 'class', classId: 'c1', isActive: true, isPinned: false, publishDate: '2026-09-01', authorName: 'Admin', authorRole: 'school_admin' }],
   ['direct_messages', { id: 'm1', schoolId: 's1', senderId: 'u1', senderName: 'Teacher', senderRole: 'teacher', recipientId: 'u2', recipientName: 'Parent', recipientRole: 'parent', content: 'Hello', timestamp: '2026-09-01T00:00:00Z', isRead: false }],
   ['fee_payments', { id: 'p1', schoolId: 's1', studentId: 'st1', receiptNumber: 'R-1', academicYear: '2026', month: 'September', feeType: 'custom', feeStructureId: 'fs1', idempotencyKey: 'key-1', amountDue: 10, amountPaid: 10, remainingAmount: 0, paymentMethod: 'Cash', status: 'paid', date: '2026-09-01', recordedBy: 'u1' }],
+  ['fee_receipt_sequences', { id: 's1:2026-2027', schoolId: 's1', academicYear: '2026-2027', nextValue: 1 }],
+  ['inventory_items', { id: 'inv1', schoolId: 's1', name: 'Exercise books', category: 'Stationery', unit: 'pack', quantityOnHand: 12, reorderLevel: 3, unitCost: 2.5, isActive: true }],
+  ['inventory_transactions', { id: 'itx1', schoolId: 's1', itemId: 'inv1', transactionType: 'stock_in', quantityDelta: 12, quantityBefore: 0, quantityAfter: 12, unitCost: 2.5 }],
   ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }]
 ];
 
@@ -44,10 +48,20 @@ test('domain write payloads map to real schema columns and satisfy required colu
 });
 
 test('schema checks exercised by student, teacher, fee and messaging writes are represented', () => {
+  assert.match(sql, /grade_level\s+INTEGER\s+NOT NULL\s+CHECK\s*\(grade_level BETWEEN 0 AND 12\)/i);
   assert.match(sql, /gender\s+VARCHAR\(10\)\s+NOT NULL\s+CHECK\s*\(gender IN \('male', 'female'\)\)/i);
   assert.match(sql, /payment_method\s+VARCHAR\(20\)\s+NOT NULL DEFAULT 'Cash' CHECK\s*\(payment_method = 'Cash'\)/i);
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
   assert.ok(definitions.has('payroll_records'), 'payroll persistence is represented in the schema');
+  assert.ok(definitions.has('inventory_items'), 'inventory item persistence is represented in the schema');
+  assert.ok(definitions.has('inventory_transactions'), 'inventory stock ledger is represented in the schema');
+  assert.match(sql, /schoolos_adjust_inventory/i);
+  assert.match(sql, /schoolos_claim_communication_queue/i);
+  assert.match(sql, /schoolos_complete_communication_queue/i);
+  assert.match(sql, /status IN \('present', 'late'\)/i);
+  assert.match(sql, /status = 'excused'/i);
+  assert.match(apiSource, /apiRouter\.post\('\/inventory\/:id\/transactions'/);
+  assert.match(apiSource, /await db\.exportAuditLogsCSV\(\)/);
   for (const [table, payload] of fixtures.filter(([name]) => ['students', 'teachers', 'staff_members'].includes(name))) {
     const mapped = mapStorageRowToDatabase(table, payload);
     const columns = definitions.get(table)!;
@@ -57,8 +71,8 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     }
   }
   for (const [label, needle] of [
-    ['student', "db.createStudent({ ...req.body"],
-    ['teacher', "db.createTeacher({ ...req.body"],
+    ['student', "db.createStudent({\n    schoolId: school.id"],
+        ['teacher', "db.createTeacher({\n    schoolId: school.id"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
   ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
 });
@@ -119,7 +133,7 @@ test('notice read receipts use school-scoped unique keys and self-only RLS', () 
   assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_notice_reads_user/);
   assert.match(migration, /notice_reads_self_scope/);
   assert.match(migration, /notice_reads_self_insert/);
-  assert.match(sql, /user_id = auth_user_id\(\)/);
+  assert.match(sql, /user_id = private.auth_user_id()/);
 });
 
 test('paged-list projections contain only columns that exist in schema.sql', () => {
@@ -139,4 +153,152 @@ test('student list route applies role scope in its single paged query', () => {
   assert.ok(route, 'students list route exists');
   assert.equal((route![0].match(/db\.queryPage\('students'/g) || []).length, 1);
   assert.equal(route![0].includes('db.getStudents('), false, 'role scoping does not hydrate the full student list');
+});
+
+test('fee receipt numbers use a database-atomic per-school academic-year sequence', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/026_fee_receipt_sequences.sql', import.meta.url), 'utf8');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.fee_receipt_sequences/);
+  assert.match(migration, /UNIQUE \(school_id, academic_year\)/);
+  assert.match(migration, /ON CONFLICT \(school_id, academic_year\)/);
+  assert.match(migration, /CREATE POLICY fee_receipt_sequences_deny_client/);
+  assert.match(migration, /SET search_path = ''/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_next_fee_receipt/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_next_fee_receipt[^;]+TO service_role/);
+});
+
+test('SECURITY DEFINER functions are schema-qualified and restricted to the service role', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/025_harden_security_definer_search_paths.sql', import.meta.url), 'utf8');
+  for (const name of [
+    'schoolos_bulk_import',
+    'schoolos_save_subject_assignments',
+    'super_admin_dashboard_summary',
+    'school_dashboard_summary',
+    'schoolos_notice_unread_count',
+    'schoolos_replace_class_timetable',
+    'schoolos_swap_timetable_slots'
+  ]) {
+    assert.ok(migration.includes(`public.${name}`), `${name} is schema-qualified`);
+    assert.ok(migration.includes(`REVOKE ALL ON FUNCTION public.${name}`), `${name} is revoked from client roles`);
+    assert.ok(migration.includes(`GRANT EXECUTE ON FUNCTION public.${name}`), `${name} is granted to service_role`);
+  }
+  assert.match(migration, /SET search_path = ''/);
+});
+
+
+test('inventory policies avoid overlapping SELECT permissions and index every inventory foreign key', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/040_inventory_policy_and_fk_indexes.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'CREATE INDEX IF NOT EXISTS inventory_items_created_by_idx',
+    'CREATE INDEX IF NOT EXISTS inventory_transactions_item_school_idx',
+    'CREATE INDEX IF NOT EXISTS inventory_transactions_performed_by_idx',
+    'CREATE POLICY inventory_items_school_insert',
+    'CREATE POLICY inventory_items_school_update',
+    'CREATE POLICY inventory_items_school_delete',
+    'FOR INSERT TO authenticated',
+    'FOR UPDATE TO authenticated',
+    'FOR DELETE TO authenticated'
+  ]) assert.ok(migration.includes(fragment), `inventory hardening migration includes ${fragment}`);
+  assert.doesNotMatch(migration, /CREATE POLICY inventory_items_school_write[\s\S]*?FOR ALL/i);
+  const schemaPolicies = sql.slice(sql.indexOf('DROP POLICY IF EXISTS inventory_items_school_read'));
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_read[\s\S]*?FOR SELECT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_insert[\s\S]*?FOR INSERT TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_update[\s\S]*?FOR UPDATE TO authenticated/i);
+  assert.match(schemaPolicies, /CREATE POLICY inventory_items_school_delete[\s\S]*?FOR DELETE TO authenticated/i);
+});
+
+
+test('database class-capacity guards serialize student enrollment and capacity edits', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/049_enforce_class_capacity.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'private.enforce_student_class_capacity()',
+    'private.prevent_class_capacity_below_enrollment()',
+    'FROM public.classes',
+    'FOR UPDATE',
+    'v_enrolled >= v_capacity',
+    'NEW.capacity < v_enrolled',
+    'BEFORE INSERT OR UPDATE OF school_id, class_id ON public.students',
+    'BEFORE UPDATE OF capacity ON public.classes',
+    'REVOKE ALL ON FUNCTION private.enforce_student_class_capacity()',
+    'GRANT EXECUTE ON FUNCTION private.enforce_student_class_capacity() TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `capacity migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
+
+
+test('fee payment voiding is atomic, school-scoped, and service-role only', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/050_atomic_fee_payment_void.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'schoolos_void_fee_payment(',
+    'RETURNS public.fee_payments',
+    'SECURITY DEFINER',
+    "SET search_path = ''",
+    'WHERE id = p_payment_id',
+    'AND school_id = p_school_id',
+    'FOR UPDATE',
+    'payment_row.voided_at IS NOT NULL',
+    'SET voided_at = now()',
+    'REVOKE ALL ON FUNCTION public.schoolos_void_fee_payment',
+    'GRANT EXECUTE ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `fee void migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
+
+
+test('fee installments are updated atomically and idempotently under a row lock', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/051_atomic_fee_installments.sql', import.meta.url), 'utf8');
+  for (const fragment of [
+    'schoolos_apply_fee_installment(',
+    'RETURNS public.fee_payments',
+    'SECURITY DEFINER',
+    "SET search_path = ''",
+    'WHERE id = p_payment_id AND school_id = p_school_id',
+    'FOR UPDATE',
+    'payment_row.idempotency_keys',
+    'next_paid := payment_row.amount_paid + p_amount_paid',
+    'next_paid > payment_row.amount_due',
+    'idempotency_keys = CASE',
+    'REVOKE ALL ON FUNCTION public.schoolos_apply_fee_installment',
+    'GRANT EXECUTE ON FUNCTION public.schoolos_apply_fee_installment(VARCHAR, VARCHAR, NUMERIC, VARCHAR, TEXT, VARCHAR) TO service_role'
+  ]) {
+    assert.ok(migration.includes(fragment), `fee installment migration includes ${fragment}`);
+    assert.ok(sql.includes(fragment), `fresh-install schema includes ${fragment}`);
+  }
+});
+
+
+test('school backups include newer tenant modules but exclude credentials and active sessions', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async generateSchoolBackup');
+  const end = storage.indexOf('public async generatePlatformBackup', start);
+  const backup = storage.slice(start, end);
+  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions']) {
+    assert.ok(backup.includes(`'${table}'`), `school backup includes ${table}`);
+  }
+  assert.doesNotMatch(backup, /'user_sessions'/, 'school backups do not contain active login sessions');
+  for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
+    assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
+  }
+  assert.match(backup, /sensitiveBackupFields/);
+  assert.match(backup, /tables\[table\] = rows\.map/);
+  assert.doesNotMatch(backup, /tables\.users\s*=/, 'school backups exclude login accounts entirely');
+});
+
+
+test('daily attendance waits for database persistence before returning success', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async recordDailyAttendance');
+  const end = storage.indexOf('// EXAMS & RESULTS', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /this\.save\(\);\s*await this\.flush\(\);\s*return results;/);
+});
+
+
+test('school backup restore rejects single-column foreign keys that cross school boundaries', () => {
+  assert.match(backupRestoreMigration, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
+  assert.match(backupRestoreMigration, /v_fk_scope := CASE[\s\S]*target_row\.role::text = ''super_admin''/);
+  assert.match(sql, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
 });

@@ -19,6 +19,12 @@ function getSessionSecret(): string {
   return secret;
 }
 
+export function isSessionExpiryValid(expiresAt: unknown, now = Date.now()): boolean {
+  if (typeof expiresAt !== 'string' || !expiresAt.trim()) return false;
+  const parsedExpiry = Date.parse(expiresAt);
+  return Number.isFinite(parsedExpiry) && parsedExpiry > now;
+}
+
 export interface SessionPayload {
   sessionId: string;
   userId: string;
@@ -32,6 +38,17 @@ export interface SessionPayload {
 // -------------------------------------------------------------
 // 1. Password & PIN Hashing (Scrypt)
 // -------------------------------------------------------------
+
+export function passwordPolicyError(password: unknown): string | null {
+  if (typeof password !== 'string' || password.length < 12) {
+    return 'Password must contain at least 12 characters.';
+  }
+  if (password.length > 128) return 'Password must not exceed 128 characters.';
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Password must include uppercase and lowercase letters and at least one number.';
+  }
+  return null;
+}
 
 export function hashPassword(password: string): string {
   if (!password) return '';
@@ -187,6 +204,29 @@ export function verify2FACode(code: string, secret: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function hashRecoveryCode(code: string): string {
+  const normalized = String(code || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!normalized) return '';
+  return crypto.createHmac('sha256', getSessionSecret()).update(normalized).digest('hex');
+}
+
+export function findRecoveryCodeIndex(code: string, storedCodes: string[]): number {
+  const normalized = String(code || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!normalized || !Array.isArray(storedCodes)) return -1;
+  const candidateHash = Buffer.from(hashRecoveryCode(normalized), 'hex');
+  const candidateLegacy = Buffer.from(normalized);
+  return storedCodes.findIndex(stored => {
+    if (typeof stored !== 'string') return false;
+    if (/^[a-f0-9]{64}$/i.test(stored)) {
+      const storedHash = Buffer.from(stored, 'hex');
+      return storedHash.length === candidateHash.length && crypto.timingSafeEqual(storedHash, candidateHash);
+    }
+    // Accept older plaintext recovery codes once, then replace them with hashes.
+    const legacy = Buffer.from(stored.replace(/[^a-z0-9]/gi, '').toUpperCase());
+    return legacy.length === candidateLegacy.length && crypto.timingSafeEqual(legacy, candidateLegacy);
+  });
 }
 
 export function generateRecoveryCodes(count = 8): string[] {
