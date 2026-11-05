@@ -97,7 +97,7 @@ export const MessagesView: React.FC = () => {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-[calc(100vh-100px)] flex flex-col">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Direct Communications</h1>
@@ -116,7 +116,7 @@ export const MessagesView: React.FC = () => {
 
       <div className="flex-1 bg-white rounded-xl border border-[#E2E8F0] overflow-hidden flex flex-col md:flex-row shadow-xs">
         {/* Contact List */}
-        <div className="w-full md:w-80 border-r border-slate-200 flex flex-col bg-slate-50/50">
+        <div className="w-full md:w-80 min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
           <div className="p-3 border-b border-slate-200 bg-white">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -130,7 +130,7 @@ export const MessagesView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-slate-100">
             {filteredContacts.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400">No contacts available.</div>
             ) : (
@@ -181,7 +181,7 @@ export const MessagesView: React.FC = () => {
               </div>
 
               {/* Chat history */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8FAFC]">
+              <div className="flex-1 min-h-0 p-4 overflow-y-auto overscroll-contain space-y-3 bg-[#F8FAFC]">
                 {activeThread.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs">
                     <MessageSquare className="w-8 h-8 mb-2 text-slate-300" />
