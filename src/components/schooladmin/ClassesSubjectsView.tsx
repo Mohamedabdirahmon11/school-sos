@@ -87,7 +87,6 @@ export const ClassesSubjectsView: React.FC = () => {
       const payload = {
         name: subjectName,
         code: subjectCode,
-        creditUnits: 0,
         department: 'General'
       };
       const savedSubject = editingSubject ? await ApiClient.updateSubject(editingSubject.id, payload) : await ApiClient.addSubject(payload, school?.id);
