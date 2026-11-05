@@ -391,6 +391,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 { id: 'overview', label: 'Overview' },
                 { id: 'attendance', label: 'Attendance' },
                 { id: 'results', label: 'Results' },
+                { id: 'fees', label: 'Fees' },
                 { id: 'documents', label: 'Documents' },
                 { id: 'notes', label: 'Notes' }
               ].map(t => (
@@ -491,10 +492,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <span>Current Balance Status:</span>
                   <span className="font-bold uppercase text-[#0F766E]">{selectedStudent.feeStatus}</span>
                 </div>
-                {studentDetails?.fees?.length === 0 ? (
+                {studentDetails?.payments?.length === 0 ? (
                   <p className="text-[#64748B] py-4 text-center">No fee payments recorded yet.</p>
                 ) : (
-                  studentDetails?.fees?.map((f: any) => (
+                  studentDetails?.payments?.map((f: any) => (
                     <div key={f.id} className="p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0] space-y-0.5">
                       <div className="flex justify-between font-mono">
                         <span className="font-medium text-[#132A29]">{f.receiptNumber}</span>
@@ -502,7 +503,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                       </div>
                       <div className="flex justify-between text-[11px] text-[#64748B]">
                         <span>{f.paymentMethod}</span>
-                        <span>{f.date.split('T')[0]}</span>
+                        <span>{String(f.date || f.paymentDate || '').split('T')[0] || '—'}</span>
                       </div>
                     </div>
                   ))
