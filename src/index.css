@@ -171,3 +171,82 @@
   .school-admin-design main > div { padding-left: 16px; padding-right: 16px; }
   .school-admin-design main table { min-width: 680px; }
 }
+
+
+/* Compact School Admin navigation: the sidebar owns its scroll area. */
+.school-admin-design {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.school-admin-design > .flex-1.flex.overflow-hidden {
+  min-height: 0;
+  overflow: hidden;
+}
+.school-admin-design aside {
+  width: 250px;
+  height: 100dvh;
+  max-height: 100dvh;
+  flex: 0 0 250px;
+  background: linear-gradient(180deg, #0b302d 0%, #082522 100%) !important;
+  box-shadow: 8px 0 28px rgba(6, 29, 26, .10);
+}
+.school-admin-design aside nav {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 14px 12px 18px;
+}
+.school-admin-design aside nav::-webkit-scrollbar { width: 5px; }
+.school-admin-design aside nav::-webkit-scrollbar-track { background: transparent; }
+.school-admin-design aside nav::-webkit-scrollbar-thumb {
+  background: rgba(180, 213, 207, .28);
+  border-radius: 999px;
+}
+.school-admin-design aside nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(180, 213, 207, .5);
+}
+.school-admin-design aside nav button {
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #c5d8d4;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+.school-admin-design aside nav button:hover {
+  background: rgba(255,255,255,.075);
+  border-color: rgba(255,255,255,.055);
+}
+.school-admin-design aside nav button[class*="bg-[#0F766E]"] {
+  background: linear-gradient(105deg, #167a70, #12645d) !important;
+  border-color: rgba(173, 238, 225, .16);
+  box-shadow: 0 5px 14px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.10);
+}
+.school-admin-design aside > div:first-child {
+  min-height: 68px;
+  height: 68px;
+  padding-left: 16px;
+  padding-right: 14px;
+  background: rgba(255,255,255,.025);
+}
+.school-admin-design aside > div:last-child {
+  min-height: 52px;
+  padding: 12px 14px;
+  background: #071f1d;
+  border-top-color: rgba(194, 225, 219, .12);
+}
+.school-admin-design main {
+  min-height: 0;
+}
+@media (max-width: 767px) {
+  .school-admin-design aside {
+    width: min(82vw, 300px);
+    flex-basis: auto;
+    height: 100dvh;
+  }
+  .school-admin-design main { min-height: 0; }
+}
