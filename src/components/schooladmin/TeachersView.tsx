@@ -32,7 +32,6 @@ export const TeachersView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [department, setDepartment] = useState('Sciences');
   const [qualification, setQualification] = useState('B.Ed / B.Sc');
   const [monthlySalary, setMonthlySalary] = useState(550);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -100,7 +99,6 @@ export const TeachersView: React.FC = () => {
         fullName,
         phone,
         gender,
-        department,
         qualification,
         monthlySalary,
         assignedClasses: selectedClassId ? [selectedClassId] : [],
@@ -174,7 +172,7 @@ export const TeachersView: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-[#132A29]">{t.fullName}</h3>
                 <span className="text-[11px] font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded border border-[#CCFBF1]">
-                  {t.department}
+                  {t.status === 'active' ? 'Active teacher' : 'Inactive teacher'}
                 </span>
               </div>
               <span className="text-[11px] font-bold text-emerald-700 uppercase">{t.status}</span>
@@ -260,32 +258,16 @@ export const TeachersView: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-[#334155]">Department</label>
-                  <select
-                    value={department}
-                    onChange={e => setDepartment(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-                  >
-                    <option value="Sciences">Sciences</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Languages">Languages</option>
-                    <option value="Social Studies">Social Studies</option>
-                    <option value="Islamic Studies">Islamic Studies</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
-                  <input
-                    type="number"
-                    min="100"
-                    required
-                    value={monthlySalary}
-                    onChange={e => setMonthlySalary(parseFloat(e.target.value) || 0)}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                </div>
+              <div>
+                <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
+                <input
+                  type="number"
+                  min="100"
+                  required
+                  value={monthlySalary}
+                  onChange={e => setMonthlySalary(parseFloat(e.target.value) || 0)}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                />
               </div>
 
               <div>
