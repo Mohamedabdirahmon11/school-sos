@@ -36,10 +36,10 @@ test('database trigger serializes issue requests and prevents over-lending', () 
   assert.match(migration, /prevent_library_quantity_below_loans/);
 });
 
-test('server API validates and records issue and return actions for school admins', () => {
-  assert.match(api, /apiRouter\.get\('\/school\/library\/loans',[^\n]*requireSchoolAdminOrSuperAdmin/);
-  assert.match(api, /apiRouter\.post\('\/school\/library\/loans',[^\n]*requireSchoolAdminOrSuperAdmin/);
-  assert.match(api, /apiRouter\.put\('\/school\/library\/loans\/:loanId\/return',[^\n]*requireSchoolAdminOrSuperAdmin/);
+test('server API validates issue and return actions for admins or staff with library permission', () => {
+  assert.match(api, /apiRouter\.get\('\/school\/library\/loans',[^\n]*requireSchoolAdminOrStaffPermission\('library_manage'\)/);
+  assert.match(api, /apiRouter\.post\('\/school\/library\/loans',[^\n]*requireSchoolAdminOrStaffPermission\('library_manage'\)/);
+  assert.match(api, /apiRouter\.put\('\/school\/library\/loans\/:loanId\/return',[^\n]*requireSchoolAdminOrStaffPermission\('library_manage'\)/);
   assert.match(api, /dueDate < today/);
   assert.match(storage, /public async issueLibraryLoan/);
   assert.match(storage, /public async returnLibraryLoan/);
