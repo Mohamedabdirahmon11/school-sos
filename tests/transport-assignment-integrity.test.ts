@@ -34,7 +34,7 @@ test('only active same-school students and active routes can receive assignments
   assert.match(migration, /school_id = NEW\.school_id AND status = 'active'/);
   assert.match(storage, /student\.status !== 'active'/);
   assert.match(storage, /item\.active !== false/);
-  assert.match(api, /apiRouter\.put\('\/bus\/assignments\/:studentId',[^\n]*requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.put\('\/bus\/assignments\/:studentId',[^\n]*requireSchoolAdminOrStaffPermission\('transport_manage'\)/);
 });
 
 test('transport UI exposes capacity and live seat occupancy', () => {
