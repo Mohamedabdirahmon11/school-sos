@@ -378,7 +378,7 @@ export const YearEndPromotionView: React.FC = () => {
         </div>
         {history.length === 0 ? <p className="p-4 text-xs text-[#64748B]">No confirmed promotion records yet.</p> : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[700px] text-left text-xs">
               <thead className="bg-slate-50 text-[#64748B]"><tr><th className="px-4 py-2">Student</th><th className="px-4 py-2">Academic year</th><th className="px-4 py-2">Decision</th><th className="px-4 py-2">Notes</th></tr></thead>
               <tbody>{history.map((record: any) => <tr key={record.id} className="border-t border-[#E2E8F0]"><td className="px-4 py-2">{record.studentId}</td><td className="px-4 py-2">{record.academicYearFrom} → {record.academicYearTo}</td><td className="px-4 py-2 capitalize">{record.decision}</td><td className="px-4 py-2">{record.notes || '—'}</td></tr>)}</tbody>
             </table>
