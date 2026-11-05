@@ -11,7 +11,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord } from '../types/index.ts';
+import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
