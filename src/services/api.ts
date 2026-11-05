@@ -326,7 +326,7 @@ export class ApiClient {
   }
 
   public static async generateBatchInvoices() {
-    return this.request<any>('/superadmin/invoices/generate', { method: 'POST' }).catch(() => ({ success: true, count: 0 }));
+    return this.request<{ success: boolean; generatedCount: number; skippedOpenInvoiceCount: number; skippedLifetimeCount: number; skippedInvalidPricingCount: number }>('/superadmin/invoices/generate', { method: 'POST' });
   }
 
   public static async getBroadcasts() {
