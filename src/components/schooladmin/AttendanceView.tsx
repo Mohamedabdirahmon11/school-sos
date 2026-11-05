@@ -61,6 +61,7 @@ const getSchoolLocalDate = (timeZone?: string): string => {
 
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
+  const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.phone);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [date, setDate] = useState(() => schoolLocalDate(school?.timezone));
@@ -168,6 +169,10 @@ export const AttendanceView: React.FC = () => {
   };
 
   const openAbsentStudentWhatsApp = (student: Student) => {
+    if (!adminWhatsAppNumber) {
+      setNotice('Marka hore School Settings geli lambarka WhatsApp-ka maamulka (+country code), kuna gal WhatsApp lambarkaas.');
+      return;
+    }
     const whatsappNumber = parentWhatsAppNumber(student);
     if (!whatsappNumber) {
       setNotice('Waalidka lambarkiisa u qor qaabka caalamiga ah, tusaale +2519XXXXXXXX, kadib WhatsApp fur.');
@@ -181,7 +186,7 @@ export const AttendanceView: React.FC = () => {
       className ? `Fasalka: ${className}.` : '',
       'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
       school?.name || '',
-      school?.phone ? `Xiriirka dugsiga: ${school.phone}` : ''
+      adminWhatsAppNumber ? `Xiriirka dugsiga: +${adminWhatsAppNumber}` : ''
     ].filter(Boolean).join('\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -436,13 +441,16 @@ export const AttendanceView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => openAbsentStudentWhatsApp(std)}
-                            disabled={isReadOnly || !validParentWhatsApp}
+                            disabled={isReadOnly || !validParentWhatsApp || !adminWhatsAppNumber}
                             title="Open WhatsApp chat with the parent and prepare the absence message"
                             className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                           </button>
                         ) : <span className="text-[11px] text-[#94A3B8]">—</span>}
+                        {state.status === 'absent' && !adminWhatsAppNumber && (
+                          <p className="mt-1 max-w-40 text-[10px] text-amber-700">Marka hore kaydi lambarka WhatsApp-ka maamulka ee School Settings.</p>
+                        )}
                         {state.status === 'absent' && !validParentWhatsApp && (
                           <p className="mt-1 max-w-40 text-[10px] text-amber-700">Ku qor waalidka lambarka +country code.</p>
                         )}
