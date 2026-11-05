@@ -147,7 +147,7 @@ export const NoticesEventsView: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
@@ -170,13 +170,13 @@ export const NoticesEventsView: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
         <button
           onClick={() => setActiveTab('events')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+          className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
             activeTab === 'events'
-              ? 'border-[#0F766E] text-[#0F766E]'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
+              ? 'bg-[#EAF4F1] text-[#0F766E]'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -220,7 +220,7 @@ export const NoticesEventsView: React.FC = () => {
               return (
                 <div
                   key={ev.id}
-                  className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-col justify-between"
+                  className="flex flex-col justify-between rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

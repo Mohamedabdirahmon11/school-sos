@@ -61,3 +61,198 @@
     display: block !important;
   }
 }
+
+
+/* School Admin visual reference: Scholastic Horizon design.
+   These rules are presentation-only; all existing routes, data requests and actions remain unchanged. */
+.school-admin-design {
+  --admin-canvas: #f2f6f5;
+  --admin-ink: #102522;
+  --admin-muted: #627571;
+  --admin-line: #dce7e4;
+  --admin-sidebar: #0b302d;
+  --admin-active: #155b55;
+  --admin-primary: #0e8078;
+  background: var(--admin-canvas) !important;
+  color: var(--admin-ink);
+}
+.school-admin-design main { background: var(--admin-canvas); }
+.school-admin-design aside {
+  width: 268px;
+  background: var(--admin-sidebar) !important;
+}
+.school-admin-design aside .h-14 { min-height: 76px; height: 76px; padding-left: 22px; padding-right: 22px; }
+.school-admin-design aside nav { padding: 16px 16px 20px; }
+.school-admin-design aside nav button {
+  min-height: 38px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 13px;
+  letter-spacing: .005em;
+}
+.school-admin-design aside nav button[class*="bg-[#0F766E]"] { background: var(--admin-active) !important; }
+.school-admin-design header {
+  background: rgba(255,255,255,.96);
+  border-color: var(--admin-line);
+}
+.school-admin-design main > div {
+  max-width: none;
+  padding: 30px 34px 36px;
+}
+.school-admin-design main .rounded-xl {
+  border-radius: 22px;
+}
+.school-admin-design main .rounded-lg {
+  border-radius: 12px;
+}
+.school-admin-design main [class*="border-[#E2E8F0]"],
+.school-admin-design main [class*="border-slate-200"] {
+  border-color: var(--admin-line) !important;
+}
+.school-admin-design main [class*="text-[#132A29]"] { color: var(--admin-ink) !important; }
+.school-admin-design main [class*="text-[#64748B]"] { color: var(--admin-muted) !important; }
+.school-admin-design main [class*="bg-[#0F766E]"] { background-color: var(--admin-primary) !important; }
+.school-admin-design main [class*="hover:bg-[#0D655E]"]:hover { background-color: #0b6f68 !important; }
+.school-admin-design main input,
+.school-admin-design main select,
+.school-admin-design main textarea {
+  min-height: 40px;
+  border-color: #d4e0dd;
+  border-radius: 10px;
+}
+.school-admin-design main table thead { background: #f4f8f7; }
+.school-admin-design main table th {
+  font-size: 11px;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.school-admin-design main table tbody tr:hover { background: #f5faf8; }
+.school-admin-design main button { transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.school-admin-design main button:focus-visible,
+.school-admin-design aside button:focus-visible {
+  outline: 3px solid rgba(14,128,120,.28);
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .school-admin-design aside { width: min(84vw, 320px); }
+  .school-admin-design main > div { padding: 20px 16px 28px; }
+  .school-admin-design main .rounded-xl { border-radius: 18px; }
+}
+
+
+/* Reference layout refinements shared by School Admin modules. */
+.school-admin-design main h1 {
+  color: var(--admin-ink);
+  font-size: clamp(1.55rem, 2vw, 2rem);
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+.school-admin-design main h2 { color: var(--admin-ink); letter-spacing: -.018em; }
+.school-admin-design main .bg-white { box-shadow: 0 1px 2px rgba(16,37,34,.025); }
+.school-admin-design main table { border-collapse: separate; border-spacing: 0; }
+.school-admin-design main table thead th { color: #657873; font-weight: 700; padding-top: 13px; padding-bottom: 13px; }
+.school-admin-design main table tbody td { padding-top: 13px; padding-bottom: 13px; }
+.school-admin-design main button:not(:disabled) { cursor: pointer; }
+.school-admin-design main button:disabled { cursor: not-allowed; }
+.school-admin-design main [role="dialog"] { border-radius: 22px; border-color: var(--admin-line); box-shadow: 0 24px 70px rgba(7,35,31,.18); }
+.school-admin-design main input:focus,
+.school-admin-design main select:focus,
+.school-admin-design main textarea:focus { border-color: var(--admin-primary); outline: 3px solid rgba(14,128,120,.12); }
+.school-admin-design aside nav { gap: 3px; }
+.school-admin-design aside nav button { line-height: 1.35; }
+.school-admin-design aside > div:last-child { background: #082522; border-color: #17433e; }
+.school-admin-design header { min-height: 64px; }
+.school-admin-design header button { border-radius: 10px; }
+@media (min-width: 1280px) {
+  .school-admin-design main > div { padding-left: 34px; padding-right: 34px; }
+}
+@media (max-width: 767px) {
+  .school-admin-design header { min-height: 56px; }
+  .school-admin-design main > div { padding-left: 16px; padding-right: 16px; }
+  .school-admin-design main table { min-width: 680px; }
+}
+
+
+/* Compact School Admin navigation: the sidebar owns its scroll area. */
+.school-admin-design {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.school-admin-design > .flex-1.flex.overflow-hidden {
+  min-height: 0;
+  overflow: hidden;
+}
+.school-admin-design aside {
+  width: 250px;
+  height: 100%;
+  max-height: 100%;
+  flex: 0 0 250px;
+  background: linear-gradient(180deg, #0b302d 0%, #082522 100%) !important;
+  box-shadow: 8px 0 28px rgba(6, 29, 26, .10);
+}
+.school-admin-design aside nav {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 14px 12px 18px;
+}
+.school-admin-design aside nav::-webkit-scrollbar { width: 5px; }
+.school-admin-design aside nav::-webkit-scrollbar-track { background: transparent; }
+.school-admin-design aside nav::-webkit-scrollbar-thumb {
+  background: rgba(180, 213, 207, .28);
+  border-radius: 999px;
+}
+.school-admin-design aside nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(180, 213, 207, .5);
+}
+.school-admin-design aside nav button {
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #c5d8d4;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+.school-admin-design aside nav button:hover {
+  background: rgba(255,255,255,.075);
+  border-color: rgba(255,255,255,.055);
+}
+.school-admin-design aside nav button[class*="bg-[#0F766E]"] {
+  background: linear-gradient(105deg, #167a70, #12645d) !important;
+  border-color: rgba(173, 238, 225, .16);
+  box-shadow: 0 5px 14px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.10);
+}
+.school-admin-design aside > div:first-child {
+  min-height: 68px;
+  height: 68px;
+  padding-left: 16px;
+  padding-right: 14px;
+  background: rgba(255,255,255,.025);
+}
+.school-admin-design aside > div:last-child {
+  min-height: 52px;
+  padding: 12px 14px;
+  background: #071f1d;
+  border-top-color: rgba(194, 225, 219, .12);
+}
+.school-admin-design main {
+  min-height: 0;
+}
+@media (max-width: 767px) {
+  .school-admin-design aside {
+    width: min(82vw, 300px);
+    flex-basis: auto;
+    height: 100dvh;
+  }
+  .school-admin-design main { min-height: 0; }
+}
+
+.school-admin-design main > div { min-height: 100%; }
+.school-admin-design main > div:has(> .flex-1.bg-white.rounded-xl) { min-height: 0; }
+@media (max-width: 767px) {
+  .school-admin-design aside nav button { min-height: 42px; }
+}

@@ -187,22 +187,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   if (isLoading) return <div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>;
   if (studentLoad.error) return <ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Enrolled Students Directory
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Three-part student records, fee status tracking, and 360-degree academic profiles
-          </p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Students</h1>
+          <p className="mt-1 text-sm text-[#71817d]">Manage admissions, student records and academic profiles</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={handleExportCSV}
-            className="px-3 py-1.5 text-xs font-medium text-[#334155] bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]"
           >
             <Download className="w-3.5 h-3.5 text-[#0F766E]" />
             <span>Export CSV</span>
@@ -210,7 +207,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <button
             onClick={() => setShowBulkImport(true)}
             disabled={isReadOnly}
-            className="px-3 py-1.5 text-xs font-medium text-[#334155] bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
           >
             <Upload className="w-3.5 h-3.5 text-[#0F766E]" />
             <span>{t('bulk_import')}</span>
@@ -218,7 +215,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <button
             onClick={() => setShowAddModal(true)}
             disabled={isReadOnly}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b6f68] disabled:opacity-50"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Admit Student</span>
@@ -234,20 +231,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       )}
 
       {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-[#E2E8F0]">
-        <div className="relative w-full md:w-72">
+      <div className="rounded-2xl border border-[#dce7e4] bg-white p-4 md:p-5">
+        <div className="relative w-full md:max-w-md">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
             placeholder="Search by student name, ID, or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+            className="w-full rounded-xl border border-[#d5e2de] bg-[#f8fbfa] py-3 pl-10 pr-4 text-sm text-[#18312d] outline-none transition placeholder:text-[#91a19c] focus:border-[#0e8078] focus:ring-2 focus:ring-[#0e8078]/10"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto text-xs">
-          <select value={branchFilter} onChange={e => { setBranchFilter(e.target.value); setPage(1); }} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]">
+        <div className="mt-3 flex w-full flex-wrap items-center gap-2 text-xs md:mt-4">
+          <select value={branchFilter} onChange={e => { setBranchFilter(e.target.value); setPage(1); }} className="min-w-[145px] rounded-xl border border-[#d5e2de] bg-white px-3 py-2.5 text-sm text-[#18312d] outline-none focus:border-[#0e8078]">
             <option value="">All Branches</option>
             {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
@@ -281,18 +278,22 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Students Table */}
-        <div className={`bg-white rounded-xl border border-[#E2E8F0] overflow-hidden ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        <div className={`overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)] ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+          <div className="flex items-center justify-between border-b border-[#e6efec] px-5 py-4">
+            <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
+            <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{students.length} shown</span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
+            <table className="w-full min-w-[820px] text-left text-sm">
+              <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
-                  <th className="px-4 py-3">Student ID</th>
-                  <th className="px-4 py-3">Full Three-Part Name</th>
-                  <th className="px-4 py-3">Class</th>
-                  <th className="px-4 py-3">Gender</th>
-                  <th className="px-4 py-3">Parent Phone</th>
-                  <th className="px-4 py-3">Fee Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-5 py-4">Student ID</th>
+                  <th className="px-5 py-4">Full Three-Part Name</th>
+                  <th className="px-5 py-4">Class</th>
+                  <th className="px-5 py-4">Gender</th>
+                  <th className="px-5 py-4">Parent Phone</th>
+                  <th className="px-5 py-4">Fee Status</th>
+                  <th className="px-5 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
@@ -312,28 +313,28 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                       <tr
                         key={s.id}
                         onClick={() => loadStudentDetails(s)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-[#F0FDFA]' : 'hover:bg-[#F8FAFC]'
+                        className={`cursor-pointer border-b border-[#edf2f0] transition-colors last:border-0 ${
+                          isSelected ? 'bg-[#eef8f5]' : 'hover:bg-[#f8fbfa]'
                         }`}
                       >
-                        <td className="px-4 py-3 font-mono font-bold text-[#0F766E]">{s.studentId}</td>
-                        <td className="px-4 py-3 font-semibold text-[#132A29]">
+                        <td className="px-5 py-4 font-mono font-bold text-[#0F766E]">{s.studentId}</td>
+                        <td className="px-5 py-4 font-semibold text-[#132A29]">
                           {s.firstName} {s.middleName} {s.lastName}
                         </td>
-                        <td className="px-4 py-3 text-[#334155]">{s.className}</td>
-                        <td className="px-4 py-3 capitalize text-[#64748B]">{s.gender}</td>
-                        <td className="px-4 py-3 font-mono text-[#64748B]">{s.fatherPhone}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] font-semibold ${
-                            normalizedFeeStatus === 'paid' ? 'text-emerald-700' :
-                            normalizedFeeStatus === 'partial' ? 'text-amber-700' :
-                            normalizedFeeStatus === 'unpaid' ? 'text-rose-700' :
-                            'text-slate-500'
+                        <td className="px-5 py-4 text-[#334155]">{s.className}</td>
+                        <td className="px-5 py-4 capitalize text-[#64748B]">{s.gender}</td>
+                        <td className="px-5 py-4 font-mono text-[#64748B]">{s.fatherPhone}</td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                            normalizedFeeStatus === 'partial' ? 'bg-amber-100 text-amber-800' :
+                            normalizedFeeStatus === 'unpaid' ? 'bg-rose-100 text-rose-800' :
+                            'bg-slate-100 text-slate-600'
                           }`}>
                             {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-5 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
                             {onPrintIDCard && (
                               <button

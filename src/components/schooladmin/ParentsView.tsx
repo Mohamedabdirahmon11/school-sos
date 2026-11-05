@@ -26,12 +26,12 @@ export const ParentsView: React.FC = () => {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-          Parents & Guardian Directory
+        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">
+          Parents & guardians
         </h1>
-        <p className="text-xs text-[#64748B]">
+        <p className="text-sm text-[#71817d]">
           Direct contact directory, linked enrolled siblings, and communication channels
         </p>
       </div>
@@ -49,10 +49,10 @@ export const ParentsView: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
+      <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
+          <table className="w-full min-w-[760px] text-left text-xs">
+            <thead className="bg-[#f6faf8] text-[#71817d] font-semibold border-b border-[#e6efec]">
               <tr>
                 <th className="px-4 py-3">Enrolled Child (Student)</th>
                 <th className="px-4 py-3">Class</th>
@@ -78,10 +78,10 @@ export const ParentsView: React.FC = () => {
                     <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.fatherPhone}</td>
                     <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.motherPhone}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-[11px] font-bold uppercase ${
-                        s.feeStatus === 'paid' ? 'text-emerald-700' : 'text-rose-700'
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                        s.feeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
-                        {s.feeStatus}
+                        {s.feeStatus || 'NOT SET'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

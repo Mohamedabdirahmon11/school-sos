@@ -422,7 +422,7 @@ export const SchoolSettingsView: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -436,7 +436,7 @@ export const SchoolSettingsView: React.FC = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-[#F1F5F9] p-1 rounded-xl text-xs overflow-x-auto">
+        <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-[#EAF1EF] p-1 text-xs shadow-sm md:w-fit">
           <button
             type="button"
             onClick={() => setActiveTab('identity')}

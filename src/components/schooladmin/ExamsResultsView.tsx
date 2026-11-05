@@ -183,21 +183,21 @@ export const ExamsResultsView: React.FC = () => {
   const maxCombined = smallExamMax + bigExamMax;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-[#0F766E]" />
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
+            <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
             {t('exams_results')}
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
+          <p className="mt-1 text-sm text-[#71817d]">
             Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
           </p>
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-[#F1F5F9] p-1 rounded-xl text-xs">
+        <div className="flex items-center gap-1 bg-[#edf4f1] p-1.5 rounded-2xl text-sm">
           <button
             type="button"
             onClick={() => setActiveTab('entry_approval')}
@@ -333,12 +333,12 @@ export const ExamsResultsView: React.FC = () => {
           {/* Marks Grading Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {students.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">
+              <div className="p-8 text-center text-sm text-[#71817d]">
                 No students enrolled in this class.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-[#132A29]">
+                <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
                   <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                     <tr>
                       <th className="py-3 px-4">Student</th>
@@ -462,7 +462,7 @@ export const ExamsResultsView: React.FC = () => {
               <h2 className="text-sm font-bold text-[#132A29]">
                 Semester 1 Class Ranking & Top Students Sheet
               </h2>
-              <p className="text-xs text-[#64748B]">
+              <p className="text-sm text-[#71817d]">
                 Class results calculated as average percentages across all curriculum subjects.
               </p>
             </div>
@@ -573,7 +573,7 @@ export const ExamsResultsView: React.FC = () => {
               <h2 className="text-sm font-bold text-[#132A29]">
                 Yearly Combined Results & Class Rank (Semester 1 + Semester 2)
               </h2>
-              <p className="text-xs text-[#64748B]">
+              <p className="text-sm text-[#71817d]">
                 Combines both semesters to produce yearly subject percentages and final class ranking.
               </p>
             </div>
@@ -644,7 +644,7 @@ export const ExamsResultsView: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
             <h2 className="text-base font-bold text-[#132A29]">Exam Configuration & Maximum Marks</h2>
-            <p className="text-xs text-[#64748B] mt-0.5">
+            <p className="text-sm text-[#71817d] mt-0.5">
               Set the maximum marks for Small Exam and Big Exam according to school policy.
             </p>
           </div>

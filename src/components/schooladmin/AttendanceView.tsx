@@ -174,15 +174,16 @@ export const AttendanceView: React.FC = () => {
   const visibleStudents = searchQuery.trim() ? filteredStudents.slice((page - 1) * 20, page * 20) : pageStudents;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
-            <CalendarCheck className="w-6 h-6 text-[#0F766E]" />
-            {t('attendance')} (Once Per Day)
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Daily operations</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
+            <CalendarCheck className="h-7 w-7 text-[#0e8078]" />
+            {t('attendance')}
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
+          <p className="mt-1 text-sm text-[#71817d]">
             Take official daily class attendance. Absent students automatically trigger parent notifications.
           </p>
         </div>
@@ -192,7 +193,7 @@ export const AttendanceView: React.FC = () => {
             type="button"
             onClick={handleMarkAllPresent}
             disabled={isReadOnly || students.length === 0}
-            className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]"
           >
             <Check className="w-3.5 h-3.5" />
             {t('mark_all_present')}
@@ -201,7 +202,7 @@ export const AttendanceView: React.FC = () => {
             type="button"
             onClick={handleSaveAttendance}
             disabled={isSaving || isReadOnly || students.length === 0}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             {isSaving ? 'Saving...' : 'Save Attendance'}
@@ -217,13 +218,13 @@ export const AttendanceView: React.FC = () => {
       )}
 
       {/* Control Bar: Class, Date */}
-      <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#dce7e4] bg-white p-5 sm:grid-cols-2 md:grid-cols-3">
         <div>
           <label className="block text-xs font-semibold text-[#475569] mb-1">Select Class</label>
           <select
             value={selectedClassId}
             onChange={e => setSelectedClassId(e.target.value)}
-            className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+            className="w-full rounded-xl border border-[#d5e2de] bg-[#f8fbfa] px-3 py-3 text-sm text-[#18312d] outline-none focus:border-[#0e8078] focus:ring-2 focus:ring-[#0e8078]/10"
           >
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
@@ -250,7 +251,7 @@ export const AttendanceView: React.FC = () => {
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
               placeholder="Search name or ID..."
-              className="w-full text-xs py-2 pl-9 pr-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+              className="w-full rounded-xl border border-[#d5e2de] bg-[#f8fbfa] py-3 pl-9 pr-3 text-sm text-[#18312d] outline-none focus:border-[#0e8078] focus:ring-2 focus:ring-[#0e8078]/10"
             />
           </div>
         </div>
@@ -258,30 +259,30 @@ export const AttendanceView: React.FC = () => {
 
       {/* Summary KPI Counters */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] shadow-sm">
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4">
           <p className="text-[11px] font-medium text-[#64748B]">Enrolled Students</p>
           <p className="text-xl font-bold text-[#132A29] font-mono mt-0.5">{totalCount}</p>
         </div>
-        <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 shadow-sm">
+        <div className="rounded-2xl border border-[#cce9df] bg-[#eff8f4] p-4">
           <p className="text-[11px] font-medium text-emerald-700">{t('present')}</p>
           <p className="text-xl font-bold text-emerald-800 font-mono mt-0.5">{presentCount}</p>
         </div>
-        <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 shadow-sm">
+        <div className="rounded-2xl border border-[#f3d9d7] bg-[#fff5f4] p-4">
           <p className="text-[11px] font-medium text-rose-700">{t('absent')}</p>
           <p className="text-xl font-bold text-rose-800 font-mono mt-0.5">{absentCount}</p>
         </div>
-        <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 shadow-sm">
+        <div className="rounded-2xl border border-[#f2e4c4] bg-[#fffaf0] p-4">
           <p className="text-[11px] font-medium text-amber-700">{t('late')}</p>
           <p className="text-xl font-bold text-amber-800 font-mono mt-0.5">{lateCount}</p>
         </div>
-        <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 shadow-sm col-span-2 sm:col-span-1">
+        <div className="col-span-2 rounded-2xl border border-[#dfe5f5] bg-[#f5f7fc] p-4 sm:col-span-1">
           <p className="text-[11px] font-medium text-indigo-700">{t('excused')}</p>
           <p className="text-xl font-bold text-indigo-800 font-mono mt-0.5">{excusedCount}</p>
         </div>
       </div>
 
       {/* Daily Attendance Student Register Table */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)]">
         {isLoading ? (
           <div className="p-8 text-center text-xs text-[#64748B]">Loading student attendance register...</div>
         ) : filteredStudents.length === 0 ? (
@@ -290,8 +291,8 @@ export const AttendanceView: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-[#132A29]">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
+            <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
+              <thead className="bg-[#f6faf8] border-b border-[#e6efec] text-[11px] uppercase font-semibold tracking-wide text-[#71817d]">
                 <tr>
                   <th className="py-3 px-4">Student ID</th>
                   <th className="py-3 px-4">Student Name</th>
@@ -300,7 +301,7 @@ export const AttendanceView: React.FC = () => {
                   <th className="py-3 px-4">Attendance Note</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F1F5F9]">
+              <tbody className="divide-y divide-[#edf2f0]">
                 {visibleStudents.map(std => {
                   const state = attendanceMap[std.id] || { status: 'present', note: '' };
                   return (

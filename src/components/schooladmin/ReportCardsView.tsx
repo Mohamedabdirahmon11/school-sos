@@ -152,7 +152,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border" style={{ borderColor: '#E2E8F0' }}>
+          <table className="w-full min-w-[720px] text-left text-xs border" style={{ borderColor: '#E2E8F0' }}>
             <thead className="bg-[#F8FAFC] border-b text-[11px] uppercase font-semibold text-[#64748B]">
               <tr>
                 <th className="py-2.5 px-3">Subject</th>

@@ -211,15 +211,15 @@ export const FeesLedgerView: React.FC = () => {
 
   if (feeLoad.error) return <ErrorState error={feeLoad.error} onRetry={feeLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
-            <Banknote className="w-6 h-6 text-[#0F766E]" />
-            Student Cash Fees & Billing Ledger
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
+            <Banknote className="h-7 w-7 text-[#0e8078]" />
+            Fees & payments
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
+          <p className="mt-1 text-sm text-[#71817d]">
             Cash-only collections, class-range fee structures, instant receipts, and daily reconciliation.
           </p>
         </div>
@@ -229,7 +229,7 @@ export const FeesLedgerView: React.FC = () => {
             type="button"
             onClick={() => setShowStructureModal(true)}
             disabled={isReadOnly}
-            className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]"
           >
             <Sliders className="w-3.5 h-3.5" />
             Class-Range Fees
@@ -238,7 +238,7 @@ export const FeesLedgerView: React.FC = () => {
             type="button"
             onClick={() => setShowRecordModal(true)}
             disabled={isReadOnly || students.length === 0}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"
           >
             <Plus className="w-3.5 h-3.5" />
             Record Cash Payment
@@ -325,14 +325,14 @@ export const FeesLedgerView: React.FC = () => {
           {/* Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {isLoading ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">Loading payments...</div>
+              <div className="p-8 text-center text-sm text-[#71817d]">Loading payments...</div>
             ) : filteredPayments.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">
+              <div className="p-8 text-center text-sm text-[#71817d]">
                 No cash payment records found. Click "Record Cash Payment" to record a collection.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-[#132A29]">
+                <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
                   <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                     <tr>
                       <th className="py-3 px-4">Receipt #</th>
@@ -406,10 +406,10 @@ export const FeesLedgerView: React.FC = () => {
         <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
           <div className="p-4 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29]">Fee Arrears & Outstanding Balances</h2>
-            <p className="text-xs text-[#64748B]">Students with unpaid tuition or activity balances.</p>
+            <p className="text-sm text-[#71817d]">Students with unpaid tuition or activity balances.</p>
           </div>
           {arrears.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#64748B]">All students are up to date on fee payments!</div>
+            <div className="p-8 text-center text-sm text-[#71817d]">All students are up to date on fee payments!</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#132A29]">
@@ -449,7 +449,7 @@ export const FeesLedgerView: React.FC = () => {
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center justify-between">
             <div>
-              <p className="text-xs text-[#64748B] font-medium">Daily Cash Collection Total</p>
+              <p className="text-sm text-[#71817d] font-medium">Daily Cash Collection Total</p>
               <p className="text-2xl font-bold font-mono text-[#132A29] mt-1">
                 {money(dailyReport?.totalCollected || 0)}
               </p>
@@ -503,7 +503,7 @@ export const FeesLedgerView: React.FC = () => {
           <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-[#132A29]">School Fee Structures & Class Ranges</h2>
-              <p className="text-xs text-[#64748B]">Define monthly rates per grade range, bus fees, and registration fees.</p>
+              <p className="text-sm text-[#71817d]">Define monthly rates per grade range, bus fees, and registration fees.</p>
             </div>
             <button
               type="button"
@@ -774,7 +774,7 @@ export const FeesLedgerView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowStructureModal(false)}
-                  className="px-3 py-2 text-xs text-[#64748B]"
+                  className="px-3 py-2 text-sm text-[#71817d]"
                 >
                   Cancel
                 </button>
@@ -864,7 +864,7 @@ export const FeesLedgerView: React.FC = () => {
               </div>
 
               {/* Payment Item Breakdown */}
-              <table className="w-full text-xs text-left border-t border-b border-[#E2E8F0] my-2">
+              <table className="w-full min-w-[640px] text-xs text-left border-t border-b border-[#E2E8F0] my-2">
                 <thead>
                   <tr className="border-b border-[#E2E8F0] text-[11px] uppercase text-[#64748B]">
                     <th className="py-2">Description</th>

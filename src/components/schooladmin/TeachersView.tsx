@@ -101,25 +101,24 @@ export const TeachersView: React.FC = () => {
   if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Faculty & Teaching Staff
-          </h1>
-          <p className="text-xs text-[#64748B]">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
+          <p className="mt-1 text-sm text-[#71817d]">
             Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <button type="button" onClick={handleExportTeachers}
-            className="px-3.5 py-2 text-xs font-semibold text-[#334155] bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg flex items-center gap-1.5">
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]">
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
           </button>
           <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
-            className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50">
             <Plus className="w-4 h-4" />
             <span>Appoint Teacher</span>
           </button>
@@ -145,43 +144,47 @@ export const TeachersView: React.FC = () => {
         <span className="text-xs text-[#64748B]">{filteredTeachers.length} of {teachers.length} teachers on this page</span>
       </div>
 
-      {/* Teachers Directory Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTeachers.map(t => (
-          <div key={t.id} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-[#132A29]">{t.fullName}</h3>
-                <span className="text-[11px] font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded border border-[#CCFBF1]">
-                  {t.department}
-                </span>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-700 uppercase">{t.status}</span>
-            </div>
-
-            <p className="text-xs text-[#64748B]">{t.qualification}</p>
-            <div className="space-y-1 text-[11px] text-[#64748B]">
-              <p><strong className="text-[#334155]">Classes:</strong> {(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</p>
-              <p><strong className="text-[#334155]">Subjects:</strong> {(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</p>
-            </div>
-
-            <div className="space-y-1 text-xs text-[#334155] pt-2 border-t border-[#F1F5F9]">
-              <p className="text-[11px] font-mono text-[#0F766E]">Teacher ID: {t.staffId || t.id}</p>
-              <p className="flex items-center gap-2 font-mono">
-                <Phone className="w-3.5 h-3.5 text-[#64748B]" />
-                <span>{t.phone || 'Phone not provided'}</span>
-              </p>
-              <p className="text-[11px] text-[#64748B] pt-1">
-                Base Salary: <strong className="font-mono text-[#132A29]">${t.monthlySalary} / month</strong>
-              </p>
-            </div>
-          </div>
-        ))}
-        {filteredTeachers.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-[#CBD5E1] bg-white p-8 text-center text-sm text-[#64748B]">
-            {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
-          </div>
-        )}
+      {/* Teachers Directory: reference-style table, retaining all existing teacher details */}
+      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-xs">
+            <thead>
+              <tr className="border-b border-[#E2E8F0]">
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Teacher</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Subjects</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Classes</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Phone</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Salary</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E2E8F0]">
+              {filteredTeachers.map(t => (
+                <tr key={t.id} className="hover:bg-[#F5FAF8]">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-[#132A29]">{t.fullName}</p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">{t.department} · {t.qualification}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">ID: {t.staffId || t.id}</p>
+                  </td>
+                  <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
+                  <td className="px-4 py-3 text-[#334155]">{(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
+                  <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
+                  <td className="px-4 py-3 font-mono text-[#132A29]">${t.monthlySalary} / month</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
+                  </td>
+                </tr>
+              ))}
+              {filteredTeachers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
+                    {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       <PaginationControls info={pageInfo} onPage={setPage} />
 
