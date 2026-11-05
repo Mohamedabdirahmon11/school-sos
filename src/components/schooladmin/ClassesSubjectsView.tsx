@@ -120,12 +120,11 @@ export const ClassesSubjectsView: React.FC = () => {
   if (classLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading classes"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (classLoad.error) return <ErrorState error={classLoad.error} onRetry={classLoad.retry} />;
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-          Classes, Sections & Curriculum Subjects
-        </h1>
-        <p className="text-xs text-[#64748B]">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Academic management</p>
+        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & subjects</h1>
+        <p className="mt-1 text-sm text-[#71817d]">
           Configure KG–Grade 12 classes, sections, room assignments, and curriculum subjects
         </p>
       </div>
