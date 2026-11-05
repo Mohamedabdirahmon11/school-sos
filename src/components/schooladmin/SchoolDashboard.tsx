@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { CalendarCheck, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
+import { CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface SchoolDashboardProps {
   onNavigate: (view: string) => void;
