@@ -325,9 +325,9 @@ export const FeesLedgerView: React.FC = () => {
           {/* Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {isLoading ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">Loading payments...</div>
+              <div className="p-8 text-center text-sm text-[#71817d]">Loading payments...</div>
             ) : filteredPayments.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">
+              <div className="p-8 text-center text-sm text-[#71817d]">
                 No cash payment records found. Click "Record Cash Payment" to record a collection.
               </div>
             ) : (
@@ -406,10 +406,10 @@ export const FeesLedgerView: React.FC = () => {
         <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
           <div className="p-4 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29]">Fee Arrears & Outstanding Balances</h2>
-            <p className="text-xs text-[#64748B]">Students with unpaid tuition or activity balances.</p>
+            <p className="text-sm text-[#71817d]">Students with unpaid tuition or activity balances.</p>
           </div>
           {arrears.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#64748B]">All students are up to date on fee payments!</div>
+            <div className="p-8 text-center text-sm text-[#71817d]">All students are up to date on fee payments!</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#132A29]">
@@ -449,7 +449,7 @@ export const FeesLedgerView: React.FC = () => {
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center justify-between">
             <div>
-              <p className="text-xs text-[#64748B] font-medium">Daily Cash Collection Total</p>
+              <p className="text-sm text-[#71817d] font-medium">Daily Cash Collection Total</p>
               <p className="text-2xl font-bold font-mono text-[#132A29] mt-1">
                 {money(dailyReport?.totalCollected || 0)}
               </p>
@@ -503,7 +503,7 @@ export const FeesLedgerView: React.FC = () => {
           <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-[#132A29]">School Fee Structures & Class Ranges</h2>
-              <p className="text-xs text-[#64748B]">Define monthly rates per grade range, bus fees, and registration fees.</p>
+              <p className="text-sm text-[#71817d]">Define monthly rates per grade range, bus fees, and registration fees.</p>
             </div>
             <button
               type="button"
@@ -774,7 +774,7 @@ export const FeesLedgerView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowStructureModal(false)}
-                  className="px-3 py-2 text-xs text-[#64748B]"
+                  className="px-3 py-2 text-sm text-[#71817d]"
                 >
                   Cancel
                 </button>
