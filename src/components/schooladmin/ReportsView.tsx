@@ -64,7 +64,7 @@ export const ReportsView: React.FC = () => {
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
@@ -85,7 +85,7 @@ export const ReportsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div hidden={user?.role === 'school_admin'} className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+        <div hidden={user?.role === 'school_admin'} className="min-w-0 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Total Collected</span>
             <div className="w-8 h-8 rounded-lg bg-teal-50 text-[#0F766E] flex items-center justify-center">
@@ -143,7 +143,7 @@ export const ReportsView: React.FC = () => {
       {/* Export Modules Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Finance Export */}
-        <div hidden={user?.role === 'school_admin'} className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-col justify-between">
+        <div hidden={user?.role === 'school_admin'} className="flex min-w-0 flex-col justify-between rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
           <div className="space-y-2">
             <div className="w-10 h-10 rounded-lg bg-teal-50 text-[#0F766E] flex items-center justify-center">
               <FileSpreadsheet className="w-5 h-5" />
