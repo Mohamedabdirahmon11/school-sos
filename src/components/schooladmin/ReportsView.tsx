@@ -64,19 +64,20 @@ export const ReportsView: React.FC = () => {
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Comprehensive Reports & Analytics Hub
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Insights & performance</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">
+            Reports & analytics
           </h1>
-          <p className="text-xs text-[#64748B]">
+          <p className="mt-1 text-sm text-[#71817d]">
             Aggregate performance indicators, fee collections, attendance stats, and one-click CSV data exports
           </p>
         </div>
         <button
           onClick={fetchSummary}
-          className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-1.5 hover:bg-slate-50"
+          className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh Metrics</span>
@@ -85,7 +86,7 @@ export const ReportsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div hidden={user?.role === 'school_admin'} className="min-w-0 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
+        <div hidden={user?.role === 'school_admin'} className="min-w-0 rounded-2xl border border-[#dce7e4] bg-white p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Total Collected</span>
             <div className="w-8 h-8 rounded-lg bg-teal-50 text-[#0F766E] flex items-center justify-center">
