@@ -1,24 +1,26 @@
 /**
- * School Admin Dashboard
- * Presentation aligned to the supplied School Admin reference.
- * Existing school-scoped API data and navigation actions are preserved.
+ * School Admin Core Dashboard
+ * Real campus metrics, today's attendance rate, daily collection, outstanding fees, notices, quick actions
  */
+
 import React from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import {
-  GraduationCap,
-  UserCheck,
-  CalendarCheck,
-  UserPlus,
+import { 
+  GraduationCap, 
+  UserCheck, 
+  CalendarCheck, 
+  CreditCard, 
+  TrendingUp, 
+  UserPlus, 
+  DollarSign, 
+  Clock, 
   BellRing,
   ArrowRight,
-  CalendarDays,
-  ClipboardList,
-  FileSpreadsheet,
-  Megaphone
+  ShieldAlert
 } from 'lucide-react';
 
 interface SchoolDashboardProps {
@@ -47,7 +49,7 @@ export function normalizeSchoolDashboardData(data: unknown) {
 }
 
 export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, onOpenAddStudent }) => {
-  const { school, isReadOnly } = useAuth();
+  const { school, isReadOnly, t } = useAuth();
   const { data, loading, error, retry } = useApi(
     () => ApiClient.getSchoolDashboard(school?.id),
     [school?.id],
@@ -56,172 +58,230 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
 
   if (loading) {
     return (
-      <div className="p-6 space-y-5" aria-label="Loading dashboard">
-        <div className="h-8 bg-slate-200 rounded-xl w-1/4 animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 bg-white rounded-2xl border border-slate-200 animate-pulse" />)}
+      <div className="p-6 space-y-4">
+        <div className="h-8 bg-slate-200 rounded w-1/4 animate-pulse"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-24 bg-white rounded-xl border border-slate-200 p-4 animate-pulse"></div>
+          ))}
         </div>
-        <div className="h-72 bg-white rounded-2xl border border-slate-200 animate-pulse" />
       </div>
     );
   }
+
   if (error) return <ErrorState error={error} onRetry={retry} />;
 
   const safeData = normalizeSchoolDashboardData(data);
-  const { totalStudents, totalTeachers, attendanceRate } = safeData.stats;
-  const notices = safeData.notices;
-  const latestNotices = notices.slice(0, 4);
-  const schoolLabel = school?.name || 'School Dashboard';
-
-  const metrics = [
-    { label: 'Students', value: totalStudents.toLocaleString(), note: 'Enrolled learners', icon: GraduationCap, action: () => onNavigate('sch_students') },
-    { label: 'Teachers', value: totalTeachers.toLocaleString(), note: 'Teaching faculty', icon: UserCheck, action: () => onNavigate('sch_teachers') },
-    { label: 'Attendance today', value: `${attendanceRate}%`, note: 'Daily attendance rate', icon: CalendarCheck, action: () => onNavigate('sch_attendance') }
-  ];
-
-  const quickActions = [
-    { label: 'Mark attendance', icon: CalendarCheck, action: () => onNavigate('sch_attendance') },
-    { label: 'New admission', icon: UserPlus, action: () => onNavigate('sch_admissions') },
-    { label: 'Post notice', icon: Megaphone, action: () => onNavigate('sch_notices') },
-    { label: 'Enter exam results', icon: FileSpreadsheet, action: () => onNavigate('sch_exams') }
-  ];
+  const { stats, recentPayments, notices } = safeData;
+  const { totalStudents, totalTeachers, attendanceRate, todayCollection, totalOutstanding } = stats;
+  const currency = school?.currency || 'ETB';
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-none mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Welcome Banner & Quick Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#0F766E] mb-1">School Admin</p>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#132A29]">Dashboard</h1>
-          <p className="text-sm text-[#64748B] mt-1">
-            {schoolLabel}{school?.academicYear ? ` · ${school.academicYear}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}
+          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
+            {school?.name || 'School Dashboard'}
+          </h1>
+          <p className="text-xs text-[#64748B]">
+            {school?.academicYear} · {school?.currentSemester} · Campus Code: <span className="font-mono">{school?.code}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
-            type="button"
-            onClick={() => onNavigate('sch_notices')}
-            className="px-4 py-2.5 text-sm font-semibold text-[#132A29] bg-white border border-[#DCE7E4] rounded-xl hover:bg-[#F8FBFA]"
-          >
-            View notices
-          </button>
-          <button
-            type="button"
             onClick={onOpenAddStudent}
             disabled={isReadOnly}
-            className="px-4 py-2.5 text-sm font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-xl disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50"
           >
-            <span className="inline-flex items-center gap-2"><UserPlus className="w-4 h-4" /> Add student</span>
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Admit Student</span>
           </button>
         </div>
       </div>
 
-      <section aria-label="School overview" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {metrics.map(({ label, value, note, icon: Icon, action }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={action}
-            className="text-left bg-white p-5 md:p-6 rounded-2xl border border-[#DCE7E4] hover:border-[#0F766E] hover:shadow-sm transition-all"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-[#627571]">{label}</span>
-              <span className="w-9 h-9 rounded-xl bg-[#EAF5F2] text-[#0F766E] flex items-center justify-center"><Icon className="w-5 h-5" /></span>
-            </div>
-            <div className="mt-2 text-3xl md:text-4xl font-bold tracking-tight text-[#102522] tabular-nums">{value}</div>
-            <div className="mt-1 text-xs text-[#627571]">{note}</div>
-          </button>
-        ))}
-      </section>
-
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="bg-white rounded-2xl border border-[#DCE7E4] p-5 md:p-6 xl:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-bold text-[#102522]">Notice board</h2>
-              <p className="text-xs text-[#627571] mt-1">Latest school announcements</p>
-            </div>
-            <BellRing className="w-5 h-5 text-[#0F766E]" />
+      {/* 4 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          onClick={() => onNavigate('sch_students')}
+          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
+        >
+          <div className="flex items-center justify-between text-[#64748B]">
+            <span className="text-xs font-medium uppercase tracking-wider">Enrolled Students</span>
+            <GraduationCap className="w-4 h-4 text-[#0F766E]" />
           </div>
-          {latestNotices.length === 0 ? (
-            <div className="py-8 text-center">
-              <BellRing className="w-8 h-8 mx-auto text-[#A8BCB7] mb-2" />
-              <p className="text-sm font-medium text-[#102522]">No notices yet</p>
-              <p className="text-xs text-[#627571] mt-1">Published announcements will appear here.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#E7EFEC]">
-              {latestNotices.map((notice: any, index: number) => (
-                <button
-                  type="button"
-                  key={notice?.id ?? index}
-                  onClick={() => onNavigate('sch_notices')}
-                  className="w-full py-3 text-left first:pt-0 last:pb-0"
-                >
-                  <span className="block text-sm font-semibold text-[#102522]">{notice?.title || 'School notice'}</span>
-                  <span className="block text-xs text-[#627571] mt-1 line-clamp-2">{notice?.content || ''}</span>
-                  <span className="block text-[11px] text-[#849590] mt-2">{typeof notice?.publishDate === 'string' ? notice.publishDate.split('T')[0] : 'Published'}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <button type="button" onClick={() => onNavigate('sch_notices')} className="mt-4 text-xs font-semibold text-[#0F766E] inline-flex items-center gap-1">
-            Manage notices <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold font-mono text-[#132A29]">{totalStudents}</span>
+            <span className="text-xs text-emerald-600 font-medium">Active</span>
+          </div>
+          <p className="text-[11px] text-[#64748B] mt-1">Student directory & profiles</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#DCE7E4] p-5 md:p-6 xl:col-span-1">
-          <div className="mb-4">
-            <h2 className="text-base font-bold text-[#102522]">Quick actions</h2>
-            <p className="text-xs text-[#627571] mt-1">Common school administration tasks</p>
+        <div 
+          onClick={() => onNavigate('sch_teachers')}
+          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
+        >
+          <div className="flex items-center justify-between text-[#64748B]">
+            <span className="text-xs font-medium uppercase tracking-wider">Teaching Faculty</span>
+            <UserCheck className="w-4 h-4 text-[#0F766E]" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {quickActions.map(({ label, icon: Icon, action }) => (
-              <button
-                type="button"
-                key={label}
-                onClick={action}
-                className="min-h-16 px-3 py-3 rounded-xl border border-[#DCE7E4] text-sm font-semibold text-[#102522] hover:border-[#0F766E] hover:bg-[#F5FAF8] flex items-center gap-2 text-left"
-              >
-                <span className="w-8 h-8 rounded-lg bg-[#EAF5F2] text-[#0F766E] flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
-                {label}
-              </button>
-            ))}
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold font-mono text-[#132A29]">{totalTeachers}</span>
+            <span className="text-xs text-emerald-600 font-medium">Appointed</span>
           </div>
-          <div className="mt-5 rounded-xl bg-[#F3F8F6] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#102522]"><ClipboardList className="w-4 h-4 text-[#0F766E]" /> Academic overview</div>
-            <p className="text-xs leading-relaxed text-[#627571] mt-2">Use the school modules to manage classes, attendance, examinations and student records. Dashboard figures reflect the selected school.</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Subject & class assignments</p>
+        </div>
+
+        <div 
+          onClick={() => onNavigate('sch_attendance')}
+          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
+        >
+          <div className="flex items-center justify-between text-[#64748B]">
+            <span className="text-xs font-medium uppercase tracking-wider">Today's Attendance</span>
+            <CalendarCheck className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold font-mono text-[#132A29]">{attendanceRate}%</span>
+            <span className="text-xs text-emerald-600 font-medium">Present</span>
+          </div>
+          <p className="text-[11px] text-[#64748B] mt-1">Daily register & absentee alerts</p>
+        </div>
+
+        <div hidden
+          onClick={() => onNavigate('sch_fees')}
+          className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer hover:border-[#0F766E] transition-colors"
+        >
+          <div className="flex items-center justify-between text-[#64748B]">
+            <span className="text-xs font-medium uppercase tracking-wider">Today's Collections</span>
+            <DollarSign className="w-4 h-4 text-[#0F766E]" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-bold font-mono text-[#132A29]">
+              ${todayCollection.toLocaleString()}
+            </span>
+            <span className="text-xs text-[#64748B]">{currency}</span>
+          </div>
+          <p className="text-[11px] text-[#64748B] mt-1">
+            Outstanding: ${totalOutstanding.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Center Layout: Left is Recent Fee Transactions, Right is Notices */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Recent Fee Payments Table */}
+        <div hidden className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden lg:col-span-2 shadow-xs">
+          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-[#132A29]">Recent Fee Payments</h2>
+              <p className="text-[11px] text-[#64748B]">Latest school tuition and transport receipts</p>
+            </div>
+            <button
+              onClick={() => onNavigate('sch_fees')}
+              className="text-xs font-semibold text-[#0F766E] hover:underline"
+            >
+              Full Ledger →
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
+                <tr>
+                  <th className="px-4 py-3">Receipt #</th>
+                  <th className="px-4 py-3">Student ID</th>
+                  <th className="px-4 py-3">Amount Paid</th>
+                  <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E2E8F0]">
+                {recentPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-[#64748B]">
+                      No payments recorded yet. Click "Record Payment" to log fee collections.
+                    </td>
+                  </tr>
+                ) : (
+                  recentPayments.map((p: any, index: number) => (
+                    <tr key={p?.id ?? index} className="hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-3 font-mono font-medium text-[#132A29]">{p?.receiptNumber || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-[#64748B]">{p?.studentId || '—'}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-[#132A29]">
+                        {formatMoney(Number(p?.amountPaid) || 0, currency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-[#334155]">{p?.paymentMethod || '—'}</span>
+                        {p?.referenceNumber && (
+                          <span className="block text-[10px] font-mono text-[#64748B]">{p.referenceNumber}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[11px] font-semibold ${
+                          p?.status === 'paid' ? 'text-emerald-700' :
+                          p?.status === 'partial' ? 'text-amber-700' :
+                          'text-red-700'
+                        }`}>
+                          {(p?.status || 'unpaid').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[#64748B]">
+                        {typeof p?.date === 'string' ? p.date.split('T')[0] : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#DCE7E4] p-5 md:p-6 xl:col-span-1">
-          <div className="flex items-center justify-between mb-4">
+        {/* Notices Board Widget */}
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs lg:col-span-1">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
             <div>
-              <h2 className="text-base font-bold text-[#102522]">School activity</h2>
-              <p className="text-xs text-[#627571] mt-1">Recent published updates</p>
+              <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-1.5">
+                <BellRing className="w-4 h-4 text-[#0F766E]" />
+                <span>Notice Board</span>
+              </h2>
+              <p className="text-[11px] text-[#64748B]">Announcements & circulars</p>
             </div>
-            <CalendarDays className="w-5 h-5 text-[#0F766E]" />
+            <button
+              onClick={() => onNavigate('sch_notices')}
+              className="text-xs text-[#0F766E] hover:underline font-semibold"
+            >
+              Manage
+            </button>
           </div>
-          {latestNotices.length === 0 ? (
-            <p className="text-sm text-[#627571] py-8 text-center">New school activity will appear here.</p>
-          ) : (
-            <div className="space-y-4">
-              {latestNotices.map((notice: any, index: number) => (
-                <div key={notice?.id ?? index} className="flex gap-3">
-                  <span className="w-2 h-2 mt-1.5 rounded-full bg-[#0F766E] shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#102522]">{notice?.title || 'School notice published'}</p>
-                    <p className="text-xs text-[#627571] mt-1 line-clamp-2">{notice?.content || ''}</p>
-                    <p className="text-[11px] text-[#849590] mt-1">{typeof notice?.publishDate === 'string' ? notice.publishDate.split('T')[0] : 'Recently'}</p>
+
+          <div className="space-y-3">
+            {notices.length === 0 ? (
+              <p className="text-xs text-[#64748B] text-center py-6">
+                No active notices published.
+              </p>
+            ) : (
+              notices.slice(0, 3).map((n: any, index: number) => (
+                <div key={n?.id ?? index} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#132A29]">{n?.title || '—'}</span>
+                    {n?.isPinned && (
+                      <span className="text-[10px] font-mono text-amber-700 font-bold uppercase">Pinned</span>
+                    )}
                   </div>
+                  <p className="text-[#475569] line-clamp-2 leading-relaxed">{n?.content || ''}</p>
+                  <p className="text-[10px] text-[#64748B] font-mono pt-1">
+                    {typeof n?.publishDate === 'string' ? n.publishDate.split('T')[0] : '—'} · By {n?.authorName || '—'}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-          <button type="button" onClick={() => onNavigate('sch_notices')} className="mt-5 text-xs font-semibold text-[#0F766E] inline-flex items-center gap-1">
-            View activity <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+              ))
+            )}
+          </div>
         </div>
-      </section>
+
+      </div>
     </div>
   );
 };
