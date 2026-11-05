@@ -477,10 +477,10 @@ class StorageEngine {
       ['timetableSettings', 'timetable_settings'], ['teacherUnavailability', 'teacher_unavailability'],
       ['examConfigs', 'exam_configs'], ['marks', 'student_marks'], ['promotions', 'promotions'],
       ['feeStructures', 'fee_structures'], ['feePayments', 'fee_payments'], ['reportCardDesigns', 'report_card_templates'],
-      ['communicationSettings', ], ['communicationQueue', ],
+      ['communicationSettings', 'communication_settings'], ['communicationQueue', 'communication_queue'],
       ['notices', 'school_notices'], ['events', 'school_events'], ['messages', 'direct_messages'],
       ['broadcasts', 'platform_broadcasts'], ['tickets', 'support_tickets'], ['invoices', ],
-      ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'],
+      ['auditLogs', 'audit_logs'], ['assignments', 'assignments'], ['assignmentSubmissions', 'assignment_submissions'], ['invoices', 'subscription_invoices'],
       ['staffMembers', 'staff_members'], ['payrollRecords', 'payroll_records'], ['libraryBooks', 'library_books'], ['libraryLoans', 'library_loans'], ['transportRoutes', 'transport_routes'],
       ['admissionApplications', 'admission_applications'],
       ['feeRanges', 'fee_ranges'], ['busAssignments', 'bus_assignments'], ['inventoryItems', 'inventory_items'], ['inventoryTransactions', 'inventory_transactions'], ['notificationTemplates', 'notification_templates'],
@@ -604,16 +604,16 @@ class StorageEngine {
     const tables: Array<[string, any[]]> = [
       ['plans', snapshot.plans],
       ['schools', snapshot.schools.map(({ subscription: _subscription, ...school }) => school)],
-      [snapshot.schools.filter(school => school.subscription).map(school => ({ id: school.id, schoolId: school.id, ...school.subscription }))],
+      ['school_subscriptions', snapshot.schools.filter(school => school.subscription).map(school => ({ id: school.id, schoolId: school.id, ...school.subscription }))],
       ['school_branches', snapshot.branches], ['users', snapshot.users], ['user_sessions', snapshot.sessions],
       ['classes', snapshot.classes], ['subjects', snapshot.subjects], ['students', snapshot.students], ['teachers', snapshot.teachers],
       ['timetable_slots', snapshot.timetable], ['attendance_records', snapshot.attendance], ['exam_configs', snapshot.examConfigs],
       ['student_marks', snapshot.marks], ['promotions', snapshot.promotions], ['promotion_history', snapshot.promotionHistory],
       ['fee_structures', snapshot.feeStructures], ['fee_payments', snapshot.feePayments], ['report_card_templates', snapshot.reportCardDesigns],
       ['fee_ranges', snapshot.feeRanges], ['bus_assignments', snapshot.busAssignments], ['notification_templates', snapshot.notificationTemplates],
-      [snapshot.communicationSettings], [snapshot.communicationQueue],
+      ['communication_settings', snapshot.communicationSettings], ['communication_queue', snapshot.communicationQueue],
       ['school_notices', snapshot.notices], ['school_events', snapshot.events], ['direct_messages', snapshot.messages],
-      ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], [snapshot.invoices],
+      ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
       ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['transport_routes', snapshot.transportRoutes], ['discipline_incidents', snapshot.disciplineIncidents],
       ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
@@ -885,7 +885,7 @@ class StorageEngine {
   public async getSchools(): Promise<School[]> {
     const [schools, subscriptions] = await Promise.all([
       this.queryRows<School>('schools', {}),
-      this.queryRows<any>({})
+      this.queryRows<any>('school_subscriptions', {})
     ]);
     return schools.map(school => ({ ...school, subscription: subscriptions.find(item => item.schoolId === school.id), branches: [] }));
   }
@@ -898,7 +898,7 @@ class StorageEngine {
     }
     const [schools, subscriptions] = await Promise.all([
       this.queryRows<School>('schools', { id }),
-      this.queryRows<any>({ school_id: id })
+      this.queryRows<any>('school_subscriptions', { school_id: id })
     ]);
     const s = schools[0];
     if (!s) return null;
@@ -915,7 +915,7 @@ class StorageEngine {
     const s = (await this.queryRows<School>('schools', { code: code.trim().toUpperCase() }))[0];
     if (!s) return null;
     const [[subscription], branches] = await Promise.all([
-      this.queryRows<any>({ school_id: s.id }),
+      this.queryRows<any>('school_subscriptions', { school_id: s.id }),
       this.queryRows<SchoolBranch>('school_branches', { school_id: s.id })
     ]);
     return {
@@ -2770,7 +2770,7 @@ class StorageEngine {
   // COMMUNICATION & SMS / WHATSAPP QUEUE
   // -------------------------------------------------------------
   public async getCommunicationSettings(schoolId: string): Promise<CommunicationSettings> {
-    await this.queryRows<CommunicationSettings>({ school_id: schoolId });
+    await this.queryRows<CommunicationSettings>('communication_settings', { school_id: schoolId });
     let s = this.data.communicationSettings.find(cs => cs.schoolId === schoolId);
     if (!s) {
       s = {
@@ -2838,7 +2838,7 @@ class StorageEngine {
       ? `msg-q-${createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 32)}`
       : `msg-q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     if (idempotencyKey) {
-      const existing = (await this.queryRows<CommunicationQueueItem>({ id, school_id: itemData.schoolId }))[0];
+      const existing = (await this.queryRows<CommunicationQueueItem>('communication_queue', { id, school_id: itemData.schoolId }))[0];
       if (existing) return existing;
     }
     const settings = await this.getCommunicationSettings(itemData.schoolId);
@@ -2899,7 +2899,7 @@ class StorageEngine {
   }
 
   public async getCommunicationQueue(schoolId: string): Promise<CommunicationQueueItem[]> {
-    return this.queryRows<CommunicationQueueItem>({ school_id: schoolId });
+    return this.queryRows<CommunicationQueueItem>('communication_queue', { school_id: schoolId });
   }
 
   // -------------------------------------------------------------
@@ -3180,7 +3180,7 @@ class StorageEngine {
   // SUBSCRIPTION INVOICES (PLATFORM OWNER REVENUE)
   // -------------------------------------------------------------
   public async getSubscriptionInvoices(schoolId?: string): Promise<SubscriptionInvoice[]> {
-    return this.queryRows<SubscriptionInvoice>(schoolId ? { school_id: schoolId } : {});
+    return this.queryRows<SubscriptionInvoice>('subscription_invoices', schoolId ? { school_id: schoolId } : {});
   }
 
   public createSubscriptionInvoice(invData: Omit<SubscriptionInvoice, 'id'>): SubscriptionInvoice {
@@ -3203,7 +3203,7 @@ class StorageEngine {
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return null;
       const invoice = fromSupabaseRow(row, ) as SubscriptionInvoice;
-      await this.queryRows<SubscriptionInvoice>({ id });
+      await this.queryRows<SubscriptionInvoice>('subscription_invoices', { id });
       schoolContextCache.delete(invoice.schoolId);
       await this.getSchoolById(invoice.schoolId);
       return invoice;
