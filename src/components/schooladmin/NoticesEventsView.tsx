@@ -153,9 +153,6 @@ export const NoticesEventsView: React.FC = () => {
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
             Notice board
           </h1>
-          <p className="text-xs text-[#64748B]">
-            
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {activeTab === 'notices' && user?.role === 'school_admin' && <button onClick={() => { setEditingNotice(null); setShowNoticeModal(true); }} className="px-3.5 py-2 bg-[#0F766E] text-white text-xs font-semibold rounded-lg"><Plus className="w-3.5 h-3.5 inline mr-1" />{t('add_notice')}</button>}
