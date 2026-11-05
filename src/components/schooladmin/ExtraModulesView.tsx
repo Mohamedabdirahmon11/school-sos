@@ -442,7 +442,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {inventory.map(i => (
+                {inventory.length === 0 ? <tr><td colSpan={6} className="p-6 text-center text-[#64748B]">No inventory records are connected yet.</td></tr> : inventory.map(i => (
                   <tr key={i.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono font-bold text-[#0F766E]">{i.assetTag}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{i.itemName}</td>
