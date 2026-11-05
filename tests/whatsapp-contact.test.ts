@@ -27,7 +27,9 @@ test('attendance and manual WhatsApp actions use the same validator and never au
   assert.ok(attendance.includes("import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts'"));
   assert.ok(settings.includes("import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts'"));
   assert.ok(attendance.includes('window.open(url'));
+  assert.ok(attendance.includes('if (!adminWhatsAppNumber)'));
   assert.ok(settings.includes('window.open(`https://wa.me/${digits}'));
+  assert.ok(settings.includes('if (!normalizeWhatsAppNumber(school?.phone))'));
   assert.ok(api.includes('Paid provider settings and queued delivery endpoints are intentionally disabled.'));
   assert.match(guide, /administrator-owned WhatsApp account/);
   assert.match(guide, /does not send WhatsApp messages automatically/);
