@@ -175,14 +175,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
       <aside className={`
         fixed md:static inset-y-0 left-0 z-40
-        w-64 bg-[#0B2B2A] text-white flex flex-col shrink-0
+        w-[250px] h-[100dvh] bg-[#0B2B2A] text-white flex flex-col shrink-0 md:sticky md:top-0 md:self-start
         transition-transform duration-200 ease-in-out
         ${isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         {/* Brand / Tenant Header */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-[#143D3B] shrink-0">
+        <div className="h-16 px-4 flex items-center justify-between border-b border-[#143D3B] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#0F766E] flex items-center justify-center font-bold text-base tracking-wider shrink-0 text-white shadow-sm">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#15998F] to-[#0F766E] flex items-center justify-center font-bold text-base tracking-wider shrink-0 text-white shadow-lg shadow-black/20 ring-1 ring-white/10">
               S
             </div>
             <div className="min-w-0">
@@ -197,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         </div>
 
         {/* Navigation Links (Scrollable with custom sleek scrollbar) */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-1">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
                 key={item.id}
                 onClick={() => handleItemClick(item.id)}
                 className={`
-                  w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[12px] font-semibold
                   transition-colors whitespace-nowrap text-left
                   ${isActive
                     ? 'bg-[#0F766E] text-white shadow-sm'
