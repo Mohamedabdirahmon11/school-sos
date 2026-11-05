@@ -250,3 +250,9 @@
   }
   .school-admin-design main { min-height: 0; }
 }
+
+.school-admin-design main > div { min-height: 100%; }
+.school-admin-design main > div:has(> .flex-1.bg-white.rounded-xl) { min-height: 0; }
+@media (max-width: 767px) {
+  .school-admin-design aside nav button { min-height: 42px; }
+}
