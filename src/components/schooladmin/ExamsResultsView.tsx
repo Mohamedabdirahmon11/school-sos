@@ -333,7 +333,7 @@ export const ExamsResultsView: React.FC = () => {
           {/* Marks Grading Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {students.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">
+              <div className="p-8 text-center text-sm text-[#71817d]">
                 No students enrolled in this class.
               </div>
             ) : (
@@ -462,7 +462,7 @@ export const ExamsResultsView: React.FC = () => {
               <h2 className="text-sm font-bold text-[#132A29]">
                 Semester 1 Class Ranking & Top Students Sheet
               </h2>
-              <p className="text-xs text-[#64748B]">
+              <p className="text-sm text-[#71817d]">
                 Class results calculated as average percentages across all curriculum subjects.
               </p>
             </div>
@@ -573,7 +573,7 @@ export const ExamsResultsView: React.FC = () => {
               <h2 className="text-sm font-bold text-[#132A29]">
                 Yearly Combined Results & Class Rank (Semester 1 + Semester 2)
               </h2>
-              <p className="text-xs text-[#64748B]">
+              <p className="text-sm text-[#71817d]">
                 Combines both semesters to produce yearly subject percentages and final class ranking.
               </p>
             </div>
@@ -644,7 +644,7 @@ export const ExamsResultsView: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
             <h2 className="text-base font-bold text-[#132A29]">Exam Configuration & Maximum Marks</h2>
-            <p className="text-xs text-[#64748B] mt-0.5">
+            <p className="text-sm text-[#71817d] mt-0.5">
               Set the maximum marks for Small Exam and Big Exam according to school policy.
             </p>
           </div>
