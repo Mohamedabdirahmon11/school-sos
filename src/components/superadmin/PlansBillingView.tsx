@@ -61,7 +61,7 @@ export const PlansBillingView: React.FC = () => {
     setPayingInvoiceId(id);
     try {
       await ApiClient.payInvoice(id);
-      setNotice('Invoice marked as paid and receipt generated. School validity automatically extended.');
+      setNotice('Invoice marked as paid and receipt generated. Subscription access was updated according to its plan.');
       await fetchData();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
