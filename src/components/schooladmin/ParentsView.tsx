@@ -51,7 +51,7 @@ export const ParentsView: React.FC = () => {
 
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
               <tr>
                 <th className="px-4 py-3">Enrolled Child (Student)</th>
@@ -78,10 +78,10 @@ export const ParentsView: React.FC = () => {
                     <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.fatherPhone}</td>
                     <td className="px-4 py-3 font-mono text-[#132A29] font-medium">{s.motherPhone}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-[11px] font-bold uppercase ${
-                        s.feeStatus === 'paid' ? 'text-emerald-700' : 'text-rose-700'
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                        s.feeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
-                        {s.feeStatus}
+                        {s.feeStatus || 'NOT SET'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
