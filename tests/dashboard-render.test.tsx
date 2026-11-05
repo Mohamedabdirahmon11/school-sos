@@ -22,8 +22,8 @@ test('School Dashboard error state renders a 403 with a retry control', () => {
 
 test('School Dashboard handles an empty response and malformed lists without crashing', () => {
   const model = normalizeSchoolDashboardData({ stats: null, recentPayments: null, notices: {} });
-  const markup = renderToStaticMarkup(<div>{model.stats.totalStudents}:{model.stats.totalTeachers}:{model.recentPayments.length}:{model.notices.length}</div>);
-  assert.match(markup, /0:0:0:0/);
+  const markup = renderToStaticMarkup(<div>{model.stats.totalStudents}:{model.stats.totalTeachers}:{model.stats.totalClasses}:{model.recentPayments.length}:{model.notices.length}</div>);
+  assert.match(markup, /0:0:0:0:0/);
 });
 
 test('School Dashboard API maps undefined array responses to safe zero stats', async (t) => {
