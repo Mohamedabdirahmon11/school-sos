@@ -183,7 +183,7 @@ export const ExamsResultsView: React.FC = () => {
   const maxCombined = smallExamMax + bigExamMax;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -338,7 +338,7 @@ export const ExamsResultsView: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-[#132A29]">
+                <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
                   <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                     <tr>
                       <th className="py-3 px-4">Student</th>
