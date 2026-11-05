@@ -45,7 +45,7 @@ export const YearEndPromotionView: React.FC = () => {
   // Fetch initial classes and config
   useEffect(() => {
     if (!school) return;
-    setLoading(true);
+    setLoading(true); setError(null);
     Promise.all([
       ApiClient.getClasses(),
       ApiClient.getExamConfig(),
@@ -58,13 +58,16 @@ export const YearEndPromotionView: React.FC = () => {
         if (clsList.length > 1) setTargetClassId(clsList[1].id);
       }
       setExamConfig(conf);
+    }).catch((err: any) => {
+      console.error(err);
+      setError(err.message || 'Unable to load promotion setup. Please retry.');
     }).finally(() => setLoading(false));
   }, [school]);
 
   // Load class yearly rankings when class changes
   const loadClassRankings = async () => {
-    if (!selectedClassId) return;
-    setLoading(true);
+    if (!selectedClassId) { setYearlyRankings([]); setDecisionMap({}); return; }
+    setYearlyRankings([]); setDecisionMap({}); setError(null); setLoading(true);
     try {
       const rankings = await ApiClient.getYearlyRankings(selectedClassId);
       setYearlyRankings(rankings);
