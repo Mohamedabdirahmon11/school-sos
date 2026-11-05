@@ -24,8 +24,8 @@ test('due broadcasts publish once and create a system audit record', () => {
 });
 
 test('platform broadcast management is Super Admin-only and UI exposes retry on load errors', () => {
-  assert.match(api, /apiRouter\.post\('\\/superadmin\\/broadcasts', requireAuth, requireSuperAdmin/);
-  assert.match(api, /apiRouter\.get\('\\/superadmin\\/broadcasts', requireAuth, requireSuperAdmin/);
+  assert.ok(api.includes("apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin"));
+  assert.ok(api.includes("apiRouter.get('/superadmin/broadcasts', requireAuth, requireSuperAdmin"));
   assert.match(ui, /loadError/);
   assert.match(ui, /Retry loading/);
 });
