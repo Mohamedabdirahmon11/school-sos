@@ -120,7 +120,7 @@ export const ClassesSubjectsView: React.FC = () => {
   if (classLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading classes"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (classLoad.error) return <ErrorState error={classLoad.error} onRetry={classLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
           Classes, Sections & Curriculum Subjects
@@ -139,7 +139,7 @@ export const ClassesSubjectsView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Classes Column */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
+        <div className="min-w-0 space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#0F766E]" />
