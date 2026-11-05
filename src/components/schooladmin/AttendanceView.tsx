@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
@@ -38,17 +39,6 @@ const schoolLocalDate = (timeZone?: string) => {
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
-};
-
-const normalizeWhatsAppNumber = (phone?: string | null): string | null => {
-  const value = phone?.trim();
-  if (!value) return null;
-  const digits = value.startsWith('00')
-    ? value.slice(2).replace(/\\D/g, '')
-    : value.startsWith('+')
-      ? value.slice(1).replace(/\\D/g, '')
-      : '';
-  return digits.length >= 8 && digits.length <= 15 ? digits : null;
 };
 
 const parentWhatsAppNumber = (student: Student) =>
