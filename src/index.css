@@ -256,3 +256,64 @@
 @media (max-width: 767px) {
   .school-admin-design aside nav button { min-height: 42px; }
 }
+
+
+/* Fine alignment with the supplied Scholastic Horizon desktop screens.
+   Keep this layer presentation-only: no data, permissions, routes or actions are changed. */
+.school-admin-design main > div > section,
+.school-admin-design main > div > [class*="rounded-2xl"],
+.school-admin-design main > div > [class*="rounded-xl"] {
+  min-width: 0;
+}
+.school-admin-design main table {
+  width: 100%;
+  background: #fff;
+}
+.school-admin-design main table thead th {
+  background: #fff;
+  border-bottom: 1px solid #dfe9e6;
+  color: #61736f;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+.school-admin-design main table tbody td {
+  border-bottom: 1px solid #e5eeeb;
+  color: #243632;
+  font-size: 13px;
+  vertical-align: middle;
+}
+.school-admin-design main table tbody tr:last-child td { border-bottom: 0; }
+.school-admin-design main table tbody tr:hover { background: #f7faf9; }
+.school-admin-design main input,
+.school-admin-design main select,
+.school-admin-design main textarea {
+  color: #18312d;
+  background-color: #fff;
+  box-shadow: none;
+}
+.school-admin-design main input::placeholder,
+.school-admin-design main textarea::placeholder { color: #91a09c; }
+.school-admin-design main button[class*="bg-[#0F766E]"],
+.school-admin-design main button[class*="bg-[#0e8078]"] {
+  box-shadow: 0 1px 2px rgba(8, 57, 51, .12);
+}
+.school-admin-design main [role="dialog"] {
+  max-width: min(96vw, 760px);
+  max-height: min(92dvh, 900px);
+  overflow-y: auto;
+}
+.school-admin-design main .overflow-x-auto {
+  border-radius: 14px;
+  scrollbar-width: thin;
+}
+@media (max-width: 767px) {
+  .school-admin-design main table { min-width: 640px; }
+  .school-admin-design main [role="dialog"] {
+    max-width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 18px;
+  }
+}
