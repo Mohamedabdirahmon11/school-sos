@@ -1,6 +1,6 @@
 /**
  * Classes & Subjects Configuration for School Admin
- * Grade levels, sections, room assignments, capacities, and curriculum credits
+ * Grade levels, sections, room assignments, capacities, and curriculum subjects
  */
 
 import React, { useState, useEffect } from 'react';
@@ -47,8 +47,6 @@ export const ClassesSubjectsView: React.FC = () => {
   // New Subject Form State
   const [subjectName, setSubjectName] = useState('');
   const [subjectCode, setSubjectCode] = useState('');
-  const [creditUnits, setCreditUnits] = useState(3);
-  const [department, setDepartment] = useState('General');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
 
   const fetchData = classLoad.retry;
