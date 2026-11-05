@@ -24,7 +24,7 @@ export const ParentsView: React.FC = () => {
     const child = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
     const contacts = [student.fatherPhone, student.motherPhone].filter((phone: string | undefined) => Boolean(phone));
     contacts.forEach((phone: string) => {
-      const normalized = phone.replace(/\\s+/g, '').trim();
+      const normalized = phone.replace(/\s+/g, '').trim();
       if (!normalized) return;
       let group = groups.find(item => item.phone === normalized);
       if (!group) { group = { phone: normalized, children: new Set<string>(), classes: new Set<string>() }; groups.push(group); }
