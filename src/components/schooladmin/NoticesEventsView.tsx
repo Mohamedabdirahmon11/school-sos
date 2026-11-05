@@ -19,7 +19,7 @@ import {
 
 export const NoticesEventsView: React.FC = () => {
   const { school, user, t } = useAuth();
-  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('notices');
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [notices, setNotices] = useState<SchoolNotice[]>([]);
   const [noticePageInfo, setNoticePageInfo] = useState<PageInfo | null>(null);
@@ -151,10 +151,10 @@ export const NoticesEventsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Academic Calendar & School Announcements
+            Notice board
           </h1>
           <p className="text-xs text-[#64748B]">
-            Manage terms, official holidays, examination intervals, and targeted school broadcasts
+            
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -191,7 +191,7 @@ export const NoticesEventsView: React.FC = () => {
           }`}
         >
           <Bell className="w-4 h-4" />
-          <span>Announcements & Circulars ({notices.length})</span>
+          <span>Notice board ({notices.length})</span>
         </button>
       </div>
 
