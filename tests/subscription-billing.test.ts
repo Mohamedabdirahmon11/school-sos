@@ -25,7 +25,8 @@ test('batch billing uses validated recurring pricing and reports its actual coun
   assert.ok(api.includes('isOpenSubscriptionInvoice(invoice.status)'));
   assert.ok(api.includes('getRecurringInvoiceAmount(cadence, plan)'));
   assert.ok(api.includes('generatedCount: generated'));
-  assert.ok(client.includes("return this.request<any>('/superadmin/invoices/generate', { method: 'POST' });"));
+  assert.ok(client.includes("'/superadmin/invoices/generate'"));
+  assert.ok(client.includes('generatedCount: number'));
   assert.ok(!client.includes(".catch(() => ({ success: true, count: 0 }))"));
   assert.match(ui, /res\.generatedCount/);
   assert.match(ui, /loadError/);
