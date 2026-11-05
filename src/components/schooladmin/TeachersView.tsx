@@ -101,25 +101,24 @@ export const TeachersView: React.FC = () => {
   if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Faculty & Teaching Staff
-          </h1>
-          <p className="text-xs text-[#64748B]">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
+          <p className="mt-1 text-sm text-[#71817d]">
             Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <button type="button" onClick={handleExportTeachers}
-            className="px-3.5 py-2 text-xs font-semibold text-[#334155] bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg flex items-center gap-1.5">
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]">
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
           </button>
           <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
-            className="px-3.5 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50">
             <Plus className="w-4 h-4" />
             <span>Appoint Teacher</span>
           </button>
