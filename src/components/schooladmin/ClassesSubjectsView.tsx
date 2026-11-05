@@ -322,7 +322,7 @@ export const ClassesSubjectsView: React.FC = () => {
       {/* CREATE SUBJECT MODAL */}
       {showSubjectModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 border border-[#E2E8F0]">
             <h2 className="text-base font-bold text-[#132A29] mb-4">{editingSubject ? 'Edit Curriculum Subject' : 'Add Curriculum Subject'}</h2>
             <form onSubmit={handleCreateSubject} className="space-y-4 text-xs">
               <div>
