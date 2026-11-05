@@ -191,9 +191,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Students</h1>
-          <p className="mt-1 text-sm text-[#71817d]">Manage admissions, student records and academic profiles</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -287,19 +285,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
-                  <th className="px-5 py-4">Student ID</th>
-                  <th className="px-5 py-4">Full Three-Part Name</th>
+                  <th className="px-5 py-4">Roll</th>
+                  <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
-                  <th className="px-5 py-4">Gender</th>
-                  <th className="px-5 py-4">Parent Phone</th>
-                  <th className="px-5 py-4">Fee Status</th>
-                  <th className="px-5 py-4 text-right">Actions</th>
+                  <th className="px-5 py-4">Guardian</th>
+                  <th className="px-5 py-4">Fees</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={5} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
@@ -317,13 +313,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           isSelected ? 'bg-[#eef8f5]' : 'hover:bg-[#f8fbfa]'
                         }`}
                       >
-                        <td className="px-5 py-4 font-mono font-bold text-[#0F766E]">{s.studentId}</td>
-                        <td className="px-5 py-4 font-semibold text-[#132A29]">
-                          {s.firstName} {s.middleName} {s.lastName}
-                        </td>
+                        <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
+                        <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className}</td>
-                        <td className="px-5 py-4 capitalize text-[#64748B]">{s.gender}</td>
-                        <td className="px-5 py-4 font-mono text-[#64748B]">{s.fatherPhone}</td>
+                        <td className="px-5 py-4 text-[#334155]">{s.fatherPhone || "—"}</td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
                             normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
@@ -333,27 +326,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           }`}>
                             {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-                            {onPrintIDCard && (
-                              <button
-                                onClick={() => onPrintIDCard(s)}
-                                className="p-1 text-[#0F766E] hover:bg-[#E2E8F0] rounded"
-                                title="Print ID Card"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteStudent(s.id, `${s.firstName} ${s.lastName}`)}
-                              disabled={isReadOnly}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-40"
-                              title="Delete Student"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
