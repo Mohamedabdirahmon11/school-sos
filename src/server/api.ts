@@ -1286,12 +1286,47 @@ apiRouter.get('/superadmin/plans', requireAuth, requireSuperAdmin, (_req, res) =
   res.json(db.getPlans());
 });
 
-apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, (req, res) => {
-  const updated = db.updatePlan(req.params.id, req.body);
+apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const updates: Partial<PlanConfig> = {};
+  for (const field of ['monthlyPrice', 'yearlyPrice', 'lifetimePrice'] as const) {
+    if (body[field] === undefined) continue;
+    const value = typeof body[field] === 'number' ? body[field] : typeof body[field] === 'string' && body[field].trim() ? Number(body[field]) : NaN;
+    if (!Number.isFinite(value) || value < 0 || value > 1_000_000_000) {
+      res.status(400).json({ error: `${field} must be a valid non-negative price.` });
+      return;
+    }
+    updates[field] = value;
+  }
+  for (const field of ['maxStudents', 'maxTeachers'] as const) {
+    if (body[field] === undefined) continue;
+    const value = typeof body[field] === 'number' ? body[field] : typeof body[field] === 'string' && body[field].trim() ? Number(body[field]) : NaN;
+    if (!Number.isInteger(value) || value < 1 || value > 1_000_000) {
+      res.status(400).json({ error: `${field} must be a positive whole number.` });
+      return;
+    }
+    updates[field] = value;
+  }
+  if (!Object.keys(updates).length) {
+    res.status(400).json({ error: 'Provide at least one supported plan price or limit to update.' });
+    return;
+  }
+  const updated = db.updatePlan(req.params.id, updates);
   if (!updated) {
     res.status(404).json({ error: 'Plan not found.' });
     return;
   }
+  const user = (req as any).user as User;
+  db.logAudit({
+    action: 'SUBSCRIPTION_PLAN_UPDATED',
+    category: 'subscription',
+    userId: user.id,
+    userName: user.fullName,
+    userRole: user.role,
+    details: `Updated subscription plan ${updated.id}: ${Object.keys(updates).join(', ')}.`,
+    severity: 'warning'
+  });
+  await db.flush();
   res.json(updated);
 });
 
