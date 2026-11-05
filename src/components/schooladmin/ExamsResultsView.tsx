@@ -183,21 +183,21 @@ export const ExamsResultsView: React.FC = () => {
   const maxCombined = smallExamMax + bigExamMax;
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-[#0F766E]" />
+          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
+            <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
             {t('exams_results')}
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
+          <p className="mt-1 text-sm text-[#71817d]">
             Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
           </p>
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-[#F1F5F9] p-1 rounded-xl text-xs">
+        <div className="flex items-center gap-1 bg-[#edf4f1] p-1.5 rounded-2xl text-sm">
           <button
             type="button"
             onClick={() => setActiveTab('entry_approval')}
