@@ -38,6 +38,7 @@ import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
+import { staffHasPermission } from '../lib/staff-permissions.ts';
 
 export const apiRouter = Router();
 
@@ -451,6 +452,31 @@ function requireSchoolAdminOrSuperAdmin(req: Request, res: Response, next: () =>
   next();
 }
 
+function requireSchoolAdminOrStaffPermission(permission: 'library_manage' | 'transport_manage') {
+  return async (req: Request, res: Response, next: () => void) => {
+    const user = (req as any).user as User;
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    if (user.role === 'school_admin' || user.role === 'super_admin') {
+      next();
+      return;
+    }
+    if (user.role !== 'accountant') {
+      res.status(403).json({ error: 'School administrator or authorized staff access required.' });
+      return;
+    }
+    const school = (req as any).school as School;
+    const staff = await getStaffForRequest(req, user.id, school.id);
+    if (!staffHasPermission(staff, permission)) {
+      res.status(403).json({ error: 'Your staff account does not have permission for this action.' });
+      return;
+    }
+    next();
+  };
+}
+
 function requireAccountantOrSuperAdmin(req: Request, res: Response, next: () => void) {
   const user = (req as any).user as User;
   if (!user || !['accountant', 'super_admin'].includes(user.role)) {
@@ -587,8 +613,8 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
       : (path.startsWith('/admissions') || path.startsWith('/school/admissions')) ? 'admissions_manage'
         : path.startsWith('/attendance') && isWrite ? 'attendance_manage'
           : (path.startsWith('/marks') || path.startsWith('/exams') || path.startsWith('/rankings')) && isWrite ? 'grades_manage'
-            : path.startsWith('/library') ? 'library_manage'
-              : path.startsWith('/transport') ? 'transport_manage'
+            : (path.startsWith('/library') || path.startsWith('/school/library')) ? 'library_manage'
+              : (path.startsWith('/transport') || path.startsWith('/school/transport') || path.startsWith('/bus/assignments')) ? 'transport_manage'
               : path.startsWith('/inventory') ? 'inventory_manage'
         : (path.startsWith('/reports') || path.startsWith('/school/reports')) ? 'reports_export'
                   : null;
@@ -4401,12 +4427,12 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
 });
 
 // Extra Modules: Library & Transport
-apiRouter.get('/school/library', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('library_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getLibraryBooks(school.id));
 });
 
-apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('library_manage'), async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
   const title = typeof body.title === 'string' ? body.title.trim() : '';
@@ -4431,12 +4457,12 @@ apiRouter.post('/school/library', requireAuth, requireSchoolContext, requireScho
   }
 });
 
-apiRouter.get('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.get('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('library_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getLibraryLoans(school.id));
 });
 
-apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('library_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const body = req.body || {};
@@ -4470,7 +4496,7 @@ apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requi
   }
 });
 
-apiRouter.put('/school/library/loans/:loanId/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.put('/school/library/loans/:loanId/return', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('library_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   try {
@@ -4524,7 +4550,7 @@ apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireS
   res.status(201).json(incident);
 });
 
-apiRouter.get('/school/transport', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
 });
@@ -4563,7 +4589,7 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json(updated);
 });
 
-apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
   const name = typeof body.name === 'string' ? body.name.trim() : typeof body.routeName === 'string' ? body.routeName.trim() : '';
@@ -4591,12 +4617,12 @@ apiRouter.post('/school/transport', requireAuth, requireSchoolContext, requireSc
   res.status(201).json(route);
 });
 
-apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getBusAssignments(school.id));
 });
 
-apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   try {
     res.json(await db.setBusAssignment(school.id, req.params.studentId, String(req.body?.routeId || '')));
@@ -4606,7 +4632,7 @@ apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSu
   }
 });
 
-apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json({ success: await db.removeBusAssignment(school.id, req.params.studentId) });
 });
