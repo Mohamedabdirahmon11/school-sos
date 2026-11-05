@@ -39,6 +39,7 @@ import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImpor
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission } from '../lib/staff-permissions.ts';
+import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
 
 export const apiRouter = Router();
 
@@ -4402,17 +4403,32 @@ apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async 
 apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, async (_req, res) => {
   const schools = await db.getSchools();
   const [plans, existingInvoices] = await Promise.all([Promise.resolve(db.getPlans()), db.getSubscriptionInvoices()]);
-  const existingUnpaidSchools = new Set(existingInvoices.filter(invoice => invoice.status === 'unpaid').map(invoice => invoice.schoolId));
+  const openInvoiceSchools = new Set(existingInvoices.filter(invoice => isOpenSubscriptionInvoice(invoice.status)).map(invoice => invoice.schoolId));
   let generated = 0;
-  for (const s of schools) {
-    if (existingUnpaidSchools.has(s.id)) continue;
-    const p = plans.find(plan => plan.id === s.subscription?.plan);
-    const amount = s.subscription?.cadence === 'yearly' ? (p?.yearlyPrice || 890) : (p?.monthlyPrice || 89);
+  let skippedOpenInvoiceCount = 0;
+  let skippedLifetimeCount = 0;
+  let skippedInvalidPricingCount = 0;
+  for (const school of schools) {
+    if (openInvoiceSchools.has(school.id)) {
+      skippedOpenInvoiceCount++;
+      continue;
+    }
+    const cadence = school.subscription?.cadence || 'monthly';
+    if (cadence === 'lifetime') {
+      skippedLifetimeCount++;
+      continue;
+    }
+    const plan = plans.find(item => item.id === school.subscription?.plan);
+    const amount = getRecurringInvoiceAmount(cadence, plan);
+    if (amount === null) {
+      skippedInvalidPricingCount++;
+      continue;
+    }
     db.createSubscriptionInvoice({
-      schoolId: s.id,
-      schoolName: s.name,
-      plan: s.subscription?.plan || 'standard',
-      cadence: s.subscription?.cadence || 'monthly',
+      schoolId: school.id,
+      schoolName: school.name,
+      plan: school.subscription?.plan || 'standard',
+      cadence,
       amount,
       invoiceNumber: `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`,
       currency: db.getSettings().platformCurrency,
@@ -4423,7 +4439,7 @@ apiRouter.post('/superadmin/invoices/generate', requireAuth, requireSuperAdmin, 
     generated++;
   }
   await db.flush();
-  res.json({ success: true, count: generated });
+  res.json({ success: true, generatedCount: generated, skippedOpenInvoiceCount, skippedLifetimeCount, skippedInvalidPricingCount });
 });
 
 // Extra Modules: Library & Transport
