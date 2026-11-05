@@ -282,7 +282,9 @@ test('school backups include newer tenant modules but exclude credentials and ac
   for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
     assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
   }
-  assert.match(backup, /tables\.users = tables\.users\.map/);
+  assert.match(backup, /sensitiveBackupFields/);
+  assert.match(backup, /tables\[table\] = rows\.map/);
+  assert.doesNotMatch(backup, /tables\.users\s*=/, 'school backups exclude login accounts entirely');
 });
 
 
