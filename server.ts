@@ -42,6 +42,27 @@ async function startServer() {
   }, 24 * 60 * 60 * 1000);
   subscriptionTimer.unref();
 
+  // Publish scheduled platform broadcasts shortly after their due time.
+  // The database update is conditional on draft/scheduled status, so multiple
+  // application instances can safely run this check without duplicate sends.
+  let broadcastCheckInFlight = false;
+  const runDueBroadcastCheck = async () => {
+    if (broadcastCheckInFlight) return;
+    broadcastCheckInFlight = true;
+    try {
+      const context = await db.prepareRequestContext(false, 'broadcast-scheduler');
+      const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
+      if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
+    } finally {
+      broadcastCheckInFlight = false;
+    }
+  };
+  void runDueBroadcastCheck().catch(() => console.error('Scheduled broadcast check failed.'));
+  const broadcastTimer = setInterval(() => {
+    void runDueBroadcastCheck().catch(() => console.error('Scheduled broadcast check failed.'));
+  }, 60 * 1000);
+  broadcastTimer.unref();
+
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
