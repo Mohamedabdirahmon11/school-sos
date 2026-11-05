@@ -18,7 +18,7 @@ test('scheduled broadcasts are checked immediately and periodically by the serve
 test('due broadcasts publish once and create a system audit record', () => {
   assert.match(storage, /queryRows<PlatformBroadcast>\('platform_broadcasts', \{ status: 'scheduled' \}\)/);
   assert.match(storage, /Date\.parse\(item\.scheduledFor\) > now/);
-  assert.match(storage, /\.in\('status', \['draft', 'scheduled'\]\)/);
+  assert.match(storage, /\.in\('status', \['draft','scheduled'\]\)/);
   assert.match(storage, /PLATFORM_BROADCAST_AUTO_PUBLISHED/);
   assert.match(storage, /SchoolOS Scheduler/);
 });
