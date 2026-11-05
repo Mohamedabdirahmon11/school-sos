@@ -1522,10 +1522,30 @@ apiRouter.get('/superadmin/invoices', requireAuth, requireSuperAdmin, async (_re
 });
 
 apiRouter.post('/superadmin/invoices/:id/pay', requireAuth, requireSuperAdmin, async (req, res) => {
+  const previousInvoice = (await db.getSubscriptionInvoices()).find(invoice => invoice.id === req.params.id);
+  if (!previousInvoice) {
+    res.status(404).json({ error: 'Invoice not found.' });
+    return;
+  }
   const inv = await db.markInvoicePaid(req.params.id);
   if (!inv) {
     res.status(404).json({ error: 'Invoice not found.' });
     return;
+  }
+  if (previousInvoice.status !== 'paid') {
+    const user = (req as any).user as User;
+    db.logAudit({
+      action: 'SUBSCRIPTION_INVOICE_PAID',
+      category: 'subscription',
+      schoolId: inv.schoolId,
+      schoolName: inv.schoolName,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      details: `Marked subscription invoice ${inv.invoiceNumber} as paid for ${inv.schoolName}.`,
+      severity: 'warning'
+    });
+    await db.flush();
   }
   res.json(inv);
 });
