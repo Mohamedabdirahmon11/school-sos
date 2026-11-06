@@ -9,6 +9,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
+import { formatSchoolDate, formatSchoolDateTime, schoolTodayIso } from '../../lib/ethiopian-calendar.ts';
 import { 
   Library, 
   Bus, 
@@ -38,7 +39,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [librarySaving, setLibrarySaving] = useState(false);
   const [loanBookId, setLoanBookId] = useState('');
   const [loanStudentId, setLoanStudentId] = useState('');
-  const [loanDueDate, setLoanDueDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [loanDueDate, setLoanDueDate] = useState(() => schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa'));
   const [showAddBookModal, setShowAddBookModal] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
   const [bookAuthor, setBookAuthor] = useState('');
@@ -299,9 +300,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const handleIssueLibraryLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !loanBookId || !loanStudentId || !loanDueDate) return;
-    const todayParts = new Intl.DateTimeFormat('en-CA', { timeZone: school?.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-    const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
-    const todayIso = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
+    const todayIso = schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(loanDueDate) || loanDueDate < todayIso) {
       setLibraryError('Due date must be a valid date today or later.');
       return;
@@ -525,12 +524,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : libraryLoans.map(loan => {
                         const book = books.find(row => row.id === loan.bookId);
                         const student = students.find(row => row.id === loan.studentId);
-                        const overdue = loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+                        const overdue = loan.status === 'issued' && loan.dueDate < schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa');
                         return <tr key={loan.id}>
                           <td className="px-3 py-2 font-medium">{book?.title || 'Book record unavailable'}</td>
                           <td className="px-3 py-2">{student ? `${student.firstName} ${student.lastName}` : loan.studentId}</td>
-                          <td className="px-3 py-2 font-mono">{String(loan.issuedAt || '').slice(0, 10)}</td>
-                          <td className="px-3 py-2 font-mono">{loan.dueDate}</td>
+                          <td className="px-3 py-2 font-mono">{loan.issuedAt ? formatSchoolDate(String(loan.issuedAt).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')) : '—'}</td>
+                          <td className="px-3 py-2 font-mono">{formatSchoolDate(loan.dueDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</td>
                           <td className="px-3 py-2">{loan.status === 'returned' ? <span className="text-emerald-700">Returned</span> : overdue ? <span className="font-semibold text-rose-700">Overdue</span> : <span className="text-amber-700">Issued</span>}</td>
                           <td className="px-3 py-2">{loan.status === 'issued' && <button type="button" disabled={isReadOnly || librarySaving} onClick={() => handleReturnLibraryLoan(loan.id)} className="text-[#0F766E] font-semibold disabled:opacity-50">Mark returned</button>}</td>
                         </tr>;
@@ -647,7 +646,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <tbody className="divide-y divide-[#E2E8F0]">
                 {disciplineLogs.map(d => (
                   <tr key={d.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
+                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{formatSchoolDate(d.incidentDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
                     <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
                     <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
@@ -718,7 +717,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>Loading clinic visits…</td></tr>
                 ) : healthLogs.length ? healthLogs.map(h => (
                   <tr key={h.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{h.visitDate}</td>
+                    <td className="px-4 py-2.5 font-mono text-[#64748B]">{formatSchoolDate(h.visitDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{h.studentName}</td>
                     <td className="px-4 py-2.5 text-[#334155]">{h.symptoms}</td>
                     <td className="px-4 py-2.5 text-[#475569]">{h.treatment}</td>
@@ -783,7 +782,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             </form>
             <section className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
               <h3 className="text-sm font-bold text-[#132A29]">Movement history</h3>
-              {!movementItemId?<p className="text-xs text-[#64748B]">Select an item to view its ledger.</p>:inventoryTransactions.length===0?<p className="text-xs text-[#64748B]">No stock movements recorded for this item.</p>:<div className="max-h-96 overflow-y-auto space-y-2">{inventoryTransactions.map(tx=><article key={tx.id} className="rounded border border-[#E2E8F0] p-3 text-xs"><div className="flex justify-between gap-2"><strong className="capitalize">{String(tx.transactionType).replace('_',' ')}</strong><span className="font-mono">{tx.quantityDelta>0?'+':''}{tx.quantityDelta}</span></div><p className="text-[#64748B] mt-1">Balance: {tx.quantityBefore} → {tx.quantityAfter} · {tx.createdAt?new Date(tx.createdAt).toLocaleString():''}</p>{tx.note&&<p className="mt-1">{tx.note}</p>}</article>)}</div>}
+              {!movementItemId?<p className="text-xs text-[#64748B]">Select an item to view its ledger.</p>:inventoryTransactions.length===0?<p className="text-xs text-[#64748B]">No stock movements recorded for this item.</p>:<div className="max-h-96 overflow-y-auto space-y-2">{inventoryTransactions.map(tx=><article key={tx.id} className="rounded border border-[#E2E8F0] p-3 text-xs"><div className="flex justify-between gap-2"><strong className="capitalize">{String(tx.transactionType).replace('_',' ')}</strong><span className="font-mono">{tx.quantityDelta>0?'+':''}{tx.quantityDelta}</span></div><p className="text-[#64748B] mt-1">Balance: {tx.quantityBefore} → {tx.quantityAfter} · {tx.createdAt?formatSchoolDateTime(tx.createdAt, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'), 'en', school?.timezone || 'Africa/Addis_Ababa'):''}</p>{tx.note&&<p className="mt-1">{tx.note}</p>}</article>)}</div>}
             </section>
           </section>
         </div>
