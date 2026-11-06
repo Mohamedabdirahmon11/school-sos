@@ -21,6 +21,7 @@ export interface TranslationDict {
   analytics: string;
   broadcasts: string;
   support_audit: string;
+  help_support: string;
   platform_settings: string;
   students: string;
   teachers: string;
@@ -247,6 +248,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'SaaS Analytics',
     broadcasts: 'Platform Broadcasts',
     support_audit: 'Support & Audit Log',
+    help_support: 'Help & Support',
     platform_settings: 'Platform Settings',
     students: 'Students',
     teachers: 'Teachers',
@@ -453,6 +455,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'Falanqaynta & Xogta',
     broadcasts: 'Farriimaha Madasha',
     support_audit: 'Taageerada & Diiwaanka',
+    help_support: 'Caawimaad & Taageero',
     platform_settings: 'Hagaajinta Nidaamka',
     students: 'Ardayda',
     teachers: 'Macallimiinta',
@@ -659,6 +662,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'ትንታኔ እና መረጃ',
     broadcasts: 'የስርዓት መልእክቶች',
     support_audit: 'ድጋፍ እና ኦዲት ሎግ',
+    help_support: 'እገዛ እና ድጋፍ',
     platform_settings: 'የስርዓት ቅንብሮች',
     students: 'ተማሪዎች',
     teachers: 'መምህራን',
