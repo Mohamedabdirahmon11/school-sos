@@ -63,8 +63,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
   const publishedExamSchedulesState = useApi(
-    async () => (await Promise.all(classes.map(cls => ApiClient.getPublishedExamSchedules(cls.id)))).flat(),
-    [school?.id, classes.map(cls => cls.id).join(',')],
+    () => ApiClient.getPublishedExamSchedules(),
+    [school?.id, user?.id],
     Boolean(school && classes.length)
   );
   const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
