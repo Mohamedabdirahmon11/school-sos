@@ -624,13 +624,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 </div>
                 <div>
                   <label className="block font-medium text-[#334155]">Admission Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={admissionDate}
-                    onChange={e => setAdmissionDate(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none font-mono"
-                  />
+                  <SchoolDateInput required value={admissionDate} onChange={setAdmissionDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none font-mono" />
                 </div>
               </div>
 
