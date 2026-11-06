@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const migration = readFileSync(new URL('../supabase/migrations/058_exam_schedules_and_seating.sql', import.meta.url), 'utf8');
+const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
