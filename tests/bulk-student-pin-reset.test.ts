@@ -129,7 +129,7 @@ test('teachers cannot bulk reset student PINs', async () => {
 
 test('bulk PIN reset wizard accepts CSV and XLSX filename extensions', () => {
   const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
-  const matcherSource = wizard.match(/if \\(!\\/(.+?)\\/i\\.test\\(file\\.name\\)\\)/)?.[1];
+  const matcherSource = wizard.match(/\\/(.+?)\\/i\\.test\\(file\\.name\\)/)?.[1];
   assert.ok(matcherSource, 'file extension validation is present');
   const matcher = new RegExp(matcherSource, 'i');
   assert.equal(matcher.test('students.csv'), true);
