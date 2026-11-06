@@ -2099,6 +2099,18 @@ class StorageEngine {
     return (await this.getExamSchedules(schedule.schoolId)).find(row => row.id === schedule.id);
   }
 
+  public async cancelExamSchedule(schoolId: string, scheduleId: string): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam schedule storage is unavailable.');
+    const { error } = await client.from('exam_schedules')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', scheduleId).eq('school_id', schoolId).eq('status', 'draft');
+    if (error) throw new Error(error.message || 'Unable to cancel exam schedule.');
+    const schedule = (await this.getExamSchedules(schoolId)).find(row => row.id === scheduleId);
+    if (!schedule || schedule.status !== 'cancelled') throw new Error('Only a draft exam schedule can be cancelled.');
+    return schedule;
+  }
+
   public async publishExamSchedule(schoolId: string, scheduleId: string, publishedBy: string): Promise<any> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Exam schedule publishing is unavailable.');
