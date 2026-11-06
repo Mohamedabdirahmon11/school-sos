@@ -214,6 +214,13 @@ export class ApiClient {
     });
   }
 
+  public static async bulkResetStudentPins(rows: Array<{ studentId: string; pin?: string }>) {
+    return this.request<{ success: boolean; updatedCount: number; pinSlips: Array<{ studentId: string; studentName: string; newPin: string }> }>('/students/bulk-reset-pin', {
+      method: 'POST',
+      body: JSON.stringify({ rows })
+    });
+  }
+
   public static async changePassword(newPassword: string, challengeToken?: string) {
     return this.request<{ success: boolean; message: string }>('/auth/change-password', {
       method: 'POST',

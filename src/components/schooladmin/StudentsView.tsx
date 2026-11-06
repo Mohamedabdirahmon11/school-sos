@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Student, SchoolClass, SchoolBranch } from '../../types/index.ts';
 import { BulkImportWizard } from './BulkImportWizard.tsx';
+import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
@@ -51,6 +52,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showBulkPinReset, setShowBulkPinReset] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -231,6 +233,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           >
             <Upload className="w-3.5 h-3.5 text-[#0F766E]" />
             <span>{t('bulk_import')}</span>
+          </button>
+          <button
+            onClick={() => setShowBulkPinReset(true)}
+            disabled={isReadOnly}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-[#0F766E]" />
+            <span>Bulk PIN reset</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -704,6 +714,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       )}
 
       <BulkImportWizard open={showBulkImport} onClose={() => setShowBulkImport(false)} onComplete={() => { void fetchStudents(); }} />
+      <BulkStudentPinResetWizard open={showBulkPinReset} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />
     </div>
   );
 };

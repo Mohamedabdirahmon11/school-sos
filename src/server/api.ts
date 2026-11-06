@@ -2827,6 +2827,68 @@ apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuper
   });
 });
 
+apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const submitted = req.body?.rows;
+  if (!Array.isArray(submitted) || submitted.length < 1 || submitted.length > 500) {
+    res.status(400).json({ error: 'Bulk PIN reset requires between 1 and 500 student rows.' }); return;
+  }
+
+  const seenStudents = new Set<string>();
+  const seenPins = new Set<string>();
+  const pinByStudent = new Map<string, string>();
+  const rows: Array<{ student_id: string; pin_hash: string }> = [];
+  for (const entry of submitted) {
+    const studentId = typeof entry?.studentId === 'string' ? entry.studentId.trim() : '';
+    const suppliedPin = entry?.pin === undefined || entry?.pin === null ? '' : String(entry.pin).trim();
+    if (!studentId || studentId.length > 64) {
+      res.status(400).json({ error: 'Every row must contain a valid Student ID.' }); return;
+    }
+    if (seenStudents.has(studentId)) {
+      res.status(400).json({ error: `Duplicate Student ID: ${studentId}.` }); return;
+    }
+    if (suppliedPin && !/^\d{4}$/.test(suppliedPin)) {
+      res.status(400).json({ error: `PIN for ${studentId} must contain exactly four digits.` }); return;
+    }
+    let pin = suppliedPin || String(randomInt(1000, 10000));
+    if (seenPins.has(pin)) {
+      if (suppliedPin) {
+        res.status(400).json({ error: 'Each custom PIN in the file must be unique.' }); return;
+      }
+      let attempts = 0;
+      while (seenPins.has(pin) && attempts < 100) { pin = String(randomInt(1000, 10000)); attempts += 1; }
+      if (seenPins.has(pin)) { res.status(503).json({ error: 'Could not generate unique PINs. Please retry.' }); return; }
+    }
+    seenStudents.add(studentId);
+    seenPins.add(pin);
+    pinByStudent.set(studentId, pin);
+    rows.push({ student_id: studentId, pin_hash: hashPin(pin) });
+  }
+
+  try {
+    const result = await db.bulkResetStudentPins({
+      school_id: school.id,
+      changed_by: user.id,
+      changed_by_name: user.fullName,
+      changed_by_role: user.role,
+      students: rows
+    });
+    const pinSlips = (result.students || []).map(student => {
+      const studentId = String(student.student_id);
+      return {
+        studentId,
+        studentName: [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' '),
+        newPin: pinByStudent.get(studentId)
+      };
+    });
+    res.json({ success: true, updatedCount: result.updated_count, pinSlips });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Bulk PIN reset failed.';
+    res.status(400).json({ error: message.includes('not found') ? message : 'Bulk PIN reset failed. Verify the Student IDs and try again.' });
+  }
+});
+
 apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   // Never accept identity, tenant, credential, or audit fields from the client.
