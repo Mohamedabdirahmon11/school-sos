@@ -9,6 +9,7 @@ import { ApiClient } from '../../services/api.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
+import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
 import { 
   CalendarCheck, 
