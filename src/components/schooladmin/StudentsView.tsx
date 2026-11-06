@@ -28,8 +28,7 @@ import {
   MessageSquare, 
   X, 
   CheckCircle2, 
-  AlertCircle,
-  Pencil
+  AlertCircle 
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -50,11 +49,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [activeProfileTab, setActiveProfileTab] = useState<'overview' | 'attendance' | 'results' | 'fees' | 'documents' | 'notes'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    firstName: '', middleName: '', lastName: '', gender: 'male' as 'male' | 'female',
-    admissionDate: '', studentPhone: '', fatherPhone: '', motherPhone: '',
-    classId: '', status: 'active' as Student['status']
-  });
+  const [editForm, setEditForm] = useState<any>({});
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -87,7 +82,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const loadStudentDetails = async (student: any) => {
     setSelectedStudent(student);
     try {
-      const details = await ApiClient.getStudentDetails(student.id, school?.id, true);
+      const details = await ApiClient.getStudentDetails(student.id, school?.id);
       setStudentDetails(details);
     } catch (err: any) {
       alert(err.message);
@@ -133,43 +128,24 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
-  const openEditStudent = () => {
+  const openStudentEditor = () => {
     if (!selectedStudent || isReadOnly) return;
     setModalError(null);
-    setEditForm({
-      firstName: selectedStudent.firstName || '',
-      middleName: selectedStudent.middleName || '',
-      lastName: selectedStudent.lastName || '',
-      gender: selectedStudent.gender === 'female' ? 'female' : 'male',
-      admissionDate: String(selectedStudent.admissionDate || '').slice(0, 10),
-      studentPhone: selectedStudent.studentPhone || '',
-      fatherPhone: selectedStudent.fatherPhone || '',
-      motherPhone: selectedStudent.motherPhone || '',
-      classId: selectedStudent.classId || '',
-      status: selectedStudent.status || 'active'
-    });
+    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
     setShowEditModal(true);
   };
-
-  const handleUpdateStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudent || isReadOnly) return;
+  const handleSaveStudent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedStudent) return;
     setModalError(null);
-    setIsSubmitting(true);
     try {
       const updated = await ApiClient.updateStudent(selectedStudent.id, editForm);
-      setSelectedStudent(updated);
-      const details = await ApiClient.getStudentDetails(updated.id, school?.id, true);
-      setStudentDetails(details);
-      await fetchStudents();
       setShowEditModal(false);
-      setNotice('Student details updated successfully.');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setModalError(err.message || 'Could not update student details.');
-    } finally {
-      setIsSubmitting(false);
-    }
+      setNotice('Student information updated successfully.');
+      await fetchStudents();
+      await loadStudentDetails({ ...selectedStudent, ...updated, ...editForm });
+      window.setTimeout(() => setNotice(null), 3500);
+    } catch (error: any) { setModalError(error?.message || 'Unable to update student information.'); }
   };
 
   const handleResetPin = async () => {
@@ -237,9 +213,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Students</h1>
-          <p className="mt-1 text-sm text-[#71817d]">Manage admissions, student records and academic profiles</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -333,19 +307,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
-                  <th className="px-5 py-4">Student ID</th>
-                  <th className="px-5 py-4">Full Three-Part Name</th>
+                  <th className="px-5 py-4">Roll</th>
+                  <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
-                  <th className="px-5 py-4">Gender</th>
-                  <th className="px-5 py-4">Parent Phone</th>
-                  <th className="px-5 py-4">Fee Status</th>
-                  <th className="px-5 py-4 text-right">Actions</th>
+                  <th className="px-5 py-4">Guardian</th>
+                  <th className="px-5 py-4">Fees</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={5} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
@@ -363,13 +335,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           isSelected ? 'bg-[#eef8f5]' : 'hover:bg-[#f8fbfa]'
                         }`}
                       >
-                        <td className="px-5 py-4 font-mono font-bold text-[#0F766E]">{s.studentId}</td>
-                        <td className="px-5 py-4 font-semibold text-[#132A29]">
-                          {s.firstName} {s.middleName} {s.lastName}
-                        </td>
+                        <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
+                        <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className}</td>
-                        <td className="px-5 py-4 capitalize text-[#64748B]">{s.gender}</td>
-                        <td className="px-5 py-4 font-mono text-[#64748B]">{s.fatherPhone}</td>
+                        <td className="px-5 py-4 text-[#334155]">{s.fatherPhone || "—"}</td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
                             normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
@@ -379,27 +348,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           }`}>
                             {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-                            {onPrintIDCard && (
-                              <button
-                                onClick={() => onPrintIDCard(s)}
-                                className="p-1 text-[#0F766E] hover:bg-[#E2E8F0] rounded"
-                                title="Print ID Card"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteStudent(s.id, `${s.firstName} ${s.lastName}`)}
-                              disabled={isReadOnly}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-40"
-                              title="Delete Student"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
@@ -423,12 +371,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   {selectedStudent.firstName} {selectedStudent.middleName} {selectedStudent.lastName}
                 </h2>
                 <p className="text-xs text-[#64748B]">{selectedStudent.className}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={openEditStudent} disabled={isReadOnly} className="inline-flex items-center gap-1 text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-40">
-                    <Pencil className="h-3 w-3" /> Edit details
-                  </button>
-                  <button type="button" onClick={handleResetPin} disabled={isReadOnly} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-40">Reset PIN</button>
-                </div>
+                <div className="mt-2 flex flex-wrap gap-3"><button type="button" disabled={isReadOnly} onClick={openStudentEditor} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-50">Edit student</button><button type="button" onClick={handleResetPin} className="text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button><button type="button" disabled={isReadOnly} onClick={() => void handleDeleteStudent(selectedStudent.id, `${selectedStudent.firstName} ${selectedStudent.lastName}`)} className="text-xs font-semibold text-rose-700 hover:underline disabled:opacity-50">Remove record</button></div>
               </div>
               <button onClick={() => setSelectedStudent(null)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-4 h-4" />
@@ -441,7 +384,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 { id: 'overview', label: 'Overview' },
                 { id: 'attendance', label: 'Attendance' },
                 { id: 'results', label: 'Results' },
-                { id: 'fees', label: 'Fees' },
                 { id: 'documents', label: 'Documents' },
                 { id: 'notes', label: 'Notes' }
               ].map(t => (
@@ -503,7 +445,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 ) : (
                   studentDetails?.attendance?.slice(-5).map((a: any) => (
                     <div key={a.id} className="p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
-                      <span className="font-mono">{a.date}</span>
+                      <span className="font-mono">{a.date} ({a.session})</span>
                       <span className={`font-semibold uppercase text-[11px] ${
                         a.status === 'present' ? 'text-emerald-700' : 'text-rose-700'
                       }`}>
@@ -525,10 +467,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   studentDetails?.marks?.map((m: any) => (
                     <div key={m.id} className="p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-[#132A29]">Score: {m.totalMarks} · {Number(m.percentage || 0).toFixed(1)}%</p>
-                        <p className="text-[10px] text-[#64748B]">Subject: {m.subjectName || m.subjectId} · Status: {m.status}</p>
+                        <p className="font-semibold text-[#132A29]">Score: {m.marksObtained}/{m.maxMarks}</p>
+                        <p className="text-[10px] text-[#64748B]">Grade: {m.grade} · Status: {m.status}</p>
                       </div>
-                      <span className="font-bold font-mono text-emerald-700">{Number(m.percentage || 0).toFixed(0)}%</span>
+                      <span className="font-bold font-mono text-emerald-700">{m.grade}</span>
                     </div>
                   ))
                 )}
@@ -584,65 +526,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
       {showEditModal && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={handleUpdateStudent} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-              <div>
-                <h2 className="text-base font-bold text-[#132A29]">Edit Student Details</h2>
-                <p className="mt-1 text-xs text-[#64748B]">{selectedStudent.studentId}</p>
-              </div>
-              <button type="button" onClick={() => setShowEditModal(false)} aria-label="Close edit student form" className="text-[#64748B] hover:text-[#132A29]"><X className="h-5 w-5" /></button>
-            </div>
-            {modalError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">{modalError}</div>}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {([
-                ['firstName', 'First Name'],
-                ['middleName', 'Father Name'],
-                ['lastName', 'Grandfather']
-              ] as const).map(([field, label]) => (
-                <label key={field} className="block text-xs font-medium text-[#334155]">{label} *
-                  <input required value={editForm[field]} onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
-                </label>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-medium text-[#334155]">Gender
-                <select value={editForm.gender} onChange={e => setEditForm(prev => ({ ...prev, gender: e.target.value as 'male' | 'female' }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
-                  <option value="male">Male</option><option value="female">Female</option>
-                </select>
-              </label>
-              <label className="block text-xs font-medium text-[#334155]">Admission Date
-                <input required type="date" value={editForm.admissionDate} onChange={e => setEditForm(prev => ({ ...prev, admissionDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
-              </label>
-              <label className="block text-xs font-medium text-[#334155]">Class
-                <select required value={editForm.classId} onChange={e => setEditForm(prev => ({ ...prev, classId: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
-                  {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
-                </select>
-              </label>
-              <label className="block text-xs font-medium text-[#334155]">Status
-                <select value={editForm.status} onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value as Student['status'] }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
-                  <option value="active">Active</option><option value="inactive">Inactive</option><option value="graduated">Graduated</option><option value="transferred">Transferred</option>
-                </select>
-              </label>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-medium text-[#334155]">Father Phone *
-                <input required type="tel" value={editForm.fatherPhone} onChange={e => setEditForm(prev => ({ ...prev, fatherPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-              </label>
-              <label className="block text-xs font-medium text-[#334155]">Mother Phone
-                <input type="tel" value={editForm.motherPhone} onChange={e => setEditForm(prev => ({ ...prev, motherPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-              </label>
-              <label className="block text-xs font-medium text-[#334155] sm:col-span-2">Student Phone
-                <input type="tel" value={editForm.studentPhone} onChange={e => setEditForm(prev => ({ ...prev, studentPhone: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-              </label>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-[#E2E8F0] pt-3">
-              <button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs">Cancel</button>
-              <button type="submit" disabled={isSubmitting || isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{isSubmitting ? 'Saving...' : 'Save Changes'}</button>
-            </div>
+          <form onSubmit={handleSaveStudent} className="max-h-[90vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-xl border bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Edit student information</h2><button type="button" onClick={() => setShowEditModal(false)} aria-label="Close"><X className="h-5 w-5"/></button></div>
+            {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{modalError}</p>}
+            {['firstName','middleName','lastName'].map((field,index) => <label key={field} className="block text-xs font-medium">{['First name','Father name','Grandfather name'][index]}<input required value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <label className="block text-xs font-medium">Gender<select value={editForm.gender} onChange={e => setEditForm((value:any) => ({...value,gender:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
+            <label className="block text-xs font-medium">Class<select required value={editForm.classId} onChange={e => setEditForm((value:any) => ({...value,classId:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}</select></label>
+            {['studentPhone','fatherPhone','motherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Father phone','Mother phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <div className="flex justify-end gap-2 border-t pt-3"><button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button type="submit" disabled={isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></div>
           </form>
         </div>
       )}
-
       {/* ADMISSION FORM MODAL (Three-Part Name, NO Date of Birth) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
