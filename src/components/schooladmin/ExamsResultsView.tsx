@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { SchoolClass, Subject, Student, ExamConfig, StudentMark } from '../../types/index.ts';
+import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
 import { 
   FileSpreadsheet, 
   Check, 
@@ -784,7 +785,7 @@ export const ExamsResultsView: React.FC = () => {
                 </select>
               </label>
               <label className="text-xs font-semibold text-[#475569]">Exam date
-                <input type="date" required value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+                <SchoolDateInput required value={scheduleDate} onChange={setScheduleDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
               </label>
               <label className="text-xs font-semibold text-[#475569]">Start time
                 <input type="time" required value={scheduleStartTime} onChange={event => setScheduleStartTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
