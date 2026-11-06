@@ -54,6 +54,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [assignmentRouteId, setAssignmentRouteId] = useState('');
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
   const [routeName, setRouteName] = useState('');
+  const [routeStops, setRouteStops] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
@@ -370,11 +371,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         feeAmount: routeFee,
         capacity: routeCapacity,
         active: true,
-        stops: []
+        stops: routeStops.split(/[\\r\\n,]+/).map(stop => stop.trim()).filter(Boolean)
       }, school?.id);
       setRoutes(prev => [...prev, r]);
       setShowAddRouteModal(false);
       setRouteName('');
+      setRouteStops('');
       setDriverName('');
       setVehicleNumber('');
       setDriverPhone('');
@@ -461,7 +463,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs">
+            <table className="w-full min-w-[900px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                 <tr>
                   <th className="px-4 py-2.5">Title</th>
@@ -567,6 +569,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Vehicle Plate</th>
                   <th className="px-4 py-2.5">Driver Name</th>
                   <th className="px-4 py-2.5">Driver Phone</th>
+                  <th className="px-4 py-2.5">Neighborhood Stops</th>
                   <th className="px-4 py-2.5">Monthly Fee</th>
                   <th className="px-4 py-2.5">Seats</th>
                 </tr>
@@ -574,7 +577,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <tbody className="divide-y divide-[#E2E8F0]">
                 {routes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
+                    <td colSpan={7} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
                 ) : (
                   routes.map(r => (
@@ -583,6 +586,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="px-4 py-2.5 font-mono">{r.vehicleNumber}</td>
                       <td className="px-4 py-2.5 text-[#334155]">{r.driverName}</td>
                       <td className="px-4 py-2.5 font-mono text-[#64748B]">{r.driverPhone}</td>
+                      <td className="px-4 py-2.5 text-[#334155]">{Array.isArray(r.stops) && r.stops.length ? r.stops.join(' → ') : 'Not set'}</td>
                       <td className="px-4 py-2.5 font-mono font-bold text-emerald-700">{formatMoney(r.feeAmount, school?.currency)}</td>
                       <td className="px-4 py-2.5 font-mono">{busAssignments.filter(item => item.routeId === r.id && item.active !== false).length} / {r.capacity || 40}</td>
                     </tr>
@@ -964,9 +968,21 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   required
                   value={routeName}
                   onChange={e => setRouteName(e.target.value)}
-                  placeholder="e.g. Hodan - KM4 Express"
+                  placeholder="e.g. North Jigjiga pickup route"
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block font-medium">Stops / Neighborhoods (in pickup order)</label>
+                <textarea
+                  rows={3}
+                  maxLength={15000}
+                  value={routeStops}
+                  onChange={e => setRouteStops(e.target.value)}
+                  placeholder="Enter confirmed Jigjiga neighborhoods or pickup points, one per line"
+                  className="mt-1 w-full resize-y rounded-lg border border-[#CBD5E1] px-3 py-2"
+                />
+                <p className="mt-1 text-[10px] text-[#64748B]">Use one verified neighborhood or pickup point per line. The stops are saved with this route.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
