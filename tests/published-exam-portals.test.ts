@@ -13,7 +13,8 @@ test('only published school-scoped exam schedules are exposed to student, parent
   assert.ok(api.includes("apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext"));
   assert.ok(api.includes("user.role === 'student' || user.role === 'parent'"));
   assert.ok(api.includes("user.role === 'teacher'"));
-  assert.ok(api.includes("db.getPublishedExamSchedules(school.id, classId)"));
+  assert.ok(api.includes("db.queryPage('class_subjects'"));
+  assert.ok(api.includes("db.getPublishedExamSchedules(school.id)"));
   assert.ok(storage.includes("schedule.status === 'published'"));
   assert.ok(client.includes("getPublishedExamSchedules()"));
   assert.ok(student.includes('ApiClient.getPublishedExamSchedules()'));
