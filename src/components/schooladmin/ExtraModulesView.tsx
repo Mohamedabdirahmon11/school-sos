@@ -74,6 +74,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [parentContacted, setParentContacted] = useState(false);
 
   // Health State
+  const [healthLogs] = useState<any[]>([]);
 
   // Payroll State
   const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
