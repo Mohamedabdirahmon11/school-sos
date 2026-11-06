@@ -3408,13 +3408,33 @@ apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requ
 
 apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : undefined;
-  if (classId && !await db.getClassById(classId, school.id)) {
-    res.status(404).json({ error: 'Class not found in this school.' }); return;
+  const user = (req as any).user as User;
+  let allowedClassIds: Set<string> | null = null;
+
+  if (user.role === 'school_admin' || user.role === 'super_admin' || user.role === 'accountant') {
+    allowedClassIds = null;
+  } else if (user.role === 'student' || user.role === 'parent') {
+    const students = await db.getStudents(school.id);
+    const visibleStudents = user.role === 'student'
+      ? students.filter(student => student.studentId === user.studentId)
+      : students.filter(student =>
+          user.linkedStudentIds?.includes(student.id) ||
+          (Boolean(user.phone) && (student.fatherPhone === user.phone || student.motherPhone === user.phone))
+        );
+    allowedClassIds = new Set(visibleStudents.map(student => student.classId).filter(Boolean));
+  } else if (user.role === 'teacher') {
+    const assignments = await db.getTeacherSubjectAssignments(user.id);
+    allowedClassIds = new Set(assignments.map(assignment => assignment.classId || assignment.class?.id).filter(Boolean));
+  } else {
+    allowedClassIds = new Set();
   }
-  const [schedules, classes, subjects] = await Promise.all([
-    db.getPublishedExamSchedules(school.id, classId), db.getClasses(school.id), db.getSubjects(school.id)
+
+  const [allSchedules, classes, subjects] = await Promise.all([
+    db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
   ]);
+  const schedules = allowedClassIds === null
+    ? allSchedules
+    : allSchedules.filter(schedule => allowedClassIds!.has(schedule.classId));
   const classNames = new Map(classes.map(item => [item.id, item.name]));
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
   res.json(schedules.map(schedule => ({
