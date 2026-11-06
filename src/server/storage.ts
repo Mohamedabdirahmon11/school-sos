@@ -1364,7 +1364,7 @@ class StorageEngine {
     }
     if (cachedAuth) authContextCache.delete(userId);
     const userColumns = 'id,school_id,role,full_name,email,phone,staff_id,student_id,parent_phone,password_hash,pin_hash,must_change_password,is_blocked,failed_login_attempts,locked_until,two_factor_enabled,two_factor_secret,pending_two_factor_secret,must_setup_2fa,recovery_codes,permissions,assigned_class_ids,assigned_subject_ids,linked_student_ids,branch_id,created_at,last_login_at';
-    const schoolColumns = 'id,name,code,address,city,phone,email,logo_url,brand_color,currency,academic_year,current_semester,default_class_capacity,student_access_enabled,created_at,updated_at,subscription:school_subscriptions!school_subscriptions_school_id_fkey(*)';
+    const schoolColumns = 'id,name,code,address,city,phone,email,logo_url,brand_color,currency,calendar_type,academic_year,current_semester,default_class_capacity,student_access_enabled,created_at,updated_at,subscription:school_subscriptions!school_subscriptions_school_id_fkey(*)';
     let query = client.from('user_sessions').select(`id,user_id,user_role,school_id,expires_at,created_at,last_activity_at,user:users!user_sessions_user_id_fkey!inner(${userColumns},school:schools!users_school_id_fkey(${schoolColumns}))`).eq('id', sessionId).eq('user_id', userId);
     if (schoolId) query = query.eq('school_id', schoolId);
     const startedAt = performance.now();
