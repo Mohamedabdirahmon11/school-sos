@@ -61,3 +61,12 @@ test('library catalogue enforces non-negative quantity and school-local unique I
   assert.match(api, /error\?\.code === '23505'/);
   assert.match(schema, /quantity INTEGER NOT NULL DEFAULT 1 CONSTRAINT library_books_quantity_nonnegative CHECK \(quantity >= 0\)/);
 });
+
+test('transport routes capture and display ordered neighborhood pickup stops', () => {
+  assert.ok(ui.includes("const [routeStops, setRouteStops] = useState('')"));
+  assert.ok(ui.includes('stops: routeStops.split(/[\\r\\n,]+/)'));
+  assert.ok(ui.includes('Stops / Neighborhoods (in pickup order)'));
+  assert.ok(ui.includes("r.stops.join(' → ')"));
+  assert.ok(api.includes('const stops = body.stops ?? []'));
+  assert.ok(api.includes('stops.length > 100'));
+});
