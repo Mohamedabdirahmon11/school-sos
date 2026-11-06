@@ -2075,6 +2075,57 @@ class StorageEngine {
     return this.data.examConfigs[idx];
   }
 
+  public async getExamSchedules(schoolId: string): Promise<any[]> {
+    const rows = await this.queryRows<any>('exam_schedules', { school_id: schoolId });
+    return rows.sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime)));
+  }
+
+  public async createExamSchedule(schedule: {
+    id: string; schoolId: string; classId: string; subjectId: string; examName: string;
+    examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
+    examDate: string; startTime: string; endTime: string; roomName: string;
+    seatCapacity: number; createdBy: string;
+  }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam schedule storage is unavailable.');
+    const { error } = await client.from('exam_schedules').insert({
+      id: schedule.id, school_id: schedule.schoolId, class_id: schedule.classId,
+      subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
+      academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
+      start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
+      seat_capacity: schedule.seatCapacity, status: 'draft', created_by: schedule.createdBy
+    });
+    if (error) throw new Error(error.message || 'Unable to create exam schedule.');
+    return (await this.getExamSchedules(schedule.schoolId)).find(row => row.id === schedule.id);
+  }
+
+  public async publishExamSchedule(schoolId: string, scheduleId: string, publishedBy: string): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Exam schedule publishing is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_publish_exam_schedule', {
+      p_school_id: schoolId, p_schedule_id: scheduleId, p_published_by: publishedBy
+    });
+    this.recordQuery('rpc:schoolos_publish_exam_schedule', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to publish exam schedule.');
+    return data;
+  }
+
+  public async getExamScheduleSeats(schoolId: string, scheduleId: string): Promise<any[]> {
+    const seats = await this.queryRows<any>('exam_seat_assignments', { school_id: schoolId, schedule_id: scheduleId });
+    if (!seats.length) return [];
+    const students = await this.queryRows<any>('students', { school_id: schoolId, id: seats.map(seat => seat.studentId) });
+    const byId = new Map(students.map(student => [student.id, student]));
+    return seats.map(seat => {
+      const student: any = byId.get(seat.studentId);
+      return {
+        ...seat,
+        studentIdLabel: student?.studentId || seat.studentId,
+        studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : 'Unknown student'
+      };
+    }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
+  }
+
   public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
     return this.queryRows<StudentMark>('student_marks', { school_id: schoolId, class_id: classId, subject_id: subjectId, semester });
   }
