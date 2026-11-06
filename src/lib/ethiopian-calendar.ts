@@ -120,3 +120,27 @@ export function gregorianAcademicYearToSchool(value: string, calendarType: Calen
   }
   throw new Error('Unable to determine Ethiopian academic year boundary.');
 }
+
+export function schoolTodayIso(timeZone = 'Africa/Addis_Ababa'): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function formatSchoolDateTime(isoDateTime: string, calendarType: CalendarType, locale = 'en', timeZone = 'Africa/Addis_Ababa'): string {
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) return isoDateTime;
+  const calendarLocale = calendarType === 'ethiopian'
+    ? `${locale}-u-ca-ethiopic-nu-latn`
+    : locale;
+  return new Intl.DateTimeFormat(calendarLocale, {
+    timeZone,
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date);
+}
