@@ -16,7 +16,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
   if (!open) return null;
 
   const downloadTemplate = () => {
-    const csv = 'studentId,pin\\r\\n';
+    const csv = 'studentId,pin\r\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -47,7 +47,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
         if (!studentId) throw new Error(`Row ${index + 2}: Student ID is required.`);
         if (studentId.length > 64) throw new Error(`Row ${index + 2}: Student ID is too long.`);
         if (seenStudents.has(studentId)) throw new Error(`Row ${index + 2}: duplicate Student ID ${studentId}.`);
-        if (pin && !/^\\d{4}$/.test(pin)) throw new Error(`Row ${index + 2}: PIN must contain exactly four digits.`);
+        if (pin && !/^\d{4}$/.test(pin)) throw new Error(`Row ${index + 2}: PIN must contain exactly four digits.`);
         if (pin && seenPins.has(pin)) throw new Error('Custom PINs must be unique within this file.');
         seenStudents.add(studentId);
         if (pin) seenPins.add(pin);
