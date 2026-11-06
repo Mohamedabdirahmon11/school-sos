@@ -210,14 +210,14 @@ export const SchoolSettingsView: React.FC = () => {
     if (sortedBands[sortedBands.length - 1].minPercentage !== 0) { setError('The final grade band must start at 0%.'); return; }
     if (sortedBands.some((band, index) => index > 0 && band.minPercentage >= sortedBands[index - 1].minPercentage)) { setError('Grade bands must use strictly descending minimum percentages.'); return; }
     if (sortedBands.some(band => !band.label.trim())) { setError('Each grade band needs a label.'); return; }
-    if (terms.semester1Start && terms.semester1End && terms.semester1Start > terms.semester1End) { setError('Semester 1 start date must be on or before its end date.'); return; }
-    if (terms.semester2Start && terms.semester2End && terms.semester2Start > terms.semester2End) { setError('Semester 2 start date must be on or before its end date.'); return; }
-    if (terms.semester1End && terms.semester2Start && terms.semester1End > terms.semester2Start) { setError('Semester 2 must start after Semester 1 ends.'); return; }
     let storedAcademicYear: string;
     let storedTerms: typeof terms;
     try {
       storedAcademicYear = schoolAcademicYearToGregorian(academicYear, calendarType);
       storedTerms = convertTermDates(terms, calendarType, 'gregorian');
+      if (storedTerms.semester1Start && storedTerms.semester1End && storedTerms.semester1Start > storedTerms.semester1End) throw new Error('Semester 1 start date must be on or before its end date.');
+      if (storedTerms.semester2Start && storedTerms.semester2End && storedTerms.semester2Start > storedTerms.semester2End) throw new Error('Semester 2 start date must be on or before its end date.');
+      if (storedTerms.semester1End && storedTerms.semester2Start && storedTerms.semester1End > storedTerms.semester2Start) throw new Error('Semester 2 must start after Semester 1 ends.');
     } catch (err: any) {
       setError(err.message || 'Please check the selected calendar dates.');
       return;
