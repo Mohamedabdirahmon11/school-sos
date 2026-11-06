@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
       st_results: t('exams_results'), st_attendance: t('attendance'), st_notices: t('notice_board'),
       st_messages: t('messages')
     };
-    const section = labels[currentView] || currentView.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());
+    const section = labels[currentView] || currentView.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return `${roleLabel} / ${section}`;
   };
 
