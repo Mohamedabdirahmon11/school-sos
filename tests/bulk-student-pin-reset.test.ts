@@ -3,6 +3,7 @@ import { after, before, test } from 'node:test';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-supabase.ts';
 
 process.env.NODE_ENV = 'test';
@@ -124,4 +125,14 @@ test('bulk reset rejects invalid PINs, duplicate IDs, and students from another 
 test('teachers cannot bulk reset student PINs', async () => {
   const { response } = await reset(teacher, [{ studentId: 'STD-PIN-001' }]);
   assert.equal(response.status, 403);
+});
+
+test('bulk PIN reset wizard accepts CSV and XLSX filename extensions', () => {
+  const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
+  const matcherSource = wizard.split('\n').find(line => line.includes('file.name'))?.split('!/')[1]?.split('/i.test')[0];
+  assert.ok(matcherSource, 'file extension validation is present');
+  const matcher = new RegExp(matcherSource, 'i');
+  assert.equal(matcher.test('students.csv'), true);
+  assert.equal(matcher.test('students.xlsx'), true);
+  assert.equal(matcher.test('students.txt'), false);
 });
