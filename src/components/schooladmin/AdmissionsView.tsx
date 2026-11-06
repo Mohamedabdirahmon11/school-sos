@@ -79,7 +79,7 @@ export const AdmissionsView: React.FC = () => {
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Admissions & Student Enrollment</h1>
+          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Admissions</h1>
           <p className="text-xs text-[#64748B]">Review school admission applications and enroll approved students.</p>
         </div>
         <button type="button" onClick={() => { setError(null); setShowForm(true); }} disabled={isReadOnly || classes.length === 0} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" />New Application</button>
