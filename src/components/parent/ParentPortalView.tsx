@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
@@ -98,7 +99,7 @@ export const ParentPortalView: React.FC = () => {
         <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
           <span className="text-[#64748B]">Enrolled Class</span>
           <p className="text-lg font-bold text-[#132A29] mt-1">{currentChild.className}</p>
-          <p className="text-[11px] text-[#64748B]">Admission: {currentChild.admissionDate}</p>
+          <p className="text-[11px] text-[#64748B]">Admission: {formatSchoolDate(String(currentChild.admissionDate).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</p>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
