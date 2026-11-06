@@ -4586,6 +4586,44 @@ apiRouter.put('/school/library/loans/:loanId/return', requireAuth, requireSchool
   }
 });
 
+apiRouter.get('/school/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  res.json(await db.getHealthVisits(school.id));
+});
+
+apiRouter.post('/school/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
+  const visitDate = typeof body.visitDate === 'string' ? body.visitDate.trim() : '';
+  const symptoms = typeof body.symptoms === 'string' ? body.symptoms.trim() : '';
+  const treatment = typeof body.treatment === 'string' ? body.treatment.trim() : '';
+  const nurseName = typeof body.nurseName === 'string' ? body.nurseName.trim() : '';
+  const parsedDate = new Date(`${visitDate}T00:00:00.000Z`);
+  if (!studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) ||
+      Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
+      !symptoms || symptoms.length > 2000 || treatment.length > 2000 || nurseName.length > 160) {
+    res.status(400).json({ error: 'Clinic visit details are invalid. Provide a student, valid date, and symptoms.' });
+    return;
+  }
+  try {
+    const visit = await db.addHealthVisit({
+      schoolId: school.id, studentId, visitDate, symptoms, treatment, nurseName, recordedBy: user.id
+    });
+    db.logAudit({
+      action: 'SCHOOL_HEALTH_VISIT_RECORDED', category: 'school', schoolId: school.id,
+      schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Recorded a clinic visit for student ${studentId} on ${visitDate}.`, severity: 'info'
+    });
+    res.status(201).json(visit);
+  } catch (error: any) {
+    const message = error?.message || 'Unable to save the clinic visit.';
+    if (message.includes('Choose a student')) { res.status(400).json({ error: message }); return; }
+    throw error;
+  }
+});
+
 apiRouter.get('/school/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getDisciplineIncidents(school.id));
