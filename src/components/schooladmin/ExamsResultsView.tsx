@@ -253,6 +253,18 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const handleCancelExamSchedule = async (scheduleId: string) => {
+    if (isReadOnly) return;
+    setScheduleError('');
+    try {
+      await ApiClient.cancelExamSchedule(scheduleId);
+      setExamSchedules(await ApiClient.getExamSchedules());
+      setNotice('Draft exam schedule cancelled.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to cancel exam schedule.');
+    }
+  };
+
   const handlePrintExamSeats = async (schedule: any) => {
     setScheduleError('');
     try {
@@ -816,7 +828,10 @@ export const ExamsResultsView: React.FC = () => {
                         <td className="px-3 py-3">{schedule.seatCapacity} seats</td>
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
-                          {schedule.status === 'draft' && <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>}
+                          {schedule.status === 'draft' && <>
+                            <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
+                            <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
+                          </>}
                           {schedule.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold"><Printer className="h-3.5 w-3.5"/>Print seating</button>}
                         </div></td>
                       </tr>
