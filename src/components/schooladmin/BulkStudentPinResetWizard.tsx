@@ -42,7 +42,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
       const seenStudents = new Set<string>();
       const seenPins = new Set<string>();
       const parsed = values.map((value, index) => {
-        const studentId = String(value.studentId ?? value.student_id ?? value.StudentID ?? '').trim();
+        const studentId = String(value.studentId ?? value.student_id ?? value.StudentID ?? '').trim().toUpperCase();
         const pin = String(value.pin ?? value.newPin ?? value.new_pin ?? '').trim();
         if (!studentId) throw new Error(`Row ${index + 2}: Student ID is required.`);
         if (studentId.length > 64) throw new Error(`Row ${index + 2}: Student ID is too long.`);
@@ -76,6 +76,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
   };
 
   const reset = () => { setRows([]); setPinSlips([]); setFileName(''); setError(''); };
+  const close = () => { reset(); onClose(); };
 
   return (
     <>
@@ -84,7 +85,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
         <section role="dialog" aria-modal="true" aria-label="Bulk student PIN reset" className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6">
           <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
             <div><h2 className="text-lg font-bold text-slate-900">Bulk student PIN reset</h2><p className="mt-1 text-xs text-slate-500">Upload a CSV/XLSX with Student IDs. Leave PIN blank to generate a unique 4-digit PIN.</p></div>
-            <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5"/></button>
+            <button type="button" onClick={close} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5"/></button>
           </header>
           {error && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
           {!pinSlips.length ? <>
@@ -97,7 +98,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
               <div className="rounded-xl border border-slate-200 p-4">
                 <h3 className="text-sm font-semibold text-slate-900">2. Upload the completed file</h3>
                 <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-400 px-3 py-2 text-xs text-slate-700"><FileSpreadsheet className="h-4 w-4 text-teal-700"/><span className="truncate">{fileName || 'Choose CSV or XLSX file'}</span><input type="file" className="sr-only" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={event => void chooseFile(event.target.files?.[0])}/></label>
-                <p className="mt-2 text-[11px] text-slate-500">Maximum 5 MB and 500 students. Each custom PIN must be 4 digits and unique.</p>
+                <p className="mt-2 text-[11px] text-slate-500">Maximum 5 MB and 500 students. Each custom PIN must be 4 digits and unique. Parent account PINs are not changed.</p>
               </div>
             </div>
             {rows.length > 0 && <div className="mt-5">
@@ -107,7 +108,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
             </div>}
           </> : <>
             <p className="my-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="mr-2 inline h-5 w-5"/>{pinSlips.length} student PINs were reset. These PINs are shown once only; print or securely share them now.</p>
-            <div className="my-4 flex flex-wrap gap-2"><button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white"><Printer className="h-4 w-4"/>Print PIN slips</button><button type="button" onClick={onClose} className="min-h-10 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold">Close</button></div>
+            <div className="my-4 flex flex-wrap gap-2"><button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white"><Printer className="h-4 w-4"/>Print PIN slips</button><button type="button" onClick={close} className="min-h-10 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold">Close</button></div>
             <div className="bulk-pin-print grid grid-cols-1 gap-4 sm:grid-cols-2">{pinSlips.map(slip => <article key={slip.studentId} className="break-inside-avoid rounded-xl border-2 border-teal-700 p-5"><p className="text-xs font-bold uppercase tracking-wide text-teal-700">Student PIN slip</p><h3 className="mt-2 text-lg font-bold text-slate-900">{slip.studentName}</h3><p className="mt-1 text-xs text-slate-500">Student ID: {slip.studentId}</p><p className="mt-4 text-xs text-slate-500">New PIN</p><p className="font-mono text-3xl font-bold tracking-[0.3em] text-slate-900">{slip.newPin}</p></article>)}</div>
           </>}
         </section>
