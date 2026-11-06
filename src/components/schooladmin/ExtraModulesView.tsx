@@ -73,8 +73,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [incidentNotes, setIncidentNotes] = useState('');
   const [parentContacted, setParentContacted] = useState(false);
 
-  // Health State
-  const [healthLogs] = useState<any[]>([]);
+  // Health / clinic state
+  const [healthLogs, setHealthLogs] = useState<any[]>([]);
+  const [healthStudents, setHealthStudents] = useState<any[]>([]);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthSaving, setHealthSaving] = useState(false);
+  const [healthStudentId, setHealthStudentId] = useState('');
+  const [healthVisitDate, setHealthVisitDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [healthSymptoms, setHealthSymptoms] = useState('');
+  const [healthTreatment, setHealthTreatment] = useState('');
+  const [healthNurseName, setHealthNurseName] = useState('');
 
   // Payroll State
   const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
@@ -103,6 +111,51 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const [notice, setNotice] = useState<string | null>(null);
   const [moduleError, setModuleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!school || activeModule !== 'health') return;
+    let cancelled = false;
+    setHealthLoading(true);
+    setModuleError(null);
+    Promise.all([ApiClient.getHealthVisits(), ApiClient.getAllStudents()])
+      .then(([visits, studentRows]) => {
+        if (cancelled) return;
+        setHealthStudents(studentRows);
+        const byId = new Map(studentRows.map((student: any) => [student.id, student]));
+        setHealthLogs(visits.map((visit: any) => {
+          const student: any = byId.get(visit.studentId);
+          return { ...visit, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : visit.studentId };
+        }));
+        setHealthStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      })
+      .catch((err: any) => { if (!cancelled) setModuleError(err.message || 'Unable to load clinic visits.'); })
+      .finally(() => { if (!cancelled) setHealthLoading(false); });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
+
+  const handleSaveHealthVisit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!healthStudentId || !healthSymptoms.trim() || healthSaving || isReadOnly) return;
+    setHealthSaving(true);
+    setModuleError(null);
+    try {
+      const visit = await ApiClient.addHealthVisit({
+        studentId: healthStudentId, visitDate: healthVisitDate, symptoms: healthSymptoms.trim(),
+        treatment: healthTreatment.trim(), nurseName: healthNurseName.trim()
+      });
+      const student: any = healthStudents.find(item => item.id === healthStudentId);
+      setHealthLogs(current => [{
+        ...visit, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : healthStudentId
+      }, ...current]);
+      setHealthSymptoms('');
+      setHealthTreatment('');
+      setNotice('Clinic visit saved securely.');
+    } catch (err: any) {
+      setModuleError(err.message || 'Unable to save clinic visit.');
+    } finally {
+      setHealthSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!school || activeModule !== 'library') return;
