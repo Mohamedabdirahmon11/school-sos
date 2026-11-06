@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { SchoolClass, Subject, Student, ExamConfig, StudentMark } from '../../types/index.ts';
 import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { 
   FileSpreadsheet, 
   Check, 
@@ -824,7 +825,7 @@ export const ExamsResultsView: React.FC = () => {
                       <tr key={schedule.id}>
                         <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</p></td>
                         <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
-                        <td className="px-3 py-3"><p>{schedule.examDate}</p><p className="mt-1 text-[10px] text-[#64748B]">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</p></td>
+                        <td className="px-3 py-3"><p>{formatSchoolDate(schedule.examDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</p><p className="mt-1 text-[10px] text-[#64748B]">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</p></td>
                         <td className="px-3 py-3">{schedule.roomName}</td>
                         <td className="px-3 py-3">{schedule.seatCapacity} seats</td>
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
@@ -925,7 +926,7 @@ export const ExamsResultsView: React.FC = () => {
               <h1 className="text-xl font-bold">{school?.name}</h1>
               <h2 className="mt-2 text-lg font-semibold">{seatSheet.schedule.examName} · Seating Plan</h2>
               <p className="mt-1 text-sm">{seatSheet.schedule.className} · {seatSheet.schedule.subjectName}</p>
-              <p className="mt-1 text-xs">{seatSheet.schedule.examDate} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
+              <p className="mt-1 text-xs">{formatSchoolDate(seatSheet.schedule.examDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
             </header>
             <table className="w-full border-collapse text-sm">
               <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
