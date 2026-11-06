@@ -19,7 +19,7 @@ import {
 
 export const NoticesEventsView: React.FC = () => {
   const { school, user, t } = useAuth();
-  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('notices');
+  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('events');
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [notices, setNotices] = useState<SchoolNotice[]>([]);
   const [noticePageInfo, setNoticePageInfo] = useState<PageInfo | null>(null);
@@ -44,13 +44,15 @@ export const NoticesEventsView: React.FC = () => {
   const [editingNotice, setEditingNotice] = useState<SchoolNotice | null>(null);
   const [noticeClassId, setNoticeClassId] = useState('');
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const canManageEvents = user?.role === 'school_admin' || user?.role === 'super_admin';
 
   const fetchData = async () => {
     if (!school) return;
     setLoading(true);
+    setError(null);
     try {
       const [eventsList, noticesList, classList] = await Promise.all([
-        ApiClient.request<SchoolEvent[]>('/school/events').catch(() => []),
+        ApiClient.request<SchoolEvent[]>('/school/events'),
         ApiClient.getNotices({ page: noticePage, pageSize: 20 }).catch(() => []),
         ApiClient.request<Array<{ id: string; name: string }>>('/classes').catch(() => [])
       ]);
@@ -151,8 +153,11 @@ export const NoticesEventsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Notice board
+            Academic Calendar & School Announcements
           </h1>
+          <p className="text-xs text-[#64748B]">
+            Manage terms, official holidays, examination intervals, and targeted school broadcasts
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {activeTab === 'notices' && user?.role === 'school_admin' && <button onClick={() => { setEditingNotice(null); setShowNoticeModal(true); }} className="px-3.5 py-2 bg-[#0F766E] text-white text-xs font-semibold rounded-lg"><Plus className="w-3.5 h-3.5 inline mr-1" />{t('add_notice')}</button>}
@@ -165,6 +170,8 @@ export const NoticesEventsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
 
       {/* Tabs */}
       <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
@@ -188,7 +195,7 @@ export const NoticesEventsView: React.FC = () => {
           }`}
         >
           <Bell className="w-4 h-4" />
-          <span>Notice board ({notices.length})</span>
+          <span>Announcements & Circulars ({notices.length})</span>
         </button>
       </div>
 
@@ -228,12 +235,13 @@ export const NoticesEventsView: React.FC = () => {
                       >
                         {ev.type}
                       </span>
-                      <button
+                      {canManageEvents && <button
                         onClick={() => handleDeleteEvent(ev.id)}
                         className="text-slate-400 hover:text-red-600 p-1 rounded"
+                        aria-label={`Delete ${ev.title}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </button>}
                     </div>
                     <h3 className="text-sm font-bold text-slate-800">{ev.title}</h3>
                     {ev.description && (
@@ -284,7 +292,7 @@ export const NoticesEventsView: React.FC = () => {
                   <span className="text-xs text-slate-400">
                     {new Date(n.publishDate).toLocaleDateString()}
                   </span>
-                  {user?.role === 'school_admin' && <span className="flex gap-2"><button onClick={() => editNotice(n)} aria-label={t('edit_notice')} className="text-xs text-teal-700">{t('edit_notice')}</button><button onClick={() => handleArchiveNotice(n)} aria-label={t('archive_notice')} className="text-xs text-red-600">{t('archive_notice')}</button></span>}
+                  {canManageEvents && <span className="flex gap-2"><button onClick={() => editNotice(n)} aria-label={t('edit_notice')} className="text-xs text-teal-700">{t('edit_notice')}</button><button onClick={() => handleArchiveNotice(n)} aria-label={t('archive_notice')} className="text-xs text-red-600">{t('archive_notice')}</button></span>}
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">{n.title}</h3>
                 <p className="text-xs text-slate-700 whitespace-pre-wrap">{n.content}</p>
