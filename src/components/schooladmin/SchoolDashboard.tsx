@@ -55,7 +55,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
   if (error) return <ErrorState error={error} onRetry={retry}/>;
 
   const result = normalizeSchoolDashboardData(data);
-  const canViewFinance = user?.role === 'accountant' || user?.role === 'super_admin';
+  const canViewFinance = user?.role === 'school_admin' || user?.role === 'accountant' || user?.role === 'super_admin';
   const canManageStudents = user?.role === 'school_admin' || user?.role === 'super_admin';
   const { totalStudents, totalTeachers, totalClasses, attendanceRate, todayCollection, totalOutstanding } = result.stats;
   const currency = school?.currency || 'ETB';
