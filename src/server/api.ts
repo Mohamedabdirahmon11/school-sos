@@ -2848,7 +2848,7 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
     if (seenStudents.has(studentId)) {
       res.status(400).json({ error: `Duplicate Student ID: ${studentId}.` }); return;
     }
-    if (suppliedPin && !/^\\d{4}$/.test(suppliedPin)) {
+    if (suppliedPin && !/^\d{4}$/.test(suppliedPin)) {
       res.status(400).json({ error: `PIN for ${studentId} must contain exactly four digits.` }); return;
     }
     let pin = suppliedPin || String(randomInt(1000, 10000));
