@@ -371,7 +371,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   {selectedStudent.firstName} {selectedStudent.middleName} {selectedStudent.lastName}
                 </h2>
                 <p className="text-xs text-[#64748B]">{selectedStudent.className}</p>
-                <div className="mt-2 flex flex-wrap gap-3"><button type="button" disabled={isReadOnly} onClick={openStudentEditor} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-50">Edit student</button><button type="button" onClick={handleResetPin} className="text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button></div>
+                <div className="mt-2 flex flex-wrap gap-3"><button type="button" disabled={isReadOnly} onClick={openStudentEditor} className="text-xs font-semibold text-[#0F766E] hover:underline disabled:opacity-50">Edit student</button><button type="button" onClick={handleResetPin} className="text-xs font-semibold text-[#0F766E] hover:underline">Reset PIN</button><button type="button" disabled={isReadOnly} onClick={() => void handleDeleteStudent(selectedStudent.id, `${selectedStudent.firstName} ${selectedStudent.lastName}`)} className="text-xs font-semibold text-rose-700 hover:underline disabled:opacity-50">Remove record</button></div>
               </div>
               <button onClick={() => setSelectedStudent(null)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-4 h-4" />
