@@ -115,7 +115,7 @@ export const TeachersView: React.FC = () => {
           <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
             className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50">
             <Plus className="w-4 h-4" />
-            <span>Appoint Teacher</span>
+            <span>Add Teacher</span>
           </button>
         </div>
       </div>
