@@ -16,6 +16,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { FeePayment, FeeStructureItem, Student, SchoolClass, FeeType } from '../../types/index.ts';
 import { 
   Banknote, 
@@ -80,7 +81,7 @@ export const FeesLedgerView: React.FC = () => {
   const [feeStructureId, setFeeStructureId] = useState('');
   const [amountDue, setAmountDue] = useState(30);
   const [amountPaid, setAmountPaid] = useState(30);
-  const [month, setMonth] = useState(new Date().toLocaleString('default', { month: 'long', year: 'numeric' }));
+  const [month, setMonth] = useState(() => new Intl.DateTimeFormat(school?.calendarType === 'ethiopian' || (!school?.calendarType && school?.timezone === 'Africa/Addis_Ababa') ? 'en-u-ca-ethiopic-nu-latn' : 'en-u-ca-gregory', { month: 'long', year: 'numeric', timeZone: school?.timezone || 'Africa/Addis_Ababa' }).format(new Date()));
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const paymentIdempotencyKey = useRef<string | null>(null);
@@ -451,7 +452,7 @@ export const FeesLedgerView: React.FC = () => {
                 {money(dailyReport?.totalCollected || 0)}
               </p>
               <p className="text-[11px] text-[#64748B] mt-0.5">
-                {dailyReport?.paymentCount || 0} Cash receipts recorded today ({dailyReport?.date})
+                {dailyReport?.paymentCount || 0} Cash receipts recorded today ({dailyReport?.date ? formatSchoolDate(String(dailyReport.date).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')) : '—'})
               </p>
             </div>
             <button
@@ -836,7 +837,7 @@ export const FeesLedgerView: React.FC = () => {
                     CASH RECEIPT
                   </div>
                   <p className="text-xs font-mono font-semibold text-[#132A29] mt-1">{selectedReceipt.receiptNumber}</p>
-                  <p className="text-[11px] text-[#64748B]">Date: {selectedReceipt.date}</p>
+                  <p className="text-[11px] text-[#64748B]">Date: {formatSchoolDate(String(selectedReceipt.date).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</p>
                 </div>
               </div>
 
