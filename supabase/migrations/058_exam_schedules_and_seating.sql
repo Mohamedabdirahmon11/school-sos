@@ -94,7 +94,8 @@ BEGIN
      WHERE other.school_id = p_school_id
        AND other.id <> p_schedule_id
        AND other.status <> 'cancelled'
-       AND lower(btrim(other.room_name)) = lower(btrim(v_schedule.room_name))
+       AND (lower(btrim(other.room_name)) = lower(btrim(v_schedule.room_name))
+            OR other.class_id = v_schedule.class_id)
        AND other.exam_date = v_schedule.exam_date
        AND (v_schedule.exam_date + v_schedule.start_time) < (other.exam_date + other.end_time)
        AND (other.exam_date + other.start_time) < (v_schedule.exam_date + v_schedule.end_time)
