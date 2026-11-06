@@ -1,4 +1,4 @@
--- Run after supabase/schema.sql in Supabase SQL Editor.
+-- Run after schema.sql in Supabase SQL Editor.
 -- Returns one row per public table. Any row with RLS disabled or zero policies needs review.
 SELECT
   t.tablename AS table_name,

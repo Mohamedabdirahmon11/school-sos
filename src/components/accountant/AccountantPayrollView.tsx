@@ -21,7 +21,7 @@ export const AccountantPayrollView: React.FC = () => {
   const reload = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [staffRows, payrollRows] = await Promise.all([ApiClient.getPayrollStaff(), ApiClient.getPayrollRecords(month)]);
+      const [staffRows, payrollRows] = await Promise.all([ApiClient.getPayrollStaff(), ApiClient.getAllPayrollRecords(month)]);
       setStaff(Array.isArray(staffRows) ? staffRows : []);
       setRecords(Array.isArray(payrollRows) ? payrollRows : []);
     } catch {

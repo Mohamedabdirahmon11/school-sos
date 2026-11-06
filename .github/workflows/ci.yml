@@ -2,9 +2,13 @@ name: SchoolOS CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/schoolos-audit-2026-11-03
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,10 +39,13 @@ jobs:
         run: npm run typecheck:ci
 
       - name: Test suite
-        run: npm run test:ci
+        run: npm test
 
       - name: Route parity audit
         run: npm run audit:routes
+
+      - name: Row-level security source audit
+        run: npm run audit:rls
 
       - name: Production build
         run: npm run build

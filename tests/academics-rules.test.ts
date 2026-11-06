@@ -25,9 +25,9 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     schoolId: school.id, studentId: `ACAD-${index + 1}`, firstName: `Pupil${index + 1}`, middleName: '', lastName: 'Test', gender: 'female',
     admissionDate: '2026-01-01', fatherPhone: '', classId: source.id, status: 'active'
   } as any));
-  db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
-  assert.throws(() => db.updateExamConfig(school.id, { smallExamMax: 0 }), /maximum marks/);
-  assert.throws(() => db.updateExamConfig(school.id, { passMarkPercentage: 101 }), /pass mark/);
+  await db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
+  await assert.rejects(() => db.updateExamConfig(school.id, { smallExamMax: 0 }), /maximum marks/);
+  await assert.rejects(() => db.updateExamConfig(school.id, { passMarkPercentage: 101 }), /pass mark/);
   await db.flush();
 
   const marks = students.map((student, index) => ({ studentId: student.id, smallExamMarks: [18, 14, 12, 8][index], bigExamMarks: [72, 56, 48, 32][index], status: 'submitted' as const }));
@@ -35,18 +35,34 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   assert.deepEqual(firstSemester.map(mark => mark.percentage), [90, 70, 60, 40]);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], smallExamMarks: 21 }], 'teacher-1'), /configured maximums/);
   await assert.rejects(() => db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', [{ ...marks[0], bigExamMarks: -1 }], 'teacher-1'), /configured maximums/);
-  await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', marks, 'teacher-1');
+  const secondSemester = await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 2', marks, 'teacher-1');
   await db.flush();
 
+  const unapprovedSemesterRanks = await db.getClassSemesterRankings(school.id, source.id, 'Semester 1');
+  assert.equal(unapprovedSemesterRanks.every(row => row.subjectCount === 0), true, 'submitted marks must not affect official semester rankings');
+  const unapprovedYearlyRanks = await db.getClassYearlyRankings(school.id, source.id);
+  assert.equal(unapprovedYearlyRanks.every(row => row.subjectResults.length === 0), true, 'draft/submitted marks must not affect official yearly rankings');
+
+  const approved = db.approveMarks(school.id, [...firstSemester, ...secondSemester].map(mark => mark.id), 'admin-1');
+  assert.equal(approved.length, 8);
+  await db.flush();
+
+  const semesterRanks = await db.getClassSemesterRankings(school.id, source.id, 'Semester 1');
+  assert.deepEqual(semesterRanks.map(row => row.averagePercentage), [90, 70, 60, 40]);
   const rankings = await db.getClassYearlyRankings(school.id, source.id);
   assert.deepEqual(rankings.map(row => row.yearlyRank), [1, 2, 3, 4]);
   assert.deepEqual(rankings.map(row => row.isPass), [true, true, true, false]);
+  const undersizedTarget = db.createClass({ schoolId: school.id, name: 'Small Grade 2', gradeLevel: 2, section: 'B', roomNumber: '', capacity: 2, monthlyFee: 0 });
   const payload = rankings.map((row, index) => ({
     studentId: row.student.id, classFromId: source.id, classToId: index < 3 ? target.id : source.id,
     yearlyPercentage: row.yearlyPercentage, yearlyRank: row.yearlyRank, decision: index < 3 ? 'promoted' as const : 'repeated' as const,
     adminOverride: index === 2, notes: index === 2 ? 'School board decision' : `Rank ${row.yearlyRank}`
   }));
   await assert.rejects(() => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, adminOverride: false })), 'admin-1'), /reason is required/);
+  await assert.rejects(
+    () => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, classToId: row.decision === 'promoted' ? undersizedTarget.id : row.classToId })), 'admin-1'),
+    /does not have enough capacity/
+  );
   const confirmed = await db.confirmYearEndPromotions(school.id, source.id, 2, payload, 'admin-1');
   assert.equal(confirmed.length, 4);
   assert.equal(confirmed[2].yearlyPercentage, 60);

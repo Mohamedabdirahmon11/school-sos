@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'studentPhone', 'branch'] as const;
+export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'fatherPhone', 'motherName', 'motherPhone', 'studentPhone', 'branch'] as const;
 export const MAX_IMPORT_ROWS = 2000;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
@@ -12,6 +12,9 @@ export interface SchoolImportRow {
   dateOfBirth: string;
   parentName: string;
   parentPhone: string;
+  fatherPhone: string;
+  motherName: string;
+  motherPhone: string;
   studentPhone: string;
   branch: string;
 }

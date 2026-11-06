@@ -20,9 +20,11 @@ export const BroadcastsView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchBroadcasts = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const [bData, sData] = await Promise.all([
         ApiClient.getBroadcasts(),
@@ -31,8 +33,9 @@ export const BroadcastsView: React.FC = () => {
       setBroadcasts(bData);
       setSchools(sData);
       if (sData.length > 0) setTargetSchoolId(sData[0].id);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setLoadError(err.message || 'Unable to load platform broadcasts.');
     } finally {
       setIsLoading(false);
     }
@@ -46,17 +49,22 @@ export const BroadcastsView: React.FC = () => {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !message) return;
+    if (!title.trim() || !message.trim()) return;
+    const scheduleDate = sendOption === 'schedule' ? new Date(scheduledFor) : null;
+    if (scheduleDate && (Number.isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now())) {
+      setNotice('Choose a future date and time for the scheduled broadcast.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await ApiClient.sendBroadcast({
-        title,
-        message,
+        title: title.trim(),
+        message: message.trim(),
         audience,
         targetSchoolId: audience === 'one_school' ? targetSchoolId : undefined,
         sendNow: sendOption === 'now',
-        scheduledFor: sendOption === 'schedule' ? scheduledFor : undefined
+        scheduledFor: scheduleDate ? scheduleDate.toISOString() : undefined
       });
 
       setTitle('');
@@ -86,6 +94,12 @@ export const BroadcastsView: React.FC = () => {
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{notice}</span>
+        </div>
+      )}
+      {loadError && (
+        <div role="alert" className="p-3 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center justify-between gap-3">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void fetchBroadcasts()} className="font-semibold underline">Retry loading</button>
         </div>
       )}
 

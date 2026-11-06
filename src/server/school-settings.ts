@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { School, SchoolBranch, GradingBand, ExamConfig } from '../types/index.ts';
+import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -96,7 +97,7 @@ const schoolSettingsSchema = z.object({
   email: z.string().trim().max(150, 'School email must be 150 characters or fewer.').regex(EMAIL, 'School email must be a valid email address.').optional(),
   address: z.string().trim().max(500, 'Address must be 500 characters or fewer.').optional(),
   city: z.string().trim().max(100, 'City must be 100 characters or fewer.').optional(),
-  phone: z.string().trim().max(50, 'Telephone must be 50 characters or fewer.').optional(),
+  phone: z.string().trim().max(50, 'Telephone must be 50 characters or fewer.').refine(value => value === '' || normalizeWhatsAppNumber(value) !== null, 'Telephone / WhatsApp must use an international number such as +2519XXXXXXXX.').optional(),
   brandColor: z.string().trim().regex(HEX_COLOR, 'Brand color must be a six-digit hex color.').optional(),
   logoUrl: z.string().optional(),
   currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),

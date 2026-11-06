@@ -1,14 +1,16 @@
 # Supabase setup for SchoolOS
 
-## Run the schema
+## Run the schema and migrations
 
-Re-running schema.sql is safe.
+Re-running the schema and migrations is intended to be safe, but take a database backup before applying changes to a live project.
 
 1. Create a Supabase project.
 2. In the project dashboard, open **SQL Editor** and click **New query**.
-3. Open `supabase/schema.sql` from this repository, copy the entire file into the query editor, and click **Run**.
-4. Run every file in `supabase/migrations/` in numeric order. They are rerun-safe and must run after `schema.sql`.
-5. Review the result and run the RLS verification query in `scripts/check-rls.sql` in a new SQL Editor tab.
+3. Open the repository-root file `schema.sql` (not `supabase/schema.sql`), copy its entire contents into the SQL Editor, and run it.
+4. Apply every migration file present in `supabase/migrations/` in numeric order. The current branch includes migrations through `053`; do not assume the numbering is contiguous or stop at an older migration number.
+5. Run `scripts/check-rls.sql` and `scripts/check-database-readiness.sql` in separate SQL Editor tabs. Every check should pass before using the corresponding feature. Migrations `052` and `053` add atomic admission approval and safe school backup restore RPCs.
+
+Do not skip migrations or run them out of numeric order. The schema and migration files are the source of truth for a fresh database; the migration history in an existing project should match these files.
 
 ## Configure the server
 
@@ -26,12 +28,22 @@ Do not commit `.env`, share the service role key, or place server secrets in bro
 
 ## Import existing data
 
-After installing dependencies, run `npx tsx scripts/migrate-dbjson-to-supabase.ts`. The script requires the real Supabase URL and service role key in `.env`. It repairs the legacy Super Admin role and invalid 2FA record during import. Keep `data/db.json.bak` until the owner verifies the imported rows.
+After installing dependencies, run `npx tsx scripts/migrate-dbjson-to-supabase.ts`. The script requires the real Supabase URL and service role key in `.env`. It repairs the legacy Super Admin role and invalid 2FA records during migration.
 
-## Start SchoolOS
+## Verify
 
-From the project root, run `npm install --legacy-peer-deps`, then `npm run dev`.
+Run the repository checks before deployment:
 
-## Verification status
+```bash
+npm run lint
+npm test
+npm run audit:rls
+npm run audit:routes
+npm run build
+```
 
-The committed schema is still under development. The application has not been verified against a real Supabase project. See `PROGRESS.md` for the precise status and remaining work.
+For local development after the required migrations and environment variables are ready, run:
+
+```bash
+npm run dev
+```

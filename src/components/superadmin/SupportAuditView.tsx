@@ -63,17 +63,25 @@ export const SupportAuditView: React.FC = () => {
     }
   };
 
-  const handleExportAuditCSV = () => {
-    let csv = 'ID,Timestamp,Action,Category,School,User,Role,Details,Severity\n';
-    for (const l of logs) {
-      csv += `"${l.id}","${l.timestamp}","${l.action}","${l.category}","${l.schoolName || ''}","${l.userName}","${l.userRole}","${l.details.replace(/"/g, '""')}","${l.severity}"\n`;
+  const handleExportAuditCSV = async () => {
+    try {
+      const response = await fetch('/api/superadmin/audit-logs/export-csv', { credentials: 'include' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Audit log export failed.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `schoolos_audit_log_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      window.alert(error.message || 'Unable to download the complete audit log.');
     }
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `schoolos_audit_log_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading support and security records…</div>;

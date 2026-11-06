@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { shouldTouchSession } from '../src/server/storage.ts';
+import { calculateSubscriptionGraceEnd, shouldTouchSession } from '../src/server/storage.ts';
 
 test('session refresh persistence is throttled to at most once per minute', () => {
   const now = Date.UTC(2026, 10, 3, 12, 0, 0);
@@ -31,4 +31,14 @@ test('session expiry reductions and invalid stored expiries are persisted immedi
     true
   );
   assert.equal(shouldTouchSession('invalid', new Date(now + 60_000).toISOString(), now), true);
+});
+
+test('subscription grace periods preserve an explicitly configured zero days', () => {
+  const validUntil = '2026-11-03T00:00:00.000Z';
+  assert.equal(calculateSubscriptionGraceEnd(validUntil, 0, 7).toISOString(), validUntil);
+});
+
+test('subscription grace periods use platform defaults only when school setting is absent', () => {
+  const validUntil = '2026-11-03T00:00:00.000Z';
+  assert.equal(calculateSubscriptionGraceEnd(validUntil, undefined, 3).toISOString(), '2026-11-06T00:00:00.000Z');
 });

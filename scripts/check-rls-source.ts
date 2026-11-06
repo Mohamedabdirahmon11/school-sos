@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 
-const schema = fs.readFileSync('supabase/schema.sql', 'utf8');
+const schema = fs.readFileSync('schema.sql', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/001_missing_tables.sql', 'utf8');
 const migrationFiles = fs.readdirSync('supabase/migrations').filter(file => /^\d+_.+\.sql$/.test(file)).sort();
 const storage = fs.readFileSync('src/server/storage.ts', 'utf8');
 const liveCheck = fs.readFileSync('scripts/check-rls.sql', 'utf8');
-const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase());
+const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase());
 const uniqueTables = [...new Set(tables)].sort();
 const globalRlsEnable = /ALTER TABLE public\.%I ENABLE ROW LEVEL SECURITY/i.test(schema);
 const genericTenantPolicy = /CREATE POLICY tenant_scope_v2 ON public\.%I/i.test(schema);
@@ -46,16 +46,24 @@ for (const file of migrationFiles) auditIdempotency(fs.readFileSync(`supabase/mi
 
 const helperFunctions = ['auth_user_id', 'auth_school_id', 'auth_user_role', 'auth_can_access_student', 'auth_can_access_class'];
 const firstPolicyIndex = schema.search(/\bCREATE\s+POLICY\b/i);
-const undefinedHelpers = helperFunctions.filter(name => !schema.includes(`CREATE OR REPLACE FUNCTION ${name}(`));
+const undefinedHelpers = helperFunctions.filter(name => !schema.includes(`CREATE OR REPLACE FUNCTION private.${name}(`));
 const lateHelpers = helperFunctions.filter(name => {
-  const definitionIndex = schema.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+  const definitionIndex = schema.indexOf(`CREATE OR REPLACE FUNCTION private.${name}(`);
   return definitionIndex === -1 || (firstPolicyIndex !== -1 && definitionIndex > firstPolicyIndex);
 });
 const helperOrderOk = undefinedHelpers.length === 0 && lateHelpers.length === 0;
 console.log(`${helperOrderOk ? 'PASS' : 'FAIL'} auth helper functions are defined before the first policy${helperOrderOk ? '' : ` (missing: ${undefinedHelpers.join(', ') || 'none'}; late: ${lateHelpers.join(', ') || 'none'})`}`);
 if (!helperOrderOk) failed = true;
 
-const staticSchema = schema.split('\n').filter(line => !line.includes('%I')).join('\n');
+// Only inspect executable static SQL. Comments and quoted literals can contain ordinary
+// English words such as "references a" that are not SQL foreign-key declarations.
+const staticSchema = schema
+  .replace(/--[^\n]*/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/'(?:''|[^'])*'/g, "''")
+  .split('\n')
+  .filter(line => !line.includes('%I'))
+  .join('\n');
 const tableCreationPositions = new Map<string, number>();
 for (const match of staticSchema.matchAll(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)) {
   if (!tableCreationPositions.has(match[1].toLowerCase())) tableCreationPositions.set(match[1].toLowerCase(), match.index!);
@@ -79,7 +87,10 @@ const tableOrderOk = earlyTableReferences.length === 0;
 console.log(`${tableOrderOk ? 'PASS' : 'FAIL'} schema statements reference tables only after creation${tableOrderOk ? '' : ` (${[...new Set(earlyTableReferences)].join('; ')})`}`);
 if (!tableOrderOk) failed = true;
 
-const migrationTables = new Set([...migration.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)].map(match => match[1].toLowerCase()));
+const migrationTables = new Set(migrationFiles.flatMap(file =>
+  [...fs.readFileSync(`supabase/migrations/${file}`, 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)]
+    .map(match => match[1].toLowerCase())
+));
 const tableMapStart = storage.indexOf('const tableMap:');
 const tableMapEnd = storage.indexOf('];', tableMapStart);
 const tableMapSource = storage.slice(tableMapStart, tableMapEnd);

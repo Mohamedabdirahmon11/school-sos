@@ -16,14 +16,14 @@ export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20 }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page], Boolean(school));
+    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page, search], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const subjects: Subject[] = Array.isArray(subjectRows) ? subjectRows : [];
-  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [initialPassword, setInitialPassword] = useState('');
@@ -47,6 +47,7 @@ export const TeachersView: React.FC = () => {
 
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
+  useEffect(() => { setPage(1); }, [search]);
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
 

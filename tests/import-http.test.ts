@@ -8,7 +8,7 @@ import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-sup
 process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = randomBytes(48).toString('hex');
 const memory = new InMemorySupabase();
-const { hashPassword, createSignedSessionToken } = await import('../src/server/auth-security.ts');
+const { hashPassword, hashPin, createSignedSessionToken } = await import('../src/server/auth-security.ts');
 const admin = { id: 'import-admin', role: 'school_admin', schoolId: 'import-school', fullName: 'Import Admin', email: 'import@example.test', passwordHash: hashPassword('test-password'), isBlocked: false, failedLoginAttempts: 0 };
 const teacher = { id: 'import-teacher', role: 'teacher', schoolId: 'import-school', fullName: 'Import Teacher', email: 'teacher-import@example.test', passwordHash: hashPassword('test-password'), isBlocked: false, failedLoginAttempts: 0 };
 const readonlyAdmin = { ...admin, id: 'import-readonly-admin', schoolId: 'import-readonly', email: 'readonly-import@example.test' };
@@ -18,9 +18,12 @@ await memory.from('schools').insert([
   { id: 'import-readonly', code: 'IMR', name: 'Import Read Only', subscription: { status: 'read_only' } },
   { id: 'import-other', code: 'IMO', name: 'Other School', subscription: { status: 'active' } }
 ]);
+await memory.from('school_subscriptions').insert([
+  { id: 'import-school', schoolId: 'import-school', plan: 'basic', cadence: 'yearly', status: 'active', startDate: new Date().toISOString(), validUntil: '2099-12-31', graceDays: 7, pricePaid: 0, autoRenew: false },
+  { id: 'import-readonly', schoolId: 'import-readonly', plan: 'basic', cadence: 'yearly', status: 'read_only', startDate: new Date().toISOString(), validUntil: '2020-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+]);
 const storage = await import('../src/server/storage.ts');
-const adapter = createHttpTestStorage(memory);
-storage.installTestStorageAdapter(adapter as any);
+createHttpTestStorage(memory);
 const { apiRouter } = await import('../src/server/api.ts');
 const app = express();
 app.use(express.json());
@@ -46,6 +49,11 @@ const csv = (...rows: string[][]) => [
   'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,studentPhone,branch',
   ...rows.map(row => row.join(','))
 ].join('\n');
+const csvWithGuardians = (...rows: string[][]) => [
+  'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,fatherPhone,motherName,motherPhone,studentPhone,branch',
+  ...rows.map(row => row.join(','))
+].join('\n');
+
 async function preview(user: typeof admin, text: string, headers: Record<string, string> = {}) {
   const form = new FormData();
   form.append('file', new Blob([text], { type: 'text/csv' }), 'school-import.csv');
@@ -77,6 +85,42 @@ test('CSV import creates one missing class, students, linked parent and one-time
   assert.equal(JSON.stringify(students).includes(result.pinSlips[0].pin), false);
 });
 
+test('bulk import links father and mother accounts and never resets an existing parent PIN', async () => {
+  const existingPinHash = hashPin('2468');
+  await memory.from('users').insert([{
+    id: 'existing-father-parent',
+    schoolId: admin.schoolId,
+    role: 'parent',
+    fullName: 'Existing Father',
+    phone: '+252611199991',
+    parentPhone: '+252611199991',
+    pinHash: existingPinHash,
+    linkedStudentIds: [],
+    isBlocked: false,
+    failedLoginAttempts: 0
+  }]);
+  const { response, body } = await preview(admin, csvWithGuardians([
+    'Grade 8', 'A', 'Ayaan Hassan', 'female', '2015-05-04',
+    'Existing Father', '', '+252611199991', 'Hodan Hassan', '+252622299992', '', ''
+  ]));
+  assert.equal(response.status, 200);
+  assert.equal(body.totals.valid, 1);
+  const imported = await confirm(admin, body.rows.map((row: any) => row.data));
+  assert.equal(imported.status, 200);
+  const result = await imported.json() as any;
+  assert.equal(result.counts.parents, 2);
+  assert.equal(result.pinSlips.length, 2);
+  const studentSlip = result.pinSlips.find((slip: any) => slip.type === 'student');
+  const student = memory.rows('students').find(row => row.studentId === studentSlip?.studentId);
+  assert.equal(student?.fatherPhone, '+252611199991');
+  assert.equal(student?.motherPhone, '+252622299992');
+  const father = memory.rows('users').find(row => row.id === 'existing-father-parent');
+  assert.equal(father?.pinHash, existingPinHash);
+  assert.ok(father?.linkedStudentIds?.includes(student.id));
+  const mother = memory.rows('users').find(row => row.role === 'parent' && row.phone === '+252622299992');
+  assert.ok(mother?.linkedStudentIds?.includes(student.id));
+});
+
 test('preview rejects duplicate rows and invalid parent phone with row reasons', async () => {
   const { response, body } = await preview(admin, csv(
     ['Grade 3', 'A', 'Hodan Ali', 'female', '2017-02-04', 'Parent Ali', '+252611234568', '', ''],
@@ -102,7 +146,7 @@ test('import scope rejects cross-school attempts; read-only schools and teacher 
 test('mid-transaction failure leaves classes, students, users and audit rows unchanged', async () => {
   const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
   const before = ['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length);
-  adapter.failNextBulkImport();
+  memory.failNextBulkImport();
   const failed = await confirm(admin, body.rows.map((row: any) => row.data));
   assert.equal(failed.status, 500);
   assert.deepEqual(['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length), before);
@@ -112,6 +156,6 @@ test('template contains required headers and explicitly skipped examples', async
   const response = await fetch(`${baseUrl}/import/template`, { headers: { Cookie: `schoolos_session=${tokenFor(admin)}` } });
   const text = await response.text();
   assert.equal(response.status, 200);
-  assert.match(text, /"?className"?,"?section"?,"?studentName"?,"?gender"?,"?dateOfBirth"?,"?parentName"?,"?parentPhone"?,"?studentPhone"?,"?branch"?/);
-  assert.equal((text.match(/EXAMPLE/g) || []).length, 4);
+  assert.match(text, /"?className"?,"?section"?,"?studentName"?,"?gender"?,"?dateOfBirth"?,"?parentName"?,"?parentPhone"?,"?fatherPhone"?,"?motherName"?,"?motherPhone"?,"?studentPhone"?,"?branch"?/);
+  assert.equal((text.match(/EXAMPLE/g) || []).length, 6);
 });

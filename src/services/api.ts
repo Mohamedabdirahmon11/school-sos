@@ -29,8 +29,6 @@ import {
   SupportTicket,
   AuditLog,
   SuperAdminSettings,
-  CommunicationSettings,
-  CommunicationQueueItem,
   StaffPayrollRecord
 } from '../types/index.ts';
 
@@ -69,11 +67,12 @@ export class ApiClient {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
-  private static pageQuery(params?: { page?: number; pageSize?: number }) {
-    if (!params?.page && !params?.pageSize) return '';
+  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string }) {
+    if (!params?.page && !params?.pageSize && !params?.search?.trim()) return '';
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params.search?.trim()) query.set('search', params.search.trim());
     return `?${query.toString()}`;
   }
   private static getHeaders(): HeadersInit {
@@ -327,7 +326,7 @@ export class ApiClient {
   }
 
   public static async generateBatchInvoices() {
-    return this.request<any>('/superadmin/invoices/generate', { method: 'POST' }).catch(() => ({ success: true, count: 0 }));
+    return this.request<{ success: boolean; generatedCount: number; skippedOpenInvoiceCount: number; skippedLifetimeCount: number; skippedInvalidPricingCount: number }>('/superadmin/invoices/generate', { method: 'POST' });
   }
 
   public static async getBroadcasts() {
@@ -514,13 +513,27 @@ export class ApiClient {
   }
 
   // Students & Teachers
-  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number) {
+  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string) {
     const params = new URLSearchParams();
     if (classId) params.append('classId', classId);
     if (branchId) params.append('branchId', branchId);
     if (page) params.append('page', String(page));
     if (pageSize) params.append('pageSize', String(pageSize));
+    if (search?.trim()) params.append('search', search.trim());
+    if (feeStatus && feeStatus !== 'all') params.append('feeStatus', feeStatus);
     return this.request<Student[]>(`/students?${params.toString()}`);
+  }
+
+  public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100): Promise<Student[]> {
+    const firstPage = await this.getStudents(classId, branchId, 1, pageSize);
+    const pagination = (firstPage as any).pagination;
+    const totalPages = Math.max(1, Number(pagination?.totalPages) || 1);
+    const allStudents = [...firstPage];
+    for (let page = 2; page <= totalPages; page += 1) {
+      const nextPage = await this.getStudents(classId, branchId, page, pageSize);
+      allStudents.push(...nextPage);
+    }
+    return allStudents;
   }
 
   public static async createStudent(studentData: Partial<Student>, schoolId?: string) {
@@ -542,18 +555,18 @@ export class ApiClient {
   }
 
   public static async getSchoolStudents(params?: any) {
-    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize);
+    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus);
   }
 
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
-    const students = await this.getStudents();
-    const student = students.find(s => s.id === id);
-    const payments = includeFinance ? await this.getFeePayments(id) : [];
-    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${id}`).catch(() => []);
-    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${id}`).catch(() => []);
+    const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
+    const payments = includeFinance ? await this.getFeePayments(id, { page: 1, pageSize: 100 }) : [];
+    const marks = await this.request<StudentMark[]>(`/exams/marks?studentId=${encodeURIComponent(id)}`).catch(() => []);
+    const attendance = await this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(id)}&page=1&pageSize=100`).catch(() => []);
     return {
       student,
       payments,
+      fees: payments,
       marks,
       attendance,
       totalDue: payments.reduce((acc, p) => acc + (p.amountDue || 0), 0),
@@ -623,15 +636,42 @@ export class ApiClient {
     return { stats: { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], recentPayments: [], notices: [] };
   }
 
+  public static async getDisciplineIncidents() {
+    return this.request<any[]>('/school/discipline');
+  }
+
+  public static async addDisciplineIncident(data: {
+    studentId: string; incidentDate: string; infractionType: string;
+    severity: 'low' | 'medium' | 'high'; actionTaken: string; notes?: string;
+    parentContacted?: boolean;
+  }) {
+    return this.request<any>('/school/discipline', { method: 'POST', body: JSON.stringify(data) });
+  }
+
   public static async getLibraryBooks(schoolId?: string) {
-    return this.request<any[]>('/school/library').catch(() => []);
+    return this.request<any[]>('/school/library');
   }
 
   public static async addLibraryBook(data: any, schoolId?: string) {
     return this.request<any>('/school/library', {
       method: 'POST',
       body: JSON.stringify(data)
-    }).catch(() => data);
+    });
+  }
+
+  public static async getLibraryLoans() {
+    return this.request<any[]>('/school/library/loans');
+  }
+
+  public static async issueLibraryLoan(data: { bookId: string; studentId: string; dueDate: string }) {
+    return this.request<any>('/school/library/loans', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async returnLibraryLoan(loanId: string) {
+    return this.request<any>(`/school/library/loans/${encodeURIComponent(loanId)}/return`, { method: 'PUT' });
   }
 
   public static async getTransportRoutes(schoolId?: string) {
@@ -643,6 +683,32 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  }
+
+  public static async getInventoryItems() {
+    return this.request<any[]>('/inventory');
+  }
+
+  public static async createInventoryItem(data: {
+    name: string; sku?: string; category?: string; unit?: string;
+    reorderLevel?: number; unitCost?: number; location?: string; notes?: string;
+  }) {
+    return this.request<any>('/inventory', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async updateInventoryItem(id: string, data: Record<string, unknown>) {
+    return this.request<any>(`/inventory/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public static async getInventoryTransactions(id: string) {
+    return this.request<any[]>(`/inventory/${encodeURIComponent(id)}/transactions`);
+  }
+
+  public static async createInventoryTransaction(id: string, data: {
+    transactionType: 'stock_in' | 'stock_out' | 'adjustment';
+    quantity: number; unitCost?: number; reference?: string; note?: string;
+  }) {
+    return this.request<any>(`/inventory/${encodeURIComponent(id)}/transactions`, { method: 'POST', body: JSON.stringify(data) });
   }
 
   public static async getBusAssignments() {
@@ -777,6 +843,17 @@ export class ApiClient {
     return this.request<StaffPayrollRecord[]>(`/payroll?${query.toString()}`);
   }
 
+  public static async getAllPayrollRecords(month: string, pageSize = 100): Promise<StaffPayrollRecord[]> {
+    const firstPage = await this.getPayrollRecords(month, 1, pageSize);
+    const pagination = (firstPage as any).pagination;
+    const totalPages = Math.max(1, Number(pagination?.totalPages) || 1);
+    const records = [...firstPage];
+    for (let page = 2; page <= totalPages; page += 1) {
+      records.push(...await this.getPayrollRecords(month, page, pageSize));
+    }
+    return records;
+  }
+
   public static async createPayrollDraft(month: string, staff: Array<{ staffId: string; allowances: Array<{ label: string; amount: number }>; deductions: Array<{ label: string; amount: number }> }>) {
     return this.request<StaffPayrollRecord[]>('/payroll', { method: 'POST', body: JSON.stringify({ month, staff }) });
   }
@@ -816,29 +893,6 @@ export class ApiClient {
     return this.request<ReportCardDesign>('/report-card/design', {
       method: 'PUT',
       body: JSON.stringify(design)
-    });
-  }
-
-  // Communication
-  public static async getCommunicationSettings() {
-    return this.request<CommunicationSettings>('/communication/settings');
-  }
-
-  public static async updateCommunicationSettings(settings: Partial<CommunicationSettings>) {
-    return this.request<CommunicationSettings>('/communication/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings)
-    });
-  }
-
-  public static async getCommunicationQueue(params?: any) {
-    return this.request<CommunicationQueueItem[]>(`/communication/queue${this.pageQuery(params)}`);
-  }
-
-  public static async sendQueuedNotification(data: any) {
-    return this.request<CommunicationQueueItem>('/communication/send', {
-      method: 'POST',
-      body: JSON.stringify(data)
     });
   }
 
