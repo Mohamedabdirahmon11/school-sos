@@ -188,7 +188,7 @@ export const TeachersView: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
               <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-[#0F766E]" />
-                <span>Appoint Faculty Member</span>
+                <span>Add Teacher</span>
               </h2>
               <button onClick={() => setShowAddModal(false)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-5 h-5" />
