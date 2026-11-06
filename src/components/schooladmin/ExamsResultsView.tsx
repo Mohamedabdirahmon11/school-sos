@@ -24,7 +24,8 @@ import {
   Save, 
   Printer, 
   Download,
-  AlertCircle
+  AlertCircle,
+  CalendarDays
 } from 'lucide-react';
 
 export const ExamsResultsView: React.FC = () => {
@@ -34,7 +35,7 @@ export const ExamsResultsView: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config'>('entry_approval');
+  const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('entry_approval');
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
@@ -308,6 +309,16 @@ export const ExamsResultsView: React.FC = () => {
             }`}
           >
             Yearly Results (S1 + S2)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('schedule')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+              activeTab === 'schedule' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            Exam Schedule
           </button>
           <button
             type="button"
