@@ -255,7 +255,7 @@ export const NoticesEventsView: React.FC = () => {
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>
-                        {ev.startDate} {ev.endDate && ev.endDate !== ev.startDate ? `to ${ev.endDate}` : ''}
+                        {formatSchoolDate(ev.startDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))} {ev.endDate && ev.endDate !== ev.startDate ? `to ${formatSchoolDate(ev.endDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}` : ''}
                       </span>
                     </div>
                   </div>
