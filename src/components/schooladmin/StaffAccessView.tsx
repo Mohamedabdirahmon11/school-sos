@@ -42,6 +42,9 @@ export const StaffAccessView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [staffId, setStaffId] = useState('');
   const [phone, setPhone] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [resetTarget, setResetTarget] = useState<StaffMember | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
   const [salary, setSalary] = useState('500');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['fees_manage']);
   const [message, setMessage] = useState<string | null>(null);
@@ -91,7 +94,7 @@ export const StaffAccessView: React.FC = () => {
         });
         setMessage('Staff profile and permissions updated successfully.');
       } else {
-        const created = await ApiClient.request<StaffMember & { initialPassword?: string }>('/school/staff', {
+        const created = await ApiClient.request<StaffMember>('/school/staff', {
           method: 'POST',
           body: JSON.stringify({
             fullName,
@@ -99,13 +102,12 @@ export const StaffAccessView: React.FC = () => {
             email,
             staffId,
             phone,
+            temporaryPassword,
             monthlySalary: parseFloat(salary) || 0,
             permissions: selectedPermissions
           })
         });
-        if (created.initialPassword) {
-          window.alert(`Sign-in account created for ${created.email}.\nTemporary password (shown once):\n${created.initialPassword}\nThe staff member must change it after signing in.`);
-        }
+
         setMessage(`Staff sign-in account created for ${fullName} (${created.staffId}).`);
       }
 
@@ -115,23 +117,24 @@ export const StaffAccessView: React.FC = () => {
       setEmail('');
       setStaffId('');
       setPhone('');
+      setTemporaryPassword('');
       await fetchStaff();
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  const handleResetStaffPassword = async (staff: StaffMember) => {
-    if (!staff.userId) {
-      setError('This staff record is not linked to a sign-in account.');
-      return;
-    }
-    if (!confirm(`Generate a temporary password for ${staff.fullName}? They must change it at next sign-in.`)) return;
+  const handleResetStaffPassword = async () => {
+    if (!resetTarget?.userId) return;
     setError(null);
     try {
-      const result = await ApiClient.resetUserPassword(staff.userId);
-      window.alert(`Temporary password for ${staff.fullName}:\n\n${result.temporaryPassword}\n\nThis is shown once. The user must change it at next sign-in.`);
-      setMessage(`Temporary password generated for ${staff.fullName}.`);
+      await ApiClient.request(`/users/${resetTarget.userId}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ temporaryPassword: resetPassword })
+      });
+      setMessage(`Temporary password set for ${resetTarget.fullName}. They must change it at next sign-in.`);
+      setResetTarget(null);
+      setResetPassword('');
     } catch (err: any) {
       setError(err.message || 'Could not reset this staff password.');
     }
@@ -144,6 +147,7 @@ export const StaffAccessView: React.FC = () => {
     setEmail(staff.email);
     setStaffId(staff.staffId || '');
     setPhone(staff.phone);
+    setTemporaryPassword('');
     setSalary(staff.monthlySalary.toString());
     setSelectedPermissions(staff.permissions || []);
     setShowAddModal(true);
@@ -172,6 +176,7 @@ export const StaffAccessView: React.FC = () => {
             setEmail('');
             setStaffId('');
             setPhone('');
+            setTemporaryPassword('');
             setSelectedPermissions(['fees_manage']);
             setShowAddModal(true);
           }}
@@ -269,7 +274,7 @@ export const StaffAccessView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {st.userId && <button type="button" onClick={() => handleResetStaffPassword(st)} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
+                        {st.userId && <button type="button" onClick={() => { setResetTarget(st); setResetPassword(''); setError(null); }} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
                           <KeyRound className="w-3 h-3" /><span>Reset password</span>
                         </button>}
                         <button
@@ -288,6 +293,23 @@ export const StaffAccessView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {resetTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-sm font-bold text-slate-900">Set temporary password</h3>
+            <p className="text-xs text-slate-600 mt-1">For {resetTarget.fullName} ({resetTarget.staffId}). They must change it after signing in.</p>
+            <form onSubmit={e => { e.preventDefault(); void handleResetStaffPassword(); }} className="mt-4 space-y-3">
+              <input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="At least 12 characters, upper/lowercase and number" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+              <p className="text-[11px] text-slate-500">Use uppercase, lowercase and at least one number. The staff member will be forced to replace it.</p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setResetTarget(null); setResetPassword(''); }} className="px-3 py-2 text-xs rounded-lg bg-slate-100">Cancel</button>
+                <button type="submit" className="px-3 py-2 text-xs rounded-lg bg-[#0F766E] text-white font-semibold">Save temporary password</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Staff Modal */}
       {showAddModal && (
@@ -343,6 +365,13 @@ export const StaffAccessView: React.FC = () => {
                 </div>
               </div>
 
+              {!editingStaff && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Temporary Password (set by administrator)</label>
+                  <input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={temporaryPassword} onChange={e => setTemporaryPassword(e.target.value)} placeholder="At least 12 characters, upper/lowercase and number" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <p className="mt-1 text-[11px] text-slate-500">Staff must choose a new password the first time they sign in.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Email (Login ID)</label>
