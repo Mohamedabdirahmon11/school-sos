@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { sanitizeSchoolSettings } from '../src/server/school-settings.ts';
 import {
   ethiopianToGregorian,
   formatSchoolDate,
@@ -46,4 +47,10 @@ test('converts academic year labels while keeping Gregorian database values', ()
   assert.equal(schoolAcademicYearToGregorian('2019-2020', 'ethiopian'), '2026-2027');
   assert.equal(gregorianAcademicYearToSchool('2026-2027', 'gregorian'), '2026-2027');
   assert.equal(schoolAcademicYearToGregorian('2026-2027', 'gregorian'), '2026-2027');
+});
+
+test('validates per-school calendar preferences', () => {
+  assert.equal(sanitizeSchoolSettings({ calendarType: 'ethiopian' }).calendarType, 'ethiopian');
+  assert.equal(sanitizeSchoolSettings({ calendarType: 'gregorian' }).calendarType, 'gregorian');
+  assert.throws(() => sanitizeSchoolSettings({ calendarType: 'lunar' }), /Calendar must be Ethiopian or Gregorian/);
 });
