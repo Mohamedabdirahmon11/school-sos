@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
       sch_reports: t('reports_export'), sch_report_cards: t('report_cards'),
       sch_admissions: t('admissions'), sch_settings: t('school_settings'),
       sch_library: t('library'), sch_transport: t('transport'), sch_inventory: t('inventory'),
-      sch_discipline: t('discipline'), sch_health: t('health_nurse'), sch_support: 'Help & Support',
+      sch_discipline: t('discipline'), sch_health: t('health_nurse'), sch_support: t('help_support'),
       acc_dashboard: t('dashboard'), sch_payroll: t('payroll_management'),
       t_dashboard: t('dashboard'), t_timetable: t('timetable'), t_attendance: t('attendance'),
       t_grades: t('exams_results'), t_assignments: t('assignments'), t_notices: t('notice_board'),
