@@ -3421,10 +3421,10 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
           user.linkedStudentIds?.includes(student.id) ||
           (Boolean(user.phone) && (student.fatherPhone === user.phone || student.motherPhone === user.phone))
         );
-    allowedClassIds = new Set(visibleStudents.map(student => student.classId).filter(Boolean));
+    allowedClassIds = new Set(visibleStudents.map(student => student.classId).filter((id): id is string => Boolean(id)));
   } else if (user.role === 'teacher') {
     const assignments = await db.getTeacherSubjectAssignments(user.id);
-    allowedClassIds = new Set(assignments.map(assignment => assignment.classId || assignment.class?.id).filter(Boolean));
+    allowedClassIds = new Set(assignments.map(assignment => assignment.classId || assignment.class?.id).filter((id): id is string => Boolean(id)));
   } else {
     allowedClassIds = new Set();
   }
