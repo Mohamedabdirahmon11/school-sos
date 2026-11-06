@@ -36,10 +36,8 @@ import {
   Bus,
   AlertTriangle,
   HeartPulse,
-  Award,
   Wallet,
   Boxes,
-  Compass
 } from 'lucide-react';
 
 interface SidebarProps {
