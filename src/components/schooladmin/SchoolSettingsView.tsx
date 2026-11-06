@@ -88,6 +88,7 @@ export const SchoolSettingsView: React.FC = () => {
   const [defaultClassCapacity, setDefaultClassCapacity] = useState(String(school?.defaultClassCapacity ?? 40));
 
   // Academic Rules State
+  const [calendarType, setCalendarType] = useState<'ethiopian' | 'gregorian'>(school?.calendarType || (school?.timezone?.startsWith('Africa/Addis_Ababa') ? 'ethiopian' : 'gregorian'));
   const [academicYear, setAcademicYear] = useState(school?.academicYear || '2026-2027');
   const [currentSemester, setCurrentSemester] = useState<'Semester 1' | 'Semester 2'>(school?.currentSemester || 'Semester 1');
   const [terms, setTerms] = useState(school?.terms || defaultTerms);
