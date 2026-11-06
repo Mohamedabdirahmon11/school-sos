@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
+import { formatSchoolDate, schoolTodayIso } from '../../lib/ethiopian-calendar.ts';
 import { 
   SchoolClass, 
   Subject, 
@@ -75,7 +76,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, { grade: string; feedback: string }>>({});
 
   // Attendance state
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(() => schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa'));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
 
   // Marks state (Small Exam + Big Exam)
@@ -632,7 +633,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-lg bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold text-[#132A29]">{item.title}</p>
-                <span className={`font-mono text-[10px] font-semibold ${item.dueDate < new Date().toISOString().slice(0, 10) ? 'text-rose-700' : 'text-[#0F766E]'}`}>{item.dueDate}</span>
+                <span className={`font-mono text-[10px] font-semibold ${item.dueDate < schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa') ? 'text-rose-700' : 'text-[#0F766E]'}`}>{formatSchoolDate(item.dueDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</span>
               </div>
               <p className="text-[#475569]">{item.description}</p>
               <p className="text-[11px] text-[#64748B]">{item.subjectName || item.subjectId} • {item.maxPoints} points</p>
@@ -646,7 +647,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </h2>
             <select value={reviewAssignmentId} onChange={handleReviewAssignment} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg">
               <option value="">Select assigned homework</option>
-              {homework.map(item => <option key={item.id} value={item.id}>{item.title} - {item.dueDate}</option>)}
+              {homework.map(item => <option key={item.id} value={item.id}>{item.title} - {formatSchoolDate(item.dueDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</option>)}
             </select>
             {!reviewAssignmentId ? <p className="text-[#64748B]">Choose homework to review student submissions.</p> : isLoadingSubmissions ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : reviewSubmissions.length === 0 ? <p className="text-[#64748B]">No student has submitted this homework yet.</p> : <div className="space-y-3">{reviewSubmissions.map(submission => {
               const draft = gradeDrafts[submission.id] || { grade: '', feedback: '' };
@@ -711,7 +712,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 <div key={n.id} className="p-3.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
-                    <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
+                    <span className="text-[10px] text-[#64748B] font-mono">{formatSchoolDate(String(n.publishDate).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</span>
                   </div>
                   <p className="text-[#334155]">{n.content}</p>
                 </div>
