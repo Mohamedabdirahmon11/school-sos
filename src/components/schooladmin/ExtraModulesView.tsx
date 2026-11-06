@@ -371,7 +371,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         feeAmount: routeFee,
         capacity: routeCapacity,
         active: true,
-        stops: routeStops.split(/[\\r\\n,]+/).map(stop => stop.trim()).filter(Boolean)
+        stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean)
       }, school?.id);
       setRoutes(prev => [...prev, r]);
       setShowAddRouteModal(false);
