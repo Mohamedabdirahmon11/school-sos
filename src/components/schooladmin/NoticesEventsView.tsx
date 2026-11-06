@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { SchoolEvent, SchoolNotice } from '../../types/index.ts';
 import { ApiClient } from '../../services/api.ts';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
+import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { 
   Calendar, 
   Bell, 
@@ -290,7 +292,7 @@ export const NoticesEventsView: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-xs text-slate-400">
-                    {new Date(n.publishDate).toLocaleDateString()}
+                    {formatSchoolDate(String(n.publishDate).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}
                   </span>
                   {canManageEvents && <span className="flex gap-2"><button onClick={() => editNotice(n)} aria-label={t('edit_notice')} className="text-xs text-teal-700">{t('edit_notice')}</button><button onClick={() => handleArchiveNotice(n)} aria-label={t('archive_notice')} className="text-xs text-red-600">{t('archive_notice')}</button></span>}
                 </div>
