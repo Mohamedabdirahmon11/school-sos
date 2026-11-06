@@ -39,6 +39,7 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes("setActiveTab('schedule')"));
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
+  assert.ok(ui.includes('Cancel draft'));
   assert.ok(ui.includes('Print seating'));
   assert.ok(ui.includes('exam-seat-print'));
 });
