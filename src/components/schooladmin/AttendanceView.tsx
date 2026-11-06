@@ -366,6 +366,7 @@ export const AttendanceView: React.FC = () => {
               <tbody className="divide-y divide-[#edf2f0]">
                 {visibleStudents.map(std => {
                   const state = attendanceMap[std.id] || { status: 'present', note: '' };
+                  const validParentWhatsApp = parentWhatsAppNumber(std);
                   return (
                     <tr key={std.id} className="hover:bg-[#F8FAFC]">
                       <td className="py-3 px-4 font-mono font-medium text-[#475569]">{std.studentId}</td>
