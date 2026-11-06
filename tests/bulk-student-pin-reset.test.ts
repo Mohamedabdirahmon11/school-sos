@@ -9,7 +9,7 @@ process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = randomBytes(48).toString('hex');
 
 const memory = new InMemorySupabase();
-const { hashPassword, hashPin, createSignedSessionToken } = await import('../src/server/auth-security.ts');
+const { hashPassword, hashPin, verifyPin, createSignedSessionToken } = await import('../src/server/auth-security.ts');
 const admin = {
   id: 'pin-reset-admin', role: 'school_admin', schoolId: 'pin-reset-school',
   fullName: 'PIN Reset Admin', email: 'pin-reset@example.test',
@@ -95,10 +95,10 @@ test('bulk reset assigns unique four-digit PINs atomically and updates student a
   assert.notEqual(body.pinSlips[0].newPin, body.pinSlips[1].newPin);
   const studentOne = memory.rows('students').find(row => row.studentId === 'STD-PIN-001');
   const studentTwo = memory.rows('students').find(row => row.studentId === 'STD-PIN-002');
-  assert.equal(studentOne?.pinHash, hashPin('2468'));
-  assert.equal(studentTwo?.pinHash, hashPin(body.pinSlips[1].newPin));
+  assert.equal(verifyPin('2468', String(studentOne?.pinHash || '')), true);
+  assert.equal(verifyPin(body.pinSlips[1].newPin, String(studentTwo?.pinHash || '')), true);
   const studentUser = memory.rows('users').find(row => row.id === 'usr-student-std-pin-1');
-  assert.equal(studentUser?.pinHash, hashPin('2468'));
+  assert.equal(verifyPin('2468', String(studentUser?.pinHash || '')), true);
   assert.equal(studentUser?.failedLoginAttempts, 0);
   assert.equal(studentUser?.lockedUntil, null);
   assert.equal(memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash, parentPinBefore);
@@ -118,7 +118,7 @@ test('bulk reset rejects invalid PINs, duplicate IDs, and students from another 
   const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '5678' }]);
   assert.equal(crossSchool.response.status, 400);
   assert.equal(memory.rows('students').find(row => row.studentId === 'STD-PIN-001')?.pinHash, before);
-  assert.equal(memory.rows('students').find(row => row.studentId === 'STD-OTHER-001')?.pinHash, hashPin('4444'));
+  assert.equal(verifyPin('4444', String(memory.rows('students').find(row => row.studentId === 'STD-OTHER-001')?.pinHash || '')), true);
 });
 
 test('teachers cannot bulk reset student PINs', async () => {
