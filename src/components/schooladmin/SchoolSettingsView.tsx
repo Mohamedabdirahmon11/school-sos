@@ -594,6 +594,7 @@ export const SchoolSettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Official Telephone / WhatsApp maamulka</label>
+                <p className="mb-1 text-[11px] text-[#64748B]">Lambarkan maamulka ayaa WhatsApp u adeegsanaya; fariinta waalidka waxaa laga furaa Attendance, maamuluhu ayaa riixaya Send.</p>
                 <input
                   type="tel"
                   value={phone}
