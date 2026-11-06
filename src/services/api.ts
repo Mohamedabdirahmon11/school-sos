@@ -633,7 +633,7 @@ export class ApiClient {
   public static async getSchoolDashboard(schoolId?: string) {
     const data = await this.request<any>('/school/dashboard');
     if (data && typeof data === 'object') return data;
-    return { stats: { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], recentPayments: [], notices: [] };
+    return { stats: { totalStudents: 0, totalTeachers: 0, totalClasses: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], recentPayments: [], notices: [] };
   }
 
   public static async getHealthVisits() {
