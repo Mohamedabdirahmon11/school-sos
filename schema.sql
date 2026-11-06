@@ -1803,7 +1803,7 @@ VALUES
   ('premium', 'Premium Enterprise', 179, 1790, 4800, ARRAY['students', 'teachers', 'parents', 'classes', 'subjects', 'timetable', 'attendance', 'exams', 'assignments', 'fees', 'events', 'notices', 'messages', 'admissions', 'staff', 'reports', 'report_cards', 'settings', 'promotion', 'sms_templates'], 5000, 200, 'dedicated_24_7')
 ON CONFLICT (id) DO NOTHING;
 
-CREATE OR REPLACE FUNCTION public.school_dashboard_summary(p_school_id character varying)
+CREATE OR REPLACE FUNCTION school_dashboard_summary(p_school_id character varying)
 RETURNS jsonb
 LANGUAGE sql
 STABLE
