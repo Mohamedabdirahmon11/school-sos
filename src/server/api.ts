@@ -3423,8 +3423,15 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
         );
     allowedClassIds = new Set(visibleStudents.map(student => student.classId).filter((id): id is string => Boolean(id)));
   } else if (user.role === 'teacher') {
-    const assignments = await db.getTeacherSubjectAssignments(user.id);
-    allowedClassIds = new Set(assignments.map(assignment => assignment.classId || assignment.class?.id).filter((id): id is string => Boolean(id)));
+    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    if (!teacherPage.items.length) {
+      allowedClassIds = new Set();
+    } else {
+      const assignments = await db.queryPage('class_subjects', {
+        school_id: school.id, teacher_id: teacherPage.items[0].id, is_active: 'true'
+      }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
+      allowedClassIds = new Set(assignments.items.map((assignment: any) => assignment.classId).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0));
+    }
   } else {
     allowedClassIds = new Set();
   }
