@@ -583,7 +583,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Infraction</th>
                   <th className="px-4 py-2.5">Severity</th>
                   <th className="px-4 py-2.5">Action Taken</th>
-                  <th className="px-4 py-2.5">Parent Notified</th>
+                  <th className="px-4 py-2.5">Parent contacted manually</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
@@ -594,7 +594,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
                     <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
                     <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (SMS)' : 'No'}</td>
+                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (manual contact)' : 'No'}</td>
                   </tr>
                 ))}
               </tbody>
