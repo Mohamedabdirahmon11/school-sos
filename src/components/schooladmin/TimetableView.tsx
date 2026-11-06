@@ -336,7 +336,7 @@ export const TimetableView: React.FC = () => {
                     onChange={e => setPeriodNumber(parseInt(e.target.value, 10))}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   >
-                    {periods.filter(p => dayOfWeek !== 'Friday' || p <= 5).map(p => <option key={p} value={p}>Period {p}</option>)}
+                    {periodsForDay(dayOfWeek).map(p => <option key={p} value={p}>Period {p}</option>)}
                   </select>
                 </div>
               </div>
