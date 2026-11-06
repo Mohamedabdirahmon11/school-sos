@@ -91,7 +91,7 @@ test('bulk reset assigns unique four-digit PINs atomically and updates student a
   assert.equal(body.updatedCount, 2);
   assert.equal(body.pinSlips.length, 2);
   assert.equal(body.pinSlips[0].newPin, '2468');
-  assert.match(body.pinSlips[1].newPin, /^\\d{4}$/);
+  assert.match(body.pinSlips[1].newPin, /^\d{4}$/);
   assert.notEqual(body.pinSlips[0].newPin, body.pinSlips[1].newPin);
   const studentOne = memory.rows('students').find(row => row.studentId === 'STD-PIN-001');
   const studentTwo = memory.rows('students').find(row => row.studentId === 'STD-PIN-002');
