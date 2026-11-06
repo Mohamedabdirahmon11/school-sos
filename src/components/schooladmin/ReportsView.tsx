@@ -4,6 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { gregorianAcademicYearToSchool } from '../../lib/ethiopian-calendar.ts';
 import { 
   FileSpreadsheet, 
   Download, 
@@ -59,7 +60,7 @@ export const ReportsView: React.FC = () => {
     let csvContent = '';
     if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += [csvCell('Enrolled Students'), csvCell(summary.studentCount), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
+      csvContent += [csvCell('Enrolled Students'), csvCell(summary.studentCount), csvCell(school?.name), csvCell(school?.academicYear ? gregorianAcademicYearToSchool(school.academicYear, school.calendarType || (school.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')) : '')].join(',') + '\n';
       csvContent += [csvCell('Attendance Rate'), csvCell(`${summary.attendanceRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
       csvContent += [csvCell('Academic Pass Rate'), csvCell(summary.passRate == null ? 'Not calculated' : `${summary.passRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
     }
