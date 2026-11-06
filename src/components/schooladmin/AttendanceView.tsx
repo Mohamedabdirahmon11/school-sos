@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
-import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
@@ -19,52 +18,15 @@ import {
   Save, 
   CheckCircle2, 
   Send,
-  MessageCircle,
   Search,
   Filter
 } from 'lucide-react';
 
-const schoolLocalDate = (timeZone?: string) => {
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'Africa/Addis_Ababa',
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    }).formatToParts(new Date());
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-    return `${values.year}-${values.month}-${values.day}`;
-  } catch {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-};
-
-const parentWhatsAppNumber = (student: Student) =>
-  normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
-
-const getSchoolLocalDate = (timeZone?: string): string => {
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'Africa/Addis_Ababa',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(new Date());
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-    return `${values.year}-${values.month}-${values.day}`;
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-};
-
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
-  const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.phone);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [date, setDate] = useState(() => schoolLocalDate(school?.timezone));
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
@@ -168,30 +130,6 @@ export const AttendanceView: React.FC = () => {
     }));
   };
 
-  const openAbsentStudentWhatsApp = (student: Student) => {
-    if (!adminWhatsAppNumber) {
-      setNotice('Marka hore School Settings geli lambarka WhatsApp-ka maamulka (+country code), kuna gal WhatsApp lambarkaas.');
-      return;
-    }
-    const whatsappNumber = parentWhatsAppNumber(student);
-    if (!whatsappNumber) {
-      setNotice('Waalidka lambarkiisa u qor qaabka caalamiga ah, tusaale +2519XXXXXXXX, kadib WhatsApp fur.');
-      return;
-    }
-    const studentName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-    const className = classes.find(item => item.id === selectedClassId)?.name || '';
-    const message = [
-      'Asc,',
-      `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${date}, dugsiga ka maqnaa.`,
-      className ? `Fasalka: ${className}.` : '',
-      'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
-      school?.name || '',
-      adminWhatsAppNumber ? `Xiriirka dugsiga: +${adminWhatsAppNumber}` : ''
-    ].filter(Boolean).join('\n');
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
   const handleSaveAttendance = async () => {
     if (!selectedClassId || isReadOnly) return;
     if (school?.attendanceRules?.requireExcusedReason) {
@@ -212,7 +150,7 @@ export const AttendanceView: React.FC = () => {
       }));
 
       await ApiClient.recordDailyAttendance(selectedClassId, date, records);
-      setNotice('Attendance saved. Ardayda maqneyd, riix badhanka WhatsApp si aad fariin ugu dirto waalid kasta.');
+      setNotice('Daily attendance recorded successfully! Absent notifications queued for parents.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to save attendance.');
@@ -240,14 +178,10 @@ export const AttendanceView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Daily operations</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
             <CalendarCheck className="h-7 w-7 text-[#0e8078]" />
             {t('attendance')}
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. Absent students automatically trigger parent notifications.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -366,7 +300,6 @@ export const AttendanceView: React.FC = () => {
               <tbody className="divide-y divide-[#edf2f0]">
                 {visibleStudents.map(std => {
                   const state = attendanceMap[std.id] || { status: 'present', note: '' };
-                  const validParentWhatsApp = parentWhatsAppNumber(std);
                   return (
                     <tr key={std.id} className="hover:bg-[#F8FAFC]">
                       <td className="py-3 px-4 font-mono font-medium text-[#475569]">{std.studentId}</td>
@@ -435,25 +368,6 @@ export const AttendanceView: React.FC = () => {
                           disabled={isReadOnly}
                           className="w-full text-xs px-2.5 py-1 border border-[#CBD5E1] rounded focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
                         />
-                      </td>
-                      <td className="py-3 px-4">
-                        {state.status === 'absent' ? (
-                          <button
-                            type="button"
-                            onClick={() => openAbsentStudentWhatsApp(std)}
-                            disabled={isReadOnly || !validParentWhatsApp || !adminWhatsAppNumber}
-                            title="Open WhatsApp chat with the parent and prepare the absence message"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                          </button>
-                        ) : <span className="text-[11px] text-[#94A3B8]">—</span>}
-                        {state.status === 'absent' && !adminWhatsAppNumber && (
-                          <p className="mt-1 max-w-40 text-[10px] text-amber-700">Marka hore kaydi lambarka WhatsApp-ka maamulka ee School Settings.</p>
-                        )}
-                        {state.status === 'absent' && !validParentWhatsApp && (
-                          <p className="mt-1 max-w-40 text-[10px] text-amber-700">Ku qor waalidka lambarka +country code.</p>
-                        )}
                       </td>
                     </tr>
                   );
