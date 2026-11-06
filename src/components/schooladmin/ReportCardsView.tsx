@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { School, SchoolBranch, SchoolClass, ExamConfig, ReportCardDesign } from '../../types/index.ts';
 import { adminRemark, formatReportCardMark, initialsFor, teacherRemark } from '../../lib/report-card.ts';
+import { gregorianAcademicYearToSchool } from '../../lib/ethiopian-calendar.ts';
 import {
   FileText,
   Printer,
@@ -112,7 +113,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 {design.titleText || 'Official Academic Achievement Record'}
               </p>
               <p className={template === 'executive' ? 'text-[11px] text-white/80' : 'text-[11px] text-[#64748B]'}>
-                Academic Year: {school.academicYear || 'Current'} · {template} template
+                Academic Year: {school.academicYear ? gregorianAcademicYearToSchool(school.academicYear, school.calendarType || (school.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')) : 'Current'} · {template} template
               </p>
             </div>
           </div>
