@@ -163,7 +163,7 @@ export const ReportsView: React.FC = () => {
             <div className="w-10 h-10 rounded-lg bg-teal-50 text-[#0F766E] flex items-center justify-center">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">Financial Fee Collection & Arrears Ledger</h3>
+            <h3 className="text-sm font-bold text-slate-900">Fee Collection & Arrears</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               Complete breakdown of every tuition installment, cash payment,
               reference IDs, and remaining balances per enrolled pupil.
