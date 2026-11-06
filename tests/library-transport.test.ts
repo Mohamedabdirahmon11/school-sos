@@ -62,6 +62,11 @@ test('library catalogue enforces non-negative quantity and school-local unique I
   assert.match(schema, /quantity INTEGER NOT NULL DEFAULT 1 CONSTRAINT library_books_quantity_nonnegative CHECK \(quantity >= 0\)/);
 });
 
+test('transport route fee input preserves a zero fee', () => {
+  assert.ok(ui.includes("setRouteFee(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0))"));
+  assert.match(api, /feeAmount < 0/);
+});
+
 test('transport routes capture and display ordered neighborhood pickup stops', () => {
   assert.ok(ui.includes("const [routeStops, setRouteStops] = useState('')"));
   assert.ok(ui.includes('stops: routeStops.split(/[\\r\\n,]+/)'));
