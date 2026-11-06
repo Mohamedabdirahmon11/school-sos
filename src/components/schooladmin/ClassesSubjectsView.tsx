@@ -1,6 +1,6 @@
 /**
  * Classes & Subjects Configuration for School Admin
- * Grade levels, sections, room assignments, capacities, and curriculum credits
+ * Grade levels, sections, room assignments, capacities, and curriculum subjects
  */
 
 import React, { useState, useEffect } from 'react';
@@ -47,8 +47,6 @@ export const ClassesSubjectsView: React.FC = () => {
   // New Subject Form State
   const [subjectName, setSubjectName] = useState('');
   const [subjectCode, setSubjectCode] = useState('');
-  const [creditUnits, setCreditUnits] = useState(3);
-  const [department, setDepartment] = useState('General');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
 
   const fetchData = classLoad.retry;
@@ -122,11 +120,7 @@ export const ClassesSubjectsView: React.FC = () => {
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Academic management</p>
-        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & subjects</h1>
-        <p className="mt-1 text-sm text-[#71817d]">
-          Configure KG–Grade 12 classes, sections, room assignments, and curriculum subjects
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & Subjects</h1>
       </div>
 
       {notice && (
@@ -328,7 +322,7 @@ export const ClassesSubjectsView: React.FC = () => {
       {/* CREATE SUBJECT MODAL */}
       {showSubjectModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 border border-[#E2E8F0]">
             <h2 className="text-base font-bold text-[#132A29] mb-4">{editingSubject ? 'Edit Curriculum Subject' : 'Add Curriculum Subject'}</h2>
             <form onSubmit={handleCreateSubject} className="space-y-4 text-xs">
               <div>
