@@ -3179,11 +3179,13 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
-  const temporaryPassword = randomBytes(12).toString('base64url');
+  const temporaryPassword = req.body?.temporaryPassword;
+  const passwordError = passwordPolicyError(temporaryPassword);
+  if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
   const account = db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: temporaryPassword, mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0 });
   const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions, status: 'active', userId: account.id });
   db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
-  res.status(201).json({ ...staff, initialPassword: temporaryPassword });
+  res.status(201).json(staff);
 });
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
@@ -4630,7 +4632,9 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(403).json({ error: 'Only staff account passwords can be reset here.' });
     return;
   }
-  const temporaryPassword = randomBytes(18).toString('base64url');
+  const temporaryPassword = req.body?.temporaryPassword;
+  const passwordError = passwordPolicyError(temporaryPassword);
+  if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -4652,7 +4656,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}).`,
     severity: 'warning'
   });
-  res.json({ success: true, temporaryPassword, mustChangePassword: true });
+  res.json({ success: true, mustChangePassword: true });
 });
 
 apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async (req, res) => {
