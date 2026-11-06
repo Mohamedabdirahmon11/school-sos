@@ -1,7 +1,7 @@
 /**
  * Comprehensive Extra Modules for School Admin
  * Library Catalogue, Transport Routes, Discipline Logs, Clinic Health Records,
- * Staff Payroll with Payslip PDF, and School Inventory
+ * and School Inventory
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,10 +13,8 @@ import {
   Bus, 
   AlertTriangle, 
   HeartPulse, 
-  Wallet, 
   Boxes, 
   Plus, 
-  Printer, 
   CheckCircle2, 
   DollarSign, 
   FileText,
@@ -24,12 +22,12 @@ import {
 } from 'lucide-react';
 
 interface ExtraModulesViewProps {
-  initialSubModule?: 'library' | 'transport' | 'discipline' | 'health' | 'payroll' | 'inventory';
+  initialSubModule?: 'library' | 'transport' | 'discipline' | 'health' | 'inventory';
 }
 
 export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubModule = 'library' }) => {
   const { school, isReadOnly, t } = useAuth();
-  const [activeModule, setActiveModule] = useState<'library' | 'transport' | 'discipline' | 'health' | 'payroll' | 'inventory'>(initialSubModule);
+  const [activeModule, setActiveModule] = useState<'library' | 'transport' | 'discipline' | 'health' | 'inventory'>(initialSubModule);
   
   // Library State
   const [books, setBooks] = useState<any[]>([]);
@@ -84,10 +82,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [healthSymptoms, setHealthSymptoms] = useState('');
   const [healthTreatment, setHealthTreatment] = useState('');
   const [healthNurseName, setHealthNurseName] = useState('');
-
-  // Payroll State
-  const [payrollLogs, setPayrollLogs] = useState<any[]>([]);
-  const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null);
 
   // Inventory state
   const [inventory, setInventory] = useState<any[]>([]);
@@ -407,7 +401,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             Campus Extension Modules
           </h1>
           <p className="text-xs text-[#64748B]">
-            Library, Transport, Discipline, Clinic, Staff Payroll, and Assets
+            Library, Transport, Discipline, Clinic, and Assets
           </p>
         </div>
 
@@ -418,7 +412,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             { id: 'transport', label: 'Transport' },
             { id: 'discipline', label: 'Discipline' },
             { id: 'health', label: 'Clinic/Health' },
-            { id: 'payroll', label: 'Staff Payroll' },
             { id: 'inventory', label: 'Inventory' }
           ].map(m => (
             <button
@@ -732,55 +725,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         </div>
       )}
 
-      {/* 5. PAYROLL MODULE & PAYSLIP PDF */}
-      {activeModule === 'payroll' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-[#0F766E]" />
-              <span>Staff Monthly Payroll & Payslips</span>
-            </h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Faculty Member</th>
-                  <th className="px-4 py-2.5">Pay Month</th>
-                  <th className="px-4 py-2.5">Base Salary</th>
-                  <th className="px-4 py-2.5">Allowances</th>
-                  <th className="px-4 py-2.5">Net Salary</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5 text-right">Payslip</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {payrollLogs.map(p => (
-                  <tr key={p.id} className="hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{p.teacherName}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{p.month}</td>
-                    <td className="px-4 py-2.5 font-mono">${p.baseSalary}</td>
-                    <td className="px-4 py-2.5 font-mono text-emerald-700">+${p.allowances}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-[#132A29]">${p.netSalary}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-bold uppercase">{p.paymentStatus}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => setSelectedPayslip(p)}
-                        className="px-2.5 py-1 text-xs font-medium text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] rounded border border-[#CCFBF1] transition-colors flex items-center gap-1 ml-auto"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Print Payslip</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* 6. INVENTORY MODULE */}
       {activeModule === 'inventory' && (
         <div className="space-y-5">
@@ -834,57 +778,6 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               {!movementItemId?<p className="text-xs text-[#64748B]">Select an item to view its ledger.</p>:inventoryTransactions.length===0?<p className="text-xs text-[#64748B]">No stock movements recorded for this item.</p>:<div className="max-h-96 overflow-y-auto space-y-2">{inventoryTransactions.map(tx=><article key={tx.id} className="rounded border border-[#E2E8F0] p-3 text-xs"><div className="flex justify-between gap-2"><strong className="capitalize">{String(tx.transactionType).replace('_',' ')}</strong><span className="font-mono">{tx.quantityDelta>0?'+':''}{tx.quantityDelta}</span></div><p className="text-[#64748B] mt-1">Balance: {tx.quantityBefore} → {tx.quantityAfter} · {tx.createdAt?new Date(tx.createdAt).toLocaleString():''}</p>{tx.note&&<p className="mt-1">{tx.note}</p>}</article>)}</div>}
             </section>
           </section>
-        </div>
-      )}
-
-      {/* OFFICIAL PAYSLIP MODAL */}
-      {selectedPayslip && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0] text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4 no-print">
-              <h2 className="text-base font-bold text-[#132A29]">Official Staff Payslip</h2>
-              <button onClick={() => setSelectedPayslip(null)} className="text-[#64748B] hover:text-[#132A29]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 bg-white border border-[#CBD5E1] rounded space-y-3 font-mono">
-              <div className="text-center pb-2 border-b border-[#E2E8F0]">
-                <h3 className="font-bold text-sm text-[#132A29]">{school?.name}</h3>
-                <p className="text-[10px] text-[#64748B]">Staff Salary Disbursal Slip · {selectedPayslip.month}</p>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Employee:</span>
-                  <span className="font-bold">{selectedPayslip.teacherName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Base Monthly Salary:</span>
-                  <span>${selectedPayslip.baseSalary}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Teaching Allowances:</span>
-                  <span className="text-emerald-700">+${selectedPayslip.allowances}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-[#E2E8F0] font-bold text-sm">
-                  <span>Net Salary Disbursed:</span>
-                  <span>${selectedPayslip.netSalary}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-between items-center no-print">
-              <span className="text-[10px] text-[#64748B]">Finance Office Approved</span>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded font-medium flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Payslip</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
