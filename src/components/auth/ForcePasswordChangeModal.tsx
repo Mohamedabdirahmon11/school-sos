@@ -80,6 +80,8 @@ export const ForcePasswordChangeModal: React.FC = () => {
             <PasswordInput
               label="confirm new password"
               required
+              minLength={8}
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repeat your password"
