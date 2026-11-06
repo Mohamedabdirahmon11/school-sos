@@ -100,10 +100,7 @@ export const MessagesView: React.FC = () => {
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Direct Communications</h1>
-          <p className="text-xs text-[#64748B]">
-            Real-time internal messaging between administration, teachers, and parents
-          </p>
+          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Messages</h1>
         </div>
         <button
           onClick={fetchData}

@@ -310,11 +310,8 @@ export const ReportCardsView: React.FC = () => {
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <FileText className="w-6 h-6 text-[#0F766E]" />
-            Official Yearly Report Cards & Transcripts
+            Report Cards
           </h1>
-          <p className="text-xs text-[#64748B] mt-1">
-            Combines Semester 1 &amp; 2 marks with percentages, exam maximums, subject mastery, ranking, signatures, and school stamp.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

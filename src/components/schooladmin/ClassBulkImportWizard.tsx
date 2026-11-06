@@ -18,7 +18,10 @@ export const ClassBulkImportWizard: React.FC<{ open: boolean; onClose: () => voi
   };
   const chooseFile = async (file?: File) => {
     if (!file) return;
-    setError(''); setRows([]); setFileName(file.name);
+    setError(''); setRows([]); setFileName('');
+    if (file.size > 5 * 1024 * 1024) { setError('File exceeds the 5 MB limit.'); return; }
+    if (!/\.(csv|xlsx)$/i.test(file.name)) { setError('Choose a CSV or XLSX file.'); return; }
+    setFileName(file.name);
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: false });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];

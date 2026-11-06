@@ -32,8 +32,7 @@ export const TeachersView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [department, setDepartment] = useState('Sciences');
-  const [qualification, setQualification] = useState('B.Ed / B.Sc');
+    const [qualification, setQualification] = useState('B.Ed / B.Sc');
   const [monthlySalary, setMonthlySalary] = useState(550);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -41,13 +40,13 @@ export const TeachersView: React.FC = () => {
   const filteredTeachers = teachers.filter(teacher => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
-    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification]
+    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.qualification]
       .some(value => String(value || '').toLowerCase().includes(query));
   });
 
   const fetchData = teacherLoad.retry;
-  useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
   useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
 
@@ -80,7 +79,6 @@ export const TeachersView: React.FC = () => {
         fullName,
         phone,
         gender,
-        department,
         qualification,
         monthlySalary,
         assignedClasses: selectedClassId ? [selectedClassId] : [],
@@ -105,11 +103,7 @@ export const TeachersView: React.FC = () => {
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">People management</p>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Create teachers with a school-issued Teacher ID and a short 4-digit sign-in PIN
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
@@ -132,13 +126,13 @@ export const TeachersView: React.FC = () => {
           <span>{notice}</span>
         </div>
       )}
-      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Give these sign-in details to the teacher. They are shown only now: <strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong></div>}
+      {initialPassword && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><p>Give these sign-in details to the teacher. They are shown only now:</p><strong className="block whitespace-pre-line font-mono select-all mt-1">{initialPassword}</strong><div className="mt-3 flex gap-2"><button type="button" onClick={() => void navigator.clipboard.writeText(initialPassword)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Copy ID & PIN</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Print ID & PIN</button><button type="button" onClick={() => setInitialPassword('')} className="rounded-lg border border-amber-300 bg-white px-3 py-2">Close</button></div></div>}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <input type="search" value={search} onChange={event => setSearch(event.target.value)}
-            placeholder="Search this page by teacher name, ID, phone or department"
+            placeholder="Search this page by teacher name, ID or phone"
             aria-label="Search teachers on this page"
             className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
         </label>
@@ -155,7 +149,6 @@ export const TeachersView: React.FC = () => {
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Subjects</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Classes</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Phone</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Salary</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Status</th>
               </tr>
             </thead>
@@ -164,13 +157,12 @@ export const TeachersView: React.FC = () => {
                 <tr key={t.id} className="hover:bg-[#F5FAF8]">
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[#132A29]">{t.fullName}</p>
-                    <p className="mt-0.5 text-[11px] text-[#64748B]">{t.department} · {t.qualification}</p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">{t.qualification}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">ID: {t.staffId || t.id}</p>
                   </td>
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
-                  <td className="px-4 py-3 font-mono text-[#132A29]">${t.monthlySalary} / month</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
                   </td>
@@ -178,7 +170,7 @@ export const TeachersView: React.FC = () => {
               ))}
               {filteredTeachers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#64748B]">
                     {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
                   </td>
                 </tr>
@@ -237,21 +229,11 @@ export const TeachersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Department</label>
-                  <select
-                    value={department}
-                    onChange={e => setDepartment(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-                  >
-                    <option value="Sciences">Sciences</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Languages">Languages</option>
-                    <option value="Social Studies">Social Studies</option>
-                    <option value="Islamic Studies">Islamic Studies</option>
-                  </select>
+                  <label className="block font-medium text-[#334155]">Assigned Subject</label>
+                  <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"><option value="">Select subject</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
+                  <label className="block font-medium text-[#334155]">Monthly Salary ({school?.currency || 'ETB'})</label>
                   <input
                     type="number"
                     min="100"
