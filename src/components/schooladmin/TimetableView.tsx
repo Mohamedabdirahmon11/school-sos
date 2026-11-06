@@ -39,6 +39,7 @@ export const TimetableView: React.FC = () => {
 
   const days: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday')[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   const periods = [1, 2, 3, 4, 5, 6];
+  const periodsForDay = (day: string) => periods.filter(period => day !== 'Friday' || period <= 5);
   const periodTime = (period: number) => {
     const [hour, minute] = settings.firstPeriodStart.split(':').map(Number);
     const start = hour * 60 + minute + (period - 1) * settings.periodMinutes + (period > settings.breakAfterPeriod ? settings.breakMinutes : 0);
@@ -80,6 +81,10 @@ export const TimetableView: React.FC = () => {
     fetchData();
   }, [school]);
 
+  useEffect(() => {
+    setRoomNumber(classes.find(klass => klass.id === selectedClassId)?.roomNumber || '');
+  }, [classes, selectedClassId]);
+
   // Clash detector
   const checkClash = (day: string, period: number, tchId: string, room: string) => {
     const teacherClash = timetable.find(s => 
@@ -91,7 +96,7 @@ export const TimetableView: React.FC = () => {
     }
 
     const roomClash = timetable.find(s => 
-      s.dayOfWeek === day && s.periodNumber === period && s.roomNumber.toLowerCase() === room.toLowerCase() && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
+      s.dayOfWeek === day && s.periodNumber === period && String(s.roomNumber || '').trim().toLowerCase() === String(room || '').trim().toLowerCase() && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
     );
     if (roomClash) {
       return `Room Clash: ${room} is already occupied during ${day} Period ${period}!`;
@@ -162,8 +167,11 @@ export const TimetableView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Timetable
+            Timetable Matrix & Clash Detector
           </h1>
+          <p className="text-xs text-[#64748B]">
+            Class schedule grid with real-time teacher and classroom conflict validation
+          </p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -174,7 +182,11 @@ export const TimetableView: React.FC = () => {
           </select>
           <select
             value={selectedClassId}
-            onChange={e => setSelectedClassId(e.target.value)}
+            onChange={e => {
+              const nextClassId = e.target.value;
+              setSelectedClassId(nextClassId);
+              setRoomNumber(classes.find(klass => klass.id === nextClassId)?.roomNumber || '');
+            }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155] font-medium"
           >
             {classes.map(c => (
@@ -311,20 +323,20 @@ export const TimetableView: React.FC = () => {
                   <label className="block font-medium text-[#334155]">Day of Week</label>
                   <select
                     value={dayOfWeek}
-                    onChange={e => setDayOfWeek(e.target.value as any)}
+                    onChange={e => { const nextDay = e.target.value as typeof dayOfWeek; setDayOfWeek(nextDay); if (nextDay === 'Friday' && periodNumber > 5) setPeriodNumber(5); }}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   >
                     {days.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Period Number (1-7)</label>
+                  <label className="block font-medium text-[#334155]">Period Number ({dayOfWeek === 'Friday' ? '1-5' : '1-6'})</label>
                   <select
                     value={periodNumber}
                     onChange={e => setPeriodNumber(parseInt(e.target.value, 10))}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   >
-                    {periods.filter(p => dayOfWeek !== 'Friday' || p <= 5).map(p => <option key={p} value={p}>Period {p}</option>)}
+                    {periodsForDay(dayOfWeek).map(p => <option key={p} value={p}>Period {p}</option>)}
                   </select>
                 </div>
               </div>
