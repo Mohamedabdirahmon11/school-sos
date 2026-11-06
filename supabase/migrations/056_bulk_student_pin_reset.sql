@@ -51,12 +51,18 @@ BEGIN
     RAISE EXCEPTION 'Every student must have a valid ID and hashed PIN.';
   END IF;
 
-  SELECT COUNT(*) INTO v_matched_count
+  PERFORM s.id
     FROM public.students AS s
     JOIN jsonb_to_recordset(p_payload->'students') AS item(student_id TEXT, pin_hash TEXT)
       ON item.student_id = s.student_id
    WHERE s.school_id = v_school_id
    FOR UPDATE OF s;
+
+  SELECT COUNT(*) INTO v_matched_count
+    FROM public.students AS s
+    JOIN jsonb_to_recordset(p_payload->'students') AS item(student_id TEXT, pin_hash TEXT)
+      ON item.student_id = s.student_id
+   WHERE s.school_id = v_school_id;
 
   IF v_matched_count <> v_requested_count THEN
     RAISE EXCEPTION 'One or more students were not found in this school. No PINs were changed.';
