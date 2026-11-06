@@ -4902,7 +4902,17 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
     return;
   }
 
-  const updated = db.updateSchool(school.id, updates);
+  let updated: School | null;
+  try {
+    updated = db.updateSchool(school.id, updates);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (updates.calendarType !== undefined && message.toLowerCase().includes('calendar_type')) {
+      res.status(503).json({ error: 'Apply Supabase migration 060_school_calendar_preference.sql before saving the school calendar setting.' });
+      return;
+    }
+    throw error;
+  }
   if (!updated) {
     res.status(404).json({ error: 'School was not found.' });
     return;
