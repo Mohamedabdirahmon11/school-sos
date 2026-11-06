@@ -4,6 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { Student, FeePayment, PaymentMethod, FeeStructureItem, StaffPayrollRecord } from '../../types/index.ts';
 import { 
   DollarSign, 
@@ -123,7 +124,7 @@ export const AccountantDashboard: React.FC = () => {
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Date Issued:</span>
                 <span className="font-semibold text-slate-800">
-                  {new Date(selectedReceipt.date).toLocaleDateString()}
+                  {formatSchoolDate(String(selectedReceipt.date).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
