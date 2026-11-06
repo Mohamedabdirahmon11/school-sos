@@ -88,6 +88,14 @@ BEGIN
     RAISE EXCEPTION 'Only draft exam schedules can be published.';
   END IF;
 
+  -- Serialize publishes for the same room/date and class/date to prevent races.
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    p_school_id || ':' || v_schedule.exam_date::text || ':room:' || lower(btrim(v_schedule.room_name)), 0
+  ));
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    p_school_id || ':' || v_schedule.exam_date::text || ':class:' || v_schedule.class_id, 0
+  ));
+
   IF EXISTS (
     SELECT 1
       FROM public.exam_schedules AS other
