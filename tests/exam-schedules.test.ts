@@ -18,6 +18,7 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.match(migration, /lower\(btrim\(other\.room_name\)\)/);
   assert.match(migration, /other\.class_id = v_schedule\.class_id/);
   assert.match(migration, /ROW_NUMBER\(\) OVER/);
+  assert.ok(migration.includes('pg_advisory_xact_lock'));
   assert.match(migration, /SET search_path = ''/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_publish_exam_schedule/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_publish_exam_schedule/);
@@ -28,6 +29,8 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.match(api, /apiRouter\.post\('\/exams\/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
   assert.match(api, /apiRouter\.post\('\/exams\/schedules\/:id\/publish', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
   assert.match(api, /apiRouter\.get\('\/exams\/schedules\/:id\/seats', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
+  assert.ok(api.includes("apiRouter.post('/exams/schedules/:id/cancel'"));
+  assert.ok(api.includes('This room or class already has an overlapping exam schedule'));
   assert.ok(api.includes('validTime(startTime)'));
   assert.ok(api.includes('seatCapacity > 500'));
 });
