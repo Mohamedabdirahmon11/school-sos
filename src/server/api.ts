@@ -33,6 +33,7 @@ import {
   generateRecoveryCodes
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
+import { classGradeMismatchError } from './class-grade-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -1870,6 +1871,7 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
     if (!name || !section) errors.push(`Row ${index + 2}: className and section are required.`);
     else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class ${name} / ${section}.`);
     else if (!Number.isInteger(grade) || !allowedLevels.has(grade)) errors.push(`Row ${index + 2}: gradeLevel must be KG or an offered grade from 1 to 12.`);
+    else if (classGradeMismatchError(name, grade)) errors.push(`Row ${index + 2}: ${classGradeMismatchError(name, grade)}.`);
     else if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) errors.push(`Row ${index + 2}: capacity must be between 1 and 500.`);
     else if (!Number.isFinite(monthlyFee) || monthlyFee < 0) errors.push(`Row ${index + 2}: monthlyFee must be zero or greater.`);
     else if (branchName && !branch) errors.push(`Row ${index + 2}: unknown branch "${branchName}".`);
@@ -2100,6 +2102,8 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
   const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
   if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+  const gradeMismatch = classGradeMismatchError(req.body.name, Number(req.body.gradeLevel));
+  if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const newClass = db.createClass({ ...req.body, schoolId: school.id });
   res.status(201).json(newClass);
@@ -2119,6 +2123,8 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
     if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   }
+  const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
+  if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const updated = await db.updateClass(String(req.params.id), req.body, school.id);
   res.json(updated);
