@@ -89,7 +89,7 @@ export interface School {
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS
   language?: SchoolLanguage; // English default; Somali enabled
   timezone?: string;
-  calendarType: SchoolCalendarType;
+  calendarType?: SchoolCalendarType;
   academicYear: string; // e.g. "2026-2027"
   currentSemester: 'Semester 1' | 'Semester 2';
   terms?: SchoolTermDates;
