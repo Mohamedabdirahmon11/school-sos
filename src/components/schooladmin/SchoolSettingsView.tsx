@@ -11,9 +11,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, CommunicationSettings, CommunicationQueueItem, ExamConfig, GradingBand } from '../../types/index.ts';
-import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
+import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
+import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { 
   Building2, 
   Palette, 
@@ -21,8 +21,7 @@ import {
   Save, 
   CheckCircle2, 
   GitBranch, 
-  FileText, 
-  MessageSquare, 
+  FileText,
   Database, 
   Download, 
   Plus, 
@@ -116,23 +115,12 @@ export const SchoolSettingsView: React.FC = () => {
   // Report Card Designer State
   const [design, setDesign] = useState<ReportCardDesign | null>(null);
 
-  // SMS / WhatsApp Gateway State
-  const [commSettings, setCommSettings] = useState<CommunicationSettings | null>(null);
-  const [queueItems, setQueueItems] = useState<CommunicationQueueItem[]>([]);
-  const [queuePageInfo, setQueuePageInfo] = useState<PageInfo | null>(null);
-  const [queuePage, setQueuePage] = useState(1);
-
   useEffect(() => {
     if (!school) return;
     ApiClient.getBranches()
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
       .catch((err: any) => setBranchError(err.message || 'Failed to load campus branches.'));
     ApiClient.getReportCardDesign().then(setDesign);
-    ApiClient.getCommunicationSettings().then(setCommSettings);
-    ApiClient.getCommunicationQueue({ page: queuePage, pageSize: 20 }).then(items => {
-      setQueueItems(items);
-      setQueuePageInfo((items as any).pagination || null);
-    });
     ApiClient.getExamConfig().then(setExamConfig).catch(() => setExamConfig(null));
     ApiClient.getTimetableSettings().then(settings => setTimetableSettings({
       firstPeriodStart: settings.firstPeriodStart,
@@ -140,7 +128,7 @@ export const SchoolSettingsView: React.FC = () => {
       breakAfterPeriod: settings.breakAfterPeriod,
       breakMinutes: settings.breakMinutes
     }));
-  }, [school, queuePage]);
+  }, [school]);
 
   // Save Identity
   const handleSaveIdentity = async (e: React.FormEvent) => {
@@ -148,6 +136,7 @@ export const SchoolSettingsView: React.FC = () => {
     if (isReadOnly || !school) return;
     setError(null);
     if (!name.trim()) { setError('Official school name is required.'); return; }
+    if (phone.trim() && !normalizeWhatsAppNumber(phone)) { setError('WhatsApp number must include an international country code, for example +2519XXXXXXXX.'); return; }
     if (!/^#[0-9a-f]{6}$/i.test(brandColor)) { setError('Brand color must be a six-digit hex color such as #0F766E.'); return; }
     const capacity = Number(defaultClassCapacity);
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) { setError('Default class capacity must be a whole number between 1 and 500.'); return; }
@@ -389,23 +378,6 @@ export const SchoolSettingsView: React.FC = () => {
     }
   };
 
-  // Save SMS Gateway Settings
-  const handleSaveComm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isReadOnly || !commSettings) return;
-    setIsSaving(true);
-    try {
-      const updated = await ApiClient.updateCommunicationSettings(commSettings);
-      setCommSettings(updated);
-      setNotice('SMS / WhatsApp Gateway settings saved successfully!');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setNotice(err.message || 'Failed to save gateway.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Download School Backup JSON
   const handleDownloadBackup = async () => {
     try {
@@ -428,8 +400,11 @@ export const SchoolSettingsView: React.FC = () => {
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
-            School Settings
+            {t('school_settings')} & Administration
           </h1>
+          <p className="text-xs text-[#64748B] mt-1">
+            Configure institutional identity, report card designs, multi-branch campuses, and notification gateways.
+          </p>
         </div>
 
         {/* Tab Switcher */}
@@ -483,16 +458,6 @@ export const SchoolSettingsView: React.FC = () => {
           >
             <FileText className="w-3.5 h-3.5" />
             Report Card Designer
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('sms')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'sms' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            SMS / WhatsApp
           </button>
           <button
             type="button"
@@ -628,7 +593,8 @@ export const SchoolSettingsView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Official Telephone</label>
+                <label className="block font-semibold text-[#334155] mb-1">Official Telephone / WhatsApp maamulka</label>
+                <p className="mb-1 text-[11px] text-[#64748B]">Lambarkan maamulka ayaa WhatsApp u adeegsanaya; fariinta waalidka waxaa laga furaa Attendance, maamuluhu ayaa riixaya Send.</p>
                 <input
                   type="tel"
                   value={phone}
@@ -1384,99 +1350,6 @@ export const SchoolSettingsView: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* TAB 4: SMS / WHATSAPP GATEWAY */}
-      {activeTab === 'sms' && commSettings && (
-        <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
-          <div>
-            <h2 className="text-base font-bold text-[#132A29]">SMS & WhatsApp Provider Integration</h2>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              Connect SMS gateways for automated parent absence alerts, fee reminders, and announcements.
-            </p>
-          </div>
-
-          <form onSubmit={handleSaveComm} className="space-y-4 text-xs">
-            <div>
-              <label className="block font-semibold text-[#334155] mb-1">Notification Provider</label>
-              <select
-                value={commSettings.provider}
-                onChange={e => setCommSettings({ ...commSettings, provider: e.target.value as any })}
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-              >
-                <option value="none">Disabled (Store in queue only)</option>
-                <option value="twilio">Twilio Programmable SMS / WhatsApp</option>
-                <option value="infobip">Infobip Enterprise Gateway</option>
-                <option value="local_gateway">Local Telecom HTTP Gateway</option>
-              </select>
-            </div>
-
-            {commSettings.provider !== 'none' && (
-              <>
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">API Key / Account SID</label>
-                  <input
-                    type="password"
-                    value={commSettings.apiKey || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiKey: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">API Secret / Auth Token</label>
-                  <input
-                    type="password"
-                    value={commSettings.apiSecret || ''}
-                    onChange={e => setCommSettings({ ...commSettings, apiSecret: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#334155] mb-1">Sender ID / Brand Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. SCHOOLOS"
-                    value={commSettings.senderId || ''}
-                    onChange={e => setCommSettings({ ...commSettings, senderId: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono uppercase"
-                  />
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer pt-2">
-                  <input
-                    type="checkbox"
-                    checked={commSettings.isActive}
-                    onChange={e => setCommSettings({ ...commSettings, isActive: e.target.checked })}
-                    className="rounded text-[#0F766E] focus:ring-[#0F766E]"
-                  />
-                  <span className="font-semibold text-[#132A29]">
-                    Activate live dispatch (Unchecked messages stay queued as "not sent")
-                  </span>
-                </label>
-              </>
-            )}
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                disabled={isReadOnly || isSaving}
-                className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"
-              >
-                <Save className="w-3.5 h-3.5" />
-                Save Gateway
-              </button>
-            </div>
-          </form>
-          <section className="border-t border-[#E2E8F0] pt-5 space-y-3">
-            <h3 className="text-sm font-bold text-[#132A29]">Notification Queue</h3>
-            {queueItems.length === 0 ? <p className="text-xs text-[#64748B]">No queued notifications.</p> : queueItems.map(item => (
-              <article key={item.id} className="rounded-lg border border-[#E2E8F0] p-3 text-xs">
-                <div className="flex justify-between gap-3"><strong>{item.recipientName} ┬╖ {item.channel.toUpperCase()}</strong><span className="capitalize">{item.status === 'queued' ? 'Queued ┬╖ not sent' : item.status}</span></div>
-                <p className="mt-1 text-[#64748B]">{item.content}</p>
-              </article>
-            ))}
-            <PaginationControls info={queuePageInfo} onPage={setQueuePage} />
-          </section>
         </div>
       )}
 
