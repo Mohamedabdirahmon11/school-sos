@@ -3,7 +3,7 @@
  * Dark green-teal sidebar (~#0B2B2A), teal primary (#0F766E), high density layout
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
@@ -20,7 +20,6 @@ import {
   UserCheck,
   PhoneCall,
   Layers,
-  BookOpen,
   CalendarDays,
   CalendarCheck,
   FileSpreadsheet,
