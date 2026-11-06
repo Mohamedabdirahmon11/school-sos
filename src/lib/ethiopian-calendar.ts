@@ -25,6 +25,9 @@ function parseIsoDate(value: string): Date {
 }
 
 function partsFor(date: Date): EthiopianDate {
+  if (ETHIOPIAN_PARTS_FORMATTER.resolvedOptions().calendar !== 'ethiopic') {
+    throw new Error('The runtime does not support the Ethiopian calendar.');
+  }
   const parts = ETHIOPIAN_PARTS_FORMATTER.formatToParts(date);
   const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find(part => part.type === type)?.value);
   const result = { year: value('year'), month: value('month'), day: value('day') };
@@ -64,10 +67,17 @@ export function formatSchoolDate(isoDate: string, calendarType: CalendarType, lo
   const calendarLocale = calendarType === 'ethiopian'
     ? `${locale}-u-ca-ethiopic-nu-latn`
     : locale;
-  return new Intl.DateTimeFormat(calendarLocale, {
+  const formatter = new Intl.DateTimeFormat(calendarLocale, {
     timeZone: 'UTC',
     dateStyle: 'medium'
-  }).format(date);
+  });
+  // English ICU output appends the implementation era label ("ERA1") for
+  // Ethiopic dates. It is not useful in school-facing dates, so omit only
+  // that part while preserving the locale's date ordering and month name.
+  return formatter.formatToParts(date)
+    .filter(part => part.type !== 'era')
+    .map(part => part.value)
+    .join('');
 }
 
 export function schoolDateToGregorian(value: string, calendarType: CalendarType): string {
@@ -138,9 +148,13 @@ export function formatSchoolDateTime(isoDateTime: string, calendarType: Calendar
   const calendarLocale = calendarType === 'ethiopian'
     ? `${locale}-u-ca-ethiopic-nu-latn`
     : locale;
-  return new Intl.DateTimeFormat(calendarLocale, {
+  const formatter = new Intl.DateTimeFormat(calendarLocale, {
     timeZone,
     dateStyle: 'medium',
     timeStyle: 'short'
-  }).format(date);
+  });
+  return formatter.formatToParts(date)
+    .filter(part => part.type !== 'era')
+    .map(part => part.value)
+    .join('');
 }
