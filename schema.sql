@@ -3388,3 +3388,35 @@ REVOKE ALL ON FUNCTION public.schoolos_restore_school_backup(JSONB) FROM PUBLIC,
 GRANT EXECUTE ON FUNCTION public.schoolos_restore_school_backup(JSONB) TO service_role;
 NOTIFY pgrst, 'reload schema';
 COMMIT;
+
+-- School clinic visit records (migration 054).
+CREATE TABLE IF NOT EXISTS school_health_visits (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  student_id VARCHAR(64) NOT NULL,
+  visit_date DATE NOT NULL,
+  symptoms VARCHAR(2000) NOT NULL,
+  treatment VARCHAR(2000) NOT NULL DEFAULT '',
+  nurse_name VARCHAR(160) NOT NULL DEFAULT '',
+  recorded_by VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT school_health_visits_student_school_fk
+    FOREIGN KEY (student_id, school_id) REFERENCES students(id, school_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_school_health_visits_school_date ON school_health_visits(school_id, visit_date DESC);
+CREATE INDEX IF NOT EXISTS idx_school_health_visits_student ON school_health_visits(student_id, school_id);
+ALTER TABLE school_health_visits ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS school_health_visits_read ON school_health_visits;
+CREATE POLICY school_health_visits_read ON school_health_visits FOR SELECT TO authenticated
+USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
+DROP POLICY IF EXISTS school_health_visits_insert ON school_health_visits;
+CREATE POLICY school_health_visits_insert ON school_health_visits FOR INSERT TO authenticated
+WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS school_health_visits_update ON school_health_visits;
+CREATE POLICY school_health_visits_update ON school_health_visits FOR UPDATE TO authenticated
+USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
+WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS school_health_visits_delete ON school_health_visits;
+CREATE POLICY school_health_visits_delete ON school_health_visits FOR DELETE TO authenticated
+USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
+GRANT SELECT, INSERT, UPDATE, DELETE ON school_health_visits TO authenticated, service_role;
