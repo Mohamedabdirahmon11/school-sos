@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
 import { 
   Library, 
   Bus, 
@@ -505,7 +506,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <option value="">Select student</option>
                     {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
                   </select>
-                  <input required type="date" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)} value={loanDueDate} onChange={e => setLoanDueDate(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg" aria-label="Due date" />
+                  <SchoolDateInput required value={loanDueDate} onChange={setLoanDueDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg" ariaLabel="Due date" />
                   <button type="submit" disabled={isReadOnly || librarySaving || !loanBookId || !loanStudentId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">{librarySaving ? 'Saving…' : 'Issue book'}</button>
                 </form>
                 <div className="overflow-x-auto">
@@ -674,7 +675,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             </label>
             <label className="space-y-1 text-xs font-medium text-slate-700">
               Visit date
-              <input required type="date" value={healthVisitDate} onChange={event => setHealthVisitDate(event.target.value)} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+              <SchoolDateInput required value={healthVisitDate} onChange={setHealthVisitDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
             </label>
             <label className="space-y-1 text-xs font-medium text-slate-700">
               Reported symptoms
