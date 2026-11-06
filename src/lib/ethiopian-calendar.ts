@@ -92,3 +92,31 @@ export function gregorianToSchoolDate(isoDate: string, calendarType: CalendarTyp
   const { year, month, day } = gregorianToEthiopian(isoDate);
   return [year, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
 }
+
+export function schoolAcademicYearToGregorian(value: string, calendarType: CalendarType): string {
+  const match = /^(\\d{4})-(\\d{4})$/.exec(value);
+  if (!match) throw new Error('Academic year must use YYYY-YYYY.');
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (end !== start + 1) throw new Error('Academic year must cover two consecutive years.');
+  if (calendarType === 'gregorian') return value;
+  const firstDay = ethiopianToGregorian({ year: start, month: 1, day: 1 });
+  const secondDay = ethiopianToGregorian({ year: end, month: 1, day: 1 });
+  return `${firstDay.slice(0, 4)}-${secondDay.slice(0, 4)}`;
+}
+
+export function gregorianAcademicYearToSchool(value: string, calendarType: CalendarType): string {
+  const match = /^(\\d{4})-(\\d{4})$/.exec(value);
+  if (!match) throw new Error('Academic year must use YYYY-YYYY.');
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (end !== start + 1) throw new Error('Academic year must cover two consecutive years.');
+  if (calendarType === 'gregorian') return value;
+  for (let day = 10; day <= 13; day += 1) {
+    const candidate = gregorianToEthiopian(`${String(start).padStart(4, '0')}-09-${day}`);
+    if (candidate.month === 1 && candidate.day === 1) {
+      return `${candidate.year}-${candidate.year + 1}`;
+    }
+  }
+  throw new Error('Unable to determine Ethiopian academic year boundary.');
+}
