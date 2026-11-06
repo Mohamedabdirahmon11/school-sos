@@ -16,7 +16,6 @@ import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { 
   Building2, 
-  Palette, 
   Sliders, 
   Save, 
   CheckCircle2, 
@@ -26,16 +25,13 @@ import {
   Download, 
   Plus, 
   Eye, 
-  Check,
   AlertCircle,
   ImagePlus,
   Trash2,
   Pencil,
   Star,
   Mail,
-  Lock,
   X,
-  Globe2,
   CalendarDays,
   ClipboardCheck,
   Bell
