@@ -53,6 +53,21 @@ export const ExamsResultsView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Exam timetable, room allocation, and seat list state
+  const [examSchedules, setExamSchedules] = useState<any[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [publishingScheduleId, setPublishingScheduleId] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [scheduleExamName, setScheduleExamName] = useState('Midterm Examination');
+  const [scheduleExamType, setScheduleExamType] = useState<'small' | 'big'>('small');
+  const [scheduleDate, setScheduleDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [scheduleStartTime, setScheduleStartTime] = useState('08:00');
+  const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
+  const [scheduleRoom, setScheduleRoom] = useState('');
+  const [scheduleCapacity, setScheduleCapacity] = useState(40);
+  const [seatSheet, setSeatSheet] = useState<any | null>(null);
+
   // Load classes, subjects, exam config
   useEffect(() => {
     if (!school) return;
@@ -74,6 +89,22 @@ export const ExamsResultsView: React.FC = () => {
       }
     }).finally(() => setIsLoading(false));
   }, [school]);
+
+  useEffect(() => {
+    if (activeTab !== 'schedule' || !school) return;
+    let cancelled = false;
+    setScheduleLoading(true);
+    setScheduleError('');
+    ApiClient.getExamSchedules()
+      .then(rows => { if (!cancelled) setExamSchedules(Array.isArray(rows) ? rows : []); })
+      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam schedules.'); })
+      .finally(() => { if (!cancelled) setScheduleLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, school?.id]);
+
+  useEffect(() => {
+    if (seatSheet) window.print();
+  }, [seatSheet]);
 
   // Load students and marks for selected class & subject
   const loadClassData = async () => {
@@ -175,6 +206,59 @@ export const ExamsResultsView: React.FC = () => {
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to approve marks.');
+    }
+  };
+
+  const handleCreateExamSchedule = async () => {
+    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      await ApiClient.createExamSchedule({
+        examName: scheduleExamName.trim(),
+        classId: selectedClassId,
+        subjectId: selectedSubjectId,
+        examType: scheduleExamType,
+        semester: selectedSemester,
+        examDate: scheduleDate,
+        startTime: scheduleStartTime,
+        endTime: scheduleEndTime,
+        roomName: scheduleRoom.trim(),
+        seatCapacity: scheduleCapacity
+      });
+      const rows = await ApiClient.getExamSchedules();
+      setExamSchedules(rows);
+      setNotice('Exam schedule saved as a draft. Publish it to assign seats.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to create exam schedule.');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handlePublishExamSchedule = async (scheduleId: string) => {
+    if (isReadOnly) return;
+    setPublishingScheduleId(scheduleId);
+    setScheduleError('');
+    try {
+      const result = await ApiClient.publishExamSchedule(scheduleId);
+      const rows = await ApiClient.getExamSchedules();
+      setExamSchedules(rows);
+      setNotice(`Exam schedule published and ${result.seat_count} seats assigned.`);
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to publish exam schedule.');
+    } finally {
+      setPublishingScheduleId('');
+    }
+  };
+
+  const handlePrintExamSeats = async (schedule: any) => {
+    setScheduleError('');
+    try {
+      const result = await ApiClient.getExamScheduleSeats(schedule.id);
+      setSeatSheet({ schedule: { ...schedule, ...result.schedule }, seats: result.seats });
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to load the seating list.');
     }
   };
 
