@@ -780,6 +780,12 @@ export class ApiClient {
     return this.request<any>('/exams/schedules', { method: 'POST', body: JSON.stringify(schedule) });
   }
 
+  public static async cancelExamSchedule(scheduleId: string) {
+    return this.request<{ success: boolean; schedule: any }>(
+      `/exams/schedules/${encodeURIComponent(scheduleId)}/cancel`, { method: 'POST', body: JSON.stringify({}) }
+    );
+  }
+
   public static async publishExamSchedule(scheduleId: string) {
     return this.request<{ success: boolean; schedule_id: string; status: string; seat_count: number; published_at: string }>(
       `/exams/schedules/${encodeURIComponent(scheduleId)}/publish`, { method: 'POST', body: JSON.stringify({}) }
