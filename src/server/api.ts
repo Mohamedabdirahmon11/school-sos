@@ -3435,12 +3435,18 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
   const seatCapacity = Number(body.seatCapacity);
 
+  const [dateYear, dateMonth, dateDay] = examDate.split('-').map(Number);
+  const parsedDate = new Date(Date.UTC(dateYear, dateMonth - 1, dateDay));
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
+  const validTime = (value: string) => {
+    if (!/^\d{2}:\d{2}$/.test(value)) return false;
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
+  };
   if (!examName || examName.length > 120 || !classId || !subjectId ||
       !['small', 'big'].includes(examType) ||
       !['Semester 1', 'Semester 2'].includes(semester) ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(examDate) ||
-      !Number.isFinite(Date.parse(examDate + 'T00:00:00Z')) ||
-      !/^\\d{2}:\\d{2}$/.test(startTime) || !/^\\d{2}:\\d{2}$/.test(endTime) ||
+      !validDate || !validTime(startTime) || !validTime(endTime) ||
       startTime >= endTime || !roomName || roomName.length > 120 ||
       !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid exam name, class, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
