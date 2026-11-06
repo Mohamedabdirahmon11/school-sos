@@ -2080,6 +2080,11 @@ class StorageEngine {
     return rows.sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime)));
   }
 
+  public async getPublishedExamSchedules(schoolId: string, classId?: string): Promise<any[]> {
+    const schedules = await this.getExamSchedules(schoolId);
+    return schedules.filter(schedule => schedule.status === 'published' && (!classId || schedule.classId === classId));
+  }
+
   public async createExamSchedule(schedule: {
     id: string; schoolId: string; classId: string; subjectId: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
