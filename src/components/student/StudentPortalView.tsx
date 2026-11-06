@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { formatSchoolDate, schoolTodayIso } from '../../lib/ethiopian-calendar.ts';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -50,7 +51,7 @@ export const StudentPortalView: React.FC = () => {
     ? [...school.gradingScale].sort((a, b) => b.minPercentage - a.minPercentage)
     : [{ minPercentage: 90, label: 'A', remark: 'Excellent' }, { minPercentage: 80, label: 'B', remark: 'Very good' }, { minPercentage: 70, label: 'C', remark: 'Good' }, { minPercentage: 60, label: 'D', remark: 'Pass' }, { minPercentage: 0, label: 'F', remark: 'Needs support' }];
   const gradeFor = (percentage: number) => gradingScale.find(band => percentage >= band.minPercentage) || gradingScale[gradingScale.length - 1];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = schoolTodayIso(school?.timezone || 'Africa/Addis_Ababa');
   const attendanceSummary = attendance.reduce((summary, record) => {
     if (record.status === 'present' || record.status === 'late' || record.status === 'excused' || record.status === 'absent') summary[record.status] += 1;
     return summary;
@@ -185,7 +186,7 @@ export const StudentPortalView: React.FC = () => {
                 <div className="flex flex-wrap justify-between gap-2 font-bold text-[#132A29]">
                   <span>{assignment.title}</span>
                   <span className={`font-mono text-[11px] ${assignment.dueDate < today ? 'text-rose-700' : 'text-[#0F766E]'}`}>
-                    {assignment.dueDate < today ? `Overdue: ${assignment.dueDate}` : assignment.dueDate === today ? 'Due today' : `Due ${assignment.dueDate}`}
+                    {assignment.dueDate < today ? `Overdue: ${formatSchoolDate(assignment.dueDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}` : assignment.dueDate === today ? 'Due today' : `Due ${formatSchoolDate(assignment.dueDate, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}`}
                   </span>
                 </div>
                 <p className="text-[#475569]">{assignment.description}</p>
@@ -249,7 +250,7 @@ export const StudentPortalView: React.FC = () => {
 
           {attendanceState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : attendanceState.error ? <ErrorState error={attendanceState.error} onRetry={attendanceState.retry} /> : attendance.length === 0 ? <p className="text-[#64748B]">No attendance records have been recorded yet.</p> : <div className="divide-y divide-[#F1F5F9]">{attendance.map(record => <div key={record.id} className="py-2 flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold text-[#132A29]">{record.date}</p>
+              <p className="font-semibold text-[#132A29]">{formatSchoolDate(record.date, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</p>
               {record.note && <p className="text-[11px] text-[#64748B]">{record.note}</p>}
             </div>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${record.status === 'present' ? 'bg-emerald-50 text-emerald-700' : record.status === 'absent' ? 'bg-rose-50 text-rose-700' : record.status === 'late' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>
@@ -273,7 +274,7 @@ export const StudentPortalView: React.FC = () => {
           {noticesState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : noticesState.error ? <ErrorState error={noticesState.error} onRetry={noticesState.retry} /> : notices.length === 0 ? <p className="text-[#64748B]">No school notices have been published yet.</p> : <div className="space-y-2">{notices.map(notice => <div key={notice.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-bold text-[#132A29]">{notice.isPinned ? 'Pinned • ' : ''}{notice.title}</p>
-              <span className="text-[10px] font-mono text-[#64748B]">{notice.publishDate}</span>
+              <span className="text-[10px] font-mono text-[#64748B]">{formatSchoolDate(String(notice.publishDate).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</span>
             </div>
             <p className="text-[#475569] whitespace-pre-wrap">{notice.content}</p>
             <p className="text-[11px] text-[#64748B]">{notice.authorName} • {notice.authorRole}</p>
