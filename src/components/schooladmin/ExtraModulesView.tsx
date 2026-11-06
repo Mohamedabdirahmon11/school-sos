@@ -930,7 +930,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     min="0"
                     required
                     value={routeFee}
-                    onChange={e => setRouteFee(parseFloat(e.target.value) || 20)}
+                    onChange={e => setRouteFee(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0))}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   />
                 </div>
