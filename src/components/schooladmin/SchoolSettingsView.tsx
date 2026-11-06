@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
+import { gregorianAcademicYearToSchool, gregorianToSchoolDate, schoolAcademicYearToGregorian, schoolDateToGregorian, type CalendarType } from '../../lib/ethiopian-calendar.ts';
 import { 
   Building2, 
   Palette, 
@@ -65,6 +66,12 @@ const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, re
 const defaultNotificationPreferences = { email: true, sms: true, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+function convertTermDates<T extends { semester1Start: string; semester1End: string; semester2Start: string; semester2End: string }>(terms: T, from: CalendarType, to: CalendarType): T {
+  if (from === to) return { ...terms };
+  const convert = (value: string) => value ? gregorianToSchoolDate(schoolDateToGregorian(value, from), to) : '';
+  return { ...terms, semester1Start: convert(terms.semester1Start), semester1End: convert(terms.semester1End), semester2Start: convert(terms.semester2Start), semester2End: convert(terms.semester2End) };
+}
+
 export const SchoolSettingsView: React.FC = () => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'sms' | 'backup'>('identity');
@@ -89,9 +96,9 @@ export const SchoolSettingsView: React.FC = () => {
 
   // Academic Rules State
   const [calendarType, setCalendarType] = useState<'ethiopian' | 'gregorian'>(school?.calendarType || (school?.timezone?.startsWith('Africa/Addis_Ababa') ? 'ethiopian' : 'gregorian'));
-  const [academicYear, setAcademicYear] = useState(school?.academicYear || '2026-2027');
+  const [academicYear, setAcademicYear] = useState(() => gregorianAcademicYearToSchool(school?.academicYear || '2026-2027', calendarType));
   const [currentSemester, setCurrentSemester] = useState<'Semester 1' | 'Semester 2'>(school?.currentSemester || 'Semester 1');
-  const [terms, setTerms] = useState(school?.terms || defaultTerms);
+  const [terms, setTerms] = useState(() => convertTermDates(school?.terms || defaultTerms, 'gregorian', calendarType));
   const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : defaultGradingScale);
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
@@ -206,10 +213,20 @@ export const SchoolSettingsView: React.FC = () => {
     if (terms.semester1Start && terms.semester1End && terms.semester1Start > terms.semester1End) { setError('Semester 1 start date must be on or before its end date.'); return; }
     if (terms.semester2Start && terms.semester2End && terms.semester2Start > terms.semester2End) { setError('Semester 2 start date must be on or before its end date.'); return; }
     if (terms.semester1End && terms.semester2Start && terms.semester1End > terms.semester2Start) { setError('Semester 2 must start after Semester 1 ends.'); return; }
+    let storedAcademicYear: string;
+    let storedTerms: typeof terms;
+    try {
+      storedAcademicYear = schoolAcademicYearToGregorian(academicYear, calendarType);
+      storedTerms = convertTermDates(terms, calendarType, 'gregorian');
+    } catch (err: any) {
+      setError(err.message || 'Please check the selected calendar dates.');
+      return;
+    }
     await saveSchoolSection('academics', {
-      academicYear,
+      calendarType,
+      academicYear: storedAcademicYear,
       currentSemester,
-      terms,
+      terms: storedTerms,
       gradingScale: sortedBands,
       attendanceRules,
       classLevels
@@ -715,6 +732,23 @@ export const SchoolSettingsView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
+                <label className="block font-semibold text-[#334155] mb-1">Calendar System</label>
+                <select value={calendarType} onChange={e => {
+                  const nextType = e.target.value as CalendarType;
+                  try {
+                    setAcademicYear(current => gregorianAcademicYearToSchool(schoolAcademicYearToGregorian(current, calendarType), nextType));
+                    setTerms(current => convertTermDates(current, calendarType, nextType));
+                    setCalendarType(nextType);
+                  } catch (err: any) {
+                    setError(err.message || 'Unable to switch calendar systems.');
+                  }
+                }} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                  <option value="ethiopian">Ethiopian Calendar (default in Ethiopia)</option>
+                  <option value="gregorian">Gregorian Calendar</option>
+                </select>
+                <p className="mt-1 text-[11px] text-[#64748B]">Dates are stored safely as Gregorian dates in the database.</p>
+              </div>
+              <div>
                 <label className="block font-semibold text-[#334155] mb-1">Academic Year</label>
                 <input type="text" required value={academicYear} onChange={e => setAcademicYear(e.target.value)} placeholder="2026-2027" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
               </div>
@@ -728,10 +762,10 @@ export const SchoolSettingsView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 starts</span><input type="date" value={terms.semester1Start} onChange={e => setTerms(prev => ({ ...prev, semester1Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 ends</span><input type="date" value={terms.semester1End} onChange={e => setTerms(prev => ({ ...prev, semester1End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 starts</span><input type="date" value={terms.semester2Start} onChange={e => setTerms(prev => ({ ...prev, semester2Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 ends</span><input type="date" value={terms.semester2End} onChange={e => setTerms(prev => ({ ...prev, semester2End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 starts</span><input type="text" inputMode="numeric" placeholder={calendarType === 'ethiopian' ? 'YYYY-MM-DD (E.C.)' : 'YYYY-MM-DD'} value={terms.semester1Start} onChange={e => setTerms(prev => ({ ...prev, semester1Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 ends</span><input type="text" inputMode="numeric" placeholder={calendarType === 'ethiopian' ? 'YYYY-MM-DD (E.C.)' : 'YYYY-MM-DD'} value={terms.semester1End} onChange={e => setTerms(prev => ({ ...prev, semester1End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 starts</span><input type="text" inputMode="numeric" placeholder={calendarType === 'ethiopian' ? 'YYYY-MM-DD (E.C.)' : 'YYYY-MM-DD'} value={terms.semester2Start} onChange={e => setTerms(prev => ({ ...prev, semester2Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 ends</span><input type="text" inputMode="numeric" placeholder={calendarType === 'ethiopian' ? 'YYYY-MM-DD (E.C.)' : 'YYYY-MM-DD'} value={terms.semester2End} onChange={e => setTerms(prev => ({ ...prev, semester2End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
             </div>
 
             <div className="space-y-2">
