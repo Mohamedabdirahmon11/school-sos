@@ -24,7 +24,8 @@ import {
   Save, 
   Printer, 
   Download,
-  AlertCircle
+  AlertCircle,
+  CalendarDays
 } from 'lucide-react';
 
 export const ExamsResultsView: React.FC = () => {
@@ -34,7 +35,7 @@ export const ExamsResultsView: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config'>('entry_approval');
+  const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('entry_approval');
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
@@ -52,6 +53,21 @@ export const ExamsResultsView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Exam timetable, room allocation, and seat list state
+  const [examSchedules, setExamSchedules] = useState<any[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [publishingScheduleId, setPublishingScheduleId] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [scheduleExamName, setScheduleExamName] = useState('Midterm Examination');
+  const [scheduleExamType, setScheduleExamType] = useState<'small' | 'big'>('small');
+  const [scheduleDate, setScheduleDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [scheduleStartTime, setScheduleStartTime] = useState('08:00');
+  const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
+  const [scheduleRoom, setScheduleRoom] = useState('');
+  const [scheduleCapacity, setScheduleCapacity] = useState(40);
+  const [seatSheet, setSeatSheet] = useState<any | null>(null);
 
   // Load classes, subjects, exam config
   useEffect(() => {
@@ -74,6 +90,22 @@ export const ExamsResultsView: React.FC = () => {
       }
     }).finally(() => setIsLoading(false));
   }, [school]);
+
+  useEffect(() => {
+    if (activeTab !== 'schedule' || !school) return;
+    let cancelled = false;
+    setScheduleLoading(true);
+    setScheduleError('');
+    ApiClient.getExamSchedules()
+      .then(rows => { if (!cancelled) setExamSchedules(Array.isArray(rows) ? rows : []); })
+      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam schedules.'); })
+      .finally(() => { if (!cancelled) setScheduleLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, school?.id]);
+
+  useEffect(() => {
+    if (seatSheet) window.print();
+  }, [seatSheet]);
 
   // Load students and marks for selected class & subject
   const loadClassData = async () => {
@@ -178,6 +210,71 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const handleCreateExamSchedule = async () => {
+    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      await ApiClient.createExamSchedule({
+        examName: scheduleExamName.trim(),
+        classId: selectedClassId,
+        subjectId: selectedSubjectId,
+        examType: scheduleExamType,
+        semester: selectedSemester,
+        examDate: scheduleDate,
+        startTime: scheduleStartTime,
+        endTime: scheduleEndTime,
+        roomName: scheduleRoom.trim(),
+        seatCapacity: scheduleCapacity
+      });
+      const rows = await ApiClient.getExamSchedules();
+      setExamSchedules(rows);
+      setNotice('Exam schedule saved as a draft. Publish it to assign seats.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to create exam schedule.');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handlePublishExamSchedule = async (scheduleId: string) => {
+    if (isReadOnly) return;
+    setPublishingScheduleId(scheduleId);
+    setScheduleError('');
+    try {
+      const result = await ApiClient.publishExamSchedule(scheduleId);
+      const rows = await ApiClient.getExamSchedules();
+      setExamSchedules(rows);
+      setNotice(`Exam schedule published and ${result.seat_count} seats assigned.`);
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to publish exam schedule.');
+    } finally {
+      setPublishingScheduleId('');
+    }
+  };
+
+  const handleCancelExamSchedule = async (scheduleId: string) => {
+    if (isReadOnly) return;
+    setScheduleError('');
+    try {
+      await ApiClient.cancelExamSchedule(scheduleId);
+      setExamSchedules(await ApiClient.getExamSchedules());
+      setNotice('Draft exam schedule cancelled.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to cancel exam schedule.');
+    }
+  };
+
+  const handlePrintExamSeats = async (schedule: any) => {
+    setScheduleError('');
+    try {
+      const result = await ApiClient.getExamScheduleSeats(schedule.id);
+      setSeatSheet({ schedule: { ...schedule, ...result.schedule }, seats: result.seats });
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to load the seating list.');
+    }
+  };
+
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
   const maxCombined = smallExamMax + bigExamMax;
@@ -224,6 +321,16 @@ export const ExamsResultsView: React.FC = () => {
             }`}
           >
             Yearly Results (S1 + S2)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('schedule')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+              activeTab === 'schedule' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            Exam Schedule
           </button>
           <button
             type="button"
@@ -641,6 +748,102 @@ export const ExamsResultsView: React.FC = () => {
         </div>
       )}
 
+      {/* EXAM TIMETABLE, ROOM AND SEATING */}
+      {activeTab === 'schedule' && (
+        <div className="space-y-5">
+          {scheduleError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{scheduleError}</div>}
+          <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-base font-bold text-[#132A29]">Create exam schedule</h2>
+              <p className="mt-1 text-xs text-[#64748B]">Set the exam date, time, room and seating capacity. Publishing assigns a seat to every active student in the selected class.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-semibold text-[#475569]">Exam name
+                <input maxLength={120} required value={scheduleExamName} onChange={event => setScheduleExamName(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Midterm Examination" />
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Exam type
+                <select value={scheduleExamType} onChange={event => setScheduleExamType(event.target.value as 'small' | 'big')} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                  <option value="small">Small Exam</option>
+                  <option value="big">Big Exam</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Class
+                <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                  {classes.map(item => <option key={item.id} value={item.id}>{item.name} {item.section ? `· ${item.section}` : ''}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Subject
+                <select value={selectedSubjectId} onChange={event => setSelectedSubjectId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                  {subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Semester
+                <select value={selectedSemester} onChange={event => setSelectedSemester(event.target.value as 'Semester 1' | 'Semester 2')} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                  <option value="Semester 1">Semester 1</option>
+                  <option value="Semester 2">Semester 2</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Exam date
+                <input type="date" required value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Start time
+                <input type="time" required value={scheduleStartTime} onChange={event => setScheduleStartTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">End time
+                <input type="time" required value={scheduleEndTime} onChange={event => setScheduleEndTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Room / Hall
+                <input maxLength={120} required value={scheduleRoom} onChange={event => setScheduleRoom(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="e.g. Hall A" />
+              </label>
+              <label className="text-xs font-semibold text-[#475569]">Room seat capacity
+                <input type="number" min={1} max={500} step={1} required value={scheduleCapacity} onChange={event => setScheduleCapacity(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
+              <p className="text-[11px] text-[#64748B]">Academic year: {school?.academicYear || 'Current school year'} · Room and class time conflicts are checked when publishing.</p>
+              <button type="button" onClick={() => void handleCreateExamSchedule()} disabled={isReadOnly || scheduleSaving || !classes.length || !subjects.length || !scheduleExamName.trim() || !scheduleRoom.trim() || scheduleCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+                {scheduleSaving ? 'Saving draft…' : 'Save schedule draft'}
+              </button>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4">
+              <div><h2 className="text-sm font-bold text-[#132A29]">Exam timetable and seating</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} schedules · {school?.academicYear || 'Current year'}</p></div>
+              <button type="button" onClick={() => { setScheduleError(''); setScheduleLoading(true); ApiClient.getExamSchedules().then(setExamSchedules).catch(error => setScheduleError(error.message || 'Unable to refresh schedules.')).finally(() => setScheduleLoading(false)); }} disabled={scheduleLoading} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] disabled:opacity-50">{scheduleLoading ? 'Refreshing…' : 'Refresh'}</button>
+            </div>
+            {scheduleLoading ? <p className="p-6 text-center text-xs text-[#64748B]">Loading exam schedules…</p> : examSchedules.length === 0 ? <p className="p-8 text-center text-xs text-[#64748B]">No exam schedules yet. Create a draft above.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] text-left text-xs">
+                  <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
+                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Class / Subject</th><th className="px-3 py-3">Date / Time</th><th className="px-3 py-3">Room</th><th className="px-3 py-3">Capacity</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-[#E2E8F0]">
+                    {examSchedules.map(schedule => (
+                      <tr key={schedule.id}>
+                        <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</p></td>
+                        <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
+                        <td className="px-3 py-3"><p>{schedule.examDate}</p><p className="mt-1 text-[10px] text-[#64748B]">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</p></td>
+                        <td className="px-3 py-3">{schedule.roomName}</td>
+                        <td className="px-3 py-3">{schedule.seatCapacity} seats</td>
+                        <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
+                        <td className="px-3 py-3"><div className="flex justify-end gap-2">
+                          {schedule.status === 'draft' && <>
+                            <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
+                            <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
+                          </>}
+                          {schedule.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold"><Printer className="h-3.5 w-3.5"/>Print seating</button>}
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
       {/* TAB 4: EXAM STRUCTURE CONFIGURATION */}
       {activeTab === 'config' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
@@ -711,6 +914,25 @@ export const ExamsResultsView: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+      {seatSheet && (
+        <>
+          <style>{`@page { size: A4; margin: 12mm; } @media print { body * { visibility: hidden !important; } .exam-seat-print, .exam-seat-print * { visibility: visible !important; } .exam-seat-print { position: absolute !important; inset: 0 !important; overflow: visible !important; background: white !important; padding: 12mm !important; } .exam-seat-print .no-print { display: none !important; } }`}</style>
+          <section className="exam-seat-print fixed inset-0 z-50 overflow-auto bg-white p-6">
+            <div className="no-print mb-4 flex justify-end"><button type="button" onClick={() => setSeatSheet(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold">Close print preview</button></div>
+            <header className="mb-6 border-b-2 border-slate-900 pb-4 text-center">
+              <h1 className="text-xl font-bold">{school?.name}</h1>
+              <h2 className="mt-2 text-lg font-semibold">{seatSheet.schedule.examName} · Seating Plan</h2>
+              <p className="mt-1 text-sm">{seatSheet.schedule.className} · {seatSheet.schedule.subjectName}</p>
+              <p className="mt-1 text-xs">{seatSheet.schedule.examDate} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
+            </header>
+            <table className="w-full border-collapse text-sm">
+              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
+              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.studentIdLabel}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
+            </table>
+            <p className="mt-5 text-right text-xs">Total assigned seats: {seatSheet.seats.length}</p>
+          </section>
+        </>
       )}
     </div>
   );
