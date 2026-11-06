@@ -772,6 +772,11 @@ export class ApiClient {
     return this.request<any[]>('/exams/schedules');
   }
 
+  public static async getPublishedExamSchedules(classId?: string) {
+    const query = classId ? `?classId=${encodeURIComponent(classId)}` : '';
+    return this.request<any[]>(`/exams/schedules/published${query}`);
+  }
+
   public static async createExamSchedule(schedule: {
     examName: string; classId: string; subjectId: string; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
