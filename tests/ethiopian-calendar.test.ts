@@ -3,8 +3,10 @@ import { test } from 'node:test';
 import {
   ethiopianToGregorian,
   formatSchoolDate,
+  gregorianAcademicYearToSchool,
   gregorianToEthiopian,
   gregorianToSchoolDate,
+  schoolAcademicYearToGregorian,
   schoolDateToGregorian
 } from '../src/lib/ethiopian-calendar.ts';
 
@@ -37,4 +39,11 @@ test('school date adapters preserve Gregorian storage and format Ethiopian displ
   assert.equal(schoolDateToGregorian('2026-11-06', 'gregorian'), '2026-11-06');
   assert.equal(gregorianToSchoolDate('2026-11-06', 'gregorian'), '2026-11-06');
   assert.ok(formatSchoolDate('2026-11-06', 'ethiopian').length > 0);
+});
+
+test('converts academic year labels while keeping Gregorian database values', () => {
+  assert.equal(gregorianAcademicYearToSchool('2026-2027', 'ethiopian'), '2019-2020');
+  assert.equal(schoolAcademicYearToGregorian('2019-2020', 'ethiopian'), '2026-2027');
+  assert.equal(gregorianAcademicYearToSchool('2026-2027', 'gregorian'), '2026-2027');
+  assert.equal(schoolAcademicYearToGregorian('2026-2027', 'gregorian'), '2026-2027');
 });
