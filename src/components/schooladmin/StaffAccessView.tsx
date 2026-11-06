@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { StaffMember } from '../../types/index.ts';
 import { ApiClient } from '../../services/api.ts';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { 
   Users, 
   ShieldCheck, 
@@ -236,7 +237,7 @@ export const StaffAccessView: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900">{st.fullName}</div>
                       <div className="text-[11px] font-mono text-[#0F766E]">{st.staffId || '—'}</div>
-                      <div className="text-[11px] text-slate-500">Joined {st.joinedDate}</div>
+                      <div className="text-[11px] text-slate-500">Joined {formatSchoolDate(String(st.joinedDate).slice(0, 10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}</div>
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-bold text-slate-800 px-2 py-0.5 rounded bg-slate-100 text-[11px]">
