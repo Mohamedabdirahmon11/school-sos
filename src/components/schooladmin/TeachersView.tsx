@@ -232,7 +232,7 @@ export const TeachersView: React.FC = () => {
                   <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"><option value="">Select subject</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Monthly Salary ($)</label>
+                  <label className="block font-medium text-[#334155]">Monthly Salary ({school?.currency || 'ETB'})</label>
                   <input
                     type="number"
                     min="100"
