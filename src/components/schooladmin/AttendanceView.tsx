@@ -248,7 +248,7 @@ export const AttendanceView: React.FC = () => {
             {t('attendance')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. Absent students automatically trigger parent notifications.
+            Take official daily class attendance. After saving, open WhatsApp for each absent student's parent and send the prepared message manually.
           </p>
         </div>
 
@@ -358,6 +358,7 @@ export const AttendanceView: React.FC = () => {
                   <th className="py-3 px-4">Parent Phone</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4">Attendance Note</th>
+                  <th className="py-3 px-4">Parent WhatsApp</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf2f0]">
@@ -370,7 +371,7 @@ export const AttendanceView: React.FC = () => {
                       <td className="py-3 px-4 font-semibold text-[#132A29]">
                         {std.firstName} {std.middleName} {std.lastName}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || 'N/A'}</td>
+                      <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || std.motherPhone || 'N/A'}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
                           <button
