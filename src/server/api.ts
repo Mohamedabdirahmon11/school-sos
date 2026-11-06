@@ -3465,6 +3465,20 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
     return;
   }
 
+  const existingSchedules = await db.getExamSchedules(school.id);
+  const overlaps = existingSchedules.some(other => {
+    if (other.status === 'cancelled' || other.examDate !== examDate) return false;
+    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameClass = other.classId === classId;
+    const otherStart = String(other.startTime).slice(0, 5);
+    const otherEnd = String(other.endTime).slice(0, 5);
+    return (sameRoom || sameClass) && startTime < otherEnd && otherStart < endTime;
+  });
+  if (overlaps) {
+    res.status(409).json({ error: 'This room or class already has an overlapping exam schedule on that date.' });
+    return;
+  }
+
   try {
     const schedule = await db.createExamSchedule({
       id: 'exam-' + randomUUID(),
@@ -3492,6 +3506,27 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
     res.status(201).json(schedule);
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to create exam schedule.' });
+  }
+});
+
+apiRouter.post('/exams/schedules/:id/cancel', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
+  if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  if (schedule.status !== 'draft') { res.status(409).json({ error: 'Only draft exam schedules can be cancelled.' }); return; }
+  try {
+    const cancelled = await db.cancelExamSchedule(school.id, schedule.id);
+    db.logAudit({
+      action: 'EXAM_SCHEDULE_CANCELLED', category: 'academics', schoolId: school.id,
+      schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Cancelled draft exam schedule "${schedule.examName}".`,
+      severity: 'warning'
+    });
+    await db.flush();
+    res.json({ success: true, schedule: cancelled });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to cancel exam schedule.' });
   }
 });
 
