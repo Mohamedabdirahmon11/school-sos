@@ -30,3 +30,5 @@ END $$;
 
 COMMENT ON COLUMN public.schools.calendar_type IS
   'Preferred school-facing calendar. Persisted date columns remain Gregorian ISO dates.';
+
+NOTIFY pgrst, 'reload schema';
