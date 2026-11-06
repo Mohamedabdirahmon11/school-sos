@@ -76,7 +76,7 @@ export const ParentsView: React.FC = () => {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Parents & Guardian Directory</h1>
+        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Parents & Guardians</h1>
         <p className="text-xs text-[#64748B]">Parent contact details and linked enrolled children</p>
       </div>
 
