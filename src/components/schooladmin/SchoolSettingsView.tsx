@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
+import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { 
   Building2, 
   Palette, 
@@ -135,6 +136,7 @@ export const SchoolSettingsView: React.FC = () => {
     if (isReadOnly || !school) return;
     setError(null);
     if (!name.trim()) { setError('Official school name is required.'); return; }
+    if (phone.trim() && !normalizeWhatsAppNumber(phone)) { setError('WhatsApp number must include an international country code, for example +2519XXXXXXXX.'); return; }
     if (!/^#[0-9a-f]{6}$/i.test(brandColor)) { setError('Brand color must be a six-digit hex color such as #0F766E.'); return; }
     const capacity = Number(defaultClassCapacity);
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) { setError('Default class capacity must be a whole number between 1 and 500.'); return; }
@@ -591,7 +593,7 @@ export const SchoolSettingsView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Official Telephone</label>
+                <label className="block font-semibold text-[#334155] mb-1">Official Telephone / WhatsApp maamulka</label>
                 <input
                   type="tel"
                   value={phone}
