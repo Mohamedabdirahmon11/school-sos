@@ -297,12 +297,7 @@ export const AttendanceView: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold text-[#475569] mb-1">Attendance Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-          />
+          <SchoolDateInput value={date} onChange={setDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
         </div>
 
         <div>
