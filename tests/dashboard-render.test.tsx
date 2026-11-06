@@ -9,7 +9,7 @@ import { AuthProvider } from '../src/context/AuthContext.tsx';
 
 test('School Dashboard handles an undefined response with zero metrics and empty lists', () => {
   const model = normalizeSchoolDashboardData(undefined);
-  assert.deepEqual(model.stats, { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 });
+  assert.deepEqual(model.stats, { totalStudents: 0, totalTeachers: 0, totalClasses: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 });
   assert.deepEqual(model.recentPayments, []);
   assert.deepEqual(model.notices, []);
 });
@@ -31,7 +31,7 @@ test('School Dashboard API maps undefined array responses to safe zero stats', a
   t.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async () => new Response('null', { status: 200, headers: { 'Content-Type': 'application/json' } });
   const result = await ApiClient.getSchoolDashboard();
-  assert.deepEqual(result.stats, { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 });
+  assert.deepEqual(result.stats, { totalStudents: 0, totalTeachers: 0, totalClasses: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 });
   assert.deepEqual(result.recentPayments, []);
   assert.deepEqual(result.notices, []);
 });
