@@ -3406,6 +3406,24 @@ apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requ
   }
 });
 
+apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : undefined;
+  if (classId && !await db.getClassById(classId, school.id)) {
+    res.status(404).json({ error: 'Class not found in this school.' }); return;
+  }
+  const [schedules, classes, subjects] = await Promise.all([
+    db.getPublishedExamSchedules(school.id, classId), db.getClasses(school.id), db.getSubjects(school.id)
+  ]);
+  const classNames = new Map(classes.map(item => [item.id, item.name]));
+  const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
+  res.json(schedules.map(schedule => ({
+    ...schedule,
+    className: classNames.get(schedule.classId) || schedule.classId,
+    subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
+  })));
+});
+
 apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const [schedules, classes, subjects] = await Promise.all([
