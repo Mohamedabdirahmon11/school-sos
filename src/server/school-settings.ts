@@ -103,6 +103,7 @@ const schoolSettingsSchema = z.object({
   currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),
   language: z.enum(['en', 'so'], 'Language must be English or Somali.').optional(),
   timezone: z.string().trim().min(1, 'Timezone is required.').max(100, 'Timezone must be 100 characters or fewer.').refine(isValidTimeZone, 'Timezone must be a valid IANA timezone.').optional(),
+  calendarType: z.enum(['ethiopian', 'gregorian'], 'Calendar must be Ethiopian or Gregorian.').optional(),
   academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.').refine(value => {
     const [start, end] = value.split('-').map(Number);
     return end === start + 1;
