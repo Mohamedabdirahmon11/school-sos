@@ -39,7 +39,10 @@ test('school date adapters preserve Gregorian storage and format Ethiopian displ
   assert.equal(gregorianToSchoolDate('2026-11-06', 'ethiopian'), '2019-02-27');
   assert.equal(schoolDateToGregorian('2026-11-06', 'gregorian'), '2026-11-06');
   assert.equal(gregorianToSchoolDate('2026-11-06', 'gregorian'), '2026-11-06');
-  assert.ok(formatSchoolDate('2026-11-06', 'ethiopian').length > 0);
+  const ethiopianDisplay = formatSchoolDate('2026-11-06', 'ethiopian');
+  assert.ok(ethiopianDisplay.length > 0);
+  assert.match(ethiopianDisplay, /2019/);
+  assert.doesNotMatch(ethiopianDisplay, /ERA1/i);
 });
 
 test('converts academic year labels while keeping Gregorian database values', () => {
