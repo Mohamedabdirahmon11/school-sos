@@ -269,6 +269,70 @@ export class InMemorySupabase {
         return { data: null, error: { message: error instanceof Error ? error.message : 'Backup restore failed.' } };
       }
     }
+    if (name === 'schoolos_bulk_reset_student_pins') {
+      const payload = args?.p_payload || {};
+      const students = Array.isArray(payload.students) ? payload.students : [];
+      const tables = ['students', 'users', 'audit_logs'];
+      const snapshots = new Map<string, any[]>(tables.map(table => [table, structuredClone(this.rows(table))] as [string, any[]]));
+      const field = (row: any, camelName: string, snakeName: string) => row?.[camelName] ?? row?.[snakeName];
+      try {
+        if (!payload.school_id || !payload.changed_by || students.length < 1 || students.length > 500) throw new Error('Invalid bulk PIN reset payload.');
+        const ids = students.map((row: any) => String(row.student_id || ''));
+        if (ids.some((id: string) => !id) || new Set(ids).size !== ids.length) throw new Error('Duplicate or missing student IDs.');
+        if (students.some((row: any) => typeof row.pin_hash !== 'string' || !row.pin_hash)) throw new Error('Hashed PIN is required.');
+        const matched = ids.map((id: string) => this.rows('students').find(row =>
+          String(field(row, 'studentId', 'student_id')) === id
+          && String(field(row, 'schoolId', 'school_id')) === String(payload.school_id)
+        ));
+        if (matched.some((row: any) => !row)) throw new Error('One or more students were not found in this school. No PINs were changed.');
+        for (let index = 0; index < matched.length; index += 1) {
+          const student = matched[index];
+          const pinHash = students[index].pin_hash;
+          student.pinHash = pinHash;
+          student.pin_hash = pinHash;
+          for (const user of this.rows('users')) {
+            if (String(field(user, 'schoolId', 'school_id')) !== String(payload.school_id) || String(field(user, 'role', 'role')) !== 'student') continue;
+            if (String(field(user, 'studentId', 'student_id')) !== String(field(student, 'studentId', 'student_id')) && String(user.id) !== 'usr-student-' + student.id) continue;
+            user.pinHash = pinHash;
+            user.pin_hash = pinHash;
+            user.failedLoginAttempts = 0;
+            user.failed_login_attempts = 0;
+            user.lockedUntil = null;
+            user.locked_until = null;
+          }
+        }
+        this.rows('audit_logs').push({
+          id: 'audit-bulk-pin-reset-' + Date.now(),
+          action: 'STUDENT_BULK_PIN_RESET',
+          category: 'security',
+          schoolId: payload.school_id,
+          school_id: payload.school_id,
+          userId: payload.changed_by,
+          user_id: payload.changed_by,
+          userName: payload.changed_by_name,
+          user_name: payload.changed_by_name,
+          userRole: payload.changed_by_role,
+          user_role: payload.changed_by_role,
+          details: 'Bulk reset of ' + students.length + ' student PINs. Parent account PINs were unchanged.',
+          severity: 'warning'
+        });
+        return {
+          data: {
+            updated_count: students.length,
+            students: matched.map((row: any) => ({
+              student_id: field(row, 'studentId', 'student_id'),
+              first_name: field(row, 'firstName', 'first_name'),
+              middle_name: field(row, 'middleName', 'middle_name'),
+              last_name: field(row, 'lastName', 'last_name')
+            }))
+          },
+          error: null
+        };
+      } catch (error) {
+        for (const [table, rows] of snapshots) this.replaceRows(table, rows);
+        return { data: null, error: { message: error instanceof Error ? error.message : 'Bulk PIN reset failed.' } };
+      }
+    }
     if (name === 'schoolos_approve_admission') {
       const payload = args?.p_payload || {};
       const tables = ['admission_applications', 'classes', 'students', 'users', 'audit_logs'];
