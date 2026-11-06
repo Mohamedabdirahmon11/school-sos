@@ -32,7 +32,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
     setPinSlips([]);
     setFileName('');
     if (file.size > 5 * 1024 * 1024) { setError('File exceeds the 5 MB limit.'); return; }
-    if (!/\\.(csv|xlsx)$/i.test(file.name)) { setError('Choose a CSV or XLSX file.'); return; }
+    if (!/\.(csv|xlsx)$/i.test(file.name)) { setError('Choose a CSV or XLSX file.'); return; }
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: false });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
