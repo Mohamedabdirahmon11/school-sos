@@ -80,7 +80,7 @@ export const ExamsResultsView: React.FC = () => {
     if (!selectedClassId) return;
     try {
       const [stdList, existingMarks] = await Promise.all([
-        ApiClient.getAllStudents(selectedClassId),
+        ApiClient.getStudents(selectedClassId),
         ApiClient.getMarks(selectedClassId, selectedSubjectId || undefined, selectedSemester)
       ]);
 
@@ -162,15 +162,15 @@ export const ExamsResultsView: React.FC = () => {
   // Admin Approve All Submitted Marks
   const handleApproveAll = async () => {
     if (isReadOnly) return;
-    const pendingIds = marks.filter(m => m.status === 'submitted').map(m => m.id);
+    const pendingIds = marks.filter(m => m.status === 'submitted' || m.status === 'draft').map(m => m.id);
     if (pendingIds.length === 0) {
       setNotice('No pending marks to approve.');
       return;
     }
 
     try {
-      const result = await ApiClient.approveMarks(pendingIds);
-      setNotice(`Approved and permanently locked ${result.approvedCount} mark records.`);
+      await ApiClient.approveMarks(pendingIds);
+      setNotice(`Approved and permanently locked ${pendingIds.length} mark records!`);
       await loadClassData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -191,9 +191,6 @@ export const ExamsResultsView: React.FC = () => {
             <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
             {t('exams_results')}
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
-          </p>
         </div>
 
         {/* View Switcher Tabs */}
@@ -464,7 +461,6 @@ export const ExamsResultsView: React.FC = () => {
               </h2>
               <p className="text-sm text-[#71817d]">
                 Class results calculated as average percentages across all curriculum subjects.
-                <span className="mt-1 block text-xs font-semibold text-[#0F766E]">Class: {classes.find(c => c.id === selectedClassId)?.name || 'Select a class'} · Section {classes.find(c => c.id === selectedClassId)?.section || '—'}</span>
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -576,7 +572,6 @@ export const ExamsResultsView: React.FC = () => {
               </h2>
               <p className="text-sm text-[#71817d]">
                 Combines both semesters to produce yearly subject percentages and final class ranking.
-                <span className="mt-1 block text-xs font-semibold text-[#0F766E]">Class: {classes.find(c => c.id === selectedClassId)?.name || 'Select a class'} · Section {classes.find(c => c.id === selectedClassId)?.section || '—'}</span>
               </p>
             </div>
             <div className="flex items-center gap-2">
