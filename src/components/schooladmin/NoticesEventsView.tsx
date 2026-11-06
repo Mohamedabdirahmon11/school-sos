@@ -360,23 +360,11 @@ export const NoticesEventsView: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={eventStartDate}
-                    onChange={e => setEventStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-                  />
+                  <SchoolDateInput required value={eventStartDate} onChange={setEventStartDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={eventEndDate}
-                    onChange={e => setEventEndDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-                  />
+                  <SchoolDateInput required value={eventEndDate} onChange={setEventEndDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                 </div>
               </div>
 
