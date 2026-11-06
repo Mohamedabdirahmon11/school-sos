@@ -299,6 +299,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const handleIssueLibraryLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !loanBookId || !loanStudentId || !loanDueDate) return;
+    const todayParts = new Intl.DateTimeFormat('en-CA', { timeZone: school?.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
+    const todayIso = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(loanDueDate) || loanDueDate < todayIso) {
+      setLibraryError('Due date must be a valid date today or later.');
+      return;
+    }
     setLibrarySaving(true);
     setLibraryError(null);
     try {
