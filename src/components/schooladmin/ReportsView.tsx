@@ -184,7 +184,7 @@ export const ReportsView: React.FC = () => {
             <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Users className="w-5 h-5" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">Academic Census & Performance Summary</h3>
+            <h3 className="text-sm font-bold text-slate-900">Academic Performance Summary</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               Enrollment counts across grades, student-to-teacher ratios, attendance percentages, and overall
               subject pass metrics for governmental or institutional compliance.
