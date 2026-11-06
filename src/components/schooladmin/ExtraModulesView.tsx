@@ -606,10 +606,44 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       {/* 4. HEALTH / CLINIC MODULE */}
       {activeModule === 'health' && (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <HeartPulse className="w-4 h-4 text-rose-600" />
-            <span>School Clinic & Health Visits</span>
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+              <HeartPulse className="w-4 h-4 text-rose-600" />
+              <span>School Clinic & Health Visits</span>
+            </h2>
+            <span className="text-xs text-slate-500">{healthLogs.length} recorded visits</span>
+          </div>
+          {moduleError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{moduleError}</div>}
+          <form onSubmit={handleSaveHealthVisit} className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Student
+              <select required value={healthStudentId} onChange={event => setHealthStudentId(event.target.value)} disabled={isReadOnly || healthLoading || !healthStudents.length} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="">Select student</option>
+                {healthStudents.map((student: any) => <option key={student.id} value={student.id}>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')} · {student.studentId}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Visit date
+              <input required type="date" value={healthVisitDate} onChange={event => setHealthVisitDate(event.target.value)} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Reported symptoms
+              <input required maxLength={2000} value={healthSymptoms} onChange={event => setHealthSymptoms(event.target.value)} disabled={isReadOnly} placeholder="Describe the symptoms reported" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Treatment / action
+              <input maxLength={2000} value={healthTreatment} onChange={event => setHealthTreatment(event.target.value)} disabled={isReadOnly} placeholder="Treatment or action taken" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Attending nurse / staff
+              <input maxLength={160} value={healthNurseName} onChange={event => setHealthNurseName(event.target.value)} disabled={isReadOnly} placeholder="Name" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <div className="flex items-end justify-end">
+              <button type="submit" disabled={isReadOnly || healthSaving || !healthStudentId || !healthSymptoms.trim()} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                {healthSaving ? 'Saving…' : 'Record clinic visit'}
+              </button>
+            </div>
+          </form>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -622,7 +656,9 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {healthLogs.length ? healthLogs.map(h => (
+                {healthLoading ? (
+                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>Loading clinic visits…</td></tr>
+                ) : healthLogs.length ? healthLogs.map(h => (
                   <tr key={h.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{h.visitDate}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{h.studentName}</td>
