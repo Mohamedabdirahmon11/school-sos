@@ -34,3 +34,11 @@ test('attendance and manual WhatsApp actions use the same validator and never au
   assert.match(guide, /administrator-owned WhatsApp account/);
   assert.match(guide, /does not send WhatsApp messages automatically/);
 });
+
+
+test('attendance WhatsApp action is clearly labeled and aligned with its table column', () => {
+  const attendance = readFileSync(new URL('../src/components/schooladmin/AttendanceView.tsx', import.meta.url), 'utf8');
+  assert.match(attendance, /Parent WhatsApp/);
+  assert.match(attendance, /After saving, open WhatsApp for each absent student's parent and send the prepared message manually/);
+  assert.match(attendance, /std\.fatherPhone \|\| std\.motherPhone \|\| 'N\/A'/);
+});
