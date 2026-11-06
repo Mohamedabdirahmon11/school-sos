@@ -20,14 +20,15 @@ export const ParentsView: React.FC = () => {
     ApiClient.getSchoolStudents({ schoolId: school.id }).then(setStudents).catch((error: any) => setLoadError(error?.message || 'Could not load parent contacts.')).finally(() => setIsLoading(false));
   }, [school]);
 
-  const parentRows = students.reduce((groups: Array<{ phone: string; children: Set<string>; classes: Set<string> }>, student) => {
+  const parentRows = students.reduce((groups: Array<{ phone: string; relationships: Set<string>; children: Set<string>; classes: Set<string> }>, student) => {
     const child = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-    const contacts = [student.fatherPhone, student.motherPhone].filter((phone: string | undefined) => Boolean(phone));
-    contacts.forEach((phone: string) => {
-      const normalized = phone.replace(/\s+/g, '').trim();
+    const contacts: Array<[string, string | undefined]> = [['Father', student.fatherPhone], ['Mother', student.motherPhone]];
+    contacts.forEach(([relationship, phone]) => {
+      const normalized = String(phone || '').replace(/\s+/g, '').trim();
       if (!normalized) return;
       let group = groups.find(item => item.phone === normalized);
-      if (!group) { group = { phone: normalized, children: new Set<string>(), classes: new Set<string>() }; groups.push(group); }
+      if (!group) { group = { phone: normalized, relationships: new Set<string>(), children: new Set<string>(), classes: new Set<string>() }; groups.push(group); }
+      group.relationships.add(relationship);
       if (child) group.children.add(child);
       if (student.className) group.classes.add(student.className);
     });
@@ -65,7 +66,7 @@ export const ParentsView: React.FC = () => {
           <table className="w-full min-w-[620px] text-left text-xs">
             <thead className="bg-[#f6faf8] text-[#71817d] font-semibold border-b border-[#e6efec]">
               <tr>
-                <th className="px-4 py-3">Parent</th>
+                <th className="px-4 py-3">Contact type</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Children</th>
                 <th className="px-4 py-3">Class</th>
@@ -80,7 +81,7 @@ export const ParentsView: React.FC = () => {
                 <tr><td colSpan={4} className="p-8 text-center text-[#64748B]">No parent records found.</td></tr>
               ) : filtered.map(row => (
                 <tr key={row.phone} className="hover:bg-[#F8FAFC]">
-                  <td className="px-4 py-3 font-medium text-[#132A29]">Parent</td>
+                  <td className="px-4 py-3 font-medium text-[#132A29]">{Array.from(row.relationships).sort().join(' / ')}</td>
                   <td className="px-4 py-3 font-mono text-[#132A29]">{row.phone}</td>
                   <td className="px-4 py-3 text-[#334155]">{Array.from(row.children).sort((a, b) => a.localeCompare(b)).join(', ')}</td>
                   <td className="px-4 py-3 text-[#334155]">{Array.from(row.classes).sort((a, b) => a.localeCompare(b)).join(', ') || '—'}</td>
