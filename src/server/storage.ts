@@ -3403,6 +3403,36 @@ class StorageEngine {
     return incident;
   }
 
+  public async getHealthVisits(schoolId: string): Promise<any[]> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_health_visits')
+      .select('*').eq('school_id', schoolId).order('visit_date', { ascending: false });
+    this.recordQuery('school_health_visits', 'select', startedAt);
+    if (error) throw new Error(error.message || 'Unable to load school clinic visits.');
+    return (data || []).map((row: any) => fromSupabaseRow(row, 'school_health_visits'));
+  }
+
+  public async addHealthVisit(input: {
+    schoolId: string; studentId: string; visitDate: string; symptoms: string;
+    treatment?: string; nurseName?: string; recordedBy: string;
+  }): Promise<any> {
+    const student = await this.getStudentById(input.studentId, input.schoolId);
+    if (!student || student.schoolId !== input.schoolId) throw new Error('Choose a student from this school.');
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const payload = toSupabaseRow({
+      id: randomUUID(), ...input, treatment: input.treatment?.trim() || '',
+      nurseName: input.nurseName?.trim() || ''
+    }, 'school_health_visits');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_health_visits').insert(payload).select('*').single();
+    this.recordQuery('school_health_visits', 'insert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save the clinic visit.');
+    return fromSupabaseRow(data, 'school_health_visits');
+  }
+
   public async getLibraryBooks(schoolId: string): Promise<any[]> {
     const rows = await this.queryRows<any>('library_books', { school_id: schoolId });
     return rows.filter(book => book.schoolId === schoolId);

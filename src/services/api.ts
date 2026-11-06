@@ -636,6 +636,20 @@ export class ApiClient {
     return { stats: { totalStudents: 0, totalTeachers: 0, attendanceRate: 0, todayCollection: 0, totalOutstanding: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], recentPayments: [], notices: [] };
   }
 
+  public static async getHealthVisits() {
+    return this.request<any[]>('/school/health-visits');
+  }
+
+  public static async addHealthVisit(data: {
+    studentId: string; visitDate: string; symptoms: string;
+    treatment?: string; nurseName?: string;
+  }) {
+    return this.request<any>('/school/health-visits', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
   public static async getDisciplineIncidents() {
     return this.request<any[]>('/school/discipline');
   }
