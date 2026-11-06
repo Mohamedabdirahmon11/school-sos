@@ -10,6 +10,7 @@ import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
+import { formatSchoolDate } from '../../lib/ethiopian-calendar.ts';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
 import { 
   CalendarCheck, 
@@ -183,7 +184,7 @@ export const AttendanceView: React.FC = () => {
     const className = classes.find(item => item.id === selectedClassId)?.name || '';
     const message = [
       'Asc,',
-      `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${date}, dugsiga ka maqnaa.`,
+      `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${formatSchoolDate(date, school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}, dugsiga ka maqnaa.`,
       className ? `Fasalka: ${className}.` : '',
       'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
       school?.name || '',
