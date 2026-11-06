@@ -171,6 +171,8 @@ export const NoticesEventsView: React.FC = () => {
         </div>
       </div>
 
+      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+
       {/* Tabs */}
       <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
         <button
