@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS schools (
   currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   language VARCHAR(5) NOT NULL DEFAULT 'en',
   timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Addis_Ababa',
+  calendar_type VARCHAR(20) NOT NULL DEFAULT 'ethiopian' CHECK (calendar_type IN ('ethiopian', 'gregorian')),
   academic_year VARCHAR(50) NOT NULL DEFAULT '2026-2027',
   current_semester VARCHAR(50) NOT NULL DEFAULT 'Semester 1',
   terms JSONB NOT NULL DEFAULT '{"semester1Start": "", "semester1End": "", "semester2Start": "", "semester2End": ""}'::JSONB,
