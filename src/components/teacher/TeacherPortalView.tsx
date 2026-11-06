@@ -351,12 +351,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">Date (Once Per Day)</label>
-              <input
-                type="date"
-                value={attendanceDate}
-                onChange={e => setAttendanceDate(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
-              />
+              <SchoolDateInput value={attendanceDate} onChange={setAttendanceDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
             </div>
             <div>
               <button
