@@ -12,6 +12,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { SchoolDateInput } from '../common/SchoolDateInput.tsx';
 import { 
   SchoolClass, 
   Subject, 
@@ -613,7 +614,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Due date</label>
-                <input type="date" value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
+                <SchoolDateInput value={assignmentDueDate} onChange={setAssignmentDueDate} calendarType={school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Max points</label>
