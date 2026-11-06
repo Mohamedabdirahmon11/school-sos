@@ -4,6 +4,7 @@
 import React from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { formatSchoolDate, gregorianAcademicYearToSchool } from '../../lib/ethiopian-calendar.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -68,7 +69,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
 
   return <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
     <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-      <div><h1 className="text-3xl font-bold tracking-tight text-[#102522]">Dashboard</h1><p className="mt-1 text-sm text-[#71817d]">{school?.name || 'Your school'}{school?.academicYear ? ` · ${school.academicYear}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}</p></div>
+      <div><h1 className="text-3xl font-bold tracking-tight text-[#102522]">Dashboard</h1><p className="mt-1 text-sm text-[#71817d]">{school?.name || 'Your school'}{school?.academicYear ? ` · ${gregorianAcademicYearToSchool(school.academicYear, school.calendarType || (school.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}` : ''}{school?.currentSemester ? ` · ${school.currentSemester}` : ''}</p></div>
       <div className="flex flex-wrap gap-2">{canViewFinance && <button onClick={()=>onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f7faf9]"><CreditCard size={16}/>Record payment</button>}{canManageStudents && <button onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"><UserPlus size={16}/>Add student</button>}</div>
     </section>
 
@@ -82,7 +83,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
       <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
         <div className="mb-5 flex items-start justify-between"><div><h2 className="font-bold text-[#102522]">Attendance this week</h2></div></div>
-        {hasTrend ? <div className="flex h-52 items-end gap-3 border-b border-[#e5eeeb] px-1">{result.attendanceTrend.map((item: DashboardRecord, index: number)=><div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[11px] font-semibold text-[#627571]">{Number(item.rate ?? item.attendanceRate ?? item.present) || 0}%</span><div className="w-full max-w-[76px] rounded-t-xl bg-[#bfe3da]" style={{height:`${Math.max(4, Math.min(100, (Number(item.rate ?? item.attendanceRate ?? item.present) || 0) / maxTrend * 100))}%`}}/><span className="text-[11px] text-[#71817d]">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0,3) : `Day ${index+1}`)}</span></div>)}</div> : <div className="flex h-52 flex-col items-center justify-center rounded-xl bg-[#f6faf8] text-center"><CalendarCheck className="mb-2 text-[#0e8078]" size={26}/><p className="text-sm font-semibold text-[#18312d]">Weekly trend is not available yet</p><p className="mt-1 max-w-sm text-xs text-[#71817d]">Once daily attendance history is returned by the dashboard API, it will appear here.</p></div>}
+        {hasTrend ? <div className="flex h-52 items-end gap-3 border-b border-[#e5eeeb] px-1">{result.attendanceTrend.map((item: DashboardRecord, index: number)=><div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[11px] font-semibold text-[#627571]">{Number(item.rate ?? item.attendanceRate ?? item.present) || 0}%</span><div className="w-full max-w-[76px] rounded-t-xl bg-[#bfe3da]" style={{height:`${Math.max(4, Math.min(100, (Number(item.rate ?? item.attendanceRate ?? item.present) || 0) / maxTrend * 100))}%`}}/><span className="text-[11px] text-[#71817d]">{item.day ?? (typeof item.date === 'string' ? formatSchoolDate(item.date.slice(0,10), school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian')).slice(0,3) : `Day ${index+1}`)}</span></div>)}</div> : <div className="flex h-52 flex-col items-center justify-center rounded-xl bg-[#f6faf8] text-center"><CalendarCheck className="mb-2 text-[#0e8078]" size={26}/><p className="text-sm font-semibold text-[#18312d]">Weekly trend is not available yet</p><p className="mt-1 max-w-sm text-xs text-[#71817d]">Once daily attendance history is returned by the dashboard API, it will appear here.</p></div>}
       </div>
       {canViewFinance && (
       <div className="rounded-2xl border border-[#dce7e4] bg-white p-5 md:p-6">
