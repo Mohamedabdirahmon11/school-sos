@@ -447,6 +447,16 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Bulk import transaction failed.');
   }
 
+  public async bulkResetStudentPins(payload: Record<string, unknown>): Promise<{ updated_count: number; students: Array<{ student_id: string; first_name: string; middle_name?: string; last_name: string }> }> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic bulk PIN reset is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_bulk_reset_student_pins', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_bulk_reset_student_pins', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Bulk student PIN reset failed.');
+    return data as { updated_count: number; students: Array<{ student_id: string; first_name: string; middle_name?: string; last_name: string }> };
+  }
+
   public async initialize(clientOverride?: any): Promise<void> {
     const client = clientOverride || this.testClient || supabase;
     if (!client || (!isSupabaseConfigured && !clientOverride && !this.testClient)) {
