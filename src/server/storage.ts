@@ -1061,6 +1061,24 @@ class StorageEngine {
       this.data.events = this.data.events.filter(e => e.schoolId !== id);
       this.data.messages = this.data.messages.filter(m => m.schoolId !== id);
       this.data.communicationQueue = this.data.communicationQueue.filter(q => q.schoolId !== id);
+      // Remove every other tenant-scoped collection from this request snapshot too.
+      // The schools row deletion is persisted first; PostgreSQL cascades all school_id
+      // foreign keys and preserves audit_logs with ON DELETE SET NULL.
+      const tenantCollections = [
+        'sessions', 'timetableSettings', 'teacherUnavailability', 'examConfigs', 'promotions',
+        'reportCardDesigns', 'communicationSettings', 'tickets', 'invoices', 'assignments',
+        'assignmentSubmissions', 'staffMembers', 'payrollRecords', 'admissionApplications',
+        'feeRanges', 'busAssignments', 'notificationTemplates', 'promotionHistory',
+        'restoreTestRecords', 'lockoutCounterRows', 'libraryBooks', 'libraryLoans',
+        'transportRoutes', 'inventoryItems', 'inventoryTransactions', 'disciplineIncidents'
+      ] as const;
+      for (const collection of tenantCollections) {
+        const rows = (this.data as any)[collection];
+        if (Array.isArray(rows)) (this.data as any)[collection] = rows.filter((row: any) => row.schoolId !== id && row.school_id !== id);
+      }
+      this.data.broadcasts = this.data.broadcasts.filter((row: any) => row.targetSchoolId !== id && row.target_school_id !== id);
+      // Keep the security audit trail, but detach it from the erased tenant.
+      this.data.auditLogs = this.data.auditLogs.map(row => row.schoolId === id ? { ...row, schoolId: undefined } : row);
       this.save();
       return true;
     }
