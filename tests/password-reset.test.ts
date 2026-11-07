@@ -76,7 +76,7 @@ const IP = '203.0.113.10';
 const OLD_PASSWORD = 'OldSchoolPassword123';
 const NEW_PASSWORD = 'NewSchoolPassword456';
 
-function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean; mailConfigured?: boolean } = {}) {
+function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean; mailConfigured?: boolean; mailFailure?: boolean } = {}) {
   let clock = new Date('2026-11-07T12:00:00.000Z');
   const user: User = {
     id: 'usr-school-admin-1',
@@ -103,7 +103,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     repository,
     findUserByEmail: async email => options.exists === false || email !== EMAIL ? null : user,
     getSchool: async () => ({ id: 'school-1', language: 'so', subscription: { status: options.suspended ? 'suspended' : 'active' } } as unknown as School),
-    sendEmail: async (_to, code, language) => { sentCodes.push(code); sentLanguages.push(language); },
+    sendEmail: async (_to, code, language) => { if (options.mailFailure) throw new Error('delivery failed'); sentCodes.push(code); sentLanguages.push(language); },
     mailConfigured: () => options.mailConfigured ?? true,
     updatePassword: async (_account, passwordHash, changedAt) => {
       user.passwordHash = passwordHash;
@@ -306,5 +306,24 @@ test('explicit user language overrides the school default for reset email', asyn
   const f = fixture();
   await f.service.request(EMAIL, IP, 'am');
   assert.deepEqual(f.sentLanguages, ['am']);
+});
+
+
+test('development fallback prints the code only in non-production mode', async () => {
+  const f = fixture({ production: false, mailConfigured: false });
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.deepEqual(f.devCodes, ['123456']);
+  assert.equal(f.sentCodes.length, 0);
+  assert.notEqual(f.repository.rows[0].code_hash, '123456');
+});
+
+test('failed Resend delivery invalidates the undelivered code', async () => {
+  const f = fixture({ mailFailure: true });
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(f.repository.rows[0].used_at);
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: false, reason: 'invalid_code' });
 });
 
