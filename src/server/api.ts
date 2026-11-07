@@ -4911,7 +4911,7 @@ async function getSchoolSetupState(school: School) {
   ]);
   const teacherUserIds = teachers.map((teacher: any) => String(teacher.userId || '')).filter(Boolean);
   const teacherAccounts = teacherUserIds.length
-    ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash')
+    ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map(teacherAccounts.map((account: any) => [account.id, account]));
   const checklist = buildSchoolSetupChecklist(school, {
@@ -4971,7 +4971,17 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
     return;
   }
 
-  await db.getSchoolById(school.id);
+  let loadedSchool: School | null;
+  try {
+    loadedSchool = await db.getSchoolById(school.id);
+  } catch {
+    res.status(503).json({ error: 'School setup progress could not be saved. Please retry.' });
+    return;
+  }
+  if (!loadedSchool) {
+    res.status(404).json({ error: 'School was not found. No setup progress was saved.' });
+    return;
+  }
   const updated = db.updateSchool(school.id, { setupProgress: progress });
   if (!updated) {
     res.status(404).json({ error: 'School was not found. No setup progress was saved.' });

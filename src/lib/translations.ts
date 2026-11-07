@@ -232,6 +232,7 @@ export interface TranslationDict {
   setup_title: string;
   setup_subtitle: string;
   setup_progress: string;
+  setup_current_step: string;
   setup_saved: string;
   setup_in_progress: string;
   setup_return: string;
@@ -479,6 +480,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_title: 'Set up your school',
     setup_subtitle: 'Follow these steps to prepare your school before opening the dashboard.',
     setup_progress: 'Setup progress',
+    setup_current_step: 'Current step',
     setup_saved: 'Your progress is saved automatically. You can leave and continue later.',
     setup_in_progress: 'School setup is still in progress. Complete the required steps before opening the dashboard.',
     setup_return: 'Back to setup checklist',
@@ -724,6 +726,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_title: 'Deji dugsigaaga',
     setup_subtitle: 'Raac tallaabooyinkan si aad dugsiga u diyaariso ka hor inta aan Dashboard-ka la furin.',
     setup_progress: 'Horumarka dejinta',
+    setup_current_step: 'Tallaabada hadda',
     setup_saved: 'Horumarka si toos ah ayaa loo kaydiyaa. Waad ka bixi kartaa oo mar dambe waad sii wadan kartaa.',
     setup_in_progress: 'Dejinta dugsigu weli way socotaa. Dhammaystir tallaabooyinka muhiimka ah ka hor Dashboard-ka.',
     setup_return: 'Ku noqo liiska dejinta',
@@ -966,6 +969,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_title: 'ትምህርት ቤትዎን ያዘጋጁ',
     setup_subtitle: 'ዳሽቦርዱን ከመክፈትዎ በፊት ትምህርት ቤቱን ለማዘጋጀት እነዚህን ደረጃዎች ይከተሉ።',
     setup_progress: 'የዝግጅት ሂደት',
+    setup_current_step: 'የአሁኑ ደረጃ',
     setup_saved: 'እድገትዎ በራስ-ሰር ይቀመጣል። ወጥተው በኋላ መቀጠል ይችላሉ።',
     setup_in_progress: 'የትምህርት ቤቱ ዝግጅት ገና አልተጠናቀቀም። ዳሽቦርዱን ከመክፈትዎ በፊት አስፈላጊ ደረጃዎችን ያጠናቅቁ።',
     setup_return: 'ወደ ዝግጅት ዝርዝር ተመለስ',

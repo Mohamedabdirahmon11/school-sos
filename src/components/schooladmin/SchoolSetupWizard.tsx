@@ -129,7 +129,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">{t('setup_subtitle')}</p>
         <p className="mt-4 text-sm font-semibold">{school?.name || t('school_admin')}</p>
         <div className="mt-5 flex items-center justify-between text-xs text-teal-100">
-          <span>{t('setup_progress')}</span>
+          <span>{t('setup_progress')} · {t('setup_current_step')} {state.progress.currentStep}/10</span>
           <span>{completedCount}/9</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
@@ -148,7 +148,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           const ready = isFinal ? state.canFinish : Boolean(state.checklist[item.id]?.ready);
           const status = isCompleted ? t('setup_completed') : isSkipped ? t('setup_skipped') : ready ? t('setup_pending') : t('setup_needs_attention');
           return (
-            <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <article key={item.id} aria-current={item.id === state.progress.currentStep ? 'step' : undefined} className={'rounded-xl border p-4 shadow-sm sm:p-5 ' + (item.id === state.progress.currentStep ? 'border-teal-300 bg-teal-50/40' : 'border-slate-200 bg-white')}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <div className="flex min-w-0 flex-1 gap-3">
                   <div className="mt-0.5 shrink-0 text-teal-700">
