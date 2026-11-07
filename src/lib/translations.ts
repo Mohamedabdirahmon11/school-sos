@@ -86,6 +86,29 @@ export interface TranslationDict {
   staff_signin_identifier: string;
   staff_signin_placeholder: string;
   school_admin_initial_password_hint: string;
+  forgot_password: string;
+  forgot_password_title: string;
+  forgot_password_email: string;
+  forgot_password_send_code: string;
+  forgot_password_neutral: string;
+  forgot_password_code: string;
+  forgot_password_new_password: string;
+  forgot_password_confirm_password: string;
+  forgot_password_reset: string;
+  forgot_password_resend: string;
+  forgot_password_back: string;
+  forgot_password_expiry: string;
+  forgot_password_resend_wait: string;
+  forgot_password_password_rules: string;
+  forgot_password_password_min: string;
+  forgot_password_password_complexity: string;
+  forgot_password_password_max: string;
+  forgot_password_code_invalid: string;
+  forgot_password_too_many_attempts: string;
+  forgot_password_same_password: string;
+  forgot_password_password_mismatch: string;
+  forgot_password_success: string;
+  forgot_password_pin_hint: string;
   first_time_password_hint: string;
   staff_id: string;
   staff_id_generated_hint: string;
@@ -329,6 +352,29 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     staff_signin_identifier: 'Email or Staff ID',
     staff_signin_placeholder: 'name@school.com or STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'Use the temporary password from your Super Admin. Your Gmail password is not used for SchoolOS.',
+    forgot_password: 'Forgot password?',
+    forgot_password_title: 'Reset your password',
+    forgot_password_email: 'Email address',
+    forgot_password_send_code: 'Send code',
+    forgot_password_neutral: 'If an account exists for this email, a 6-digit code has been sent.',
+    forgot_password_code: '6-digit code',
+    forgot_password_new_password: 'New password',
+    forgot_password_confirm_password: 'Confirm new password',
+    forgot_password_reset: 'Change password',
+    forgot_password_resend: 'Resend code',
+    forgot_password_back: 'Back to sign in',
+    forgot_password_expiry: 'Code expires in {seconds}.',
+    forgot_password_resend_wait: 'Resend available in {seconds}.',
+    forgot_password_password_rules: 'Use at least 12 characters, including uppercase, lowercase, and a number.',
+    forgot_password_password_min: 'Password must contain at least 12 characters.',
+    forgot_password_password_complexity: 'Password must include uppercase and lowercase letters and at least one number.',
+    forgot_password_password_max: 'Password must not exceed 128 characters.',
+    forgot_password_code_invalid: 'The code is invalid or expired. Request a new one.',
+    forgot_password_too_many_attempts: 'Too many incorrect codes. Request a new code.',
+    forgot_password_same_password: 'Choose a password different from your current password.',
+    forgot_password_password_mismatch: 'Passwords do not match.',
+    forgot_password_success: 'Password changed. You can now sign in with your new password.',
+    forgot_password_pin_hint: 'Forgot your PIN or password? Ask your school administrator to reset it.',
     first_time_password_hint: 'Create a password different from your temporary sign-in password. It must be at least 8 characters.',
     staff_id: 'Staff ID',
     staff_id_generated_hint: 'Leave blank to generate a unique ID',
@@ -552,6 +598,29 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     staff_signin_identifier: 'Iimayl ama Aqoonsiga Shaqaalaha',
     staff_signin_placeholder: 'name@school.com ama STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'Isticmaal furaha ku-meel-gaarka ah ee Maamulaha Guud ku siiyay. Furaha Gmail-kaaga laguma galo SchoolOS.',
+    forgot_password: 'Furaha sirta ma illowday?',
+    forgot_password_title: 'Dib u deji furaha sirta',
+    forgot_password_email: 'Cinwaanka iimaylka',
+    forgot_password_send_code: 'Dir koodhka',
+    forgot_password_neutral: 'Haddii akoon ku jiro iimaylkan, waxaa la diray koodh 6 lambar ah.',
+    forgot_password_code: 'Koodhka 6-da lambar ah',
+    forgot_password_new_password: 'Furaha sirta cusub',
+    forgot_password_confirm_password: 'Xaqiiji furaha sirta cusub',
+    forgot_password_reset: 'Beddel furaha sirta',
+    forgot_password_resend: 'Dib u dir koodhka',
+    forgot_password_back: 'Ku noqo gelitaanka',
+    forgot_password_expiry: 'Koodhku wuxuu dhacayaa {seconds} gudahood.',
+    forgot_password_resend_wait: 'Dib u diristu waxay diyaar noqonaysaa {seconds} kadib.',
+    forgot_password_password_rules: 'Isticmaal ugu yaraan 12 xaraf, kuna dar xaraf weyn, xaraf yar iyo lambar.',
+    forgot_password_password_min: 'Furaha sirta waa inuu ka koobnaadaa ugu yaraan 12 xaraf.',
+    forgot_password_password_complexity: 'Furaha sirta waa inuu ka koobnaadaa xaraf weyn, xaraf yar iyo ugu yaraan hal lambar.',
+    forgot_password_password_max: 'Furaha sirta kama badnaan karo 128 xaraf.',
+    forgot_password_code_invalid: 'Koodhku waa khaldan yahay ama wuu dhacay. Codso koodh cusub.',
+    forgot_password_too_many_attempts: 'Koodh khaldan ayaa marar badan la geliyey. Codso koodh cusub.',
+    forgot_password_same_password: 'Dooro furaha sirta oo ka duwan kii hore.',
+    forgot_password_password_mismatch: 'Furayaasha sirta isma laha.',
+    forgot_password_success: 'Furaha sirta waa la beddelay. Hadda ku gal furahaaga cusub.',
+    forgot_password_pin_hint: 'Haddii aad illowday PIN-ka ama furaha sirta, weydii maamulaha dugsiga inuu kuu beddelo.',
     first_time_password_hint: 'Sameyso furaha sirta ah oo ka duwan kii ku-meel-gaarka ahaa ee aad ku gashay. Waa inuu ka koobnaadaa ugu yaraan 8 xaraf.',
     staff_id: 'Aqoonsiga Shaqaalaha',
     staff_id_generated_hint: 'Madhan ka tag si aqoonsi gaar ah loo sameeyo',
@@ -775,6 +844,29 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     staff_signin_identifier: 'ኢሜይል ወይም የሰራተኛ መታወቂያ',
     staff_signin_placeholder: 'name@school.com ወይም STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'በዋና አስተዳዳሪው የተሰጠዎትን ጊዜያዊ የይለፍ ቃል ይጠቀሙ። የGmail የይለፍ ቃልዎ ወደ SchoolOS ለመግባት አይጠቅምም።',
+    forgot_password: 'የይለፍ ቃል ረሱ?',
+    forgot_password_title: 'የይለፍ ቃልዎን ዳግም ያዘጋጁ',
+    forgot_password_email: 'የኢሜይል አድራሻ',
+    forgot_password_send_code: 'ኮድ ላክ',
+    forgot_password_neutral: 'ለዚህ ኢሜይል መለያ ካለ፣ 6 አሃዝ ያለው ኮድ ተልኳል።',
+    forgot_password_code: '6 አሃዝ ኮድ',
+    forgot_password_new_password: 'አዲስ የይለፍ ቃል',
+    forgot_password_confirm_password: 'አዲሱን የይለፍ ቃል ያረጋግጡ',
+    forgot_password_reset: 'የይለፍ ቃል ቀይር',
+    forgot_password_resend: 'ኮዱን እንደገና ላክ',
+    forgot_password_back: 'ወደ መግቢያ ተመለስ',
+    forgot_password_expiry: 'ኮዱ በ{seconds} ውስጥ ያበቃል።',
+    forgot_password_resend_wait: 'እንደገና መላክ በ{seconds} ውስጥ ይቻላል።',
+    forgot_password_password_rules: 'ቢያንስ 12 ቁምፊዎችን ይጠቀሙ፤ ትልቅ ፊደል፣ ትንሽ ፊደል እና ቁጥር ያካትቱ።',
+    forgot_password_password_min: 'የይለፍ ቃሉ ቢያንስ 12 ቁምፊዎች መሆን አለበት።',
+    forgot_password_password_complexity: 'የይለፍ ቃሉ ትልቅና ትንሽ ፊደሎችን እና ቢያንስ አንድ ቁጥር ማካተት አለበት።',
+    forgot_password_password_max: 'የይለፍ ቃሉ ከ128 ቁምፊዎች መብለጥ የለበትም።',
+    forgot_password_code_invalid: 'ኮዱ ልክ አይደለም ወይም ጊዜው አልፏል። አዲስ ኮድ ይጠይቁ።',
+    forgot_password_too_many_attempts: 'ብዙ የተሳሳቱ ኮዶች ገብተዋል። አዲስ ኮድ ይጠይቁ።',
+    forgot_password_same_password: 'ከአሁኑ የተለየ የይለፍ ቃል ይምረጡ።',
+    forgot_password_password_mismatch: 'የይለፍ ቃሎቹ አይዛመዱም።',
+    forgot_password_success: 'የይለፍ ቃሉ ተቀይሯል። አሁን በአዲሱ የይለፍ ቃል ይግቡ።',
+    forgot_password_pin_hint: 'ፒንዎን ወይም የይለፍ ቃልዎን ከረሱ፣ እንዲቀይርልዎ የትምህርት ቤትዎን አስተዳዳሪ ይጠይቁ።',
     first_time_password_hint: 'ከጊዜያዊ የመግቢያ የይለፍ ቃልዎ የተለየ የይለፍ ቃል ይፍጠሩ። ቢያንስ 8 ቁምፊዎች መሆን አለበት።',
     staff_id: 'የሰራተኛ መታወቂያ',
     staff_id_generated_hint: 'ልዩ መታወቂያ ለማመንጨት ባዶ ይተዉ',
