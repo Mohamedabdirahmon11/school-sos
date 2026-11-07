@@ -197,7 +197,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
     try {
-      await deps.repository.cleanup(new Date(timestamp.getTime() - 24 * 60 * 60 * 1000).toISOString());
+      await deps.repository.cleanup(new Date(timestamp.getTime() - 60 * 60 * 1000).toISOString());
     } catch {
       // Cleanup is best-effort; the request still follows the normal safe response.
     }
