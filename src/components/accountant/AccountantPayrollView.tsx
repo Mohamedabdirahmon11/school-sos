@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { formatSchoolMonthPeriod } from '../../lib/ethiopian-calendar.ts';
 import { StaffPayrollRecord } from '../../types/index.ts';
 
 type PayrollStaff = { id: string; staffId: string; userId: string; name: string; monthlySalary: number };
@@ -37,6 +38,8 @@ export const AccountantPayrollView: React.FC = () => {
     return value;
   }, { draft: { count: 0, net: 0 }, approved: { count: 0, net: 0 }, paid: { count: 0, net: 0 } }), [records]);
   const money = (amount: number) => formatMoney(Number(amount) || 0, school?.currency);
+  const calendarType = school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian');
+  const payrollPeriodLabel = (monthKey: string) => formatSchoolMonthPeriod(monthKey, calendarType);
   const statusText = (status: StaffPayrollRecord['status']) => status === 'draft' ? t('payroll_draft') : status === 'approved' ? t('payroll_approved') : t('payroll_paid');
 
   const createDraft = async () => {
@@ -62,8 +65,9 @@ export const AccountantPayrollView: React.FC = () => {
   return <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
     <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
       <div><h1 className="text-xl md:text-2xl font-bold text-[#132A29]">{t('payroll_management')}</h1></div>
-      <label className="text-xs font-semibold text-[#475569]">{t('payroll_month')}
+      <label className="text-xs font-semibold text-[#475569]">{t('payroll_month')} (Gregorian accounting month)
         <input type="month" value={month} onChange={event => setMonth(event.target.value)} className="ml-2 px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+        <span className="block mt-1 text-[11px] font-normal text-slate-500">School calendar period: {payrollPeriodLabel(month)}</span>
       </label>
     </header>
 
@@ -100,7 +104,7 @@ export const AccountantPayrollView: React.FC = () => {
           <thead className="bg-[#F8FAFC] text-[#64748B] uppercase"><tr>
             <th className="p-3">{t('payroll_staff_member')}</th><th className="p-3">{t('payroll_salary')}</th><th className="p-3">{t('payroll_allowance')}</th><th className="p-3">{t('payroll_deduction')}</th><th className="p-3">{t('payroll_net')}</th><th className="p-3">{t('payroll_status')}</th><th className="p-3"></th>
           </tr></thead><tbody className="divide-y divide-slate-100">{records.map(record => <tr key={record.id}>
-            <td className="p-3 font-semibold">{record.staffName}</td><td className="p-3">{money(record.baseSalary)}</td><td className="p-3">{money(record.allowanceTotal)}</td><td className="p-3">{money(record.deductionTotal)}</td><td className="p-3 font-bold">{money(record.netSalary)}</td><td className="p-3">{statusText(record.status)}</td>
+            <td className="p-3 font-semibold">{record.staffName}<span className="block text-[10px] font-normal text-slate-500">{payrollPeriodLabel(record.payrollMonth)}</span></td><td className="p-3">{money(record.baseSalary)}</td><td className="p-3">{money(record.allowanceTotal)}</td><td className="p-3">{money(record.deductionTotal)}</td><td className="p-3 font-bold">{money(record.netSalary)}</td><td className="p-3">{statusText(record.status)}</td>
             <td className="p-3"><div className="flex justify-end gap-2">{record.status === 'draft' && <button type="button" onClick={() => void transition(record, 'approve')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_approve')}</button>}{record.status === 'approved' && <button type="button" onClick={() => void transition(record, 'pay')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_mark_paid')}</button>}<button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-2 py-1 text-slate-700 border border-slate-200 rounded">{t('payroll_payslip')}</button></div></td>
           </tr>)}</tbody>
         </table></div>}
@@ -115,6 +119,6 @@ export const StaffPayslipsView: React.FC = () => {
   useEffect(() => { ApiClient.getMyPayslips().then(rows => setRecords(Array.isArray(rows) ? rows : [])).finally(() => setLoading(false)); }, []);
   return <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
     <h1 className="text-xl font-bold text-[#132A29]">{t('payroll_payslip')}</h1>
-    {loading ? <p>{t('payroll_loading')}</p> : !records.length ? <p className="text-sm text-slate-500">{t('payroll_empty')}</p> : records.map(record => <div key={record.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl"><div><p className="font-semibold">{record.payrollMonth}</p><p className="text-sm text-slate-500">{formatMoney(record.netSalary, school?.currency)}</p></div><button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-3 py-2 border border-teal-200 text-teal-800 rounded-lg text-sm">{t('payroll_payslip')}</button></div>)}
+    {loading ? <p>{t('payroll_loading')}</p> : !records.length ? <p className="text-sm text-slate-500">{t('payroll_empty')}</p> : records.map(record => <div key={record.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl"><div><p className="font-semibold">{payrollPeriodLabel(record.payrollMonth)}</p><p className="text-[10px] text-slate-500">Accounting key: {record.payrollMonth}</p><p className="text-sm text-slate-500">{formatMoney(record.netSalary, school?.currency)}</p></div><button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-3 py-2 border border-teal-200 text-teal-800 rounded-lg text-sm">{t('payroll_payslip')}</button></div>)}
   </div>;
 };
