@@ -2244,8 +2244,6 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   do { id = `STF-${schoolTag}-${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
   return id;
 }
-const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
-const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
   const statuses = new Map<string, 'paid' | 'partial' | 'unpaid'>();
   if (studentIds && studentIds.length === 0) return statuses;
@@ -2533,7 +2531,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
     db.queryPage('teachers', { school_id: school.id, id: String(teacherId || '') }, 1, 1, undefined, 'id'),
     db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || ''), teacher_id: String(teacherId || ''), is_active: 'true' }, 1, 1, undefined, 'id'),
     db.getTimetableSettings(school.id),
-    db.queryPage('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    queryAllRows('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
     db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId || ''), day_of_week: dayOfWeek, period_number: String(period), shift: String(shift) }, 1, 1, undefined, 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active')
   ]);
