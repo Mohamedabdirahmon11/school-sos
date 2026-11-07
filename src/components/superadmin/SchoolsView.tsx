@@ -23,7 +23,8 @@ import {
   ExternalLink,
   ChevronRight,
   X,
-  CreditCard
+  CreditCard,
+  Trash2
 } from 'lucide-react';
 
 interface SchoolsViewProps {
@@ -42,6 +43,9 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [isLoading, setIsLoading] = useState(true);
   const [modalError, setModalError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [showEraseModal, setShowEraseModal] = useState(false);
+  const [eraseConfirmation, setEraseConfirmation] = useState('');
+  const [isErasing, setIsErasing] = useState(false);
 
   // Add School Form State
   const [addName, setAddName] = useState('');
@@ -197,6 +201,24 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       window.alert(`Temporary password (shown once):\n\n${result.temporaryPassword}\n\nThe administrator must change it at next sign-in.`);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleEraseSchoolData = async () => {
+    if (!selectedSchool || eraseConfirmation.trim().toUpperCase() !== selectedSchool.school.code.toUpperCase()) return;
+    setIsErasing(true);
+    try {
+      await ApiClient.eraseSchoolData(selectedSchool.school.id, eraseConfirmation.trim());
+      const erasedName = selectedSchool.school.name;
+      setShowEraseModal(false);
+      setEraseConfirmation('');
+      setSelectedSchool(null);
+      setActionNotice(`All data for "${erasedName}" was permanently erased.`);
+      await fetchSchools();
+    } catch (err: any) {
+      setModalError(err.message || 'School data could not be erased.');
+    } finally {
+      setIsErasing(false);
     }
   };
 
@@ -471,6 +493,14 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               </button>
 
               <button
+                onClick={() => { setEraseConfirmation(''); setModalError(null); setShowEraseModal(true); }}
+                className="w-full py-2 px-3 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Erase All School Data</span>
+              </button>
+
+              <button
                 onClick={handleToggleSuspension}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 ${
                   selectedSchool.school.subscription.status === 'suspended'
@@ -651,6 +681,36 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* PERMANENT SCHOOL DATA ERASURE CONFIRMATION */}
+      {showEraseModal && selectedSchool && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="erase-school-title" className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 border border-red-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start gap-3 pb-4 border-b border-red-100">
+              <div className="p-2 rounded-lg bg-red-50 text-red-700"><Trash2 className="w-5 h-5" /></div>
+              <div className="flex-1">
+                <h2 id="erase-school-title" className="text-base font-bold text-red-800">Permanently erase this school?</h2>
+                <p className="text-xs text-slate-600 mt-1">This action cannot be undone. The school and its administrator accounts will be removed.</p>
+              </div>
+              <button type="button" onClick={() => setShowEraseModal(false)} disabled={isErasing} className="text-slate-500 hover:text-slate-800"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-100 text-xs text-red-900 space-y-2">
+              <p className="font-semibold">The following school-owned records will be erased:</p>
+              <p>Students ({selectedSchool.studentCount || 0}), teachers, staff and logins, classes, attendance, exams and results, fees and payments, payroll, admissions, notices, messages, transport, library, inventory, and other school modules.</p>
+              <p className="font-semibold">Platform-wide settings, plans, other schools, and Super Admin accounts are not deleted. Security audit history is retained.</p>
+            </div>
+            {modalError && <p role="alert" className="mt-3 p-2 rounded bg-red-50 text-red-700 text-xs">{modalError}</p>}
+            <label className="block mt-4 text-xs font-semibold text-slate-700">
+              Type school code <span className="font-mono text-red-700">{selectedSchool.school.code}</span> to confirm
+              <input autoFocus value={eraseConfirmation} onChange={e => setEraseConfirmation(e.target.value)} disabled={isErasing} className="mt-1 w-full px-3 py-2 border border-red-200 rounded-lg font-mono uppercase focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Enter exact school code" />
+            </label>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowEraseModal(false)} disabled={isErasing} className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold">Cancel</button>
+              <button type="button" onClick={() => void handleEraseSchoolData()} disabled={isErasing || eraseConfirmation.trim().toUpperCase() !== selectedSchool.school.code.toUpperCase()} className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold disabled:opacity-40">{isErasing ? 'Erasing school data…' : 'Permanently Erase School'}</button>
+            </div>
+          </section>
         </div>
       )}
 
