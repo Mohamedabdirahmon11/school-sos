@@ -122,14 +122,6 @@ export const TimetableView: React.FC = () => {
     } catch (err: any) { setNotice(err.message || 'Unable to remove this period.'); }
   };
 
-  const handleSaveSettings = async () => {
-    try {
-      await ApiClient.saveTimetableSettings(settings);
-      setNoticeIsWarning(false);
-      setNotice('Timetable shift times saved.');
-    } catch (err: any) { setNotice(err.message || 'Unable to save timetable settings.'); }
-  };
-
   const handleSwapSlot = async (slot: TimetableSlot) => {
     if (!swapMode) return;
     if (!firstSwapSlot) { setFirstSwapSlot(slot.id); setNotice(t('timetable_swap_select')); return; }
