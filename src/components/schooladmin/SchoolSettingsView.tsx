@@ -817,7 +817,7 @@ export const SchoolSettingsView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {([1, 2] as const).map(shift => {
-                  const fields = shift === 1
+                  const fields: { start: 'firstPeriodStart' | 'shift2FirstPeriodStart'; period: 'periodMinutes' | 'shift2PeriodMinutes'; after: 'breakAfterPeriod' | 'shift2BreakAfterPeriod'; length: 'breakMinutes' | 'shift2BreakMinutes' } = shift === 1
                     ? { start: 'firstPeriodStart', period: 'periodMinutes', after: 'breakAfterPeriod', length: 'breakMinutes' }
                     : { start: 'shift2FirstPeriodStart', period: 'shift2PeriodMinutes', after: 'shift2BreakAfterPeriod', length: 'shift2BreakMinutes' };
                   return <fieldset key={shift} className="rounded-xl border border-[#DCE7E4] p-4 space-y-3">
