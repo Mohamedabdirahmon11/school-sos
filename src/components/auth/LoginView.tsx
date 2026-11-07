@@ -155,7 +155,7 @@ export const LoginView: React.FC = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetError(null);
-    if (!/^\\d{6}$/.test(resetCode)) { setResetError(t('forgot_password_code_invalid')); return; }
+    if (!/^\d{6}$/.test(resetCode)) { setResetError(t('forgot_password_code_invalid')); return; }
     if (resetNewPassword.length < 12) { setResetError(t('forgot_password_password_min')); return; }
     if (resetNewPassword.length > 128) { setResetError(t('forgot_password_password_max')); return; }
     if (!/[a-z]/.test(resetNewPassword) || !/[A-Z]/.test(resetNewPassword) || !/[0-9]/.test(resetNewPassword)) {
@@ -229,7 +229,7 @@ export const LoginView: React.FC = () => {
                   <p className="text-xs text-[#64748B]">{t('forgot_password_expiry').replace('{seconds}', expiresIn > 0 ? `${Math.floor(expiresIn / 60)}:${String(expiresIn % 60).padStart(2, '0')}` : '0:00')}</p>
                   <div>
                     <label htmlFor="reset-code" className="block text-xs font-medium text-[#334155]">{t('forgot_password_code')}</label>
-                    <input id="reset-code" type="text" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={resetCode} onChange={e => setResetCode(e.target.value.replace(/\\D/g, '').slice(0, 6))} className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <input id="reset-code" type="text" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={resetCode} onChange={e => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#334155]">{t('forgot_password_new_password')}</label>
