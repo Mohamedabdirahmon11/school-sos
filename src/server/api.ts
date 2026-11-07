@@ -2582,8 +2582,16 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
   if (slots.items.length !== 2) { res.status(404).json({ error: 'One or both timetable periods were not found in this school.' }); return; }
   try { await db.swapTimetableSlots(school.id, firstId, secondId); }
-  catch (error: any) { res.status(409).json({ error: error.message || 'The swap would create a schedule conflict.' }); return; }
-  res.json({ success: true });
+  catch (error: any) { res.status(503).json({ error: error.message || 'The timetable periods could not be swapped.' }); return; }
+  const allSlots = await queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const swapped = allSlots.filter((slot: any) => slot.id === firstId || slot.id === secondId);
+  const warnings: string[] = [];
+  for (const slot of swapped) {
+    const others = allSlots.filter((other: any) => other.id !== slot.id);
+    if (hasTeacherTimeClash(slot, others)) warnings.push(`Teacher clash warning: ${slot.teacherId} has another class at ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}.`);
+    if (hasRoomTimeClash(slot, others)) warnings.push(`Room clash warning: ${slot.roomNumber} is used by another class at ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}.`);
+  }
+  res.json({ success: true, warnings: [...new Set(warnings)] });
 });
 
 apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
