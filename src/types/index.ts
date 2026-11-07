@@ -75,6 +75,32 @@ export interface NotificationPreferences {
   examResults: boolean;
 }
 
+export interface SchoolSetupProgress {
+  currentStep: number;
+  completedSteps: number[];
+  skippedSteps: number[];
+  completedAt: string | null;
+}
+
+export interface SchoolSetupChecklistItem {
+  ready: boolean;
+  optional: boolean;
+  reason: string;
+}
+
+export interface SchoolSetupState {
+  progress: SchoolSetupProgress;
+  checklist: Record<number, SchoolSetupChecklistItem>;
+  canFinish: boolean;
+}
+
+export interface SchoolSetupProgressUpdate {
+  currentStep: number;
+  completedSteps: number[];
+  skippedSteps: number[];
+  complete?: boolean;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -99,6 +125,7 @@ export interface School {
   receiptHeader?: string;
   receiptFooter?: string;
   notificationPreferences?: NotificationPreferences;
+  setupProgress?: SchoolSetupProgress;
   defaultClassCapacity: number;
   studentAccessEnabled: boolean; // School Admin and Super Admin can toggle
   subscription: SchoolSubscription;

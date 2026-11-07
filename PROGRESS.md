@@ -1,3 +1,10 @@
+## School Setup Wizard (2026-11-07)
+
+- PARTIAL: The main branch did not yet contain a first-login School Admin setup wizard or a dashboard gate. Work is isolated to `work/school-setup-wizard-2026-11-07`; main and other PR branches are not being changed.
+- VERIFIED (read-only): The selected Supabase project migration history already contains calendar preference, shift-aware timetable, and password-reset migrations; the latest is `password_reset_codes` (062), so the next migration number is 063.
+- SAFETY: Only read-only Supabase metadata/schema inspection was performed. No production migration, data update, deployment, or secret change was made.
+- PENDING: The additive setup-progress migration, tenant-scoped checklist API, first-login route gate, translations, regression tests, and GitHub CI validation are being prepared. No browser/Gmail manual test is claimed.
+
 
 ## Request write-amplification fix (2026-11-03)
 

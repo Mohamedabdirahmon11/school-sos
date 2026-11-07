@@ -29,7 +29,9 @@ import {
   SupportTicket,
   AuditLog,
   SuperAdminSettings,
-  StaffPayrollRecord
+  StaffPayrollRecord,
+  SchoolSetupState,
+  SchoolSetupProgressUpdate
 } from '../types/index.ts';
 
 const LANG_KEY = 'schoolos_lang';
@@ -231,6 +233,17 @@ export class ApiClient {
 
   public static async getMe() {
     return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
+  }
+
+  public static async getSchoolSetupProgress() {
+    return this.request<SchoolSetupState>('/school/setup-progress');
+  }
+
+  public static async updateSchoolSetupProgress(update: SchoolSetupProgressUpdate) {
+    return this.request<SchoolSetupState>('/school/setup-progress', {
+      method: 'PUT',
+      body: JSON.stringify(update)
+    });
   }
 
   // Super Admin

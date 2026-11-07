@@ -229,6 +229,45 @@ export interface TranslationDict {
   settings_save_exam: string;
   settings_save_timetable: string;
   settings_save_documents: string;
+  setup_title: string;
+  setup_subtitle: string;
+  setup_progress: string;
+  setup_saved: string;
+  setup_in_progress: string;
+  setup_return: string;
+  setup_open_step: string;
+  setup_mark_complete: string;
+  setup_skip_for_now: string;
+  setup_completed: string;
+  setup_pending: string;
+  setup_skipped: string;
+  setup_needs_attention: string;
+  setup_optional: string;
+  setup_required: string;
+  setup_finish: string;
+  setup_finish_help: string;
+  setup_loading: string;
+  setup_retry: string;
+  setup_step_1_title: string;
+  setup_step_1_help: string;
+  setup_step_2_title: string;
+  setup_step_2_help: string;
+  setup_step_3_title: string;
+  setup_step_3_help: string;
+  setup_step_4_title: string;
+  setup_step_4_help: string;
+  setup_step_5_title: string;
+  setup_step_5_help: string;
+  setup_step_6_title: string;
+  setup_step_6_help: string;
+  setup_step_7_title: string;
+  setup_step_7_help: string;
+  setup_step_8_title: string;
+  setup_step_8_help: string;
+  setup_step_9_title: string;
+  setup_step_9_help: string;
+  setup_step_10_title: string;
+  setup_step_10_help: string;
 }
 
 export const translations: Record<LanguageCode, TranslationDict> = {
@@ -437,6 +476,45 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_save_exam: 'Save Exam Rules',
     settings_save_timetable: 'Save Timetable Settings',
     settings_save_documents: 'Save Documents & Alerts',
+    setup_title: 'Set up your school',
+    setup_subtitle: 'Follow these steps to prepare your school before opening the dashboard.',
+    setup_progress: 'Setup progress',
+    setup_saved: 'Your progress is saved automatically. You can leave and continue later.',
+    setup_in_progress: 'School setup is still in progress. Complete the required steps before opening the dashboard.',
+    setup_return: 'Back to setup checklist',
+    setup_open_step: 'Open this section',
+    setup_mark_complete: 'Verify and mark complete',
+    setup_skip_for_now: 'Skip for now',
+    setup_completed: 'Completed',
+    setup_pending: 'Not completed',
+    setup_skipped: 'Skipped for now',
+    setup_needs_attention: 'Needs attention',
+    setup_optional: 'Optional',
+    setup_required: 'Required',
+    setup_finish: 'Complete setup and open Dashboard',
+    setup_finish_help: 'Steps 1–6 and 8 are required. Steps 7 and 9 can be completed now or skipped and configured later.',
+    setup_loading: 'Loading setup progress…',
+    setup_retry: 'Retry',
+    setup_step_1_title: 'Academic year and semesters',
+    setup_step_1_help: 'Set the academic year and the start and end dates for both semesters.',
+    setup_step_2_title: 'School information and admin WhatsApp',
+    setup_step_2_help: 'Confirm the school identity and save the administration WhatsApp number with its international country code.',
+    setup_step_3_title: 'Classes and grades',
+    setup_step_3_help: 'Create the school classes, including both KG 1 and KG 2.',
+    setup_step_4_title: 'Subjects',
+    setup_step_4_help: 'Add the subjects taught by this school.',
+    setup_step_5_title: 'Teachers and staff IDs',
+    setup_step_5_help: 'Create teacher accounts with a school-specific Teacher ID and an initial PIN or password.',
+    setup_step_6_title: 'Students and parents',
+    setup_step_6_help: 'Register students, parent contact details, and use bulk import or PIN reset where needed.',
+    setup_step_7_title: 'Timetable',
+    setup_step_7_help: 'Create the class timetable. You can skip this step and return to it later.',
+    setup_step_8_title: 'Attendance and exams',
+    setup_step_8_help: 'Review attendance rules and exam settings for this academic year.',
+    setup_step_9_title: 'Fees and other modules',
+    setup_step_9_help: 'Review optional modules. Fee structures are managed by the school Accountant role.',
+    setup_step_10_title: 'Final review',
+    setup_step_10_help: 'Confirm the required setup is complete, then open the normal school dashboard.',
   },
   so: {
     app_name: 'SchoolOS Soomaaliya',
@@ -643,6 +721,45 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_save_exam: 'Kaydi Xeerarka Imtixaanka',
     settings_save_timetable: 'Kaydi Habaynta Jadwalka',
     settings_save_documents: 'Kaydi Dukumiintiga & Ogeysiisyada',
+    setup_title: 'Deji dugsigaaga',
+    setup_subtitle: 'Raac tallaabooyinkan si aad dugsiga u diyaariso ka hor inta aan Dashboard-ka la furin.',
+    setup_progress: 'Horumarka dejinta',
+    setup_saved: 'Horumarka si toos ah ayaa loo kaydiyaa. Waad ka bixi kartaa oo mar dambe waad sii wadan kartaa.',
+    setup_in_progress: 'Dejinta dugsigu weli way socotaa. Dhammaystir tallaabooyinka muhiimka ah ka hor Dashboard-ka.',
+    setup_return: 'Ku noqo liiska dejinta',
+    setup_open_step: 'Fur qaybtaan',
+    setup_mark_complete: 'Hubi oo calaamadee inay dhammaatay',
+    setup_skip_for_now: 'Hadda ka bood',
+    setup_completed: 'Way dhammaatay',
+    setup_pending: 'Weli ma dhammaan',
+    setup_skipped: 'Hadda waa laga booday',
+    setup_needs_attention: 'Waxay u baahan tahay sixid',
+    setup_optional: 'Ikhtiyaari',
+    setup_required: 'Waajib',
+    setup_finish: 'Dhammaystir dejinta oo fur Dashboard-ka',
+    setup_finish_help: 'Tallaabooyinka 1–6 iyo 8 waa waajib. Tallaabooyinka 7 iyo 9 waad dhammayn kartaa ama hadda waad ka boodi kartaa.',
+    setup_loading: 'Horumarka dejinta waa la soo rarayaa…',
+    setup_retry: 'Mar kale isku day',
+    setup_step_1_title: 'Sannad-dugsiyeedka iyo simistarrada',
+    setup_step_1_help: 'Deji sannad-dugsiyeedka iyo taariikhaha bilowga iyo dhammaadka labada simistar.',
+    setup_step_2_title: 'Xogta dugsiga iyo WhatsApp-ka maamulka',
+    setup_step_2_help: 'Xaqiiji aqoonsiga dugsiga oo kaydi lambarka WhatsApp-ka maamulka oo leh furaha waddanka.',
+    setup_step_3_title: 'Fasallada iyo heerarka',
+    setup_step_3_help: 'Samee fasallada dugsiga, kuna dar KG 1 iyo KG 2 labadaba.',
+    setup_step_4_title: 'Maaddooyinka',
+    setup_step_4_help: 'Ku dar maaddooyinka dugsiga laga dhigo.',
+    setup_step_5_title: 'Macallimiinta iyo aqoonsiga shaqaalaha',
+    setup_step_5_help: 'Samee akoonnada macallimiinta oo leh Teacher ID u gaar ah dugsiga iyo PIN ama password bilow ah.',
+    setup_step_6_title: 'Ardayda iyo waalidiinta',
+    setup_step_6_help: 'Diiwaangeli ardayda iyo xiriirka waalidiinta; isticmaal bulk import ama PIN reset marka loo baahdo.',
+    setup_step_7_title: 'Jadwalka casharrada',
+    setup_step_7_help: 'Samee jadwalka fasallada. Waad ka boodi kartaa oo dib ayaad ugu soo noqon kartaa.',
+    setup_step_8_title: 'Imaanshaha iyo imtixaannada',
+    setup_step_8_help: 'Dib u eeg xeerarka imaanshaha iyo dejimaha imtixaannada sannad-dugsiyeedkan.',
+    setup_step_9_title: 'Lacagaha iyo qaybaha kale',
+    setup_step_9_help: 'Dib u eeg qaybaha ikhtiyaariga ah. Khidmadaha waxaa maamula Xisaabiyaha dugsiga.',
+    setup_step_10_title: 'Hubinta ugu dambaysa',
+    setup_step_10_help: 'Xaqiiji in dejinta waajibka ahi dhammaatay, kadibna fur Dashboard-ka dugsiga.',
   },
   am: {
     app_name: 'SchoolOS ኢትዮጵያ',
@@ -846,5 +963,44 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_save_exam: 'Save Exam Rules',
     settings_save_timetable: 'Save Timetable Settings',
     settings_save_documents: 'Save Documents & Alerts',
+    setup_title: 'ትምህርት ቤትዎን ያዘጋጁ',
+    setup_subtitle: 'ዳሽቦርዱን ከመክፈትዎ በፊት ትምህርት ቤቱን ለማዘጋጀት እነዚህን ደረጃዎች ይከተሉ።',
+    setup_progress: 'የዝግጅት ሂደት',
+    setup_saved: 'እድገትዎ በራስ-ሰር ይቀመጣል። ወጥተው በኋላ መቀጠል ይችላሉ።',
+    setup_in_progress: 'የትምህርት ቤቱ ዝግጅት ገና አልተጠናቀቀም። ዳሽቦርዱን ከመክፈትዎ በፊት አስፈላጊ ደረጃዎችን ያጠናቅቁ።',
+    setup_return: 'ወደ ዝግጅት ዝርዝር ተመለስ',
+    setup_open_step: 'ይህን ክፍል ክፈት',
+    setup_mark_complete: 'አረጋግጥ እና ተጠናቋል ብለህ ምልክት አድርግ',
+    setup_skip_for_now: 'ለአሁን ዝለል',
+    setup_completed: 'ተጠናቋል',
+    setup_pending: 'አልተጠናቀቀም',
+    setup_skipped: 'ለአሁን ተዘልሏል',
+    setup_needs_attention: 'ተጨማሪ ማስተካከያ ያስፈልጋል',
+    setup_optional: 'አማራጭ',
+    setup_required: 'አስፈላጊ',
+    setup_finish: 'ዝግጅቱን ጨርስ እና ዳሽቦርዱን ክፈት',
+    setup_finish_help: 'ደረጃዎች 1–6 እና 8 አስፈላጊ ናቸው። ደረጃዎች 7 እና 9 አሁን ማጠናቀቅ ወይም ለጊዜው መዝለል ይችላሉ።',
+    setup_loading: 'የዝግጅት ሂደት በመጫን ላይ…',
+    setup_retry: 'እንደገና ሞክር',
+    setup_step_1_title: 'የትምህርት ዓመት እና ሴሚስተሮች',
+    setup_step_1_help: 'የትምህርት ዓመቱን እና የሁለቱን ሴሚስተሮች መጀመሪያና መጨረሻ ቀናት ያዘጋጁ።',
+    setup_step_2_title: 'የትምህርት ቤት መረጃ እና የአስተዳደር WhatsApp',
+    setup_step_2_help: 'የትምህርት ቤቱን መለያ ያረጋግጡ እና የአስተዳደሩን WhatsApp ቁጥር ከአገር መለያ ጋር ያስቀምጡ።',
+    setup_step_3_title: 'ክፍሎች እና ደረጃዎች',
+    setup_step_3_help: 'የትምህርት ቤቱን ክፍሎች ይፍጠሩ፤ KG 1 እና KG 2 ሁለቱንም ያካትቱ።',
+    setup_step_4_title: 'ትምህርቶች',
+    setup_step_4_help: 'በዚህ ትምህርት ቤት የሚሰጡ ትምህርቶችን ያክሉ።',
+    setup_step_5_title: 'መምህራን እና የሰራተኛ መለያ',
+    setup_step_5_help: 'ለእያንዳንዱ መምህር የትምህርት ቤቱ ልዩ Teacher ID እና የመጀመሪያ PIN ወይም password ያለው መለያ ይፍጠሩ።',
+    setup_step_6_title: 'ተማሪዎች እና ወላጆች',
+    setup_step_6_help: 'ተማሪዎችንና የወላጆችን የግንኙነት መረጃ ያስመዝግቡ፤ bulk import ወይም PIN reset ይጠቀሙ።',
+    setup_step_7_title: 'የክፍል ጊዜ ሰሌዳ',
+    setup_step_7_help: 'የክፍሎችን የጊዜ ሰሌዳ ያዘጋጁ። ይህን ደረጃ ዘልለው በኋላ መመለስ ይችላሉ።',
+    setup_step_8_title: 'ክትትል እና ፈተናዎች',
+    setup_step_8_help: 'የክትትል ህጎችን እና የዚህን የትምህርት ዓመት የፈተና ቅንብሮች ይመልከቱ።',
+    setup_step_9_title: 'ክፍያዎች እና ሌሎች ሞጁሎች',
+    setup_step_9_help: 'አማራጭ ሞጁሎችን ይመልከቱ። የክፍያ መዋቅሮችን የትምህርት ቤቱ ሂሳብ ሹም ያስተዳድራል።',
+    setup_step_10_title: 'የመጨረሻ ማረጋገጫ',
+    setup_step_10_help: 'አስፈላጊ ዝግጅቶች መጠናቀቃቸውን ያረጋግጡ፤ ከዚያ የትምህርት ቤቱን ዳሽቦርድ ይክፈቱ።',
   }
 };
