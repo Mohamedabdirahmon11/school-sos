@@ -2123,7 +2123,23 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 or 2.' }); return; }
+  const previousShift = Number(existing.shift) === 2 ? 2 : 1;
+  const nextShift = req.body?.shift === undefined ? previousShift : Number(req.body.shift);
   const updated = await db.updateClass(String(req.params.id), req.body, school.id);
+  if (updated && nextShift !== previousShift) {
+    try {
+      const [settings, slots] = await Promise.all([
+        db.getTimetableSettings(school.id),
+        queryAllRows('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active')
+      ]);
+      const retimed = slots.map((slot: any) => ({ ...slot, ...getTimetablePeriodTimes(settings, Number(slot.periodNumber), nextShift) }));
+      if (retimed.length) await db.replaceTimetableForClass(school.id, existing.id, retimed);
+    } catch {
+      await db.updateClass(existing.id, { shift: previousShift }, school.id);
+      res.status(503).json({ error: 'The class shift could not be changed because its timetable could not be retimed. The previous shift was restored.' });
+      return;
+    }
+  }
   res.json(updated);
 });
 
@@ -2539,7 +2555,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (unavailable.total) { res.status(409).json({ error: 'This teacher is marked unavailable for this shift and period.' }); return; }
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
   const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period, shift), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
-  const otherSlots = existing.items.filter((item: any) => item.classId !== classId);
+  const otherSlots = existing.filter((item: any) => item.classId !== classId);
   if (hasRoomTimeClash(slot, otherSlots)) { res.status(409).json({ error: 'This classroom is already occupied at that time. Choose another room or period.' }); return; }
   const warnings: string[] = [];
   if (hasTeacherTimeClash(slot, otherSlots)) warnings.push('Teacher is already assigned to another class during these clock times. Save is allowed; review the clash.');
