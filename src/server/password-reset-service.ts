@@ -336,6 +336,7 @@ export const passwordResetService = createPasswordResetService({
   revokeSessions: async user => {
     const sessions = await db.getUserSessions(user.schoolId);
     await Promise.all(sessions.filter(session => session.userId === user.id).map(session => db.revokeSession(session.id)));
+    await db.flush();
   },
   checkRateLimit: (key, threshold, durationMinutes) => db.checkLoginLockout(key, threshold, durationMinutes).locked,
   recordRateLimit: async (key, threshold, durationMinutes) => {
