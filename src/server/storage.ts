@@ -1733,7 +1733,7 @@ class StorageEngine {
     if (!current) return null;
     const client = this.testClient || supabase;
     if (!client) throw new Error('Class storage is unavailable.');
-    const row = toSupabaseRow({ ...updates, updatedAt: new Date().toISOString() }, 'classes');
+    const row = toSupabaseRow(updates as Record<string, any>, 'classes');
     const startedAt = performance.now();
     const { data, error } = await client.from('classes').update(row).eq('id', id).eq('school_id', schoolId || current.schoolId).select('*').maybeSingle();
     this.recordQuery('classes', 'update', startedAt);
@@ -1919,7 +1919,7 @@ class StorageEngine {
   public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, shift: number, unavailable: boolean) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Teacher availability storage is unavailable.');
-    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}-shift-${shift}`;
+    const id = shift === 1 ? `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}` : `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}-shift-${shift}`;
     if (unavailable) {
       const startedAt = performance.now();
       const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber, shift }, { onConflict: 'school_id,teacher_id,day_of_week,period_number,shift' });
