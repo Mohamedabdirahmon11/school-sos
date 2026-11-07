@@ -158,3 +158,15 @@ export function formatSchoolDateTime(isoDateTime: string, calendarType: Calendar
     .map(part => part.value)
     .join('');
 }
+
+
+/** Format a Gregorian payroll accounting month as the school-calendar date span it covers. */
+export function formatSchoolMonthPeriod(monthKey: string, calendarType: CalendarType, locale = 'en'): string {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(monthKey);
+  if (!match) throw new Error('Payroll month must use YYYY-MM.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const last = new Date(Date.UTC(year, month, 0));
+  return `${formatSchoolDate(first.toISOString().slice(0, 10), calendarType, locale)} – ${formatSchoolDate(last.toISOString().slice(0, 10), calendarType, locale)}`;
+}
