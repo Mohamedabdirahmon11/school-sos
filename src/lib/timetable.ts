@@ -17,7 +17,7 @@ export interface TimetablePeriodTime {
 }
 
 export function timetableClockMinutes(value: string): number {
-  const match = /^(\\d{2}):(\\d{2})$/.exec(String(value || ''));
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || ''));
   if (!match) throw new Error('Time must use HH:MM.');
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -84,7 +84,7 @@ export function hasRoomTimeClash(
   return Boolean(room) && existing.some(slot =>
     slot.dayOfWeek === candidate.dayOfWeek
     && slot.classId !== candidate.classId
-    && slot.roomNumber.trim().toLowerCase() === room
+    && String(slot.roomNumber || '').trim().toLowerCase() === room
     && timetableTimesOverlap(candidate, slot)
   );
 }
