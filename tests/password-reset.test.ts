@@ -95,6 +95,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
   const sentLanguages: string[] = [];
   const devCodes: string[] = [];
   const audits: PasswordResetAudit[] = [];
+  const logs: string[] = [];
   const rateLocks = new Map<string, { count: number; lockedUntil: number }>();
   let revoked = 0;
   let cleared = 0;
@@ -130,7 +131,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     },
     clearLockouts: async () => { cleared += 1; rateLocks.clear(); },
     audit: entry => { audits.push(entry); },
-    logError: () => {},
+    logError: message => { logs.push(message); },
     logDevelopmentCode: (_email, code) => { devCodes.push(code); },
     isProduction: options.production ?? true,
     secret: SECRET,
@@ -138,7 +139,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     generateCode: () => nextCode
   });
   return {
-    service, repository, user, sentCodes, sentLanguages, devCodes, audits,
+    service, repository, user, sentCodes, sentLanguages, devCodes, audits, logs,
     get revoked() { return revoked; },
     get cleared() { return cleared; },
     get updated() { return updated; },
@@ -221,6 +222,8 @@ test('a new request invalidates the earlier unused code', async () => {
   f.advance(1000);
   await f.service.request(EMAIL, IP);
   assert.ok(f.repository.rows[0].used_at);
+  assert.ok(f.logs.some(message => message.includes('delivery failed')));
+  assert.ok(f.logs.every(message => !message.includes('123456')));
   assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: false, reason: 'invalid_code' });
   assert.deepEqual(await f.service.reset(EMAIL, '654321', NEW_PASSWORD, IP), { ok: true });
 });
@@ -282,6 +285,7 @@ test('plain code is never stored in the database row or audit details', async ()
   assert.match(row.code_hash || '', /^[a-f0-9]{64}$/);
   assert.ok(f.audits.every(item => !item.details.includes('123456')));
   assert.equal(f.devCodes.length, 0);
+  assert.ok(f.logs.every(message => !message.includes('123456')));
 });
 
 test('per-IP request rate limit also applies across different unknown email addresses', async () => {
@@ -303,6 +307,8 @@ test('production with no mail provider never creates a usable code', async () =>
   assert.equal(f.sentCodes.length, 0);
   assert.equal(f.repository.rows[0].code_hash, null);
   assert.equal(f.devCodes.length, 0);
+  assert.ok(f.logs.some(message => message.includes('not configured')));
+  assert.ok(f.logs.every(message => !message.includes('123456')));
 });
 
 test('the environment-configured Super Admin is seeded into the database user store', () => {
