@@ -43,6 +43,7 @@ export const TimetablePrintView: React.FC<Props> = ({
     timetable.find(slot => slot.classId === classId && slot.dayOfWeek === day && slot.periodNumber === period);
   const teacherSlotsAt = (teacherId: string, day: string, period: number) =>
     timetable.filter(slot => slot.teacherId === teacherId && slot.dayOfWeek === day && slot.periodNumber === period);
+  const sheetShift = mode === 'class' ? Number(selectedClass?.shift || 1) as 1 | 2 : shift;
   const timeLabel = (period: number, classShift: number) => {
     const value = getTimetablePeriodTimes(settings, period, classShift);
     return `${value.startTime}–${value.endTime}`;
@@ -115,7 +116,7 @@ export const TimetablePrintView: React.FC<Props> = ({
             <p className="mt-1 text-sm font-semibold">{heading}</p>
             <div className="mt-1 flex justify-center gap-5 text-[10px]">
               <span>{t('timetable_academic_year')}: {school?.academicYear || '—'}</span>
-              {(mode === 'class' || mode === 'shift') && <span>{t('timetable_shift')}: {shift}</span>}
+              {(mode === 'class' || mode === 'shift') && <span>{t('timetable_shift')}: {sheetShift}</span>}
               {mode === 'class' && selectedClass?.roomNumber && <span>{selectedClass.roomNumber}</span>}
             </div>
           </header>
@@ -124,7 +125,7 @@ export const TimetablePrintView: React.FC<Props> = ({
             <table className="w-full table-fixed border-collapse text-[10px]">
               <thead><tr>
                 <th className={rowClass + ' print-day'}>{mode === 'shift' ? t('timetable_class_label') + ' / ' + t('timetable_day') : t('timetable_day')}</th>
-                {periodHeader(shift)}
+                {periodHeader(sheetShift)}
               </tr></thead>
               <tbody>
                 {(mode === 'class' && selectedClass ? [selectedClass] : shiftClasses).map(klass =>
