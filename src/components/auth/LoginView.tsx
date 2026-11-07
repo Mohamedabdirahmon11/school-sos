@@ -7,7 +7,7 @@
  * - Student & Parent: School Code + Phone Number + PIN (with children switcher and lockout protection)
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { UserRole } from '../../types/index.ts';
@@ -42,6 +42,26 @@ export const LoginView: React.FC = () => {
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [forgotStep, setForgotStep] = useState<'login' | 'request' | 'verify'>('login');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [expiresIn, setExpiresIn] = useState(0);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (forgotStep !== 'verify' || (!expiresIn && !resendIn)) return;
+    const timer = window.setInterval(() => {
+      setExpiresIn(value => Math.max(0, value - 1));
+      setResendIn(value => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [forgotStep, expiresIn > 0, resendIn > 0]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,6 +109,84 @@ export const LoginView: React.FC = () => {
     }
   };
 
+  const openForgotPassword = () => {
+    setForgotEmail(email.includes('@') ? email.trim() : '');
+    setResetCode('');
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    setResetError(null);
+    setResetNotice(null);
+    setForgotStep('request');
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      await ApiClient.forgotPassword(forgotEmail);
+      setResetNotice(t('forgot_password_neutral'));
+      setExpiresIn(600);
+      setResendIn(60);
+      setForgotStep('verify');
+    } catch {
+      setResetError(t('forgot_password_request_error'));
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendIn > 0 || resetLoading) return;
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      await ApiClient.forgotPassword(forgotEmail);
+      setResetNotice(t('forgot_password_neutral'));
+      setExpiresIn(600);
+      setResendIn(60);
+    } catch {
+      setResetError(t('forgot_password_request_error'));
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    if (!/^\\d{6}$/.test(resetCode)) { setResetError(t('forgot_password_code_invalid')); return; }
+    if (resetNewPassword.length < 12) { setResetError(t('forgot_password_password_min')); return; }
+    if (resetNewPassword.length > 128) { setResetError(t('forgot_password_password_max')); return; }
+    if (!/[a-z]/.test(resetNewPassword) || !/[A-Z]/.test(resetNewPassword) || !/[0-9]/.test(resetNewPassword)) {
+      setResetError(t('forgot_password_password_complexity')); return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) { setResetError(t('forgot_password_password_mismatch')); return; }
+    setResetLoading(true);
+    try {
+      await ApiClient.resetPassword(forgotEmail, resetCode, resetNewPassword, resetConfirmPassword);
+      setEmail(forgotEmail);
+      setPassword('');
+      setResetCode('');
+      setResetNewPassword('');
+      setResetConfirmPassword('');
+      setExpiresIn(0);
+      setResendIn(0);
+      setForgotStep('login');
+      setResetNotice(t('forgot_password_success'));
+    } catch (err: any) {
+      const code = err?.code;
+      const messageKey = code === 'PASSWORD_RESET_CODE_INVALID' ? 'forgot_password_code_invalid'
+        : code === 'PASSWORD_RESET_TOO_MANY_ATTEMPTS' ? 'forgot_password_too_many_attempts'
+        : code === 'PASSWORD_SAME_AS_CURRENT' ? 'forgot_password_same_password'
+        : code === 'PASSWORD_CONFIRM_MISMATCH' ? 'forgot_password_password_mismatch'
+        : 'forgot_password_reset_error';
+      setResetError(t(messageKey));
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F3F6F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Brand Header */}
@@ -108,7 +206,51 @@ export const LoginView: React.FC = () => {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-6 px-4 shadow-sm border border-[#E2E8F0] sm:rounded-xl sm:px-8">
           
-          {passwordChangeRequired ? (
+          {forgotStep !== 'login' ? (
+            <div className="space-y-4">
+              <button type="button" onClick={() => { setForgotStep('login'); setResetError(null); setResetNotice(null); }} className="text-xs text-[#0F766E] underline">
+                {t('forgot_password_back')}
+              </button>
+              <h3 className="text-base font-semibold text-[#132A29]">{t('forgot_password_title')}</h3>
+              {forgotStep === 'request' ? (
+                <form className="space-y-4" onSubmit={handleForgotRequest}>
+                  <div>
+                    <label htmlFor="forgot-email" className="block text-xs font-medium text-[#334155]">{t('forgot_password_email')}</label>
+                    <input id="forgot-email" type="email" required autoComplete="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                  </div>
+                  {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
+                  <button type="submit" disabled={resetLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+                    {resetLoading ? 'Sending…' : t('forgot_password_send_code')}
+                  </button>
+                </form>
+              ) : (
+                <form className="space-y-4" onSubmit={handleResetPassword}>
+                  <p role="status" className="text-xs text-[#475569]">{resetNotice || t('forgot_password_neutral')}</p>
+                  <p className="text-xs text-[#64748B]">{t('forgot_password_expiry').replace('{seconds}', expiresIn > 0 ? `${Math.floor(expiresIn / 60)}:${String(expiresIn % 60).padStart(2, '0')}` : '0:00')}</p>
+                  <div>
+                    <label htmlFor="reset-code" className="block text-xs font-medium text-[#334155]">{t('forgot_password_code')}</label>
+                    <input id="reset-code" type="text" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={resetCode} onChange={e => setResetCode(e.target.value.replace(/\\D/g, '').slice(0, 6))} className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#334155]">{t('forgot_password_new_password')}</label>
+                    <PasswordInput label={t('forgot_password_new_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <p className="mt-1 text-[11px] text-[#64748B]">{t('forgot_password_password_rules')}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#334155]">{t('forgot_password_confirm_password')}</label>
+                    <PasswordInput label={t('forgot_password_confirm_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                  </div>
+                  {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
+                  <button type="submit" disabled={resetLoading || expiresIn <= 0} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+                    {resetLoading ? 'Updating…' : t('forgot_password_reset')}
+                  </button>
+                  <button type="button" onClick={handleResendCode} disabled={resetLoading || resendIn > 0} className="w-full text-xs text-[#0F766E] underline disabled:text-[#94A3B8] disabled:no-underline">
+                    {resendIn > 0 ? t('forgot_password_resend_wait').replace('{seconds}', `${Math.floor(resendIn / 60)}:${String(resendIn % 60).padStart(2, '0')}`) : t('forgot_password_resend')}
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : passwordChangeRequired ? (
             <form className="space-y-4" onSubmit={handleBootstrapPasswordChange}>
               <h3 className="text-base font-semibold text-[#132A29]">Change the Super Admin password</h3>
               <p className="text-xs text-[#64748B]">Set a new password to continue to the dashboard.</p>
@@ -121,6 +263,12 @@ export const LoginView: React.FC = () => {
           <div className="mb-5 text-right text-xs">
             {parentStudentMode ? <><button type="button" className="text-[#0F766E] underline" onClick={() => { setParentStudentMode(false); setActiveTab('school_admin'); setError(null); }}>Staff sign in</button><span className="mx-2 text-slate-300">|</span><button type="button" className="text-[#64748B]" onClick={() => setActiveTab(activeTab === 'parent' ? 'student' : 'parent')}>Switch to {activeTab === 'parent' ? 'Student' : 'Parent'}</button></> : <button type="button" className="text-[#0F766E] underline" onClick={() => { setParentStudentMode(true); setActiveTab('parent'); setError(null); }}>Parent / Student sign in</button>}
           </div>
+
+          {resetNotice && (
+            <div role="status" className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+              {resetNotice}
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -162,6 +310,7 @@ export const LoginView: React.FC = () => {
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
+                  <button type="button" onClick={openForgotPassword} className="mt-2 text-[11px] text-[#0F766E] underline">{t('forgot_password')}</button>
                 </div>
 
               </>
@@ -188,7 +337,7 @@ export const LoginView: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Password / PIN' : 'Password'}</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? 'Use the password or PIN given to you by your School Admin.' : 'Contact your school administrator to reset your password.'}
+                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? t('forgot_password_pin_hint') : null}
                     </span>
                   </div>
                   <div className="mt-1">
@@ -201,6 +350,9 @@ export const LoginView: React.FC = () => {
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
+                  {(activeTab === 'school_admin' || activeTab === 'accountant') && (
+                    <button type="button" onClick={openForgotPassword} className="mt-2 text-[11px] text-[#0F766E] underline">{t('forgot_password')}</button>
+                  )}
                 </div>
               </>
             )}
@@ -249,6 +401,7 @@ export const LoginView: React.FC = () => {
                       className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
+                  <p className="mt-2 text-[11px] text-[#64748B]">{t('forgot_password_pin_hint')}</p>
                 </div>
               </>
             )}
@@ -297,6 +450,7 @@ export const LoginView: React.FC = () => {
                       className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
+                  <p className="mt-2 text-[11px] text-[#64748B]">{t('forgot_password_pin_hint')}</p>
                 </div>
               </>
             )}
