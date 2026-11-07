@@ -5,6 +5,7 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
+const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/061_shift_aware_timetables.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
@@ -301,4 +302,15 @@ test('school backup restore rejects single-column foreign keys that cross school
   assert.match(backupRestoreMigration, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
   assert.match(backupRestoreMigration, /v_fk_scope := CASE[\s\S]*target_row\.role::text = ''super_admin''/);
   assert.match(sql, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
+});
+
+
+test('shift-aware timetable migration is additive and keeps legacy Shift 1 settings', () => {
+  assert.match(timetableShiftMigration, /classes[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
+  assert.match(timetableShiftMigration, /shift2_break_minutes INTEGER NOT NULL DEFAULT 20/);
+  assert.match(timetableShiftMigration, /teacher_unavailability[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /UNIQUE \(school_id, teacher_id, day_of_week, period_number, shift\)/);
+  assert.match(sql, /shift SMALLINT NOT NULL DEFAULT 1 CHECK \(shift IN \(1, 2\)\)/);
+  assert.match(sql, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
 });
