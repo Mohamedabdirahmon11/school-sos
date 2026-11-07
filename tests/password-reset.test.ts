@@ -76,7 +76,7 @@ const IP = '203.0.113.10';
 const OLD_PASSWORD = 'OldSchoolPassword123';
 const NEW_PASSWORD = 'NewSchoolPassword456';
 
-function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean; mailConfigured?: boolean; mailFailure?: boolean } = {}) {
+function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean; mailConfigured?: boolean; mailFailure?: boolean; rateLimitFailure?: boolean } = {}) {
   let clock = new Date('2026-11-07T12:00:00.000Z');
   const user: User = {
     id: 'usr-school-admin-1',
@@ -124,6 +124,9 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
       return false;
     },
     recordRateLimit: async (key, threshold, durationMinutes) => {
+      if (options.rateLimitFailure) {
+        throw Object.assign(new Error('null value in column attempt_count violates not-null constraint'), { table: 'lockout_counters', code: '23502' });
+      }
       const entry = rateLocks.get(key) || { count: 0, lockedUntil: 0 };
       entry.count += 1;
       if (entry.count >= threshold) entry.lockedUntil = clock.getTime() + durationMinutes * 60 * 1000;
@@ -139,7 +142,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     generateCode: () => nextCode
   });
   return {
-    service, repository, user, sentCodes, sentLanguages, devCodes, audits, logs,
+    service, repository, user, sentCodes, sentLanguages, devCodes, audits, logs, rateLocks,
     get revoked() { return revoked; },
     get cleared() { return cleared; },
     get updated() { return updated; },
@@ -237,7 +240,57 @@ test('per-email request rate limit returns the same neutral response and stops a
   }
   assert.ok(responses.every(response => response.message === PASSWORD_RESET_NEUTRAL_MESSAGE));
   assert.equal(f.sentCodes.length, 5);
+  assert.equal(responses[5].message, PASSWORD_RESET_NEUTRAL_MESSAGE);
   assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS'));
+});
+
+test('password reset creates finite integer lockout counters and increments them', async () => {
+  const f = fixture({ exists: false });
+  const emailKey = `pwreset-email:${hashPasswordResetEmail(EMAIL, SECRET)}`;
+  await f.service.request(EMAIL, IP);
+  assert.equal(f.rateLocks.get(emailKey)?.count, 1);
+  const ipKey = [...f.rateLocks.keys()].find(key => key.startsWith('pwreset-ip:'));
+  assert.ok(ipKey);
+  assert.equal(f.rateLocks.get(ipKey!)?.count, 1);
+  await f.service.request(EMAIL, IP);
+  assert.equal(f.rateLocks.get(emailKey)?.count, 2);
+  assert.equal(f.rateLocks.get(ipKey!)?.count, 2);
+  assert.ok(Number.isSafeInteger(f.rateLocks.get(emailKey)?.count));
+});
+
+test('password reset lockout counter resets after its 60-minute window expires', async () => {
+  const f = fixture({ exists: false });
+  const emailKey = `pwreset-email:${hashPasswordResetEmail(EMAIL, SECRET)}`;
+  for (let i = 0; i < 5; i++) {
+    await f.service.request(EMAIL, IP);
+    f.advance(1000);
+  }
+  assert.equal(f.rateLocks.get(emailKey)?.count, 5);
+  f.advance(60 * 60 * 1000 + 1);
+  await f.service.request(EMAIL, IP);
+  assert.equal(f.rateLocks.get(emailKey)?.count, 1);
+});
+
+test('password reset lockout keys do not collide with login lockout keys', async () => {
+  const f = fixture({ exists: false });
+  f.rateLocks.set(`ip:${IP}`, { count: 4, lockedUntil: 0 });
+  await f.service.request(EMAIL, IP);
+  assert.equal(f.rateLocks.get(`ip:${IP}`)?.count, 4);
+  const resetIpKey = [...f.rateLocks.keys()].find(key => key.startsWith('pwreset-ip:'));
+  assert.ok(resetIpKey);
+  assert.notEqual(resetIpKey, `ip:${IP}`);
+  assert.equal(f.rateLocks.get(resetIpKey!)?.count, 1);
+  assert.ok([...f.rateLocks.keys()].some(key => key.startsWith('pwreset-email:')));
+});
+
+test('lockout counter write failure logs database diagnostics and safely skips email delivery', async () => {
+  const f = fixture({ rateLimitFailure: true });
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.sentCodes.length, 0);
+  assert.equal(f.repository.rows.length, 0);
+  assert.ok(f.logs.some(message => message.includes('table=lockout_counters') && message.includes('code=23502') && message.includes('attempt_count')));
+  assert.ok(f.logs.every(message => !message.includes(EMAIL) && !message.includes('123456')));
 });
 
 test('unknown email receives the exact same neutral request response and no code', async () => {
@@ -311,6 +364,13 @@ test('production with no mail provider never creates a usable code', async () =>
   assert.ok(f.logs.every(message => !message.includes('123456')));
 });
 
+test('lockout rows restore and persist a finite attempt_count integer', () => {
+  const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storageSource, /const count = Number\(row\.count\)/);
+  assert.doesNotMatch(storageSource, /count:\s*row\.attemptCount/);
+  assert.match(storageSource, /Number\.isSafeInteger\(previousCount\).*\? previousCount : 0/);
+});
+
 test('the environment-configured Super Admin is seeded into the database user store', () => {
   const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   assert.match(storageSource, /process\.env\.SUPER_ADMIN_EMAIL/);
@@ -338,12 +398,14 @@ test('development fallback prints the code only in non-production mode', async (
   assert.notEqual(f.repository.rows[0].code_hash, '123456');
 });
 
-test('failed Resend delivery invalidates the undelivered code', async () => {
+test('failed Resend delivery logs provider diagnostics without email or code and invalidates the code', async () => {
   const f = fixture({ mailFailure: true });
   const response = await f.service.request(EMAIL, IP);
   assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.ok(f.repository.rows[0].used_at);
+  assert.ok(f.logs.some(message => message.includes('provider=unknown') && message.includes('message=') && message.includes('delivery failed')));
+  assert.ok(f.logs.every(message => !message.includes(EMAIL) && !message.includes('123456')));
   assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: false, reason: 'invalid_code' });
 });
 
