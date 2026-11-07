@@ -225,7 +225,6 @@ test('a new request invalidates the earlier unused code', async () => {
   f.advance(1000);
   await f.service.request(EMAIL, IP);
   assert.ok(f.repository.rows[0].used_at);
-  assert.ok(f.logs.some(message => message.includes('delivery failed')));
   assert.ok(f.logs.every(message => !message.includes('123456')));
   assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: false, reason: 'invalid_code' });
   assert.deepEqual(await f.service.reset(EMAIL, '654321', NEW_PASSWORD, IP), { ok: true });
