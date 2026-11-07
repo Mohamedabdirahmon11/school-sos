@@ -288,7 +288,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_teacher_label: 'Teacher',
     timetable_class_label: 'Class',
     timetable_time: 'Time',
-    timetable_academic_year: 'Academic year'
+    timetable_academic_year: 'Academic year',
     attendance: 'Daily Attendance',
     exams_results: 'Exams & Marks Approval',
     assignments: 'Homework & Assignments',
@@ -511,7 +511,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_teacher_label: 'Macallin',
     timetable_class_label: 'Fasal',
     timetable_time: 'Waqti',
-    timetable_academic_year: 'Sanad-dugsiyeedka'
+    timetable_academic_year: 'Sanad-dugsiyeedka',
     attendance: 'Xaadirinta Maalinlaha ah',
     exams_results: 'Imtixaanaadka & Natiijooyinka',
     assignments: 'Laylisyada & Shaqo-guri',
@@ -734,7 +734,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_teacher_label: 'መምህር',
     timetable_class_label: 'ክፍል',
     timetable_time: 'ሰዓት',
-    timetable_academic_year: 'የትምህርት ዓመት'
+    timetable_academic_year: 'የትምህርት ዓመት',
     attendance: 'የዕለት መገኘት',
     exams_results: 'ፈተናዎች እና ውጤቶች',
     assignments: 'የቤት ስራዎች',
