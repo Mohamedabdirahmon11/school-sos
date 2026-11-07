@@ -1076,7 +1076,9 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
   }
   const startedAt = Date.now();
   try {
-    await passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown');
+    const acceptLanguage = String(req.headers['accept-language'] || '').split(',')[0].trim().slice(0, 2).toLowerCase();
+    const preferredLanguage = acceptLanguage === 'so' || acceptLanguage === 'am' ? acceptLanguage : 'en';
+    await passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown', preferredLanguage);
   } catch {
     console.error('[password-reset] Request processing failed. No account or code details were logged.');
   }
