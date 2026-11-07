@@ -1,0 +1,264 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { User, School } from '../src/types/index.ts';
+import {
+  createPasswordResetService,
+  hashPasswordResetEmail,
+  hashPasswordResetCode,
+  isPasswordResetRole,
+  isPasswordResetSessionValid,
+  PASSWORD_RESET_NEUTRAL_MESSAGE,
+  type PasswordResetRepository,
+  type PasswordResetRow,
+  type PasswordResetAudit
+} from '../src/server/password-reset-service.ts';
+import { hashPassword, verifyPassword } from '../src/server/auth-security.ts';
+
+class MemoryResetRepository implements PasswordResetRepository {
+  rows: PasswordResetRow[] = [];
+  private nextId = 0;
+  constructor(private now: () => Date) {}
+
+  async countRequests(emailHash: string, ip: string, since: string) {
+    const matches = this.rows.filter(row => row.created_at >= since);
+    return {
+      emailCount: matches.filter(row => row.request_email_hash === emailHash).length,
+      ipCount: matches.filter(row => row.request_ip === ip).length
+    };
+  }
+
+  async insertRequest(row: Omit<PasswordResetRow, 'id' | 'created_at'>) {
+    const record: PasswordResetRow = { ...row, id: `reset-${++this.nextId}`, created_at: this.now().toISOString() };
+    this.rows.push(record);
+    return record;
+  }
+
+  async invalidateUnusedCodes(userId: string, now: string) {
+    for (const row of this.rows) {
+      if (row.user_id === userId && row.code_hash && !row.used_at) row.used_at = now;
+    }
+  }
+
+  async findLatestUnusedCode(userId: string, emailHash: string) {
+    return this.rows.filter(row => row.user_id === userId && row.request_email_hash === emailHash && row.code_hash && !row.used_at)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
+  }
+
+  async incrementAttempts(id: string, expectedAttempts: number, attempts: number, usedAt?: string) {
+    const row = this.rows.find(item => item.id === id && item.attempts === expectedAttempts && !item.used_at);
+    if (!row) return false;
+    row.attempts = attempts;
+    if (usedAt) row.used_at = usedAt;
+    return true;
+  }
+
+  async markUsed(id: string, now: string) {
+    const row = this.rows.find(item => item.id === id);
+    if (row && !row.used_at) row.used_at = now;
+  }
+
+  async consume(id: string, now: string) {
+    const row = this.rows.find(item => item.id === id && !item.used_at && Date.parse(item.expires_at) > Date.parse(now) && item.attempts < 5);
+    if (!row) return false;
+    row.used_at = now;
+    return true;
+  }
+
+  async cleanup(olderThan: string) {
+    this.rows = this.rows.filter(row => row.created_at >= olderThan);
+  }
+}
+
+const SECRET = 'test-session-secret-that-is-long-enough';
+const EMAIL = 'admin@school.test';
+const IP = '203.0.113.10';
+const OLD_PASSWORD = 'OldSchoolPassword123';
+const NEW_PASSWORD = 'NewSchoolPassword456';
+
+function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean } = {}) {
+  let clock = new Date('2026-11-07T12:00:00.000Z');
+  const user: User = {
+    id: 'usr-school-admin-1',
+    schoolId: 'school-1',
+    role: 'school_admin',
+    fullName: 'School Administrator',
+    email: EMAIL,
+    passwordHash: hashPassword(OLD_PASSWORD),
+    isBlocked: false,
+    failedLoginAttempts: 4,
+    lockedUntil: '2026-11-07T12:15:00.000Z',
+    createdAt: clock.toISOString()
+  };
+  const repository = new MemoryResetRepository(() => clock);
+  const sentCodes: string[] = [];
+  const devCodes: string[] = [];
+  const audits: PasswordResetAudit[] = [];
+  let revoked = 0;
+  let cleared = 0;
+  let updated = 0;
+  let nextCode = '123456';
+  const service = createPasswordResetService({
+    repository,
+    findUserByEmail: async email => options.exists === false || email !== EMAIL ? null : user,
+    getSchool: async () => ({ id: 'school-1', language: 'so', subscription: { status: options.suspended ? 'suspended' : 'active' } } as unknown as School),
+    sendEmail: async (_to, code) => { sentCodes.push(code); },
+    mailConfigured: () => true,
+    updatePassword: async (_account, passwordHash, changedAt) => {
+      user.passwordHash = passwordHash;
+      user.passwordChangedAt = changedAt;
+      user.mustChangePassword = false;
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+      updated += 1;
+    },
+    revokeSessions: async () => { revoked += 1; },
+    clearLockouts: async () => { cleared += 1; },
+    audit: entry => { audits.push(entry); },
+    logError: () => {},
+    logDevelopmentCode: (_email, code) => { devCodes.push(code); },
+    isProduction: options.production ?? true,
+    secret: SECRET,
+    now: () => new Date(clock),
+    generateCode: () => nextCode
+  });
+  return {
+    service, repository, user, sentCodes, devCodes, audits,
+    get revoked() { return revoked; },
+    get cleared() { return cleared; },
+    get updated() { return updated; },
+    setCode(value: string) { nextCode = value; },
+    advance(ms: number) { clock = new Date(clock.getTime() + ms); },
+    get now() { return clock; }
+  };
+}
+
+test('password reset HMAC stores a digest and verifies the code in constant-time comparison helper', () => {
+  const digest = hashPasswordResetCode('123456', SECRET);
+  assert.match(digest, /^[a-f0-9]{64}$/);
+  assert.notEqual(digest, '123456');
+  assert.equal(hashPasswordResetCode('123456', SECRET), digest);
+  assert.equal(hashPasswordResetEmail(EMAIL, SECRET), hashPasswordResetEmail(EMAIL.toUpperCase(), SECRET));
+});
+
+test('only email-password roles are eligible for password reset', () => {
+  assert.equal(isPasswordResetRole('super_admin'), true);
+  assert.equal(isPasswordResetRole('school_admin'), true);
+  assert.equal(isPasswordResetRole('accountant'), true);
+  assert.equal(isPasswordResetRole('teacher'), false);
+  assert.equal(isPasswordResetRole('parent'), false);
+  assert.equal(isPasswordResetRole('student'), false);
+});
+
+test('successful reset hashes the new password, clears lockout, and revokes sessions', async () => {
+  const f = fixture();
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.deepEqual(f.sentCodes, ['123456']);
+  const result = await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(verifyPassword(NEW_PASSWORD, f.user.passwordHash), true);
+  assert.equal(verifyPassword(OLD_PASSWORD, f.user.passwordHash), false);
+  assert.equal(f.user.mustChangePassword, false);
+  assert.equal(f.user.failedLoginAttempts, 0);
+  assert.equal(f.user.lockedUntil, null);
+  assert.equal(f.updated, 1);
+  assert.equal(f.revoked, 1);
+  assert.equal(f.cleared, 1);
+  assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_SUCCEEDED'));
+});
+
+test('wrong code increments attempts and invalidates the code after five failures', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  for (let i = 0; i < 4; i++) {
+    const result = await f.service.reset(EMAIL, '000000', NEW_PASSWORD, IP);
+    assert.deepEqual(result, { ok: false, reason: 'invalid_code' });
+  }
+  const fifth = await f.service.reset(EMAIL, '000000', NEW_PASSWORD, IP);
+  assert.deepEqual(fifth, { ok: false, reason: 'too_many_attempts' });
+  assert.equal(f.repository.rows[0].attempts, 5);
+  assert.ok(f.repository.rows[0].used_at);
+  assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS'));
+});
+
+test('expired reset code is rejected and marked used', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  f.advance(10 * 60 * 1000 + 1);
+  const result = await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP);
+  assert.deepEqual(result, { ok: false, reason: 'invalid_code' });
+  assert.ok(f.repository.rows[0].used_at);
+});
+
+test('a reset code can only be used once', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: true });
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', 'AnotherNewPassword789', IP), { ok: false, reason: 'invalid_code' });
+});
+
+test('a new request invalidates the earlier unused code', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  f.setCode('654321');
+  f.advance(1000);
+  await f.service.request(EMAIL, IP);
+  assert.ok(f.repository.rows[0].used_at);
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP), { ok: false, reason: 'invalid_code' });
+  assert.deepEqual(await f.service.reset(EMAIL, '654321', NEW_PASSWORD, IP), { ok: true });
+});
+
+test('per-email request rate limit returns the same neutral response and stops additional delivery', async () => {
+  const f = fixture();
+  const responses = [];
+  for (let i = 0; i < 6; i++) {
+    responses.push(await f.service.request(EMAIL, IP));
+    f.advance(1000);
+  }
+  assert.ok(responses.every(response => response.message === PASSWORD_RESET_NEUTRAL_MESSAGE));
+  assert.equal(f.sentCodes.length, 5);
+  assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS'));
+});
+
+test('unknown email receives the exact same neutral request response and no code', async () => {
+  const f = fixture({ exists: false });
+  const response = await f.service.request('unknown@school.test', IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.sentCodes.length, 0);
+  assert.equal(f.repository.rows[0].user_id, null);
+  assert.equal(f.repository.rows[0].code_hash, null);
+});
+
+test('suspended school account receives no reset code', async () => {
+  const f = fixture({ suspended: true });
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.sentCodes.length, 0);
+  assert.equal(f.repository.rows[0].user_id, null);
+  assert.equal(f.repository.rows[0].code_hash, null);
+});
+
+test('session timestamp invalidates old cookies after password reset', () => {
+  const changedAt = '2026-11-07T12:00:00.000Z';
+  assert.equal(isPasswordResetSessionValid(changedAt, undefined), false);
+  assert.equal(isPasswordResetSessionValid(changedAt, Date.parse('2026-11-07T11:00:00.000Z')), false);
+  assert.equal(isPasswordResetSessionValid(changedAt, Date.parse(changedAt)), true);
+  assert.equal(isPasswordResetSessionValid(undefined, undefined), true);
+});
+
+test('password policy is enforced and a current password cannot be reused', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', 'Short1A', IP), { ok: false, reason: 'password_policy', message: 'Password must contain at least 12 characters.' });
+  assert.deepEqual(await f.service.reset(EMAIL, '123456', OLD_PASSWORD, IP), { ok: false, reason: 'same_password' });
+  assert.equal(f.updated, 0);
+});
+
+test('plain code is never stored in the database row or audit details', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP);
+  const row = f.repository.rows[0];
+  assert.notEqual(row.code_hash, '123456');
+  assert.match(row.code_hash || '', /^[a-f0-9]{64}$/);
+  assert.ok(f.audits.every(item => !item.details.includes('123456')));
+});
