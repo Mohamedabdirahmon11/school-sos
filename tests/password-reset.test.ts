@@ -75,7 +75,7 @@ const IP = '203.0.113.10';
 const OLD_PASSWORD = 'OldSchoolPassword123';
 const NEW_PASSWORD = 'NewSchoolPassword456';
 
-function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean } = {}) {
+function fixture(options: { suspended?: boolean; exists?: boolean; production?: boolean; mailConfigured?: boolean } = {}) {
   let clock = new Date('2026-11-07T12:00:00.000Z');
   const user: User = {
     id: 'usr-school-admin-1',
@@ -102,7 +102,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     findUserByEmail: async email => options.exists === false || email !== EMAIL ? null : user,
     getSchool: async () => ({ id: 'school-1', language: 'so', subscription: { status: options.suspended ? 'suspended' : 'active' } } as unknown as School),
     sendEmail: async (_to, code) => { sentCodes.push(code); },
-    mailConfigured: () => true,
+    mailConfigured: () => options.mailConfigured ?? true,
     updatePassword: async (_account, passwordHash, changedAt) => {
       user.passwordHash = passwordHash;
       user.passwordChangedAt = changedAt;
@@ -221,8 +221,11 @@ test('per-email request rate limit returns the same neutral response and stops a
 });
 
 test('unknown email receives the exact same neutral request response and no code', async () => {
+  const existing = fixture();
+  const existingResponse = await existing.service.request(EMAIL, IP);
   const f = fixture({ exists: false });
   const response = await f.service.request('unknown@school.test', IP);
+  assert.deepEqual(response, existingResponse);
   assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
   assert.equal(f.sentCodes.length, 0);
   assert.equal(f.repository.rows[0].user_id, null);
@@ -261,4 +264,26 @@ test('plain code is never stored in the database row or audit details', async ()
   assert.notEqual(row.code_hash, '123456');
   assert.match(row.code_hash || '', /^[a-f0-9]{64}$/);
   assert.ok(f.audits.every(item => !item.details.includes('123456')));
+  assert.equal(f.devCodes.length, 0);
+});
+
+test('per-IP request rate limit also applies across different unknown email addresses', async () => {
+  const f = fixture({ exists: false });
+  for (let i = 0; i < 20; i++) {
+    await f.service.request(`unknown${i}@school.test`, IP);
+    f.advance(1000);
+  }
+  const blocked = await f.service.request('another@school.test', IP);
+  assert.equal(blocked.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.repository.rows.length, 20);
+  assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS'));
+});
+
+test('production with no mail provider never creates a usable code', async () => {
+  const f = fixture({ mailConfigured: false, production: true });
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.sentCodes.length, 0);
+  assert.equal(f.repository.rows[0].code_hash, null);
+  assert.equal(f.devCodes.length, 0);
 });
