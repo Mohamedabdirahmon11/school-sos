@@ -168,7 +168,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     await deps.audit({ action, user, ip, details, severity });
   };
 
-  const eligibleAccount = async (email: string, preferredLanguage: 'en' | 'so' | 'am' = 'en'): Promise<{ user: User; language: 'en' | 'so' | 'am' } | null> => {
+  const eligibleAccount = async (email: string, preferredLanguage?: 'en' | 'so' | 'am'): Promise<{ user: User; language: 'en' | 'so' | 'am' } | null> => {
     const user = await deps.findUserByEmail(email);
     if (!user || !isPasswordResetRole(user.role) || user.isBlocked || !user.email) return null;
     if (user.role !== 'super_admin') {
@@ -176,9 +176,9 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       const school = await deps.getSchool(user.schoolId);
       if (!school || school.subscription?.status === 'suspended') return null;
       const language = (school as any).language;
-      return { user, language: language === 'so' || language === 'am' ? language : language === 'en' ? 'en' : preferredLanguage };
+      return { user, language: preferredLanguage || (language === 'so' || language === 'am' ? language : 'en') };
     }
-    return { user, language: preferredLanguage };
+    return { user, language: preferredLanguage || 'en' };
   };
 
   async function request(emailInput: string, ipInput: string, preferredLanguage: 'en' | 'so' | 'am' = 'en'): Promise<{ message: string; expiresInSeconds: number; retryAfterSeconds: number }> {
