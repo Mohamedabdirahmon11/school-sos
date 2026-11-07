@@ -125,7 +125,7 @@ export class ApiClient {
         }
       });
     } catch (error) {
-      if (typeof window !== 'undefined' && endpoint !== '/auth/login') {
+      if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login') {
         window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 500, message: 'The server could not be reached.' } }));
       }
       throw error;
