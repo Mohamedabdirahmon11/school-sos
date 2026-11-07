@@ -168,7 +168,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     await deps.audit({ action, user, ip, details, severity });
   };
 
-  const eligibleAccount = async (email: string): Promise<{ user: User; language: 'en' | 'so' | 'am' } | null> => {
+  const eligibleAccount = async (email: string, preferredLanguage: 'en' | 'so' | 'am' = 'en'): Promise<{ user: User; language: 'en' | 'so' | 'am' } | null> => {
     const user = await deps.findUserByEmail(email);
     if (!user || !isPasswordResetRole(user.role) || user.isBlocked || !user.email) return null;
     if (user.role !== 'super_admin') {
@@ -176,12 +176,12 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       const school = await deps.getSchool(user.schoolId);
       if (!school || school.subscription?.status === 'suspended') return null;
       const language = (school as any).language;
-      return { user, language: language === 'so' || language === 'am' ? language : 'en' };
+      return { user, language: language === 'so' || language === 'am' ? language : language === 'en' ? 'en' : preferredLanguage };
     }
-    return { user, language: 'en' };
+    return { user, language: preferredLanguage };
   };
 
-  async function request(emailInput: string, ipInput: string): Promise<{ message: string; expiresInSeconds: number; retryAfterSeconds: number }> {
+  async function request(emailInput: string, ipInput: string, preferredLanguage: 'en' | 'so' | 'am' = 'en'): Promise<{ message: string; expiresInSeconds: number; retryAfterSeconds: number }> {
     const email = normalizeEmail(emailInput);
     const ip = ipInput || 'unknown';
     const timestamp = now();
@@ -199,7 +199,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
 
-    const account = await eligibleAccount(email);
+    const account = await eligibleAccount(email, preferredLanguage);
     const configured = deps.mailConfigured();
     const canIssueCode = Boolean(account && (configured || !deps.isProduction));
     let code: string | null = null;
