@@ -184,6 +184,7 @@ export class ApiClient {
     return this.request<{ success: boolean; message: string; expiresInSeconds: number; retryAfterSeconds: number }>('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
+      headers: this.hasLanguagePreference() ? { 'Accept-Language': this.getLanguage() } : undefined,
       suppressGlobalApiError: true
     });
   }
