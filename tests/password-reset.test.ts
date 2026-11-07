@@ -245,6 +245,29 @@ test('per-email request rate limit returns the same neutral response and stops a
   assert.ok(f.audits.some(item => item.action === 'PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS'));
 });
 
+test('already-reached database request limit does not increment lockout counters again', async () => {
+  const f = fixture({ exists: false });
+  const emailHash = hashPasswordResetEmail(EMAIL, SECRET);
+  for (let i = 0; i < 5; i++) {
+    f.repository.rows.push({
+      id: `existing-${i}`,
+      user_id: null,
+      code_hash: null,
+      request_email_hash: emailHash,
+      expires_at: '2026-11-07T13:00:00.000Z',
+      used_at: null,
+      attempts: 0,
+      created_at: f.now.toISOString(),
+      request_ip: IP
+    });
+  }
+  const response = await f.service.request(EMAIL, IP);
+  assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
+  assert.equal(f.rateLocks.size, 0);
+  assert.equal(f.repository.rows.length, 5);
+  assert.equal(f.sentCodes.length, 0);
+});
+
 test('password reset creates finite integer lockout counters and increments them', async () => {
   const f = fixture({ exists: false });
   const emailKey = `pwreset-email:${hashPasswordResetEmail(EMAIL, SECRET)}`;
