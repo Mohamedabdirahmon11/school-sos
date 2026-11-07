@@ -118,6 +118,8 @@ export interface PasswordResetDependencies {
   mailConfigured(): boolean;
   updatePassword(user: User, passwordHash: string, changedAt: string): Promise<void>;
   revokeSessions(user: User): Promise<void>;
+  checkRateLimit(key: string, threshold: number, durationMinutes: number): boolean;
+  recordRateLimit(key: string, threshold: number, durationMinutes: number): Promise<void>;
   clearLockouts(email: string, ip: string): Promise<void>;
   audit(entry: PasswordResetAudit): Promise<void> | void;
   logError(message: string): void;
@@ -187,6 +189,13 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     const timestamp = now();
     const createdAt = timestamp.toISOString();
     const emailHash = hashPasswordResetEmail(email, deps.secret);
+    const emailLockKey = `password-reset:${emailHash}`;
+    const ipLockKey = `password-reset-ip:${hmac(ip, deps.secret, 'schoolos-password-reset-ip')}`;
+    if (deps.checkRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60)
+      || deps.checkRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60)) {
+      await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
+      return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
+    }
     try {
       await deps.repository.cleanup(new Date(timestamp.getTime() - 24 * 60 * 60 * 1000).toISOString());
     } catch {
@@ -195,9 +204,13 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
 
     const counts = await deps.repository.countRequests(emailHash, ip, new Date(timestamp.getTime() - 60 * 60 * 1000).toISOString());
     if (counts.emailCount >= PASSWORD_RESET_EMAIL_LIMIT || counts.ipCount >= PASSWORD_RESET_IP_LIMIT) {
+      await deps.recordRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60);
+      await deps.recordRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60);
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
+    await deps.recordRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60);
+    await deps.recordRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60);
 
     const account = await eligibleAccount(email, preferredLanguage);
     const configured = deps.mailConfigured();
@@ -324,10 +337,18 @@ export const passwordResetService = createPasswordResetService({
     const sessions = await db.getUserSessions(user.schoolId);
     await Promise.all(sessions.filter(session => session.userId === user.id).map(session => db.revokeSession(session.id)));
   },
+  checkRateLimit: (key, threshold, durationMinutes) => db.checkLoginLockout(key, threshold, durationMinutes).locked,
+  recordRateLimit: async (key, threshold, durationMinutes) => {
+    db.recordLoginFailure(key, threshold, durationMinutes);
+    await db.flush();
+  },
   clearLockouts: async (email, ip) => {
-    db.clearLoginFailures(`staff:${email}`);
+    const emailHash = hashPasswordResetEmail(email, process.env.SESSION_SECRET || '');
+    const ipHash = hmac(ip, process.env.SESSION_SECRET || '', 'schoolos-password-reset-ip');
     db.clearLoginFailures(`staff:${email.toLowerCase()}`);
     db.clearLoginFailures(`ip:${ip}`);
+    db.clearLoginFailures(`password-reset:${emailHash}`);
+    db.clearLoginFailures(`password-reset-ip:${ipHash}`);
     await db.flush();
   },
   audit: async entry => {
