@@ -226,7 +226,8 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
 
     const counts = await deps.repository.countRequests(emailHash, ip, new Date(timestamp.getTime() - 60 * 60 * 1000).toISOString());
     if (counts.emailCount >= PASSWORD_RESET_EMAIL_LIMIT || counts.ipCount >= PASSWORD_RESET_IP_LIMIT) {
-      await recordRateLimits();
+      // The request is already over the database-backed limit. Do not increment
+      // lockout counters again for a rejected request or extend the lockout.
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
       deps.logInfo?.('Password reset request throttled; no email was sent.');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
