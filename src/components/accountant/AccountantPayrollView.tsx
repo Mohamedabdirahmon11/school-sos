@@ -114,6 +114,8 @@ export const AccountantPayrollView: React.FC = () => {
 
 export const StaffPayslipsView: React.FC = () => {
   const { school, t } = useAuth();
+  const calendarType = school?.calendarType || (school?.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian');
+  const payrollPeriodLabel = (monthKey: string) => formatSchoolMonthPeriod(monthKey, calendarType);
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => { ApiClient.getMyPayslips().then(rows => setRecords(Array.isArray(rows) ? rows : [])).finally(() => setLoading(false)); }, []);
