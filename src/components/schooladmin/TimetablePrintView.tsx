@@ -67,7 +67,7 @@ export const TimetablePrintView: React.FC<Props> = ({
     return <div className="space-y-0.5">
       <div className="font-bold">{subjectName(slot.subjectId)}</div>
       {showTeacher && <div>{teacherName(slot.teacherId)}</div>}
-      {showClass && <div>{className(slot.classId)}</div>}
+      {showClass && <div>{className(slot.classId)} · Shift {classes.find(klass => klass.id === slot.classId)?.shift || 1}</div>}
       <div className="text-[9px] font-mono">{slot.startTime}–{slot.endTime}</div>
       {slot.roomNumber && <div className="text-[9px]">{slot.roomNumber}</div>}
     </div>;
