@@ -126,7 +126,11 @@ export const SchoolSettingsView: React.FC = () => {
       firstPeriodStart: settings.firstPeriodStart,
       periodMinutes: settings.periodMinutes,
       breakAfterPeriod: settings.breakAfterPeriod,
-      breakMinutes: settings.breakMinutes
+      breakMinutes: settings.breakMinutes,
+      shift2FirstPeriodStart: settings.shift2FirstPeriodStart || '13:00',
+      shift2PeriodMinutes: settings.shift2PeriodMinutes ?? 40,
+      shift2BreakAfterPeriod: settings.shift2BreakAfterPeriod ?? 3,
+      shift2BreakMinutes: settings.shift2BreakMinutes ?? 20
     }));
   }, [school]);
 
