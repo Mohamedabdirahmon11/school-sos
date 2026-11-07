@@ -41,12 +41,13 @@ export interface SessionPayload {
 // -------------------------------------------------------------
 
 export function passwordPolicyError(password: unknown): string | null {
-  // Password complexity is optional; require only a non-empty value and cap
-  // length to protect the synchronous scrypt hashing path from oversized input.
-  if (typeof password !== 'string' || password.length === 0) {
-    return 'Password is required.';
+  if (typeof password !== 'string' || password.length < 12) {
+    return 'Password must contain at least 12 characters.';
   }
   if (password.length > 128) return 'Password must not exceed 128 characters.';
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Password must include uppercase and lowercase letters and at least one number.';
+  }
   return null;
 }
 
