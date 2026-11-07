@@ -33,11 +33,12 @@ test('Super Admin routes require an authenticated Super Admin', () => {
   }
 });
 
-test('password policy allows simple passwords but rejects empty and oversized values', () => {
-  assert.equal(passwordPolicyError('mohamed1614'), null);
-  assert.equal(passwordPolicyError('1234'), null);
+test('password policy requires 12 characters, mixed case, and a number', () => {
   assert.equal(passwordPolicyError('Abcdefghij12'), null);
-  assert.match(passwordPolicyError('') || '', /required/);
-  assert.match(passwordPolicyError(undefined) || '', /required/);
-  assert.match(passwordPolicyError('x'.repeat(129)) || '', /128 characters/);
+  assert.match(passwordPolicyError('Short1A') || '', /12 characters/);
+  assert.match(passwordPolicyError('alllowercase123') || '', /uppercase and lowercase/);
+  assert.match(passwordPolicyError('ALLUPPERCASE123') || '', /uppercase and lowercase/);
+  assert.match(passwordPolicyError('NoDigitsAtAllAA') || '', /at least one number/);
+  assert.match(passwordPolicyError('Abcdefghij123'.repeat(10)) || '', /128 characters/);
+  assert.match(passwordPolicyError(undefined) || '', /12 characters/);
 });
