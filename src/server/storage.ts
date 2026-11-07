@@ -1729,12 +1729,20 @@ class StorageEngine {
   }
 
   public async updateClass(id: string, updates: Partial<SchoolClass>, schoolId?: string): Promise<SchoolClass | null> {
-    await this.getClassById(id, schoolId || updates.schoolId);
-    const idx = this.data.classes.findIndex(c => c.id === id);
-    if (idx === -1) return null;
-    this.data.classes[idx] = { ...this.data.classes[idx], ...updates };
-    this.save();
-    return this.data.classes[idx];
+    const current = await this.getClassById(id, schoolId || updates.schoolId);
+    if (!current) return null;
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Class storage is unavailable.');
+    const row = toSupabaseRow({ ...updates, updatedAt: new Date().toISOString() }, 'classes');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('classes').update(row).eq('id', id).eq('school_id', schoolId || current.schoolId).select('*').maybeSingle();
+    this.recordQuery('classes', 'update', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update this class.');
+    if (!data) return null;
+    const updated = fromSupabaseRow(data, 'classes') as SchoolClass;
+    const cachedIndex = this.data.classes.findIndex(item => item.id === id && item.schoolId === updated.schoolId);
+    if (cachedIndex >= 0) this.data.classes[cachedIndex] = updated;
+    return updated;
   }
 
   public async deleteClass(id: string, schoolId?: string): Promise<boolean> {
