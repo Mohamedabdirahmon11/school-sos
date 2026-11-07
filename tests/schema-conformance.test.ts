@@ -8,6 +8,7 @@ const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_
 const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
 const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107101812_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const normalizedApiSource = apiSource.replace(/\r\n/g, '\n');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
   const columns = new Map<string, { required: boolean; hasDefault: boolean }>();
@@ -76,7 +77,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     ['student', "db.createStudent({\n    schoolId: school.id"],
         ['teacher', "db.createTeacher({\n    schoolId: school.id"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
-  ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
+  ]) assert.ok(normalizedApiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
 });
 
 test('performance migration has scoped dashboard aggregates, execute grants, and idempotent filter indexes', () => {
