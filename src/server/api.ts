@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
@@ -41,6 +42,7 @@ import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
+import { passwordResetService, PASSWORD_RESET_NEUTRAL_MESSAGE, isPasswordResetSessionValid } from './password-reset-service.ts';
 
 export const apiRouter = Router();
 
@@ -119,7 +121,7 @@ apiRouter.use((req, res, next) => {
     const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
     console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
   });
-  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
+  void storage.prepareRequestContext(['/auth/login', '/auth/forgot-password', '/auth/reset-password'].includes(req.path), `${req.method} ${req.path}`).then((context: any) => {
     storage.runWithRequestContext(context, next);
   }).catch(() => {
     if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
@@ -387,6 +389,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   const normalizedRole = normalizeRole(storedUser.role);
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
+  if (!isPasswordResetSessionValid(user.passwordChangedAt, payload.passwordChangedAt)) return null;
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
   if (!session && !isBootstrap) return null;
   if (session && !isSessionExpiryValid(session.expiresAt)) return null;
@@ -655,7 +658,8 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     role: user.role,
     schoolId: user.schoolId || schoolId,
     createdAt,
-    expiresAt
+    expiresAt,
+    passwordChangedAt: user.passwordChangedAt ? Date.parse(user.passwordChangedAt) : undefined
   });
 
   await db.createSession({
@@ -1047,6 +1051,82 @@ apiRouter.post('/auth/login', async (req, res) => {
     sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
     mustChangePassword: user.mustChangePassword || false
   });
+});
+
+
+// Email-only password reset. The request response is deliberately identical for all account states.
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(254)
+});
+const resetPasswordSchema = z.object({
+  email: z.string().trim().email().max(254),
+  code: z.string().regex(/^\\d{6}$/),
+  newPassword: z.string().max(128),
+  confirmPassword: z.string().max(128)
+}).refine(value => value.newPassword === value.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword']
+});
+
+apiRouter.post('/auth/forgot-password', async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Enter a valid email address.', code: 'PASSWORD_RESET_EMAIL_INVALID' });
+    return;
+  }
+  const startedAt = Date.now();
+  try {
+    await passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown');
+  } catch {
+    console.error('[password-reset] Request processing failed. No account or code details were logged.');
+  }
+  const remainingDelay = Math.max(0, 200 - (Date.now() - startedAt));
+  if (remainingDelay) await new Promise(resolve => setTimeout(resolve, remainingDelay));
+  res.json({
+    success: true,
+    message: PASSWORD_RESET_NEUTRAL_MESSAGE,
+    expiresInSeconds: 600,
+    retryAfterSeconds: 60
+  });
+});
+
+apiRouter.post('/auth/reset-password', async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    const confirmMismatch = parsed.error.issues.some(issue => issue.path.includes('confirmPassword'));
+    res.status(400).json({
+      error: confirmMismatch ? 'Passwords do not match.' : 'Enter a valid email, 6-digit code, and password.',
+      code: confirmMismatch ? 'PASSWORD_CONFIRM_MISMATCH' : 'PASSWORD_RESET_INPUT_INVALID'
+    });
+    return;
+  }
+  const result = await passwordResetService.reset(
+    parsed.data.email,
+    parsed.data.code,
+    parsed.data.newPassword,
+    req.ip || req.socket.remoteAddress || 'unknown'
+  );
+  if (!result.ok) {
+    if (result.reason === 'password_policy') {
+      res.status(400).json({ error: result.message, code: 'PASSWORD_POLICY_FAILED' });
+      return;
+    }
+    if (result.reason === 'same_password') {
+      res.status(400).json({ error: 'Choose a password different from your current password.', code: 'PASSWORD_SAME_AS_CURRENT' });
+      return;
+    }
+    if (result.reason === 'too_many_attempts') {
+      res.status(429).json({ error: 'Too many incorrect codes. Request a new code.', code: 'PASSWORD_RESET_TOO_MANY_ATTEMPTS' });
+      return;
+    }
+    if (result.reason === 'unavailable') {
+      res.status(503).json({ error: 'Password reset could not be completed. Request a new code.', code: 'PASSWORD_RESET_UNAVAILABLE' });
+      return;
+    }
+    res.status(400).json({ error: 'The code is invalid or expired. Request a new one.', code: 'PASSWORD_RESET_CODE_INVALID' });
+    return;
+  }
+  res.json({ success: true, message: 'Password changed.' });
 });
 
 // Logout endpoint (clears HttpOnly cookie)
