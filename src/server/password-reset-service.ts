@@ -114,7 +114,7 @@ export interface PasswordResetDependencies {
   repository: PasswordResetRepository;
   findUserByEmail(email: string): Promise<User | null>;
   getSchool(schoolId: string): Promise<School | null>;
-  sendEmail(to: string, code: string, language: 'en' | 'so' | 'am'): Promise<void>;
+  sendEmail(to: string, code: string, language: 'en' | 'so' | 'am', schoolName?: string): Promise<void>;
   mailConfigured(): boolean;
   updatePassword(user: User, passwordHash: string, changedAt: string): Promise<void>;
   revokeSessions(user: User): Promise<void>;
@@ -170,7 +170,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     await deps.audit({ action, user, ip, details, severity });
   };
 
-  const eligibleAccount = async (email: string, preferredLanguage?: 'en' | 'so' | 'am'): Promise<{ user: User; language: 'en' | 'so' | 'am' } | null> => {
+  const eligibleAccount = async (email: string, preferredLanguage?: 'en' | 'so' | 'am'): Promise<{ user: User; language: 'en' | 'so' | 'am'; schoolName?: string } | null> => {
     const user = await deps.findUserByEmail(email);
     if (!user || !isPasswordResetRole(user.role) || user.isBlocked || !user.email) return null;
     if (user.role !== 'super_admin') {
@@ -178,7 +178,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       const school = await deps.getSchool(user.schoolId);
       if (!school || school.subscription?.status === 'suspended') return null;
       const language = (school as any).language;
-      return { user, language: preferredLanguage || (language === 'so' || language === 'am' ? language : 'en') };
+      return { user, language: preferredLanguage || (language === 'so' || language === 'am' ? language : 'en'), schoolName: school.name };
     }
     return { user, language: preferredLanguage || 'en' };
   };
@@ -234,7 +234,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (account && code) {
       if (configured) {
         try {
-          const delivery = deps.sendEmail(account.user.email!, code, account.language);
+          const delivery = deps.sendEmail(account.user.email!, code, account.language, account.schoolName);
           void delivery.catch(async () => {
             try { await deps.repository.markUsed(row.id, now().toISOString()); } catch { /* fail closed */ }
             deps.logError('Password reset email delivery failed. No reset code was exposed.');
