@@ -158,6 +158,7 @@ export const LoginView: React.FC = () => {
     if (!/^\d{6}$/.test(resetCode)) { setResetError(t('forgot_password_code_invalid')); return; }
     if (resetNewPassword.length < 12) { setResetError(t('forgot_password_password_min')); return; }
     if (resetNewPassword.length > 128) { setResetError(t('forgot_password_password_max')); return; }
+    if (password && resetNewPassword === password) { setResetError(t('forgot_password_same_password')); return; }
     if (!/[a-z]/.test(resetNewPassword) || !/[A-Z]/.test(resetNewPassword) || !/[0-9]/.test(resetNewPassword)) {
       setResetError(t('forgot_password_password_complexity')); return;
     }
@@ -232,13 +233,13 @@ export const LoginView: React.FC = () => {
                     <input id="reset-code" type="text" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={resetCode} onChange={e => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="mt-1 w-full px-3 py-2 text-sm font-mono tracking-[0.35em] border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#334155]">{t('forgot_password_new_password')}</label>
-                    <PasswordInput label={t('forgot_password_new_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <label htmlFor="reset-new-password" className="block text-xs font-medium text-[#334155]">{t('forgot_password_new_password')}</label>
+                    <PasswordInput id="reset-new-password" label={t('forgot_password_new_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                     <p className="mt-1 text-[11px] text-[#64748B]">{t('forgot_password_password_rules')}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#334155]">{t('forgot_password_confirm_password')}</label>
-                    <PasswordInput label={t('forgot_password_confirm_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <label htmlFor="reset-confirm-password" className="block text-xs font-medium text-[#334155]">{t('forgot_password_confirm_password')}</label>
+                    <PasswordInput id="reset-confirm-password" label={t('forgot_password_confirm_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                   </div>
                   {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
                   <button type="submit" disabled={resetLoading || expiresIn <= 0} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
