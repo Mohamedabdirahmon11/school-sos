@@ -60,9 +60,9 @@ export class PasswordResetMailError extends Error {
 
 function redactMailDiagnostic(value: string): string {
   return value
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[redacted-email]')
-    .replace(/\\b\\d{6}\\b/g, '[redacted-code]')
-    .replace(/(?:Bearer\\s+)[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .replace(/\b\\d{6}\b/g, '[redacted-code]')
+    .replace(/(?:Bearer\s+)[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
     .slice(0, 240);
 }
 
