@@ -255,6 +255,7 @@ ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1 C
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);
 CREATE INDEX IF NOT EXISTS idx_classes_active ON classes(school_id, is_archived);
+CREATE INDEX IF NOT EXISTS idx_timetable_class_shift ON classes(school_id, shift, is_archived);
 
 -- 11. SUBJECTS
 CREATE TABLE IF NOT EXISTS subjects (
