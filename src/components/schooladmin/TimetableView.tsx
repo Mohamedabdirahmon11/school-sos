@@ -197,7 +197,7 @@ export const TimetableView: React.FC = () => {
 
       {notice && (
         <div className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${noticeIsWarning ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          {noticeIsWarning ? <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
           <span>{notice}</span>
         </div>
       )}
