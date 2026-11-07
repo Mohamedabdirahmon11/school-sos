@@ -33,6 +33,7 @@ export interface SessionPayload {
   studentId?: string;
   createdAt: number;
   expiresAt: number;
+  passwordChangedAt?: number;
 }
 
 // -------------------------------------------------------------
