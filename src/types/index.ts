@@ -135,6 +135,7 @@ export interface User {
   linkedStudentIds?: string[]; // For parents with multiple kids
   createdAt: string;
   lastLoginAt?: string;
+  passwordChangedAt?: string;
 }
 
 export interface UserSession {
