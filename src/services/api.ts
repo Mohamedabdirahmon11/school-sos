@@ -180,6 +180,22 @@ export class ApiClient {
     });
   }
 
+  public static async forgotPassword(email: string) {
+    return this.request<{ success: boolean; message: string; expiresInSeconds: number; retryAfterSeconds: number }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+      suppressGlobalApiError: true
+    });
+  }
+
+  public static async resetPassword(email: string, code: string, newPassword: string, confirmPassword: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword, confirmPassword }),
+      suppressGlobalApiError: true
+    });
+  }
+
   public static async logout() {
     return this.request<{ success: boolean; message: string }>('/auth/logout', {
       method: 'POST'
