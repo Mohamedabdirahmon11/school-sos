@@ -484,7 +484,7 @@ export class ApiClient {
   }
 
   public static async generateTimetable(classId: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; warnings?: string[] }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
   }
 
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
