@@ -1,6 +1,7 @@
 import React from 'react';
 import { SchoolClass, Subject, Teacher, TimetableSlot } from '../../types/index.ts';
 import { getTimetablePeriodTimes } from '../../lib/timetable.ts';
+import { TranslationDict } from '../../lib/translations.ts';
 
 type PrintMode = 'class' | 'shift' | 'teacher' | 'allTeachers';
 
@@ -24,7 +25,7 @@ interface Props {
     shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number;
   };
   school: any;
-  t: (key: string) => string;
+  t: (key: keyof TranslationDict) => string;
   onClose: () => void;
   onPrint: () => void;
 }
