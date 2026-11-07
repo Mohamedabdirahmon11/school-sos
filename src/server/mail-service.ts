@@ -77,7 +77,7 @@ export async function sendPasswordResetEmail(to: string, code: string, language:
     code,
     template.expiry,
     template.ignore
-  ].join('\\n\\n');
+  ].join('\n\n');
   const html = `<!doctype html><html lang="${language}"><body style="font-family:Arial,sans-serif;color:#132A29;line-height:1.5">
     <h2>SchoolOS</h2><p>${escapeHtml(template.greeting)}</p><p>${escapeHtml(template.intro)}</p>
     <p style="font-size:28px;font-weight:700;letter-spacing:6px">${safeCode}</p>
