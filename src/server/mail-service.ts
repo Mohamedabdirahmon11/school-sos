@@ -120,24 +120,25 @@ class GmailSmtpMailProvider implements MailProvider {
       throw new PasswordResetMailError('gmail', null, 'MAIL_FROM must use the authenticated Gmail address.');
     }
 
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user, pass },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
+      tls: { minVersion: 'TLSv1.2' }
+    });
     try {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user, pass },
-        connectionTimeout: 15000,
-        greetingTimeout: 10000,
-        socketTimeout: 20000,
-        tls: { minVersion: 'TLSv1.2' }
-      });
       await transporter.sendMail(message);
-      transporter.close();
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'SMTP delivery failed.';
       const code = error && typeof error === 'object' && 'responseCode' in error && typeof error.responseCode === 'number'
         ? error.responseCode : null;
       throw new PasswordResetMailError('gmail', code, detail);
+    } finally {
+      transporter.close();
     }
   }
 }
