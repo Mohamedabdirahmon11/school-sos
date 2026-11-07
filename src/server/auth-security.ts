@@ -154,6 +154,7 @@ export function sanitizeUser(user: any): Partial<User> {
   delete copy.pin;
   delete copy.twoFactorSecret;
   delete copy.recoveryCodes;
+  delete copy.passwordChangedAt;
   return copy;
 }
 
