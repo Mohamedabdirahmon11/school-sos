@@ -315,7 +315,6 @@ export const passwordResetService = createPasswordResetService({
     });
     if (!updated) throw new Error('User account could not be updated.');
     await db.flush();
-    invalidateAuthenticatedSnapshotForPasswordReset(user.id);
   },
   revokeSessions: async user => {
     const sessions = await db.getUserSessions(user.schoolId);
@@ -327,26 +326,26 @@ export const passwordResetService = createPasswordResetService({
     db.clearLoginFailures(`ip:${ip}`);
     await db.flush();
   },
-  audit: entry => {
-    db.logAudit({
-      action: entry.action,
-      category: 'auth',
-      schoolId: entry.user?.schoolId,
-      userId: entry.user?.id || 'unknown',
-      userName: entry.user?.fullName || 'Unknown account',
-      userRole: entry.user?.role || 'school_admin',
-      details: entry.details,
-      ipAddress: entry.ip,
-      severity: entry.severity
-    });
+  audit: async entry => {
+    try {
+      db.logAudit({
+        action: entry.action,
+        category: 'auth',
+        schoolId: entry.user?.schoolId,
+        userId: entry.user?.id || 'unknown',
+        userName: entry.user?.fullName || 'Unknown account',
+        userRole: entry.user?.role || 'school_admin',
+        details: entry.details,
+        ipAddress: entry.ip,
+        severity: entry.severity
+      });
+      await db.flush();
+    } catch {
+      console.error('[password-reset] Audit event could not be persisted.');
+    }
   },
   logError: message => console.error(`[password-reset] ${message}`),
   logDevelopmentCode: (_email, code) => console.info(`[password-reset-development] code=${code}`),
   isProduction: process.env.NODE_ENV === 'production',
   secret: process.env.SESSION_SECRET || ''
 });
-
-function invalidateAuthenticatedSnapshotForPasswordReset(userId: string): void {
-  // db.updateUser invalidates the storage auth cache; this hook remains intentionally local.
-  void userId;
-}
