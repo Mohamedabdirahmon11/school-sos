@@ -6,7 +6,7 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
 const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
-const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107100000_password_reset_codes.sql', import.meta.url), 'utf8');
+const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107101812_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
