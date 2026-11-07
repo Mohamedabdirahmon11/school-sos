@@ -4920,12 +4920,12 @@ async function getSchoolSetupState(school: School) {
   const teacherAccounts = teacherUserIds.length
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
-  const accountsById = new Map(teacherAccounts.map((account: any) => [account.id, account]));
+  const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
   const checklist = buildSchoolSetupChecklist(school, {
     classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
-      const account = accountsById.get(teacher.userId) as any;
+      const account = accountsById.get(String(teacher.userId || '')) as any;
       return {
         staffId: teacher.staffId,
         userId: teacher.userId,

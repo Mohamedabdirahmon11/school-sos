@@ -76,21 +76,22 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const openStep = async (id: number, target?: string) => {
     if (!state || !target) return;
     const skippedSteps = state.progress.skippedSteps.filter(step => step !== id);
-    const completedSteps = state.progress.completedSteps.filter(step => step !== id || state.checklist[id]?.ready);
+    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready) && step !== id);
     const saved = await persist({ currentStep: id, completedSteps, skippedSteps });
     if (saved) onNavigate(target);
   };
 
   const markComplete = async (id: number) => {
     if (!state) return;
-    const completedSteps = [...new Set([...state.progress.completedSteps.filter(step => step !== id), id])].sort((a, b) => a - b);
+    const validCompleted = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready));
+    const completedSteps = [...new Set([...validCompleted.filter(step => step !== id), id])].sort((a, b) => a - b);
     const skippedSteps = state.progress.skippedSteps.filter(step => step !== id);
     await persist({ currentStep: Math.min(10, id + 1), completedSteps, skippedSteps });
   };
 
   const skipStep = async (id: number) => {
     if (!state) return;
-    const completedSteps = state.progress.completedSteps.filter(step => step !== id);
+    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready) && step !== id);
     const skippedSteps = [...new Set([...state.progress.skippedSteps.filter(step => step !== id), id])].sort((a, b) => a - b);
     await persist({ currentStep: Math.min(10, id + 1), completedSteps, skippedSteps });
   };
@@ -99,7 +100,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     if (!state) return;
     const saved = await persist({
       currentStep: 10,
-      completedSteps: state.progress.completedSteps.filter(step => step !== 10),
+      completedSteps: state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready)),
       skippedSteps: state.progress.skippedSteps,
       complete: true
     });
