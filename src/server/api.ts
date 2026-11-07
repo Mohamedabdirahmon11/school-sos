@@ -1959,6 +1959,13 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
   }
   try {
     const school = (req as any).school as School;
+    if (role === 'school_admin' && !school.setupProgress?.completedAt) {
+      res.status(423).json({
+        error: 'Complete the first-time school setup before opening the dashboard.',
+        code: 'SCHOOL_SETUP_REQUIRED'
+      });
+      return;
+    }
     if (role === 'teacher') {
       const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
