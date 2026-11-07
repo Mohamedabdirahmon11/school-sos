@@ -6,6 +6,7 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
 const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
+const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107100000_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
@@ -314,3 +315,19 @@ test('shift-aware timetable migration is additive and keeps legacy Shift 1 setti
   assert.match(sql, /shift SMALLINT NOT NULL DEFAULT 1 CHECK \(shift IN \(1, 2\)\)/);
   assert.match(sql, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
 });
+
+test('password reset migration is private, hashed, and session-versioned', () => {
+  assert.match(passwordResetMigration, /ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ/i);
+  assert.match(passwordResetMigration, /CREATE TABLE IF NOT EXISTS public\.password_reset_codes/i);
+  assert.match(passwordResetMigration, /user_id VARCHAR\(64\) REFERENCES public\.users\(id\)/i);
+  assert.match(passwordResetMigration, /code_hash TEXT/i);
+  assert.match(passwordResetMigration, /request_email_hash TEXT NOT NULL/i);
+  assert.match(passwordResetMigration, /attempts INTEGER NOT NULL DEFAULT 0 CHECK \(attempts BETWEEN 0 AND 5\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(user_id\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(expires_at\)/i);
+  assert.match(passwordResetMigration, /ALTER TABLE public\.password_reset_codes ENABLE ROW LEVEL SECURITY/i);
+  assert.match(passwordResetMigration, /REVOKE ALL ON TABLE public\.password_reset_codes FROM PUBLIC, anon, authenticated/i);
+  assert.match(passwordResetMigration, /GRANT ALL ON TABLE public\.password_reset_codes TO service_role/i);
+  assert.doesNotMatch(passwordResetMigration, /CREATE POLICY/i);
+});
+
