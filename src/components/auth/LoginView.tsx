@@ -219,7 +219,7 @@ export const LoginView: React.FC = () => {
                     <label htmlFor="forgot-email" className="block text-xs font-medium text-[#334155]">{t('forgot_password_email')}</label>
                     <input id="forgot-email" type="email" required autoComplete="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                   </div>
-                  {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
+                  <div className="min-h-[34px]" aria-live="polite">{resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}</div>
                   <button type="submit" disabled={resetLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
                     {resetLoading ? t('forgot_password_sending') : t('forgot_password_send_code')}
                   </button>
@@ -241,7 +241,7 @@ export const LoginView: React.FC = () => {
                     <label htmlFor="reset-confirm-password" className="block text-xs font-medium text-[#334155]">{t('forgot_password_confirm_password')}</label>
                     <PasswordInput id="reset-confirm-password" label={t('forgot_password_confirm_password')} required minLength={12} maxLength={128} autoComplete="new-password" value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                   </div>
-                  {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
+                  <div className="min-h-[34px]" aria-live="polite">{resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}</div>
                   <button type="submit" disabled={resetLoading || expiresIn <= 0} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
                     {resetLoading ? t('forgot_password_updating') : t('forgot_password_reset')}
                   </button>
