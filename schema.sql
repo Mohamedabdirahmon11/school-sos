@@ -6527,3 +6527,6 @@ REVOKE ALL ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VA
 GRANT EXECUTE ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) TO service_role;
 
 
+
+
+NOTIFY pgrst, 'reload schema';
