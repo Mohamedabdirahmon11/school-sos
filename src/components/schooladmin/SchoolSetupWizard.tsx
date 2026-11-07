@@ -76,7 +76,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const openStep = async (id: number, target?: string) => {
     if (!state || !target) return;
     const skippedSteps = state.progress.skippedSteps.filter(step => step !== id);
-    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready) && step !== id);
+    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready));
     const saved = await persist({ currentStep: id, completedSteps, skippedSteps });
     if (saved) onNavigate(target);
   };
