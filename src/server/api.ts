@@ -1074,16 +1074,12 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
     res.status(400).json({ error: 'Enter a valid email address.', code: 'PASSWORD_RESET_EMAIL_INVALID' });
     return;
   }
-  const startedAt = Date.now();
-  try {
-    const acceptLanguage = String(req.headers['accept-language'] || '').trim().toLowerCase();
-    const preferredLanguage = acceptLanguage === 'so' || acceptLanguage === 'am' || acceptLanguage === 'en' ? acceptLanguage : undefined;
-    await passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown', preferredLanguage);
-  } catch {
-    console.error('[password-reset] Request processing failed. No account or code details were logged.');
-  }
-  const remainingDelay = Math.max(0, 200 - (Date.now() - startedAt));
-  if (remainingDelay) await new Promise(resolve => setTimeout(resolve, remainingDelay));
+  const acceptLanguage = String(req.headers['accept-language'] || '').trim().toLowerCase();
+  const preferredLanguage = acceptLanguage === 'so' || acceptLanguage === 'am' || acceptLanguage === 'en' ? acceptLanguage : undefined;
+  void passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown', preferredLanguage)
+    .catch(() => console.error('[password-reset] Request processing failed. No account or code details were logged.'));
+  // Keep response timing independent of whether the email belongs to an account.
+  await new Promise(resolve => setTimeout(resolve, 200));
   res.json({
     success: true,
     message: PASSWORD_RESET_NEUTRAL_MESSAGE,
