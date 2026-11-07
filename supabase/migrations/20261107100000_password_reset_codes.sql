@@ -5,7 +5,7 @@ ALTER TABLE public.users
 
 CREATE TABLE IF NOT EXISTS public.password_reset_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) REFERENCES public.users(id) ON DELETE CASCADE,
   code_hash TEXT,
   request_email_hash TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
