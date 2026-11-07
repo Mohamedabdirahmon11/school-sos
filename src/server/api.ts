@@ -1344,6 +1344,27 @@ apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (_req
   res.json(directory);
 });
 
+apiRouter.delete('/superadmin/schools/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const school = await db.getSchoolById(req.params.id);
+  if (!school) { res.status(404).json({ error: 'School not found.' }); return; }
+  const confirmationCode = typeof req.body?.confirmationCode === 'string' ? req.body.confirmationCode.trim().toUpperCase() : '';
+  if (!confirmationCode || confirmationCode !== school.code.toUpperCase()) {
+    res.status(400).json({ error: 'Enter the exact school code to confirm permanent erasure.', code: 'SCHOOL_ERASURE_CONFIRMATION_REQUIRED' });
+    return;
+  }
+  const actor = (req as any).user as User;
+  if (!db.deleteSchool(school.id)) { res.status(409).json({ error: 'School data could not be erased because the school was no longer available.' }); return; }
+  await db.flush();
+  db.logAudit({
+    action: 'SCHOOL_DATA_ERASED', category: 'security', schoolName: school.name,
+    userId: actor.id, userName: actor.fullName, userRole: 'super_admin',
+    details: `Permanently erased school ${school.name} (${school.code}), including its administrator accounts and tenant records.`,
+    severity: 'critical'
+  });
+  await db.flush();
+  res.json({ success: true, erasedSchool: { id: school.id, name: school.name, code: school.code } });
+});
+
 apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req, res) => {
   const body = req.body || {};
   const missing = onboardingFieldErrors(body);
