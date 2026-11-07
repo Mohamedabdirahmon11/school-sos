@@ -36,6 +36,7 @@ import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
+import { formatSchoolMonthPeriod } from '../lib/ethiopian-calendar.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
@@ -4026,7 +4027,7 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.userId !== user.id && !['accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to your own payroll record.' }); return; }
   const line = (item: any) => `${item.label}: ${formatMoney(Number(item.amount) || 0, school.currency)}`;
-  sendPdf(res, `payslip-${record.staffName}-${record.payrollMonth}`, [[school.name, 'PAYSLIP', `Staff: ${record.staffName}`, `Month: ${record.payrollMonth}`, `Status: ${record.status}`,
+  sendPdf(res, `payslip-${record.staffName}-${record.payrollMonth}`, [[school.name, 'PAYSLIP', `Staff: ${record.staffName}`, `Payroll period: ${formatSchoolMonthPeriod(record.payrollMonth, school.calendarType || (school.timezone === 'Africa/Addis_Ababa' ? 'ethiopian' : 'gregorian'))}`, `Status: ${record.status}`,
     `Base salary: ${formatMoney(record.baseSalary, school.currency)}`, 'Allowances:', ...(Array.isArray(record.allowances) ? record.allowances.map(line) : []),
     `Allowance total: ${formatMoney(record.allowanceTotal || 0, school.currency)}`, 'Deductions:', ...(Array.isArray(record.deductions) ? record.deductions.map(line) : []),
     `Deduction total: ${formatMoney(record.deductionTotal || 0, school.currency)}`, `Net salary: ${formatMoney(record.netSalary, school.currency)}`]]);
