@@ -201,7 +201,7 @@ export interface SchoolClass {
   branchId?: string;
   name: string; // e.g., "Grade 10 - A"
   gradeLevel: number; // 0 (KG) to 12
-  shift: 1 | 2;
+  shift?: 1 | 2;
   section: string; // "A", "B", etc.
   roomNumber: string;
   capacity: number;
