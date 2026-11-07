@@ -97,7 +97,7 @@ class SupabasePasswordResetRepository implements PasswordResetRepository {
   }
 
   async cleanup(olderThan: string) {
-    const { error } = await this.client().from('password_reset_codes').delete().lt('created_at', olderThan);
+    const { error } = await this.client().from('password_reset_codes').delete().lt('expires_at', olderThan);
     if (error) throw new Error('Expired password reset cleanup failed.');
   }
 }
@@ -221,7 +221,11 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (account && code) {
       if (configured) {
         try {
-          await deps.sendEmail(account.user.email!, code, account.language);
+          const delivery = deps.sendEmail(account.user.email!, code, account.language);
+          void delivery.catch(async () => {
+            try { await deps.repository.markUsed(row.id, now().toISOString()); } catch { /* fail closed */ }
+            deps.logError('Password reset email delivery failed. No reset code was exposed.');
+          });
         } catch {
           await deps.repository.markUsed(row.id, now().toISOString());
           deps.logError('Password reset email delivery failed. No reset code was exposed.');
@@ -229,7 +233,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       } else if (!deps.isProduction) {
         deps.logDevelopmentCode(email, code);
       }
-    } else if (account && deps.isProduction && !configured) {
+    } else if (deps.isProduction && !configured) {
       deps.logError('Password reset email is not configured. No reset code was issued.');
     }
 
