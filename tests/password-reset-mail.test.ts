@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isPasswordResetMailConfigured, sendPasswordResetEmail } from '../src/server/mail-service.ts';
+import { formatPasswordResetMailFailure, isPasswordResetMailConfigured, sendPasswordResetEmail } from '../src/server/mail-service.ts';
 
 test('Resend receives plain text and HTML templates in Somali and Amharic', async () => {
   const previousKey = process.env.MAIL_PROVIDER_API_KEY;
@@ -45,6 +45,35 @@ test('Resend service fails safely when mail configuration is absent', async () =
     assert.equal(isPasswordResetMailConfigured(), false);
     await assert.rejects(() => sendPasswordResetEmail('admin@school.test', '123456', 'en'), /not configured/);
   } finally {
+    if (previousKey === undefined) delete process.env.MAIL_PROVIDER_API_KEY; else process.env.MAIL_PROVIDER_API_KEY = previousKey;
+    if (previousFrom === undefined) delete process.env.MAIL_FROM; else process.env.MAIL_FROM = previousFrom;
+  }
+});
+
+
+test('Resend failures expose safe provider diagnostics with email and code redacted', async () => {
+  const previousKey = process.env.MAIL_PROVIDER_API_KEY;
+  const previousFrom = process.env.MAIL_FROM;
+  const previousFetch = globalThis.fetch;
+  process.env.MAIL_PROVIDER_API_KEY = 'test-resend-key';
+  process.env.MAIL_FROM = 'SchoolOS <no-reply@example.test>';
+  globalThis.fetch = (async () => new Response(JSON.stringify({
+    message: 'Invalid recipient admin@school.test; attempted code 123456'
+  }), { status: 422, statusText: 'Unprocessable Entity', headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+  try {
+    let failure: unknown;
+    try {
+      await sendPasswordResetEmail('admin@school.test', '123456', 'en');
+    } catch (error) {
+      failure = error;
+    }
+    const diagnostic = formatPasswordResetMailFailure(failure);
+    assert.match(diagnostic, /provider=resend status=422/);
+    assert.match(diagnostic, /Invalid recipient/);
+    assert.doesNotMatch(diagnostic, /admin@school\.test/);
+    assert.doesNotMatch(diagnostic, /123456/);
+  } finally {
+    globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.MAIL_PROVIDER_API_KEY; else process.env.MAIL_PROVIDER_API_KEY = previousKey;
     if (previousFrom === undefined) delete process.env.MAIL_FROM; else process.env.MAIL_FROM = previousFrom;
   }
