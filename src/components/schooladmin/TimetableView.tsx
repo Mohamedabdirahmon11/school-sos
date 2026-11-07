@@ -21,6 +21,7 @@ export const TimetableView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeIsWarning, setNoticeIsWarning] = useState(false);
   const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'day'>('class');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedDay, setSelectedDay] = useState('Monday');
@@ -96,6 +97,7 @@ export const TimetableView: React.FC = () => {
       setTimetable(prev => [...prev.filter(slot => !(slot.dayOfWeek === dayOfWeek && slot.periodNumber === periodNumber && slot.classId === selectedClassId)), newSlot]);
       setShowAddModal(false);
       setClashWarning(null);
+      setNoticeIsWarning(Boolean(newSlot.warnings?.length));
       setNotice(newSlot.warnings?.length ? newSlot.warnings.join(' ') : 'Timetable period saved.');
       setTimeout(() => setNotice(null), 5000);
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
@@ -108,6 +110,7 @@ export const TimetableView: React.FC = () => {
       setTimetable(prev => [...prev.filter(slot => slot.classId !== selectedClassId), ...result.slots]);
       setUnfilledSlots(result.unfilled);
       const messages = [...(result.warnings || []), ...(result.unfilled.length ? [`${result.unfilled.length} subject periods could not be placed.`] : [])];
+      setNoticeIsWarning(Boolean(result.warnings?.length));
       setNotice(messages.length ? messages.join(' ') : 'Timetable generated successfully.');
     } catch (err: any) { setNotice(err.message || 'Unable to generate timetable.'); }
   };
@@ -122,6 +125,7 @@ export const TimetableView: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       await ApiClient.saveTimetableSettings(settings);
+      setNoticeIsWarning(false);
       setNotice('Timetable shift times saved.');
     } catch (err: any) { setNotice(err.message || 'Unable to save timetable settings.'); }
   };
@@ -132,6 +136,7 @@ export const TimetableView: React.FC = () => {
     try {
       await ApiClient.swapTimetableSlots(firstSwapSlot, slot.id);
       setTimetable(await ApiClient.getTimetable());
+      setNoticeIsWarning(false);
       setNotice(t('timetable_swapped'));
       setFirstSwapSlot(null); setSwapMode(false);
     } catch (err: any) { setNotice(err.message || 'Unable to swap these timetable periods.'); setFirstSwapSlot(null); }
@@ -199,7 +204,7 @@ export const TimetableView: React.FC = () => {
       </div>
 
       {notice && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+        <div className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${noticeIsWarning ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{notice}</span>
         </div>
@@ -231,7 +236,7 @@ export const TimetableView: React.FC = () => {
           <select value={selectedAvailabilityShift} onChange={e => setSelectedAvailabilityShift(Number(e.target.value) as 1 | 2)} className="border border-[#DCE7E4] rounded-lg px-3 py-2 text-xs bg-white"><option value={1}>{t('timetable_shift_1')}</option><option value={2}>{t('timetable_shift_2')}</option></select>
           {days.map(day => periods.filter(period => day !== 'Friday' || period <= 5).map(period => {
             const unavailable = unavailableSlots.some(item => item.teacherId === selectedTeacherId && item.dayOfWeek === day && item.periodNumber === period && item.shift === selectedAvailabilityShift);
-            return <label key={`${day}-${period}-${selectedAvailabilityShift}`} className="inline-flex items-center gap-1 rounded border px-2 py-1"><input type="checkbox" checked={unavailable} disabled={isReadOnly} onChange={e => handleAvailability(day, period, e.target.checked)} />{day.slice(0, 3)} P{period}</label>;
+            return <label key={`${day}-${period}-${selectedAvailabilityShift}`} className="inline-flex items-center gap-1 rounded border px-2 py-1"><input type="checkbox" checked={unavailable} disabled={isReadOnly} onChange={e => handleAvailability(day, period, e.target.checked)} />{day.slice(0, 3)} P{period} · {getTimetablePeriodTimes(settings, period, selectedAvailabilityShift).startTime}</label>;
           }))}
         </div>
       </section>
