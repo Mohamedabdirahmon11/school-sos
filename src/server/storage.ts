@@ -1887,10 +1887,17 @@ class StorageEngine {
 
   public async getTimetableSettings(schoolId: string) {
     const rows = await this.queryRows<any>('timetable_settings', { school_id: schoolId });
-    return rows[0] || { schoolId, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 };
+    const saved = rows[0] || { schoolId, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 };
+    return {
+      ...saved,
+      shift2FirstPeriodStart: saved.shift2FirstPeriodStart || '13:00',
+      shift2PeriodMinutes: Number(saved.shift2PeriodMinutes ?? 40),
+      shift2BreakAfterPeriod: Number(saved.shift2BreakAfterPeriod ?? 3),
+      shift2BreakMinutes: Number(saved.shift2BreakMinutes ?? 20)
+    };
   }
 
-  public async saveTimetableSettings(schoolId: string, values: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }) {
+  public async saveTimetableSettings(schoolId: string, values: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number }) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable settings storage is unavailable.');
     const row = toSupabaseRow({ schoolId, ...values, updatedAt: new Date().toISOString() }, 'timetable_settings');
@@ -1901,13 +1908,13 @@ class StorageEngine {
     return { schoolId, ...values };
   }
 
-  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, unavailable: boolean) {
+  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, shift: number, unavailable: boolean) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Teacher availability storage is unavailable.');
-    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}`;
+    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}-shift-${shift}`;
     if (unavailable) {
       const startedAt = performance.now();
-      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber }, { onConflict: 'school_id,teacher_id,day_of_week,period_number' });
+      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber, shift }, { onConflict: 'school_id,teacher_id,day_of_week,period_number,shift' });
       this.recordQuery('teacher_unavailability', 'upsert', startedAt);
       if (error) throw new Error(error.message || 'Unable to save teacher availability.');
     } else {
