@@ -1060,7 +1060,7 @@ const forgotPasswordSchema = z.object({
 });
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(254),
-  code: z.string().regex(/^\\d{6}$/),
+  code: z.string().regex(/^\d{6}$/),
   newPassword: z.string().max(128),
   confirmPassword: z.string().max(128)
 }).refine(value => value.newPassword === value.confirmPassword, {
@@ -4669,7 +4669,7 @@ apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requi
   try {
     today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   } catch { /* Fall back to UTC when a legacy school timezone is invalid. */ }
-  if (!bookId || !studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) ||
+  if (!bookId || !studentId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
       Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate || dueDate < today) {
     res.status(400).json({ error: 'Select a book, student and a valid due date that is today or later.' });
     return;
