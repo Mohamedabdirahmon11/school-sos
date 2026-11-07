@@ -78,3 +78,49 @@ test('Resend failures expose safe provider diagnostics with email and code redac
     if (previousFrom === undefined) delete process.env.MAIL_FROM; else process.env.MAIL_FROM = previousFrom;
   }
 });
+
+
+test('Gmail SMTP is selected only with complete server-side credentials', () => {
+  const previous = {
+    provider: process.env.MAIL_PROVIDER,
+    user: process.env.GMAIL_SMTP_USER,
+    password: process.env.GMAIL_APP_PASSWORD,
+    from: process.env.MAIL_FROM
+  };
+  process.env.MAIL_PROVIDER = 'gmail';
+  process.env.GMAIL_SMTP_USER = 'schoolos.test@gmail.com';
+  process.env.GMAIL_APP_PASSWORD = 'test-app-password';
+  process.env.MAIL_FROM = 'SchoolOS <schoolos.test@gmail.com>';
+  try {
+    assert.equal(isPasswordResetMailConfigured(), true);
+  } finally {
+    if (previous.provider === undefined) delete process.env.MAIL_PROVIDER; else process.env.MAIL_PROVIDER = previous.provider;
+    if (previous.user === undefined) delete process.env.GMAIL_SMTP_USER; else process.env.GMAIL_SMTP_USER = previous.user;
+    if (previous.password === undefined) delete process.env.GMAIL_APP_PASSWORD; else process.env.GMAIL_APP_PASSWORD = previous.password;
+    if (previous.from === undefined) delete process.env.MAIL_FROM; else process.env.MAIL_FROM = previous.from;
+  }
+});
+
+test('Gmail SMTP rejects a sender address that differs from the authenticated account', async () => {
+  const previous = {
+    provider: process.env.MAIL_PROVIDER,
+    user: process.env.GMAIL_SMTP_USER,
+    password: process.env.GMAIL_APP_PASSWORD,
+    from: process.env.MAIL_FROM
+  };
+  process.env.MAIL_PROVIDER = 'gmail';
+  process.env.GMAIL_SMTP_USER = 'schoolos.test@gmail.com';
+  process.env.GMAIL_APP_PASSWORD = 'test-app-password';
+  process.env.MAIL_FROM = 'SchoolOS <different.test@gmail.com>';
+  try {
+    await assert.rejects(
+      () => sendPasswordResetEmail('admin@school.test', '123456', 'en'),
+      /MAIL_FROM must use the authenticated Gmail address/
+    );
+  } finally {
+    if (previous.provider === undefined) delete process.env.MAIL_PROVIDER; else process.env.MAIL_PROVIDER = previous.provider;
+    if (previous.user === undefined) delete process.env.GMAIL_SMTP_USER; else process.env.GMAIL_SMTP_USER = previous.user;
+    if (previous.password === undefined) delete process.env.GMAIL_APP_PASSWORD; else process.env.GMAIL_APP_PASSWORD = previous.password;
+    if (previous.from === undefined) delete process.env.MAIL_FROM; else process.env.MAIL_FROM = previous.from;
+  }
+});
