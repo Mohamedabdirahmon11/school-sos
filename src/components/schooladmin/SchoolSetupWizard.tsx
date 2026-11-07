@@ -118,7 +118,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     );
   }
 
-  const completedCount = state.progress.completedSteps.filter(id => id !== 10).length + state.progress.skippedSteps.length;
+  const completedCount = state.progress.completedSteps.filter(id => id !== 10 && Boolean(state.checklist[id]?.ready)).length + state.progress.skippedSteps.length;
   const percent = Math.round((completedCount / 9) * 100);
 
   return (
@@ -143,7 +143,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       <div className="grid gap-3">
         {steps.map(item => {
           const isFinal = item.id === 10;
-          const isCompleted = state.progress.completedSteps.includes(item.id);
+          const isCompleted = state.progress.completedSteps.includes(item.id) && (isFinal ? Boolean(state.progress.completedAt) : Boolean(state.checklist[item.id]?.ready));
           const isSkipped = state.progress.skippedSteps.includes(item.id);
           const ready = isFinal ? state.canFinish : Boolean(state.checklist[item.id]?.ready);
           const status = isCompleted ? t('setup_completed') : isSkipped ? t('setup_skipped') : ready ? t('setup_pending') : t('setup_needs_attention');

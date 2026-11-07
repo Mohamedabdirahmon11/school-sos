@@ -4922,7 +4922,7 @@ async function getSchoolSetupState(school: School) {
       return {
         staffId: teacher.staffId,
         userId: teacher.userId,
-        hasLogin: account?.role === 'teacher' && typeof account.passwordHash === 'string' && account.passwordHash.length >= 20
+        hasLogin: account?.role === 'teacher' && ((typeof account.passwordHash === 'string' && account.passwordHash.length >= 20) || (typeof account.pinHash === 'string' && account.pinHash.length >= 20))
       };
     }),
     studentCount: students.total,
