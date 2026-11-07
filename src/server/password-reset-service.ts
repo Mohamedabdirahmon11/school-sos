@@ -251,8 +251,6 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     const account = await eligibleAccount(email);
     if (!account) return { ok: false, reason: 'invalid_code' };
     const { user } = account;
-    if (verifyPassword(newPassword, user.passwordHash)) return { ok: false, reason: 'same_password' };
-
     const emailHash = hashPasswordResetEmail(email, deps.secret);
     const record = await deps.repository.findLatestUnusedCode(user.id, emailHash);
     if (!record || !record.code_hash || record.used_at) return { ok: false, reason: 'invalid_code' };
@@ -278,6 +276,8 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       }
       return { ok: false, reason: 'invalid_code' };
     }
+
+    if (verifyPassword(newPassword, user.passwordHash)) return { ok: false, reason: 'same_password' };
 
     const consumed = await deps.repository.consume(record.id, timestamp.toISOString());
     if (!consumed) return { ok: false, reason: 'invalid_code' };
