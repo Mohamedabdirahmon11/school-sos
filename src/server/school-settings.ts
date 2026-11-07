@@ -190,10 +190,14 @@ export function sanitizeExamConfigSettings(body: unknown): Partial<ExamConfig> {
 }
 
 const timetableSettingsSchema = z.object({
-  firstPeriodStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Timetable start must use HH:MM.'),
+  firstPeriodStart: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, 'Timetable start must use HH:MM.'),
   periodMinutes: z.number().int('Period length must be a whole number.').min(20, 'Period length must be 20-120 minutes.').max(120, 'Period length must be 20-120 minutes.'),
   breakAfterPeriod: z.number().int('Break position must be a whole number.').min(1, 'Break must follow period 1-5.').max(5, 'Break must follow period 1-5.'),
-  breakMinutes: z.number().int('Break length must be a whole number.').min(0, 'Break length must be 0-120 minutes.').max(120, 'Break length must be 0-120 minutes.')
+  breakMinutes: z.number().int('Break length must be a whole number.').min(0, 'Break length must be 0-120 minutes.').max(120, 'Break length must be 0-120 minutes.'),
+  shift2FirstPeriodStart: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, 'Shift 2 start must use HH:MM.').default('13:00'),
+  shift2PeriodMinutes: z.number().int('Shift 2 period length must be a whole number.').min(20, 'Shift 2 period length must be 20-120 minutes.').max(120, 'Shift 2 period length must be 20-120 minutes.').default(40),
+  shift2BreakAfterPeriod: z.number().int('Shift 2 break position must be a whole number.').min(1).max(5).default(3),
+  shift2BreakMinutes: z.number().int('Shift 2 break length must be a whole number.').min(0).max(120).default(20)
 });
 
 export function sanitizeTimetableSettings(body: unknown) {
