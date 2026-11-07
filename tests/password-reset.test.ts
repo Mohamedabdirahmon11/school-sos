@@ -92,6 +92,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
   };
   const repository = new MemoryResetRepository(() => clock);
   const sentCodes: string[] = [];
+  const sentLanguages: string[] = [];
   const devCodes: string[] = [];
   const audits: PasswordResetAudit[] = [];
   let revoked = 0;
@@ -102,7 +103,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     repository,
     findUserByEmail: async email => options.exists === false || email !== EMAIL ? null : user,
     getSchool: async () => ({ id: 'school-1', language: 'so', subscription: { status: options.suspended ? 'suspended' : 'active' } } as unknown as School),
-    sendEmail: async (_to, code) => { sentCodes.push(code); },
+    sendEmail: async (_to, code, language) => { sentCodes.push(code); sentLanguages.push(language); },
     mailConfigured: () => options.mailConfigured ?? true,
     updatePassword: async (_account, passwordHash, changedAt) => {
       user.passwordHash = passwordHash;
@@ -123,7 +124,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     generateCode: () => nextCode
   });
   return {
-    service, repository, user, sentCodes, devCodes, audits,
+    service, repository, user, sentCodes, sentLanguages, devCodes, audits,
     get revoked() { return revoked; },
     get cleared() { return cleared; },
     get updated() { return updated; },
@@ -155,6 +156,7 @@ test('successful reset hashes the new password, clears lockout, and revokes sess
   const response = await f.service.request(EMAIL, IP);
   assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
   assert.deepEqual(f.sentCodes, ['123456']);
+  assert.deepEqual(f.sentLanguages, ['so']);
   const result = await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP);
   assert.deepEqual(result, { ok: true });
   assert.equal(verifyPassword(NEW_PASSWORD, f.user.passwordHash), true);
@@ -297,5 +299,12 @@ test('the environment-configured Super Admin is seeded into the database user st
   const serviceSource = readFileSync(new URL('../src/server/password-reset-service.ts', import.meta.url), 'utf8');
   assert.match(serviceSource, /db\.queryPage<User>\('users', \{ email \}/);
   assert.match(serviceSource, /return db\.findUserForLogin\(email\)/);
+});
+
+
+test('explicit user language overrides the school default for reset email', async () => {
+  const f = fixture();
+  await f.service.request(EMAIL, IP, 'am');
+  assert.deepEqual(f.sentLanguages, ['am']);
 });
 
