@@ -587,10 +587,16 @@ class StorageEngine {
       await Promise.all([settingsTask(), plansTask()]);
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
-        this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
-          count: row.attemptCount, firstFailedAt: new Date(row.firstFailedAt).getTime(),
-          lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
-        }]));
+        this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => {
+          // fromSupabaseRow maps attempt_count to `count`; never read the
+          // non-existent `attemptCount` property or NaN will persist as NULL.
+          const count = Number(row.count);
+          return [row.id, {
+            count: Number.isSafeInteger(count) && count >= 0 ? count : 0,
+            firstFailedAt: new Date(row.firstFailedAt).getTime(),
+            lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
+          }];
+        }));
       }
       await this.flush();
     });
@@ -616,7 +622,7 @@ class StorageEngine {
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
       ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['library_loans', snapshot.libraryLoans], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems], ['inventory_transactions', snapshot.inventoryTransactions], ['discipline_incidents', snapshot.disciplineIncidents],
-      ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
+      ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: Number.isSafeInteger(counter.count) && counter.count >= 0 ? counter.count : 0, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
     await this.persistTable(client, 'super_admin_settings', settingsRows, toRows('super_admin_settings'), knownIds, knownRows);
@@ -729,25 +735,30 @@ class StorageEngine {
     this.persistedRows.set(table, latestRows);
   }
 
-  public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15) {
+  public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15, windowMinutes = 30) {
     const entry = this.data.lockoutCounters[key];
     if (!entry) return { locked: false, remainingMinutes: 0 };
     const now = Date.now();
+    const windowMs = Math.max(1, Number.isFinite(windowMinutes) ? windowMinutes : 30) * 60 * 1000;
     if (entry.lockedUntil && entry.lockedUntil > now) {
       return { locked: true, remainingMinutes: Math.ceil((entry.lockedUntil - now) / 60000) };
     }
-    if ((entry.lockedUntil && entry.lockedUntil <= now) || now - entry.firstFailedAt > 30 * 60 * 1000) {
+    if ((entry.lockedUntil && entry.lockedUntil <= now) || !Number.isFinite(entry.firstFailedAt) || now - entry.firstFailedAt > windowMs) {
       delete this.data.lockoutCounters[key];
       this.save();
     }
     return { locked: false, remainingMinutes: 0 };
   }
 
-  public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15) {
+  public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15, windowMinutes = 30) {
     const now = Date.now();
+    const windowMs = Math.max(1, Number.isFinite(windowMinutes) ? windowMinutes : 30) * 60 * 1000;
     let entry = this.data.lockoutCounters[key];
-    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) entry = { count: 0, firstFailedAt: now, lockedUntil: null };
-    entry.count += 1;
+    if (!entry || !Number.isFinite(entry.firstFailedAt) || now - entry.firstFailedAt > windowMs) {
+      entry = { count: 0, firstFailedAt: now, lockedUntil: null };
+    }
+    const previousCount = Number(entry.count);
+    entry.count = (Number.isSafeInteger(previousCount) && previousCount >= 0 ? previousCount : 0) + 1;
     const newlyLocked = entry.count >= threshold;
     if (newlyLocked) entry.lockedUntil = now + durationMinutes * 60 * 1000;
     this.data.lockoutCounters[key] = entry;
