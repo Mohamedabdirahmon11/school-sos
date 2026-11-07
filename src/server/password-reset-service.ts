@@ -3,12 +3,13 @@ import type { User, School } from '../types/index.ts';
 import { db } from './storage.ts';
 import { supabase } from './supabase.ts';
 import { hashPassword, passwordPolicyError, verifyPassword } from './auth-security.ts';
-import { isPasswordResetMailConfigured, sendPasswordResetEmail } from './mail-service.ts';
+import { formatPasswordResetMailFailure, isPasswordResetMailConfigured, sendPasswordResetEmail } from './mail-service.ts';
 
 export const PASSWORD_RESET_NEUTRAL_MESSAGE = 'If an account exists for this email, a 6-digit code has been sent.';
 export const PASSWORD_RESET_CODE_TTL_MS = 10 * 60 * 1000;
 export const PASSWORD_RESET_EMAIL_LIMIT = 5;
 export const PASSWORD_RESET_IP_LIMIT = 20;
+export const PASSWORD_RESET_RATE_WINDOW_MINUTES = 60;
 
 export interface PasswordResetRow {
   id: string;
@@ -118,8 +119,8 @@ export interface PasswordResetDependencies {
   mailConfigured(): boolean;
   updatePassword(user: User, passwordHash: string, changedAt: string): Promise<void>;
   revokeSessions(user: User): Promise<void>;
-  checkRateLimit(key: string, threshold: number, durationMinutes: number): boolean;
-  recordRateLimit(key: string, threshold: number, durationMinutes: number): Promise<void>;
+  checkRateLimit(key: string, threshold: number, durationMinutes: number, windowMinutes: number): boolean;
+  recordRateLimit(key: string, threshold: number, durationMinutes: number, windowMinutes: number): Promise<void>;
   clearLockouts(email: string, ip: string): Promise<void>;
   audit(entry: PasswordResetAudit): Promise<void> | void;
   logError(message: string): void;
@@ -132,6 +133,15 @@ export interface PasswordResetDependencies {
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function formatRateLimitWriteFailure(error: unknown): string {
+  const failure = error as { table?: unknown; code?: unknown; message?: unknown } | null;
+  const table = typeof failure?.table === 'string' ? failure.table : 'lockout_counters';
+  const code = typeof failure?.code === 'string' ? failure.code : 'unknown';
+  const rawMessage = typeof failure?.message === 'string' ? failure.message : error instanceof Error ? error.message : 'Unknown persistence error';
+  const message = rawMessage.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]').replace(/\b\d{6}\b/g, '[redacted-code]').slice(0, 240);
+  return `Password reset rate-limit write failed table=${table} code=${code} message="${message}"`;
 }
 
 function hmac(value: string, secret: string, purpose: string): string {
@@ -189,10 +199,20 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     const timestamp = now();
     const createdAt = timestamp.toISOString();
     const emailHash = hashPasswordResetEmail(email, deps.secret);
-    const emailLockKey = `password-reset:${emailHash}`;
-    const ipLockKey = `password-reset-ip:${hmac(ip, deps.secret, 'schoolos-password-reset-ip')}`;
-    if (deps.checkRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60)
-      || deps.checkRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60)) {
+    const emailLockKey = `pwreset-email:${emailHash}`;
+    const ipLockKey = `pwreset-ip:${hmac(ip, deps.secret, 'schoolos-password-reset-ip')}`;
+    const recordRateLimits = async (): Promise<boolean> => {
+      try {
+        await deps.recordRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES);
+        await deps.recordRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES);
+        return true;
+      } catch (error) {
+        deps.logError(formatRateLimitWriteFailure(error));
+        return false;
+      }
+    };
+    if (deps.checkRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES)
+      || deps.checkRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES)) {
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
@@ -204,13 +224,11 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
 
     const counts = await deps.repository.countRequests(emailHash, ip, new Date(timestamp.getTime() - 60 * 60 * 1000).toISOString());
     if (counts.emailCount >= PASSWORD_RESET_EMAIL_LIMIT || counts.ipCount >= PASSWORD_RESET_IP_LIMIT) {
-      await deps.recordRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60);
-      await deps.recordRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60);
+      await recordRateLimits();
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
-    await deps.recordRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, 60);
-    await deps.recordRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, 60);
+    if (!(await recordRateLimits())) return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
 
     const account = await eligibleAccount(email, preferredLanguage);
     const configured = deps.mailConfigured();
@@ -235,13 +253,13 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
       if (configured) {
         try {
           const delivery = deps.sendEmail(account.user.email!, code, account.language, account.schoolName);
-          void delivery.catch(async () => {
+          void delivery.catch(async error => {
             try { await deps.repository.markUsed(row.id, now().toISOString()); } catch { /* fail closed */ }
-            deps.logError('Password reset email delivery failed. No reset code was exposed.');
+            deps.logError(formatPasswordResetMailFailure(error));
           });
-        } catch {
+        } catch (error) {
           await deps.repository.markUsed(row.id, now().toISOString());
-          deps.logError('Password reset email delivery failed. No reset code was exposed.');
+          deps.logError(formatPasswordResetMailFailure(error));
         }
       } else if (!deps.isProduction) {
         deps.logDevelopmentCode(email, code);
@@ -338,9 +356,9 @@ export const passwordResetService = createPasswordResetService({
     await Promise.all(sessions.filter(session => session.userId === user.id).map(session => db.revokeSession(session.id)));
     await db.flush();
   },
-  checkRateLimit: (key, threshold, durationMinutes) => db.checkLoginLockout(key, threshold, durationMinutes).locked,
-  recordRateLimit: async (key, threshold, durationMinutes) => {
-    db.recordLoginFailure(key, threshold, durationMinutes);
+  checkRateLimit: (key, threshold, durationMinutes, windowMinutes) => db.checkLoginLockout(key, threshold, durationMinutes, windowMinutes).locked,
+  recordRateLimit: async (key, threshold, durationMinutes, windowMinutes) => {
+    db.recordLoginFailure(key, threshold, durationMinutes, windowMinutes);
     await db.flush();
   },
   clearLockouts: async (email, ip) => {
@@ -348,8 +366,8 @@ export const passwordResetService = createPasswordResetService({
     const ipHash = hmac(ip, process.env.SESSION_SECRET || '', 'schoolos-password-reset-ip');
     db.clearLoginFailures(`staff:${email.toLowerCase()}`);
     db.clearLoginFailures(`ip:${ip}`);
-    db.clearLoginFailures(`password-reset:${emailHash}`);
-    db.clearLoginFailures(`password-reset-ip:${ipHash}`);
+    db.clearLoginFailures(`pwreset-email:${emailHash}`);
+    db.clearLoginFailures(`pwreset-ip:${ipHash}`);
     await db.flush();
   },
   audit: async entry => {
