@@ -134,10 +134,10 @@ export const TimetableView: React.FC = () => {
     if (!swapMode) return;
     if (!firstSwapSlot) { setFirstSwapSlot(slot.id); setNotice(t('timetable_swap_select')); return; }
     try {
-      await ApiClient.swapTimetableSlots(firstSwapSlot, slot.id);
+      const result = await ApiClient.swapTimetableSlots(firstSwapSlot, slot.id);
       setTimetable(await ApiClient.getTimetable());
-      setNoticeIsWarning(false);
-      setNotice(t('timetable_swapped'));
+      setNoticeIsWarning(Boolean(result.warnings?.length));
+      setNotice(result.warnings?.length ? result.warnings.join(' ') : t('timetable_swapped'));
       setFirstSwapSlot(null); setSwapMode(false);
     } catch (err: any) { setNotice(err.message || 'Unable to swap these timetable periods.'); setFirstSwapSlot(null); }
   };
