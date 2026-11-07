@@ -43,6 +43,7 @@ export const ClassesSubjectsView: React.FC = () => {
   const [roomNumber, setRoomNumber] = useState('Room 101');
   const [capacity, setCapacity] = useState(school?.defaultClassCapacity || 40);
   const [monthlyFee, setMonthlyFee] = useState(50);
+  const [classShift, setClassShift] = useState<1 | 2>(1);
 
   // New Subject Form State
   const [subjectName, setSubjectName] = useState('');
@@ -65,6 +66,7 @@ export const ClassesSubjectsView: React.FC = () => {
         roomNumber,
         capacity,
         monthlyFee,
+        shift: classShift,
         branchId: branchId || undefined
       };
       if (editingClass) await ApiClient.updateClass(editingClass.id, payload);
@@ -149,7 +151,7 @@ export const ClassesSubjectsView: React.FC = () => {
                 <Upload className="w-3.5 h-3.5 text-[#0F766E]" /><span>{t('bulk_import')}</span>
               </button>
               <button
-                onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setShowClassModal(true); }}
+                onClick={() => { setEditingClass(null); setClassShift(1); setCapacity(school?.defaultClassCapacity || 40); setShowClassModal(true); }}
                 disabled={isReadOnly}
                 className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
               >
@@ -165,13 +167,13 @@ export const ClassesSubjectsView: React.FC = () => {
                 <button type="button" onClick={() => { setSelectedClassId(c.id); setStudentPage(1); }} className="text-left min-w-0 hover:text-[#0F766E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E] rounded">
                   <p className="font-semibold text-[#132A29]">{c.name}</p>
                   <p className="text-[11px] text-[#64748B]">
-                    {c.roomNumber} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
+                    {c.roomNumber} · Shift {c.shift || 1} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
                   </p>
                 </button>
                 <span className="font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded text-[11px] font-bold">
                   Section {c.section}
                 </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
+                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setClassShift(c.shift === 2 ? 2 : 1); setBranchId(c.branchId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
@@ -278,6 +280,14 @@ export const ClassesSubjectsView: React.FC = () => {
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block font-medium">School Shift</label>
+                <select value={classShift} onChange={e => setClassShift(Number(e.target.value) as 1 | 2)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white">
+                  <option value={1}>Shift 1</option>
+                  <option value={2}>Shift 2</option>
+                </select>
+                <p className="mt-1 text-[11px] text-slate-500">A class stays in its selected shift; classrooms can be reused by the other shift at different times.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
