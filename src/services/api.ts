@@ -296,6 +296,13 @@ export class ApiClient {
     return this.updateSchoolSubscription(schoolId, { studentAccessEnabled: enabled });
   }
 
+  public static async eraseSchoolData(schoolId: string, confirmationCode: string) {
+    return this.request<{ success: boolean; erasedSchool: { id: string; name: string; code: string } }>(`/superadmin/schools/${encodeURIComponent(schoolId)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ confirmationCode })
+    });
+  }
+
   public static async resetUserPassword(userId: string): Promise<{ success: boolean; temporaryPassword: string; mustChangePassword: boolean }> {
     return this.request(`/users/${userId}/reset-password`, { method: 'POST' });
   }
