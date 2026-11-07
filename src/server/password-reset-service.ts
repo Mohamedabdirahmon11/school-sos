@@ -124,6 +124,7 @@ export interface PasswordResetDependencies {
   clearLockouts(email: string, ip: string): Promise<void>;
   audit(entry: PasswordResetAudit): Promise<void> | void;
   logError(message: string): void;
+  logInfo?(message: string): void;
   logDevelopmentCode(email: string, code: string): void;
   isProduction: boolean;
   secret: string;
@@ -214,6 +215,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (deps.checkRateLimit(emailLockKey, PASSWORD_RESET_EMAIL_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES)
       || deps.checkRateLimit(ipLockKey, PASSWORD_RESET_IP_LIMIT, PASSWORD_RESET_RATE_WINDOW_MINUTES, PASSWORD_RESET_RATE_WINDOW_MINUTES)) {
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
+      deps.logInfo?.('Password reset request throttled; no email was sent.');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
     try {
@@ -226,6 +228,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (counts.emailCount >= PASSWORD_RESET_EMAIL_LIMIT || counts.ipCount >= PASSWORD_RESET_IP_LIMIT) {
       await recordRateLimits();
       await audit('PASSWORD_RESET_FAILED_TOO_MANY_ATTEMPTS', null, ip, 'Password reset request rate limit exceeded.', 'warning');
+      deps.logInfo?.('Password reset request throttled; no email was sent.');
       return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
     }
     if (!(await recordRateLimits())) return { message: PASSWORD_RESET_NEUTRAL_MESSAGE, expiresInSeconds: 600, retryAfterSeconds: 60 };
@@ -252,18 +255,18 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (account && code) {
       if (configured) {
         try {
-          const delivery = deps.sendEmail(account.user.email!, code, account.language, account.schoolName);
-          void delivery.catch(async error => {
-            try { await deps.repository.markUsed(row.id, now().toISOString()); } catch { /* fail closed */ }
-            deps.logError(formatPasswordResetMailFailure(error));
-          });
+          await deps.sendEmail(account.user.email!, code, account.language, account.schoolName);
+          deps.logInfo?.('Password reset email delivery succeeded.');
         } catch (error) {
-          await deps.repository.markUsed(row.id, now().toISOString());
+          try { await deps.repository.markUsed(row.id, now().toISOString()); } catch { /* fail closed */ }
           deps.logError(formatPasswordResetMailFailure(error));
         }
       } else if (!deps.isProduction) {
         deps.logDevelopmentCode(email, code);
+        deps.logInfo?.('Password reset is using the development-only code fallback.');
       }
+    } else if (!account) {
+      deps.logInfo?.('Password reset request has no eligible account; no email was sent.');
     } else if (deps.isProduction && !configured) {
       deps.logError('Password reset email is not configured. No reset code was issued.');
     }
@@ -389,6 +392,7 @@ export const passwordResetService = createPasswordResetService({
     }
   },
   logError: message => console.error(`[password-reset] ${message}`),
+  logInfo: message => console.info(`[password-reset] ${message}`),
   logDevelopmentCode: (_email, code) => console.info(`[password-reset-development] code=${code}`),
   isProduction: process.env.NODE_ENV === 'production',
   secret: process.env.SESSION_SECRET || ''
