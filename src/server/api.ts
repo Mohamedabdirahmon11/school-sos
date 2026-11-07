@@ -1100,12 +1100,19 @@ apiRouter.post('/auth/reset-password', async (req, res) => {
     });
     return;
   }
-  const result = await passwordResetService.reset(
-    parsed.data.email,
-    parsed.data.code,
-    parsed.data.newPassword,
-    req.ip || req.socket.remoteAddress || 'unknown'
-  );
+  let result: Awaited<ReturnType<typeof passwordResetService.reset>>;
+  try {
+    result = await passwordResetService.reset(
+      parsed.data.email,
+      parsed.data.code,
+      parsed.data.newPassword,
+      req.ip || req.socket.remoteAddress || 'unknown'
+    );
+  } catch {
+    console.error('[password-reset] Reset processing failed. No code or password details were logged.');
+    res.status(503).json({ error: 'Password reset could not be completed. Request a new code.', code: 'PASSWORD_RESET_UNAVAILABLE' });
+    return;
+  }
   if (!result.ok) {
     if (result.reason === 'password_policy') {
       res.status(400).json({ error: result.message, code: 'PASSWORD_POLICY_FAILED' });
