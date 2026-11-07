@@ -221,7 +221,7 @@ export const LoginView: React.FC = () => {
                   </div>
                   {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
                   <button type="submit" disabled={resetLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
-                    {resetLoading ? 'Sending…' : t('forgot_password_send_code')}
+                    {resetLoading ? t('forgot_password_sending') : t('forgot_password_send_code')}
                   </button>
                 </form>
               ) : (
@@ -243,7 +243,7 @@ export const LoginView: React.FC = () => {
                   </div>
                   {resetError && <p role="alert" className="text-xs text-red-700">{resetError}</p>}
                   <button type="submit" disabled={resetLoading || expiresIn <= 0} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
-                    {resetLoading ? 'Updating…' : t('forgot_password_reset')}
+                    {resetLoading ? t('forgot_password_updating') : t('forgot_password_reset')}
                   </button>
                   <button type="button" onClick={handleResendCode} disabled={resetLoading || resendIn > 0} className="w-full text-xs text-[#0F766E] underline disabled:text-[#94A3B8] disabled:no-underline">
                     {resendIn > 0 ? t('forgot_password_resend_wait').replace('{seconds}', `${Math.floor(resendIn / 60)}:${String(resendIn % 60).padStart(2, '0')}`) : t('forgot_password_resend')}
