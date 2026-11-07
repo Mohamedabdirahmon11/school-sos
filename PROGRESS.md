@@ -1,5 +1,13 @@
 ## School Setup Wizard (2026-11-07)
 
+- IMPLEMENTED on `work/school-setup-wizard-2026-11-07`: ten guided steps, database-persisted resume state, school-scoped readiness checks, a School Admin dashboard gate in both the app and dashboard API, English/Somali/Amharic labels, and regression tests.
+- VERIFIED (read-only): the live Supabase migration history ends at 062 (`password_reset_codes`), so this feature uses repository migration 063. The current `main` migration directory only contains files through 059; the live-applied 060–062 source files are not all present on `main`. Do not replay or recreate those migrations as part of this feature.
+- VERIFIED GitHub CI: run 42379865713 on commit `f4a734d6c13430370d343f5baf8c2603c265db54` passed TypeScript checks, the full test suite, route parity, RLS source audit, and production build.
+- SAFETY: Only read-only Supabase metadata/schema inspection was performed. Migration 063 has not been applied; no production data, deployment, secrets, or other PR branches were changed.
+- OPEN: Draft PR #23 is prepared. PRs #18, #20, and #21 remain open and untouched; they overlap some files in this change, so refresh/rebase after those PRs are resolved.
+- REMAINING: Apply migration 063 only with explicit approval and before deploying the code; perform browser/manual setup walkthrough after deployment. No browser or Gmail manual test is claimed.
+
+
 - PARTIAL: The main branch did not yet contain a first-login School Admin setup wizard or a dashboard gate. Work is isolated to `work/school-setup-wizard-2026-11-07`; main and other PR branches are not being changed.
 - VERIFIED (read-only): The selected Supabase project migration history already contains calendar preference, shift-aware timetable, and password-reset migrations; the latest is `password_reset_codes` (062), so the next migration number is 063.
 - SAFETY: Only read-only Supabase metadata/schema inspection was performed. No production migration, data update, deployment, or secret change was made.
