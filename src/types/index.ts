@@ -200,7 +200,8 @@ export interface SchoolClass {
   schoolId: string;
   branchId?: string;
   name: string; // e.g., "Grade 10 - A"
-  gradeLevel: number; // 1 to 12
+  gradeLevel: number; // 0 (KG) to 12
+  shift: 1 | 2;
   section: string; // "A", "B", etc.
   roomNumber: string;
   capacity: number;
@@ -233,6 +234,7 @@ export interface TimetableSlot {
   subjectName?: string;
   teacherName?: string;
   className?: string;
+  warnings?: string[];
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
