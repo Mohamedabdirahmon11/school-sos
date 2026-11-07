@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatPasswordResetMailFailure, isPasswordResetMailConfigured, sendPasswordResetEmail } from '../src/server/mail-service.ts';
+import { formatPasswordResetMailFailure, isPasswordResetMailConfigured, PasswordResetMailError, sendPasswordResetEmail } from '../src/server/mail-service.ts';
 
 test('Resend receives plain text and HTML templates in Somali and Amharic', async () => {
   const previousKey = process.env.MAIL_PROVIDER_API_KEY;
@@ -115,7 +115,7 @@ test('Gmail SMTP rejects a sender address that differs from the authenticated ac
   try {
     await assert.rejects(
       () => sendPasswordResetEmail('admin@school.test', '123456', 'en'),
-      /MAIL_FROM must use the authenticated Gmail address/
+      (error: unknown) => error instanceof PasswordResetMailError && error.provider === 'gmail' && error.providerMessage === 'MAIL_FROM must use the authenticated Gmail address.'
     );
   } finally {
     if (previous.provider === undefined) delete process.env.MAIL_PROVIDER; else process.env.MAIL_PROVIDER = previous.provider;
