@@ -181,7 +181,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     return { user, language: preferredLanguage || 'en' };
   };
 
-  async function request(emailInput: string, ipInput: string, preferredLanguage: 'en' | 'so' | 'am' = 'en'): Promise<{ message: string; expiresInSeconds: number; retryAfterSeconds: number }> {
+  async function request(emailInput: string, ipInput: string, preferredLanguage?: 'en' | 'so' | 'am'): Promise<{ message: string; expiresInSeconds: number; retryAfterSeconds: number }> {
     const email = normalizeEmail(emailInput);
     const ip = ipInput || 'unknown';
     const timestamp = now();
