@@ -115,7 +115,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
       updated += 1;
     },
     revokeSessions: async () => { revoked += 1; },
-    checkRateLimit: (key, threshold, durationMinutes) => {
+    checkRateLimit: (key, _threshold, _durationMinutes) => {
       const entry = rateLocks.get(key);
       if (!entry) return false;
       if (entry.lockedUntil > clock.getTime()) return true;
@@ -128,7 +128,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
       if (entry.count >= threshold) entry.lockedUntil = clock.getTime() + durationMinutes * 60 * 1000;
       rateLocks.set(key, entry);
     },
-    clearLockouts: async () => { cleared += 1; },
+    clearLockouts: async () => { cleared += 1; rateLocks.clear(); },
     audit: entry => { audits.push(entry); },
     logError: () => {},
     logDevelopmentCode: (_email, code) => { devCodes.push(code); },
