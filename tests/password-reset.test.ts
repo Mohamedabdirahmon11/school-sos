@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import type { User, School } from '../src/types/index.ts';
 import {
   createPasswordResetService,
@@ -287,3 +288,14 @@ test('production with no mail provider never creates a usable code', async () =>
   assert.equal(f.repository.rows[0].code_hash, null);
   assert.equal(f.devCodes.length, 0);
 });
+
+test('the environment-configured Super Admin is seeded into the database user store', () => {
+  const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storageSource, /process\.env\.SUPER_ADMIN_EMAIL/);
+  assert.match(storageSource, /role: 'super_admin'/);
+  assert.match(storageSource, /this\.data\.users\.push\(superAdminUser\)/);
+  const serviceSource = readFileSync(new URL('../src/server/password-reset-service.ts', import.meta.url), 'utf8');
+  assert.match(serviceSource, /db\.queryPage<User>\('users', \{ email \}/);
+  assert.match(serviceSource, /return db\.findUserForLogin\(email\)/);
+});
+
