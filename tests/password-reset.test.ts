@@ -135,6 +135,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
     clearLockouts: async () => { cleared += 1; rateLocks.clear(); },
     audit: entry => { audits.push(entry); },
     logError: message => { logs.push(message); },
+    logInfo: message => { logs.push(message); },
     logDevelopmentCode: (_email, code) => { devCodes.push(code); },
     isProduction: options.production ?? true,
     secret: SECRET,
@@ -175,6 +176,7 @@ test('successful reset hashes the new password, clears lockout, and revokes sess
   assert.equal(response.message, PASSWORD_RESET_NEUTRAL_MESSAGE);
   assert.deepEqual(f.sentCodes, ['123456']);
   assert.deepEqual(f.sentLanguages, ['so']);
+  assert.ok(f.logs.includes('Password reset email delivery succeeded.'));
   const result = await f.service.reset(EMAIL, '123456', NEW_PASSWORD, IP);
   assert.deepEqual(result, { ok: true });
   assert.equal(verifyPassword(NEW_PASSWORD, f.user.passwordHash), true);
@@ -302,6 +304,7 @@ test('unknown email receives the exact same neutral request response and no code
   assert.equal(f.sentCodes.length, 0);
   assert.equal(f.repository.rows[0].user_id, null);
   assert.equal(f.repository.rows[0].code_hash, null);
+  assert.ok(f.logs.includes('Password reset request has no eligible account; no email was sent.'));
 });
 
 test('suspended school account receives no reset code', async () => {
