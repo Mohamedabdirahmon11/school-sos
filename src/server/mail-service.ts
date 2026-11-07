@@ -25,9 +25,10 @@ const PASSWORD_RESET_TEMPLATES: Record<ResetMailLanguage, { subject: string; gre
 };
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, character => ({
+  const entities: Record<string, string> = {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[character] || character);
+  };
+  return value.replace(/[&<>"']/g, character => entities[character] || character);
 }
 
 export function isPasswordResetMailConfigured(): boolean {
