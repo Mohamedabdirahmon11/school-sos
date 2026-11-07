@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 type ResetMailLanguage = 'en' | 'so' | 'am';
 
 const PASSWORD_RESET_TEMPLATES: Record<ResetMailLanguage, { subject: string; greeting: string; intro: string; expiry: string; ignore: string }> = {
@@ -31,8 +33,16 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => entities[character] || character);
 }
 
+function providerName(): string {
+  return (process.env.MAIL_PROVIDER?.trim().toLowerCase() || 'resend');
+}
+
 export function isPasswordResetMailConfigured(): boolean {
-  return Boolean(process.env.MAIL_PROVIDER_API_KEY?.trim() && process.env.MAIL_FROM?.trim());
+  const provider = providerName();
+  if (provider === 'gmail') {
+    return Boolean(process.env.GMAIL_SMTP_USER?.trim() && process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '') && process.env.MAIL_FROM?.trim());
+  }
+  return provider === 'resend' && Boolean(process.env.MAIL_PROVIDER_API_KEY?.trim() && process.env.MAIL_FROM?.trim());
 }
 
 interface MailMessage {
@@ -92,18 +102,52 @@ class ResendMailProvider implements MailProvider {
         const detail = typeof body.message === 'string' ? body.message : body.error;
         if (typeof detail === 'string' && detail.trim()) providerMessage = detail.trim();
       } catch {
-        // Do not log the raw response body; retain only the HTTP status text.
+        // Do not log the raw response body.
       }
       throw new PasswordResetMailError('resend', response.status, providerMessage);
     }
   }
 }
 
-const mailProvider: MailProvider = new ResendMailProvider();
+class GmailSmtpMailProvider implements MailProvider {
+  async send(message: MailMessage): Promise<void> {
+    const user = process.env.GMAIL_SMTP_USER?.trim();
+    const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '');
+    if (!user || !pass) throw new PasswordResetMailError('gmail', null, 'Gmail SMTP credentials are not configured.');
+
+    const sender = message.from.match(/<([^<>]+)>/)?.[1]?.trim() || message.from.trim();
+    if (sender.toLowerCase() !== user.toLowerCase()) {
+      throw new PasswordResetMailError('gmail', null, 'MAIL_FROM must use the authenticated Gmail address.');
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user, pass },
+        connectionTimeout: 15000,
+        greetingTimeout: 10000,
+        socketTimeout: 20000,
+        tls: { minVersion: 'TLSv1.2' }
+      });
+      await transporter.sendMail(message);
+      transporter.close();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'SMTP delivery failed.';
+      const code = error && typeof error === 'object' && 'responseCode' in error && typeof error.responseCode === 'number'
+        ? error.responseCode : null;
+      throw new PasswordResetMailError('gmail', code, detail);
+    }
+  }
+}
 
 export async function sendPasswordResetEmail(to: string, code: string, language: ResetMailLanguage = 'en', schoolName?: string): Promise<void> {
   const from = process.env.MAIL_FROM?.trim();
-  if (!isPasswordResetMailConfigured() || !from) throw new Error('Password reset email delivery is not configured.');
+  const providerNameValue = providerName();
+  if (!isPasswordResetMailConfigured() || !from) {
+    throw new Error('Password reset email delivery is not configured.');
+  }
 
   const template = PASSWORD_RESET_TEMPLATES[language] || PASSWORD_RESET_TEMPLATES.en;
   const safeCode = escapeHtml(code);
@@ -123,5 +167,11 @@ export async function sendPasswordResetEmail(to: string, code: string, language:
     <p>${escapeHtml(template.expiry)}</p><p>${escapeHtml(template.ignore)}</p>
   </body></html>`;
 
-  await mailProvider.send({ from, to: [to], subject: template.subject, text, html });
+  const provider: MailProvider = providerNameValue === 'gmail'
+    ? new GmailSmtpMailProvider()
+    : new ResendMailProvider();
+  if (providerNameValue !== 'gmail' && providerNameValue !== 'resend') {
+    throw new Error('MAIL_PROVIDER must be either gmail or resend.');
+  }
+  await provider.send({ from, to: [to], subject: template.subject, text, html });
 }
