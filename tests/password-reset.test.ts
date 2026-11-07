@@ -95,6 +95,7 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
   const sentLanguages: string[] = [];
   const devCodes: string[] = [];
   const audits: PasswordResetAudit[] = [];
+  const rateLocks = new Map<string, { count: number; lockedUntil: number }>();
   let revoked = 0;
   let cleared = 0;
   let updated = 0;
@@ -114,6 +115,19 @@ function fixture(options: { suspended?: boolean; exists?: boolean; production?: 
       updated += 1;
     },
     revokeSessions: async () => { revoked += 1; },
+    checkRateLimit: (key, threshold, durationMinutes) => {
+      const entry = rateLocks.get(key);
+      if (!entry) return false;
+      if (entry.lockedUntil > clock.getTime()) return true;
+      if (entry.lockedUntil && entry.lockedUntil <= clock.getTime()) rateLocks.delete(key);
+      return false;
+    },
+    recordRateLimit: async (key, threshold, durationMinutes) => {
+      const entry = rateLocks.get(key) || { count: 0, lockedUntil: 0 };
+      entry.count += 1;
+      if (entry.count >= threshold) entry.lockedUntil = clock.getTime() + durationMinutes * 60 * 1000;
+      rateLocks.set(key, entry);
+    },
     clearLockouts: async () => { cleared += 1; },
     audit: entry => { audits.push(entry); },
     logError: () => {},
