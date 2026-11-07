@@ -45,7 +45,7 @@ export interface TranslationDict {
   timetable_swap: string;
   timetable_swap_select: string;
   timetable_swapped: string;
-  timetable_unfilled: string;;
+  timetable_unfilled: string;
   timetable_print_class: string;
   timetable_print_shift: string;
   timetable_print_teacher: string;
