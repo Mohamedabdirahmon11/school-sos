@@ -7,6 +7,12 @@ type PrintMode = 'class' | 'shift' | 'teacher' | 'allTeachers';
 interface Props {
   mode: PrintMode;
   shift: 1 | 2;
+  selectedClassId: string;
+  selectedTeacherId: string;
+  onModeChange: (mode: PrintMode) => void;
+  onShiftChange: (shift: 1 | 2) => void;
+  onClassChange: (classId: string) => void;
+  onTeacherChange: (teacherId: string) => void;
   selectedClass?: SchoolClass;
   selectedTeacher?: Teacher;
   classes: SchoolClass[];
@@ -27,7 +33,7 @@ const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
 const periods = [1, 2, 3, 4, 5, 6] as const;
 
 export const TimetablePrintView: React.FC<Props> = ({
-  mode, shift, selectedClass, selectedTeacher, classes, teachers, subjects, timetable, settings, school, t, onClose, onPrint
+  mode, shift, selectedClass, selectedTeacher, selectedClassId, selectedTeacherId, onModeChange, onShiftChange, onClassChange, onTeacherChange, classes, teachers, subjects, timetable, settings, school, t, onClose, onPrint
 }) => {
   const shiftClasses = classes.filter(klass => (klass.shift || 1) === shift);
   const subjectName = (id: string) => subjects.find(subject => subject.id === id)?.name || id;
@@ -85,7 +91,18 @@ export const TimetablePrintView: React.FC<Props> = ({
       `}</style>
       <div id="timetable-print-root" className="mx-auto max-w-[1400px]">
         <div className="no-print mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 shadow">
-          <p className="text-sm font-semibold text-slate-800">{t('timetable_print_sheet')}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-slate-800">{t('timetable_print_sheet')}</p>
+            <select aria-label="Print mode" value={mode} onChange={e => onModeChange(e.target.value as PrintMode)} className="rounded-lg border px-2 py-2 text-xs">
+              <option value="class">{t('timetable_print_class')}</option>
+              <option value="shift">{t('timetable_print_shift')}</option>
+              <option value="teacher">{t('timetable_print_teacher')}</option>
+              <option value="allTeachers">{t('timetable_print_all_teachers')}</option>
+            </select>
+            {mode === 'shift' && <select aria-label={t('timetable_shift')} value={shift} onChange={e => onShiftChange(Number(e.target.value) as 1 | 2)} className="rounded-lg border px-2 py-2 text-xs"><option value={1}>{t('timetable_shift_1')}</option><option value={2}>{t('timetable_shift_2')}</option></select>}
+            {mode === 'class' && <select aria-label={t('timetable_class_label')} value={selectedClassId} onChange={e => onClassChange(e.target.value)} className="rounded-lg border px-2 py-2 text-xs">{classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}</option>)}</select>}
+            {mode === 'teacher' && <select aria-label={t('timetable_teacher_label')} value={selectedTeacherId} onChange={e => onTeacherChange(e.target.value)} className="rounded-lg border px-2 py-2 text-xs">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>}
+          </div>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">{t('timetable_print_close')}</button>
             <button type="button" onClick={onPrint} className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white">{t('timetable_print_sheet')}</button>
