@@ -492,7 +492,7 @@ export class ApiClient {
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
-    return this.request<{ success: boolean }>('/timetable/swap', { method: 'POST', body: JSON.stringify({ firstSlotId, secondSlotId }) });
+    return this.request<{ success: boolean; warnings?: string[] }>('/timetable/swap', { method: 'POST', body: JSON.stringify({ firstSlotId, secondSlotId }) });
   }
 
   public static async getTimetableSettings() {
