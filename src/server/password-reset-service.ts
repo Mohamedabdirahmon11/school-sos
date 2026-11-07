@@ -133,7 +133,7 @@ function normalizeEmail(email: string): string {
 }
 
 function hmac(value: string, secret: string, purpose: string): string {
-  if (secret.length < 32) throw new Error('SESSION_SECRET must contain at least 32 characters for password reset.');
+  if (!secret) throw new Error('SESSION_SECRET is required for password reset.');
   return createHmac('sha256', secret).update(`${purpose}:${value}`).digest('hex');
 }
 
@@ -341,7 +341,7 @@ export const passwordResetService = createPasswordResetService({
     });
   },
   logError: message => console.error(`[password-reset] ${message}`),
-  logDevelopmentCode: (email, code) => console.info(`[password-reset-development] ${email} code=${code}`),
+  logDevelopmentCode: (_email, code) => console.info(`[password-reset-development] code=${code}`),
   isProduction: process.env.NODE_ENV === 'production',
   secret: process.env.SESSION_SECRET || ''
 });
