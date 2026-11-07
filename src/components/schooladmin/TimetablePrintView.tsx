@@ -1,7 +1,7 @@
 import React from 'react';
 import { SchoolClass, Subject, Teacher, TimetableSlot } from '../../types/index.ts';
 import { getTimetablePeriodTimes } from '../../lib/timetable.ts';
-import { TranslationDict } from '../../lib/translations.ts';
+import type { TranslationDict } from '../../lib/translations.ts';
 
 type PrintMode = 'class' | 'shift' | 'teacher' | 'allTeachers';
 
@@ -85,8 +85,8 @@ export const TimetablePrintView: React.FC<Props> = ({
           #timetable-print-root { position: absolute !important; inset: 0 !important; width: 100% !important; background: #fff !important; padding: 0 !important; overflow: visible !important; }
           #timetable-print-root .no-print { display: none !important; }
           #timetable-print-sheet { box-shadow: none !important; border: 0 !important; margin: 0 !important; max-width: none !important; padding: 0 !important; }
-          #timetable-print-sheet table { width: 100% !important; border-collapse: collapse !important; font-size: 8pt !important; }
-          #timetable-print-sheet th, #timetable-print-sheet td { border: 1px solid #475569 !important; padding: 4px !important; }
+          #timetable-print-sheet table { width: 100% !important; border-collapse: collapse !important; font-size: 6pt !important; line-height: 1.05 !important; }
+          #timetable-print-sheet th, #timetable-print-sheet td { border: 1px solid #475569 !important; padding: 2px !important; }
           #timetable-print-sheet tr { break-inside: avoid; page-break-inside: avoid; }
           #timetable-print-sheet .print-day { width: 75px; }
         }
