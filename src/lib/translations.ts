@@ -109,6 +109,8 @@ export interface TranslationDict {
   forgot_password_password_mismatch: string;
   forgot_password_success: string;
   forgot_password_pin_hint: string;
+  forgot_password_request_error: string;
+  forgot_password_reset_error: string;
   first_time_password_hint: string;
   staff_id: string;
   staff_id_generated_hint: string;
@@ -375,6 +377,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     forgot_password_password_mismatch: 'Passwords do not match.',
     forgot_password_success: 'Password changed. You can now sign in with your new password.',
     forgot_password_pin_hint: 'Forgot your PIN or password? Ask your school administrator to reset it.',
+    forgot_password_request_error: 'Could not process the request. Please try again.',
+    forgot_password_reset_error: 'Password reset could not be completed. Please request a new code.',
     first_time_password_hint: 'Create a password different from your temporary sign-in password. It must be at least 8 characters.',
     staff_id: 'Staff ID',
     staff_id_generated_hint: 'Leave blank to generate a unique ID',
@@ -621,6 +625,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     forgot_password_password_mismatch: 'Furayaasha sirta isma laha.',
     forgot_password_success: 'Furaha sirta waa la beddelay. Hadda ku gal furahaaga cusub.',
     forgot_password_pin_hint: 'Haddii aad illowday PIN-ka ama furaha sirta, weydii maamulaha dugsiga inuu kuu beddelo.',
+    forgot_password_request_error: 'Codsiga lama fulin karin. Fadlan mar kale isku day.',
+    forgot_password_reset_error: 'Furaha sirta lama beddeli karin. Fadlan codso koodh cusub.',
     first_time_password_hint: 'Sameyso furaha sirta ah oo ka duwan kii ku-meel-gaarka ahaa ee aad ku gashay. Waa inuu ka koobnaadaa ugu yaraan 8 xaraf.',
     staff_id: 'Aqoonsiga Shaqaalaha',
     staff_id_generated_hint: 'Madhan ka tag si aqoonsi gaar ah loo sameeyo',
@@ -867,6 +873,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     forgot_password_password_mismatch: 'የይለፍ ቃሎቹ አይዛመዱም።',
     forgot_password_success: 'የይለፍ ቃሉ ተቀይሯል። አሁን በአዲሱ የይለፍ ቃል ይግቡ።',
     forgot_password_pin_hint: 'ፒንዎን ወይም የይለፍ ቃልዎን ከረሱ፣ እንዲቀይርልዎ የትምህርት ቤትዎን አስተዳዳሪ ይጠይቁ።',
+    forgot_password_request_error: 'ጥያቄውን ማስኬድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።',
+    forgot_password_reset_error: 'የይለፍ ቃሉን መቀየር አልተቻለም። አዲስ ኮድ ይጠይቁ።',
     first_time_password_hint: 'ከጊዜያዊ የመግቢያ የይለፍ ቃልዎ የተለየ የይለፍ ቃል ይፍጠሩ። ቢያንስ 8 ቁምፊዎች መሆን አለበት።',
     staff_id: 'የሰራተኛ መታወቂያ',
     staff_id_generated_hint: 'ልዩ መታወቂያ ለማመንጨት ባዶ ይተዉ',
