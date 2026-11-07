@@ -66,7 +66,7 @@ class MemoryResetRepository implements PasswordResetRepository {
   }
 
   async cleanup(olderThan: string) {
-    this.rows = this.rows.filter(row => row.created_at >= olderThan);
+    this.rows = this.rows.filter(row => row.expires_at >= olderThan);
   }
 }
 
