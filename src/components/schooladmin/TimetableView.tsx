@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { getTimetablePeriodTimes } from '../../lib/timetable.ts';
 import { TimetablePrintView } from './TimetablePrintView.tsx';
-import { CalendarDays, AlertTriangle, CheckCircle2, Plus, Clock, X } from 'lucide-react';
+import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X } from 'lucide-react';
 
 export const TimetableView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -179,7 +179,7 @@ export const TimetableView: React.FC = () => {
           {viewMode === 'day' && <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
           <button onClick={handleGenerate} disabled={isReadOnly || !selectedClassId} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs disabled:opacity-50">{t('timetable_generate')}</button>
           <button onClick={() => { setSwapMode(value => !value); setFirstSwapSlot(null); }} disabled={isReadOnly} className={`px-3 py-1.5 rounded-lg border text-xs ${swapMode ? 'bg-amber-100 border-amber-300' : 'border-[#CBD5E1]'}`}>{t('timetable_swap')}</button>
-          <button onClick={() => setShowPrintView(true)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">{t('timetable_print')}</button>
+          <button onClick={() => { setPrintShift(selectedClass?.shift === 2 ? 2 : 1); setShowPrintView(true); }} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">{t('timetable_print')}</button>
 
           <button
             onClick={() => {
