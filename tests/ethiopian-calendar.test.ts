@@ -5,6 +5,7 @@ import {
   ethiopianToGregorian,
   formatSchoolDate,
   formatSchoolMonthPeriod,
+  formatSchoolMonthPeriod,
   gregorianAcademicYearToSchool,
   gregorianToEthiopian,
   gregorianToSchoolDate,
@@ -57,6 +58,16 @@ test('validates per-school calendar preferences', () => {
   assert.equal(sanitizeSchoolSettings({ calendarType: 'ethiopian' }).calendarType, 'ethiopian');
   assert.equal(sanitizeSchoolSettings({ calendarType: 'gregorian' }).calendarType, 'gregorian');
   assert.throws(() => sanitizeSchoolSettings({ calendarType: 'lunar' }), /Calendar must be Ethiopian or Gregorian/);
+});
+
+
+test('formats Gregorian payroll accounting months using the selected school calendar', () => {
+  const ethiopian = formatSchoolMonthPeriod('2026-11', 'ethiopian');
+  const gregorian = formatSchoolMonthPeriod('2026-11', 'gregorian');
+  assert.match(ethiopian, /2019/);
+  assert.match(gregorian, /Nov/);
+  assert.notEqual(ethiopian, gregorian);
+  assert.throws(() => formatSchoolMonthPeriod('2026-13', 'ethiopian'), /Payroll month/);
 });
 
 
