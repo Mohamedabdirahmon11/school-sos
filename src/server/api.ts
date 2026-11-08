@@ -10,6 +10,14 @@ import express from 'express';
 import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
+import type { Session } from '@supabase/supabase-js';
+import {
+  signInSchoolOSUser,
+  getSupabaseAuthUser,
+  refreshSupabaseAuthSession,
+  revokeSupabaseAuthSession,
+  updateSupabaseAuthPassword
+} from './supabase-auth.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
 import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig } from '../types/index.ts';
@@ -352,7 +360,7 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
   ).map(student => student.classId);
 }
 
-async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
+async function getAuthenticatedUser(req: Request, allowBootstrap = false, res?: Response): Promise<User | null> {
   let token = req.cookies?.schoolos_session;
   if (!token && req.headers.authorization) {
     token = req.headers.authorization.replace(/^Bearer\s+/, '').trim();
@@ -361,12 +369,12 @@ async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promi
   const cached = authenticatedRequestCache.get(req);
   const bootstrapToken = Boolean(verifySignedSessionToken(token)?.sessionId.startsWith('bootstrap-'));
   if (cached && cached.token === token && (cached.bootstrapAllowed || !allowBootstrap || !bootstrapToken)) return cached.promise;
-  const promise = loadAuthenticatedUser(req, token, allowBootstrap);
+  const promise = loadAuthenticatedUser(req, token, allowBootstrap, res);
   authenticatedRequestCache.set(req, { token, promise, bootstrapAllowed: allowBootstrap });
   return promise;
 }
 
-async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap: boolean): Promise<User | null> {
+async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap: boolean, res?: Response): Promise<User | null> {
   // Verify HMAC-SHA256 signature, expiry, and structure
   const payload = verifySignedSessionToken(token);
   if (!payload) return null;
@@ -389,6 +397,21 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   const normalizedRole = normalizeRole(storedUser.role);
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
+  // Newly issued sessions are validated against Supabase Auth. Legacy cookies
+  // remain valid until their original expiry so users are not abruptly logged out.
+  const authAccessToken = req.cookies?.schoolos_auth_access;
+  const authRefreshToken = req.cookies?.schoolos_auth_refresh;
+  if (authAccessToken || authRefreshToken) {
+    let authIdentity = authAccessToken ? await getSupabaseAuthUser(authAccessToken) : null;
+    if (!authIdentity && authRefreshToken && res) {
+      const refreshedAuthSession = await refreshSupabaseAuthSession(authRefreshToken);
+      if (refreshedAuthSession) {
+        authIdentity = refreshedAuthSession.user;
+        setSupabaseAuthCookies(res, refreshedAuthSession);
+      }
+    }
+    if (!authIdentity || !user.authUserId || authIdentity.id !== user.authUserId) return null;
+  }
   if (!isPasswordResetSessionValid(user.passwordChangedAt, payload.passwordChangedAt)) return null;
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
   if (!session && !isBootstrap) return null;
@@ -415,7 +438,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
 
 // Middleware: Require Authenticated User
 async function requireAuth(req: Request, res: Response, next: () => void) {
-  const user = await getAuthenticatedUser(req, true);
+  const user = await getAuthenticatedUser(req, true, res);
   if (!user) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
@@ -644,8 +667,26 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
   await requireSchoolContext(req, res, next);
 }
 
-// Helper: Issue signed cookie session
-async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string): Promise<void> {
+// Supabase Auth tokens are HttpOnly and never exposed to browser JavaScript.
+function setSupabaseAuthCookies(res: Response, session: Session): void {
+  const base = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/'
+  };
+  res.cookie('schoolos_auth_access', session.access_token, {
+    ...base,
+    maxAge: Math.max(60, Number(session.expires_in || 3600)) * 1000
+  });
+  res.cookie('schoolos_auth_refresh', session.refresh_token, {
+    ...base,
+    maxAge: 30 * 24 * 60 * 60 * 1000
+  });
+}
+
+// Helper: Issue signed app session, bound to a verified Supabase Auth session.
+async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, authSession?: Session): Promise<void> {
   const settings = db.getSettings();
   const timeoutMinutes = settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
@@ -681,6 +722,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     path: '/',
     maxAge: timeoutMinutes * 60 * 1000
   });
+  if (authSession) setSupabaseAuthCookies(res, authSession);
 
 }
 
@@ -832,7 +874,19 @@ apiRouter.post('/auth/login', async (req, res) => {
         });
       }
 
-      await issueSessionCookie(res, existingUser, req, school.id);
+      let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+      try {
+        authResult = await signInSchoolOSUser(existingUser, pin, 'pin');
+      } catch {
+        console.error('[auth] Supabase account linking failed; no credentials were logged.');
+        res.status(503).json({ error: 'Account sign-in is temporarily unavailable. Contact your school administrator if this continues.' });
+        return;
+      }
+      if (!authResult) {
+        res.status(401).json({ error: 'Invalid PIN or account credentials.' });
+        return;
+      }
+      await issueSessionCookie(res, existingUser, req, school.id, authResult.session);
       db.logAudit({
         action: 'USER_LOGIN_SUCCESS',
         category: 'auth',
@@ -908,7 +962,19 @@ apiRouter.post('/auth/login', async (req, res) => {
       );
     }
 
-    await issueSessionCookie(res, targetUser, req, school.id);
+    let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+    try {
+      authResult = await signInSchoolOSUser(targetUser, pin, 'pin');
+    } catch {
+      console.error('[auth] Supabase account linking failed; no credentials were logged.');
+      res.status(503).json({ error: 'Account sign-in is temporarily unavailable. Contact your school administrator if this continues.' });
+      return;
+    }
+    if (!authResult) {
+      res.status(401).json({ error: 'Invalid PIN or account credentials.' });
+      return;
+    }
+    await issueSessionCookie(res, targetUser, req, school.id, authResult.session);
     db.logAudit({
       action: 'USER_LOGIN_SUCCESS',
       category: 'auth',
@@ -985,9 +1051,17 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // Verify Scrypt Password Hash
-  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
-  if (!isPasswordValid) {
+  // Supabase Auth is the canonical password verifier. Legacy scrypt hashes are
+  // checked once only when safely provisioning the user's first Auth identity.
+  let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+  try {
+    authResult = await signInSchoolOSUser(user, password, 'password');
+  } catch {
+    console.error('[auth] Supabase account linking failed; no credentials were logged.');
+    res.status(503).json({ error: 'Sign-in is temporarily unavailable. Please try again shortly.' });
+    return;
+  }
+  if (!authResult) {
     const lockResult = await db.handleFailedLogin(user.id);
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
@@ -1020,6 +1094,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
+    setSupabaseAuthCookies(res, authResult.session);
     res.json({ requirePasswordChange: true, challengeToken });
     return;
   }
@@ -1030,7 +1105,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   await db.handleSuccessfulLogin(user.id);
   db.clearLoginFailures(staffLockKey);
 
-  await issueSessionCookie(res, user, req);
+  await issueSessionCookie(res, user, req, undefined, authResult.session);
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
 
   db.logAudit({
@@ -1139,7 +1214,17 @@ apiRouter.post('/auth/logout', async (req, res) => {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   if (payload) { await db.revokeSession(payload.sessionId); invalidateAuthenticatedSnapshot(undefined, payload.sessionId); }
+  try {
+    await revokeSupabaseAuthSession(
+      String(req.cookies?.schoolos_auth_access || ''),
+      String(req.cookies?.schoolos_auth_refresh || '')
+    );
+  } catch {
+    // Local cookies are still cleared if remote revocation is temporarily unavailable.
+  }
   res.clearCookie('schoolos_session', { path: '/' });
+  res.clearCookie('schoolos_auth_access', { path: '/' });
+  res.clearCookie('schoolos_auth_refresh', { path: '/' });
   res.json({ success: true, message: 'Signed out successfully.' });
 });
 
@@ -1236,6 +1321,14 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
 
+  if (user.authUserId) {
+    try {
+      await updateSupabaseAuthPassword(user.authUserId, newPassword);
+    } catch {
+      res.status(503).json({ error: 'Supabase Auth could not update the password. No SchoolOS password changes were saved.' });
+      return;
+    }
+  }
   const updated = db.updateUser(user.id, {
     passwordHash: hashPassword(newPassword),
     mustChangePassword: false
