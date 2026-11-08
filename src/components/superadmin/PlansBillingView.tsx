@@ -11,6 +11,7 @@ import { Receipt, DollarSign, CheckCircle2, Clock, FileText, Printer, Sparkles, 
 
 export const PlansBillingView: React.FC = () => {
   const [plans, setPlans] = useState<PlanConfig[]>([]);
+  const [platformCurrency, setPlatformCurrency] = useState('ETB');
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<SubscriptionInvoice | null>(null);
   const [editingPlan, setEditingPlan] = useState<PlanConfig | null>(null);
@@ -24,12 +25,14 @@ export const PlansBillingView: React.FC = () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [plansData, invoicesData] = await Promise.all([
+      const [plansData, invoicesData, settingsData] = await Promise.all([
         ApiClient.getPlans(),
-        ApiClient.getInvoices()
+        ApiClient.getInvoices(),
+        ApiClient.getSettings()
       ]);
       setPlans(plansData);
       setInvoices(invoicesData);
+      setPlatformCurrency(String(settingsData.platformCurrency || 'ETB').toUpperCase());
     } catch (err: any) {
       setLoadError(err.message || 'Unable to load plans and subscription invoices.');
     } finally {
@@ -139,11 +142,11 @@ export const PlansBillingView: React.FC = () => {
 
                 <div className="mt-3 space-y-1">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold font-mono text-[#132A29]">${p.monthlyPrice}</span>
+                    <span className="text-2xl font-bold font-mono text-[#132A29]">{formatMoney(p.monthlyPrice, platformCurrency)}</span>
                     <span className="text-xs text-[#64748B]">/ month</span>
                   </div>
                   <p className="text-[11px] text-[#64748B]">
-                    ${p.yearlyPrice} / year · Lifetime: ${p.lifetimePrice}
+                    {formatMoney(p.yearlyPrice, platformCurrency)} / year · Lifetime: {formatMoney(p.lifetimePrice, platformCurrency)}
                   </p>
                 </div>
 
@@ -277,7 +280,7 @@ export const PlansBillingView: React.FC = () => {
             <form onSubmit={handleSavePlan} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Monthly Price ($)</label>
+                  <label className="block font-medium text-[#334155]">Monthly Price (${platformCurrency})</label>
                   <input
                     type="number"
                     min="0"
@@ -288,7 +291,7 @@ export const PlansBillingView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Yearly Price ($)</label>
+                  <label className="block font-medium text-[#334155]">Yearly Price (${platformCurrency})</label>
                   <input
                     type="number"
                     min="0"
@@ -301,7 +304,7 @@ export const PlansBillingView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-medium text-[#334155]">Lifetime Access Price ($)</label>
+                <label className="block font-medium text-[#334155]">Lifetime Access Price (${platformCurrency})</label>
                 <input
                   type="number"
                   min="0"
