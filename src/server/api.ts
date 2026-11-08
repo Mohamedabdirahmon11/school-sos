@@ -303,7 +303,7 @@ apiRouter.use((req, res, next) => {
 
 // Reject cross-tenant identifiers globally, including routes that do not use requireSchoolContext.
 apiRouter.use(async (req, res, next) => {
-  const user = await getAuthenticatedUser(req);
+  const user = await getAuthenticatedUser(req, false, res);
   const requestedSchoolId = String(req.headers['x-school-id'] || req.query.schoolId || req.body?.schoolId || '');
   if (user && user.role !== 'super_admin' && requestedSchoolId && requestedSchoolId !== user.schoolId) {
     res.status(403).json({ error: 'Cross-school access denied.' });
