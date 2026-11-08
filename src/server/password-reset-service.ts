@@ -117,7 +117,7 @@ export interface PasswordResetDependencies {
   getSchool(schoolId: string): Promise<School | null>;
   sendEmail(to: string, code: string, language: 'en' | 'so' | 'am', schoolName?: string): Promise<void>;
   mailConfigured(): boolean;
-  updatePassword(user: User, passwordHash: string, changedAt: string): Promise<void>;
+  updatePassword(user: User, passwordHash: string, changedAt: string, newPassword?: string): Promise<void>;
   revokeSessions(user: User): Promise<void>;
   checkRateLimit(key: string, threshold: number, durationMinutes: number, windowMinutes: number): boolean;
   recordRateLimit(key: string, threshold: number, durationMinutes: number, windowMinutes: number): Promise<void>;
@@ -318,7 +318,7 @@ export function createPasswordResetService(deps: PasswordResetDependencies) {
     if (!consumed) return { ok: false, reason: 'invalid_code' };
 
     try {
-      await deps.updatePassword(user, hashPassword(newPassword), timestamp.toISOString());
+      await deps.updatePassword(user, hashPassword(newPassword), timestamp.toISOString(), newPassword);
       await deps.revokeSessions(user);
       await deps.clearLockouts(email, ip);
       await audit('PASSWORD_RESET_SUCCEEDED', user, ip, 'Password was reset successfully; existing sessions were revoked.', 'info');
@@ -344,7 +344,14 @@ export const passwordResetService = createPasswordResetService({
   getSchool: schoolId => db.getSchoolById(schoolId),
   sendEmail: sendPasswordResetEmail,
   mailConfigured: isPasswordResetMailConfigured,
-  updatePassword: async (user, passwordHash, changedAt) => {
+  updatePassword: async (user, passwordHash, changedAt, newPassword) => {
+    // Keep the canonical Supabase Auth password synchronized before updating
+    // the legacy hash retained for backward compatibility and audit history.
+    if (user.authUserId) {
+      if (!supabase || !newPassword) throw new Error('Supabase Auth password update is unavailable.');
+      const { error } = await supabase.auth.admin.updateUserById(user.authUserId, { password: newPassword });
+      if (error) throw new Error('Supabase Auth password update failed.');
+    }
     const updated = db.updateUser(user.id, {
       passwordHash,
       mustChangePassword: false,
