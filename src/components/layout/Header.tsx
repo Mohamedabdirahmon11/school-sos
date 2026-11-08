@@ -45,8 +45,21 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
   };
 
   const formatBreadcrumb = () => {
-    const roleLabel = user ? t(user.role as any) : '';
     const section = currentView.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (user?.role === 'super_admin' && !inspectedSchool) {
+      const labels: Record<string, string> = {
+        sa_dashboard: 'Dashboard',
+        sa_schools: 'Schools',
+        sa_plans: 'Plans & Billing',
+        sa_users: 'Global Users',
+        sa_analytics: 'Platform Analytics',
+        sa_broadcasts: 'Broadcasts',
+        sa_support: 'Support & Audit',
+        sa_settings: 'Platform Settings'
+      };
+      return `Platform / ${labels[currentView] || section}`;
+    }
+    const roleLabel = user ? t(user.role as any) : '';
     return `${roleLabel} / ${section}`;
   };
 
