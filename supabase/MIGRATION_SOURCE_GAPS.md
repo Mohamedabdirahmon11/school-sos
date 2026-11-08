@@ -10,12 +10,11 @@ that the deployed schema is missing the corresponding objects.
 - `20261104072421_bulk_import_accept_legacy_parent_phone`
 - `20261104073439_harden_support_tickets`
 - `20261104073643_communication_default_channel`
-- `20261104074806_035_attendance_rate_include_late_exclude_excused`
 - `20261106144438_school_calendar_preference`
 
-The attendance-rate migration was removed from the default branch in commit
-`9128b823ecd1cfcdd96b792c749754153dac473c`; later dashboard aggregation work
-may supersede parts of its behavior. Do not recreate it from its filename.
+The attendance-rate migration source `035_attendance_rate_include_late_exclude_excused.sql`
+was restored exactly from the parent of commit
+`9128b823ecd1cfcdd96b792c749754153dac473c`.
 
 ## Additional shift-aware SQL source gap
 
