@@ -148,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { id: 'sch_inventory', label: t('inventory'), icon: Boxes, section: t('nav_other_modules') },
       { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle, section: t('nav_other_modules') },
       { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse, section: t('nav_other_modules') },
-      { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy, section: t('nav_other_modules') }
+      { id: 'sch_support', label: t('help_support'), icon: LifeBuoy, section: t('nav_other_modules') }
     ];
   };
 
