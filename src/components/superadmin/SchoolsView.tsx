@@ -40,6 +40,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
 
   const fetchSchools = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const list = await ApiClient.getSchools({ search, status: statusFilter });
       setSchools(list);
@@ -72,7 +74,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         if (found) loadSchoolDetail(found.id);
       }
     } catch (err: any) {
-      console.error(err);
+      setLoadError(err.message || 'Unable to load the school directory.');
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +89,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       const detail = await ApiClient.getSchoolDetails(id);
       setSelectedSchool(detail);
       if (detail && detail.school) {
-        setSubPlan(detail.school.subscription?.plan || 'plan-standard');
+        setSubPlan(detail.school.subscription?.plan || 'standard');
         setSubGraceDays(detail.school.subscription?.graceDays || 7);
         setSubStatus(detail.school.subscription?.status || 'active');
       }
