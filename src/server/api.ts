@@ -320,6 +320,13 @@ const requestLookupCache = new WeakMap<Request, Map<string, Promise<any>>>();
 
 function invalidateAuthenticatedSnapshot(_userId?: string, _sessionId?: string, _schoolId?: string) {}
 
+async function revokeUserSessions(userId: string, schoolId?: string): Promise<void> {
+  const sessions = await db.getUserSessions(schoolId);
+  await Promise.all(sessions.filter(session => session.userId === userId).map(session => db.revokeSession(session.id)));
+  await db.flush();
+  invalidateAuthenticatedSnapshot(userId);
+}
+
 function requestLookup<T>(req: Request, key: string, load: () => Promise<T>): Promise<T> {
   let cache = requestLookupCache.get(req);
   if (!cache) { cache = new Map(); requestLookupCache.set(req, cache); }
@@ -1354,11 +1361,12 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   }
   const updated = db.updateUser(user.id, {
     passwordHash: hashPassword(newPassword),
-    mustChangePassword: false
+    mustChangePassword: false,
+    passwordChangedAt: new Date().toISOString()
   });
   if (!updated) { res.status(404).json({ error: 'User account not found; password was not changed.' }); return; }
-  invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
+  await revokeUserSessions(user.id, user.schoolId);
 
   db.logAudit({
     action: 'PASSWORD_CHANGED',
@@ -1428,7 +1436,11 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     return;
   }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
-  if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
+  if (newPassword) {
+    updates.passwordHash = hashPassword(newPassword);
+    updates.mustChangePassword = false;
+    updates.passwordChangedAt = new Date().toISOString();
+  }
   const updated = db.updateUser(user.id, updates);
   if (!updated) {
     if (authPasswordChanged) { try { await updateSupabaseAuthPassword(user.authUserId!, currentPassword); } catch { console.error('[auth] Profile password rollback failed.'); } }
@@ -1446,8 +1458,22 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     res.status(503).json({ error: 'Profile changes could not be saved. Your previous Auth credentials were restored where possible.' });
     return;
   }
-  invalidateAuthenticatedSnapshot(user.id);
-  if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings.', severity: 'info' });
+  if (newPassword) {
+    await revokeUserSessions(user.id, user.schoolId);
+    let refreshedAuthSession: Session | undefined;
+    if (!['parent', 'student'].includes(user.role)) {
+      const authResult = await signInSchoolOSUser(updated, newPassword, 'password');
+      if (!authResult) {
+        res.status(503).json({ error: 'Password changed, but a new session could not be started. Sign in again with the new password.' });
+        return;
+      }
+      refreshedAuthSession = authResult.session;
+    }
+    await issueSessionCookie(res, updated, req, undefined, refreshedAuthSession);
+    db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings.', severity: 'info' });
+  } else {
+    invalidateAuthenticatedSnapshot(user.id);
+  }
   res.json(sanitizeUser(updated));
 });
 
@@ -4917,7 +4943,8 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     failedLoginAttempts: 0,
     lockedUntil: null,
     passwordHash: hashPassword(temporaryPassword),
-    mustChangePassword: true
+    mustChangePassword: true,
+    passwordChangedAt: new Date().toISOString()
   });
   if (!updatedUser) {
     res.status(404).json({ error: 'User not found.' });
@@ -4939,7 +4966,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(503).json({ error: 'The account password could not be synchronized. No temporary password was issued.' });
     return;
   }
-  invalidateAuthenticatedSnapshot(targetUser.id);
+  await revokeUserSessions(targetUser.id, targetUser.schoolId);
   db.logAudit({
     action: 'ADMIN_PASSWORD_RESET',
     category: 'auth',
