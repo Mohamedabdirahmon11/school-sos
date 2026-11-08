@@ -96,7 +96,7 @@ export async function signInSchoolOSUser(
       authUserId = matchingAuthUser.id;
       const synchronized = await adminClient.auth.admin.updateUserById(authUserId, {
         password: authPassword,
-        user_metadata: {
+        app_metadata: {
           ...matchingAuthUser.app_metadata,
           schoolos_user_id: user.id,
           schoolos_role: user.role
