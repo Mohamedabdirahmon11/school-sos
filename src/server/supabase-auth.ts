@@ -144,3 +144,17 @@ export async function updateSupabaseAuthPassword(authUserId: string, password: s
   const { error } = await client.auth.admin.updateUserById(authUserId, { password });
   if (error) throw new Error('Supabase Auth could not update the account password.');
 }
+
+export async function updateSupabaseAuthEmail(authUserId: string, email: string): Promise<void> {
+  if (!authUserId) throw new Error('This account is not linked to Supabase Auth.');
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalizedEmail)) {
+    throw new Error('A valid email address is required.');
+  }
+  const client = createAdminAuthClient();
+  const { error } = await client.auth.admin.updateUserById(authUserId, {
+    email: normalizedEmail,
+    email_confirm: true
+  });
+  if (error) throw new Error('Supabase Auth could not update the account email.');
+}
