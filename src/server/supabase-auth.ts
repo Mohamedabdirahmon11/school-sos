@@ -19,6 +19,14 @@ function authEmailForUser(user: User): string {
   return `schoolos-${stableAlias}@accounts.schoolos.invalid`;
 }
 
+function authPasswordForPin(user: User, pin: string): string {
+  const secret = process.env.SESSION_SECRET || '';
+  if (secret.length < 32) throw new Error('SESSION_SECRET must be configured to protect PIN-based Auth credentials.');
+  const digest = createHash('sha256').update(`${secret}:schoolos-pin:${user.id}:${pin}`).digest('hex');
+  // Supabase Auth stores a high-entropy derived secret, never the short PIN itself.
+  return `SchoolOS-${digest}-9A`;
+}
+
 /**
  * Verify credentials with Supabase Auth. For legacy users, verify the existing
  * scrypt hash once, provision an Auth identity using that same submitted secret,
@@ -33,22 +41,24 @@ export async function signInSchoolOSUser(
   const client = createServerAuthClient();
   let authUserId = user.authUserId;
   let email: string;
+  let usePinCredential = credentialType === 'pin';
 
   if (authUserId) {
     const { data, error } = await client.auth.admin.getUserById(authUserId);
     if (error || !data.user?.email || data.user.banned_until && Date.parse(data.user.banned_until) > Date.now()) return null;
     email = data.user.email;
   } else {
-    const validLegacyCredential = credentialType === 'pin'
-      ? verifyPin(credential, String(user.pin || ''))
-      : verifyPassword(credential, String(user.passwordHash || '')) ||
-        (user.role === 'teacher' && verifyPin(credential, String(user.pin || '')));
-    if (!validLegacyCredential) return null;
+    const validLegacyPassword = credentialType === 'password' && verifyPassword(credential, String(user.passwordHash || ''));
+    const validLegacyPin = (credentialType === 'pin' || user.role === 'teacher')
+      && verifyPin(credential, String(user.pin || ''));
+    if (!validLegacyPassword && !validLegacyPin) return null;
+    usePinCredential = !validLegacyPassword && validLegacyPin;
 
     email = authEmailForUser(user);
+    const authPassword = usePinCredential ? authPasswordForPin(user, credential) : credential;
     const { data, error } = await client.auth.admin.createUser({
       email,
-      password: credential,
+      password: authPassword,
       email_confirm: true
     });
     if (error || !data.user) {
@@ -71,9 +81,17 @@ export async function signInSchoolOSUser(
     }
   }
 
-  const { data, error } = await client.auth.signInWithPassword({ email, password: credential });
-  if (error || !data.user || !data.session || data.user.id !== authUserId) return null;
-  return { session: data.session, authUserId };
+  const authPasswords = usePinCredential
+    ? [authPasswordForPin(user, credential)]
+    : [credential, ...(user.role === 'teacher' && verifyPin(credential, String(user.pin || '')) ? [authPasswordForPin(user, credential)] : [])];
+
+  for (const authPassword of authPasswords) {
+    const { data, error } = await client.auth.signInWithPassword({ email, password: authPassword });
+    if (!error && data.user && data.session && data.user.id === authUserId) {
+      return { session: data.session, authUserId };
+    }
+  }
+  return null;
 }
 
 /** Validate a Supabase access token without mutating the shared service client session. */
