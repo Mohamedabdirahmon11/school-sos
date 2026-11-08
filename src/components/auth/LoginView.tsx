@@ -279,6 +279,28 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
+          {/* Admin login role selector: both admin options stay together in one place. */}
+          {!parentStudentMode && (
+            <div className="mb-5 grid grid-cols-2 gap-2" role="group" aria-label="Choose admin login type">
+              <button
+                type="button"
+                aria-pressed={activeTab === 'super_admin'}
+                onClick={() => { setActiveTab('super_admin'); setError(null); }}
+                className={`rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === 'super_admin' ? 'border-[#0F766E] bg-[#E6F4F2] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569] hover:bg-slate-50'}`}
+              >
+                Super Admin Login
+              </button>
+              <button
+                type="button"
+                aria-pressed={activeTab === 'school_admin'}
+                onClick={() => { setActiveTab('school_admin'); setError(null); }}
+                className={`rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === 'school_admin' ? 'border-[#0F766E] bg-[#E6F4F2] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569] hover:bg-slate-50'}`}
+              >
+                School Admin Login
+              </button>
+            </div>
+          )}
+
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             
