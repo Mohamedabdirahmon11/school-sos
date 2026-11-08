@@ -75,3 +75,11 @@ test('Supabase Auth mapping migration preserves SchoolOS IDs and only links exac
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS users_auth_user_id_uidx/i);
   assert.doesNotMatch(migration, /DROP TABLE|TRUNCATE TABLE/i);
 });
+
+test('all password and email update paths synchronize linked Supabase Auth accounts', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const resetSource = readFileSync(new URL('../src/server/password-reset-service.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /updateSupabaseAuthPassword\(targetUser\.authUserId, temporaryPassword\)/);
+  assert.match(apiSource, /updateSupabaseAuthEmail\(user\.authUserId/);
+  assert.match(resetSource, /supabase\.auth\.admin\.updateUserById\(user\.authUserId, \{ password: newPassword \}\)/);
+});
