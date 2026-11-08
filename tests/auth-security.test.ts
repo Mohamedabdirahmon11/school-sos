@@ -155,3 +155,11 @@ test('existing teacher sessions are rejected when the linked teacher profile is 
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   assert.match(apiSource, /if \(user\.role === 'teacher'\)[\s\S]*teacherProfiles\.items\.length !== 1 \|\| teacherProfiles\.items\[0\]\.status !== 'active'/);
 });
+
+
+test('first-login password form mirrors the backend password policy', () => {
+  const modalSource = readFileSync(new URL('../src/components/auth/ForcePasswordChangeModal.tsx', import.meta.url), 'utf8');
+  assert.match(modalSource, /password\.length < 12 \|\| password\.length > 128/);
+  assert.match(modalSource, /minLength=\{12\} maxLength=\{128\}/);
+  assert.match(modalSource, /uppercase, lowercase, and a number/);
+});
