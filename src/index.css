@@ -724,3 +724,29 @@
   .super-admin-design .sa-attention-panel { padding: 0; }
   .super-admin-design .sa-attention-panel > div:first-child { padding: 17px; }
 }
+
+/* Metric/chart selectors for the existing Super Admin dashboard markup. */
+.super-admin-design .sa-metric-card > div:first-child > span:first-child {
+  color: #75839a !important;
+  font-size: 10px !important;
+  font-weight: 700;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+.super-admin-design .sa-metric-card > div:last-child > span:first-child {
+  color: #1b2c47 !important;
+  font-size: 25px !important;
+  font-weight: 800;
+  letter-spacing: -.04em;
+}
+.super-admin-design .sa-metric-card > div:last-child > span:last-child {
+  color: #8794a7 !important;
+  font-size: 10px !important;
+}
+.super-admin-design .sa-revenue-chart > div > div {
+  height: 100%;
+  border-radius: 7px 7px 2px 2px;
+  background: linear-gradient(180deg, #38bcae, #267d91) !important;
+  transition: filter .18s ease, transform .18s ease;
+}
+.super-admin-design .sa-revenue-chart > div:hover > div { filter: brightness(1.08); transform: scaleY(1.015); transform-origin: bottom; }
