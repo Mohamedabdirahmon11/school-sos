@@ -32,7 +32,7 @@
     "test:schema-conformance": "tsx --test tests/schema-conformance.test.ts",
     "test": "tsx --test --test-concurrency=1 \"tests/*.test.ts\" \"tests/*.test.tsx\"",
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json",
-    "test:ci": "tsx --test --test-concurrency=1 tests/auth-security.test.ts tests/security-middleware.test.ts tests/parents-directory.test.ts tests/student-update-validation.test.ts tests/bulk-student-pin-reset.test.ts tests/class-grade-validation.test.ts tests/library-transport.test.ts tests/payroll-navigation.test.ts tests/exam-schedules.test.ts tests/async-errors.test.ts tests/dashboard-render.test.tsx tests/no-json-runtime.test.ts tests/roles.test.ts tests/storage-performance.test.ts"
+    "test:ci": "tsx --test --test-concurrency=1 tests/auth-security.test.ts tests/security-middleware.test.ts tests/parents-directory.test.ts tests/student-update-validation.test.ts tests/bulk-student-pin-reset.test.ts tests/class-grade-validation.test.ts tests/library-transport.test.ts tests/payroll-navigation.test.ts tests/exam-schedules.test.ts tests/async-errors.test.ts tests/dashboard-render.test.tsx tests/no-json-runtime.test.ts tests/roles.test.ts tests/storage-performance.test.ts tests/timetable-shifts.test.ts tests/schema-conformance.test.ts tests/password-reset.test.ts tests/password-reset-mail.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -49,7 +49,8 @@
     "react-dom": "^19.0.1",
     "vite": "^8.3.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "nodemailer": "^10.3.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
