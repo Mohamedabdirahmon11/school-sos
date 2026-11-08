@@ -559,3 +559,12 @@ pm run dev and apply migrations 001-014.
 - DONE: Supabase Security Advisor returned no security lints after the migration. Direct `anon`/`authenticated` access to public tables, sequences, and functions was checked and returned zero; `service_role` retains full table access to all 45 tables.
 - PARTIAL: Performance Advisor still reports 47 foreign keys without covering indexes. These are non-urgent performance work and were not changed in this security stage.
 - NOT VERIFIED: local `npm run lint`, `npm run build`, and automated tests were not run from this connector session. No GitHub Actions workflows are configured. Re-run CI/local checks before deployment. Reviewed the Supabase client module: it is server-only and requires `SUPABASE_SERVICE_ROLE_KEY`; the browser uses the SchoolOS HTTP API.
+
+
+## Super Admin command-centre redesign (2026-11-08)
+
+- DONE (code): Added a dedicated Super Admin application shell so the sidebar menu scrolls independently from the main content. The shell keeps the header and sidebar fixed within the viewport, gives the main panel its own vertical scroll, and preserves the mobile drawer behavior.
+- DONE (code): Refreshed the Super Admin brand panel, workspace navigation, active menu state, role footer, and header breadcrumb labels.
+- DONE (code): Redesigned the Super Admin dashboard presentation with a premium command-centre hero, clearer platform metric cards, revenue chart panel, subscription health panel, and improved attention table. Existing API calls, tenant actions, navigation IDs, and data contracts are preserved; no database schema or production data changed.
+- DONE (CI): GitHub Actions run 1594 passed on head `2b9bc299f64adf40fc8ee1c1c49d3f9eaf14b790`: TypeScript checks, test suite, route parity audit, RLS source audit, and production build all succeeded.
+- PARTIAL (visual verification): The remote build and automated checks passed, but an interactive browser review at desktop and mobile widths remains for the owner to perform locally.
