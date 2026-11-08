@@ -38,7 +38,7 @@ function authPasswordForPin(user: User): string {
 
 /**
  * Verify credentials with Supabase Auth. For legacy users, verify the existing
- * scrypt hash once, provision an Auth identity using that same submitted secret,
+ * scrypt hash when needed, provision an Auth identity with a protected credential,
  * then persist only the Auth UUID mapping. No passwords are copied or generated.
  */
 export async function signInSchoolOSUser(
@@ -51,22 +51,26 @@ export async function signInSchoolOSUser(
   const adminClient = createAdminAuthClient();
   let authUserId = user.authUserId;
   let email: string;
-  let usePinCredential = credentialType === 'pin';
+  // Teacher IDs may authenticate with either their school password or PIN.
+  // Both are checked against current SchoolOS hashes; Auth holds a server-only
+  // identity secret for this PIN-style login, not either raw credential.
+  const usePinCredential = credentialType === 'pin' || user.role === 'teacher';
 
   if (authUserId) {
     const { data, error } = await adminClient.auth.admin.getUserById(authUserId);
     if (error || !data.user?.email || data.user.banned_until && Date.parse(data.user.banned_until) > Date.now()) return null;
     email = data.user.email;
-    if (credentialType === 'pin' || user.role === 'teacher' && !verifyPassword(credential, String(user.passwordHash || ''))) {
-      if (!verifyPin(credential, String(user.pin || ''))) return null;
-      usePinCredential = true;
+    if (usePinCredential) {
+      const validCredential = user.role === 'teacher'
+        ? verifyPassword(credential, String(user.passwordHash || '')) || verifyPin(credential, String(user.pin || ''))
+        : verifyPin(credential, String(user.pin || ''));
+      if (!validCredential) return null;
     }
   } else {
     const validLegacyPassword = credentialType === 'password' && verifyPassword(credential, String(user.passwordHash || ''));
     const validLegacyPin = (credentialType === 'pin' || user.role === 'teacher')
       && verifyPin(credential, String(user.pin || ''));
     if (!validLegacyPassword && !validLegacyPin) return null;
-    usePinCredential = !validLegacyPassword && validLegacyPin;
 
     email = authEmailForUser(user);
     const authPassword = usePinCredential ? authPasswordForPin(user) : credential;
@@ -95,10 +99,7 @@ export async function signInSchoolOSUser(
     }
   }
 
-  const authPasswords = usePinCredential
-    ? [authPasswordForPin(user)]
-    : [credential, ...(user.role === 'teacher' && verifyPin(credential, String(user.pin || '')) ? [authPasswordForPin(user)] : [])];
-
+  const authPasswords = usePinCredential ? [authPasswordForPin(user)] : [credential];
   for (const authPassword of authPasswords) {
     const { data, error } = await authClient.auth.signInWithPassword({ email, password: authPassword });
     if (!error && data.user && data.session && data.user.id === authUserId) {
