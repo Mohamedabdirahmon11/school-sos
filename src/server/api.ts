@@ -1342,7 +1342,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
 
-  if (user.authUserId) {
+  if (user.authUserId && user.role !== 'teacher') {
     try {
       await updateSupabaseAuthPassword(user.authUserId, newPassword);
     } catch {
