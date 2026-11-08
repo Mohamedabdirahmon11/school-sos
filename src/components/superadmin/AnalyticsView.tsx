@@ -3,7 +3,7 @@
  * Attendance aggregates, 30-day active users, fees collected by schools, tier mix, CSV export
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { BarChart3, Download, TrendingUp, Users, DollarSign, CalendarCheck, FileText } from 'lucide-react';
@@ -20,7 +20,7 @@ export const AnalyticsView: React.FC = () => {
   const platformCurrency = String(analytics?.platformCurrency || 'ETB').toUpperCase();
   const activeSchools = Number(analytics?.activeSchools) || 0;
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
@@ -30,11 +30,11 @@ export const AnalyticsView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadAnalytics();
-  }, []);
+  }, [loadAnalytics]);
 
   // Export Analytics CSV
   const handleExportCSV = () => {
