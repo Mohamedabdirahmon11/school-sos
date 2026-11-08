@@ -28,6 +28,7 @@ export function isSessionExpiryValid(expiresAt: unknown, now = Date.now()): bool
 export interface SessionPayload {
   sessionId: string;
   userId: string;
+  authUserId?: string;
   role: string;
   schoolId?: string;
   studentId?: string;
