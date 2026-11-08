@@ -1582,10 +1582,17 @@ apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSupe
   if (cadence !== undefined) subscriptionUpdates.cadence = cadence;
   if (graceDays !== undefined) subscriptionUpdates.graceDays = Number(graceDays);
   if (validUntil !== undefined) subscriptionUpdates.validUntil = new Date(validUntil).toISOString();
+  if (cadence === 'lifetime' && validUntil === undefined) {
+    const lifetimeExpiry = new Date();
+    lifetimeExpiry.setUTCFullYear(lifetimeExpiry.getUTCFullYear() + 100);
+    lifetimeExpiry.setUTCHours(0, 0, 0, 0);
+    subscriptionUpdates.validUntil = lifetimeExpiry.toISOString();
+  }
 
   if (monthsToAdd !== undefined && (cadence ?? school.subscription?.cadence) !== 'lifetime' && validUntil === undefined) {
     const currentTime = Date.now();
-    const parsedExpiry = Date.parse(String(school.subscription?.validUntil || ''));
+    const previousCadence = school.subscription?.cadence;
+    const parsedExpiry = previousCadence === 'lifetime' ? Number.NaN : Date.parse(String(school.subscription?.validUntil || ''));
     const baseDate = new Date(Number.isFinite(parsedExpiry) && parsedExpiry > currentTime ? parsedExpiry : currentTime);
     const originalDay = baseDate.getUTCDate();
     baseDate.setUTCDate(1);
