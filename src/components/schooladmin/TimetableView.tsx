@@ -22,7 +22,7 @@ export const TimetableView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'day'>('class');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedDay, setSelectedDay] = useState('Monday');
-  const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 });
+  const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [unavailableSlots, setUnavailableSlots] = useState<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>([]);
   const [swapMode, setSwapMode] = useState(false);
   const [firstSwapSlot, setFirstSwapSlot] = useState<string | null>(null);
@@ -40,11 +40,16 @@ export const TimetableView: React.FC = () => {
   const days: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday')[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   const periods = [1, 2, 3, 4, 5, 6];
   const periodsForDay = (day: string) => periods.filter(period => day !== 'Friday' || period <= 5);
-  const periodTime = (period: number) => {
-    const [hour, minute] = settings.firstPeriodStart.split(':').map(Number);
-    const start = hour * 60 + minute + (period - 1) * settings.periodMinutes + (period > settings.breakAfterPeriod ? settings.breakMinutes : 0);
+  const periodTime = (period: number, shift: number = 1) => {
+    const afternoon = shift === 2;
+    const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart : settings.firstPeriodStart;
+    const periodMinutes = afternoon ? settings.shift2PeriodMinutes : settings.periodMinutes;
+    const breakAfterPeriod = afternoon ? settings.shift2BreakAfterPeriod : settings.breakAfterPeriod;
+    const breakMinutes = afternoon ? settings.shift2BreakMinutes : settings.breakMinutes;
+    const [hour, minute] = firstPeriodStart.split(':').map(Number);
+    const start = hour * 60 + minute + (period - 1) * periodMinutes + (period > breakAfterPeriod ? breakMinutes : 0);
     const clock = (value: number) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
-    return `${clock(start)} - ${clock(start + settings.periodMinutes)}`;
+    return `${clock(start)} - ${clock(start + periodMinutes)}`;
   };
 
   const fetchData = async () => {
@@ -62,7 +67,7 @@ export const TimetableView: React.FC = () => {
       setSubjects(subList);
       setTeachers(tchList);
       setTimetable(schedule);
-      setSettings({ firstPeriodStart: schoolSettings.firstPeriodStart, periodMinutes: schoolSettings.periodMinutes, breakAfterPeriod: schoolSettings.breakAfterPeriod, breakMinutes: schoolSettings.breakMinutes });
+      setSettings({ firstPeriodStart: schoolSettings.firstPeriodStart || '08:00', periodMinutes: schoolSettings.periodMinutes || 40, breakAfterPeriod: schoolSettings.breakAfterPeriod || 3, breakMinutes: schoolSettings.breakMinutes ?? 20, shift2FirstPeriodStart: schoolSettings.shift2FirstPeriodStart || '13:00', shift2PeriodMinutes: schoolSettings.shift2PeriodMinutes || 40, shift2BreakAfterPeriod: schoolSettings.shift2BreakAfterPeriod || 3, shift2BreakMinutes: schoolSettings.shift2BreakMinutes ?? 20 });
       setUnavailableSlots(unavailable);
       if (clsList.length > 0 && !selectedClassId) {
         setSelectedClassId(clsList[0].id);
@@ -87,16 +92,17 @@ export const TimetableView: React.FC = () => {
 
   // Clash detector
   const checkClash = (day: string, period: number, tchId: string, room: string) => {
-    const teacherClash = timetable.find(s => 
-      s.dayOfWeek === day && s.periodNumber === period && s.teacherId === tchId && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
+    const selectedShift = Number(classes.find(item => item.id === selectedClassId)?.shift) === 2 ? 2 : 1;
+    const teacherClash = timetable.find(s =>
+      s.dayOfWeek === day && s.periodNumber === period && s.teacherId === tchId && (Number(s.shift) === 2 ? 2 : 1) === selectedShift && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
     );
     if (teacherClash) {
       const tch = teachers.find(t => t.id === tchId);
       return `Teacher Clash: ${tch?.fullName || 'Teacher'} is already teaching another class during ${day} Period ${period}!`;
     }
 
-    const roomClash = timetable.find(s => 
-      s.dayOfWeek === day && s.periodNumber === period && String(s.roomNumber || '').trim().toLowerCase() === String(room || '').trim().toLowerCase() && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
+    const roomClash = timetable.find(s =>
+      s.dayOfWeek === day && s.periodNumber === period && (Number(s.shift) === 2 ? 2 : 1) === selectedShift && String(s.roomNumber || '').trim().toLowerCase() === String(room || '').trim().toLowerCase() && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
     );
     if (roomClash) {
       return `Room Clash: ${room} is already occupied during ${day} Period ${period}!`;
@@ -190,7 +196,7 @@ export const TimetableView: React.FC = () => {
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155] font-medium"
           >
             {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name} ({c.roomNumber})</option>
+              <option key={c.id} value={c.id}>{c.name} ({c.roomNumber}) · Shift {c.shift || 1}</option>
             ))}
           </select>
           {viewMode === 'teacher' && <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>}
@@ -223,11 +229,19 @@ export const TimetableView: React.FC = () => {
 
       <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable_times')}</h2>
+        <h3 className="text-xs font-semibold text-[#475569]">Shift 1 · Morning</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end text-xs">
           <label className="space-y-1"><span>{t('timetable_start_time')}</span><input type="time" value={settings.firstPeriodStart} onChange={e => setSettings(prev => ({ ...prev, firstPeriodStart: e.target.value }))} className="w-full border border-[#DCE7E4] rounded-lg px-3 py-2 text-xs text-[#102522] focus:outline-none focus:ring-2 focus:ring-[#0E8078]/20 focus:border-[#0E8078]" /></label>
           <label className="space-y-1"><span>{t('timetable_period_minutes')}</span><input type="number" min="20" max="120" value={settings.periodMinutes} onChange={e => setSettings(prev => ({ ...prev, periodMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
           <label className="space-y-1"><span>{t('timetable_break_after')}</span><select value={settings.breakAfterPeriod} onChange={e => setSettings(prev => ({ ...prev, breakAfterPeriod: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5">{[1,2,3,4,5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
           <label className="space-y-1"><span>{t('timetable_break_minutes')}</span><input type="number" min="0" max="120" value={settings.breakMinutes} onChange={e => setSettings(prev => ({ ...prev, breakMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
+        </div>
+        <h3 className="text-xs font-semibold text-[#475569] pt-2">Shift 2 · Afternoon</h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end text-xs">
+          <label className="space-y-1"><span>First period starts</span><input type="time" value={settings.shift2FirstPeriodStart} onChange={e => setSettings(prev => ({ ...prev, shift2FirstPeriodStart: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-xs" /></label>
+          <label className="space-y-1"><span>Period minutes</span><input type="number" min="20" max="120" value={settings.shift2PeriodMinutes} onChange={e => setSettings(prev => ({ ...prev, shift2PeriodMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
+          <label className="space-y-1"><span>Break after period</span><select value={settings.shift2BreakAfterPeriod} onChange={e => setSettings(prev => ({ ...prev, shift2BreakAfterPeriod: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5">{[1,2,3,4,5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+          <label className="space-y-1"><span>Break minutes</span><input type="number" min="0" max="120" value={settings.shift2BreakMinutes} onChange={e => setSettings(prev => ({ ...prev, shift2BreakMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
           <button onClick={handleSaveSettings} disabled={isReadOnly} className="px-3 py-2 rounded-lg bg-slate-100 text-xs disabled:opacity-50">{t('timetable_save_times')}</button>
         </div>
       </section>
@@ -254,7 +268,7 @@ export const TimetableView: React.FC = () => {
                   <th key={p} className="px-3 py-3 border-r border-[#E2E8F0] text-center min-w-[130px]">
                     Period {p}
                     <span className="block text-[10px] font-mono text-[#64748B]">
-                  {periodTime(p)}
+                  {periodTime(p, selectedClass?.shift === 2 ? 2 : 1)}
                     </span>
                   </th>
                 ))}
@@ -278,7 +292,8 @@ export const TimetableView: React.FC = () => {
                           <div onClick={() => swapMode ? handleSwapSlot(slot) : (setSelectedClassId(slot.classId), setDayOfWeek(day), setPeriodNumber(p), setSubjectId(slot.subjectId), setTeacherId(slot.teacherId), setRoomNumber(slot.roomNumber), setShowAddModal(true))} className={`p-2 bg-[#F0FDFA] border rounded-lg space-y-0.5 cursor-pointer ${firstSwapSlot === slot.id ? 'border-amber-500' : 'border-[#CCFBF1]'}`}>
                             <span className="font-bold text-[#0F766E] block truncate">{sub?.name || 'Subject'}</span>
                             <span className="text-[11px] text-[#334155] block truncate">{tch?.fullName || 'Teacher'}</span>
-                            <span className="text-[10px] font-mono text-[#64748B] block">{viewMode === 'teacher' ? classes.find(klass => klass.id === slot.classId)?.name : slot.roomNumber}</span>
+                            <span className="text-[10px] font-mono text-[#64748B] block">{slot.startTime}–{slot.endTime}</span>
+                            <span className="text-[10px] font-mono text-[#64748B] block">{viewMode === 'teacher' ? classes.find(klass => klass.id === slot.classId)?.name : slot.roomNumber} · Shift {slot.shift || 1}</span>
                             {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); handleRemovePeriod(slot); }} className="text-rose-700 underline text-[10px]">{t('timetable_remove_period')}</button>}
                           </div>
                         ) : (
