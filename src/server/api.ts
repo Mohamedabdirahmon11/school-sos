@@ -3865,6 +3865,34 @@ apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requ
   }
 });
 
+apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  let allowedClassIds: Set<string> | null = null;
+
+  if (user.role === 'school_admin' || user.role === 'super_admin' || user.role === 'accountant') {
+    allowedClassIds = null;
+  } else if (user.role === 'student' || user.role === 'parent' || user.role === 'teacher') {
+    allowedClassIds = new Set(await getNoticeClassIds(school.id, user));
+  } else {
+    allowedClassIds = new Set();
+  }
+
+  const [allSchedules, classes, subjects] = await Promise.all([
+    db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
+  ]);
+  const schedules = allowedClassIds === null
+    ? allSchedules
+    : allSchedules.filter(schedule => allowedClassIds!.has(schedule.classId));
+  const classNames = new Map(classes.map(item => [item.id, item.name]));
+  const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
+  res.json(schedules.map(schedule => ({
+    ...schedule,
+    className: classNames.get(schedule.classId) || schedule.classId,
+    subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
+  })));
+});
+
 apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const [schedules, classes, subjects] = await Promise.all([
