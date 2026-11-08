@@ -167,7 +167,7 @@ export class ApiClient {
 
   // Auth
   public static async login(credentials: {
-    role: UserRole;
+    role?: UserRole;
     email?: string;
     phone?: string;
     schoolCode?: string;
