@@ -257,11 +257,15 @@ export class ApiClient {
   }
 
   public static async getSchools(params?: { search?: string; status?: string }) {
-    const query = new URLSearchParams();
-    if (params?.search?.trim()) query.set('search', params.search.trim());
-    if (params?.status && params.status !== 'all') query.set('status', params.status);
-    const suffix = query.toString();
-    return this.request<School[]>(`/superadmin/schools${suffix ? `?${suffix}` : ''}`);
+    const schools = await this.request<School[]>('/superadmin/schools');
+    const search = params?.search?.trim().toLowerCase() || '';
+    const status = params?.status || 'all';
+    return schools.filter(school => {
+      const matchesSearch = !search || [school.name, school.code, school.city, school.email]
+        .some(value => String(value || '').toLowerCase().includes(search));
+      const matchesStatus = status === 'all' || school.subscription?.status === status;
+      return matchesSearch && matchesStatus;
+    });
   }
 
   public static async createSchool(schoolData: any) {
