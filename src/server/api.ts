@@ -1065,7 +1065,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
   const normalizedRole = normalizeRole(storedUser.role);
-  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
+  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole) || (normalizedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
     res.status(401).json({ error: 'Invalid email or password.' });
