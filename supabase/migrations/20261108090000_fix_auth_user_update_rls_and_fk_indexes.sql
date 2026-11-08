@@ -30,3 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_exam_seats_student_school_fk
 
 CREATE INDEX IF NOT EXISTS idx_school_health_visits_recorded_by_fk
   ON public.school_health_visits (recorded_by);
+
+-- The Auth identity link is also a foreign key and must be indexed independently.
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id_fk
+  ON public.users (auth_user_id);
