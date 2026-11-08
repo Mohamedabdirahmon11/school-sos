@@ -24,7 +24,7 @@ test('Super Admin routes require an authenticated Super Admin', () => {
     .filter(match => !match[3].includes('requireAuth'))
     .map(match => `${match[1].toUpperCase()} ${match[2]}`)
     .sort();
-  assert.deepEqual(publicRoutes, ['POST /auth/login', 'POST /auth/logout']);
+  assert.deepEqual(publicRoutes, ['POST /auth/forgot-password', 'POST /auth/login', 'POST /auth/logout', 'POST /auth/reset-password']);
   const superAdminRoutes = routes.filter(match => match[2].startsWith('/superadmin/'));
   assert.ok(superAdminRoutes.length > 0, 'Super Admin route list is discoverable');
   for (const route of superAdminRoutes) {
