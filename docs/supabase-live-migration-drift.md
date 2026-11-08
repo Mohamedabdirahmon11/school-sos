@@ -36,7 +36,7 @@ The live database had columns/tables/constraints not fully represented in the ch
 - `password_reset_codes`
 - `subscription_reminders`
 
-The forward migration also makes the platform currency default ETB, makes the Super Admin revenue RPC currency-aware, and adds atomic fan-out when publishing a platform broadcast into school notice feeds. The two service-only tables remain RLS-enabled and inaccessible to `anon` and `authenticated`; they intentionally have no end-user policies.
+The forward migrations also make platform, school, invoice and fee-range currency defaults ETB; synchronize the default plan prices with the live ETB price book; add KG (grade 0) to new schools and the existing school's allowed grade list; make the Super Admin revenue RPC currency-aware; and add atomic fan-out when publishing a platform broadcast into school notice feeds. The two service-only tables remain RLS-enabled and inaccessible to `anon` and `authenticated`; they intentionally have no end-user policies.
 
 ## Auth migration caveat
 
