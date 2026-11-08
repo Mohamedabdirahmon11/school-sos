@@ -127,6 +127,6 @@ test('existing Supabase Auth identities require an exact SchoolOS metadata mappi
   assert.match(authSource, /candidate\.app_metadata\?\.schoolos_user_id === user\.id/);
   assert.match(authSource, /candidate\.email\?\.toLowerCase\(\) === email/);
   assert.match(authSource, /admin\.updateUserById\(authUserId, \{/);
-  assert.match(authSource, /app_metadata: \\{[\\s\\S]*schoolos_user_id: user\\.id/);
+  assert.match(authSource, /app_metadata: \{[\s\S]*schoolos_user_id: user\.id/);
   assert.doesNotMatch(authSource, /signInWithPassword\(\{ email, password: authPassword \}\);\s*if \(existingAuth\.error/);
 });
