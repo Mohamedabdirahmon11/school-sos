@@ -21,6 +21,7 @@ export const TimetableView: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'day'>('class');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
+  const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [unavailableSlots, setUnavailableSlots] = useState<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>([]);
@@ -199,7 +200,10 @@ export const TimetableView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.roomNumber}) · Shift {c.shift || 1}</option>
             ))}
           </select>
-          {viewMode === 'teacher' && <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>}
+          {viewMode === 'teacher' && <>
+            <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
+            <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
+          </>}
           {viewMode === 'day' && <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
           <button onClick={handleGenerate} disabled={isReadOnly || !selectedClassId} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs disabled:opacity-50">{t('timetable_generate')}</button>
           <button onClick={() => { setSwapMode(value => !value); setFirstSwapSlot(null); }} disabled={isReadOnly} className={`px-3 py-1.5 rounded-lg border text-xs ${swapMode ? 'bg-amber-100 border-amber-300' : 'border-[#CBD5E1]'}`}>{t('timetable_swap')}</button>
@@ -268,7 +272,7 @@ export const TimetableView: React.FC = () => {
                   <th key={p} className="px-3 py-3 border-r border-[#E2E8F0] text-center min-w-[130px]">
                     Period {p}
                     <span className="block text-[10px] font-mono text-[#64748B]">
-                  {periodTime(p, selectedClass?.shift === 2 ? 2 : 1)}
+                  {periodTime(p, viewMode === 'teacher' ? selectedTeacherShift : selectedClass?.shift === 2 ? 2 : 1)}
                     </span>
                   </th>
                 ))}
@@ -281,7 +285,7 @@ export const TimetableView: React.FC = () => {
                     {day}
                   </td>
                   {periods.map(p => {
-                    const slot = timetable.find(s => (viewMode === 'teacher' ? s.teacherId === selectedTeacherId : s.classId === selectedClassId) && s.dayOfWeek === day && s.periodNumber === p);
+                    const slot = timetable.find(s => (viewMode === 'teacher' ? s.teacherId === selectedTeacherId && (Number(s.shift) === 2 ? 2 : 1) === selectedTeacherShift : s.classId === selectedClassId) && s.dayOfWeek === day && s.periodNumber === p);
                     if (day === 'Friday' && p === 6) return <td key={p} className="p-2 border-r border-[#E2E8F0] text-center text-[10px] text-slate-400">—</td>;
                     const sub = subjects.find(s => s.id === slot?.subjectId);
                     const tch = teachers.find(t => t.id === slot?.teacherId);
