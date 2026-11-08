@@ -70,7 +70,7 @@ export const LoginView: React.FC = () => {
 
     try {
       const result = await login({
-        role: activeTab,
+        role: parentStudentMode ? activeTab : undefined,
         email,
         phone,
         schoolCode,
@@ -279,103 +279,38 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
-          {/* Admin login role selector: both admin options stay together in one place. */}
-          {!parentStudentMode && (
-            <div className="mb-5 grid grid-cols-2 gap-2" role="group" aria-label="Choose admin login type">
-              <button
-                type="button"
-                aria-pressed={activeTab === 'super_admin'}
-                onClick={() => { setActiveTab('super_admin'); setError(null); }}
-                className={`rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === 'super_admin' ? 'border-[#0F766E] bg-[#E6F4F2] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569] hover:bg-slate-50'}`}
-              >
-                Super Admin Login
-              </button>
-              <button
-                type="button"
-                aria-pressed={activeTab === 'school_admin'}
-                onClick={() => { setActiveTab('school_admin'); setError(null); }}
-                className={`rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === 'school_admin' ? 'border-[#0F766E] bg-[#E6F4F2] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569] hover:bg-slate-50'}`}
-              >
-                School Admin Login
-              </button>
-            </div>
-          )}
-
-          {/* Form */}
+          {/* Staff sign-in resolves the account role from the database. */}
           <form className="space-y-4" onSubmit={handleSubmit}>
-            
-            {/* SUPER ADMIN FORM */}
-            {activeTab === 'super_admin' && (
+            {!parentStudentMode && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Super Admin Email</label>
-                  <div className="mt-1 relative">
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[#334155]">Master Password</label>
-                  <div className="mt-1 relative">
-                    <PasswordInput
-                      label="password"
-                      required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
-                  <button type="button" onClick={openForgotPassword} className="mt-2 text-[11px] text-[#0F766E] underline">{t('forgot_password')}</button>
-                </div>
-
-              </>
-            )}
-
-            {/* SCHOOL ADMIN / TEACHER / ACCOUNTANT FORM */}
-            {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Teacher ID' : t('staff_signin_identifier')}</label>
+                  <label className="block text-xs font-medium text-[#334155]">Email, phone or Teacher ID</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
+                      autoComplete="username"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={activeTab === 'teacher' ? 'STF-SCHOOL-0001' : t('staff_signin_placeholder')}
+                      placeholder="Enter your email, phone or Teacher ID"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
                 </div>
-
                 <div>
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Password / PIN' : 'Password'}</label>
-                    <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? t('forgot_password_pin_hint') : null}
-                    </span>
-                  </div>
+                  <label className="block text-xs font-medium text-[#334155]">Password or PIN</label>
                   <div className="mt-1">
                     <PasswordInput
                       label="password"
                       required
+                      autoComplete="current-password"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="Enter your password or PIN"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
-                  {(activeTab === 'school_admin' || activeTab === 'accountant') && (
-                    <button type="button" onClick={openForgotPassword} className="mt-2 text-[11px] text-[#0F766E] underline">{t('forgot_password')}</button>
-                  )}
+                  <button type="button" onClick={openForgotPassword} className="mt-2 text-[11px] text-[#0F766E] underline">{t('forgot_password')}</button>
                 </div>
               </>
             )}
