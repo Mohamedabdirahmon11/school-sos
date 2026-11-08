@@ -1420,13 +1420,13 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   let authEmailChanged = false;
   let authPasswordChanged = false;
   try {
-    if (updateAuthEmail) {
-      await updateSupabaseAuthEmail(user.authUserId!, cleanEmail);
-      authEmailChanged = true;
-    }
     if (updateAuthPassword) {
       await updateSupabaseAuthPassword(user.authUserId!, newPassword);
       authPasswordChanged = true;
+    }
+    if (updateAuthEmail) {
+      await updateSupabaseAuthEmail(user.authUserId!, cleanEmail);
+      authEmailChanged = true;
     }
   } catch {
     if (authEmailChanged && previousEmail) {
@@ -1453,7 +1453,14 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   } catch {
     if (authPasswordChanged) { try { await updateSupabaseAuthPassword(user.authUserId!, currentPassword); } catch { console.error('[auth] Profile password rollback failed.'); } }
     if (authEmailChanged && previousEmail) { try { await updateSupabaseAuthEmail(user.authUserId!, previousEmail); } catch { console.error('[auth] Profile email rollback failed.'); } }
-    db.updateUser(user.id, { email: previousEmail || undefined, passwordHash: user.passwordHash });
+    db.updateUser(user.id, {
+      fullName: user.fullName,
+      email: previousEmail || undefined,
+      phone: user.phone,
+      passwordHash: user.passwordHash,
+      mustChangePassword: user.mustChangePassword,
+      passwordChangedAt: user.passwordChangedAt
+    });
     try { await db.flush(); } catch { console.error('[auth] Profile data rollback failed.'); }
     res.status(503).json({ error: 'Profile changes could not be saved. Your previous Auth credentials were restored where possible.' });
     return;
