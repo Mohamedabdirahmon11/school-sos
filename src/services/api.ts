@@ -276,6 +276,13 @@ export class ApiClient {
     });
   }
 
+  public static async createSuperAdmin(fullName: string, email: string) {
+    return this.request<{ user: User; temporaryPassword: string; mustChangePassword: boolean }>('/superadmin/admins', {
+      method: 'POST',
+      body: JSON.stringify({ fullName, email })
+    });
+  }
+
   public static async getPlans() {
     return this.request<PlanConfig[]>('/superadmin/plans');
   }

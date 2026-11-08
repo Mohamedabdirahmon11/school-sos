@@ -182,3 +182,14 @@ test('bulk academic year routes are Super Admin only and require typed confirmat
   }
   assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
 });
+
+test('Super Admin creation is protected and the last active Super Admin cannot be blocked', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const route = apiSource.match(/apiRouter\.post\('\/superadmin\/admins'([^=]{0,120})=>/);
+  assert.ok(route, 'POST /superadmin/admins exists');
+  assert.match(route[1], /requireAuth/);
+  assert.match(route[1], /requireSuperAdmin/);
+  assert.match(apiSource, /mustChangePassword: true/);
+  assert.match(apiSource, /At least one active Super Admin must remain\./);
+  assert.match(apiSource, /You cannot block your own Super Admin account\./);
+});
