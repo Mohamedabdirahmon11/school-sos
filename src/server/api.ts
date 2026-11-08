@@ -1298,9 +1298,9 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req
   const numericRules: Record<string, [number, number]> = {
     trialDays: [1, 90],
     graceDays: [0, 60],
-    lockoutThreshold: [3, 20],
-    lockoutDurationMinutes: [1, 1440],
-    sessionTimeoutMinutes: [5, 1440]
+    lockoutThreshold: [3, 10],
+    lockoutDurationMinutes: [5, 120],
+    sessionTimeoutMinutes: [15, 360]
   };
   for (const [field, [min, max]] of Object.entries(numericRules)) {
     if (body[field] === undefined) continue;
