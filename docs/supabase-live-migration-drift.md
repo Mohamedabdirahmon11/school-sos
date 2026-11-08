@@ -42,6 +42,8 @@ The forward migrations also make platform, school, invoice and fee-range currenc
 
 The current Express login route still validates SchoolOS password/PIN hashes and issues the `schoolos_session` cookie. The live database has 12 application users but only one row linked through `users.auth_user_id`, and only one Supabase Auth account. This is not a completed all-user migration to Supabase Auth. The existing custom-session flow was not silently replaced because doing so requires a coordinated account-linking, password-reset, session, and rollout plan that preserves existing logins.
 
+The Supabase Security Advisor also reports leaked-password protection disabled. This is an Auth dashboard configuration rather than a SQL setting; enable it in Supabase Authentication password security before production launch.
+
 ## Safety
 
 No school, student, teacher, fee, invoice, or user records were deleted or rewritten as part of this source reconciliation. The migration uses idempotent DDL and function replacements; it does not backfill or reset credentials.
