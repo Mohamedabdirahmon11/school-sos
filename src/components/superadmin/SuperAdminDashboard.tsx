@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { formatMoney } from '../../lib/money.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -64,6 +65,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
   const revenueTrend = Array.isArray(data.revenueTrend) ? data.revenueTrend : [];
   const subscriptionCounts = data.subscriptionCounts || { active: 0, trial: 0, grace: 0, read_only: 0 };
   const needsAttention = Array.isArray(data.needsAttention) ? data.needsAttention : [];
+  const platformCurrency = String(data.platformCurrency || 'ETB').toUpperCase();
 
   return (
     <div className="sa-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -135,9 +137,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
-              ${Number(metrics.currentMonthRevenue || 0).toLocaleString()}
+              ${formatMoney(metrics.currentMonthRevenue || 0, platformCurrency)}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">USD</span>
+            <span className="text-xs text-emerald-600 font-medium">{platformCurrency}</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">Platform subscription invoices</p>
         </div>
@@ -182,7 +184,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                   <span className="text-[10px] font-mono text-[#64748B] opacity-0 group-hover:opacity-100 transition-opacity">
-                    ${safeRevenue.toLocaleString()}
+                    {formatMoney(safeRevenue, platformCurrency)}
                   </span>
                   <div
                     style={{ height: `${heightPercent}%` }}
