@@ -17,6 +17,12 @@ test('inventory routes remain school-scoped and stock movements use the atomic R
   assert.match(schema, /GRANT EXECUTE ON FUNCTION public\.schoolos_adjust_inventory[\s\S]*TO service_role/);
 });
 
+test('attendance register surfaces load failures and provides a retry action', () => {
+  const attendanceView = readFileSync(new URL('../src/components/schooladmin/AttendanceView.tsx', import.meta.url), 'utf8');
+  assert.match(attendanceView, /setAttendanceLoadError\(err\.message \|\| 'Unable to load the attendance register\.'/);
+  assert.match(attendanceView, /role="alert"[\s\S]*attendanceLoadError/);
+  assert.match(attendanceView, /onClick=\{\(\) => void loadAttendanceSheet\(\)\}[\s\S]*Retry loading/);
+});
 test('attendance writes validate class membership and preserve one row per student per day', () => {
   assert.match(api, /canAccessTeachingClass\(req, res, normalizedClassId\)/);
   assert.match(api, /queryAllRows\('students', \{ school_id: school\.id, class_id: normalizedClassId \}/);
