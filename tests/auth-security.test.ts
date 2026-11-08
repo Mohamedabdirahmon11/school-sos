@@ -132,3 +132,10 @@ test('existing Supabase Auth identities require an exact SchoolOS metadata mappi
   assert.match(authSource, /app_metadata: \{[\s\S]*schoolos_user_id: user\.id/);
   assert.doesNotMatch(authSource, /signInWithPassword\(\{ email, password: authPassword \}\);\s*if \(existingAuth\.error/);
 });
+
+
+test('teacher login UI clearly requests the school-issued Teacher ID', () => {
+  const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
+  assert.match(loginSource, /activeTab === 'teacher' \? 'Teacher ID' : 'Email or phone'/);
+  assert.match(loginSource, /Enter the Teacher ID provided by your School Admin/);
+});
