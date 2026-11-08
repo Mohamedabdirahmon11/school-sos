@@ -11,6 +11,7 @@ import { BarChart3, Download, TrendingUp, Users, DollarSign, CalendarCheck, File
 export const AnalyticsView: React.FC = () => {
   const [analytics, setAnalytics] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const schools = analytics?.schools || [];
   const totalStudents = Number(analytics?.totalStudents) || 0;
   const totalTeachers = Number(analytics?.totalTeachers) || 0;
@@ -19,11 +20,20 @@ export const AnalyticsView: React.FC = () => {
   const platformCurrency = String(analytics?.platformCurrency || 'ETB').toUpperCase();
   const activeSchools = Number(analytics?.activeSchools) || 0;
 
+  const loadAnalytics = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      setAnalytics(await ApiClient.getPlatformAnalytics());
+    } catch (error: any) {
+      setLoadError(error.message || 'Unable to load platform analytics.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    ApiClient.getPlatformAnalytics()
-      .then(setAnalytics)
-      .catch(error => console.error(error))
-      .finally(() => setIsLoading(false));
+    void loadAnalytics();
   }, []);
 
   // Export Analytics CSV
@@ -52,6 +62,13 @@ export const AnalyticsView: React.FC = () => {
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading platform analytics…</div>;
+  if (loadError) return (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Platform analytics could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void loadAnalytics()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
