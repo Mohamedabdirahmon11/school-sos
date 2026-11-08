@@ -1353,6 +1353,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     res.status(403).json({ error: 'Parent and student accounts use PIN sign-in. Ask your School Admin to reset your PIN.' });
     return;
   }
+  if (!user.mustChangePassword) {
+    res.status(403).json({ error: 'Use your profile settings to change an existing password.' });
+    return;
+  }
   const { newPassword } = req.body;
 
   const passwordError = passwordPolicyError(newPassword);
