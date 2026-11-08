@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { createClient, type Session } from '@supabase/supabase-js';
 import type { User } from '../types/index.ts';
 import { db } from './storage.ts';
@@ -19,11 +19,12 @@ function authEmailForUser(user: User): string {
   return `schoolos-${stableAlias}@accounts.schoolos.invalid`;
 }
 
-function authPasswordForPin(user: User, pin: string): string {
+function authPasswordForPin(user: User): string {
   const secret = process.env.SESSION_SECRET || '';
   if (secret.length < 32) throw new Error('SESSION_SECRET must be configured to protect PIN-based Auth credentials.');
-  const digest = createHash('sha256').update(`${secret}:schoolos-pin:${user.id}:${pin}`).digest('hex');
-  // Supabase Auth stores a high-entropy derived secret, never the short PIN itself.
+  const digest = createHmac('sha256', secret).update(`schoolos-pin-auth:${user.id}`).digest('hex');
+  // The PIN is verified against its current scrypt hash on every login. Auth
+  // receives a server-only high-entropy identity secret, never the short PIN.
   return `SchoolOS-${digest}-9A`;
 }
 
@@ -47,6 +48,10 @@ export async function signInSchoolOSUser(
     const { data, error } = await client.auth.admin.getUserById(authUserId);
     if (error || !data.user?.email || data.user.banned_until && Date.parse(data.user.banned_until) > Date.now()) return null;
     email = data.user.email;
+    if (credentialType === 'pin' || user.role === 'teacher' && !verifyPassword(credential, String(user.passwordHash || ''))) {
+      if (!verifyPin(credential, String(user.pin || ''))) return null;
+      usePinCredential = true;
+    }
   } else {
     const validLegacyPassword = credentialType === 'password' && verifyPassword(credential, String(user.passwordHash || ''));
     const validLegacyPin = (credentialType === 'pin' || user.role === 'teacher')
@@ -55,7 +60,7 @@ export async function signInSchoolOSUser(
     usePinCredential = !validLegacyPassword && validLegacyPin;
 
     email = authEmailForUser(user);
-    const authPassword = usePinCredential ? authPasswordForPin(user, credential) : credential;
+    const authPassword = usePinCredential ? authPasswordForPin(user) : credential;
     const { data, error } = await client.auth.admin.createUser({
       email,
       password: authPassword,
@@ -82,8 +87,8 @@ export async function signInSchoolOSUser(
   }
 
   const authPasswords = usePinCredential
-    ? [authPasswordForPin(user, credential)]
-    : [credential, ...(user.role === 'teacher' && verifyPin(credential, String(user.pin || '')) ? [authPasswordForPin(user, credential)] : [])];
+    ? [authPasswordForPin(user)]
+    : [credential, ...(user.role === 'teacher' && verifyPin(credential, String(user.pin || '')) ? [authPasswordForPin(user)] : [])];
 
   for (const authPassword of authPasswords) {
     const { data, error } = await client.auth.signInWithPassword({ email, password: authPassword });
