@@ -8,7 +8,7 @@
  * 5. Database Backups: On-demand backup snapshot & platform JSON download
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { SuperAdminSettings } from '../../types/index.ts';
 import { 
@@ -31,18 +31,18 @@ export const PlatformSettingsView: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setLoadError(null);
     try {
       setSettings(await ApiClient.getSettings());
     } catch (error: any) {
       setLoadError(error.message || 'Unable to load platform settings.');
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
