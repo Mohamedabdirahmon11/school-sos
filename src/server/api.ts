@@ -2505,7 +2505,6 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     db.queryPage('subjects', { school_id: school.id, id: legacySubjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
     db.queryPage('classes', { school_id: school.id, id: legacyClassIds, is_archived: 'false' }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
   ]);
-  const subjectIds = new Set(subjectRows.items.map((item: any) => item.id));
   const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
   const legacyAssignments = classRows.items.flatMap((klass: any) => subjectRows.items.map((subject: any) => ({
     id: `legacy-${teacher.id}-${klass.id}-${subject.id}`,
