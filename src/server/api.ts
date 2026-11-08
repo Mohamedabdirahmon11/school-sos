@@ -1409,23 +1409,41 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const previousEmail = user.email || '';
   const updateAuthEmail = Boolean(user.authUserId && cleanEmail && cleanEmail !== previousEmail.toLowerCase());
   const updateAuthPassword = Boolean(user.authUserId && newPassword && !['teacher', 'parent', 'student'].includes(user.role));
+  let authEmailChanged = false;
+  let authPasswordChanged = false;
   try {
-    if (updateAuthEmail) await updateSupabaseAuthEmail(user.authUserId!, cleanEmail);
-    if (updateAuthPassword) await updateSupabaseAuthPassword(user.authUserId!, newPassword);
+    if (updateAuthEmail) {
+      await updateSupabaseAuthEmail(user.authUserId!, cleanEmail);
+      authEmailChanged = true;
+    }
+    if (updateAuthPassword) {
+      await updateSupabaseAuthPassword(user.authUserId!, newPassword);
+      authPasswordChanged = true;
+    }
   } catch {
+    if (authEmailChanged && previousEmail) {
+      try { await updateSupabaseAuthEmail(user.authUserId!, previousEmail); } catch { console.error('[auth] Profile email rollback failed.'); }
+    }
     res.status(503).json({ error: 'Supabase Auth could not update this account. No profile changes were saved.' });
     return;
   }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
   const updated = db.updateUser(user.id, updates);
-  if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
+  if (!updated) {
+    if (authPasswordChanged) { try { await updateSupabaseAuthPassword(user.authUserId!, currentPassword); } catch { console.error('[auth] Profile password rollback failed.'); } }
+    if (authEmailChanged && previousEmail) { try { await updateSupabaseAuthEmail(user.authUserId!, previousEmail); } catch { console.error('[auth] Profile email rollback failed.'); } }
+    res.status(404).json({ error: 'User profile not found.' });
+    return;
+  }
   try {
     await db.flush();
   } catch {
-    // Auth remains canonical; surface the persistence failure rather than
-    // reporting that a profile/password change was saved.
-    res.status(503).json({ error: 'Profile changes could not be saved to SchoolOS. Please sign in again if your password was changed.' });
+    if (authPasswordChanged) { try { await updateSupabaseAuthPassword(user.authUserId!, currentPassword); } catch { console.error('[auth] Profile password rollback failed.'); } }
+    if (authEmailChanged && previousEmail) { try { await updateSupabaseAuthEmail(user.authUserId!, previousEmail); } catch { console.error('[auth] Profile email rollback failed.'); } }
+    db.updateUser(user.id, { email: previousEmail || undefined, passwordHash: user.passwordHash });
+    try { await db.flush(); } catch { console.error('[auth] Profile data rollback failed.'); }
+    res.status(503).json({ error: 'Profile changes could not be saved. Your previous Auth credentials were restored where possible.' });
     return;
   }
   invalidateAuthenticatedSnapshot(user.id);
@@ -4895,14 +4913,6 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     return;
   }
   const temporaryPassword = randomBytes(18).toString('base64url');
-  if (targetUser.authUserId && targetUser.role !== 'teacher') {
-    try {
-      await updateSupabaseAuthPassword(targetUser.authUserId, temporaryPassword);
-    } catch {
-      res.status(503).json({ error: 'Supabase Auth could not reset this account password. No password changes were saved.' });
-      return;
-    }
-  }
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -4911,6 +4921,22 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
   });
   if (!updatedUser) {
     res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+  try {
+    await db.flush();
+    if (targetUser.authUserId && targetUser.role !== 'teacher') {
+      await updateSupabaseAuthPassword(targetUser.authUserId, temporaryPassword);
+    }
+  } catch {
+    db.updateUser(targetUser.id, {
+      passwordHash: targetUser.passwordHash,
+      mustChangePassword: targetUser.mustChangePassword,
+      failedLoginAttempts: targetUser.failedLoginAttempts,
+      lockedUntil: targetUser.lockedUntil
+    });
+    try { await db.flush(); } catch { console.error('[auth] Failed to restore account state after password reset failure.'); }
+    res.status(503).json({ error: 'The account password could not be synchronized. No temporary password was issued.' });
     return;
   }
   invalidateAuthenticatedSnapshot(targetUser.id);
