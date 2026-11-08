@@ -90,7 +90,7 @@ export async function signInSchoolOSUser(
     try {
       await db.flush();
     } catch (error) {
-      await client.auth.admin.deleteUser(authUserId);
+      await adminClient.auth.admin.deleteUser(authUserId);
       throw error;
     }
   }
