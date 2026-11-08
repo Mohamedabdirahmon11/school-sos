@@ -245,10 +245,17 @@ CREATE TABLE IF NOT EXISTS classes (
   class_teacher_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
   monthly_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  shift SMALLINT NOT NULL DEFAULT 1 CHECK (shift IN (1, 2)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
+DO $ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.classes'::regclass AND conname = 'classes_shift_check') THEN
+    ALTER TABLE public.classes ADD CONSTRAINT classes_shift_check CHECK (shift IN (1, 2));
+  END IF;
+END $;
 
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);
@@ -390,8 +397,17 @@ CREATE TABLE IF NOT EXISTS timetable_settings (
   period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (period_minutes BETWEEN 20 AND 120),
   break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 5),
   break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (break_minutes BETWEEN 0 AND 120),
+  shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00',
+  shift2_period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (shift2_period_minutes BETWEEN 20 AND 120),
+  shift2_break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (shift2_break_after_period BETWEEN 1 AND 5),
+  shift2_break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (shift2_break_minutes BETWEEN 0 AND 120),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00';
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_period_minutes INTEGER NOT NULL DEFAULT 40;
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_break_after_period INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_break_minutes INTEGER NOT NULL DEFAULT 20;
 
 CREATE TABLE IF NOT EXISTS teacher_unavailability (
   id VARCHAR(64) PRIMARY KEY,
@@ -1959,13 +1975,22 @@ REVOKE ALL ON FUNCTION super_admin_dashboard_summary() FROM PUBLIC, anon, authen
 GRANT EXECUTE ON FUNCTION super_admin_dashboard_summary() TO service_role;
 
 CREATE OR REPLACE FUNCTION schoolos_replace_class_timetable(p_school_id VARCHAR, p_class_id VARCHAR, p_slots JSONB) RETURNS VOID
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, period_number INTEGER, teacher_id VARCHAR)
+    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, start_time VARCHAR, end_time VARCHAR, teacher_id VARCHAR)
     JOIN public.timetable_slots old ON old.school_id = p_school_id AND old.day_of_week = n.day_of_week
-      AND old.period_number = n.period_number AND old.teacher_id = n.teacher_id AND old.class_id <> p_class_id AND old.is_active = TRUE
-  ) THEN RAISE EXCEPTION 'A teacher is already assigned to another class in that period.'; END IF;
+      AND old.teacher_id = n.teacher_id AND old.class_id <> p_class_id AND old.is_active = TRUE
+      AND n.start_time < old.end_time AND n.end_time > old.start_time
+  ) THEN RAISE EXCEPTION 'A teacher is already assigned during an overlapping timetable period.'; END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, start_time VARCHAR, end_time VARCHAR, room_number VARCHAR)
+    JOIN public.timetable_slots old ON old.school_id = p_school_id AND old.day_of_week = n.day_of_week
+      AND old.class_id <> p_class_id AND old.is_active = TRUE
+      AND NULLIF(BTRIM(n.room_number), '') IS NOT NULL
+      AND LOWER(BTRIM(old.room_number)) = LOWER(BTRIM(n.room_number))
+      AND n.start_time < old.end_time AND n.end_time > old.start_time
+  ) THEN RAISE EXCEPTION 'A classroom is already reserved during an overlapping timetable period.'; END IF;
   UPDATE public.timetable_slots SET is_active = FALSE WHERE school_id = p_school_id AND class_id = p_class_id AND is_active = TRUE;
   INSERT INTO public.timetable_slots (id, school_id, class_id, day_of_week, period_number, start_time, end_time, subject_id, teacher_id, room_number, is_active)
   SELECT id, p_school_id, p_class_id, day_of_week, period_number, start_time, end_time, subject_id, teacher_id, room_number, TRUE
@@ -3323,7 +3348,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits', 'communication_queue', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;
