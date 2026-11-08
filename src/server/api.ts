@@ -1287,7 +1287,8 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req
     'enabledLanguages', 'academicYearName', 'semester1Start', 'semester1End',
     'semester2Start', 'semester2End'
   ]);
-  const unknownFields = Object.keys(body).filter(field => !allowedFields.has(field));
+  const readOnlyFields = new Set(['lastBackupDate', 'lastBackupStatus']);
+  const unknownFields = Object.keys(body).filter(field => !allowedFields.has(field) && !readOnlyFields.has(field));
   if (unknownFields.length) {
     res.status(400).json({ error: `Unsupported platform setting(s): ${unknownFields.join(', ')}.` });
     return;
@@ -1354,7 +1355,7 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req
   for (const field of ['semester1Start', 'semester1End', 'semester2Start', 'semester2End']) {
     if (body[field] === undefined) continue;
     const value = body[field];
-    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) {
       res.status(400).json({ error: `${field} must be a valid YYYY-MM-DD date.` });
       return;
     }
