@@ -48,3 +48,22 @@ test('trust proxy hop configuration rejects unsafe or malformed values', () => {
   assert.throws(() => getTrustProxyHops('production', '-1'), /TRUST_PROXY_HOPS/);
   assert.throws(() => getTrustProxyHops('production', '1.5'), /TRUST_PROXY_HOPS/);
 });
+
+
+test('one trusted reverse-proxy hop makes Express use the forwarded client IP', async () => {
+  const proxyApp = express();
+  proxyApp.set('trust proxy', getTrustProxyHops('production', '1'));
+  proxyApp.get('/client-ip', (req, res) => res.json({ ip: req.ip }));
+  const proxyServer = proxyApp.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => proxyServer.once('listening', resolve));
+  try {
+    const address = proxyServer.address();
+    if (!address || typeof address === 'string') throw new Error('Proxy test server did not bind.');
+    const response = await fetch(`http://127.0.0.1:${address.port}/client-ip`, {
+      headers: { 'x-forwarded-for': '198.51.100.42' }
+    });
+    assert.deepEqual(await response.json(), { ip: '198.51.100.42' });
+  } finally {
+    await new Promise<void>((resolve, reject) => proxyServer.close(error => error ? reject(error) : resolve()));
+  }
+});
