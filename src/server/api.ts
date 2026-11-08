@@ -401,6 +401,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   // remain valid until their original expiry so users are not abruptly logged out.
   const authAccessToken = req.cookies?.schoolos_auth_access;
   const authRefreshToken = req.cookies?.schoolos_auth_refresh;
+  if (payload.authUserId && !authAccessToken && !authRefreshToken) return null;
   if (authAccessToken || authRefreshToken) {
     let authIdentity = authAccessToken ? await getSupabaseAuthUser(authAccessToken) : null;
     if (!authIdentity && authRefreshToken && res) {
@@ -410,7 +411,8 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
         setSupabaseAuthCookies(res, refreshedAuthSession);
       }
     }
-    if (!authIdentity || !user.authUserId || authIdentity.id !== user.authUserId) return null;
+    if (!authIdentity || !user.authUserId || authIdentity.id !== user.authUserId
+      || payload.authUserId && authIdentity.id !== payload.authUserId) return null;
   }
   if (!isPasswordResetSessionValid(user.passwordChangedAt, payload.passwordChangedAt)) return null;
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
@@ -696,6 +698,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
   const signedToken = createSignedSessionToken({
     sessionId,
     userId: user.id,
+    authUserId: authSession?.user?.id || user.authUserId,
     role: user.role,
     schoolId: user.schoolId || schoolId,
     createdAt,
@@ -1107,6 +1110,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     const challengeToken = createSignedSessionToken({
       sessionId: `bootstrap-${randomUUID()}`,
       userId: user.id,
+      authUserId: authResult.authUserId,
       role: user.role,
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
