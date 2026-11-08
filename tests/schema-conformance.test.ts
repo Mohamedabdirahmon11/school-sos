@@ -369,9 +369,9 @@ test('school backup restore includes safe school settings and keeps billing and 
   const schemaFunction = extract(sql);
   const migrationFunction = extract(backupHealthVisitsMigration);
   assert.equal(schemaFunction, migrationFunction, 'fresh-install schema matches the current safe restore migration');
-  assert.match(schemaFunction, /UPDATE public\\.schools/);
-  assert.match(schemaFunction, /v_school_row\\.attendance_rules/);
-  assert.match(schemaFunction, /v_school_row\\.notification_preferences/);
-  assert.match(schemaFunction, /jsonb_build_object\\('school_profile', 1\\)/);
-  assert.doesNotMatch(schemaFunction, /UPDATE public\\.school_subscriptions|UPDATE public\\.subscription_invoices/);
+  assert.match(schemaFunction, /UPDATE public\.schools/);
+  assert.match(schemaFunction, /v_school_row\.attendance_rules/);
+  assert.match(schemaFunction, /v_school_row\.notification_preferences/);
+  assert.match(schemaFunction, /jsonb_build_object\('school_profile', 1\)/);
+  assert.doesNotMatch(schemaFunction, /UPDATE public\.school_subscriptions|UPDATE public\.subscription_invoices/);
 });
