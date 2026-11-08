@@ -1216,7 +1216,7 @@ class StorageEngine {
     }
 
     if (direct) {
-      if (direct.role === 'accountant') {
+      if (direct.role === 'accountant' || direct.role === 'teacher') {
         const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: direct.schoolId, user_id: direct.id });
         if (linkedStaff.some(record => record.status !== 'active')) return null;
       }
@@ -1239,7 +1239,7 @@ class StorageEngine {
     if (matches.length !== 1) return null;
     const staff = matches[0];
     const account = await this.getUserById(staff.userId!, staff.schoolId);
-    return account?.role === 'accountant' ? account : null;
+    return account && (account.role === 'teacher' || account.role === 'accountant') ? account : null;
   }
 
   public async findUsersByPhoneInSchool(phone: string, schoolId: string): Promise<User[]> {
