@@ -16,7 +16,8 @@ import {
   getSupabaseAuthUser,
   refreshSupabaseAuthSession,
   revokeSupabaseAuthSession,
-  updateSupabaseAuthPassword
+  updateSupabaseAuthPassword,
+  updateSupabaseAuthEmail
 } from './supabase-auth.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
@@ -1405,10 +1406,28 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
     if (existing && existing.id !== user.id) { res.status(409).json({ error: 'That email address is already in use.' }); return; }
   }
+  const previousEmail = user.email || '';
+  const updateAuthEmail = Boolean(user.authUserId && cleanEmail && cleanEmail !== previousEmail.toLowerCase());
+  const updateAuthPassword = Boolean(user.authUserId && newPassword && !['teacher', 'parent', 'student'].includes(user.role));
+  try {
+    if (updateAuthEmail) await updateSupabaseAuthEmail(user.authUserId!, cleanEmail);
+    if (updateAuthPassword) await updateSupabaseAuthPassword(user.authUserId!, newPassword);
+  } catch {
+    res.status(503).json({ error: 'Supabase Auth could not update this account. No profile changes were saved.' });
+    return;
+  }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
+  try {
+    await db.flush();
+  } catch {
+    // Auth remains canonical; surface the persistence failure rather than
+    // reporting that a profile/password change was saved.
+    res.status(503).json({ error: 'Profile changes could not be saved to SchoolOS. Please sign in again if your password was changed.' });
+    return;
+  }
   invalidateAuthenticatedSnapshot(user.id);
   if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings.', severity: 'info' });
   res.json(sanitizeUser(updated));
@@ -4876,6 +4895,14 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     return;
   }
   const temporaryPassword = randomBytes(18).toString('base64url');
+  if (targetUser.authUserId && targetUser.role !== 'teacher') {
+    try {
+      await updateSupabaseAuthPassword(targetUser.authUserId, temporaryPassword);
+    } catch {
+      res.status(503).json({ error: 'Supabase Auth could not reset this account password. No password changes were saved.' });
+      return;
+    }
+  }
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,
