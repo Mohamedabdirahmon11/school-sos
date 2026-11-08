@@ -3436,7 +3436,7 @@ class StorageEngine {
     // Authentication records, audit history, platform broadcasts, billing,
     // provider secrets, and active sessions are intentionally never exported.
 
-    const schoolProfile = { ...school } as School & { subscription?: unknown; branches?: unknown };
+    const schoolProfile = { ...school } as Record<string, any>;
     delete schoolProfile.subscription;
     delete schoolProfile.branches;
 
