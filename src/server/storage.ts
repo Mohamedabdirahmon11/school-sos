@@ -598,7 +598,7 @@ class StorageEngine {
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
         this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
-          count: row.attemptCount, firstFailedAt: new Date(row.firstFailedAt).getTime(),
+          count: Number(row.count ?? row.attemptCount ?? 0) || 0, firstFailedAt: new Date(row.firstFailedAt).getTime(),
           lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
         }]));
       }

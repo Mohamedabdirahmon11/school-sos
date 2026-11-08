@@ -42,3 +42,8 @@ test('password policy requires 12 characters, mixed case, and a number', () => {
   assert.match(passwordPolicyError('Abcdefghij123'.repeat(10)) || '', /128 characters/);
   assert.match(passwordPolicyError(undefined) || '', /12 characters/);
 });
+
+test('lockout counters loaded from Supabase use the aliased count field', () => {
+  const source = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(source, /count: Number\(row\.count \?\? row\.attemptCount \?\? 0\) \|\| 0/);
+});
