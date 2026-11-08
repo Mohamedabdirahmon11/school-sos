@@ -1287,7 +1287,7 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req
     'enabledLanguages', 'academicYearName', 'semester1Start', 'semester1End',
     'semester2Start', 'semester2End'
   ]);
-  const readOnlyFields = new Set(['lastBackupDate', 'lastBackupStatus']);
+  const readOnlyFields = new Set(['id', 'updatedAt', 'lastBackupDate', 'lastBackupStatus']);
   const unknownFields = Object.keys(body).filter(field => !allowedFields.has(field) && !readOnlyFields.has(field));
   if (unknownFields.length) {
     res.status(400).json({ error: `Unsupported platform setting(s): ${unknownFields.join(', ')}.` });
