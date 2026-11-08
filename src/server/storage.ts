@@ -1202,6 +1202,18 @@ class StorageEngine {
     return (await this.queryRows<User>('users', { id, school_id: schoolId }))[0] || null;
   }
 
+  private async isActiveStaffLoginAccount(user: User): Promise<boolean> {
+    if (user.role === 'accountant' || user.role === 'teacher') {
+      const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: user.schoolId, user_id: user.id });
+      if (linkedStaff.some(record => record.status !== 'active')) return false;
+    }
+    if (user.role === 'teacher') {
+      const teacherProfiles = await this.queryRows<Teacher>('teachers', { school_id: user.schoolId, user_id: user.id });
+      if (teacherProfiles.length !== 1 || teacherProfiles[0].status !== 'active') return false;
+    }
+    return true;
+  }
+
   public async findUserForLogin(identifier: string, schoolId?: string): Promise<User | null> {
     const cleanId = identifier.trim().toLowerCase();
     const byEmail = await this.queryRows<User>('users', { school_id: schoolId, email: cleanId });
@@ -1215,33 +1227,22 @@ class StorageEngine {
       direct = byPhone[0] || null;
     }
 
-    if (direct) {
-      if (direct.role === 'accountant' || direct.role === 'teacher') {
-        const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: direct.schoolId, user_id: direct.id });
-        if (linkedStaff.some(record => record.status !== 'active')) return null;
-      }
-      return direct;
-    }
+    if (direct) return await this.isActiveStaffLoginAccount(direct) ? direct : null;
 
     const normalizedStaffId = identifier.trim().toUpperCase();
     const userIds = await this.queryRows<User>('users', { school_id: schoolId, staff_id: normalizedStaffId });
     if (userIds.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
     if (userIds.length === 1) {
       const account = userIds[0];
-      if (account.role === 'accountant' || account.role === 'teacher') {
-        const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: account.schoolId, user_id: account.id });
-        if (linkedStaff.some(record => record.status !== 'active')) return null;
-      }
-      return account;
+      return await this.isActiveStaffLoginAccount(account) ? account : null;
     }
     const matches = (await this.queryRows<StaffMember>('staff_members', { school_id: schoolId, staff_id: normalizedStaffId }))
       .filter(record => record.staffId?.toUpperCase() === normalizedStaffId && record.status === 'active' && record.userId);
     if (matches.length !== 1) return null;
     const staff = matches[0];
     const account = await this.getUserById(staff.userId!, staff.schoolId);
-    return account && (account.role === 'teacher' || account.role === 'accountant')
-      ? { ...account, staffId: account.staffId || staff.staffId }
-      : null;
+    if (!account || !['teacher', 'accountant'].includes(account.role) || !(await this.isActiveStaffLoginAccount(account))) return null;
+    return { ...account, staffId: account.staffId || staff.staffId };
   }
 
   public async findUsersByPhoneInSchool(phone: string, schoolId: string): Promise<User[]> {
