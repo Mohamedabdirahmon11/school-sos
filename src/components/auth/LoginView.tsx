@@ -284,7 +284,7 @@ export const LoginView: React.FC = () => {
             {!parentStudentMode && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Email, phone or Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Teacher ID' : 'Email or phone'}</label>
                   <div className="mt-1">
                     <input
                       type="text"
@@ -292,7 +292,7 @@ export const LoginView: React.FC = () => {
                       autoComplete="username"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Enter your email, phone or Teacher ID"
+                      placeholder={activeTab === 'teacher' ? 'Enter the Teacher ID provided by your School Admin' : 'Enter your email or phone'}
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
