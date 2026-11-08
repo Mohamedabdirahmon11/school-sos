@@ -3167,14 +3167,13 @@ class StorageEngine {
 
   public async publishBroadcast(id: string): Promise<PlatformBroadcast | null> {
     const client = this.testClient || supabase;
-    if (!client) throw new Error('Supabase client is not configured.');
+    if (!client || typeof client.rpc !== 'function') throw new Error('Supabase broadcast publishing is unavailable.');
     const startedAt = performance.now();
-    const { data, error } = await client.from('platform_broadcasts')
-      .update({ status: 'sent', sent_at: new Date().toISOString() })
-      .eq('id', id).in('status', ['draft','scheduled']).select('*').maybeSingle();
-    this.recordQuery('platform_broadcasts', 'publish', startedAt);
-    if (error) throw new Error(error.message || 'Unable to publish broadcast.');
-    return data ? fromSupabaseRow(data, 'platform_broadcasts') as PlatformBroadcast : null;
+    const { data, error } = await client.rpc('schoolos_publish_platform_broadcast', { p_broadcast_id: id });
+    this.recordQuery('rpc:schoolos_publish_platform_broadcast', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to publish broadcast to school notice feeds.');
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'platform_broadcasts') as PlatformBroadcast : null;
   }
 
   public async publishDueBroadcasts(): Promise<number> {
