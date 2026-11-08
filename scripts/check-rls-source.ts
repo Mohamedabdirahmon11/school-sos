@@ -77,11 +77,19 @@ function findEarlyReferences(pattern: RegExp, label: string) {
   }
   return early;
 }
+const earlyForeignKeys: string[] = [];
+for (const match of staticSchema.matchAll(/\bREFERENCES\s+(?:(public|auth)\.)?([a-z_][a-z0-9_]*)/gi)) {
+  const referencedSchema = (match[1] || 'public').toLowerCase();
+  if (referencedSchema === 'auth') continue; // Supabase-managed auth.users is not created by schema.sql.
+  const table = match[2].toLowerCase();
+  const creation = tableCreationPositions.get(table);
+  if (creation === undefined || creation > match.index!) earlyForeignKeys.push(`foreign key on ${table}`);
+}
 const earlyTableReferences = [
   ...findEarlyReferences(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[a-z_][a-z0-9_]*\s+ON\s+(?:public\.)?([a-z_][a-z0-9_]*)(?!\.%I)/gi, 'index'),
   ...findEarlyReferences(/ALTER\s+TABLE\s+(?:public\.)?([a-z_][a-z0-9_]*)(?!\.%I)/gi, 'alter'),
   ...findEarlyReferences(/CREATE\s+POLICY\s+[a-z_][a-z0-9_]*\s+ON\s+(?:public\.)?([a-z_][a-z0-9_]*)(?!\.%I)/gi, 'policy'),
-  ...findEarlyReferences(/\bREFERENCES\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi, 'foreign key')
+  ...earlyForeignKeys
 ];
 const tableOrderOk = earlyTableReferences.length === 0;
 console.log(`${tableOrderOk ? 'PASS' : 'FAIL'} schema statements reference tables only after creation${tableOrderOk ? '' : ` (${[...new Set(earlyTableReferences)].join('; ')})`}`);
