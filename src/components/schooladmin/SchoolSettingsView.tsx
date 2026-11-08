@@ -750,12 +750,12 @@ export const SchoolSettingsView: React.FC = () => {
           <div className="border-t border-[#E2E8F0] pt-5 space-y-3">
             <div>
               <h3 className="font-bold text-[#132A29] flex items-center gap-1.5"><Bell className="w-4 h-4 text-[#0F766E]" /> {t('settings_notifications')}</h3>
-              <p className="text-[11px] text-[#64748B] mt-0.5">Choose which school alerts and delivery channels are enabled.</p>
+              <p className="text-[11px] text-[#64748B] mt-0.5">Choose which alerts are enabled. Attendance WhatsApp messages open in the school administrator’s WhatsApp app for manual confirmation.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {([
                 ['email', 'Email notifications'],
-                ['sms', 'SMS notifications'],
+                ['sms', 'WhatsApp (manual send)'],
                 ['inApp', 'In-app notifications'],
                 ['attendanceAlerts', 'Attendance alerts'],
                 ['feeReminders', 'Fee reminders'],
