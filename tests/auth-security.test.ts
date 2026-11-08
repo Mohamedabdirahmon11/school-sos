@@ -172,13 +172,47 @@ test('bootstrap password form mirrors the backend password policy', () => {
   assert.match(loginSource, /uppercase, lowercase, and a number/);
 });
 
+
+test('profile password form mirrors policy and lets teachers verify their current PIN', () => {
+  const profileSource = readFileSync(new URL('../src/components/common/ProfileModal.tsx', import.meta.url), 'utf8');
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(profileSource, /newPassword\.length < 12 \|\| newPassword\.length > 128/);
+  assert.equal((profileSource.match(/minLength=\{12\} maxLength=\{128\}/g) || []).length, 2);
+  assert.match(profileSource, /Current password or PIN/);
+  assert.match(apiSource, /user\.role === 'teacher'[\s\S]*verifyPin\(currentPassword, String\(user\.pin \|\| ''\)\)/);
+});
+
+
+test('PIN-only parent and student accounts cannot enter the password-change flow', () => {
+  const profileSource = readFileSync(new URL('../src/components/common/ProfileModal.tsx', import.meta.url), 'utf8');
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(profileSource, /Parent and student accounts sign in with a PIN/);
+  assert.match(apiSource, /if \(\['parent', 'student'\]\.includes\(user\.role\)\)[\s\S]*Parent and student accounts use PIN sign-in/);
+});
+
+
+test('force-password endpoint only accepts accounts flagged for a required password change', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /if \(!user\.mustChangePassword\)[\s\S]*Use your profile settings to change an existing password/);
+});
+
+
+test('teacher legacy assignments are resolved only against the authenticated school', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /assigned_classes/);
+  assert.match(apiSource, /assigned_subjects/);
+  assert.match(apiSource, /school_id: school\.id, id: legacySubjectIds/);
+  assert.match(apiSource, /school_id: school\.id, id: legacyClassIds, is_archived: 'false'/);
+  assert.match(apiSource, /legacy-\$\{teacher\.id\}-\$\{klass\.id\}-\$\{subject\.id\}/);
+});
+
 test('bulk academic year routes are Super Admin only and require typed confirmation', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   for (const route of ['/superadmin/academic-year/preview', '/superadmin/academic-year/apply']) {
-    const match = apiSource.match(new RegExp(`apiRouter\\.post\\('${route.replace(/\//g, '\\/')}'([^=]{0,120})=>`));
+    const match = apiSource.match(new RegExp(`apiRouter\\\\.post\\\\('${route.replace(/\\//g, '\\\\/')}'([^=]{0,120})=>`));
     assert.ok(match, `${route} exists`);
     assert.match(match[1], /requireAuth/);
     assert.match(match[1], /requireSuperAdmin/);
   }
-  assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
+  assert.match(apiSource, /parsed\\.data\\.confirm !== 'CONFIRM'/);
 });
