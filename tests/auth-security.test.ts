@@ -83,3 +83,11 @@ test('all password and email update paths synchronize linked Supabase Auth accou
   assert.match(apiSource, /updateSupabaseAuthEmail\(user\.authUserId/);
   assert.match(resetSource, /supabase\.auth\.admin\.updateUserById\(user\.authUserId, \{ password: newPassword \}\)/);
 });
+
+test('password changes version signed sessions and revoke old SchoolOS sessions', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /passwordChangedAt: new Date\(\)\.toISOString\(\)/);
+  assert.match(apiSource, /async function revokeUserSessions\(userId: string/);
+  assert.match(apiSource, /await revokeUserSessions\(user\.id, user\.schoolId\)/);
+  assert.match(apiSource, /await revokeUserSessions\(targetUser\.id, targetUser\.schoolId\)/);
+});
