@@ -256,8 +256,12 @@ export class ApiClient {
     });
   }
 
-  public static async getSchools(params?: any) {
-    return this.request<School[]>('/superadmin/schools');
+  public static async getSchools(params?: { search?: string; status?: string }) {
+    const query = new URLSearchParams();
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    if (params?.status && params.status !== 'all') query.set('status', params.status);
+    const suffix = query.toString();
+    return this.request<School[]>(`/superadmin/schools${suffix ? `?${suffix}` : ''}`);
   }
 
   public static async createSchool(schoolData: any) {
