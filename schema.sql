@@ -177,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON school_subscriptions(stat
 -- 8. USERS (SUPER ADMIN, SCHOOL ADMIN, TEACHERS, ACCOUNTANTS, PARENTS, STUDENTS)
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(64) PRIMARY KEY,
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   school_id VARCHAR(64) REFERENCES schools(id) ON DELETE CASCADE,
   role user_role_enum NOT NULL,
   full_name VARCHAR(255) NOT NULL,
@@ -202,8 +203,41 @@ CREATE TABLE IF NOT EXISTS users (
   linked_student_ids TEXT[] DEFAULT ARRAY[]::TEXT[],
   branch_id VARCHAR(64) REFERENCES school_branches(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_login_at TIMESTAMPTZ
+  last_login_at TIMESTAMPTZ,
+  password_changed_at TIMESTAMPTZ
 );
+
+-- Additive Supabase Auth mapping. Keep all existing SchoolOS user IDs intact.
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_user_id UUID;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_auth_user_id_fkey' AND conrelid = 'public.users'::regclass) THEN
+    ALTER TABLE public.users ADD CONSTRAINT users_auth_user_id_fkey
+      FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+END
+$migration$;
+CREATE UNIQUE INDEX IF NOT EXISTS users_auth_user_id_uidx ON public.users(auth_user_id) WHERE auth_user_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.password_reset_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id VARCHAR(64) REFERENCES public.users(id) ON DELETE CASCADE,
+  code_hash TEXT,
+  request_email_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  request_ip TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_user_id ON public.password_reset_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_expires_at ON public.password_reset_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_email_hash_created ON public.password_reset_codes(request_email_hash, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_ip_created ON public.password_reset_codes(request_ip, created_at DESC);
+ALTER TABLE public.password_reset_codes ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.password_reset_codes FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.password_reset_codes TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_users_school ON users(school_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -242,6 +276,7 @@ CREATE TABLE IF NOT EXISTS classes (
   section VARCHAR(20) NOT NULL DEFAULT 'A',
   room_number VARCHAR(50),
   capacity INTEGER NOT NULL DEFAULT 40,
+  shift SMALLINT NOT NULL DEFAULT 1 CHECK (shift IN (1, 2)),
   class_teacher_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
   monthly_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -390,6 +425,10 @@ CREATE TABLE IF NOT EXISTS timetable_settings (
   period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (period_minutes BETWEEN 20 AND 120),
   break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 5),
   break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (break_minutes BETWEEN 0 AND 120),
+  shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00' CHECK (shift2_first_period_start ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  shift2_period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (shift2_period_minutes BETWEEN 20 AND 120),
+  shift2_break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (shift2_break_after_period BETWEEN 1 AND 5),
+  shift2_break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (shift2_break_minutes BETWEEN 0 AND 120),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -399,10 +438,13 @@ CREATE TABLE IF NOT EXISTS teacher_unavailability (
   teacher_id VARCHAR(64) NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
   day_of_week VARCHAR(20) NOT NULL CHECK (day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')),
   period_number INTEGER NOT NULL CHECK (period_number BETWEEN 1 AND 6),
+  shift SMALLINT NOT NULL DEFAULT 1 CHECK (shift IN (1, 2)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (school_id, teacher_id, day_of_week, period_number)
+  CONSTRAINT teacher_unavailability_school_teacher_day_period_shift_key UNIQUE (school_id, teacher_id, day_of_week, period_number, shift)
 );
 CREATE INDEX IF NOT EXISTS idx_teacher_unavailability_scope ON teacher_unavailability(school_id, teacher_id, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_timetable_class_shift ON public.classes(school_id, shift, is_archived);
+CREATE INDEX IF NOT EXISTS idx_teacher_unavailability_shift_scope ON public.teacher_unavailability(school_id, teacher_id, shift, day_of_week);
 ALTER TABLE timetable_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teacher_unavailability ENABLE ROW LEVEL SECURITY;
 
@@ -416,7 +458,13 @@ GRANT USAGE ON SCHEMA private TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION private.auth_user_id()
 RETURNS VARCHAR LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
-AS $$ SELECT COALESCE(pg_catalog.current_setting('request.jwt.claim.sub', true), auth.uid()::text); $$;
+AS $$
+  SELECT COALESCE(
+    (SELECT u.id FROM public.users AS u WHERE u.auth_user_id = auth.uid() LIMIT 1),
+    auth.uid()::text,
+    pg_catalog.current_setting('request.jwt.claim.sub', true)
+  );
+$$;
 CREATE OR REPLACE FUNCTION private.auth_school_id()
 RETURNS VARCHAR LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT COALESCE(pg_catalog.current_setting('request.jwt.claim.school_id', true),
@@ -1793,6 +1841,129 @@ $$;
 REVOKE ALL ON FUNCTION schoolos_notice_unread_count(VARCHAR, VARCHAR, TEXT, TEXT[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION schoolos_notice_unread_count(VARCHAR, VARCHAR, TEXT, TEXT[]) TO service_role;
 
+CREATE OR REPLACE FUNCTION public.schoolos_replace_class_timetable(
+  p_school_id VARCHAR, p_class_id VARCHAR, p_slots JSONB
+) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.classes c
+    WHERE c.id = p_class_id AND c.school_id = p_school_id AND c.is_archived = FALSE
+  ) THEN
+    RAISE EXCEPTION 'Class does not belong to this school.';
+  END IF;
+
+  UPDATE public.timetable_slots
+  SET is_active = FALSE
+  WHERE school_id = p_school_id AND class_id = p_class_id AND is_active = TRUE;
+
+  INSERT INTO public.timetable_slots (
+    id, school_id, class_id, day_of_week, period_number, start_time, end_time,
+    subject_id, teacher_id, room_number, is_active
+  )
+  SELECT
+    n.id, p_school_id, p_class_id, n.day_of_week, n.period_number, n.start_time, n.end_time,
+    n.subject_id, n.teacher_id, n.room_number, TRUE
+  FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(
+    id VARCHAR, day_of_week VARCHAR, period_number INTEGER, start_time VARCHAR, end_time VARCHAR,
+    subject_id VARCHAR, teacher_id VARCHAR, room_number VARCHAR
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    day_of_week = EXCLUDED.day_of_week,
+    period_number = EXCLUDED.period_number,
+    start_time = EXCLUDED.start_time,
+    end_time = EXCLUDED.end_time,
+    subject_id = EXCLUDED.subject_id,
+    teacher_id = EXCLUDED.teacher_id,
+    room_number = EXCLUDED.room_number,
+    is_active = TRUE;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_replace_class_timetable(VARCHAR, VARCHAR, JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_replace_class_timetable(VARCHAR, VARCHAR, JSONB) TO service_role;
+
+-- Swapping keeps each class in its own shift and recomputes the moved periods'
+-- clock times using that class's shift configuration. Teacher overlap remains
+-- visible as a warning in the API/UI, never as a database exception.
+CREATE OR REPLACE FUNCTION public.schoolos_swap_timetable_slots(
+  p_school_id VARCHAR, p_first_id VARCHAR, p_second_id VARCHAR
+) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  first_slot public.timetable_slots%ROWTYPE;
+  second_slot public.timetable_slots%ROWTYPE;
+  first_shift INTEGER;
+  second_shift INTEGER;
+  first_start VARCHAR(5);
+  second_start VARCHAR(5);
+  first_minutes INTEGER;
+  second_minutes INTEGER;
+  first_break_after INTEGER;
+  second_break_after INTEGER;
+  first_break_minutes INTEGER;
+  second_break_minutes INTEGER;
+  first_target_start INTEGER;
+  second_target_start INTEGER;
+  first_target_end INTEGER;
+  second_target_end INTEGER;
+BEGIN
+  SELECT * INTO first_slot FROM public.timetable_slots
+  WHERE id = p_first_id AND school_id = p_school_id AND is_active = TRUE FOR UPDATE;
+  SELECT * INTO second_slot FROM public.timetable_slots
+  WHERE id = p_second_id AND school_id = p_school_id AND is_active = TRUE FOR UPDATE;
+  IF first_slot.id IS NULL OR second_slot.id IS NULL OR first_slot.id = second_slot.id THEN
+    RAISE EXCEPTION 'Choose two different active timetable slots in this school.';
+  END IF;
+
+  SELECT COALESCE(c.shift, 1),
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_first_period_start, '13:00') ELSE COALESCE(s.first_period_start, '08:00') END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_period_minutes, 40) ELSE COALESCE(s.period_minutes, 40) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_after_period, 3) ELSE COALESCE(s.break_after_period, 3) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_minutes, 20) ELSE COALESCE(s.break_minutes, 20) END
+  INTO first_shift, first_start, first_minutes, first_break_after, first_break_minutes
+  FROM public.classes c
+  LEFT JOIN public.timetable_settings s ON s.school_id = c.school_id
+  WHERE c.id = first_slot.class_id AND c.school_id = p_school_id;
+
+  SELECT COALESCE(c.shift, 1),
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_first_period_start, '13:00') ELSE COALESCE(s.first_period_start, '08:00') END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_period_minutes, 40) ELSE COALESCE(s.period_minutes, 40) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_after_period, 3) ELSE COALESCE(s.break_after_period, 3) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_minutes, 20) ELSE COALESCE(s.break_minutes, 20) END
+  INTO second_shift, second_start, second_minutes, second_break_after, second_break_minutes
+  FROM public.classes c
+  LEFT JOIN public.timetable_settings s ON s.school_id = c.school_id
+  WHERE c.id = second_slot.class_id AND c.school_id = p_school_id;
+
+  first_target_start := split_part(first_start, ':', 1)::INTEGER * 60
+    + split_part(first_start, ':', 2)::INTEGER
+    + (second_slot.period_number - 1) * first_minutes
+    + CASE WHEN second_slot.period_number > first_break_after THEN first_break_minutes ELSE 0 END;
+  second_target_start := split_part(second_start, ':', 1)::INTEGER * 60
+    + split_part(second_start, ':', 2)::INTEGER
+    + (first_slot.period_number - 1) * second_minutes
+    + CASE WHEN first_slot.period_number > second_break_after THEN second_break_minutes ELSE 0 END;
+  first_target_end := first_target_start + first_minutes;
+  second_target_end := second_target_start + second_minutes;
+
+  UPDATE public.timetable_slots SET
+    day_of_week = second_slot.day_of_week,
+    period_number = second_slot.period_number,
+    start_time = lpad((first_target_start / 60)::TEXT, 2, '0') || ':' || lpad((first_target_start % 60)::TEXT, 2, '0'),
+    end_time = lpad((first_target_end / 60)::TEXT, 2, '0') || ':' || lpad((first_target_end % 60)::TEXT, 2, '0')
+  WHERE id = p_first_id AND school_id = p_school_id;
+
+  UPDATE public.timetable_slots SET
+    day_of_week = first_slot.day_of_week,
+    period_number = first_slot.period_number,
+    start_time = lpad((second_target_start / 60)::TEXT, 2, '0') || ':' || lpad((second_target_start % 60)::TEXT, 2, '0'),
+    end_time = lpad((second_target_end / 60)::TEXT, 2, '0') || ':' || lpad((second_target_end % 60)::TEXT, 2, '0')
+  WHERE id = p_second_id AND school_id = p_school_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 
 -- Default Subscription Plans
@@ -2634,9 +2805,26 @@ AS $function$
             FROM public.attendance_records
             WHERE school_id = p_school_id
               AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
-              AND status = 'present'
+              AND status IN ('present', 'late')
+              AND EXISTS (
+                SELECT 1 FROM public.students AS active_student
+                WHERE active_student.id = public.attendance_records.student_id
+                  AND active_student.school_id = p_school_id
+                  AND active_student.status = 'active'
+              )
           )::NUMERIC * 100
-          / (SELECT COUNT(*) FROM public.students WHERE school_id = p_school_id AND status = 'active')
+          / GREATEST(1,
+            (SELECT COUNT(*) FROM public.students WHERE school_id = p_school_id AND status = 'active')
+            - (SELECT COUNT(*) FROM public.attendance_records
+               WHERE school_id = p_school_id
+                 AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
+                 AND status = 'excused'
+                 AND EXISTS (
+                   SELECT 1 FROM public.students AS active_student
+                   WHERE active_student.id = public.attendance_records.student_id
+                     AND active_student.school_id = p_school_id
+                     AND active_student.status = 'active'
+                 )))
         )
       END,
       'todayCollection', COALESCE((
@@ -2647,9 +2835,9 @@ AS $function$
           AND voided_at IS NULL
       ), 0),
       'totalOutstanding', COALESCE((
-        SELECT SUM(CASE WHEN voided_at IS NOT NULL THEN amount_due ELSE remaining_amount END)
+        SELECT SUM(remaining_amount)
         FROM public.fee_payments
-        WHERE school_id = p_school_id
+        WHERE school_id = p_school_id AND voided_at IS NULL
       ), 0)
     ),
     'totalClasses', (
@@ -2662,6 +2850,12 @@ AS $function$
       WHERE school_id = p_school_id
         AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
         AND status IN ('present', 'late')
+              AND EXISTS (
+                SELECT 1 FROM public.students AS active_student
+                WHERE active_student.id = public.attendance_records.student_id
+                  AND active_student.school_id = p_school_id
+                  AND active_student.status = 'active'
+              )
     ),
     'recentStudents', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
@@ -3108,6 +3302,42 @@ BEGIN
   v_student_id := p_payload->>'student_id';
   v_student_user_id := p_payload->>'student_user_id';
   v_pin_hash := p_payload->>'pin_hash';
+  -- Restore school profile/settings without changing the immutable school ID/code
+  -- or platform billing/subscription records.
+  v_school_profile := public.schoolos_backup_json_snake(v_backup->'school');
+  SELECT * INTO v_school_row
+    FROM jsonb_populate_record(NULL::public.schools, v_school_profile);
+
+  UPDATE public.schools AS current_school
+     SET          name = CASE WHEN v_school_profile ? 'name' THEN v_school_row.name ELSE current_school.name END,
+         address = CASE WHEN v_school_profile ? 'address' THEN v_school_row.address ELSE current_school.address END,
+         city = CASE WHEN v_school_profile ? 'city' THEN v_school_row.city ELSE current_school.city END,
+         phone = CASE WHEN v_school_profile ? 'phone' THEN v_school_row.phone ELSE current_school.phone END,
+         email = CASE WHEN v_school_profile ? 'email' THEN v_school_row.email ELSE current_school.email END,
+         logo_url = CASE WHEN v_school_profile ? 'logo_url' THEN v_school_row.logo_url ELSE current_school.logo_url END,
+         brand_color = CASE WHEN v_school_profile ? 'brand_color' THEN v_school_row.brand_color ELSE current_school.brand_color END,
+         currency = CASE WHEN v_school_profile ? 'currency' THEN v_school_row.currency ELSE current_school.currency END,
+         language = CASE WHEN v_school_profile ? 'language' THEN v_school_row.language ELSE current_school.language END,
+         timezone = CASE WHEN v_school_profile ? 'timezone' THEN v_school_row.timezone ELSE current_school.timezone END,
+         academic_year = CASE WHEN v_school_profile ? 'academic_year' THEN v_school_row.academic_year ELSE current_school.academic_year END,
+         current_semester = CASE WHEN v_school_profile ? 'current_semester' THEN v_school_row.current_semester ELSE current_school.current_semester END,
+         terms = CASE WHEN v_school_profile ? 'terms' THEN v_school_row.terms ELSE current_school.terms END,
+         grading_scale = CASE WHEN v_school_profile ? 'grading_scale' THEN v_school_row.grading_scale ELSE current_school.grading_scale END,
+         attendance_rules = CASE WHEN v_school_profile ? 'attendance_rules' THEN v_school_row.attendance_rules ELSE current_school.attendance_rules END,
+         class_levels = CASE WHEN v_school_profile ? 'class_levels' THEN v_school_row.class_levels ELSE current_school.class_levels END,
+         report_card_header = CASE WHEN v_school_profile ? 'report_card_header' THEN v_school_row.report_card_header ELSE current_school.report_card_header END,
+         report_card_footer = CASE WHEN v_school_profile ? 'report_card_footer' THEN v_school_row.report_card_footer ELSE current_school.report_card_footer END,
+         receipt_header = CASE WHEN v_school_profile ? 'receipt_header' THEN v_school_row.receipt_header ELSE current_school.receipt_header END,
+         receipt_footer = CASE WHEN v_school_profile ? 'receipt_footer' THEN v_school_row.receipt_footer ELSE current_school.receipt_footer END,
+         notification_preferences = CASE WHEN v_school_profile ? 'notification_preferences' THEN v_school_row.notification_preferences ELSE current_school.notification_preferences END,
+         default_class_capacity = CASE WHEN v_school_profile ? 'default_class_capacity' THEN v_school_row.default_class_capacity ELSE current_school.default_class_capacity END,
+         student_access_enabled = CASE WHEN v_school_profile ? 'student_access_enabled' THEN v_school_row.student_access_enabled ELSE current_school.student_access_enabled END,
+         calendar_type = CASE WHEN v_school_profile ? 'calendar_type' THEN v_school_row.calendar_type ELSE current_school.calendar_type END,
+         updated_at = now()
+   WHERE current_school.id = v_school_id;
+
+  v_counts := v_counts || jsonb_build_object('school_profile', 1);
+
   v_user_id := p_payload->>'approved_by';
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
@@ -3301,6 +3531,8 @@ DECLARE
   v_conflict BOOLEAN;
   v_counts JSONB := '{}'::jsonb;
   v_count INTEGER;
+  v_school_row public.schools%ROWTYPE;
+  v_school_profile JSONB;
 BEGIN
   IF jsonb_typeof(p_payload) <> 'object'
      OR COALESCE((p_payload->>'confirm')::BOOLEAN, FALSE) IS NOT TRUE
@@ -3319,11 +3551,47 @@ BEGIN
     RAISE EXCEPTION 'The backup does not contain a valid tables object.';
   END IF;
 
+  -- Restore school profile/settings without changing the immutable school ID/code
+  -- or platform billing/subscription records.
+  v_school_profile := public.schoolos_backup_json_snake(v_backup->'school');
+  SELECT * INTO v_school_row
+    FROM jsonb_populate_record(NULL::public.schools, v_school_profile);
+
+  UPDATE public.schools AS current_school
+     SET          name = CASE WHEN v_school_profile ? 'name' THEN v_school_row.name ELSE current_school.name END,
+         address = CASE WHEN v_school_profile ? 'address' THEN v_school_row.address ELSE current_school.address END,
+         city = CASE WHEN v_school_profile ? 'city' THEN v_school_row.city ELSE current_school.city END,
+         phone = CASE WHEN v_school_profile ? 'phone' THEN v_school_row.phone ELSE current_school.phone END,
+         email = CASE WHEN v_school_profile ? 'email' THEN v_school_row.email ELSE current_school.email END,
+         logo_url = CASE WHEN v_school_profile ? 'logo_url' THEN v_school_row.logo_url ELSE current_school.logo_url END,
+         brand_color = CASE WHEN v_school_profile ? 'brand_color' THEN v_school_row.brand_color ELSE current_school.brand_color END,
+         currency = CASE WHEN v_school_profile ? 'currency' THEN v_school_row.currency ELSE current_school.currency END,
+         language = CASE WHEN v_school_profile ? 'language' THEN v_school_row.language ELSE current_school.language END,
+         timezone = CASE WHEN v_school_profile ? 'timezone' THEN v_school_row.timezone ELSE current_school.timezone END,
+         academic_year = CASE WHEN v_school_profile ? 'academic_year' THEN v_school_row.academic_year ELSE current_school.academic_year END,
+         current_semester = CASE WHEN v_school_profile ? 'current_semester' THEN v_school_row.current_semester ELSE current_school.current_semester END,
+         terms = CASE WHEN v_school_profile ? 'terms' THEN v_school_row.terms ELSE current_school.terms END,
+         grading_scale = CASE WHEN v_school_profile ? 'grading_scale' THEN v_school_row.grading_scale ELSE current_school.grading_scale END,
+         attendance_rules = CASE WHEN v_school_profile ? 'attendance_rules' THEN v_school_row.attendance_rules ELSE current_school.attendance_rules END,
+         class_levels = CASE WHEN v_school_profile ? 'class_levels' THEN v_school_row.class_levels ELSE current_school.class_levels END,
+         report_card_header = CASE WHEN v_school_profile ? 'report_card_header' THEN v_school_row.report_card_header ELSE current_school.report_card_header END,
+         report_card_footer = CASE WHEN v_school_profile ? 'report_card_footer' THEN v_school_row.report_card_footer ELSE current_school.report_card_footer END,
+         receipt_header = CASE WHEN v_school_profile ? 'receipt_header' THEN v_school_row.receipt_header ELSE current_school.receipt_header END,
+         receipt_footer = CASE WHEN v_school_profile ? 'receipt_footer' THEN v_school_row.receipt_footer ELSE current_school.receipt_footer END,
+         notification_preferences = CASE WHEN v_school_profile ? 'notification_preferences' THEN v_school_row.notification_preferences ELSE current_school.notification_preferences END,
+         default_class_capacity = CASE WHEN v_school_profile ? 'default_class_capacity' THEN v_school_row.default_class_capacity ELSE current_school.default_class_capacity END,
+         student_access_enabled = CASE WHEN v_school_profile ? 'student_access_enabled' THEN v_school_row.student_access_enabled ELSE current_school.student_access_enabled END,
+         calendar_type = CASE WHEN v_school_profile ? 'calendar_type' THEN v_school_row.calendar_type ELSE current_school.calendar_type END,
+         updated_at = now()
+   WHERE current_school.id = v_school_id;
+
+  v_counts := v_counts || jsonb_build_object('school_profile', 1);
+
   v_user_id := p_payload->>'approved_by';
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'exam_schedules', 'exam_seat_assignments', 'report_card_templates', 'school_events', 'school_health_visits', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;

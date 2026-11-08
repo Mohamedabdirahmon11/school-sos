@@ -246,7 +246,7 @@ export const AttendanceView: React.FC = () => {
             {t('attendance')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. Absent students automatically trigger parent notifications.
+            Take official daily class attendance. For absent students, prepare a WhatsApp message and send it manually from the school administrator’s WhatsApp.
           </p>
         </div>
 

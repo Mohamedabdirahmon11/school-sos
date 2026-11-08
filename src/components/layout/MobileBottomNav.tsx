@@ -13,7 +13,6 @@ import {
   Menu,
   GraduationCap,
   CalendarCheck,
-  Layers,
   CreditCard,
   FileSpreadsheet,
   FileText
@@ -70,7 +69,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     return [
       { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard },
       { id: 'sch_students', label: t('students'), icon: GraduationCap },
-      { id: 'sch_classes', label: t('classes'), icon: Layers },
+      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
       { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard }
     ];
   };

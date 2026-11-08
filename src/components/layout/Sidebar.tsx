@@ -3,7 +3,7 @@
  * Dark green-teal sidebar (~#0B2B2A), teal primary (#0F766E), high density layout
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
@@ -20,7 +20,6 @@ import {
   UserCheck,
   PhoneCall,
   Layers,
-  BookOpen,
   CalendarDays,
   CalendarCheck,
   FileSpreadsheet,
@@ -36,10 +35,8 @@ import {
   Bus,
   AlertTriangle,
   HeartPulse,
-  Award,
   Wallet,
   Boxes,
-  Compass
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -112,8 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         { id: 'st_assignments', label: t('assignments'), icon: FileCheck2 },
         { id: 'st_results', label: t('exams_results'), icon: FileSpreadsheet },
         { id: 'st_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 'st_notices', label: noticeLabel, icon: BellRing }
-        ,{ id: 'st_messages', label: t('messages'), icon: MessageSquare }
+        { id: 'st_notices', label: noticeLabel, icon: BellRing },
+        { id: 'st_messages', label: t('messages'), icon: MessageSquare }
       ];
     }
 
@@ -126,33 +123,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       ];
     }
 
-    // Default: School Admin (Full Suite)
+    // School Admin: grouped by daily workflow, with duplicate destinations removed.
     return [
-      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-      { id: 'sch_students', label: t('students'), icon: GraduationCap },
-      { id: 'sch_teachers', label: t('teachers'), icon: UserCheck },
-      { id: 'sch_parents', label: t('parents_contacts'), icon: PhoneCall },
-      { id: 'sch_classes', label: t('classes'), icon: Layers },
-      { id: 'sch_subjects', label: t('subjects'), icon: BookOpen },
-      { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays },
-      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
-      { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet },
-      { id: 'sch_promotion', label: 'Promotion & Alumni', icon: Award },
-      { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays },
-      { id: 'sch_notices', label: noticeLabel, icon: BellRing },
-      { id: 'sch_messages', label: t('messages'), icon: MessageSquare },
-      { id: 'sch_admissions', label: t('admissions'), icon: UserPlus },
-      { id: 'sch_staff', label: t('staff_access'), icon: ShieldCheck },
-      { id: 'sch_reports', label: t('reports_export'), icon: BarChart3 },
-      { id: 'sch_report_cards', label: t('report_cards'), icon: FileText },
-      { id: 'sch_settings', label: t('school_settings'), icon: Sliders },
-      // Extra Modules
-      { id: 'sch_library', label: t('library'), icon: Library },
-      { id: 'sch_transport', label: t('transport'), icon: Bus },
-      { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle },
-      { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse },
-      { id: 'sch_inventory', label: t('inventory'), icon: Boxes },
-      { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy }
+      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard, section: t('nav_overview') },
+      { id: 'sch_students', label: t('students'), icon: GraduationCap, section: t('nav_people_academics') },
+      { id: 'sch_teachers', label: t('teachers'), icon: UserCheck, section: t('nav_people_academics') },
+      { id: 'sch_parents', label: t('parents_contacts'), icon: PhoneCall, section: t('nav_people_academics') },
+      { id: 'sch_classes', label: `${t('classes')} & ${t('subjects')}`, icon: Layers, section: t('nav_people_academics') },
+      { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays, section: t('nav_people_academics') },
+      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck, section: t('nav_people_academics') },
+      { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet, section: t('nav_people_academics') },
+      { id: 'sch_admissions', label: t('admissions'), icon: UserPlus, section: t('nav_people_academics') },
+      { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays, section: t('nav_communication') },
+      { id: 'sch_notices', label: noticeLabel, icon: BellRing, section: t('nav_communication') },
+      { id: 'sch_messages', label: t('messages'), icon: MessageSquare, section: t('nav_communication') },
+      { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard, section: t('nav_management') },
+      { id: 'sch_reports', label: t('reports_export'), icon: BarChart3, section: t('nav_management') },
+      { id: 'sch_report_cards', label: t('report_cards'), icon: FileText, section: t('nav_management') },
+      { id: 'sch_promotion', label: t('year_end_promotion'), icon: GraduationCap, section: t('nav_management') },
+      { id: 'sch_staff', label: t('staff_access'), icon: ShieldCheck, section: t('nav_management') },
+      { id: 'sch_settings', label: t('school_settings'), icon: Sliders, section: t('nav_management') },
+      { id: 'sch_library', label: t('library'), icon: Library, section: t('nav_other_modules') },
+      { id: 'sch_transport', label: t('transport'), icon: Bus, section: t('nav_other_modules') },
+      { id: 'sch_inventory', label: t('inventory'), icon: Boxes, section: t('nav_other_modules') },
+      { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle, section: t('nav_other_modules') },
+      { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse, section: t('nav_other_modules') },
+      { id: 'sch_support', label: t('help_support'), icon: LifeBuoy, section: t('nav_other_modules') }
     ];
   };
 
@@ -198,13 +194,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
         {/* Navigation Links (Scrollable with custom sleek scrollbar) */}
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-1">
-          {navItems.map(item => {
+          {navItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
+            const section = (item as typeof item & { section?: string }).section;
+            const previousSection = index > 0
+              ? (navItems[index - 1] as typeof navItems[number] & { section?: string }).section
+              : undefined;
 
             return (
+              <React.Fragment key={item.id}>
+              {section && section !== previousSection && (
+                <p className="px-3 pt-4 pb-1 text-[9px] font-bold tracking-[0.16em] text-[#73918D]">
+                  {section}
+                </p>
+              )}
               <button
-                key={item.id}
                 onClick={() => handleItemClick(item.id)}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[12px] font-semibold
@@ -218,6 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#A0BCBA]'}`} />
                 <span className="truncate">{item.label}</span>
               </button>
+              </React.Fragment>
             );
           })}
         </nav>

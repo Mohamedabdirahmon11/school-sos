@@ -21,6 +21,7 @@ export interface TranslationDict {
   analytics: string;
   broadcasts: string;
   support_audit: string;
+  help_support: string;
   platform_settings: string;
   students: string;
   teachers: string;
@@ -46,6 +47,23 @@ export interface TranslationDict {
   timetable_swap_select: string;
   timetable_swapped: string;
   timetable_unfilled: string;
+  timetable_print_class: string;
+  timetable_print_shift: string;
+  timetable_print_teacher: string;
+  timetable_print_all_teachers: string;
+  timetable_print_sheet: string;
+  timetable_print_close: string;
+  timetable_shift: string;
+  timetable_shift_1: string;
+  timetable_shift_2: string;
+  timetable_warning: string;
+  timetable_day: string;
+  timetable_period: string;
+  timetable_subject: string;
+  timetable_teacher_label: string;
+  timetable_class_label: string;
+  timetable_time: string;
+  timetable_academic_year: string;
   attendance: string;
   exams_results: string;
   assignments: string;
@@ -65,10 +83,43 @@ export interface TranslationDict {
   pin_notice: string;
   choose_class: string;
   admissions: string;
+  year_end_promotion: string;
+  nav_overview: string;
+  nav_people_academics: string;
+  nav_communication: string;
+  nav_management: string;
+  nav_other_modules: string;
   staff_access: string;
   staff_signin_identifier: string;
   staff_signin_placeholder: string;
   school_admin_initial_password_hint: string;
+  forgot_password: string;
+  forgot_password_title: string;
+  forgot_password_email: string;
+  forgot_password_send_code: string;
+  forgot_password_neutral: string;
+  forgot_password_code: string;
+  forgot_password_new_password: string;
+  forgot_password_confirm_password: string;
+  forgot_password_reset: string;
+  forgot_password_resend: string;
+  forgot_password_back: string;
+  forgot_password_expiry: string;
+  forgot_password_resend_wait: string;
+  forgot_password_password_rules: string;
+  forgot_password_password_min: string;
+  forgot_password_password_complexity: string;
+  forgot_password_password_max: string;
+  forgot_password_code_invalid: string;
+  forgot_password_too_many_attempts: string;
+  forgot_password_same_password: string;
+  forgot_password_password_mismatch: string;
+  forgot_password_success: string;
+  forgot_password_pin_hint: string;
+  forgot_password_request_error: string;
+  forgot_password_reset_error: string;
+  forgot_password_sending: string;
+  forgot_password_updating: string;
   first_time_password_hint: string;
   staff_id: string;
   staff_id_generated_hint: string;
@@ -247,6 +298,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'SaaS Analytics',
     broadcasts: 'Platform Broadcasts',
     support_audit: 'Support & Audit Log',
+    help_support: 'Help & Support',
     platform_settings: 'Platform Settings',
     students: 'Students',
     teachers: 'Teachers',
@@ -272,6 +324,23 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_swap_select: 'Select two timetable periods to swap.',
     timetable_swapped: 'Timetable periods swapped.',
     timetable_unfilled: 'Unfilled subject periods',
+    timetable_print_class: 'One class sheet',
+    timetable_print_shift: 'All classes in one shift',
+    timetable_print_teacher: 'One teacher sheet',
+    timetable_print_all_teachers: 'All teachers sheet',
+    timetable_print_sheet: 'Print sheet',
+    timetable_print_close: 'Close',
+    timetable_shift: 'Shift',
+    timetable_shift_1: 'Shift 1',
+    timetable_shift_2: 'Shift 2',
+    timetable_warning: 'Schedule warning',
+    timetable_day: 'Day',
+    timetable_period: 'Period',
+    timetable_subject: 'Subject',
+    timetable_teacher_label: 'Teacher',
+    timetable_class_label: 'Class',
+    timetable_time: 'Time',
+    timetable_academic_year: 'Academic year',
     attendance: 'Daily Attendance',
     exams_results: 'Exams & Marks Approval',
     assignments: 'Homework & Assignments',
@@ -291,10 +360,39 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Pin notice',
     choose_class: 'Choose class',
     admissions: 'Admissions Pipeline',
+    year_end_promotion: 'Year-End Promotion',
+    nav_overview: 'OVERVIEW', nav_people_academics: 'PEOPLE & ACADEMICS', nav_communication: 'COMMUNICATION', nav_management: 'MANAGEMENT', nav_other_modules: 'OTHER MODULES',
     staff_access: 'Staff Roles & Permissions',
     staff_signin_identifier: 'Email or Staff ID',
     staff_signin_placeholder: 'name@school.com or STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'Use the temporary password from your Super Admin. Your Gmail password is not used for SchoolOS.',
+    forgot_password: 'Forgot password?',
+    forgot_password_title: 'Reset your password',
+    forgot_password_email: 'Email address',
+    forgot_password_send_code: 'Send code',
+    forgot_password_neutral: 'If an account exists for this email, a 6-digit code has been sent.',
+    forgot_password_code: '6-digit code',
+    forgot_password_new_password: 'New password',
+    forgot_password_confirm_password: 'Confirm new password',
+    forgot_password_reset: 'Change password',
+    forgot_password_resend: 'Resend code',
+    forgot_password_back: 'Back to sign in',
+    forgot_password_expiry: 'Code expires in {seconds}.',
+    forgot_password_resend_wait: 'Resend available in {seconds}.',
+    forgot_password_password_rules: 'Use 12–128 characters, including uppercase, lowercase, and a number. It must differ from your current password.',
+    forgot_password_password_min: 'Password must contain at least 12 characters.',
+    forgot_password_password_complexity: 'Password must include uppercase and lowercase letters and at least one number.',
+    forgot_password_password_max: 'Password must not exceed 128 characters.',
+    forgot_password_code_invalid: 'The code is invalid or expired. Request a new one.',
+    forgot_password_too_many_attempts: 'Too many incorrect codes. Request a new code.',
+    forgot_password_same_password: 'Choose a password different from your current password.',
+    forgot_password_password_mismatch: 'Passwords do not match.',
+    forgot_password_success: 'Password changed. You can now sign in with your new password.',
+    forgot_password_pin_hint: 'Forgot your PIN or password? Ask your school administrator to reset it.',
+    forgot_password_request_error: 'Could not process the request. Please try again.',
+    forgot_password_reset_error: 'Password reset could not be completed. Please request a new code.',
+    forgot_password_sending: 'Sending…',
+    forgot_password_updating: 'Updating…',
     first_time_password_hint: 'Create a password different from your temporary sign-in password. It must be at least 8 characters.',
     staff_id: 'Staff ID',
     staff_id_generated_hint: 'Leave blank to generate a unique ID',
@@ -453,6 +551,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'Falanqaynta & Xogta',
     broadcasts: 'Farriimaha Madasha',
     support_audit: 'Taageerada & Diiwaanka',
+    help_support: 'Caawimaad & Taageero',
     platform_settings: 'Hagaajinta Nidaamka',
     students: 'Ardayda',
     teachers: 'Macallimiinta',
@@ -478,6 +577,23 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_swap_select: 'Dooro laba cashar oo jadwalka ah si loo beddelo.',
     timetable_swapped: 'Waqtiyada jadwalka waa la beddelay.',
     timetable_unfilled: 'Casharrada jadwalka ee aan la buuxin',
+    timetable_print_class: 'Jadwalka hal fasal',
+    timetable_print_shift: 'Dhammaan fasallada hal wareeg',
+    timetable_print_teacher: 'Jadwalka hal macallin',
+    timetable_print_all_teachers: 'Jadwalka dhammaan macallimiinta',
+    timetable_print_sheet: 'Daabac jadwalka',
+    timetable_print_close: 'Xir',
+    timetable_shift: 'Wareegga',
+    timetable_shift_1: 'Wareegga 1',
+    timetable_shift_2: 'Wareegga 2',
+    timetable_warning: 'Digniin jadwal',
+    timetable_day: 'Maalin',
+    timetable_period: 'Xiisad',
+    timetable_subject: 'Maaddo',
+    timetable_teacher_label: 'Macallin',
+    timetable_class_label: 'Fasal',
+    timetable_time: 'Waqti',
+    timetable_academic_year: 'Sanad-dugsiyeedka',
     attendance: 'Xaadirinta Maalinlaha ah',
     exams_results: 'Imtixaanaadka & Natiijooyinka',
     assignments: 'Laylisyada & Shaqo-guri',
@@ -497,10 +613,39 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Ku dheji ogeysiiska',
     choose_class: 'Dooro fasal',
     admissions: 'Diiwaangelinta Cusub',
+    year_end_promotion: 'U Gudbinta Fasalka Xiga',
+    nav_overview: 'GUUDMAR', nav_people_academics: 'ARDAYDA & WAXBARASHADA', nav_communication: 'XIRIIRKA', nav_management: 'MAAMULKA', nav_other_modules: 'QAYBAHA KALE',
     staff_access: 'Shaqaalaha & Ogolaanshaha',
     staff_signin_identifier: 'Iimayl ama Aqoonsiga Shaqaalaha',
     staff_signin_placeholder: 'name@school.com ama STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'Isticmaal furaha ku-meel-gaarka ah ee Maamulaha Guud ku siiyay. Furaha Gmail-kaaga laguma galo SchoolOS.',
+    forgot_password: 'Furaha sirta ma illowday?',
+    forgot_password_title: 'Dib u deji furaha sirta',
+    forgot_password_email: 'Cinwaanka iimaylka',
+    forgot_password_send_code: 'Dir koodhka',
+    forgot_password_neutral: 'Haddii akoon ku jiro iimaylkan, waxaa la diray koodh 6 lambar ah.',
+    forgot_password_code: 'Koodhka 6-da lambar ah',
+    forgot_password_new_password: 'Furaha sirta cusub',
+    forgot_password_confirm_password: 'Xaqiiji furaha sirta cusub',
+    forgot_password_reset: 'Beddel furaha sirta',
+    forgot_password_resend: 'Dib u dir koodhka',
+    forgot_password_back: 'Ku noqo gelitaanka',
+    forgot_password_expiry: 'Koodhku wuxuu dhacayaa {seconds} gudahood.',
+    forgot_password_resend_wait: 'Dib u diristu waxay diyaar noqonaysaa {seconds} kadib.',
+    forgot_password_password_rules: 'Isticmaal 12 ilaa 128 xaraf, kuna dar xaraf weyn, xaraf yar iyo lambar. Waa inuu ka duwanaadaa furahaaga hadda.',
+    forgot_password_password_min: 'Furaha sirta waa inuu ka koobnaadaa ugu yaraan 12 xaraf.',
+    forgot_password_password_complexity: 'Furaha sirta waa inuu ka koobnaadaa xaraf weyn, xaraf yar iyo ugu yaraan hal lambar.',
+    forgot_password_password_max: 'Furaha sirta kama badnaan karo 128 xaraf.',
+    forgot_password_code_invalid: 'Koodhku waa khaldan yahay ama wuu dhacay. Codso koodh cusub.',
+    forgot_password_too_many_attempts: 'Koodh khaldan ayaa marar badan la geliyey. Codso koodh cusub.',
+    forgot_password_same_password: 'Dooro furaha sirta oo ka duwan kii hore.',
+    forgot_password_password_mismatch: 'Furayaasha sirta isma laha.',
+    forgot_password_success: 'Furaha sirta waa la beddelay. Hadda ku gal furahaaga cusub.',
+    forgot_password_pin_hint: 'Haddii aad illowday PIN-ka ama furaha sirta, weydii maamulaha dugsiga inuu kuu beddelo.',
+    forgot_password_request_error: 'Codsiga lama fulin karin. Fadlan mar kale isku day.',
+    forgot_password_reset_error: 'Furaha sirta lama beddeli karin. Fadlan codso koodh cusub.',
+    forgot_password_sending: 'Waa la dirayaa…',
+    forgot_password_updating: 'Waa la beddelayaa…',
     first_time_password_hint: 'Sameyso furaha sirta ah oo ka duwan kii ku-meel-gaarka ahaa ee aad ku gashay. Waa inuu ka koobnaadaa ugu yaraan 8 xaraf.',
     staff_id: 'Aqoonsiga Shaqaalaha',
     staff_id_generated_hint: 'Madhan ka tag si aqoonsi gaar ah loo sameeyo',
@@ -659,6 +804,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     analytics: 'ትንታኔ እና መረጃ',
     broadcasts: 'የስርዓት መልእክቶች',
     support_audit: 'ድጋፍ እና ኦዲት ሎግ',
+    help_support: 'እገዛ እና ድጋፍ',
     platform_settings: 'የስርዓት ቅንብሮች',
     students: 'ተማሪዎች',
     teachers: 'መምህራን',
@@ -684,6 +830,23 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_swap_select: 'ለመቀያየር ሁለት የጊዜ ሰሌዳ ክፍለ ጊዜዎችን ይምረጡ።',
     timetable_swapped: 'የጊዜ ሰሌዳ ክፍለ ጊዜዎች ተቀይረዋል።',
     timetable_unfilled: 'ያልተሞሉ የትምህርት ክፍለ ጊዜዎች',
+    timetable_print_class: 'የአንድ ክፍል ሰሌዳ',
+    timetable_print_shift: 'የአንድ ፈረቃ ሁሉም ክፍሎች',
+    timetable_print_teacher: 'የአንድ መምህር ሰሌዳ',
+    timetable_print_all_teachers: 'የሁሉም መምህራን ሰሌዳ',
+    timetable_print_sheet: 'ሰሌዳውን ያትሙ',
+    timetable_print_close: 'ዝጋ',
+    timetable_shift: 'ፈረቃ',
+    timetable_shift_1: 'ፈረቃ 1',
+    timetable_shift_2: 'ፈረቃ 2',
+    timetable_warning: 'የጊዜ ሰሌዳ ማስጠንቀቂያ',
+    timetable_day: 'ቀን',
+    timetable_period: 'ክፍለ ጊዜ',
+    timetable_subject: 'ትምህርት',
+    timetable_teacher_label: 'መምህር',
+    timetable_class_label: 'ክፍል',
+    timetable_time: 'ሰዓት',
+    timetable_academic_year: 'የትምህርት ዓመት',
     attendance: 'የዕለት መገኘት',
     exams_results: 'ፈተናዎች እና ውጤቶች',
     assignments: 'የቤት ስራዎች',
@@ -703,10 +866,39 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Pin notice',
     choose_class: 'Choose class',
     admissions: 'አዲስ ምዝገባ',
+    year_end_promotion: 'ወደ ቀጣይ ክፍል ማሳደግ',
+    nav_overview: 'አጠቃላይ', nav_people_academics: 'ተማሪዎች እና ትምህርት', nav_communication: 'ግንኙነት', nav_management: 'አስተዳደር', nav_other_modules: 'ሌሎች ክፍሎች',
     staff_access: 'ሰራተኞች እና ፈቃዶች',
     staff_signin_identifier: 'ኢሜይል ወይም የሰራተኛ መታወቂያ',
     staff_signin_placeholder: 'name@school.com ወይም STF-SCHOOL-0001',
     school_admin_initial_password_hint: 'በዋና አስተዳዳሪው የተሰጠዎትን ጊዜያዊ የይለፍ ቃል ይጠቀሙ። የGmail የይለፍ ቃልዎ ወደ SchoolOS ለመግባት አይጠቅምም።',
+    forgot_password: 'የይለፍ ቃል ረሱ?',
+    forgot_password_title: 'የይለፍ ቃልዎን ዳግም ያዘጋጁ',
+    forgot_password_email: 'የኢሜይል አድራሻ',
+    forgot_password_send_code: 'ኮድ ላክ',
+    forgot_password_neutral: 'ለዚህ ኢሜይል መለያ ካለ፣ 6 አሃዝ ያለው ኮድ ተልኳል።',
+    forgot_password_code: '6 አሃዝ ኮድ',
+    forgot_password_new_password: 'አዲስ የይለፍ ቃል',
+    forgot_password_confirm_password: 'አዲሱን የይለፍ ቃል ያረጋግጡ',
+    forgot_password_reset: 'የይለፍ ቃል ቀይር',
+    forgot_password_resend: 'ኮዱን እንደገና ላክ',
+    forgot_password_back: 'ወደ መግቢያ ተመለስ',
+    forgot_password_expiry: 'ኮዱ በ{seconds} ውስጥ ያበቃል።',
+    forgot_password_resend_wait: 'እንደገና መላክ በ{seconds} ውስጥ ይቻላል።',
+    forgot_password_password_rules: '12 እስከ 128 ቁምፊዎችን ይጠቀሙ፤ ትልቅ ፊደል፣ ትንሽ ፊደል እና ቁጥር ያካትቱ። ከአሁኑ የይለፍ ቃልዎ የተለየ መሆን አለበት።',
+    forgot_password_password_min: 'የይለፍ ቃሉ ቢያንስ 12 ቁምፊዎች መሆን አለበት።',
+    forgot_password_password_complexity: 'የይለፍ ቃሉ ትልቅና ትንሽ ፊደሎችን እና ቢያንስ አንድ ቁጥር ማካተት አለበት።',
+    forgot_password_password_max: 'የይለፍ ቃሉ ከ128 ቁምፊዎች መብለጥ የለበትም።',
+    forgot_password_code_invalid: 'ኮዱ ልክ አይደለም ወይም ጊዜው አልፏል። አዲስ ኮድ ይጠይቁ።',
+    forgot_password_too_many_attempts: 'ብዙ የተሳሳቱ ኮዶች ገብተዋል። አዲስ ኮድ ይጠይቁ።',
+    forgot_password_same_password: 'ከአሁኑ የተለየ የይለፍ ቃል ይምረጡ።',
+    forgot_password_password_mismatch: 'የይለፍ ቃሎቹ አይዛመዱም።',
+    forgot_password_success: 'የይለፍ ቃሉ ተቀይሯል። አሁን በአዲሱ የይለፍ ቃል ይግቡ።',
+    forgot_password_pin_hint: 'ፒንዎን ወይም የይለፍ ቃልዎን ከረሱ፣ እንዲቀይርልዎ የትምህርት ቤትዎን አስተዳዳሪ ይጠይቁ።',
+    forgot_password_request_error: 'ጥያቄውን ማስኬድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።',
+    forgot_password_reset_error: 'የይለፍ ቃሉን መቀየር አልተቻለም። አዲስ ኮድ ይጠይቁ።',
+    forgot_password_sending: 'በመላክ ላይ…',
+    forgot_password_updating: 'በማዘመን ላይ…',
     first_time_password_hint: 'ከጊዜያዊ የመግቢያ የይለፍ ቃልዎ የተለየ የይለፍ ቃል ይፍጠሩ። ቢያንስ 8 ቁምፊዎች መሆን አለበት።',
     staff_id: 'የሰራተኛ መታወቂያ',
     staff_id_generated_hint: 'ልዩ መታወቂያ ለማመንጨት ባዶ ይተዉ',

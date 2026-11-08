@@ -72,6 +72,9 @@ function findEarlyReferences(pattern: RegExp, label: string) {
   const early: string[] = [];
   for (const match of staticSchema.matchAll(pattern)) {
     const table = match[1].toLowerCase();
+    // Supabase owns auth.users outside the application schema; it is a valid
+    // foreign-key target and is not expected to be created in schema.sql.
+    if (label === 'foreign key' && table === 'auth') continue;
     const creation = tableCreationPositions.get(table);
     if (creation === undefined || creation > match.index!) early.push(`${label} on ${table}`);
   }

@@ -597,10 +597,16 @@ class StorageEngine {
       await Promise.all([settingsTask(), plansTask()]);
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
-        this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
-          count: row.attemptCount, firstFailedAt: new Date(row.firstFailedAt).getTime(),
-          lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
-        }]));
+        this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => {
+          // fromSupabaseRow maps attempt_count to `count`; never read the
+          // non-existent `attemptCount` property or NaN will persist as NULL.
+          const count = Number(row.count ?? row.attemptCount ?? 0);
+          return [row.id, {
+            count: Number.isSafeInteger(count) && count >= 0 ? count : 0,
+            firstFailedAt: new Date(row.firstFailedAt).getTime(),
+            lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
+          }];
+        }));
       }
       await this.flush();
     });
@@ -626,7 +632,7 @@ class StorageEngine {
       ['platform_broadcasts', snapshot.broadcasts], ['support_tickets', snapshot.tickets], ['subscription_invoices', snapshot.invoices],
       ['audit_logs', snapshot.auditLogs], ['assignments', snapshot.assignments], ['assignment_submissions', snapshot.assignmentSubmissions],
       ['staff_members', snapshot.staffMembers], ['payroll_records', snapshot.payrollRecords], ['admission_applications', snapshot.admissionApplications], ['library_books', snapshot.libraryBooks], ['library_loans', snapshot.libraryLoans], ['transport_routes', snapshot.transportRoutes], ['inventory_items', snapshot.inventoryItems], ['inventory_transactions', snapshot.inventoryTransactions], ['discipline_incidents', snapshot.disciplineIncidents],
-      ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: counter.count, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
+      ['restore_test_records', snapshot.restoreTestRecords], ['lockout_counters', Object.entries(snapshot.lockoutCounters).map(([id, counter]) => ({ id, count: Number.isSafeInteger(counter.count) && counter.count >= 0 ? counter.count : 0, firstFailedAt: new Date(counter.firstFailedAt).toISOString(), lockedUntil: counter.lockedUntil ? new Date(counter.lockedUntil).toISOString() : null }))]
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
     await this.persistTable(client, 'super_admin_settings', settingsRows, toRows('super_admin_settings'), knownIds, knownRows);
@@ -739,25 +745,30 @@ class StorageEngine {
     this.persistedRows.set(table, latestRows);
   }
 
-  public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15) {
+  public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15, windowMinutes = 30) {
     const entry = this.data.lockoutCounters[key];
     if (!entry) return { locked: false, remainingMinutes: 0 };
     const now = Date.now();
+    const windowMs = Math.max(1, Number.isFinite(windowMinutes) ? windowMinutes : 30) * 60 * 1000;
     if (entry.lockedUntil && entry.lockedUntil > now) {
       return { locked: true, remainingMinutes: Math.ceil((entry.lockedUntil - now) / 60000) };
     }
-    if ((entry.lockedUntil && entry.lockedUntil <= now) || now - entry.firstFailedAt > 30 * 60 * 1000) {
+    if ((entry.lockedUntil && entry.lockedUntil <= now) || !Number.isFinite(entry.firstFailedAt) || now - entry.firstFailedAt > windowMs) {
       delete this.data.lockoutCounters[key];
       this.save();
     }
     return { locked: false, remainingMinutes: 0 };
   }
 
-  public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15) {
+  public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15, windowMinutes = 30) {
     const now = Date.now();
+    const windowMs = Math.max(1, Number.isFinite(windowMinutes) ? windowMinutes : 30) * 60 * 1000;
     let entry = this.data.lockoutCounters[key];
-    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) entry = { count: 0, firstFailedAt: now, lockedUntil: null };
-    entry.count += 1;
+    if (!entry || !Number.isFinite(entry.firstFailedAt) || now - entry.firstFailedAt > windowMs) {
+      entry = { count: 0, firstFailedAt: now, lockedUntil: null };
+    }
+    const previousCount = Number(entry.count);
+    entry.count = (Number.isSafeInteger(previousCount) && previousCount >= 0 ? previousCount : 0) + 1;
     const newlyLocked = entry.count >= threshold;
     if (newlyLocked) entry.lockedUntil = now + durationMinutes * 60 * 1000;
     this.data.lockoutCounters[key] = entry;
@@ -1191,35 +1202,47 @@ class StorageEngine {
     return (await this.queryRows<User>('users', { id, school_id: schoolId }))[0] || null;
   }
 
+  private async isActiveStaffLoginAccount(user: User): Promise<boolean> {
+    if (user.role === 'accountant' || user.role === 'teacher') {
+      const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: user.schoolId, user_id: user.id });
+      if (linkedStaff.some(record => record.status !== 'active')) return false;
+    }
+    if (user.role === 'teacher') {
+      const teacherProfiles = await this.queryRows<Teacher>('teachers', { school_id: user.schoolId, user_id: user.id });
+      if (teacherProfiles.length !== 1 || teacherProfiles[0].status !== 'active') return false;
+    }
+    return true;
+  }
+
   public async findUserForLogin(identifier: string, schoolId?: string): Promise<User | null> {
     const cleanId = identifier.trim().toLowerCase();
     const byEmail = await this.queryRows<User>('users', { school_id: schoolId, email: cleanId });
-    const byPhone = byEmail.length ? [] : await this.queryRows<User>('users', { school_id: schoolId, phone: identifier.trim() });
-    const direct = byEmail[0] || byPhone[0];
-    if (direct) {
-      if (direct.role === 'accountant') {
-        const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: direct.schoolId, user_id: direct.id });
-        if (linkedStaff.some(record => record.status !== 'active')) return null;
-      }
-      return direct;
+    if (byEmail.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
+
+    let direct = byEmail[0] || null;
+    if (!direct) {
+      const byPhone = await this.queryRows<User>('users', { school_id: schoolId, phone: identifier.trim() });
+      // Shared phone numbers must never silently authenticate the first account.
+      if (byPhone.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
+      direct = byPhone[0] || null;
     }
+
+    if (direct) return await this.isActiveStaffLoginAccount(direct) ? direct : null;
+
     const normalizedStaffId = identifier.trim().toUpperCase();
     const userIds = await this.queryRows<User>('users', { school_id: schoolId, staff_id: normalizedStaffId });
-    if (userIds.length > 1) return null;
+    if (userIds.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
     if (userIds.length === 1) {
       const account = userIds[0];
-      if (account.role === 'accountant') {
-        const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: account.schoolId, user_id: account.id });
-        if (linkedStaff.some(record => record.status !== 'active')) return null;
-      }
-      return account;
+      return await this.isActiveStaffLoginAccount(account) ? account : null;
     }
     const matches = (await this.queryRows<StaffMember>('staff_members', { school_id: schoolId, staff_id: normalizedStaffId }))
       .filter(record => record.staffId?.toUpperCase() === normalizedStaffId && record.status === 'active' && record.userId);
     if (matches.length !== 1) return null;
     const staff = matches[0];
     const account = await this.getUserById(staff.userId!, staff.schoolId);
-    return account?.role === 'accountant' ? account : null;
+    if (!account || !['teacher', 'accountant'].includes(account.role) || !(await this.isActiveStaffLoginAccount(account))) return null;
+    return { ...account, staffId: account.staffId || staff.staffId };
   }
 
   public async findUsersByPhoneInSchool(phone: string, schoolId: string): Promise<User[]> {
@@ -1363,7 +1386,7 @@ class StorageEngine {
       return { session, user: cachedAuth.user, school: cachedAuth.school };
     }
     if (cachedAuth) authContextCache.delete(userId);
-    const userColumns = 'id,school_id,role,full_name,email,phone,staff_id,student_id,parent_phone,password_hash,pin_hash,must_change_password,is_blocked,failed_login_attempts,locked_until,two_factor_enabled,two_factor_secret,pending_two_factor_secret,must_setup_2fa,recovery_codes,permissions,assigned_class_ids,assigned_subject_ids,linked_student_ids,branch_id,created_at,last_login_at';
+    const userColumns = 'id,auth_user_id,school_id,role,full_name,email,phone,staff_id,student_id,parent_phone,password_hash,pin_hash,must_change_password,is_blocked,failed_login_attempts,locked_until,two_factor_enabled,two_factor_secret,pending_two_factor_secret,must_setup_2fa,recovery_codes,permissions,assigned_class_ids,assigned_subject_ids,linked_student_ids,branch_id,created_at,last_login_at,password_changed_at';
     const schoolColumns = 'id,name,code,address,city,phone,email,logo_url,brand_color,currency,academic_year,current_semester,default_class_capacity,student_access_enabled,created_at,updated_at,subscription:school_subscriptions!school_subscriptions_school_id_fkey(*)';
     let query = client.from('user_sessions').select(`id,user_id,user_role,school_id,expires_at,created_at,last_activity_at,user:users!user_sessions_user_id_fkey!inner(${userColumns},school:schools!users_school_id_fkey(${schoolColumns}))`).eq('id', sessionId).eq('user_id', userId);
     if (schoolId) query = query.eq('school_id', schoolId);
@@ -1739,12 +1762,20 @@ class StorageEngine {
   }
 
   public async updateClass(id: string, updates: Partial<SchoolClass>, schoolId?: string): Promise<SchoolClass | null> {
-    await this.getClassById(id, schoolId || updates.schoolId);
-    const idx = this.data.classes.findIndex(c => c.id === id);
-    if (idx === -1) return null;
-    this.data.classes[idx] = { ...this.data.classes[idx], ...updates };
-    this.save();
-    return this.data.classes[idx];
+    const current = await this.getClassById(id, schoolId || updates.schoolId);
+    if (!current) return null;
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Class storage is unavailable.');
+    const row = toSupabaseRow(updates as Record<string, any>, 'classes');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('classes').update(row).eq('id', id).eq('school_id', schoolId || current.schoolId).select('*').maybeSingle();
+    this.recordQuery('classes', 'update', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update this class.');
+    if (!data) return null;
+    const updated = fromSupabaseRow(data, 'classes') as SchoolClass;
+    const cachedIndex = this.data.classes.findIndex(item => item.id === id && item.schoolId === updated.schoolId);
+    if (cachedIndex >= 0) this.data.classes[cachedIndex] = updated;
+    return updated;
   }
 
   public async deleteClass(id: string, schoolId?: string): Promise<boolean> {
@@ -1897,10 +1928,17 @@ class StorageEngine {
 
   public async getTimetableSettings(schoolId: string) {
     const rows = await this.queryRows<any>('timetable_settings', { school_id: schoolId });
-    return rows[0] || { schoolId, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 };
+    const saved = rows[0] || { schoolId, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 };
+    return {
+      ...saved,
+      shift2FirstPeriodStart: saved.shift2FirstPeriodStart || '13:00',
+      shift2PeriodMinutes: Number(saved.shift2PeriodMinutes ?? 40),
+      shift2BreakAfterPeriod: Number(saved.shift2BreakAfterPeriod ?? 3),
+      shift2BreakMinutes: Number(saved.shift2BreakMinutes ?? 20)
+    };
   }
 
-  public async saveTimetableSettings(schoolId: string, values: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }) {
+  public async saveTimetableSettings(schoolId: string, values: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number }) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable settings storage is unavailable.');
     const row = toSupabaseRow({ schoolId, ...values, updatedAt: new Date().toISOString() }, 'timetable_settings');
@@ -1911,13 +1949,13 @@ class StorageEngine {
     return { schoolId, ...values };
   }
 
-  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, unavailable: boolean) {
+  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, shift: number, unavailable: boolean) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Teacher availability storage is unavailable.');
-    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}`;
+    const id = shift === 1 ? `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}` : `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}-shift-${shift}`;
     if (unavailable) {
       const startedAt = performance.now();
-      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber }, { onConflict: 'school_id,teacher_id,day_of_week,period_number' });
+      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber, shift }, { onConflict: 'school_id,teacher_id,day_of_week,period_number,shift' });
       this.recordQuery('teacher_unavailability', 'upsert', startedAt);
       if (error) throw new Error(error.message || 'Unable to save teacher availability.');
     } else {
@@ -3372,11 +3410,11 @@ class StorageEngine {
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
       'bus_assignments', 'class_subjects', 'classes',
-      'direct_messages', 'discipline_incidents', 'exam_configs',
+      'direct_messages', 'discipline_incidents', 'exam_configs', 'exam_schedules', 'exam_seat_assignments',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
       'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
-      'report_card_templates', 'school_branches', 'school_events', 'school_notices',
+      'report_card_templates', 'school_branches', 'school_events', 'school_health_visits', 'school_notices',
       'staff_members', 'student_marks', 'students', 'subjects',
       'support_tickets', 'teacher_unavailability', 'teachers',
       'timetable_settings', 'timetable_slots', 'transport_routes'
@@ -3399,10 +3437,14 @@ class StorageEngine {
     // Authentication records, audit history, platform broadcasts, billing,
     // provider secrets, and active sessions are intentionally never exported.
 
+    const schoolProfile = { ...school } as Record<string, any>;
+    delete schoolProfile.subscription;
+    delete schoolProfile.branches;
+
     return {
       backupDate: new Date().toISOString(),
       version: '1.2.0',
-      school,
+      school: schoolProfile,
       tables,
       // Keep the original top-level properties for existing restore/download consumers.
       branches: tables.school_branches,

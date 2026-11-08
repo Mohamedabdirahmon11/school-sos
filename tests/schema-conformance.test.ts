@@ -5,7 +5,11 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
+const backupHealthVisitsMigration = readFileSync(new URL('../supabase/migrations/20261108100000_school_backup_include_health_visits.sql', import.meta.url), 'utf8');
+const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
+const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107101812_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const normalizedApiSource = apiSource.replace(/\r\n/g, '\n');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
   const columns = new Map<string, { required: boolean; hasDefault: boolean }>();
@@ -74,7 +78,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     ['student', "db.createStudent({\n    schoolId: school.id"],
         ['teacher', "db.createTeacher({\n    schoolId: school.id"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
-  ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
+  ]) assert.ok(normalizedApiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
 });
 
 test('performance migration has scoped dashboard aggregates, execute grants, and idempotent filter indexes', () => {
@@ -275,13 +279,20 @@ test('school backups include newer tenant modules but exclude credentials and ac
   const start = storage.indexOf('public async generateSchoolBackup');
   const end = storage.indexOf('public async generatePlatformBackup', start);
   const backup = storage.slice(start, end);
-  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions']) {
+  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions', 'school_health_visits', 'exam_schedules', 'exam_seat_assignments']) {
     assert.ok(backup.includes(`'${table}'`), `school backup includes ${table}`);
   }
   assert.doesNotMatch(backup, /'user_sessions'/, 'school backups do not contain active login sessions');
   for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
     assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
   }
+  assert.match(backupHealthVisitsMigration, /'school_health_visits'/);
+  assert.match(sql, /'school_health_visits'/);
+  assert.match(apiSource, /school_health_visits/);
+  assert.match(backup, /const schoolProfile = \{ \.\.\.school \}/);
+  assert.match(backup, /delete schoolProfile\.subscription/);
+  assert.match(backup, /delete schoolProfile\.branches/);
+  assert.match(backup, /school: schoolProfile/);
   assert.match(backup, /sensitiveBackupFields/);
   assert.match(backup, /tables\[table\] = rows\.map/);
   assert.doesNotMatch(backup, /tables\.users\s*=/, 'school backups exclude login accounts entirely');
@@ -301,4 +312,72 @@ test('school backup restore rejects single-column foreign keys that cross school
   assert.match(backupRestoreMigration, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
   assert.match(backupRestoreMigration, /v_fk_scope := CASE[\s\S]*target_row\.role::text = ''super_admin''/);
   assert.match(sql, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
+});
+
+
+test('shift-aware timetable migration is additive and keeps legacy Shift 1 settings', () => {
+  assert.match(timetableShiftMigration, /classes[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
+  assert.match(timetableShiftMigration, /shift2_break_minutes INTEGER NOT NULL DEFAULT 20/);
+  assert.match(timetableShiftMigration, /teacher_unavailability[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /UNIQUE \(school_id, teacher_id, day_of_week, period_number, shift\)/);
+  assert.match(sql, /shift SMALLINT NOT NULL DEFAULT 1 CHECK \(shift IN \(1, 2\)\)/);
+  assert.match(sql, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
+});
+
+test('password reset migration is private, hashed, and session-versioned', () => {
+  assert.match(passwordResetMigration, /ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ/i);
+  assert.match(passwordResetMigration, /CREATE TABLE IF NOT EXISTS public\.password_reset_codes/i);
+  assert.match(passwordResetMigration, /user_id VARCHAR\(64\) REFERENCES public\.users\(id\)/i);
+  assert.match(passwordResetMigration, /code_hash TEXT/i);
+  assert.match(passwordResetMigration, /request_email_hash TEXT NOT NULL/i);
+  assert.match(passwordResetMigration, /attempts INTEGER NOT NULL DEFAULT 0 CHECK \(attempts BETWEEN 0 AND 5\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(user_id\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(expires_at\)/i);
+  assert.match(passwordResetMigration, /ALTER TABLE public\.password_reset_codes ENABLE ROW LEVEL SECURITY/i);
+  assert.match(passwordResetMigration, /REVOKE ALL ON TABLE public\.password_reset_codes FROM PUBLIC, anon, authenticated/i);
+  assert.match(passwordResetMigration, /GRANT ALL ON TABLE public\.password_reset_codes TO service_role/i);
+  assert.doesNotMatch(passwordResetMigration, /CREATE POLICY/i);
+});
+
+
+
+test('fresh-install dashboard aggregates match the applied attendance and voided-payment migration', () => {
+  const dashboardMigration = readFileSync(new URL('../supabase/migrations/037_reports_exclude_voided_and_inactive_records.sql', import.meta.url), 'utf8');
+  const marker = '$function$\n;';
+  const extract = (source: string) => {
+    const start = source.indexOf('CREATE OR REPLACE FUNCTION public.school_dashboard_summary');
+    const end = source.indexOf(marker, start);
+    assert.ok(start >= 0 && end >= 0, 'school_dashboard_summary definition exists');
+    return source.slice(start, end + marker.length);
+  };
+  const schemaFunction = extract(sql);
+  const migrationFunction = extract(dashboardMigration);
+  assert.equal(schemaFunction, migrationFunction, 'fresh-install schema matches the applied dashboard migration');
+  assert.match(schemaFunction, /status IN \('present', 'late'\)/);
+  assert.match(schemaFunction, /status = 'excused'/);
+  assert.match(schemaFunction, /active_student\.status = 'active'/);
+  assert.match(schemaFunction, /voided_at IS NULL/);
+});
+
+
+test('school backup restore includes safe school settings and keeps billing and credentials out', () => {
+  const startToken = 'CREATE OR REPLACE FUNCTION public.schoolos_restore_school_backup';
+  const endToken = 'REVOKE ALL ON FUNCTION public.schoolos_restore_school_backup(JSONB)';
+  const extract = (source: string) => {
+    const start = source.indexOf(startToken);
+    const end = source.indexOf(endToken, start);
+    assert.ok(start >= 0 && end >= 0, 'safe school restore function exists');
+    return source.slice(start, end).trim();
+  };
+  const schemaFunction = extract(sql);
+  const migrationFunction = extract(backupHealthVisitsMigration);
+  assert.equal(schemaFunction, migrationFunction, 'fresh-install schema matches the current safe restore migration');
+  assert.match(schemaFunction, /UPDATE public\.schools/);
+  assert.match(schemaFunction, /v_school_row\.attendance_rules/);
+  assert.match(schemaFunction, /v_school_row\.notification_preferences/);
+  assert.match(schemaFunction, /jsonb_build_object\('school_profile', 1\)/);
+  assert.match(schemaFunction, /v_school_profile := public\.schoolos_backup_json_snake/);
+  assert.match(schemaFunction, /CASE WHEN v_school_profile \? 'calendar_type'/);
+  assert.doesNotMatch(schemaFunction, /UPDATE public\.school_subscriptions|UPDATE public\.subscription_invoices/);
 });

@@ -5,8 +5,8 @@ on:
     branches:
       - main
       - fix/schoolos-audit-2026-11-03
+      - fix/supabase-auth-login-main-2026-11-08
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
@@ -25,27 +25,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: TypeScript checks
-        run: npm run typecheck:ci
-
+        run: npm run lint
       - name: Test suite
-        run: npm test
-
+        run: npm run test:ci
       - name: Route parity audit
         run: npm run audit:routes
-
       - name: Row-level security source audit
         run: npm run audit:rls
-
       - name: Production build
         run: npm run build
