@@ -1228,7 +1228,7 @@ class StorageEngine {
     if (userIds.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
     if (userIds.length === 1) {
       const account = userIds[0];
-      if (account.role === 'accountant') {
+      if (account.role === 'accountant' || account.role === 'teacher') {
         const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: account.schoolId, user_id: account.id });
         if (linkedStaff.some(record => record.status !== 'active')) return null;
       }
