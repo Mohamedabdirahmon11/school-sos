@@ -122,8 +122,7 @@ test('Teacher ID lookup resolves linked active teacher staff records and rejects
   assert.match(storageSource, /record\.status !== 'active'/);
   assert.match(storageSource, /queryRows<Teacher>\('teachers', \{ school_id: user\.schoolId, user_id: user\.id \}\)/);
   assert.match(storageSource, /teacherProfiles\.length !== 1 \|\| teacherProfiles\[0\]\.status !== 'active'/);
-  assert.match(storageSource, /account\.role === 'accountant' \|\| account\.role === 'teacher'/);
-  assert.match(storageSource, /account\.role === 'teacher' \|\| account\.role === 'accountant'/);
+  assert.match(storageSource, /!\['teacher', 'accountant'\]\.includes\(account\.role\)/);
   assert.match(storageSource, /staffId: account\.staffId \|\| staff\.staffId/);
 });
 
