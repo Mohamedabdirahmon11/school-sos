@@ -29,9 +29,19 @@ export const PlatformSettingsView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadSettings = async () => {
+    setLoadError(null);
+    try {
+      setSettings(await ApiClient.getSettings());
+    } catch (error: any) {
+      setLoadError(error.message || 'Unable to load platform settings.');
+    }
+  };
 
   useEffect(() => {
-    ApiClient.getSettings().then(setSettings).catch(console.error);
+    void loadSettings();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -81,7 +91,13 @@ export const PlatformSettingsView: React.FC = () => {
     setSettings({ ...settings, enabledLanguages: list });
   };
 
-  if (!settings) return <div className="p-6 text-xs text-[#64748B]">Loading settings...</div>;
+  if (!settings) return loadError ? (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Platform settings could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void loadSettings()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  ) : <div role="status" aria-busy="true" className="p-6 text-xs text-[#64748B]">Loading settings...</div>;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
