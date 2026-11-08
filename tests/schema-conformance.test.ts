@@ -278,13 +278,16 @@ test('school backups include newer tenant modules but exclude credentials and ac
   const start = storage.indexOf('public async generateSchoolBackup');
   const end = storage.indexOf('public async generatePlatformBackup', start);
   const backup = storage.slice(start, end);
-  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions']) {
+  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions', 'school_health_visits']) {
     assert.ok(backup.includes(`'${table}'`), `school backup includes ${table}`);
   }
   assert.doesNotMatch(backup, /'user_sessions'/, 'school backups do not contain active login sessions');
   for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
     assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
   }
+  assert.match(backupRestoreMigration, /'school_health_visits'/);
+  assert.match(sql, /'school_health_visits'/);
+  assert.match(apiSource, /school_health_visits/);
   assert.match(backup, /sensitiveBackupFields/);
   assert.match(backup, /tables\[table\] = rows\.map/);
   assert.doesNotMatch(backup, /tables\.users\s*=/, 'school backups exclude login accounts entirely');
