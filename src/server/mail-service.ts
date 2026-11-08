@@ -176,3 +176,13 @@ export async function sendPasswordResetEmail(to: string, code: string, language:
   }
   await provider.send({ from, to: [to], subject: template.subject, text, html });
 }
+
+/** Generic platform email (subscription reminders, notices) using the same provider as password reset. */
+export async function sendPlatformEmail(message: { to: string; subject: string; text: string; html: string }): Promise<void> {
+  const from = process.env.MAIL_FROM?.trim();
+  const providerNameValue = providerName();
+  if (!isPasswordResetMailConfigured() || !from) throw new Error('Email delivery is not configured.');
+  if (providerNameValue !== 'gmail' && providerNameValue !== 'resend') throw new Error('MAIL_PROVIDER must be either gmail or resend.');
+  const provider: MailProvider = providerNameValue === 'gmail' ? new GmailSmtpMailProvider() : new ResendMailProvider();
+  await provider.send({ from, to: [message.to], subject: message.subject, text: message.text, html: message.html });
+}

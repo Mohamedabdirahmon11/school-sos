@@ -13,6 +13,7 @@ import { apiNotFound, createLoginRateLimiter, getTrustProxyHops, securityHeaders
 import { assertProductionAssets } from './src/server/production-assets.ts';
 import { db, initializeStorage } from './src/server/storage.ts';
 import path from 'node:path';
+import { runSubscriptionReminders } from './src/server/subscription-reminders.ts';
 
 if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
 
@@ -35,6 +36,7 @@ async function startServer() {
   const runDailySubscriptionCheck = async () => {
     const context = await db.prepareRequestContext();
     await db.runWithRequestContext(context, () => db.runSubscriptionDailyCheck());
+    await db.runWithRequestContext(context, () => runSubscriptionReminders());
   };
   await runDailySubscriptionCheck();
   const subscriptionTimer = setInterval(() => {
