@@ -23,9 +23,11 @@ The production database contains shift-2 timetable settings columns and a
 shift-aware `schoolos_swap_timetable_slots` function, but the previously
 referenced source path
 `supabase/migrations/20261107092357_shift_aware_timetables.sql` is not present
-in `main`. This PR adds an idempotent schema-alignment migration for the
-observed `classes.shift` and `timetable_settings.shift2_*` columns. It does
-not claim to recover the original function migration.
+in `main`. This PR adds forward migrations for the observed
+`classes.shift` and `timetable_settings.shift2_*` columns, restores the
+shift-aware slot-swap behavior, and adds atomic overlap guards. These forward
+migrations make the deployed behavior reproducible without claiming to recover
+the original historical migration byte-for-byte.
 
 ## Recovery policy
 
