@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { formatMoney } from '../../lib/money.ts';
 import { BarChart3, Download, TrendingUp, Users, DollarSign, CalendarCheck, FileText } from 'lucide-react';
 
 export const AnalyticsView: React.FC = () => {
@@ -15,6 +16,7 @@ export const AnalyticsView: React.FC = () => {
   const totalTeachers = Number(analytics?.totalTeachers) || 0;
   const activeUsers = Number(analytics?.activeUsers30Days) || 0;
   const totalInvoiced = Number(analytics?.totalPaidBillings) || 0;
+  const platformCurrency = String(analytics?.platformCurrency || 'ETB').toUpperCase();
   const activeSchools = Number(analytics?.activeSchools) || 0;
 
   useEffect(() => {
@@ -89,8 +91,8 @@ export const AnalyticsView: React.FC = () => {
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total SaaS Billings</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">${totalInvoiced.toLocaleString()}</p>
-          <p className="text-[11px] text-[#64748B] mt-1">Paid subscription invoices</p>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{formatMoney(totalInvoiced, platformCurrency)}</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Paid invoices in {platformCurrency}</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
