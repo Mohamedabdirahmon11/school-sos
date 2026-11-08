@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_swap_timetable_slots(
 ) RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
+SET search_path = ''
 AS $function$
 DECLARE
   first_slot public.timetable_slots%ROWTYPE;
