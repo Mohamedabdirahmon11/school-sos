@@ -222,6 +222,10 @@ BEGIN
     RETURN NULL;
   END IF;
 
+  IF broadcast_row.audience NOT IN ('all_schools', 'school_admins', 'teachers', 'one_school') THEN
+    RAISE EXCEPTION 'The platform broadcast audience is invalid.';
+  END IF;
+
   IF broadcast_row.audience = 'one_school'
      AND (broadcast_row.target_school_id IS NULL OR NOT EXISTS (
        SELECT 1 FROM public.schools WHERE id = broadcast_row.target_school_id
@@ -234,7 +238,7 @@ BEGIN
     author_name, author_role, class_id, is_active, created_at
   )
   SELECT
-    'platform-' || broadcast_row.id || '-' || school.id,
+    'platform-' || md5(broadcast_row.id || ':' || school.id),
     school.id,
     broadcast_row.title,
     broadcast_row.message,
