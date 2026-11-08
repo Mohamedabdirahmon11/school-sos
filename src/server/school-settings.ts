@@ -194,7 +194,7 @@ const timetableSettingsSchema = z.object({
   periodMinutes: z.number().int('Period length must be a whole number.').min(20, 'Period length must be 20-120 minutes.').max(120, 'Period length must be 20-120 minutes.'),
   breakAfterPeriod: z.number().int('Break position must be a whole number.').min(1, 'Break must follow period 1-5.').max(5, 'Break must follow period 1-5.'),
   breakMinutes: z.number().int('Break length must be a whole number.').min(0, 'Break length must be 0-120 minutes.').max(120, 'Break length must be 0-120 minutes.'),
-  shift2FirstPeriodStart: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, 'Afternoon timetable start must use HH:MM.').optional(),
+  shift2FirstPeriodStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Afternoon timetable start must use HH:MM.').optional(),
   shift2PeriodMinutes: z.number().int().min(20).max(120).optional(),
   shift2BreakAfterPeriod: z.number().int().min(1).max(5).optional(),
   shift2BreakMinutes: z.number().int().min(0).max(120).optional()
