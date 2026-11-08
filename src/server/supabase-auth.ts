@@ -3,10 +3,18 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import type { User } from '../types/index.ts';
 import { db } from './storage.ts';
 import { verifyPassword, verifyPin } from './auth-security.ts';
-import { supabase, supabaseUrl, supabaseKey } from './supabase.ts';
+import { supabase, supabaseUrl, supabaseKey, supabaseAnonKey } from './supabase.ts';
 
-function createServerAuthClient() {
-  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase Auth is not configured on the server.');
+function createAuthClient() {
+  const apiKey = supabaseAnonKey || supabaseKey;
+  if (!supabaseUrl || !apiKey) throw new Error('Supabase Auth is not configured on the server.');
+  return createClient(supabaseUrl, apiKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
+function createAdminAuthClient() {
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase Auth administration is not configured on the server.');
   return createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
@@ -39,13 +47,14 @@ export async function signInSchoolOSUser(
   credentialType: 'password' | 'pin'
 ): Promise<{ session: Session; authUserId: string } | null> {
   if (!credential || user.isBlocked) return null;
-  const client = createServerAuthClient();
+  const authClient = createAuthClient();
+  const adminClient = createAdminAuthClient();
   let authUserId = user.authUserId;
   let email: string;
   let usePinCredential = credentialType === 'pin';
 
   if (authUserId) {
-    const { data, error } = await client.auth.admin.getUserById(authUserId);
+    const { data, error } = await adminClient.auth.admin.getUserById(authUserId);
     if (error || !data.user?.email || data.user.banned_until && Date.parse(data.user.banned_until) > Date.now()) return null;
     email = data.user.email;
     if (credentialType === 'pin' || user.role === 'teacher' && !verifyPassword(credential, String(user.passwordHash || ''))) {
@@ -61,7 +70,7 @@ export async function signInSchoolOSUser(
 
     email = authEmailForUser(user);
     const authPassword = usePinCredential ? authPasswordForPin(user) : credential;
-    const { data, error } = await client.auth.admin.createUser({
+    const { data, error } = await adminClient.auth.admin.createUser({
       email,
       password: authPassword,
       email_confirm: true
@@ -75,7 +84,7 @@ export async function signInSchoolOSUser(
     authUserId = data.user.id;
     const updated = db.updateUser(user.id, { authUserId });
     if (!updated) {
-      await client.auth.admin.deleteUser(authUserId);
+      await adminClient.auth.admin.deleteUser(authUserId);
       throw new Error('The SchoolOS account could not be linked to Supabase Auth.');
     }
     try {
@@ -91,7 +100,7 @@ export async function signInSchoolOSUser(
     : [credential, ...(user.role === 'teacher' && verifyPin(credential, String(user.pin || '')) ? [authPasswordForPin(user)] : [])];
 
   for (const authPassword of authPasswords) {
-    const { data, error } = await client.auth.signInWithPassword({ email, password: authPassword });
+    const { data, error } = await authClient.auth.signInWithPassword({ email, password: authPassword });
     if (!error && data.user && data.session && data.user.id === authUserId) {
       return { session: data.session, authUserId };
     }
@@ -108,21 +117,21 @@ export async function getSupabaseAuthUser(accessToken: string) {
 
 export async function refreshSupabaseAuthSession(refreshToken: string): Promise<Session | null> {
   if (!refreshToken) return null;
-  const client = createServerAuthClient();
+  const client = createAuthClient();
   const { data, error } = await client.auth.refreshSession({ refresh_token: refreshToken });
   return error ? null : data.session;
 }
 
 export async function revokeSupabaseAuthSession(accessToken: string, refreshToken: string): Promise<void> {
   if (!accessToken || !refreshToken) return;
-  const client = createServerAuthClient();
+  const client = createAuthClient();
   await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
   await client.auth.signOut({ scope: 'local' });
 }
 
 export async function updateSupabaseAuthPassword(authUserId: string, password: string): Promise<void> {
   if (!authUserId) throw new Error('This account is not linked to Supabase Auth.');
-  const client = createServerAuthClient();
+  const client = createAdminAuthClient();
   const { error } = await client.auth.admin.updateUserById(authUserId, { password });
   if (error) throw new Error('Supabase Auth could not update the account password.');
 }
