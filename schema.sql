@@ -251,11 +251,13 @@ CREATE TABLE IF NOT EXISTS classes (
 
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
-DO $ BEGIN
+DO $shift_constraint$
+BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.classes'::regclass AND conname = 'classes_shift_check') THEN
     ALTER TABLE public.classes ADD CONSTRAINT classes_shift_check CHECK (shift IN (1, 2));
   END IF;
-END $;
+END
+$shift_constraint$;
 
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);
