@@ -1195,8 +1195,16 @@ class StorageEngine {
   public async findUserForLogin(identifier: string, schoolId?: string): Promise<User | null> {
     const cleanId = identifier.trim().toLowerCase();
     const byEmail = await this.queryRows<User>('users', { school_id: schoolId, email: cleanId });
-    const byPhone = byEmail.length ? [] : await this.queryRows<User>('users', { school_id: schoolId, phone: identifier.trim() });
-    const direct = byEmail[0] || byPhone[0];
+    if (byEmail.length > 1) return null;
+
+    let direct = byEmail[0] || null;
+    if (!direct) {
+      const byPhone = await this.queryRows<User>('users', { school_id: schoolId, phone: identifier.trim() });
+      // Shared phone numbers must never silently authenticate the first account.
+      if (byPhone.length > 1) return null;
+      direct = byPhone[0] || null;
+    }
+
     if (direct) {
       if (direct.role === 'accountant') {
         const linkedStaff = await this.queryRows<StaffMember>('staff_members', { school_id: direct.schoolId, user_id: direct.id });
@@ -1204,6 +1212,7 @@ class StorageEngine {
       }
       return direct;
     }
+
     const normalizedStaffId = identifier.trim().toUpperCase();
     const userIds = await this.queryRows<User>('users', { school_id: schoolId, staff_id: normalizedStaffId });
     if (userIds.length > 1) return null;
