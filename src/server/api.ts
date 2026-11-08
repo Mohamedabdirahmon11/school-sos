@@ -802,9 +802,17 @@ apiRouter.post('/auth/login', async (req, res) => {
       const students = await db.getStudents(school.id);
       const matchedStudents = students.filter(student =>
         role === 'student'
-          ? student.studentPhone === phone || student.fatherPhone === phone
+          ? student.studentPhone === phone
           : student.fatherPhone === phone || student.motherPhone === phone
       );
+      if (matchedStudents.length > 1) {
+        res.status(409).json({
+          error: role === 'student'
+            ? 'This phone number is linked to multiple student records. Ask your School Admin to issue a unique student login.'
+            : 'This parent phone is linked to multiple students but has no parent account yet. Ask your School Admin to create one.'
+        });
+        return;
+      }
       const matchStd = matchedStudents[0];
 
       if (!matchStd) {
@@ -1357,7 +1365,16 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     severity: 'info'
   });
 
-  await issueSessionCookie(res, updated, req);
+  let refreshedAuthSession: Session | undefined;
+  if (updated.authUserId) {
+    const authResult = await signInSchoolOSUser(updated, newPassword, 'password');
+    if (!authResult) {
+      res.status(503).json({ error: 'Password was changed, but the new Supabase Auth session could not be started. Sign in again with the new password.' });
+      return;
+    }
+    refreshedAuthSession = authResult.session;
+  }
+  await issueSessionCookie(res, updated, req, undefined, refreshedAuthSession);
   res.json({ success: true, message: 'Password updated successfully.' });
 });
 
