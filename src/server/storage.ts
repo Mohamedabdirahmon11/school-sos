@@ -1195,13 +1195,13 @@ class StorageEngine {
   public async findUserForLogin(identifier: string, schoolId?: string): Promise<User | null> {
     const cleanId = identifier.trim().toLowerCase();
     const byEmail = await this.queryRows<User>('users', { school_id: schoolId, email: cleanId });
-    if (byEmail.length > 1) return null;
+    if (byEmail.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
 
     let direct = byEmail[0] || null;
     if (!direct) {
       const byPhone = await this.queryRows<User>('users', { school_id: schoolId, phone: identifier.trim() });
       // Shared phone numbers must never silently authenticate the first account.
-      if (byPhone.length > 1) return null;
+      if (byPhone.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
       direct = byPhone[0] || null;
     }
 
@@ -1215,7 +1215,7 @@ class StorageEngine {
 
     const normalizedStaffId = identifier.trim().toUpperCase();
     const userIds = await this.queryRows<User>('users', { school_id: schoolId, staff_id: normalizedStaffId });
-    if (userIds.length > 1) return null;
+    if (userIds.length > 1) throw new Error('LOGIN_IDENTIFIER_AMBIGUOUS');
     if (userIds.length === 1) {
       const account = userIds[0];
       if (account.role === 'accountant') {
