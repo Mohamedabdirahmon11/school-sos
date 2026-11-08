@@ -205,3 +205,10 @@ test('teacher legacy assignments are resolved only against the authenticated sch
   assert.match(apiSource, /school_id: school\.id, id: legacyClassIds, is_archived: 'false'/);
   assert.match(apiSource, /legacy-\$\{teacher\.id\}-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
+
+
+test('users UPDATE RLS does not retain the older permissive non-parent policy', () => {
+  const migrationSource = readFileSync(new URL('../supabase/migrations/20261108090000_fix_auth_user_update_rls_and_fk_indexes.sql', import.meta.url), 'utf8');
+  assert.match(migrationSource, /DROP POLICY IF EXISTS parent_student_block_update ON public\.users/);
+  assert.match(migrationSource, /CREATE POLICY users_update_scope[\s\S]*private\.auth_user_role\(\).*super_admin/);
+});
