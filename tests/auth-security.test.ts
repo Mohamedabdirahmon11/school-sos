@@ -149,3 +149,9 @@ test('teacher accounts cannot bypass Teacher ID login by omitting the requested 
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   assert.match(apiSource, /normalizedRole === 'teacher' && normalizeStaffId\(storedUser\.staffId\) !== normalizeStaffId\(identifier\)/);
 });
+
+
+test('existing teacher sessions are rejected when the linked teacher profile is inactive or missing', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /if \(user\.role === 'teacher'\)[\s\S]*teacherProfiles\.items\.length !== 1 \|\| teacherProfiles\.items\[0\]\.status !== 'active'/);
+});
