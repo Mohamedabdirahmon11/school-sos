@@ -13,7 +13,6 @@ import {
   Menu,
   GraduationCap,
   CalendarCheck,
-  Layers,
   CreditCard,
   FileSpreadsheet,
   FileText
