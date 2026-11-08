@@ -82,6 +82,12 @@ export interface TranslationDict {
   pin_notice: string;
   choose_class: string;
   admissions: string;
+  year_end_promotion: string;
+  nav_overview: string;
+  nav_people_academics: string;
+  nav_communication: string;
+  nav_management: string;
+  nav_other_modules: string;
   staff_access: string;
   staff_signin_identifier: string;
   staff_signin_placeholder: string;
@@ -352,6 +358,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Pin notice',
     choose_class: 'Choose class',
     admissions: 'Admissions Pipeline',
+    year_end_promotion: 'Year-End Promotion',
+    nav_overview: 'OVERVIEW', nav_people_academics: 'PEOPLE & ACADEMICS', nav_communication: 'COMMUNICATION', nav_management: 'MANAGEMENT', nav_other_modules: 'OTHER MODULES',
     staff_access: 'Staff Roles & Permissions',
     staff_signin_identifier: 'Email or Staff ID',
     staff_signin_placeholder: 'name@school.com or STF-SCHOOL-0001',
@@ -602,6 +610,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Ku dheji ogeysiiska',
     choose_class: 'Dooro fasal',
     admissions: 'Diiwaangelinta Cusub',
+    year_end_promotion: 'U Gudbinta Fasalka Xiga',
+    nav_overview: 'GUUDMAR', nav_people_academics: 'ARDAYDA & WAXBARASHADA', nav_communication: 'XIRIIRKA', nav_management: 'MAAMULKA', nav_other_modules: 'QAYBAHA KALE',
     staff_access: 'Shaqaalaha & Ogolaanshaha',
     staff_signin_identifier: 'Iimayl ama Aqoonsiga Shaqaalaha',
     staff_signin_placeholder: 'name@school.com ama STF-SCHOOL-0001',
@@ -852,6 +862,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     pin_notice: 'Pin notice',
     choose_class: 'Choose class',
     admissions: 'አዲስ ምዝገባ',
+    year_end_promotion: 'ወደ ቀጣይ ክፍል ማሳደግ',
+    nav_overview: 'አጠቃላይ', nav_people_academics: 'ተማሪዎች እና ትምህርት', nav_communication: 'ግንኙነት', nav_management: 'አስተዳደር', nav_other_modules: 'ሌሎች ክፍሎች',
     staff_access: 'ሰራተኞች እና ፈቃዶች',
     staff_signin_identifier: 'ኢሜይል ወይም የሰራተኛ መታወቂያ',
     staff_signin_placeholder: 'name@school.com ወይም STF-SCHOOL-0001',
