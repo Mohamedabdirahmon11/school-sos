@@ -5,6 +5,7 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
+const backupHealthVisitsMigration = readFileSync(new URL('../supabase/migrations/20261108100000_school_backup_include_health_visits.sql', import.meta.url), 'utf8');
 const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
 const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107101812_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
@@ -285,7 +286,7 @@ test('school backups include newer tenant modules but exclude credentials and ac
   for (const secret of ['passwordHash', 'pinHash', 'twoFactorSecret', 'pendingTwoFactorSecret', 'recoveryCodes']) {
     assert.ok(backup.includes(secret), `school backup explicitly redacts ${secret}`);
   }
-  assert.match(backupRestoreMigration, /'school_health_visits'/);
+  assert.match(backupHealthVisitsMigration, /'school_health_visits'/);
   assert.match(sql, /'school_health_visits'/);
   assert.match(apiSource, /school_health_visits/);
   assert.match(backup, /sensitiveBackupFields/);
