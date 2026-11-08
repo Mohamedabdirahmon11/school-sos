@@ -25,6 +25,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newPassword && (newPassword.length < 12 || newPassword.length > 128 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword))) {
+      setError('Password must be 12–128 characters and include uppercase, lowercase, and a number.');
+      return;
+    }
+    if (newPassword && !currentPassword) {
+      setError(user.role === 'teacher' ? 'Enter your current password or PIN.' : 'Enter your current password.');
+      return;
+    }
     if (newPassword && newPassword !== confirmPassword) {
       setError('New passwords do not match.');
       return;
@@ -127,34 +135,41 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <label className="block text-xs font-bold text-slate-800 mb-2">Change Password (Optional)</label>
-            <div className="space-y-2">
-              <PasswordInput
-                label="current password"
-                value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
-              <PasswordInput
-                label="new password"
-                minLength={6}
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                placeholder="New password (min 6 characters)"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
-              <PasswordInput
-                label="confirm new password"
-                minLength={6}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
+          {['parent', 'student'].includes(user.role) ? (
+            <div className="pt-2 border-t border-slate-100 text-xs text-slate-600">
+              Parent and student accounts sign in with a PIN. Contact your School Admin to reset your PIN.
             </div>
-          </div>
+          ) : (
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-xs font-bold text-slate-800 mb-2">Change Password (Optional)</label>
+              <div className="space-y-2">
+                <PasswordInput
+                  label="current password"
+                  required={Boolean(newPassword)}
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  placeholder={user.role === 'teacher' ? 'Current password or PIN' : 'Current password'}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                />
+                <PasswordInput
+                  label="new password"
+                  minLength={12} maxLength={128}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="12–128 characters, upper/lowercase and a number"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                />
+                <PasswordInput
+                  label="confirm new password"
+                  minLength={12} maxLength={128}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your secure password"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <button
