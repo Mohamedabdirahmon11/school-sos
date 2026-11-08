@@ -112,3 +112,10 @@ test('missing composite foreign-key indexes are added without dropping existing 
   ]) assert.match(migration, new RegExp('CREATE INDEX IF NOT EXISTS ' + indexName));
   assert.doesNotMatch(migration, /DROP INDEX/i);
 });
+
+test('Teacher ID lookup resolves linked active teacher staff records and rejects inactive staff', () => {
+  const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storageSource, /direct\.role === 'accountant' \|\| direct\.role === 'teacher'/);
+  assert.match(storageSource, /record\.status !== 'active'/);
+  assert.match(storageSource, /account\.role === 'teacher' \|\| account\.role === 'accountant'/);
+});
