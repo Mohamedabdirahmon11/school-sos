@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
+import { SchoolBranch, ReportCardDesign, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { 
@@ -39,7 +39,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   Bell,
-  Clock
 } from 'lucide-react';
 
 type BranchForm = {
@@ -50,7 +49,6 @@ type BranchForm = {
   isMain: boolean;
 };
 
-type TimetableSettings = { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number };
 
 const emptyBranchForm: BranchForm = { name: '', address: '', phone: '', email: '', isMain: false };
 const defaultGradingScale: GradingBand[] = [
@@ -67,7 +65,7 @@ const defaultClassLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const SchoolSettingsView: React.FC = () => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'sms' | 'backup'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>('identity');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -94,8 +92,6 @@ export const SchoolSettingsView: React.FC = () => {
   const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : defaultGradingScale);
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
-  const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
-  const [timetableSettings, setTimetableSettings] = useState<TimetableSettings>({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
 
   // Documents & Notifications State
   const [reportCardHeader, setReportCardHeader] = useState(school?.reportCardHeader || '');
@@ -121,17 +117,6 @@ export const SchoolSettingsView: React.FC = () => {
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
       .catch((err: any) => setBranchError(err.message || 'Failed to load campus branches.'));
     ApiClient.getReportCardDesign().then(setDesign);
-    ApiClient.getExamConfig().then(setExamConfig).catch(() => setExamConfig(null));
-    ApiClient.getTimetableSettings().then(settings => setTimetableSettings({
-      firstPeriodStart: settings.firstPeriodStart,
-      periodMinutes: settings.periodMinutes,
-      breakAfterPeriod: settings.breakAfterPeriod,
-      breakMinutes: settings.breakMinutes,
-      shift2FirstPeriodStart: settings.shift2FirstPeriodStart || '13:00',
-      shift2PeriodMinutes: settings.shift2PeriodMinutes ?? 40,
-      shift2BreakAfterPeriod: settings.shift2BreakAfterPeriod ?? 3,
-      shift2BreakMinutes: settings.shift2BreakMinutes ?? 20
-    }));
   }, [school]);
 
   // Save Identity
@@ -217,56 +202,6 @@ export const SchoolSettingsView: React.FC = () => {
       attendanceRules,
       classLevels
     }, 'Academic year, terms, grading, attendance, and class levels saved successfully!');
-  };
-
-  const handleSaveExamRules = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isReadOnly || !examConfig) return;
-    setError(null);
-    if ([examConfig.smallExamMax, examConfig.bigExamMax].some(value => !Number.isFinite(value) || value < 1)) { setError('Exam maximum marks must be at least 1.'); return; }
-    if (!Number.isFinite(examConfig.passMarkPercentage) || examConfig.passMarkPercentage < 0 || examConfig.passMarkPercentage > 100) { setError('Pass mark must be between 0 and 100.'); return; }
-    setSavingSection('exams');
-    try {
-      const updated = await ApiClient.updateExamConfig({
-        smallExamMax: examConfig.smallExamMax,
-        bigExamMax: examConfig.bigExamMax,
-        passMarkPercentage: examConfig.passMarkPercentage
-      });
-      setExamConfig(updated);
-      setNotice('Exam maximum marks and pass mark saved successfully!');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save exam rules.');
-    } finally {
-      setSavingSection(null);
-    }
-  };
-
-  const handleSaveTimetable = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isReadOnly) return;
-    setError(null);
-    const shiftValues = [
-      ['Shift 1', timetableSettings.firstPeriodStart, timetableSettings.periodMinutes, timetableSettings.breakAfterPeriod, timetableSettings.breakMinutes],
-      ['Shift 2', timetableSettings.shift2FirstPeriodStart, timetableSettings.shift2PeriodMinutes, timetableSettings.shift2BreakAfterPeriod, timetableSettings.shift2BreakMinutes]
-    ] as Array<[string, string, number, number, number]>;
-    for (const [label, start, period, breakAfter, breakMinutes] of shiftValues) {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)) { setError(`${label} start must use HH:MM.`); return; }
-      if (!Number.isInteger(period) || period < 20 || period > 120) { setError(`${label} period length must be between 20 and 120 minutes.`); return; }
-      if (!Number.isInteger(breakAfter) || breakAfter < 1 || breakAfter > 5) { setError(`${label} break must follow period 1–5.`); return; }
-      if (!Number.isInteger(breakMinutes) || breakMinutes < 0 || breakMinutes > 120) { setError(`${label} break length must be between 0 and 120 minutes.`); return; }
-    }
-    setSavingSection('timetable');
-    try {
-      const updated = await ApiClient.saveTimetableSettings(timetableSettings) as TimetableSettings;
-      setTimetableSettings(updated);
-      setNotice('Timetable shift times saved successfully!');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save timetable settings.');
-    } finally {
-      setSavingSection(null);
-    }
   };
 
     const handleSaveDocuments = async (e: React.FormEvent) => {
@@ -789,55 +724,12 @@ export const SchoolSettingsView: React.FC = () => {
             </div>
           </form>
 
-          <div className="space-y-6">
-            {examConfig && (
-              <form onSubmit={handleSaveExamRules} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4 text-xs">
-                <div>
-                  <h2 className="text-base font-bold text-[#132A29]">{t('settings_exam_marks')}</h2>
-                  <p className="text-xs text-[#64748B] mt-0.5">These values drive marks entry, report cards, and year-end promotion for this school.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="space-y-1"><span className="font-semibold text-[#334155]">Small Exam Maximum</span><input type="number" min={1} max={1000} required value={examConfig.smallExamMax} onChange={e => setExamConfig({ ...examConfig, smallExamMax: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                  <label className="space-y-1"><span className="font-semibold text-[#334155]">Big Exam Maximum</span><input type="number" min={1} max={1000} required value={examConfig.bigExamMax} onChange={e => setExamConfig({ ...examConfig, bigExamMax: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                </div>
-                <label className="block space-y-1"><span className="font-semibold text-[#334155]">Minimum Pass Mark (%)</span><input type="number" min={0} max={100} required value={examConfig.passMarkPercentage} onChange={e => setExamConfig({ ...examConfig, passMarkPercentage: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                <p className="text-[11px] text-[#64748B]">Combined maximum score: <span className="font-mono font-bold text-[#132A29]">{examConfig.smallExamMax + examConfig.bigExamMax}</span></p>
-                <div className="flex justify-end">
-                  <button type="submit" disabled={isReadOnly || savingSection === 'exams'} className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                    <Save className="w-3.5 h-3.5" /> {savingSection === 'exams' ? '...' : t('settings_save_exam')}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <form onSubmit={handleSaveTimetable} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4 text-xs">
-              <div>
-                <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2"><Clock className="w-4 h-4 text-[#0F766E]" /> {t('settings_timetable')}</h2>
-                <p className="text-xs text-[#64748B] mt-0.5">Monday to Friday, six periods per day, and five periods on Friday. These times drive the timetable generator.</p>
-              </div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {([1, 2] as const).map(shift => {
-                  const fields: { start: 'firstPeriodStart' | 'shift2FirstPeriodStart'; period: 'periodMinutes' | 'shift2PeriodMinutes'; after: 'breakAfterPeriod' | 'shift2BreakAfterPeriod'; length: 'breakMinutes' | 'shift2BreakMinutes' } = shift === 1
-                    ? { start: 'firstPeriodStart', period: 'periodMinutes', after: 'breakAfterPeriod', length: 'breakMinutes' }
-                    : { start: 'shift2FirstPeriodStart', period: 'shift2PeriodMinutes', after: 'shift2BreakAfterPeriod', length: 'shift2BreakMinutes' };
-                  return <fieldset key={shift} className="rounded-xl border border-[#DCE7E4] p-4 space-y-3">
-                    <legend className="px-2 font-bold text-[#0F766E]">Shift {shift}</legend>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="space-y-1"><span className="font-semibold text-[#334155]">First Period Start</span><input type="time" required value={timetableSettings[fields.start]} onChange={e => setTimetableSettings(prev => ({ ...prev, [fields.start]: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                      <label className="space-y-1"><span className="font-semibold text-[#334155]">Period Length (minutes)</span><input type="number" min={20} max={120} required value={timetableSettings[fields.period]} onChange={e => setTimetableSettings(prev => ({ ...prev, [fields.period]: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                      <label className="space-y-1"><span className="font-semibold text-[#334155]">Break After Period</span><select value={timetableSettings[fields.after]} onChange={e => setTimetableSettings(prev => ({ ...prev, [fields.after]: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">{[1, 2, 3, 4, 5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
-                      <label className="space-y-1"><span className="font-semibold text-[#334155]">Break Length (minutes)</span><input type="number" min={0} max={120} required value={timetableSettings[fields.length]} onChange={e => setTimetableSettings(prev => ({ ...prev, [fields.length]: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                    </div>
-                  </fieldset>;
-                })}
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" disabled={isReadOnly || savingSection === 'timetable'} className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                  <Save className="w-3.5 h-3.5" /> {savingSection === 'timetable' ? '...' : t('settings_save_timetable')}
-                </button>
-              </div>
-            </form>
-          </div>
+          <aside className="rounded-xl border border-[#DCE7E4] bg-[#F7FAF9] p-4 text-xs text-[#475569] space-y-2">
+            <h3 className="font-semibold text-[#132A29]">Where to manage the other settings</h3>
+            <p><strong>Exam marks and pass percentage:</strong> manage these in Exams & Results so there is only one place to change them.</p>
+            <p><strong>Period start time, lesson length, shifts and breaks:</strong> manage these in Timetable.</p>
+            <p><strong>Holidays, exam days and school events:</strong> add these in Events & Holidays. This page is for academic year, semester dates, grading, attendance rules and class levels.</p>
+          </aside>
         </div>
       )}
 
