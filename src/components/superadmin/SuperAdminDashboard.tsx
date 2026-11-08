@@ -100,14 +100,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
       <div className="sa-metrics-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="sa-metric-card bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Active Schools</span>
+            <span className="text-xs font-medium uppercase tracking-wider">Registered Schools</span>
             <Building2 className="w-4 h-4 text-[#0F766E]" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
               {metrics.totalSchools}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">+100% cloud</span>
+            <span className="text-xs text-emerald-600 font-medium">Platform-wide</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">
             {subscriptionCounts.active} Active · {subscriptionCounts.trial} Trial · {subscriptionCounts.read_only} Read-only
@@ -123,7 +123,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
               {metrics.totalStudents ?? '—'}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">Across all campuses</span>
+            <span className="text-xs text-emerald-600 font-medium">Across all registered schools</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">Multi-tenant student ledger</p>
         </div>
@@ -167,26 +167,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               <p className="text-[11px] text-[#64748B]">Subscription billing across all schools</p>
             </div>
             <span className="text-xs font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-1 rounded border border-[#CCFBF1]">
-              Live Invoices
+              Recorded Billing
             </span>
           </div>
 
           <div className="sa-revenue-chart h-44 flex items-end gap-4 pt-6 border-b border-[#E2E8F0] px-2">
             {revenueTrend.map((m: any, idx: number) => {
-              const maxRev = Math.max(...revenueTrend.map((r: any) => r.revenue), 200);
-              const heightPercent = Math.max(12, Math.round((m.revenue / maxRev) * 100));
+              const revenueValues = revenueTrend.map((r: any) => Number(r?.revenue)).filter((value: number) => Number.isFinite(value) && value >= 0);
+              const maxRev = Math.max(...revenueValues, 200);
+              const revenue = Number(m?.revenue);
+              const safeRevenue = Number.isFinite(revenue) && revenue >= 0 ? revenue : 0;
+              const heightPercent = Math.max(12, Math.round((safeRevenue / maxRev) * 100));
 
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                   <span className="text-[10px] font-mono text-[#64748B] opacity-0 group-hover:opacity-100 transition-opacity">
-                    ${m.revenue}
+                    ${safeRevenue.toLocaleString()}
                   </span>
                   <div
                     style={{ height: `${heightPercent}%` }}
                     className="w-full bg-[#0F766E]/80 hover:bg-[#0F766E] rounded-t transition-all cursor-pointer relative"
                   />
                   <span className="text-[11px] text-[#64748B] font-medium truncate w-full text-center">
-                    {m.month.split(' ')[0]}
+                    {typeof m.month === 'string' ? m.month.split(' ')[0] : '—'}
                   </span>
                 </div>
               );
@@ -225,7 +228,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           </div>
 
           <div className="pt-4 border-t border-[#F1F5F9] text-[11px] text-[#64748B]">
-            Automated daily reconciliation daemon is running.
+            Subscription status reflects the latest data returned by the platform.
           </div>
         </div>
       </div>
@@ -280,11 +283,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                         s.status === 'suspended' ? 'text-slate-800' :
                         'text-sky-700'
                       }`}>
-                        {s.status.toUpperCase()}
+                        {typeof s.status === 'string' ? s.status.replace(/_/g, ' ').toUpperCase() : 'UNKNOWN'}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-[#64748B]">
-                      {s.validUntil.split('T')[0]}
+                      {typeof s.validUntil === 'string' ? s.validUntil.split('T')[0] : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
