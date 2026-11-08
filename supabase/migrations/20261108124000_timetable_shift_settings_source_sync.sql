@@ -9,15 +9,15 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.classes'::regclass
-      AND conname = 'classes_shift_valid'
+      AND conname = 'classes_shift_check'
   ) THEN
     ALTER TABLE public.classes
-      ADD CONSTRAINT classes_shift_valid CHECK (shift IN (1, 2)) NOT VALID;
+      ADD CONSTRAINT classes_shift_check CHECK (shift IN (1, 2)) NOT VALID;
   END IF;
 END
 $migration$;
 
-ALTER TABLE public.classes VALIDATE CONSTRAINT classes_shift_valid;
+ALTER TABLE public.classes VALIDATE CONSTRAINT classes_shift_check;
 
 ALTER TABLE public.timetable_settings
   ADD COLUMN IF NOT EXISTS shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00',
