@@ -124,7 +124,7 @@ const AppContent: React.FC = () => {
   };
 
   const requestedView = getEffectiveView();
-  const activeView = requestedView;
+  const activeView = user.role === 'school_admin' && requestedView === 'sch_payroll' ? 'sch_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
     setCurrentView(view);
