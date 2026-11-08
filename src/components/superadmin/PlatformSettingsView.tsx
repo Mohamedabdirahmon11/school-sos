@@ -263,7 +263,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, lockoutThreshold: parseInt(e.target.value, 10) || 5 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Locks after 5 failed attempts</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Locks after {settings.lockoutThreshold} failed attempts</p>
             </div>
 
             <div>
@@ -276,7 +276,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, lockoutDurationMinutes: parseInt(e.target.value, 10) || 15 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Account locked for 15 minutes</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Account locked for {settings.lockoutDurationMinutes} minutes</p>
             </div>
 
             <div>
@@ -289,7 +289,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, sessionTimeoutMinutes: parseInt(e.target.value, 10) || 60 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Default 60 minutes</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Session expires after {settings.sessionTimeoutMinutes} minutes</p>
             </div>
           </div>
 
