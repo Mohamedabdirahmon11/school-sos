@@ -19,8 +19,8 @@ export const ForcePasswordChangeModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (password.length < 12 || password.length > 128 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must be 12–128 characters and include uppercase, lowercase, and a number.');
       return;
     }
     if (password !== confirmPassword) {
@@ -68,9 +68,9 @@ export const ForcePasswordChangeModal: React.FC = () => {
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
-              minLength={8}
+              minLength={12} maxLength={128}
               autoComplete="new-password"
-              placeholder="Minimum 8 characters"
+              placeholder="12–128 characters, upper/lowercase and a number"
               className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
             />
           </div>
@@ -84,7 +84,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
-              placeholder="Repeat your password"
+              placeholder="Repeat your secure password"
               className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
             />
           </div>
