@@ -69,7 +69,7 @@ export const BroadcastsView: React.FC = () => {
 
       setTitle('');
       setMessage('');
-      setNotice(sendOption === 'now' ? 'Broadcast dispatched to target schools.' : 'Broadcast scheduled.');
+      setNotice(sendOption === 'now' ? 'Platform notice published to the selected schools’ notice feeds.' : 'Broadcast scheduled.');
       await fetchBroadcasts();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
