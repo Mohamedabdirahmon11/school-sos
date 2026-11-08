@@ -139,3 +139,9 @@ test('teacher login UI clearly requests the school-issued Teacher ID', () => {
   assert.match(loginSource, /activeTab === 'teacher' \? 'Teacher ID' : 'Email or phone'/);
   assert.match(loginSource, /Enter the Teacher ID provided by your School Admin/);
 });
+
+
+test('teacher accounts cannot bypass Teacher ID login by omitting the requested role', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /normalizedRole === 'teacher' && normalizeStaffId\\(storedUser\\.staffId\\) !== normalizeStaffId\\(identifier\\)/);
+});
