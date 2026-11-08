@@ -181,3 +181,11 @@ test('profile password form mirrors policy and lets teachers verify their curren
   assert.match(profileSource, /Current password or PIN/);
   assert.match(apiSource, /user\.role === 'teacher'[\s\S]*verifyPin\(currentPassword, String\(user\.pin \|\| ''\)\)/);
 });
+
+
+test('PIN-only parent and student accounts cannot enter the password-change flow', () => {
+  const profileSource = readFileSync(new URL('../src/components/common/ProfileModal.tsx', import.meta.url), 'utf8');
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(profileSource, /Parent and student accounts sign in with a PIN/);
+  assert.match(apiSource, /if \(\['parent', 'student'\]\.includes\(user\.role\)\)[\s\S]*Parent and student accounts use PIN sign-in/);
+});
