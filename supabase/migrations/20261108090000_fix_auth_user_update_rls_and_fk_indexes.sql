@@ -6,6 +6,10 @@
 -- Do not grant authenticated users row-wide UPDATE: it would allow self-promotion
 -- or changing tenant/credential columns through an otherwise self-scoped policy.
 DROP POLICY IF EXISTS users_update_scope ON public.users;
+-- This older permissive policy allows every non-parent/non-student role to UPDATE.
+-- Drop it as well: permissive policies are OR-combined, so leaving it would
+-- defeat the Super Admin-only policy below if authenticated UPDATE is ever granted.
+DROP POLICY IF EXISTS parent_student_block_update ON public.users;
 
 CREATE POLICY users_update_scope
 ON public.users
