@@ -189,3 +189,9 @@ test('PIN-only parent and student accounts cannot enter the password-change flow
   assert.match(profileSource, /Parent and student accounts sign in with a PIN/);
   assert.match(apiSource, /if \(\['parent', 'student'\]\.includes\(user\.role\)\)[\s\S]*Parent and student accounts use PIN sign-in/);
 });
+
+
+test('force-password endpoint only accepts accounts flagged for a required password change', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /if \(!user\.mustChangePassword\)[\s\S]*Use your profile settings to change an existing password/);
+});
