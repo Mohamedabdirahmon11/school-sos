@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupProgressUpdate, SchoolSetupState } from '../../types/index.ts';
 import { TranslationDict } from '../../lib/translations.ts';
+import { SCHOOL_SETUP_STEP_TARGETS } from '../../lib/school-setup-navigation.ts';
 
 interface Props {
   onNavigate: (view: string) => void;
@@ -15,6 +16,9 @@ interface StepDefinition {
   titleKey: keyof TranslationDict;
   helpKey: keyof TranslationDict;
   target?: string;
+  targetLabelKey?: keyof TranslationDict;
+  secondaryTarget?: string;
+  secondaryTargetLabelKey?: keyof TranslationDict;
   optional: boolean;
 }
 
@@ -27,7 +31,7 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 6, titleKey: 'setup_step_6_title', helpKey: 'setup_step_6_help', target: 'sch_students', optional: false },
   { id: 7, titleKey: 'setup_step_7_title', helpKey: 'setup_step_7_help', target: 'sch_timetable', optional: true },
   { id: 8, titleKey: 'setup_step_8_title', helpKey: 'setup_step_8_help', target: 'sch_setup_academics', optional: false },
-  { id: 9, titleKey: 'setup_step_9_title', helpKey: 'setup_step_9_help', target: 'sch_inventory', optional: true },
+  { id: 9, titleKey: 'setup_step_9_title', helpKey: 'setup_step_9_help', target: SCHOOL_SETUP_STEP_TARGETS.fees, targetLabelKey: 'setup_open_fees', secondaryTarget: SCHOOL_SETUP_STEP_TARGETS.modules, secondaryTargetLabelKey: 'setup_open_modules', optional: true },
   { id: 10, titleKey: 'setup_step_10_title', helpKey: 'setup_step_10_help', optional: false }
 ];
 
@@ -173,7 +177,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
                 <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                   {item.target && (
                     <button type="button" disabled={saving} onClick={() => void openStep(item.id, item.target)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      {t('setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
+                      {t(item.targetLabelKey || 'setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {item.secondaryTarget && (
+                    <button type="button" disabled={saving} onClick={() => void openStep(item.id, item.secondaryTarget)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                      {t(item.secondaryTargetLabelKey || 'setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   )}
                   {!isFinal && !isCompleted && !isSkipped && (

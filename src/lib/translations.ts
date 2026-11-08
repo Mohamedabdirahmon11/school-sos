@@ -237,6 +237,8 @@ export interface TranslationDict {
   setup_in_progress: string;
   setup_return: string;
   setup_open_step: string;
+  setup_open_fees: string;
+  setup_open_modules: string;
   setup_mark_complete: string;
   setup_skip_for_now: string;
   setup_completed: string;
@@ -485,6 +487,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_in_progress: 'School setup is still in progress. Complete the required steps before opening the dashboard.',
     setup_return: 'Back to setup checklist',
     setup_open_step: 'Open this section',
+    setup_open_fees: 'Open fees',
+    setup_open_modules: 'Open modules',
     setup_mark_complete: 'Verify and mark complete',
     setup_skip_for_now: 'Skip for now',
     setup_completed: 'Completed',
@@ -731,6 +735,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_in_progress: 'Dejinta dugsigu weli way socotaa. Dhammaystir tallaabooyinka muhiimka ah ka hor Dashboard-ka.',
     setup_return: 'Ku noqo liiska dejinta',
     setup_open_step: 'Fur qaybtaan',
+    setup_open_fees: 'Fur khidmadaha',
+    setup_open_modules: 'Fur qaybaha kale',
     setup_mark_complete: 'Hubi oo calaamadee inay dhammaatay',
     setup_skip_for_now: 'Hadda ka bood',
     setup_completed: 'Way dhammaatay',
@@ -974,6 +980,8 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     setup_in_progress: 'የትምህርት ቤቱ ዝግጅት ገና አልተጠናቀቀም። ዳሽቦርዱን ከመክፈትዎ በፊት አስፈላጊ ደረጃዎችን ያጠናቅቁ።',
     setup_return: 'ወደ ዝግጅት ዝርዝር ተመለስ',
     setup_open_step: 'ይህን ክፍል ክፈት',
+    setup_open_fees: 'የክፍያ ክፍልን ክፈት',
+    setup_open_modules: 'ሌሎች ሞጁሎችን ክፈት',
     setup_mark_complete: 'አረጋግጥ እና ተጠናቋል ብለህ ምልክት አድርግ',
     setup_skip_for_now: 'ለአሁን ዝለል',
     setup_completed: 'ተጠናቋል',

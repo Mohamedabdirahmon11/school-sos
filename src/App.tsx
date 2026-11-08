@@ -13,6 +13,7 @@ import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeM
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
+import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -48,13 +49,6 @@ const StaffPayslipsView = React.lazy(() => import('./components/accountant/Accou
 const TeacherPortalView = React.lazy(() => import('./components/teacher/TeacherPortalView.tsx').then(module => ({ default: module.TeacherPortalView })));
 const ParentPortalView = React.lazy(() => import('./components/parent/ParentPortalView.tsx').then(module => ({ default: module.ParentPortalView })));
 const StudentPortalView = React.lazy(() => import('./components/student/StudentPortalView.tsx').then(module => ({ default: module.StudentPortalView })));
-
-const SETUP_ALLOWED_VIEWS = new Set([
-  'sch_setup', 'sch_settings', 'sch_setup_academics', 'sch_classes', 'sch_subjects',
-  'sch_teachers', 'sch_students', 'sch_timetable', 'sch_attendance', 'sch_exams',
-  'sch_inventory', 'sch_transport', 'sch_library', 'sch_discipline', 'sch_health',
-  'sch_admissions', 'sch_events', 'sch_report_cards', 'sch_staff', 'sch_messages', 'sch_support'
-]);
 
 const AppContent: React.FC = () => {
   const { user, school, inspectedSchool, isLoading, refreshUser, t } = useAuth();
@@ -134,11 +128,11 @@ const AppContent: React.FC = () => {
   const setupRequired = user.role === 'school_admin' && Boolean(school) && !school?.setupProgress?.completedAt;
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
-    ? (SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
+    ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
     : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
-    if (setupRequired && !SETUP_ALLOWED_VIEWS.has(view)) {
+    if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
       setCurrentView('sch_setup');
       return;
     }
