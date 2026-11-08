@@ -351,12 +351,18 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id');
+  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id,assigned_classes');
   if (!teacher.items.length) return [];
-  const assignments = await queryAllRows('class_subjects', {
-    school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true'
-  }, 'class_id');
-  return [...new Set(assignments.map((assignment: any) => assignment.classId))];
+  const [assignments, legacyClasses] = await Promise.all([
+    queryAllRows('class_subjects', { school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true' }, 'class_id'),
+    Array.isArray(teacher.items[0].assignedClasses) && teacher.items[0].assignedClasses.length
+      ? db.queryPage('classes', { school_id: schoolId, id: teacher.items[0].assignedClasses, is_archived: 'false' }, 1, 100, undefined, 'id')
+      : Promise.resolve({ items: [] as any[], total: 0 })
+  ]);
+  return [...new Set([
+    ...assignments.map((assignment: any) => assignment.classId),
+    ...legacyClasses.items.map((klass: any) => klass.id)
+  ])];
 }
 
 async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]> {
@@ -2471,21 +2477,50 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes,assigned_subjects');
   if (!teacherPage.items.length) { res.json([]); return; }
-  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacherPage.items[0].id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
-  if (!assignments.items.length) { res.json([]); return; }
+  const teacher = teacherPage.items[0];
+  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
+  if (assignments.items.length) {
+    const [subjectRows, classRows] = await Promise.all([
+      db.queryPage('subjects', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.subjectId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
+      db.queryPage('classes', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.classId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
+    ]);
+    const subjectsById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
+    const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
+    res.json(assignments.items.flatMap((item: any) => {
+      const subject = subjectsById.get(item.subjectId);
+      const klass = classesById.get(item.classId);
+      return subject && klass ? [{ ...item, subject, class: klass }] : [];
+    }));
+    return;
+  }
+
+  // Older teacher records store class/subject IDs directly on the teacher row.
+  // Resolve them within this school only; never broaden access to all school subjects.
+  const legacyClassIds = Array.isArray(teacher.assignedClasses) ? [...new Set(teacher.assignedClasses.filter((id: unknown) => typeof id === 'string'))] : [];
+  const legacySubjectIds = Array.isArray(teacher.assignedSubjects) ? [...new Set(teacher.assignedSubjects.filter((id: unknown) => typeof id === 'string'))] : [];
+  if (!legacyClassIds.length || !legacySubjectIds.length) { res.json([]); return; }
   const [subjectRows, classRows] = await Promise.all([
-    db.queryPage('subjects', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.subjectId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
-    db.queryPage('classes', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.classId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
+    db.queryPage('subjects', { school_id: school.id, id: legacySubjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
+    db.queryPage('classes', { school_id: school.id, id: legacyClassIds, is_archived: 'false' }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
   ]);
-  const subjectsById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
+  const subjectIds = new Set(subjectRows.items.map((item: any) => item.id));
   const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
-  res.json(assignments.items.flatMap((item: any) => {
-    const subject = subjectsById.get(item.subjectId);
-    const klass = classesById.get(item.classId);
-    return subject && klass ? [{ ...item, subject, class: klass }] : [];
-  }));
+  const legacyAssignments = classRows.items.flatMap((klass: any) => subjectRows.items.map((subject: any) => ({
+    id: `legacy-${teacher.id}-${klass.id}-${subject.id}`,
+    schoolId: school.id,
+    teacherId: teacher.id,
+    classId: klass.id,
+    subjectId: subject.id,
+    periodsPerWeek: 1,
+    smallExamEnabled: false,
+    bigExamEnabled: false,
+    isActive: true,
+    subject,
+    class: classesById.get(klass.id)
+  })));
+  res.json(legacyAssignments);
 });
 
 apiRouter.post('/subjects', requireAuth, requireSchoolContext, (req, res) => {
