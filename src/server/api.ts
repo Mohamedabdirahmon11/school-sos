@@ -698,7 +698,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
   const signedToken = createSignedSessionToken({
     sessionId,
     userId: user.id,
-    authUserId: authSession?.user?.id || user.authUserId,
+    authUserId: authSession?.user?.id || ((req.cookies?.schoolos_auth_access || req.cookies?.schoolos_auth_refresh) ? user.authUserId : undefined),
     role: user.role,
     schoolId: user.schoolId || schoolId,
     createdAt,
