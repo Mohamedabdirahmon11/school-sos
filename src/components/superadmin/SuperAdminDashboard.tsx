@@ -137,7 +137,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
-              ${formatMoney(metrics.currentMonthRevenue || 0, platformCurrency)}
+              {formatMoney(metrics.currentMonthRevenue || 0, platformCurrency)}
             </span>
             <span className="text-xs text-emerald-600 font-medium">{platformCurrency}</span>
           </div>
