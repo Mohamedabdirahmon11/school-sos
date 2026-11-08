@@ -5,7 +5,10 @@ import { mapStorageRowToDatabase } from '../src/server/storage.ts';
 
 const sql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const backupRestoreMigration = readFileSync(new URL('../supabase/migrations/053_safe_school_backup_restore.sql', import.meta.url), 'utf8');
+const timetableShiftMigration = readFileSync(new URL('../supabase/migrations/20261107092357_shift_aware_timetables.sql', import.meta.url), 'utf8');
+const passwordResetMigration = readFileSync(new URL('../supabase/migrations/20261107101812_password_reset_codes.sql', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const normalizedApiSource = apiSource.replace(/\r\n/g, '\n');
 const definitions = new Map<string, Map<string, { required: boolean; hasDefault: boolean }>>();
 for (const match of sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/gi)) {
   const columns = new Map<string, { required: boolean; hasDefault: boolean }>();
@@ -74,7 +77,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     ['student', "db.createStudent({\n    schoolId: school.id"],
         ['teacher', "db.createTeacher({\n    schoolId: school.id"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
-  ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
+  ]) assert.ok(normalizedApiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
 });
 
 test('performance migration has scoped dashboard aggregates, execute grants, and idempotent filter indexes', () => {
@@ -302,3 +305,30 @@ test('school backup restore rejects single-column foreign keys that cross school
   assert.match(backupRestoreMigration, /v_fk_scope := CASE[\s\S]*target_row\.role::text = ''super_admin''/);
   assert.match(sql, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
 });
+
+
+test('shift-aware timetable migration is additive and keeps legacy Shift 1 settings', () => {
+  assert.match(timetableShiftMigration, /classes[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
+  assert.match(timetableShiftMigration, /shift2_break_minutes INTEGER NOT NULL DEFAULT 20/);
+  assert.match(timetableShiftMigration, /teacher_unavailability[\s\S]*ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1/);
+  assert.match(timetableShiftMigration, /UNIQUE \(school_id, teacher_id, day_of_week, period_number, shift\)/);
+  assert.match(sql, /shift SMALLINT NOT NULL DEFAULT 1 CHECK \(shift IN \(1, 2\)\)/);
+  assert.match(sql, /shift2_first_period_start VARCHAR\(5\) NOT NULL DEFAULT '13:00'/);
+});
+
+test('password reset migration is private, hashed, and session-versioned', () => {
+  assert.match(passwordResetMigration, /ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ/i);
+  assert.match(passwordResetMigration, /CREATE TABLE IF NOT EXISTS public\.password_reset_codes/i);
+  assert.match(passwordResetMigration, /user_id VARCHAR\(64\) REFERENCES public\.users\(id\)/i);
+  assert.match(passwordResetMigration, /code_hash TEXT/i);
+  assert.match(passwordResetMigration, /request_email_hash TEXT NOT NULL/i);
+  assert.match(passwordResetMigration, /attempts INTEGER NOT NULL DEFAULT 0 CHECK \(attempts BETWEEN 0 AND 5\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(user_id\)/i);
+  assert.match(passwordResetMigration, /ON public\.password_reset_codes \(expires_at\)/i);
+  assert.match(passwordResetMigration, /ALTER TABLE public\.password_reset_codes ENABLE ROW LEVEL SECURITY/i);
+  assert.match(passwordResetMigration, /REVOKE ALL ON TABLE public\.password_reset_codes FROM PUBLIC, anon, authenticated/i);
+  assert.match(passwordResetMigration, /GRANT ALL ON TABLE public\.password_reset_codes TO service_role/i);
+  assert.doesNotMatch(passwordResetMigration, /CREATE POLICY/i);
+});
+
