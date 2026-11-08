@@ -3436,10 +3436,14 @@ class StorageEngine {
     // Authentication records, audit history, platform broadcasts, billing,
     // provider secrets, and active sessions are intentionally never exported.
 
+    const schoolProfile = { ...school } as School & { subscription?: unknown; branches?: unknown };
+    delete schoolProfile.subscription;
+    delete schoolProfile.branches;
+
     return {
       backupDate: new Date().toISOString(),
       version: '1.2.0',
-      school,
+      school: schoolProfile,
       tables,
       // Keep the original top-level properties for existing restore/download consumers.
       branches: tables.school_branches,
