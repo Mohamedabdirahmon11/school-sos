@@ -171,3 +171,13 @@ test('bootstrap password form mirrors the backend password policy', () => {
   assert.match(loginSource, /minLength=\{12\} maxLength=\{128\}/);
   assert.match(loginSource, /uppercase, lowercase, and a number/);
 });
+
+
+test('profile password form mirrors policy and lets teachers verify their current PIN', () => {
+  const profileSource = readFileSync(new URL('../src/components/common/ProfileModal.tsx', import.meta.url), 'utf8');
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(profileSource, /newPassword\.length < 12 \|\| newPassword\.length > 128/);
+  assert.equal((profileSource.match(/minLength=\{12\} maxLength=\{128\}/g) || []).length, 2);
+  assert.match(profileSource, /Current password or PIN/);
+  assert.match(apiSource, /user\.role === 'teacher'[\s\S]*verifyPin\(currentPassword, String\(user\.pin \|\| ''\)\)/);
+});
