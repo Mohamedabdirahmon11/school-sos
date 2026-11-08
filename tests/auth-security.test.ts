@@ -195,3 +195,13 @@ test('force-password endpoint only accepts accounts flagged for a required passw
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   assert.match(apiSource, /if \(!user\.mustChangePassword\)[\s\S]*Use your profile settings to change an existing password/);
 });
+
+
+test('teacher legacy assignments are resolved only against the authenticated school', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /assigned_classes/);
+  assert.match(apiSource, /assigned_subjects/);
+  assert.match(apiSource, /school_id: school\.id, id: legacySubjectIds/);
+  assert.match(apiSource, /school_id: school\.id, id: legacyClassIds, is_archived: 'false'/);
+  assert.match(apiSource, /legacy-\$\{teacher\.id\}-\$\{klass\.id\}-\$\{subject\.id\}/);
+});
