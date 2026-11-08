@@ -28,6 +28,9 @@ await memory.from('users').insert([
   { id: 'usr-student-std-pin-2', schoolId: admin.schoolId, role: 'student', fullName: 'Omar Ali', studentId: 'STD-PIN-002', pinHash: hashPin('2222'), failedLoginAttempts: 0 },
   { id: 'usr-parent-pin-1', schoolId: admin.schoolId, role: 'parent', fullName: 'Parent Ali', phone: '+252611111111', linkedStudentIds: ['std-pin-1'], pinHash: hashPin('3333') }
 ]);
+await memory.from('teachers').insert([
+  { id: 'teacher-profile-pin-reset', schoolId: admin.schoolId, userId: teacher.id, staffId: 'TCH-PIN-001', status: 'active' }
+]);
 await memory.from('schools').insert([
   { id: admin.schoolId, code: 'PIN', name: 'PIN Reset School', subscription: { status: 'active' } },
   { id: 'other-school', code: 'OTH', name: 'Other School', subscription: { status: 'active' } }
