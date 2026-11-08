@@ -1415,7 +1415,10 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (newPassword !== undefined && newPassword !== '') {
     const passwordError = passwordPolicyError(newPassword);
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
-    if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
+    const validCurrentCredential = typeof currentPassword === 'string' && (user.role === 'teacher'
+      ? verifyPassword(currentPassword, user.passwordHash) || verifyPin(currentPassword, String(user.pin || ''))
+      : verifyPassword(currentPassword, user.passwordHash));
+    if (!validCurrentCredential) { res.status(400).json({ error: user.role === 'teacher' ? 'Current password or PIN is incorrect.' : 'Current password is incorrect.' }); return; }
   }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
