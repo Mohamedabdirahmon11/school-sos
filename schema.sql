@@ -3553,36 +3553,37 @@ BEGIN
 
   -- Restore school profile/settings without changing the immutable school ID/code
   -- or platform billing/subscription records.
+  v_school_profile := public.schoolos_backup_json_snake(v_backup->'school');
   SELECT * INTO v_school_row
-    FROM jsonb_populate_record(NULL::public.schools, public.schoolos_backup_json_snake(v_backup->'school'));
+    FROM jsonb_populate_record(NULL::public.schools, v_school_profile);
 
-  UPDATE public.schools
-     SET name = v_school_row.name,
-         address = v_school_row.address,
-         city = v_school_row.city,
-         phone = v_school_row.phone,
-         email = v_school_row.email,
-         logo_url = v_school_row.logo_url,
-         brand_color = v_school_row.brand_color,
-         currency = v_school_row.currency,
-         language = v_school_row.language,
-         timezone = v_school_row.timezone,
-         academic_year = v_school_row.academic_year,
-         current_semester = v_school_row.current_semester,
-         terms = v_school_row.terms,
-         grading_scale = v_school_row.grading_scale,
-         attendance_rules = v_school_row.attendance_rules,
-         class_levels = v_school_row.class_levels,
-         report_card_header = v_school_row.report_card_header,
-         report_card_footer = v_school_row.report_card_footer,
-         receipt_header = v_school_row.receipt_header,
-         receipt_footer = v_school_row.receipt_footer,
-         notification_preferences = v_school_row.notification_preferences,
-         default_class_capacity = v_school_row.default_class_capacity,
-         student_access_enabled = v_school_row.student_access_enabled,
-         calendar_type = v_school_row.calendar_type,
+  UPDATE public.schools AS current_school
+     SET          name = CASE WHEN v_school_profile ? 'name' THEN v_school_row.name ELSE current_school.name END,
+         address = CASE WHEN v_school_profile ? 'address' THEN v_school_row.address ELSE current_school.address END,
+         city = CASE WHEN v_school_profile ? 'city' THEN v_school_row.city ELSE current_school.city END,
+         phone = CASE WHEN v_school_profile ? 'phone' THEN v_school_row.phone ELSE current_school.phone END,
+         email = CASE WHEN v_school_profile ? 'email' THEN v_school_row.email ELSE current_school.email END,
+         logo_url = CASE WHEN v_school_profile ? 'logo_url' THEN v_school_row.logo_url ELSE current_school.logo_url END,
+         brand_color = CASE WHEN v_school_profile ? 'brand_color' THEN v_school_row.brand_color ELSE current_school.brand_color END,
+         currency = CASE WHEN v_school_profile ? 'currency' THEN v_school_row.currency ELSE current_school.currency END,
+         language = CASE WHEN v_school_profile ? 'language' THEN v_school_row.language ELSE current_school.language END,
+         timezone = CASE WHEN v_school_profile ? 'timezone' THEN v_school_row.timezone ELSE current_school.timezone END,
+         academic_year = CASE WHEN v_school_profile ? 'academic_year' THEN v_school_row.academic_year ELSE current_school.academic_year END,
+         current_semester = CASE WHEN v_school_profile ? 'current_semester' THEN v_school_row.current_semester ELSE current_school.current_semester END,
+         terms = CASE WHEN v_school_profile ? 'terms' THEN v_school_row.terms ELSE current_school.terms END,
+         grading_scale = CASE WHEN v_school_profile ? 'grading_scale' THEN v_school_row.grading_scale ELSE current_school.grading_scale END,
+         attendance_rules = CASE WHEN v_school_profile ? 'attendance_rules' THEN v_school_row.attendance_rules ELSE current_school.attendance_rules END,
+         class_levels = CASE WHEN v_school_profile ? 'class_levels' THEN v_school_row.class_levels ELSE current_school.class_levels END,
+         report_card_header = CASE WHEN v_school_profile ? 'report_card_header' THEN v_school_row.report_card_header ELSE current_school.report_card_header END,
+         report_card_footer = CASE WHEN v_school_profile ? 'report_card_footer' THEN v_school_row.report_card_footer ELSE current_school.report_card_footer END,
+         receipt_header = CASE WHEN v_school_profile ? 'receipt_header' THEN v_school_row.receipt_header ELSE current_school.receipt_header END,
+         receipt_footer = CASE WHEN v_school_profile ? 'receipt_footer' THEN v_school_row.receipt_footer ELSE current_school.receipt_footer END,
+         notification_preferences = CASE WHEN v_school_profile ? 'notification_preferences' THEN v_school_row.notification_preferences ELSE current_school.notification_preferences END,
+         default_class_capacity = CASE WHEN v_school_profile ? 'default_class_capacity' THEN v_school_row.default_class_capacity ELSE current_school.default_class_capacity END,
+         student_access_enabled = CASE WHEN v_school_profile ? 'student_access_enabled' THEN v_school_row.student_access_enabled ELSE current_school.student_access_enabled END,
+         calendar_type = CASE WHEN v_school_profile ? 'calendar_type' THEN v_school_row.calendar_type ELSE current_school.calendar_type END,
          updated_at = now()
-   WHERE id = v_school_id;
+   WHERE current_school.id = v_school_id;
 
   v_counts := v_counts || jsonb_build_object('school_profile', 1);
 
