@@ -70,6 +70,7 @@ export const AttendanceView: React.FC = () => {
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [attendanceLoadError, setAttendanceLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,13 +80,17 @@ export const AttendanceView: React.FC = () => {
     if (!school) return;
     ApiClient.getClasses().then(cls => {
       setClasses(cls);
-      if (cls.length > 0) setSelectedClassId(cls[0].id);
+      if (cls.length > 0) setSelectedClassId(current => cls.some(item => item.id === current) ? current : cls[0].id);
+    }).catch((err: any) => {
+      setAttendanceLoadError(err.message || 'Unable to load school classes.');
+      setIsLoading(false);
     });
   }, [school]);
 
   const loadAttendanceSheet = async () => {
     if (!school || !selectedClassId) return;
     setIsLoading(true);
+    setAttendanceLoadError(null);
     try {
       const [firstPage, existingRecords] = await Promise.all([
         ApiClient.getStudents(selectedClassId, undefined, 1, 20),
@@ -114,6 +119,7 @@ export const AttendanceView: React.FC = () => {
       setAttendanceMap(map);
     } catch (err: any) {
       console.error(err);
+      setAttendanceLoadError(err.message || 'Unable to load the attendance register.');
     } finally {
       setIsLoading(false);
     }
@@ -276,6 +282,12 @@ export const AttendanceView: React.FC = () => {
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
           <span>{notice}</span>
+        </div>
+      )}
+      {attendanceLoadError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+          <span>{attendanceLoadError}</span>
+          <button type="button" onClick={() => void loadAttendanceSheet()} className="font-semibold underline">Retry loading</button>
         </div>
       )}
 
