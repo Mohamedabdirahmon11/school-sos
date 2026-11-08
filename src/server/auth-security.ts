@@ -28,11 +28,13 @@ export function isSessionExpiryValid(expiresAt: unknown, now = Date.now()): bool
 export interface SessionPayload {
   sessionId: string;
   userId: string;
+  authUserId?: string;
   role: string;
   schoolId?: string;
   studentId?: string;
   createdAt: number;
   expiresAt: number;
+  passwordChangedAt?: number;
 }
 
 // -------------------------------------------------------------
@@ -151,8 +153,10 @@ export function sanitizeUser(user: any): Partial<User> {
   const copy = { ...user };
   delete copy.passwordHash;
   delete copy.pin;
+  delete copy.authUserId;
   delete copy.twoFactorSecret;
   delete copy.recoveryCodes;
+  delete copy.passwordChangedAt;
   return copy;
 }
 
