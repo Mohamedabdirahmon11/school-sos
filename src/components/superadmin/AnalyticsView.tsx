@@ -18,6 +18,12 @@ export const AnalyticsView: React.FC = () => {
   const activeUsers = Number(analytics?.activeUsers30Days) || 0;
   const totalInvoiced = Number(analytics?.totalPaidBillings) || 0;
   const platformCurrency = String(analytics?.platformCurrency || 'ETB').toUpperCase();
+  const paidBillingsByCurrency = analytics?.paidBillingsByCurrency && typeof analytics.paidBillingsByCurrency === 'object'
+    ? analytics.paidBillingsByCurrency as Record<string, number>
+    : {};
+  const otherCurrencyTotals = Object.entries(paidBillingsByCurrency)
+    .filter(([currency]) => currency !== platformCurrency)
+    .map(([currency, amount]) => `${currency} ${Number(amount || 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   const activeSchools = Number(analytics?.activeSchools) || 0;
 
   const loadAnalytics = useCallback(async () => {
@@ -44,7 +50,11 @@ export const AnalyticsView: React.FC = () => {
       return '"' + safe.replace(/"/g, '""') + '"';
     };
     const rows = [
-      ['School Name', 'School Code', 'Plan', 'Status', 'Students', 'Teachers', 'Valid Until'],
+      ['Platform Currency', platformCurrency],
+      ['Paid Subscription Invoices', totalInvoiced],
+      ...otherCurrencyTotals.map(value => ['Paid Invoices - Other Currency', value]),
+      [],
+      ['School Name', 'School Code', 'Plan', 'Status', 'Active Students', 'Active Teachers', 'Valid Until'],
       ...(schools as any[]).map(s => {
         const subscription = s.subscription || {};
         const validUntil = typeof subscription.validUntil === 'string' ? subscription.validUntil.slice(0, 10) : '';
@@ -110,6 +120,9 @@ export const AnalyticsView: React.FC = () => {
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total SaaS Billings</span>
           <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{formatMoney(totalInvoiced, platformCurrency)}</p>
           <p className="text-[11px] text-[#64748B] mt-1">Paid invoices in {platformCurrency}</p>
+          {otherCurrencyTotals.length > 0 && (
+            <p className="text-[10px] text-[#64748B] mt-1">Other currencies: {otherCurrencyTotals.join(' · ')}</p>
+          )}
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
