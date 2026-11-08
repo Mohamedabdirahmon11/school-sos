@@ -289,6 +289,9 @@ test('school backups include newer tenant modules but exclude credentials and ac
   assert.match(backupHealthVisitsMigration, /'school_health_visits'/);
   assert.match(sql, /'school_health_visits'/);
   assert.match(apiSource, /school_health_visits/);
+  assert.match(backup, /const schoolProfile = \\{ \\.\\.\\.school \\}/);
+  assert.match(backup, /delete schoolProfile\\.subscription/);
+  assert.match(backup, /school: schoolProfile/);
   assert.match(backup, /sensitiveBackupFields/);
   assert.match(backup, /tables\[table\] = rows\.map/);
   assert.doesNotMatch(backup, /tables\.users\s*=/, 'school backups exclude login accounts entirely');
