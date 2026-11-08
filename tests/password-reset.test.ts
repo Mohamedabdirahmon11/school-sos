@@ -391,7 +391,7 @@ test('production with no mail provider never creates a usable code', async () =>
 
 test('lockout rows restore and persist a finite attempt_count integer', () => {
   const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
-  assert.match(storageSource, /const count = Number\(row\.count \\?\\? row\\.attemptCount \\?\\? 0\)/);
+  assert.match(storageSource, /const count = Number\(row\.count \?\? row\.attemptCount \?\? 0\)/);
   assert.doesNotMatch(storageSource, /count:\s*row\.attemptCount/);
   assert.match(storageSource, /Number\.isSafeInteger\(previousCount\).*\? previousCount : 0/);
 });
