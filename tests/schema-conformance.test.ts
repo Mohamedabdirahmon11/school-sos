@@ -279,7 +279,7 @@ test('school backups include newer tenant modules but exclude credentials and ac
   const start = storage.indexOf('public async generateSchoolBackup');
   const end = storage.indexOf('public async generatePlatformBackup', start);
   const backup = storage.slice(start, end);
-  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions', 'school_health_visits']) {
+  for (const table of ['discipline_incidents', 'library_loans', 'inventory_items', 'inventory_transactions', 'school_health_visits', 'exam_schedules', 'exam_seat_assignments']) {
     assert.ok(backup.includes(`'${table}'`), `school backup includes ${table}`);
   }
   assert.doesNotMatch(backup, /'user_sessions'/, 'school backups do not contain active login sessions');
