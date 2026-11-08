@@ -1019,7 +1019,16 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  const storedUser = await db.findUserForLogin(identifier);
+  let storedUser: User | null;
+  try {
+    storedUser = await db.findUserForLogin(identifier);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'LOGIN_IDENTIFIER_AMBIGUOUS') {
+      res.status(409).json({ error: 'This phone number or staff ID matches more than one account. Use the account email or ask your School Admin to correct the duplicate.' });
+      return;
+    }
+    throw error;
+  }
   if (!storedUser) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
