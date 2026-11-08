@@ -208,11 +208,8 @@ test('teacher legacy assignments are resolved only against the authenticated sch
 
 test('bulk academic year routes are Super Admin only and require typed confirmation', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-  for (const route of ['/superadmin/academic-year/preview', '/superadmin/academic-year/apply']) {
-    const match = apiSource.match(new RegExp(`apiRouter\\\\.post\\\\('${route.replace(/\\//g, '\\\\/')}'([^=]{0,120})=>`));
-    assert.ok(match, `${route} exists`);
-    assert.match(match[1], /requireAuth/);
-    assert.match(match[1], /requireSuperAdmin/);
-  }
-  assert.match(apiSource, /parsed\\.data\\.confirm !== 'CONFIRM'/);
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/preview', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/apply', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
+  assert.match(apiSource, /db\.updateSchool\(row\.id, \{ academicYear: targetYear \}/);
 });
