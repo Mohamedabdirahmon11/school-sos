@@ -280,7 +280,7 @@ export const PlansBillingView: React.FC = () => {
             <form onSubmit={handleSavePlan} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Monthly Price (${platformCurrency})</label>
+                  <label className="block font-medium text-[#334155]">Monthly Price ({platformCurrency})</label>
                   <input
                     type="number"
                     min="0"
@@ -291,7 +291,7 @@ export const PlansBillingView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Yearly Price (${platformCurrency})</label>
+                  <label className="block font-medium text-[#334155]">Yearly Price ({platformCurrency})</label>
                   <input
                     type="number"
                     min="0"
@@ -304,7 +304,7 @@ export const PlansBillingView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-medium text-[#334155]">Lifetime Access Price (${platformCurrency})</label>
+                <label className="block font-medium text-[#334155]">Lifetime Access Price ({platformCurrency})</label>
                 <input
                   type="number"
                   min="0"
