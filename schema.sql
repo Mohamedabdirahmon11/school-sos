@@ -3302,6 +3302,41 @@ BEGIN
   v_student_id := p_payload->>'student_id';
   v_student_user_id := p_payload->>'student_user_id';
   v_pin_hash := p_payload->>'pin_hash';
+  -- Restore school profile/settings without changing the immutable school ID/code
+  -- or platform billing/subscription records.
+  SELECT * INTO v_school_row
+    FROM jsonb_populate_record(NULL::public.schools, public.schoolos_backup_json_snake(v_backup->'school'));
+
+  UPDATE public.schools
+     SET name = v_school_row.name,
+         address = v_school_row.address,
+         city = v_school_row.city,
+         phone = v_school_row.phone,
+         email = v_school_row.email,
+         logo_url = v_school_row.logo_url,
+         brand_color = v_school_row.brand_color,
+         currency = v_school_row.currency,
+         language = v_school_row.language,
+         timezone = v_school_row.timezone,
+         academic_year = v_school_row.academic_year,
+         current_semester = v_school_row.current_semester,
+         terms = v_school_row.terms,
+         grading_scale = v_school_row.grading_scale,
+         attendance_rules = v_school_row.attendance_rules,
+         class_levels = v_school_row.class_levels,
+         report_card_header = v_school_row.report_card_header,
+         report_card_footer = v_school_row.report_card_footer,
+         receipt_header = v_school_row.receipt_header,
+         receipt_footer = v_school_row.receipt_footer,
+         notification_preferences = v_school_row.notification_preferences,
+         default_class_capacity = v_school_row.default_class_capacity,
+         student_access_enabled = v_school_row.student_access_enabled,
+         calendar_type = v_school_row.calendar_type,
+         updated_at = now()
+   WHERE id = v_school_id;
+
+  v_counts := v_counts || jsonb_build_object('school_profile', 1);
+
   v_user_id := p_payload->>'approved_by';
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
@@ -3495,6 +3530,7 @@ DECLARE
   v_conflict BOOLEAN;
   v_counts JSONB := '{}'::jsonb;
   v_count INTEGER;
+  v_school_row public.schools%ROWTYPE;
 BEGIN
   IF jsonb_typeof(p_payload) <> 'object'
      OR COALESCE((p_payload->>'confirm')::BOOLEAN, FALSE) IS NOT TRUE
