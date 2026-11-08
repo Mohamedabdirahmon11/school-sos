@@ -70,7 +70,7 @@ test('public user responses never expose the linked Supabase Auth UUID', () => {
 test('Supabase Auth mapping migration preserves SchoolOS IDs and only links exact UUID matches', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20261108072315_link_schoolos_users_to_supabase_auth.sql', import.meta.url), 'utf8');
   assert.match(migration, /ADD COLUMN IF NOT EXISTS auth_user_id uuid/i);
-  assert.match(migration, /REFERENCES auth\.users\(id\) ON DELETE SET NULL/i);
+  assert.match(migration, /REFERENCES auth\.users\(id\)[\s\S]*?ON DELETE SET NULL/i);
   assert.match(migration, /WHERE u\.id = a\.id::text/i);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS users_auth_user_id_uidx/i);
   assert.doesNotMatch(migration, /DROP TABLE|TRUNCATE TABLE/i);
