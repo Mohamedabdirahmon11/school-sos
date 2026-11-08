@@ -1409,6 +1409,10 @@ apiRouter.get('/auth/me', requireAuth, async (req, res) => {
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   const { fullName, email, phone, currentPassword, newPassword } = req.body || {};
+  if (newPassword && ['parent', 'student'].includes(user.role)) {
+    res.status(403).json({ error: 'Parent and student accounts use PIN sign-in. Ask your School Admin to reset your PIN.' });
+    return;
+  }
   if (typeof fullName !== 'string' || fullName.trim().length < 2) { res.status(400).json({ error: 'Full name must contain at least two characters.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
