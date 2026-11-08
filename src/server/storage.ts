@@ -3413,7 +3413,7 @@ class StorageEngine {
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
       'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
-      'report_card_templates', 'school_branches', 'school_events', 'school_notices',
+      'report_card_templates', 'school_branches', 'school_events', 'school_health_visits', 'school_notices',
       'staff_members', 'student_marks', 'students', 'subjects',
       'support_tickets', 'teacher_unavailability', 'teachers',
       'timetable_settings', 'timetable_slots', 'transport_routes'
