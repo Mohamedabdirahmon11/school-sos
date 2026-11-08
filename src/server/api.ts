@@ -7,8 +7,17 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
+import type { Session } from '@supabase/supabase-js';
+import {
+  signInSchoolOSUser,
+  getSupabaseAuthUser,
+  refreshSupabaseAuthSession,
+  revokeSupabaseAuthSession,
+  updateSupabaseAuthPassword
+} from './supabase-auth.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
 import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig } from '../types/index.ts';
@@ -36,17 +45,19 @@ import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
+import { getTimetablePeriodTimes as getShiftTimetablePeriodTimes, hasRoomTimeClash, hasTeacherTimeClash } from '../lib/timetable.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
+import { passwordResetService, PASSWORD_RESET_NEUTRAL_MESSAGE, isPasswordResetSessionValid } from './password-reset-service.ts';
 
 export const apiRouter = Router();
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,grade_level,section,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  classes: 'id,school_id,branch_id,name,grade_level,shift,section,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,class_id,section,status',
@@ -119,7 +130,7 @@ apiRouter.use((req, res, next) => {
     const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
     console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
   });
-  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
+  void storage.prepareRequestContext(['/auth/login', '/auth/forgot-password', '/auth/reset-password'].includes(req.path), `${req.method} ${req.path}`).then((context: any) => {
     storage.runWithRequestContext(context, next);
   }).catch(() => {
     if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
@@ -293,7 +304,7 @@ apiRouter.use((req, res, next) => {
 
 // Reject cross-tenant identifiers globally, including routes that do not use requireSchoolContext.
 apiRouter.use(async (req, res, next) => {
-  const user = await getAuthenticatedUser(req);
+  const user = await getAuthenticatedUser(req, false, res);
   const requestedSchoolId = String(req.headers['x-school-id'] || req.query.schoolId || req.body?.schoolId || '');
   if (user && user.role !== 'super_admin' && requestedSchoolId && requestedSchoolId !== user.schoolId) {
     res.status(403).json({ error: 'Cross-school access denied.' });
@@ -350,7 +361,7 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
   ).map(student => student.classId);
 }
 
-async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
+async function getAuthenticatedUser(req: Request, allowBootstrap = false, res?: Response): Promise<User | null> {
   let token = req.cookies?.schoolos_session;
   if (!token && req.headers.authorization) {
     token = req.headers.authorization.replace(/^Bearer\s+/, '').trim();
@@ -359,12 +370,12 @@ async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promi
   const cached = authenticatedRequestCache.get(req);
   const bootstrapToken = Boolean(verifySignedSessionToken(token)?.sessionId.startsWith('bootstrap-'));
   if (cached && cached.token === token && (cached.bootstrapAllowed || !allowBootstrap || !bootstrapToken)) return cached.promise;
-  const promise = loadAuthenticatedUser(req, token, allowBootstrap);
+  const promise = loadAuthenticatedUser(req, token, allowBootstrap, res);
   authenticatedRequestCache.set(req, { token, promise, bootstrapAllowed: allowBootstrap });
   return promise;
 }
 
-async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap: boolean): Promise<User | null> {
+async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap: boolean, res?: Response): Promise<User | null> {
   // Verify HMAC-SHA256 signature, expiry, and structure
   const payload = verifySignedSessionToken(token);
   if (!payload) return null;
@@ -387,6 +398,24 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   const normalizedRole = normalizeRole(storedUser.role);
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
+  // Newly issued sessions are validated against Supabase Auth. Legacy cookies
+  // remain valid until their original expiry so users are not abruptly logged out.
+  const authAccessToken = req.cookies?.schoolos_auth_access;
+  const authRefreshToken = req.cookies?.schoolos_auth_refresh;
+  if (payload.authUserId && !authAccessToken && !authRefreshToken) return null;
+  if (authAccessToken || authRefreshToken) {
+    let authIdentity = authAccessToken ? await getSupabaseAuthUser(authAccessToken) : null;
+    if (!authIdentity && authRefreshToken && res) {
+      const refreshedAuthSession = await refreshSupabaseAuthSession(authRefreshToken);
+      if (refreshedAuthSession) {
+        authIdentity = refreshedAuthSession.user;
+        setSupabaseAuthCookies(res, refreshedAuthSession);
+      }
+    }
+    if (!authIdentity || !user.authUserId || authIdentity.id !== user.authUserId
+      || payload.authUserId && authIdentity.id !== payload.authUserId) return null;
+  }
+  if (!isPasswordResetSessionValid(user.passwordChangedAt, payload.passwordChangedAt)) return null;
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
   if (!session && !isBootstrap) return null;
   if (session && !isSessionExpiryValid(session.expiresAt)) return null;
@@ -412,7 +441,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
 
 // Middleware: Require Authenticated User
 async function requireAuth(req: Request, res: Response, next: () => void) {
-  const user = await getAuthenticatedUser(req, true);
+  const user = await getAuthenticatedUser(req, true, res);
   if (!user) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
@@ -641,8 +670,26 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
   await requireSchoolContext(req, res, next);
 }
 
-// Helper: Issue signed cookie session
-async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string): Promise<void> {
+// Supabase Auth tokens are HttpOnly and never exposed to browser JavaScript.
+function setSupabaseAuthCookies(res: Response, session: Session): void {
+  const base = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/'
+  };
+  res.cookie('schoolos_auth_access', session.access_token, {
+    ...base,
+    maxAge: Math.max(60, Number(session.expires_in || 3600)) * 1000
+  });
+  res.cookie('schoolos_auth_refresh', session.refresh_token, {
+    ...base,
+    maxAge: 30 * 24 * 60 * 60 * 1000
+  });
+}
+
+// Helper: Issue signed app session, bound to a verified Supabase Auth session.
+async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, authSession?: Session): Promise<void> {
   const settings = db.getSettings();
   const timeoutMinutes = settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
@@ -652,10 +699,12 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
   const signedToken = createSignedSessionToken({
     sessionId,
     userId: user.id,
+    authUserId: authSession?.user?.id || ((req.cookies?.schoolos_auth_access || req.cookies?.schoolos_auth_refresh) ? user.authUserId : undefined),
     role: user.role,
     schoolId: user.schoolId || schoolId,
     createdAt,
-    expiresAt
+    expiresAt,
+    passwordChangedAt: user.passwordChangedAt ? Date.parse(user.passwordChangedAt) : undefined
   });
 
   await db.createSession({
@@ -677,6 +726,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     path: '/',
     maxAge: timeoutMinutes * 60 * 1000
   });
+  if (authSession) setSupabaseAuthCookies(res, authSession);
 
 }
 
@@ -756,9 +806,17 @@ apiRouter.post('/auth/login', async (req, res) => {
       const students = await db.getStudents(school.id);
       const matchedStudents = students.filter(student =>
         role === 'student'
-          ? student.studentPhone === phone || student.fatherPhone === phone
+          ? student.studentPhone === phone
           : student.fatherPhone === phone || student.motherPhone === phone
       );
+      if (matchedStudents.length > 1) {
+        res.status(409).json({
+          error: role === 'student'
+            ? 'This phone number is linked to multiple student records. Ask your School Admin to issue a unique student login.'
+            : 'This parent phone is linked to multiple students but has no parent account yet. Ask your School Admin to create one.'
+        });
+        return;
+      }
       const matchStd = matchedStudents[0];
 
       if (!matchStd) {
@@ -828,7 +886,19 @@ apiRouter.post('/auth/login', async (req, res) => {
         });
       }
 
-      await issueSessionCookie(res, existingUser, req, school.id);
+      let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+      try {
+        authResult = await signInSchoolOSUser(existingUser, pin, 'pin');
+      } catch {
+        console.error('[auth] Supabase account linking failed; no credentials were logged.');
+        res.status(503).json({ error: 'Account sign-in is temporarily unavailable. Contact your school administrator if this continues.' });
+        return;
+      }
+      if (!authResult) {
+        res.status(401).json({ error: 'Invalid PIN or account credentials.' });
+        return;
+      }
+      await issueSessionCookie(res, existingUser, req, school.id, authResult.session);
       db.logAudit({
         action: 'USER_LOGIN_SUCCESS',
         category: 'auth',
@@ -904,7 +974,19 @@ apiRouter.post('/auth/login', async (req, res) => {
       );
     }
 
-    await issueSessionCookie(res, targetUser, req, school.id);
+    let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+    try {
+      authResult = await signInSchoolOSUser(targetUser, pin, 'pin');
+    } catch {
+      console.error('[auth] Supabase account linking failed; no credentials were logged.');
+      res.status(503).json({ error: 'Account sign-in is temporarily unavailable. Contact your school administrator if this continues.' });
+      return;
+    }
+    if (!authResult) {
+      res.status(401).json({ error: 'Invalid PIN or account credentials.' });
+      return;
+    }
+    await issueSessionCookie(res, targetUser, req, school.id, authResult.session);
     db.logAudit({
       action: 'USER_LOGIN_SUCCESS',
       category: 'auth',
@@ -949,7 +1031,16 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  const storedUser = await db.findUserForLogin(identifier);
+  let storedUser: User | null;
+  try {
+    storedUser = await db.findUserForLogin(identifier);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'LOGIN_IDENTIFIER_AMBIGUOUS') {
+      res.status(409).json({ error: 'This phone number or staff ID matches more than one account. Use the account email or ask your School Admin to correct the duplicate.' });
+      return;
+    }
+    throw error;
+  }
   if (!storedUser) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
@@ -981,9 +1072,17 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // Verify Scrypt Password Hash
-  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
-  if (!isPasswordValid) {
+  // Supabase Auth is the canonical password verifier. Legacy scrypt hashes are
+  // checked once only when safely provisioning the user's first Auth identity.
+  let authResult: Awaited<ReturnType<typeof signInSchoolOSUser>>;
+  try {
+    authResult = await signInSchoolOSUser(user, password, 'password');
+  } catch {
+    console.error('[auth] Supabase account linking failed; no credentials were logged.');
+    res.status(503).json({ error: 'Sign-in is temporarily unavailable. Please try again shortly.' });
+    return;
+  }
+  if (!authResult) {
     const lockResult = await db.handleFailedLogin(user.id);
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
@@ -1012,10 +1111,12 @@ apiRouter.post('/auth/login', async (req, res) => {
     const challengeToken = createSignedSessionToken({
       sessionId: `bootstrap-${randomUUID()}`,
       userId: user.id,
+      authUserId: authResult.authUserId,
       role: user.role,
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
+    setSupabaseAuthCookies(res, authResult.session);
     res.json({ requirePasswordChange: true, challengeToken });
     return;
   }
@@ -1026,7 +1127,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   await db.handleSuccessfulLogin(user.id);
   db.clearLoginFailures(staffLockKey);
 
-  await issueSessionCookie(res, user, req);
+  await issueSessionCookie(res, user, req, undefined, authResult.session);
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
 
   db.logAudit({
@@ -1049,12 +1150,103 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 });
 
+
+// Email-only password reset. The request response is deliberately identical for all account states.
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(254)
+});
+const resetPasswordSchema = z.object({
+  email: z.string().trim().email().max(254),
+  code: z.string().regex(/^\d{6}$/),
+  newPassword: z.string().max(128),
+  confirmPassword: z.string().max(128)
+}).refine(value => value.newPassword === value.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword']
+});
+
+apiRouter.post('/auth/forgot-password', async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Enter a valid email address.', code: 'PASSWORD_RESET_EMAIL_INVALID' });
+    return;
+  }
+  const acceptLanguage = String(req.headers['accept-language'] || '').trim().toLowerCase();
+  const preferredLanguage = acceptLanguage === 'so' || acceptLanguage === 'am' || acceptLanguage === 'en' ? acceptLanguage : undefined;
+  void passwordResetService.request(parsed.data.email, req.ip || req.socket.remoteAddress || 'unknown', preferredLanguage)
+    .catch(() => console.error('[password-reset] Request processing failed. No account or code details were logged.'));
+  // Keep response timing independent of whether the email belongs to an account.
+  await new Promise(resolve => setTimeout(resolve, 200));
+  res.json({
+    success: true,
+    message: PASSWORD_RESET_NEUTRAL_MESSAGE,
+    expiresInSeconds: 600,
+    retryAfterSeconds: 60
+  });
+});
+
+apiRouter.post('/auth/reset-password', async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    const confirmMismatch = parsed.error.issues.some(issue => issue.path.includes('confirmPassword'));
+    res.status(400).json({
+      error: confirmMismatch ? 'Passwords do not match.' : 'Enter a valid email, 6-digit code, and password.',
+      code: confirmMismatch ? 'PASSWORD_CONFIRM_MISMATCH' : 'PASSWORD_RESET_INPUT_INVALID'
+    });
+    return;
+  }
+  let result: Awaited<ReturnType<typeof passwordResetService.reset>>;
+  try {
+    result = await passwordResetService.reset(
+      parsed.data.email,
+      parsed.data.code,
+      parsed.data.newPassword,
+      req.ip || req.socket.remoteAddress || 'unknown'
+    );
+  } catch {
+    console.error('[password-reset] Reset processing failed. No code or password details were logged.');
+    res.status(503).json({ error: 'Password reset could not be completed. Request a new code.', code: 'PASSWORD_RESET_UNAVAILABLE' });
+    return;
+  }
+  if (!result.ok) {
+    if (result.reason === 'password_policy') {
+      res.status(400).json({ error: result.message, code: 'PASSWORD_POLICY_FAILED' });
+      return;
+    }
+    if (result.reason === 'same_password') {
+      res.status(400).json({ error: 'Choose a password different from your current password.', code: 'PASSWORD_SAME_AS_CURRENT' });
+      return;
+    }
+    if (result.reason === 'too_many_attempts') {
+      res.status(429).json({ error: 'Too many incorrect codes. Request a new code.', code: 'PASSWORD_RESET_TOO_MANY_ATTEMPTS' });
+      return;
+    }
+    if (result.reason === 'unavailable') {
+      res.status(503).json({ error: 'Password reset could not be completed. Request a new code.', code: 'PASSWORD_RESET_UNAVAILABLE' });
+      return;
+    }
+    res.status(400).json({ error: 'The code is invalid or expired. Request a new one.', code: 'PASSWORD_RESET_CODE_INVALID' });
+    return;
+  }
+  res.json({ success: true, message: 'Password changed.' });
+});
+
 // Logout endpoint (clears HttpOnly cookie)
 apiRouter.post('/auth/logout', async (req, res) => {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   if (payload) { await db.revokeSession(payload.sessionId); invalidateAuthenticatedSnapshot(undefined, payload.sessionId); }
+  try {
+    await revokeSupabaseAuthSession(
+      String(req.cookies?.schoolos_auth_access || ''),
+      String(req.cookies?.schoolos_auth_refresh || '')
+    );
+  } catch {
+    // Local cookies are still cleared if remote revocation is temporarily unavailable.
+  }
   res.clearCookie('schoolos_session', { path: '/' });
+  res.clearCookie('schoolos_auth_access', { path: '/' });
+  res.clearCookie('schoolos_auth_refresh', { path: '/' });
   res.json({ success: true, message: 'Signed out successfully.' });
 });
 
@@ -1151,6 +1343,14 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
 
+  if (user.authUserId && !['teacher', 'parent', 'student'].includes(user.role)) {
+    try {
+      await updateSupabaseAuthPassword(user.authUserId, newPassword);
+    } catch {
+      res.status(503).json({ error: 'Supabase Auth could not update the password. No SchoolOS password changes were saved.' });
+      return;
+    }
+  }
   const updated = db.updateUser(user.id, {
     passwordHash: hashPassword(newPassword),
     mustChangePassword: false
@@ -1170,7 +1370,16 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     severity: 'info'
   });
 
-  await issueSessionCookie(res, updated, req);
+  let refreshedAuthSession: Session | undefined;
+  if (updated.authUserId && !['parent', 'student'].includes(user.role)) {
+    const authResult = await signInSchoolOSUser(updated, newPassword, 'password');
+    if (!authResult) {
+      res.status(503).json({ error: 'Password was changed, but the new Supabase Auth session could not be started. Sign in again with the new password.' });
+      return;
+    }
+    refreshedAuthSession = authResult.session;
+  }
+  await issueSessionCookie(res, updated, req, undefined, refreshedAuthSession);
   res.json({ success: true, message: 'Password updated successfully.' });
 });
 
@@ -2105,7 +2314,8 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const gradeMismatch = classGradeMismatchError(req.body.name, Number(req.body.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  const newClass = db.createClass({ ...req.body, schoolId: school.id });
+  if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 or 2.' }); return; }
+  const newClass = db.createClass({ ...req.body, shift: Number(req.body?.shift) === 2 ? 2 : 1, schoolId: school.id });
   res.status(201).json(newClass);
 });
 
@@ -2126,7 +2336,24 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 or 2.' }); return; }
+  const previousShift = Number(existing.shift) === 2 ? 2 : 1;
+  const nextShift = req.body?.shift === undefined ? previousShift : Number(req.body.shift);
   const updated = await db.updateClass(String(req.params.id), req.body, school.id);
+  if (updated && nextShift !== previousShift) {
+    try {
+      const [settings, slots] = await Promise.all([
+        db.getTimetableSettings(school.id),
+        queryAllRows('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active')
+      ]);
+      const retimed = slots.map((slot: any) => ({ ...slot, ...getTimetablePeriodTimes(settings, Number(slot.periodNumber), nextShift) }));
+      if (retimed.length) await db.replaceTimetableForClass(school.id, existing.id, retimed);
+    } catch {
+      await db.updateClass(existing.id, { shift: previousShift }, school.id);
+      res.status(503).json({ error: 'The class shift could not be changed because its timetable could not be retimed. The previous shift was restored.' });
+      return;
+    }
+  }
   res.json(updated);
 });
 
@@ -2247,8 +2474,6 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   do { id = `STF-${schoolTag}-${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
   return id;
 }
-const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
-const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
   const statuses = new Map<string, 'paid' | 'partial' | 'unpaid'>();
   if (studentIds && studentIds.length === 0) return statuses;
@@ -2280,10 +2505,7 @@ async function queryAllRows(table: string, filters: Record<string, string | stri
   }
   return rows;
 }
-const getTimetablePeriodTimes = (settings: any, period: number) => {
-  const start = timetableMinutes(settings.firstPeriodStart || '08:00') + (period - 1) * Number(settings.periodMinutes || 40) + (period > Number(settings.breakAfterPeriod || 3) ? Number(settings.breakMinutes ?? 20) : 0);
-  return { startTime: timetableClock(start), endTime: timetableClock(start + Number(settings.periodMinutes || 40)) };
-};
+const getTimetablePeriodTimes = (settings: any, period: number, shift: number = 1) => getShiftTimetablePeriodTimes(settings, period, shift);
 const isSchoolAdmin = (user: User) => ['school_admin', 'super_admin'].includes(normalizeRole(user.role) || '');
 const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
   if (!slots.length) return slots;
@@ -2510,7 +2732,8 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
 });
 
 apiRouter.get('/timetable/unavailability', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const result = await db.queryPage('teacher_unavailability', { school_id: (req as any).school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number');
+  const school = (req as any).school;
+  const result = await db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined, shift: req.query.shift ? String(req.query.shift) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number,shift');
   res.json(result.items);
 });
 
@@ -2519,8 +2742,9 @@ apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSupe
   const teacherId = String(req.body?.teacherId || '');
   const dayOfWeek = String(req.body?.dayOfWeek || '');
   const periodNumber = Number(req.body?.periodNumber);
-  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 6 || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, and a period from 1 to 6.' }); return; }
-  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true);
+  const shift = Number(req.body?.shift ?? 1);
+  if (![1, 2].includes(shift) || !TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > (dayOfWeek === 'Friday' ? 5 : 6) || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, shift 1 or 2, and a valid period.' }); return; }
+  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, shift, req.body?.unavailable === true);
   res.json({ success: true });
 });
 
@@ -2529,26 +2753,31 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
   const period = Number(periodNumber);
   if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 6)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (Friday has five periods).' }); return; }
-  const [klass, subject, teacher, assignment, settings, existing, unavailable] = await Promise.all([
-    db.getClassById(String(classId || ''), school.id),
+  const klass = await db.getClassById(String(classId || ''), school.id);
+  if (!klass || klass.isArchived) { res.status(400).json({ error: 'Class was not found.' }); return; }
+  const shift = Number(klass.shift) === 2 ? 2 : 1;
+  const [subject, teacher, assignment, settings, existing, unavailable, current] = await Promise.all([
     db.queryPage('subjects', { school_id: school.id, id: String(subjectId || '') }, 1, 1, undefined, 'id'),
     db.queryPage('teachers', { school_id: school.id, id: String(teacherId || '') }, 1, 1, undefined, 'id'),
     db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || ''), teacher_id: String(teacherId || ''), is_active: 'true' }, 1, 1, undefined, 'id'),
     db.getTimetableSettings(school.id),
-    db.queryPage('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId || ''), day_of_week: dayOfWeek, period_number: String(period) }, 1, 1, undefined, 'id')
+    queryAllRows('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId || ''), day_of_week: dayOfWeek, period_number: String(period), shift: String(shift) }, 1, 1, undefined, 'id'),
+    db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active')
   ]);
-  if (!klass || klass.isArchived || !subject.total || !teacher.total || !assignment.total) { res.status(400).json({ error: 'Class, subject, and teacher must belong to this school and match an active subject assignment.' }); return; }
-  if (unavailable.total) { res.status(409).json({ error: 'This teacher is unavailable for that period.' }); return; }
-  if (existing.items.some((slot: any) => slot.classId !== classId && slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in that period.' }); return; }
+  if (!subject.total || !teacher.total || !assignment.total) { res.status(400).json({ error: 'Subject and teacher must belong to this school and match an active class subject assignment.' }); return; }
+  if (unavailable.total) { res.status(409).json({ error: 'This teacher is marked unavailable for this shift and period.' }); return; }
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
-  if (effectiveRoomNumber && existing.items.some((slot: any) => slot.classId !== classId && String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in that period.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period, shift), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
+  const otherSlots = existing.filter((item: any) => item.classId !== classId);
+  if (hasRoomTimeClash(slot, otherSlots)) { res.status(409).json({ error: 'This classroom is already occupied at that time. Choose another room or period.' }); return; }
+  const warnings: string[] = [];
+  if (hasTeacherTimeClash(slot, otherSlots)) warnings.push('Teacher is already assigned to another class during these clock times. Save is allowed; review the clash.');
+  if (current.items.some((item: any) => item.dayOfWeek === dayOfWeek && item.subjectId === subjectId && item.periodNumber !== period)) warnings.push('This subject already appears in this class on this day.');
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
   try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
-  catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
-  res.status(201).json(slot);
+  catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(503).json({ error: message }); return; }
+  res.status(201).json({ ...slot, warnings });
 });
 
 apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -2567,8 +2796,16 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
   if (slots.items.length !== 2) { res.status(404).json({ error: 'One or both timetable periods were not found in this school.' }); return; }
   try { await db.swapTimetableSlots(school.id, firstId, secondId); }
-  catch (error: any) { res.status(409).json({ error: error.message || 'The swap would create a schedule conflict.' }); return; }
-  res.json({ success: true });
+  catch (error: any) { res.status(503).json({ error: error.message || 'The timetable periods could not be swapped.' }); return; }
+  const allSlots = await queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const swapped = allSlots.filter((slot: any) => slot.id === firstId || slot.id === secondId);
+  const warnings: string[] = [];
+  for (const slot of swapped) {
+    const others = allSlots.filter((other: any) => other.id !== slot.id);
+    if (hasTeacherTimeClash(slot, others)) warnings.push(`Teacher clash warning: ${slot.teacherId} has another class at ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}.`);
+    if (hasRoomTimeClash(slot, others)) warnings.push(`Room clash warning: ${slot.roomNumber} is used by another class at ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}.`);
+  }
+  res.json({ success: true, warnings: [...new Set(warnings)] });
 });
 
 apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -2576,18 +2813,17 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const classId = String(req.body?.classId || '');
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  const shift = Number(klass.shift) === 2 ? 2 : 1;
   const [assignments, allSlots, unavailable, settings] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
+    queryAllRows('teacher_unavailability', { school_id: school.id, shift: String(shift) }, 'id,teacher_id,day_of_week,period_number,shift'),
     db.getTimetableSettings(school.id)
   ]);
   const existing = allSlots.filter((slot: any) => slot.classId !== classId);
-  const occupied = new Set(existing.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
-  const occupiedRooms = new Set(existing.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
-  const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
   const generated: TimetableSlot[] = [];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
+  const warnings: string[] = [];
   const load = new Map<string, number>();
   const ordered = assignments.items.filter((item: any) => item.teacherId).sort((a: any, b: any) => b.periodsPerWeek - a.periodsPerWeek);
   for (const assignment of ordered) {
@@ -2597,20 +2833,29 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       for (let period = 1; period <= 6; period += 1) {
         for (const day of days) {
           if (day === 'Friday' && period === 6) continue;
-          const key = `${day}:${period}:${assignment.teacherId}`;
-          if (occupied.has(key) || blocked.has(key) || occupiedRooms.has(`${day}:${period}`) || generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)) continue;
-          generated.push({ id: `tt-${randomUUID()}`, schoolId: school.id, classId, dayOfWeek: day, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: assignment.subjectId, teacherId: assignment.teacherId, roomNumber: klass.roomNumber || '' });
-          occupied.add(key); load.set(`${assignment.subjectId}:${day}`, (load.get(`${assignment.subjectId}:${day}`) || 0) + 1); placed = true; break;
+          const times = getTimetablePeriodTimes(settings, period, shift);
+          const candidate = { dayOfWeek: day, periodNumber: period, teacherId: assignment.teacherId, classId, roomNumber: klass.roomNumber || '', ...times };
+          const isUnavailable = unavailable.some((item: any) => item.teacherId === assignment.teacherId && item.dayOfWeek === day && item.periodNumber === period);
+          const subjectAlreadyToday = generated.some(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+          const periodAlreadyUsed = generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period);
+          if (isUnavailable || subjectAlreadyToday || periodAlreadyUsed || hasRoomTimeClash(candidate, existing)) continue;
+          if (hasTeacherTimeClash(candidate, [...existing, ...generated])) warnings.push(`${assignment.teacherId} has an overlapping assignment on ${day} Period ${period}; timetable generation continued.`);
+          generated.push({ id: `tt-${randomUUID()}`, schoolId: school.id, classId, dayOfWeek: day, periodNumber: period, ...times, subjectId: assignment.subjectId, teacherId: assignment.teacherId, roomNumber: klass.roomNumber || '' });
+          load.set(`${assignment.subjectId}:${day}`, (load.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+          placed = true;
+          break;
         }
         if (placed) break;
       }
       if (!placed) unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId, occurrence });
     }
   }
-  for (const assignment of assignments.items.filter((item: any) => !item.teacherId)) for (let occurrence = 1; occurrence <= assignment.periodsPerWeek; occurrence += 1) unfilled.push({ subjectId: assignment.subjectId, teacherId: '', occurrence });
+  for (const assignment of assignments.items.filter((item: any) => !item.teacherId)) {
+    for (let occurrence = 1; occurrence <= assignment.periodsPerWeek; occurrence += 1) unfilled.push({ subjectId: assignment.subjectId, teacherId: '', occurrence });
+  }
   try { await db.replaceTimetableForClass(school.id, classId, generated); }
-  catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
-  res.json({ slots: generated, unfilled });
+  catch { res.status(503).json({ error: 'Generated timetable could not be saved. No existing timetable was replaced.' }); return; }
+  res.json({ slots: generated, unfilled, warnings });
 });
 
 // ==============================================================================
@@ -4768,7 +5013,7 @@ apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requi
   try {
     today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   } catch { /* Fall back to UTC when a legacy school timezone is invalid. */ }
-  if (!bookId || !studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) ||
+  if (!bookId || !studentId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
       Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate || dueDate < today) {
     res.status(400).json({ error: 'Select a book, student and a valid due date that is today or later.' });
     return;
