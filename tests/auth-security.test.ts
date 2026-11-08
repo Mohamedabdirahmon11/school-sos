@@ -163,3 +163,11 @@ test('first-login password form mirrors the backend password policy', () => {
   assert.match(modalSource, /minLength=\{12\} maxLength=\{128\}/);
   assert.match(modalSource, /uppercase, lowercase, and a number/);
 });
+
+
+test('bootstrap password form mirrors the backend password policy', () => {
+  const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
+  assert.match(loginSource, /newAdminPassword\.length < 12 \|\| newAdminPassword\.length > 128/);
+  assert.match(loginSource, /minLength=\{12\} maxLength=\{128\}/);
+  assert.match(loginSource, /uppercase, lowercase, and a number/);
+});
