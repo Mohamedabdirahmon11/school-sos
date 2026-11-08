@@ -240,6 +240,12 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
           <span>{actionNotice}</span>
         </div>
       )}
+      {loadError && (
+        <div role="alert" className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-800 flex items-center justify-between gap-3">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void fetchSchools()} className="font-semibold underline">Retry loading</button>
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-[#E2E8F0]">
