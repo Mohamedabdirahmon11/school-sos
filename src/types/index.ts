@@ -109,6 +109,8 @@ export interface School {
 
 export interface User {
   id: string;
+  /** Supabase Auth identity linked without changing the stable SchoolOS user ID. */
+  authUserId?: string;
   schoolId?: string; // null for Super Admin
   branchId?: string;
   role: UserRole;
