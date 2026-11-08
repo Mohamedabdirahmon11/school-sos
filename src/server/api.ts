@@ -1602,18 +1602,34 @@ const bulkAcademicYearSchema = z.object({
 async function buildBulkAcademicYearPreview(targetYear: string) {
   const schools = await db.getSchools();
   const targetStart = Number(targetYear.slice(0, 4));
-  return schools.map(school => {
+  return Promise.all(schools.map(async school => {
     const current = String((school as any).academicYear || '');
     const currentStart = /^\d{4}-\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
-    let status: 'change' | 'unchanged' | 'warning' = 'change';
-    let warning = '';
-    if (current === targetYear) status = 'unchanged';
-    else if (currentStart !== null && targetStart < currentStart) {
-      status = 'warning';
-      warning = 'Target year is earlier than the current year of this school.';
+    const warnings: string[] = [];
+    if (current !== targetYear) {
+      if (currentStart !== null && targetStart < currentStart) {
+        warnings.push('Target year is earlier than the current year of this school.');
+      }
+      const schedules = await db.getExamSchedules(school.id);
+      const activeOtherYearExams = schedules.filter(schedule =>
+        ['draft', 'published'].includes(String(schedule.status)) && String(schedule.academicYear || '') !== targetYear
+      );
+      if (activeOtherYearExams.length) {
+        warnings.push(`${activeOtherYearExams.length} draft/published exam schedule(s) still belong to another academic year.`);
+      }
     }
-    return { id: school.id, name: school.name, code: (school as any).code || '', currentAcademicYear: current || null, status, warning };
-  });
+    const status: 'change' | 'unchanged' | 'warning' = current === targetYear
+      ? 'unchanged'
+      : warnings.length ? 'warning' : 'change';
+    return {
+      id: school.id,
+      name: school.name,
+      code: (school as any).code || '',
+      currentAcademicYear: current || null,
+      status,
+      warning: warnings.join(' ')
+    };
+  }));
 }
 
 apiRouter.post('/superadmin/academic-year/preview', requireAuth, requireSuperAdmin, async (req, res) => {
