@@ -90,7 +90,7 @@ export const LoginView: React.FC = () => {
 
   const handleBootstrapPasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newAdminPassword.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (newAdminPassword.length < 12 || newAdminPassword.length > 128 || !/[a-z]/.test(newAdminPassword) || !/[A-Z]/.test(newAdminPassword) || !/[0-9]/.test(newAdminPassword)) { setError('Password must be 12–128 characters and include uppercase, lowercase, and a number.'); return; }
     if (newAdminPassword !== confirmAdminPassword) { setError('Passwords do not match.'); return; }
     if (!bootstrapToken) { setError('This setup session expired. Sign in again.'); return; }
     setIsLoading(true);
@@ -255,8 +255,8 @@ export const LoginView: React.FC = () => {
             <form className="space-y-4" onSubmit={handleBootstrapPasswordChange}>
               <h3 className="text-base font-semibold text-[#132A29]">Change the Super Admin password</h3>
               <p className="text-xs text-[#64748B]">Set a new password to continue to the dashboard.</p>
-              <PasswordInput label="new password" required minLength={8} autoComplete="new-password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
-              <PasswordInput label="confirm new password" required minLength={8} autoComplete="new-password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} placeholder="Confirm new password" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <PasswordInput label="new password" required minLength={12} maxLength={128} autoComplete="new-password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="12–128 characters, upper/lowercase and a number" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <PasswordInput label="confirm new password" required minLength={12} maxLength={128} autoComplete="new-password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} placeholder="Repeat your secure password" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
               {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
               <button disabled={isLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white">{isLoading ? 'Updating…' : 'Set password and continue'}</button>
             </form>
