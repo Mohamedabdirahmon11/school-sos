@@ -377,5 +377,7 @@ test('school backup restore includes safe school settings and keeps billing and 
   assert.match(schemaFunction, /v_school_row\.attendance_rules/);
   assert.match(schemaFunction, /v_school_row\.notification_preferences/);
   assert.match(schemaFunction, /jsonb_build_object\('school_profile', 1\)/);
+  assert.match(schemaFunction, /v_school_profile := public\\.schoolos_backup_json_snake/);
+  assert.match(schemaFunction, /CASE WHEN v_school_profile \\? 'calendar_type'/);
   assert.doesNotMatch(schemaFunction, /UPDATE public\.school_subscriptions|UPDATE public\.subscription_invoices/);
 });
