@@ -436,6 +436,13 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
     if (!staffAccount || staffAccount.status !== 'active') return null;
   }
 
+  if (user.role === 'teacher') {
+    const teacherProfiles = await db.queryPage('teachers', { school_id: user.schoolId, user_id: user.id }, 1, 2, undefined, 'id,status');
+    if (teacherProfiles.items.length !== 1 || teacherProfiles.items[0].status !== 'active') return null;
+    const staffAccount = await getStaffForRequest(req, user.id, user.schoolId || '');
+    if (staffAccount && staffAccount.status !== 'active') return null;
+  }
+
   // Check if school is suspended (blocks non-Super Admins)
   if (user.schoolId && user.role !== 'super_admin') {
     const school = await getSchoolForRequest(req, user.schoolId);
