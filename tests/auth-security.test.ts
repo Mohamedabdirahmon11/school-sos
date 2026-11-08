@@ -171,3 +171,14 @@ test('bootstrap password form mirrors the backend password policy', () => {
   assert.match(loginSource, /minLength=\{12\} maxLength=\{128\}/);
   assert.match(loginSource, /uppercase, lowercase, and a number/);
 });
+
+test('bulk academic year routes are Super Admin only and require typed confirmation', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  for (const route of ['/superadmin/academic-year/preview', '/superadmin/academic-year/apply']) {
+    const match = apiSource.match(new RegExp(`apiRouter\\.post\\('${route.replace(/\//g, '\\/')}'([^=]{0,120})=>`));
+    assert.ok(match, `${route} exists`);
+    assert.match(match[1], /requireAuth/);
+    assert.match(match[1], /requireSuperAdmin/);
+  }
+  assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
+});
