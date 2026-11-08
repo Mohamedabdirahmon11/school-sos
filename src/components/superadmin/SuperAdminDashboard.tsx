@@ -139,7 +139,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
               {formatMoney(metrics.currentMonthRevenue || 0, platformCurrency)}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">{platformCurrency}</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">Platform subscription invoices</p>
         </div>
