@@ -503,10 +503,10 @@ export class ApiClient {
   }
 
   public static async getTimetableSettings() {
-    return this.request<{ schoolId: string; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }>('/timetable/settings');
+    return this.request<{ schoolId: string; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number }>('/timetable/settings');
   }
 
-  public static async saveTimetableSettings(settings: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }) {
+  public static async saveTimetableSettings(settings: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart?: string; shift2PeriodMinutes?: number; shift2BreakAfterPeriod?: number; shift2BreakMinutes?: number }) {
     return this.request('/timetable/settings', { method: 'PUT', body: JSON.stringify(settings) });
   }
 

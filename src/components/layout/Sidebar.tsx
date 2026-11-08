@@ -180,24 +180,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         ${isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         {/* Brand / Tenant Header */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-[#143D3B] shrink-0">
+        <div className="h-[76px] px-4 flex items-center justify-between border-b border-[#143D3B] shrink-0 super-admin-brand">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#15998F] to-[#0F766E] flex items-center justify-center font-bold text-base tracking-wider shrink-0 text-white shadow-lg shadow-black/20 ring-1 ring-white/10">
               S
             </div>
             <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight text-white truncate">
-                {school ? school.name : 'SchoolOS Cloud'}
+                {role === 'super_admin' && !inspectedSchool ? 'SchoolOS' : school ? school.name : 'SchoolOS Cloud'}
               </h1>
               <p className="text-[10px] text-[#A0BCBA] uppercase font-mono tracking-wider truncate">
-                {school ? `Code: ${school.code}` : 'Multi-School SaaS'}
+                {role === 'super_admin' && !inspectedSchool ? 'PLATFORM CONSOLE' : school ? `Code: ${school.code}` : 'Multi-School SaaS'}
               </p>
             </div>
           </div>
         </div>
 
         {/* Navigation Links (Scrollable with custom sleek scrollbar) */}
-        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-1">
+        <nav aria-label="Main navigation" className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-1 ${role === 'super_admin' && !inspectedSchool ? 'super-admin-nav' : ''}`}>
+          {role === 'super_admin' && !inspectedSchool && (
+            <div className="px-3 pb-2 pt-1 text-[9px] font-bold tracking-[.18em] uppercase text-[#86aaa4]">Workspace</div>
+          )}
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -207,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
                 key={item.id}
                 onClick={() => handleItemClick(item.id)}
                 className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[12px] font-semibold
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[12px] font-semibold super-admin-nav-item
                   transition-colors whitespace-nowrap text-left
                   ${isActive
                     ? 'bg-[#0F766E] text-white shadow-sm'

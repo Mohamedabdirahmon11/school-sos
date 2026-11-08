@@ -39,6 +39,7 @@ export const ClassesSubjectsView: React.FC = () => {
   // New Class Form State
   const [className, setClassName] = useState('');
   const [gradeLevel, setGradeLevel] = useState(10);
+  const [classShift, setClassShift] = useState<1 | 2>(1);
   const [section, setSection] = useState('A');
   const [roomNumber, setRoomNumber] = useState('Room 101');
   const [capacity, setCapacity] = useState(school?.defaultClassCapacity || 40);
@@ -59,6 +60,7 @@ export const ClassesSubjectsView: React.FC = () => {
       const payload = {
         name: className,
         gradeLevel,
+        shift: classShift,
         section,
         roomNumber,
         capacity,
@@ -70,6 +72,7 @@ export const ClassesSubjectsView: React.FC = () => {
       setShowClassModal(false);
       setEditingClass(null);
       setClassName('');
+      setClassShift(1);
       setCapacity(school?.defaultClassCapacity || 40);
       setNotice(`Class "${className}" created.`);
       await fetchData();
@@ -159,13 +162,13 @@ export const ClassesSubjectsView: React.FC = () => {
                 <button type="button" onClick={() => { setSelectedClassId(c.id); setStudentPage(1); }} className="text-left min-w-0 hover:text-[#0F766E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E] rounded">
                   <p className="font-semibold text-[#132A29]">{c.name}</p>
                   <p className="text-[11px] text-[#64748B]">
-                    {c.roomNumber} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
+                    {c.roomNumber} · Shift {c.shift || 1} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
                   </p>
                 </button>
                 <span className="font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded text-[11px] font-bold">
                   Section {c.section}
                 </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
+                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setClassShift(c.shift === 2 ? 2 : 1); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
@@ -260,6 +263,13 @@ export const ClassesSubjectsView: React.FC = () => {
                     {[0, ...(school?.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)].map(level => (
                       <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium">Shift</label>
+                  <select value={classShift} onChange={e => setClassShift(Number(e.target.value) as 1 | 2)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                    <option value={1}>Shift 1 · Morning</option>
+                    <option value={2}>Shift 2 · Afternoon</option>
                   </select>
                 </div>
                 <div>

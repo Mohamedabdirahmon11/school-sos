@@ -207,6 +207,8 @@ export interface SchoolClass {
   classTeacherId?: string;
   monthlyFee: number;
   isArchived?: boolean;
+  /** Morning (1) or afternoon (2) school session. */
+  shift?: 1 | 2;
 }
 
 export interface Subject {
@@ -233,6 +235,7 @@ export interface TimetableSlot {
   subjectName?: string;
   teacherName?: string;
   className?: string;
+  shift?: 1 | 2;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';

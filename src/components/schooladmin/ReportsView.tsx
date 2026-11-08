@@ -59,9 +59,15 @@ export const ReportsView: React.FC = () => {
     let csvContent = '';
     if (type === 'census') {
       csvContent = 'Metric,Value,School,Academic Year\n';
-      csvContent += [csvCell('Enrolled Students'), csvCell(summary.studentCount), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
-      csvContent += [csvCell('Attendance Rate'), csvCell(`${summary.attendanceRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
-      csvContent += [csvCell('Academic Pass Rate'), csvCell(summary.passRate == null ? 'Not calculated' : `${summary.passRate}%`), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
+      const censusRow = (label: string, value: unknown) => [csvCell(label), csvCell(value), csvCell(school?.name), csvCell(school?.academicYear)].join(',') + '\n';
+      csvContent += censusRow('Enrolled Students', summary.studentCount);
+      csvContent += censusRow('Teachers', summary.teacherCount ?? 0);
+      csvContent += censusRow('Student-to-teacher ratio (students per teacher)', summary.studentTeacherRatio == null ? 'Not calculated' : summary.studentTeacherRatio);
+      for (const klass of summary.classEnrollment || []) {
+        csvContent += censusRow(`Class ${klass.className} ${klass.section || ''} (grade ${klass.gradeLevel}) student count`, klass.studentCount);
+      }
+      csvContent += censusRow('Attendance Rate', `${summary.attendanceRate}%`);
+      csvContent += censusRow('Academic Pass Rate', summary.passRate == null ? 'Not calculated' : `${summary.passRate}%`);
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -186,8 +192,8 @@ export const ReportsView: React.FC = () => {
             </div>
             <h3 className="text-sm font-bold text-slate-900">Academic Census & Performance Summary</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Enrollment counts across grades, student-to-teacher ratios, attendance percentages, and overall
-              subject pass metrics for governmental or institutional compliance.
+              School-wide enrollment, class-by-class student counts, student-to-teacher ratio, attendance rate,
+              and approved-exam pass rate for reporting and review.
             </p>
           </div>
           <button

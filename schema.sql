@@ -245,10 +245,19 @@ CREATE TABLE IF NOT EXISTS classes (
   class_teacher_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
   monthly_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  shift SMALLINT NOT NULL DEFAULT 1 CHECK (shift IN (1, 2)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
+DO $shift_constraint$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.classes'::regclass AND conname = 'classes_shift_check') THEN
+    ALTER TABLE public.classes ADD CONSTRAINT classes_shift_check CHECK (shift IN (1, 2));
+  END IF;
+END
+$shift_constraint$;
 
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);
@@ -390,8 +399,17 @@ CREATE TABLE IF NOT EXISTS timetable_settings (
   period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (period_minutes BETWEEN 20 AND 120),
   break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 5),
   break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (break_minutes BETWEEN 0 AND 120),
+  shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00',
+  shift2_period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (shift2_period_minutes BETWEEN 20 AND 120),
+  shift2_break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (shift2_break_after_period BETWEEN 1 AND 5),
+  shift2_break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (shift2_break_minutes BETWEEN 0 AND 120),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00';
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_period_minutes INTEGER NOT NULL DEFAULT 40;
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_break_after_period INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_break_minutes INTEGER NOT NULL DEFAULT 20;
 
 CREATE TABLE IF NOT EXISTS teacher_unavailability (
   id VARCHAR(64) PRIMARY KEY,
@@ -1959,13 +1977,22 @@ REVOKE ALL ON FUNCTION super_admin_dashboard_summary() FROM PUBLIC, anon, authen
 GRANT EXECUTE ON FUNCTION super_admin_dashboard_summary() TO service_role;
 
 CREATE OR REPLACE FUNCTION schoolos_replace_class_timetable(p_school_id VARCHAR, p_class_id VARCHAR, p_slots JSONB) RETURNS VOID
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, period_number INTEGER, teacher_id VARCHAR)
+    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, start_time VARCHAR, end_time VARCHAR, teacher_id VARCHAR)
     JOIN public.timetable_slots old ON old.school_id = p_school_id AND old.day_of_week = n.day_of_week
-      AND old.period_number = n.period_number AND old.teacher_id = n.teacher_id AND old.class_id <> p_class_id AND old.is_active = TRUE
-  ) THEN RAISE EXCEPTION 'A teacher is already assigned to another class in that period.'; END IF;
+      AND old.teacher_id = n.teacher_id AND old.class_id <> p_class_id AND old.is_active = TRUE
+      AND n.start_time < old.end_time AND n.end_time > old.start_time
+  ) THEN RAISE EXCEPTION 'A teacher is already assigned during an overlapping timetable period.'; END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_to_recordset(COALESCE(p_slots, '[]'::jsonb)) AS n(day_of_week VARCHAR, start_time VARCHAR, end_time VARCHAR, room_number VARCHAR)
+    JOIN public.timetable_slots old ON old.school_id = p_school_id AND old.day_of_week = n.day_of_week
+      AND old.class_id <> p_class_id AND old.is_active = TRUE
+      AND NULLIF(BTRIM(n.room_number), '') IS NOT NULL
+      AND LOWER(BTRIM(old.room_number)) = LOWER(BTRIM(n.room_number))
+      AND n.start_time < old.end_time AND n.end_time > old.start_time
+  ) THEN RAISE EXCEPTION 'A classroom is already reserved during an overlapping timetable period.'; END IF;
   UPDATE public.timetable_slots SET is_active = FALSE WHERE school_id = p_school_id AND class_id = p_class_id AND is_active = TRUE;
   INSERT INTO public.timetable_slots (id, school_id, class_id, day_of_week, period_number, start_time, end_time, subject_id, teacher_id, room_number, is_active)
   SELECT id, p_school_id, p_class_id, day_of_week, period_number, start_time, end_time, subject_id, teacher_id, room_number, TRUE
@@ -1980,25 +2007,158 @@ $$;
 REVOKE ALL ON FUNCTION schoolos_replace_class_timetable(VARCHAR, VARCHAR, JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION schoolos_replace_class_timetable(VARCHAR, VARCHAR, JSONB) TO service_role;
 
-CREATE OR REPLACE FUNCTION schoolos_swap_timetable_slots(p_school_id VARCHAR, p_first_id VARCHAR, p_second_id VARCHAR) RETURNS VOID
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE first_slot public.timetable_slots%ROWTYPE; second_slot public.timetable_slots%ROWTYPE;
+CREATE OR REPLACE FUNCTION public.schoolos_swap_timetable_slots(
+  p_school_id VARCHAR,
+  p_first_id VARCHAR,
+  p_second_id VARCHAR
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  first_slot public.timetable_slots%ROWTYPE;
+  second_slot public.timetable_slots%ROWTYPE;
+  first_start VARCHAR(5);
+  second_start VARCHAR(5);
+  first_minutes INTEGER;
+  second_minutes INTEGER;
+  first_break_after INTEGER;
+  second_break_after INTEGER;
+  first_break_minutes INTEGER;
+  second_break_minutes INTEGER;
+  first_target_start INTEGER;
+  second_target_start INTEGER;
+  first_target_end INTEGER;
+  second_target_end INTEGER;
+  first_start_text VARCHAR(5);
+  first_end_text VARCHAR(5);
+  second_start_text VARCHAR(5);
+  second_end_text VARCHAR(5);
 BEGIN
-  SELECT * INTO first_slot FROM public.timetable_slots WHERE id = p_first_id AND school_id = p_school_id AND is_active = TRUE FOR UPDATE;
-  SELECT * INTO second_slot FROM public.timetable_slots WHERE id = p_second_id AND school_id = p_school_id AND is_active = TRUE FOR UPDATE;
-  IF first_slot.id IS NULL OR second_slot.id IS NULL OR first_slot.id = second_slot.id THEN RAISE EXCEPTION 'Choose two different active timetable slots in this school.'; END IF;
-  IF EXISTS (SELECT 1 FROM public.timetable_slots other WHERE other.school_id = p_school_id AND other.is_active = TRUE AND other.id NOT IN (p_first_id, p_second_id)
-    AND ((other.teacher_id = first_slot.teacher_id AND other.day_of_week = second_slot.day_of_week AND other.period_number = second_slot.period_number)
-      OR (other.teacher_id = second_slot.teacher_id AND other.day_of_week = first_slot.day_of_week AND other.period_number = first_slot.period_number)))
-    THEN RAISE EXCEPTION 'The swap would create a teacher schedule conflict.'; END IF;
-  UPDATE public.timetable_slots SET day_of_week = second_slot.day_of_week, period_number = second_slot.period_number,
-    start_time = second_slot.start_time, end_time = second_slot.end_time WHERE id = p_first_id;
-  UPDATE public.timetable_slots SET day_of_week = first_slot.day_of_week, period_number = first_slot.period_number,
-    start_time = first_slot.start_time, end_time = first_slot.end_time WHERE id = p_second_id;
+  SELECT * INTO first_slot
+  FROM public.timetable_slots
+  WHERE id = p_first_id AND school_id = p_school_id AND is_active = TRUE
+  FOR UPDATE;
+
+  SELECT * INTO second_slot
+  FROM public.timetable_slots
+  WHERE id = p_second_id AND school_id = p_school_id AND is_active = TRUE
+  FOR UPDATE;
+
+  IF first_slot.id IS NULL OR second_slot.id IS NULL OR first_slot.id = second_slot.id THEN
+    RAISE EXCEPTION 'Choose two different active timetable slots in this school.';
+  END IF;
+
+  SELECT
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_first_period_start, '13:00') ELSE COALESCE(s.first_period_start, '08:00') END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_period_minutes, 40) ELSE COALESCE(s.period_minutes, 40) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_after_period, 3) ELSE COALESCE(s.break_after_period, 3) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_minutes, 20) ELSE COALESCE(s.break_minutes, 20) END
+  INTO first_start, first_minutes, first_break_after, first_break_minutes
+  FROM public.classes c
+  LEFT JOIN public.timetable_settings s ON s.school_id = c.school_id
+  WHERE c.id = first_slot.class_id AND c.school_id = p_school_id;
+
+  SELECT
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_first_period_start, '13:00') ELSE COALESCE(s.first_period_start, '08:00') END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_period_minutes, 40) ELSE COALESCE(s.period_minutes, 40) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_after_period, 3) ELSE COALESCE(s.break_after_period, 3) END,
+    CASE WHEN COALESCE(c.shift, 1) = 2 THEN COALESCE(s.shift2_break_minutes, 20) ELSE COALESCE(s.break_minutes, 20) END
+  INTO second_start, second_minutes, second_break_after, second_break_minutes
+  FROM public.classes c
+  LEFT JOIN public.timetable_settings s ON s.school_id = c.school_id
+  WHERE c.id = second_slot.class_id AND c.school_id = p_school_id;
+
+  first_target_start :=
+    split_part(first_start, ':', 1)::INTEGER * 60
+    + split_part(first_start, ':', 2)::INTEGER
+    + (second_slot.period_number - 1) * first_minutes
+    + CASE WHEN second_slot.period_number > first_break_after THEN first_break_minutes ELSE 0 END;
+
+  second_target_start :=
+    split_part(second_start, ':', 1)::INTEGER * 60
+    + split_part(second_start, ':', 2)::INTEGER
+    + (first_slot.period_number - 1) * second_minutes
+    + CASE WHEN first_slot.period_number > second_break_after THEN second_break_minutes ELSE 0 END;
+
+  first_target_end := first_target_start + first_minutes;
+  second_target_end := second_target_start + second_minutes;
+
+  first_start_text := lpad((first_target_start / 60)::TEXT, 2, '0') || ':' || lpad((first_target_start % 60)::TEXT, 2, '0');
+  first_end_text := lpad((first_target_end / 60)::TEXT, 2, '0') || ':' || lpad((first_target_end % 60)::TEXT, 2, '0');
+  second_start_text := lpad((second_target_start / 60)::TEXT, 2, '0') || ':' || lpad((second_target_start % 60)::TEXT, 2, '0');
+  second_end_text := lpad((second_target_end / 60)::TEXT, 2, '0') || ':' || lpad((second_target_end % 60)::TEXT, 2, '0');
+
+  IF EXISTS (
+    SELECT 1 FROM public.timetable_slots other
+    WHERE other.school_id = p_school_id AND other.is_active = TRUE
+      AND other.id NOT IN (p_first_id, p_second_id)
+      AND other.day_of_week = second_slot.day_of_week
+      AND other.teacher_id = first_slot.teacher_id
+      AND first_start_text < other.end_time AND first_end_text > other.start_time
+  ) OR EXISTS (
+    SELECT 1 FROM public.timetable_slots other
+    WHERE other.school_id = p_school_id AND other.is_active = TRUE
+      AND other.id NOT IN (p_first_id, p_second_id)
+      AND other.day_of_week = first_slot.day_of_week
+      AND other.teacher_id = second_slot.teacher_id
+      AND second_start_text < other.end_time AND second_end_text > other.start_time
+  ) THEN
+    RAISE EXCEPTION 'The swap would create an overlapping teacher schedule.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.timetable_slots other
+    WHERE other.school_id = p_school_id AND other.is_active = TRUE
+      AND other.id NOT IN (p_first_id, p_second_id)
+      AND other.day_of_week = second_slot.day_of_week
+      AND NULLIF(BTRIM(first_slot.room_number), '') IS NOT NULL
+      AND LOWER(BTRIM(other.room_number)) = LOWER(BTRIM(first_slot.room_number))
+      AND first_start_text < other.end_time AND first_end_text > other.start_time
+  ) OR EXISTS (
+    SELECT 1 FROM public.timetable_slots other
+    WHERE other.school_id = p_school_id AND other.is_active = TRUE
+      AND other.id NOT IN (p_first_id, p_second_id)
+      AND other.day_of_week = first_slot.day_of_week
+      AND NULLIF(BTRIM(second_slot.room_number), '') IS NOT NULL
+      AND LOWER(BTRIM(other.room_number)) = LOWER(BTRIM(second_slot.room_number))
+      AND second_start_text < other.end_time AND second_end_text > other.start_time
+  ) THEN
+    RAISE EXCEPTION 'The swap would create an overlapping classroom reservation.';
+  END IF;
+
+  IF first_slot.day_of_week = second_slot.day_of_week
+    AND first_slot.teacher_id = second_slot.teacher_id
+    AND first_start_text < second_end_text AND first_end_text > second_start_text THEN
+    RAISE EXCEPTION 'The two swapped periods would overlap for the same teacher.';
+  END IF;
+
+  IF first_slot.day_of_week = second_slot.day_of_week
+    AND NULLIF(BTRIM(first_slot.room_number), '') IS NOT NULL
+    AND LOWER(BTRIM(first_slot.room_number)) = LOWER(BTRIM(second_slot.room_number))
+    AND first_start_text < second_end_text AND first_end_text > second_start_text THEN
+    RAISE EXCEPTION 'The two swapped periods would reserve the same room at overlapping times.';
+  END IF;
+
+  UPDATE public.timetable_slots SET
+    day_of_week = second_slot.day_of_week,
+    period_number = second_slot.period_number,
+    start_time = first_start_text,
+    end_time = first_end_text
+  WHERE id = p_first_id AND school_id = p_school_id;
+
+  UPDATE public.timetable_slots SET
+    day_of_week = first_slot.day_of_week,
+    period_number = first_slot.period_number,
+    start_time = second_start_text,
+    end_time = second_end_text
+  WHERE id = p_second_id AND school_id = p_school_id;
 END;
-$$;
-REVOKE ALL ON FUNCTION schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) TO service_role;
+$function$;
+
+REVOKE ALL ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_swap_timetable_slots(VARCHAR, VARCHAR, VARCHAR) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
 
@@ -3323,7 +3483,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;

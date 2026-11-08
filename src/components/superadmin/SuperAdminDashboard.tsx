@@ -46,9 +46,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="sa-page p-6 space-y-4">
         <div className="h-8 bg-slate-200 rounded w-1/4 animate-pulse"></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="sa-metrics-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-24 bg-white rounded-xl border border-slate-200 p-4 animate-pulse"></div>
           ))}
@@ -66,11 +66,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
   const needsAttention = Array.isArray(data.needsAttention) ? data.needsAttention : [];
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="sa-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="sa-hero flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
+          <h1 className="sa-page-title text-xl font-bold tracking-tight text-[#132A29]">
             Super Administrator Command Hub
           </h1>
           <p className="text-xs text-[#64748B]">
@@ -97,24 +97,24 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
       {metrics.totalSchools === 0 && <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-[#64748B]">No schools are registered yet.</div>}
 
       {/* 4 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+      <div className="sa-metrics-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="sa-metric-card bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between text-[#64748B]">
-            <span className="text-xs font-medium uppercase tracking-wider">Active Schools</span>
+            <span className="text-xs font-medium uppercase tracking-wider">Registered Schools</span>
             <Building2 className="w-4 h-4 text-[#0F766E]" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
               {metrics.totalSchools}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">+100% cloud</span>
+            <span className="text-xs text-emerald-600 font-medium">Platform-wide</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">
             {subscriptionCounts.active} Active · {subscriptionCounts.trial} Trial · {subscriptionCounts.read_only} Read-only
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+        <div className="sa-metric-card bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-xs font-medium uppercase tracking-wider">Total Enrolled Students</span>
             <GraduationCap className="w-4 h-4 text-[#0F766E]" />
@@ -123,12 +123,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <span className="text-2xl font-bold text-[#132A29] font-mono tabular-nums">
               {metrics.totalStudents ?? '—'}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">Across all campuses</span>
+            <span className="text-xs text-emerald-600 font-medium">Across all registered schools</span>
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">Multi-tenant student ledger</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+        <div className="sa-metric-card bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-xs font-medium uppercase tracking-wider">SaaS Revenue (This Month)</span>
             <DollarSign className="w-4 h-4 text-[#0F766E]" />
@@ -142,7 +142,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           <p className="text-[11px] text-[#64748B] mt-1">Platform subscription invoices</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+        <div className="sa-metric-card bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-xs font-medium uppercase tracking-wider">Open Support Tickets</span>
             <LifeBuoy className="w-4 h-4 text-amber-600" />
@@ -158,35 +158,38 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
       </div>
 
       {/* 6-Month SaaS Revenue Chart & Subscription Mix */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="sa-panels-grid grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0]">
+        <div className="sa-panel lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0]">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-bold text-[#132A29]">6-Month SaaS Platform Revenue</h2>
               <p className="text-[11px] text-[#64748B]">Subscription billing across all schools</p>
             </div>
             <span className="text-xs font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-1 rounded border border-[#CCFBF1]">
-              Live Invoices
+              Recorded Billing
             </span>
           </div>
 
-          <div className="h-44 flex items-end gap-4 pt-6 border-b border-[#E2E8F0] px-2">
+          <div className="sa-revenue-chart h-44 flex items-end gap-4 pt-6 border-b border-[#E2E8F0] px-2">
             {revenueTrend.map((m: any, idx: number) => {
-              const maxRev = Math.max(...revenueTrend.map((r: any) => r.revenue), 200);
-              const heightPercent = Math.max(12, Math.round((m.revenue / maxRev) * 100));
+              const revenueValues = revenueTrend.map((r: any) => Number(r?.revenue)).filter((value: number) => Number.isFinite(value) && value >= 0);
+              const maxRev = Math.max(...revenueValues, 200);
+              const revenue = Number(m?.revenue);
+              const safeRevenue = Number.isFinite(revenue) && revenue >= 0 ? revenue : 0;
+              const heightPercent = Math.max(12, Math.round((safeRevenue / maxRev) * 100));
 
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                   <span className="text-[10px] font-mono text-[#64748B] opacity-0 group-hover:opacity-100 transition-opacity">
-                    ${m.revenue}
+                    ${safeRevenue.toLocaleString()}
                   </span>
                   <div
                     style={{ height: `${heightPercent}%` }}
                     className="w-full bg-[#0F766E]/80 hover:bg-[#0F766E] rounded-t transition-all cursor-pointer relative"
                   />
                   <span className="text-[11px] text-[#64748B] font-medium truncate w-full text-center">
-                    {m.month.split(' ')[0]}
+                    {typeof m.month === 'string' ? m.month.split(' ')[0] : '—'}
                   </span>
                 </div>
               );
@@ -195,29 +198,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
         </div>
 
         {/* Subscription Status Breakdown */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] flex flex-col justify-between">
+        <div className="sa-panel bg-white p-5 rounded-xl border border-[#E2E8F0] flex flex-col justify-between">
           <div>
             <h2 className="text-sm font-bold text-[#132A29]">Tenant Health Overview</h2>
             <p className="text-[11px] text-[#64748B] mb-4">Lifecycle status breakdown</p>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+            <div className="sa-status-list space-y-2.5 text-xs">
+              <div className="sa-status-row flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#334155] font-medium">Active Subscriptions</span>
                 <span className="font-mono font-bold text-emerald-700">{subscriptionCounts.active}</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="sa-status-row flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#334155] font-medium">Trial Phase (7 Days)</span>
                 <span className="font-mono font-bold text-sky-700">{subscriptionCounts.trial}</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="sa-status-row flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#334155] font-medium">Grace Period</span>
                 <span className="font-mono font-bold text-amber-700">{subscriptionCounts.grace}</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="sa-status-row flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#334155] font-medium">Read-Only (Expired)</span>
                 <span className="font-mono font-bold text-rose-700">{subscriptionCounts.read_only}</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="sa-status-row flex items-center justify-between p-2 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#334155] font-medium">Suspended Access</span>
                 <span className="font-mono font-bold text-slate-700">{subscriptionCounts.suspended}</span>
               </div>
@@ -225,13 +228,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           </div>
 
           <div className="pt-4 border-t border-[#F1F5F9] text-[11px] text-[#64748B]">
-            Automated daily reconciliation daemon is running.
+            Subscription status reflects the latest data returned by the platform.
           </div>
         </div>
       </div>
 
       {/* Needs Attention Table */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
+      <div className="sa-panel sa-attention-panel bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
@@ -255,7 +258,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <p className="mt-0.5">No immediate trial expirations or grace period actions pending.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="sa-table-wrap overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                 <tr>
@@ -280,11 +283,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                         s.status === 'suspended' ? 'text-slate-800' :
                         'text-sky-700'
                       }`}>
-                        {s.status.toUpperCase()}
+                        {typeof s.status === 'string' ? s.status.replace(/_/g, ' ').toUpperCase() : 'UNKNOWN'}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-[#64748B]">
-                      {s.validUntil.split('T')[0]}
+                      {typeof s.validUntil === 'string' ? s.validUntil.split('T')[0] : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">

@@ -2040,8 +2040,25 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
     }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
     const examConfig = await db.getExamConfig(school.id, school.academicYear);
     const passMark = Number(examConfig.passMarkPercentage) || 50;
+    const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
+      queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
+      queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
+      queryAllRows('teachers', { school_id: school.id }, 'id,status')
+    ]);
+    const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
+    const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
+    const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
     const result: Record<string, unknown> = {
-      studentCount: Number(stats.totalStudents) || 0,
+      studentCount: Number(stats.totalStudents) || activeStudents.length,
+      teacherCount: activeTeachers.length,
+      studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
+      classEnrollment: activeClassRows.map((klass: any) => ({
+        classId: klass.id,
+        className: klass.name,
+        gradeLevel: klass.gradeLevel,
+        section: klass.section,
+        studentCount: activeStudents.filter((student: any) => student.classId === klass.id).length
+      })).sort((a: any, b: any) => Number(a.gradeLevel) - Number(b.gradeLevel) || String(a.className).localeCompare(String(b.className))),
       attendanceRate: Number(stats.attendanceRate) || 0,
       passRate: approvedMarks.length
         ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
@@ -2102,10 +2119,12 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
   const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
   if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+  const requestedShift = Number(req.body?.shift ?? 1);
+  if (![1, 2].includes(requestedShift)) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
   const gradeMismatch = classGradeMismatchError(req.body.name, Number(req.body.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  const newClass = db.createClass({ ...req.body, schoolId: school.id });
+  const newClass = db.createClass({ ...req.body, shift: requestedShift, schoolId: school.id });
   res.status(201).json(newClass);
 });
 
@@ -2122,6 +2141,11 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   if (req.body?.gradeLevel !== undefined) {
     const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
     if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+  }
+  if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
+  if (req.body?.shift !== undefined && Number(req.body.shift) !== Number(existing.shift || 1)) {
+    const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
+    if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
   }
   const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
@@ -2280,9 +2304,14 @@ async function queryAllRows(table: string, filters: Record<string, string | stri
   }
   return rows;
 }
-const getTimetablePeriodTimes = (settings: any, period: number) => {
-  const start = timetableMinutes(settings.firstPeriodStart || '08:00') + (period - 1) * Number(settings.periodMinutes || 40) + (period > Number(settings.breakAfterPeriod || 3) ? Number(settings.breakMinutes ?? 20) : 0);
-  return { startTime: timetableClock(start), endTime: timetableClock(start + Number(settings.periodMinutes || 40)) };
+const getTimetablePeriodTimes = (settings: any, period: number, shift: number = 1) => {
+  const afternoon = Number(shift) === 2;
+  const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart || '13:00' : settings.firstPeriodStart || '08:00';
+  const periodMinutes = Number(afternoon ? settings.shift2PeriodMinutes || 40 : settings.periodMinutes || 40);
+  const breakAfterPeriod = Number(afternoon ? settings.shift2BreakAfterPeriod || 3 : settings.breakAfterPeriod || 3);
+  const breakMinutes = Number(afternoon ? settings.shift2BreakMinutes ?? 20 : settings.breakMinutes ?? 20);
+  const start = timetableMinutes(firstPeriodStart) + (period - 1) * periodMinutes + (period > breakAfterPeriod ? breakMinutes : 0);
+  return { startTime: timetableClock(start), endTime: timetableClock(start + periodMinutes) };
 };
 const isSchoolAdmin = (user: User) => ['school_admin', 'super_admin'].includes(normalizeRole(user.role) || '');
 const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
@@ -2290,12 +2319,13 @@ const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
   const [subjects, teachers, classes] = await Promise.all([
     queryAllRows('subjects', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.subjectId))] }, 'id,name'),
     queryAllRows('teachers', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.teacherId))] }, 'id,full_name'),
-    queryAllRows('classes', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.classId))] }, 'id,name')
+    queryAllRows('classes', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.classId))] }, 'id,name,shift')
   ]);
   const subjectNames = new Map(subjects.map((item: any) => [item.id, item.name]));
   const teacherNames = new Map(teachers.map((item: any) => [item.id, item.fullName]));
   const classNames = new Map(classes.map((item: any) => [item.id, item.name]));
-  return slots.map(slot => ({ ...slot, subjectName: subjectNames.get(slot.subjectId) || slot.subjectId, teacherName: teacherNames.get(slot.teacherId) || '', className: classNames.get(slot.classId) || '' }));
+  const classShifts = new Map(classes.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
+  return slots.map(slot => ({ ...slot, shift: classShifts.get(slot.classId) || 1, subjectName: subjectNames.get(slot.subjectId) || slot.subjectId, teacherName: teacherNames.get(slot.teacherId) || '', className: classNames.get(slot.classId) || '' }));
 };
 
 apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
@@ -2540,11 +2570,16 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   ]);
   if (!klass || klass.isArchived || !subject.total || !teacher.total || !assignment.total) { res.status(400).json({ error: 'Class, subject, and teacher must belong to this school and match an active subject assignment.' }); return; }
   if (unavailable.total) { res.status(409).json({ error: 'This teacher is unavailable for that period.' }); return; }
-  if (existing.items.some((slot: any) => slot.classId !== classId && slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in that period.' }); return; }
+  const existingClassIds = [...new Set(existing.items.map((slot: any) => slot.classId).filter((id: string) => id !== String(classId)))];
+  const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
+  const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
+  const targetShift = Number(klass.shift) === 2 ? 2 : 1;
+  const sameShiftSlots = existing.items.filter((slot: any) => slot.classId !== classId && (shiftByClass.get(slot.classId) || 1) === targetShift);
+  if (sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
-  if (effectiveRoomNumber && existing.items.some((slot: any) => slot.classId !== classId && String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in that period.' }); return; }
+  if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period, Number(klass.shift) === 2 ? 2 : 1), subjectId: String(subjectId), teacherId: String(teacherId), roomNumber: effectiveRoomNumber };
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
   try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
@@ -2583,8 +2618,13 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     db.getTimetableSettings(school.id)
   ]);
   const existing = allSlots.filter((slot: any) => slot.classId !== classId);
-  const occupied = new Set(existing.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
-  const occupiedRooms = new Set(existing.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
+  const existingClassIds = [...new Set(existing.map((slot: any) => slot.classId))];
+  const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
+  const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
+  const targetShift = Number(klass.shift) === 2 ? 2 : 1;
+  const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+  const occupied = new Set(sameShiftExisting.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
+  const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
   const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
   const generated: TimetableSlot[] = [];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
@@ -2599,7 +2639,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
           if (day === 'Friday' && period === 6) continue;
           const key = `${day}:${period}:${assignment.teacherId}`;
           if (occupied.has(key) || blocked.has(key) || occupiedRooms.has(`${day}:${period}`) || generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)) continue;
-          generated.push({ id: `tt-${randomUUID()}`, schoolId: school.id, classId, dayOfWeek: day, periodNumber: period, ...getTimetablePeriodTimes(settings, period), subjectId: assignment.subjectId, teacherId: assignment.teacherId, roomNumber: klass.roomNumber || '' });
+          generated.push({ id: `tt-${randomUUID()}`, schoolId: school.id, classId, dayOfWeek: day, periodNumber: period, ...getTimetablePeriodTimes(settings, period, targetShift), subjectId: assignment.subjectId, teacherId: assignment.teacherId, roomNumber: klass.roomNumber || '' });
           occupied.add(key); load.set(`${assignment.subjectId}:${day}`, (load.get(`${assignment.subjectId}:${day}`) || 0) + 1); placed = true; break;
         }
         if (placed) break;
@@ -4516,7 +4556,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;
