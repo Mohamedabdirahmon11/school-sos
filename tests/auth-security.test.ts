@@ -93,11 +93,13 @@ test('password changes version signed sessions and revoke old SchoolOS sessions'
 });
 
 
-test('Auth-linked users update their own SchoolOS profile through the stable auth mapping', () => {
+test('users update RLS policy prevents authenticated self-promotion', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20261108090000_fix_auth_user_update_rls_and_fk_indexes.sql', import.meta.url), 'utf8');
   assert.match(migration, /DROP POLICY IF EXISTS users_update_scope/i);
-  assert.match(migration, /id::text = private\.auth_user_id\(\)/i);
-  assert.match(migration, /WITH CHECK[\s\S]*private\.auth_user_id\(\)/i);
+  assert.match(migration, /USING \(\(private\.auth_user_role\(\)\)::text = 'super_admin'\)/i);
+  assert.match(migration, /WITH CHECK \(\(private\.auth_user_role\(\)\)::text = 'super_admin'\)/i);
+  assert.doesNotMatch(migration, /id::text = private\.auth_user_id\(\)/i);
+  assert.doesNotMatch(migration, /GRANT UPDATE ON public\.users TO authenticated/i);
   assert.doesNotMatch(migration, /DROP TABLE|TRUNCATE TABLE|DELETE FROM public\.users/i);
 });
 
