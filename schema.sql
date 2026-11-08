@@ -177,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON school_subscriptions(stat
 -- 8. USERS (SUPER ADMIN, SCHOOL ADMIN, TEACHERS, ACCOUNTANTS, PARENTS, STUDENTS)
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(64) PRIMARY KEY,
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   school_id VARCHAR(64) REFERENCES schools(id) ON DELETE CASCADE,
   role user_role_enum NOT NULL,
   full_name VARCHAR(255) NOT NULL,
@@ -204,6 +205,23 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_login_at TIMESTAMPTZ
 );
+
+-- Additive bridge to Supabase Auth. Existing public.users IDs remain unchanged.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_user_id UUID;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'users_auth_user_id_fkey' AND conrelid = 'public.users'::regclass
+  ) THEN
+    ALTER TABLE public.users
+      ADD CONSTRAINT users_auth_user_id_fkey
+      FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+END
+$migration$;
+CREATE UNIQUE INDEX IF NOT EXISTS users_auth_user_id_uidx
+  ON users(auth_user_id) WHERE auth_user_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_users_school ON users(school_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -425,7 +443,13 @@ GRANT USAGE ON SCHEMA private TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION private.auth_user_id()
 RETURNS VARCHAR LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
-AS $$ SELECT COALESCE(pg_catalog.current_setting('request.jwt.claim.sub', true), auth.uid()::text); $$;
+AS $$
+  SELECT COALESCE(
+    (SELECT u.id FROM public.users AS u WHERE u.auth_user_id = auth.uid() LIMIT 1),
+    auth.uid()::text,
+    pg_catalog.current_setting('request.jwt.claim.sub', true)
+  );
+$$;
 CREATE OR REPLACE FUNCTION private.auth_school_id()
 RETURNS VARCHAR LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT COALESCE(pg_catalog.current_setting('request.jwt.claim.school_id', true),
