@@ -23,9 +23,11 @@ export const SupportAuditView: React.FC = () => {
   const [auditSearch, setAuditSearch] = useState('');
   const [auditCategory, setAuditCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const [tData, lData] = await Promise.all([
         ApiClient.getTickets({ page: ticketPage, pageSize: 20 }),
@@ -35,8 +37,8 @@ export const SupportAuditView: React.FC = () => {
       setLogs(lData);
       setTicketPageInfo((tData as any).pagination || null);
       setAuditPageInfo((lData as any).pagination || null);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setLoadError(err.message || 'Unable to load support tickets and audit records.');
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +87,13 @@ export const SupportAuditView: React.FC = () => {
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading support and security records…</div>;
+  if (loadError) return (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Support and audit records could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void fetchData()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
