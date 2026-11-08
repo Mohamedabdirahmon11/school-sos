@@ -1239,7 +1239,9 @@ class StorageEngine {
     if (matches.length !== 1) return null;
     const staff = matches[0];
     const account = await this.getUserById(staff.userId!, staff.schoolId);
-    return account && (account.role === 'teacher' || account.role === 'accountant') ? account : null;
+    return account && (account.role === 'teacher' || account.role === 'accountant')
+      ? { ...account, staffId: account.staffId || staff.staffId }
+      : null;
   }
 
   public async findUsersByPhoneInSchool(phone: string, schoolId: string): Promise<User[]> {
