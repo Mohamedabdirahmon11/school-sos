@@ -205,3 +205,14 @@ test('teacher legacy assignments are resolved only against the authenticated sch
   assert.match(apiSource, /school_id: school\.id, id: legacyClassIds, is_archived: 'false'/);
   assert.match(apiSource, /legacy-\$\{teacher\.id\}-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
+
+
+test('bulk academic year routes require Super Admin authorization and explicit confirmation', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/preview', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/apply', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
+  assert.match(apiSource, /if \(!updated\)[\s\S]*School no longer exists/);
+  assert.match(apiSource, /await db\.flush\(\);[\s\S]*res\.json\(\{ academicYear: targetYear, applied, skipped \}\)/);
+});
+
