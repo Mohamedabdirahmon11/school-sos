@@ -117,7 +117,8 @@ test('missing composite foreign-key indexes are added without dropping existing 
 
 test('Teacher ID lookup resolves linked active teacher staff records and rejects inactive staff', () => {
   const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
-  assert.match(storageSource, /direct\.role === 'accountant' \|\| direct\.role === 'teacher'/);
+  assert.match(storageSource, /user\.role === 'accountant' \|\| user\.role === 'teacher'/);
+  assert.match(storageSource, /isActiveStaffLoginAccount\(direct\)/);
   assert.match(storageSource, /record\.status !== 'active'/);
   assert.match(storageSource, /queryRows<Teacher>\('teachers', \{ school_id: user\.schoolId, user_id: user\.id \}\)/);
   assert.match(storageSource, /teacherProfiles\.length !== 1 \|\| teacherProfiles\[0\]\.status !== 'active'/);
