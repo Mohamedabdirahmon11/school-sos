@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS super_admin_settings (
   id VARCHAR(50) PRIMARY KEY DEFAULT 'default',
   trial_days INTEGER NOT NULL DEFAULT 7,
   grace_days INTEGER NOT NULL DEFAULT 7,
-  platform_currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  platform_currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   read_only_after_expiry BOOLEAN NOT NULL DEFAULT true,
   require_super_admin_2fa BOOLEAN NOT NULL DEFAULT false,
   lockout_threshold INTEGER NOT NULL DEFAULT 5,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS schools (
   terms JSONB NOT NULL DEFAULT '{"semester1Start": "", "semester1End": "", "semester2Start": "", "semester2End": ""}'::JSONB,
   grading_scale JSONB NOT NULL DEFAULT '[{"minPercentage": 90, "label": "A", "remark": "Excellent"}, {"minPercentage": 80, "label": "B", "remark": "Very good"}, {"minPercentage": 70, "label": "C", "remark": "Good"}, {"minPercentage": 60, "label": "D", "remark": "Satisfactory"}, {"minPercentage": 0, "label": "F", "remark": "Below pass mark"}]'::JSONB,
   attendance_rules JSONB NOT NULL DEFAULT '{"lateAfterMinutes": 15, "absentAfterMinutes": 0, "requireExcusedReason": true, "allowParentExcuses": false}'::JSONB,
-  class_levels JSONB NOT NULL DEFAULT '[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]'::JSONB,
+  class_levels JSONB NOT NULL DEFAULT '[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]'::JSONB,
   report_card_header TEXT NOT NULL DEFAULT '',
   report_card_footer TEXT NOT NULL DEFAULT '',
   receipt_header TEXT NOT NULL DEFAULT '',
@@ -794,7 +794,7 @@ CREATE TABLE IF NOT EXISTS subscription_invoices (
   plan plan_tier_enum NOT NULL,
   cadence subscription_cadence_enum NOT NULL,
   amount NUMERIC(10, 2) NOT NULL,
-  currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   issued_date DATE NOT NULL DEFAULT CURRENT_DATE,
   due_date DATE NOT NULL,
   paid_date DATE,
@@ -915,7 +915,7 @@ CREATE TABLE IF NOT EXISTS fee_ranges (
   min_grade INTEGER NOT NULL,
   max_grade INTEGER NOT NULL,
   amount NUMERIC(10,2) NOT NULL CHECK (amount >= 0),
-  currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   active BOOLEAN NOT NULL DEFAULT true
 );
 CREATE INDEX IF NOT EXISTS idx_fee_ranges_school_grades ON fee_ranges(school_id,min_grade,max_grade);
@@ -1721,7 +1721,7 @@ INSERT INTO super_admin_settings (
   session_timeout_minutes, log_security_events, backup_schedule, enabled_languages,
   academic_year_name, semester1_start, semester1_end, semester2_start, semester2_end
 ) VALUES (
-  'default', 7, 7, 'USD', true,
+  'default', 7, 7, 'ETB', true,
   false, 5, 15,
   60, true, 'daily', ARRAY['en', 'so'],
   '2026-2027', '2026-09-01', '2027-01-20', '2027-02-01', '2027-06-30'
@@ -1816,9 +1816,9 @@ NOTIFY pgrst, 'reload schema';
 -- Default Subscription Plans
 INSERT INTO plans (id, name, monthly_price, yearly_price, lifetime_price, modules, max_students, max_teachers, support_level)
 VALUES
-  ('basic', 'Basic', 39, 390, 1200, ARRAY['students', 'teachers', 'classes', 'attendance', 'fees', 'notices', 'reports'], 300, 20, 'community'),
-  ('standard', 'Standard', 89, 890, 2400, ARRAY['students', 'teachers', 'classes', 'subjects', 'timetable', 'attendance', 'exams', 'fees', 'notices', 'messages', 'admissions', 'report_cards'], 1000, 60, 'standard'),
-  ('premium', 'Premium Enterprise', 179, 1790, 4800, ARRAY['students', 'teachers', 'parents', 'classes', 'subjects', 'timetable', 'attendance', 'exams', 'assignments', 'fees', 'events', 'notices', 'messages', 'admissions', 'staff', 'reports', 'report_cards', 'settings', 'promotion', 'sms_templates'], 5000, 200, 'dedicated_24_7')
+  ('basic', 'Basic', 2000, 20000, 50000, ARRAY['students', 'teachers', 'classes', 'attendance', 'fees', 'notices', 'reports'], 1000, 20, 'community'),
+  ('standard', 'Standard', 14240, 142400, 384000, ARRAY['students', 'teachers', 'classes', 'subjects', 'timetable', 'attendance', 'exams', 'fees', 'notices', 'messages', 'admissions', 'report_cards'], 1000, 60, 'standard'),
+  ('premium', 'Premium Enterprise', 28640, 286400, 768000, ARRAY['students', 'teachers', 'parents', 'classes', 'subjects', 'timetable', 'attendance', 'exams', 'assignments', 'fees', 'events', 'notices', 'messages', 'admissions', 'staff', 'reports', 'report_cards', 'settings', 'promotion', 'sms_templates'], 5000, 200, 'dedicated_24_7')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION school_dashboard_summary(p_school_id character varying)
@@ -4049,3 +4049,16 @@ $function$;
 REVOKE ALL ON FUNCTION public.schoolos_publish_platform_broadcast(VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_publish_platform_broadcast(VARCHAR) TO service_role;
 NOTIFY pgrst, 'reload schema';
+
+
+-- ETB platform defaults and KG grade option (2026-11-08).
+ALTER TABLE public.super_admin_settings ALTER COLUMN platform_currency SET DEFAULT 'ETB';
+ALTER TABLE public.schools ALTER COLUMN currency SET DEFAULT 'ETB';
+ALTER TABLE public.subscription_invoices ALTER COLUMN currency SET DEFAULT 'ETB';
+ALTER TABLE public.fee_ranges ALTER COLUMN currency SET DEFAULT 'ETB';
+ALTER TABLE public.schools ALTER COLUMN class_levels
+  SET DEFAULT '[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]'::jsonb;
+UPDATE public.schools
+SET class_levels = jsonb_build_array(0) || COALESCE(class_levels, '[]'::jsonb)
+WHERE NOT COALESCE(class_levels, '[]'::jsonb) @> '[0]'::jsonb;
+
