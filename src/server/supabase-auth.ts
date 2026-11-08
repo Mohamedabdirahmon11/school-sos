@@ -80,9 +80,17 @@ export async function signInSchoolOSUser(
       email_confirm: true
     });
     if (error || !data.user) {
-      // Never guess-link an existing Auth identity by email. An administrator
-      // must resolve that exceptional collision explicitly.
-      throw new Error('This account needs administrator-assisted Supabase Auth linking before it can sign in.');
+      // A manually created Auth account is linked only after the submitted
+      // legacy credential also successfully authenticates that exact email.
+      const existingAuth = await authClient.auth.signInWithPassword({ email, password: authPassword });
+      if (existingAuth.error || !existingAuth.data.user || !existingAuth.data.session) {
+        throw new Error('This account needs administrator-assisted Supabase Auth linking before it can sign in.');
+      }
+      authUserId = existingAuth.data.user.id;
+      const linked = db.updateUser(user.id, { authUserId });
+      if (!linked) throw new Error('The SchoolOS account could not be linked to Supabase Auth.');
+      await db.flush();
+      return { session: existingAuth.data.session, authUserId };
     }
 
     authUserId = data.user.id;
