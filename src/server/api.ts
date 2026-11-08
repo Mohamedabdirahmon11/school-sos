@@ -1342,7 +1342,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
 
-  if (user.authUserId && user.role !== 'teacher') {
+  if (user.authUserId && !['teacher', 'parent', 'student'].includes(user.role)) {
     try {
       await updateSupabaseAuthPassword(user.authUserId, newPassword);
     } catch {
@@ -1370,7 +1370,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   });
 
   let refreshedAuthSession: Session | undefined;
-  if (updated.authUserId) {
+  if (updated.authUserId && !['parent', 'student'].includes(user.role)) {
     const authResult = await signInSchoolOSUser(updated, newPassword, 'password');
     if (!authResult) {
       res.status(503).json({ error: 'Password was changed, but the new Supabase Auth session could not be started. Sign in again with the new password.' });
