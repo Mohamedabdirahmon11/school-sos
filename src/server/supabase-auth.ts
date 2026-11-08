@@ -77,20 +77,41 @@ export async function signInSchoolOSUser(
     const { data, error } = await adminClient.auth.admin.createUser({
       email,
       password: authPassword,
-      email_confirm: true
+      email_confirm: true,
+      user_metadata: { schoolos_user_id: user.id, schoolos_role: user.role }
     });
     if (error || !data.user) {
-      // A manually created Auth account is linked only after the submitted
-      // legacy credential also successfully authenticates that exact email.
-      const existingAuth = await authClient.auth.signInWithPassword({ email, password: authPassword });
-      if (existingAuth.error || !existingAuth.data.user || !existingAuth.data.session) {
+      // Never attach an existing Auth identity based on email/password alone.
+      // Its server-managed metadata must already identify this exact SchoolOS user.
+      const existingAuth = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchingAuthUser = existingAuth.error
+        ? null
+        : existingAuth.data.users.find((candidate) =>
+            candidate.email?.toLowerCase() === email
+            && candidate.user_metadata?.schoolos_user_id === user.id
+          );
+      if (!matchingAuthUser) {
         throw new Error('This account needs administrator-assisted Supabase Auth linking before it can sign in.');
       }
-      authUserId = existingAuth.data.user.id;
+      authUserId = matchingAuthUser.id;
+      const synchronized = await adminClient.auth.admin.updateUserById(authUserId, {
+        password: authPassword,
+        user_metadata: {
+          ...matchingAuthUser.user_metadata,
+          schoolos_user_id: user.id,
+          schoolos_role: user.role
+        }
+      });
+      if (synchronized.error) throw new Error('The existing Supabase Auth identity could not be safely synchronized.');
+      const existingSession = await authClient.auth.signInWithPassword({ email, password: authPassword });
+      if (existingSession.error || !existingSession.data.user || !existingSession.data.session
+        || existingSession.data.user.id !== authUserId) {
+        throw new Error('This account needs administrator-assisted Supabase Auth linking before it can sign in.');
+      }
       const linked = db.updateUser(user.id, { authUserId });
       if (!linked) throw new Error('The SchoolOS account could not be linked to Supabase Auth.');
       await db.flush();
-      return { session: existingAuth.data.session, authUserId };
+      return { session: existingSession.data.session, authUserId };
     }
 
     authUserId = data.user.id;
