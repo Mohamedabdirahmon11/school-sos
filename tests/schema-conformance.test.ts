@@ -336,7 +336,7 @@ test('password reset migration is private, hashed, and session-versioned', () =>
 
 test('fresh-install dashboard aggregates match the applied attendance and voided-payment migration', () => {
   const dashboardMigration = readFileSync(new URL('../supabase/migrations/037_reports_exclude_voided_and_inactive_records.sql', import.meta.url), 'utf8');
-  const marker = '$function$\\n;';
+  const marker = '$function$\n;';
   const extract = (source: string) => {
     const start = source.indexOf('CREATE OR REPLACE FUNCTION public.school_dashboard_summary');
     const end = source.indexOf(marker, start);
@@ -346,8 +346,8 @@ test('fresh-install dashboard aggregates match the applied attendance and voided
   const schemaFunction = extract(sql);
   const migrationFunction = extract(dashboardMigration);
   assert.equal(schemaFunction, migrationFunction, 'fresh-install schema matches the applied dashboard migration');
-  assert.match(schemaFunction, /status IN \\('present', 'late'\\)/);
+  assert.match(schemaFunction, /status IN \('present', 'late'\)/);
   assert.match(schemaFunction, /status = 'excused'/);
-  assert.match(schemaFunction, /active_student\\.status = 'active'/);
+  assert.match(schemaFunction, /active_student\.status = 'active'/);
   assert.match(schemaFunction, /voided_at IS NULL/);
 });
