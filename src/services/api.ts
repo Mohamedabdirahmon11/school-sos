@@ -125,7 +125,7 @@ export class ApiClient {
         }
       });
     } catch (error) {
-      if (typeof window !== 'undefined' && endpoint !== '/auth/login') {
+      if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login') {
         window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 500, message: 'The server could not be reached.' } }));
       }
       throw error;
@@ -167,7 +167,7 @@ export class ApiClient {
 
   // Auth
   public static async login(credentials: {
-    role: UserRole;
+    role?: UserRole;
     email?: string;
     phone?: string;
     schoolCode?: string;
@@ -177,6 +177,23 @@ export class ApiClient {
     return this.request<any>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials)
+    });
+  }
+
+  public static async forgotPassword(email: string) {
+    return this.request<{ success: boolean; message: string; expiresInSeconds: number; retryAfterSeconds: number }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+      headers: this.hasLanguagePreference() ? { 'Accept-Language': this.getLanguage() } : undefined,
+      suppressGlobalApiError: true
+    });
+  }
+
+  public static async resetPassword(email: string, code: string, newPassword: string, confirmPassword: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword, confirmPassword }),
+      suppressGlobalApiError: true
     });
   }
 
@@ -491,7 +508,7 @@ export class ApiClient {
   }
 
   public static async generateTimetable(classId: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; warnings?: string[] }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
   }
 
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
@@ -499,23 +516,25 @@ export class ApiClient {
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
-    return this.request<{ success: boolean }>('/timetable/swap', { method: 'POST', body: JSON.stringify({ firstSlotId, secondSlotId }) });
+    return this.request<{ success: boolean; warnings?: string[] }>('/timetable/swap', { method: 'POST', body: JSON.stringify({ firstSlotId, secondSlotId }) });
   }
 
   public static async getTimetableSettings() {
-    return this.request<{ schoolId: string; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }>('/timetable/settings');
+    return this.request<{ schoolId: string; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number }>('/timetable/settings');
   }
 
-  public static async saveTimetableSettings(settings: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number }) {
+  public static async saveTimetableSettings(settings: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number }) {
     return this.request('/timetable/settings', { method: 'PUT', body: JSON.stringify(settings) });
   }
 
-  public static async getTeacherUnavailability(teacherId?: string) {
-    const query = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
-    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>(`/timetable/unavailability${query}`);
+  public static async getTeacherUnavailability(teacherId?: string, shift?: number) {
+    const params = new URLSearchParams();
+    if (teacherId) params.set('teacherId', teacherId);
+    if (shift) params.set('shift', String(shift));
+    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number; shift: number }>>(`/timetable/unavailability?${params.toString()}`);
   }
 
-  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number; unavailable: boolean }) {
+  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number; shift: number; unavailable: boolean }) {
     return this.request<{ success: boolean }>('/timetable/unavailability', { method: 'PUT', body: JSON.stringify(input) });
   }
 
