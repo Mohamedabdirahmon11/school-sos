@@ -222,3 +222,11 @@ test('bulk academic year routes require Super Admin authorization and explicit c
   assert.match(apiSource, /if \(!updated\)[\s\S]*School no longer exists/);
   assert.match(apiSource, /await db\.flush\(\);[\s\S]*res\.json\(\{ academicYear: targetYear, applied, skipped \}\)/);
 });
+
+
+test('bulk academic year preview warns about draft and published exams attached to another year', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /db\.getExamSchedules\(school\.id\)/);
+  assert.match(apiSource, /\['draft', 'published'\]\.includes\(String\(schedule\.status\)\)/);
+  assert.match(apiSource, /draft\/published exam schedule\(s\) still belong to another academic year/);
+});
