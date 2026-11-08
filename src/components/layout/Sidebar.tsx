@@ -109,8 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         { id: 'st_assignments', label: t('assignments'), icon: FileCheck2 },
         { id: 'st_results', label: t('exams_results'), icon: FileSpreadsheet },
         { id: 'st_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 'st_notices', label: noticeLabel, icon: BellRing }
-        ,{ id: 'st_messages', label: t('messages'), icon: MessageSquare }
+        { id: 'st_notices', label: noticeLabel, icon: BellRing },
+        { id: 'st_messages', label: t('messages'), icon: MessageSquare }
       ];
     }
 
@@ -125,29 +125,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
     // School Admin: grouped by daily workflow, with duplicate destinations removed.
     return [
-      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard, section: 'OVERVIEW' },
-      { id: 'sch_students', label: t('students'), icon: GraduationCap, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_teachers', label: t('teachers'), icon: UserCheck, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_parents', label: t('parents_contacts'), icon: PhoneCall, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_classes', label: `${t('classes')} & ${t('subjects')}`, icon: Layers, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_admissions', label: t('admissions'), icon: UserPlus, section: 'PEOPLE & ACADEMICS' },
-      { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays, section: 'COMMUNICATION' },
-      { id: 'sch_notices', label: noticeLabel, icon: BellRing, section: 'COMMUNICATION' },
-      { id: 'sch_messages', label: t('messages'), icon: MessageSquare, section: 'COMMUNICATION' },
-      { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard, section: 'MANAGEMENT' },
-      { id: 'sch_reports', label: t('reports_export'), icon: BarChart3, section: 'MANAGEMENT' },
-      { id: 'sch_report_cards', label: t('report_cards'), icon: FileText, section: 'MANAGEMENT' },
-      { id: 'sch_staff', label: t('staff_access'), icon: ShieldCheck, section: 'MANAGEMENT' },
-      { id: 'sch_settings', label: t('school_settings'), icon: Sliders, section: 'MANAGEMENT' },
-      { id: 'sch_library', label: t('library'), icon: Library, section: 'OTHER MODULES' },
-      { id: 'sch_transport', label: t('transport'), icon: Bus, section: 'OTHER MODULES' },
-      { id: 'sch_inventory', label: t('inventory'), icon: Boxes, section: 'OTHER MODULES' },
-      { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle, section: 'OTHER MODULES' },
-      { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse, section: 'OTHER MODULES' },
-      { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy, section: 'OTHER MODULES' }
+      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard, section: t('nav_overview') },
+      { id: 'sch_students', label: t('students'), icon: GraduationCap, section: t('nav_people_academics') },
+      { id: 'sch_teachers', label: t('teachers'), icon: UserCheck, section: t('nav_people_academics') },
+      { id: 'sch_parents', label: t('parents_contacts'), icon: PhoneCall, section: t('nav_people_academics') },
+      { id: 'sch_classes', label: `${t('classes')} & ${t('subjects')}`, icon: Layers, section: t('nav_people_academics') },
+      { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays, section: t('nav_people_academics') },
+      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck, section: t('nav_people_academics') },
+      { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet, section: t('nav_people_academics') },
+      { id: 'sch_admissions', label: t('admissions'), icon: UserPlus, section: t('nav_people_academics') },
+      { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays, section: t('nav_communication') },
+      { id: 'sch_notices', label: noticeLabel, icon: BellRing, section: t('nav_communication') },
+      { id: 'sch_messages', label: t('messages'), icon: MessageSquare, section: t('nav_communication') },
+      { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard, section: t('nav_management') },
+      { id: 'sch_reports', label: t('reports_export'), icon: BarChart3, section: t('nav_management') },
+      { id: 'sch_report_cards', label: t('report_cards'), icon: FileText, section: t('nav_management') },
+      { id: 'sch_promotion', label: t('year_end_promotion'), icon: GraduationCap, section: t('nav_management') },
+      { id: 'sch_staff', label: t('staff_access'), icon: ShieldCheck, section: t('nav_management') },
+      { id: 'sch_settings', label: t('school_settings'), icon: Sliders, section: t('nav_management') },
+      { id: 'sch_library', label: t('library'), icon: Library, section: t('nav_other_modules') },
+      { id: 'sch_transport', label: t('transport'), icon: Bus, section: t('nav_other_modules') },
+      { id: 'sch_inventory', label: t('inventory'), icon: Boxes, section: t('nav_other_modules') },
+      { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle, section: t('nav_other_modules') },
+      { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse, section: t('nav_other_modules') },
+      { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy, section: t('nav_other_modules') }
     ];
   };
 
