@@ -156,7 +156,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               />
               <PasswordInput
                 label="confirm new password"
-                minLength={6}
+                minLength={12} maxLength={128}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Repeat your secure password"
