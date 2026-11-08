@@ -351,12 +351,18 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id');
+  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id,assigned_classes');
   if (!teacher.items.length) return [];
-  const assignments = await queryAllRows('class_subjects', {
-    school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true'
-  }, 'class_id');
-  return [...new Set(assignments.map((assignment: any) => assignment.classId))];
+  const [assignments, legacyClasses] = await Promise.all([
+    queryAllRows('class_subjects', { school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true' }, 'class_id'),
+    Array.isArray(teacher.items[0].assignedClasses) && teacher.items[0].assignedClasses.length
+      ? db.queryPage('classes', { school_id: schoolId, id: teacher.items[0].assignedClasses, is_archived: 'false' }, 1, 100, undefined, 'id')
+      : Promise.resolve({ items: [] as any[], total: 0 })
+  ]);
+  return [...new Set([
+    ...assignments.map((assignment: any) => assignment.classId),
+    ...legacyClasses.items.map((klass: any) => klass.id)
+  ])];
 }
 
 async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]> {
@@ -1349,6 +1355,14 @@ apiRouter.post('/auth/2fa/disable', requireAuth, requireSuperAdmin, (req, res) =
 // Force Password Change endpoint (hashes new password with scrypt)
 apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
+  if (['parent', 'student'].includes(user.role)) {
+    res.status(403).json({ error: 'Parent and student accounts use PIN sign-in. Ask your School Admin to reset your PIN.' });
+    return;
+  }
+  if (!user.mustChangePassword) {
+    res.status(403).json({ error: 'Use your profile settings to change an existing password.' });
+    return;
+  }
   const { newPassword } = req.body;
 
   const passwordError = passwordPolicyError(newPassword);
@@ -1409,13 +1423,20 @@ apiRouter.get('/auth/me', requireAuth, async (req, res) => {
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   const { fullName, email, phone, currentPassword, newPassword } = req.body || {};
+  if (newPassword && ['parent', 'student'].includes(user.role)) {
+    res.status(403).json({ error: 'Parent and student accounts use PIN sign-in. Ask your School Admin to reset your PIN.' });
+    return;
+  }
   if (typeof fullName !== 'string' || fullName.trim().length < 2) { res.status(400).json({ error: 'Full name must contain at least two characters.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
   if (newPassword !== undefined && newPassword !== '') {
     const passwordError = passwordPolicyError(newPassword);
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
-    if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
+    const validCurrentCredential = typeof currentPassword === 'string' && (user.role === 'teacher'
+      ? verifyPassword(currentPassword, user.passwordHash) || verifyPin(currentPassword, String(user.pin || ''))
+      : verifyPassword(currentPassword, user.passwordHash));
+    if (!validCurrentCredential) { res.status(400).json({ error: user.role === 'teacher' ? 'Current password or PIN is incorrect.' : 'Current password is incorrect.' }); return; }
   }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
@@ -2531,21 +2552,53 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes,assigned_subjects');
   if (!teacherPage.items.length) { res.json([]); return; }
-  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacherPage.items[0].id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
-  if (!assignments.items.length) { res.json([]); return; }
+  const teacher = teacherPage.items[0];
+  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
+  if (assignments.items.length) {
+    const [subjectRows, classRows] = await Promise.all([
+      db.queryPage('subjects', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.subjectId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
+      db.queryPage('classes', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.classId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
+    ]);
+    const subjectsById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
+    const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
+    res.json(assignments.items.flatMap((item: any) => {
+      const subject = subjectsById.get(item.subjectId);
+      const klass = classesById.get(item.classId);
+      return subject && klass ? [{ ...item, subject, class: klass }] : [];
+    }));
+    return;
+  }
+
+  // Older teacher records store class/subject IDs directly on the teacher row.
+  // Resolve them within this school only; never broaden access to all school subjects.
+  const legacyClassIds: string[] = Array.isArray(teacher.assignedClasses)
+    ? [...new Set((teacher.assignedClasses as unknown[]).filter((id): id is string => typeof id === 'string'))]
+    : [];
+  const legacySubjectIds: string[] = Array.isArray(teacher.assignedSubjects)
+    ? [...new Set((teacher.assignedSubjects as unknown[]).filter((id): id is string => typeof id === 'string'))]
+    : [];
+  if (!legacyClassIds.length || !legacySubjectIds.length) { res.json([]); return; }
   const [subjectRows, classRows] = await Promise.all([
-    db.queryPage('subjects', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.subjectId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
-    db.queryPage('classes', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.classId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
+    db.queryPage('subjects', { school_id: school.id, id: legacySubjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
+    db.queryPage('classes', { school_id: school.id, id: legacyClassIds, is_archived: 'false' }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
   ]);
-  const subjectsById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
   const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
-  res.json(assignments.items.flatMap((item: any) => {
-    const subject = subjectsById.get(item.subjectId);
-    const klass = classesById.get(item.classId);
-    return subject && klass ? [{ ...item, subject, class: klass }] : [];
-  }));
+  const legacyAssignments = classRows.items.flatMap((klass: any) => subjectRows.items.map((subject: any) => ({
+    id: `legacy-${teacher.id}-${klass.id}-${subject.id}`,
+    schoolId: school.id,
+    teacherId: teacher.id,
+    classId: klass.id,
+    subjectId: subject.id,
+    periodsPerWeek: 1,
+    smallExamEnabled: false,
+    bigExamEnabled: false,
+    isActive: true,
+    subject,
+    class: classesById.get(klass.id)
+  })));
+  res.json(legacyAssignments);
 });
 
 apiRouter.post('/subjects', requireAuth, requireSchoolContext, (req, res) => {
