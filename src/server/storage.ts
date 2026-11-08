@@ -600,7 +600,7 @@ class StorageEngine {
         this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => {
           // fromSupabaseRow maps attempt_count to `count`; never read the
           // non-existent `attemptCount` property or NaN will persist as NULL.
-          const count = Number(row.count);
+          const count = Number(row.count ?? row.attemptCount ?? 0);
           return [row.id, {
             count: Number.isSafeInteger(count) && count >= 0 ? count : 0,
             firstFailedAt: new Date(row.firstFailedAt).getTime(),
