@@ -1590,6 +1590,90 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, (req, res)
   res.json(updated);
 });
 
+const bulkAcademicYearSchema = z.object({
+  academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.').refine(value => {
+    const [start, end] = value.split('-').map(Number);
+    return end === start + 1;
+  }, 'Academic year must cover two consecutive years.'),
+  confirm: z.string().optional(),
+  includeWarned: z.boolean().optional()
+});
+
+async function buildBulkAcademicYearPreview(targetYear: string) {
+  const schools = await db.getSchools();
+  const targetStart = Number(targetYear.slice(0, 4));
+  return schools.map(school => {
+    const current = String((school as any).academicYear || '');
+    const currentStart = /^\d{4}-\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
+    let status: 'change' | 'unchanged' | 'warning' = 'change';
+    let warning = '';
+    if (current === targetYear) status = 'unchanged';
+    else if (currentStart !== null && targetStart < currentStart) {
+      status = 'warning';
+      warning = 'Target year is earlier than the current year of this school.';
+    }
+    return { id: school.id, name: school.name, code: (school as any).code || '', currentAcademicYear: current || null, status, warning };
+  });
+}
+
+apiRouter.post('/superadmin/academic-year/preview', requireAuth, requireSuperAdmin, async (req, res) => {
+  const parsed = bulkAcademicYearSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid academic year.' });
+    return;
+  }
+  const rows = await buildBulkAcademicYearPreview(parsed.data.academicYear);
+  res.json({ academicYear: parsed.data.academicYear, schools: rows });
+});
+
+apiRouter.post('/superadmin/academic-year/apply', requireAuth, requireSuperAdmin, async (req, res) => {
+  const parsed = bulkAcademicYearSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid academic year.' });
+    return;
+  }
+  if (parsed.data.confirm !== 'CONFIRM') {
+    res.status(400).json({ error: 'Type CONFIRM to apply the academic year to all schools.' });
+    return;
+  }
+
+  const targetYear = parsed.data.academicYear;
+  const rows = await buildBulkAcademicYearPreview(targetYear);
+  const actor = (req as any).user as User;
+  let applied = 0;
+  const skipped: Array<{ id: string; name: string; reason: string }> = [];
+
+  for (const row of rows) {
+    if (row.status === 'unchanged') continue;
+    if (row.status === 'warning' && !parsed.data.includeWarned) {
+      skipped.push({ id: row.id, name: row.name, reason: row.warning });
+      continue;
+    }
+
+    const updated = db.updateSchool(row.id, { academicYear: targetYear } as any);
+    if (!updated) {
+      skipped.push({ id: row.id, name: row.name, reason: 'School no longer exists; no change was made.' });
+      continue;
+    }
+
+    db.logAudit({
+      action: 'SCHOOL_ACADEMIC_YEAR_BULK_UPDATED',
+      category: 'subscription',
+      schoolId: row.id,
+      schoolName: row.name,
+      userId: actor.id,
+      userName: actor.fullName,
+      userRole: 'super_admin',
+      details: `Academic year changed from ${row.currentAcademicYear || 'none'} to ${targetYear} by bulk Super Admin action.`,
+      severity: 'warning'
+    });
+    applied += 1;
+  }
+
+  await db.flush();
+  res.json({ academicYear: targetYear, applied, skipped });
+});
+
 apiRouter.get('/superadmin/plans', requireAuth, requireSuperAdmin, (_req, res) => {
   res.json(db.getPlans());
 });
