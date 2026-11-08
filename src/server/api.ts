@@ -2043,14 +2043,15 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
     const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
       queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
       queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
-      queryAllRows('teachers', { school_id: school.id }, 'id')
+      queryAllRows('teachers', { school_id: school.id }, 'id,status')
     ]);
     const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
+    const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
     const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
     const result: Record<string, unknown> = {
       studentCount: Number(stats.totalStudents) || activeStudents.length,
-      teacherCount: schoolTeachers.length,
-      studentTeacherRatio: schoolTeachers.length ? Number((activeStudents.length / schoolTeachers.length).toFixed(1)) : null,
+      teacherCount: activeTeachers.length,
+      studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
       classEnrollment: activeClassRows.map((klass: any) => ({
         classId: klass.id,
         className: klass.name,
