@@ -123,8 +123,8 @@ test('Teacher ID lookup resolves linked active teacher staff records and rejects
 
 test('existing Supabase Auth identities require an exact SchoolOS metadata mapping before linking', () => {
   const authSource = readFileSync(new URL('../src/server/supabase-auth.ts', import.meta.url), 'utf8');
-  assert.match(authSource, /user_metadata: \{ schoolos_user_id: user\.id, schoolos_role: user\.role \}/);
-  assert.match(authSource, /candidate\.user_metadata\?\.schoolos_user_id === user\.id/);
+  assert.match(authSource, /app_metadata: \{ schoolos_user_id: user\.id, schoolos_role: user\.role \}/);
+  assert.match(authSource, /candidate\.app_metadata\?\.schoolos_user_id === user\.id/);
   assert.match(authSource, /candidate\.email\?\.toLowerCase\(\) === email/);
   assert.match(authSource, /admin\.updateUserById\(authUserId, \{/);
   assert.doesNotMatch(authSource, /signInWithPassword\(\{ email, password: authPassword \}\);\s*if \(existingAuth\.error/);
