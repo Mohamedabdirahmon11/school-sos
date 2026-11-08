@@ -46,7 +46,31 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
 
   const formatBreadcrumb = () => {
     const roleLabel = user ? t(user.role as any) : '';
-    const section = currentView.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const labels: Record<string, string> = {
+      sa_dashboard: t('dashboard'), sa_schools: t('schools'), sa_plans: t('plans_billing'),
+      sa_users: t('users'), sa_analytics: t('analytics'), sa_broadcasts: t('broadcasts'),
+      sa_support: t('support_audit'), sa_settings: t('platform_settings'),
+      sch_dashboard: t('dashboard'), sch_students: t('students'), sch_teachers: t('teachers'),
+      sch_parents: t('parents_contacts'), sch_classes: `${t('classes')} & ${t('subjects')}`,
+      sch_subjects: `${t('classes')} & ${t('subjects')}`, sch_timetable: t('timetable'),
+      sch_attendance: t('attendance'), sch_exams: t('exams_results'), sch_fees: t('fees_payments'),
+      sch_promotion: 'Year-end Promotion', sch_events: t('events_holidays'),
+      sch_notices: t('notice_board'), sch_messages: t('messages'), sch_staff: t('staff_access'),
+      sch_reports: t('reports_export'), sch_report_cards: t('report_cards'),
+      sch_admissions: t('admissions'), sch_settings: t('school_settings'),
+      sch_library: t('library'), sch_transport: t('transport'), sch_inventory: t('inventory'),
+      sch_discipline: t('discipline'), sch_health: t('health_nurse'), sch_support: t('help_support'),
+      acc_dashboard: t('dashboard'), sch_payroll: t('payroll_management'),
+      t_dashboard: t('dashboard'), t_timetable: t('timetable'), t_attendance: t('attendance'),
+      t_grades: t('exams_results'), t_assignments: t('assignments'), t_notices: t('notice_board'),
+      t_messages: t('messages'), t_payslips: t('payroll_payslip'),
+      p_overview: t('dashboard'), p_attendance: t('attendance'), p_results: t('exams_results'),
+      p_fees: t('fees_payments'), p_notices: t('notice_board'), p_messages: t('messages'),
+      st_dashboard: t('dashboard'), st_timetable: t('timetable'), st_assignments: t('assignments'),
+      st_results: t('exams_results'), st_attendance: t('attendance'), st_notices: t('notice_board'),
+      st_messages: t('messages')
+    };
+    const section = labels[currentView] || currentView.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return `${roleLabel} / ${section}`;
   };
 
