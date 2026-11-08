@@ -78,7 +78,7 @@ export async function signInSchoolOSUser(
       email,
       password: authPassword,
       email_confirm: true,
-      user_metadata: { schoolos_user_id: user.id, schoolos_role: user.role }
+      app_metadata: { schoolos_user_id: user.id, schoolos_role: user.role }
     });
     if (error || !data.user) {
       // Never attach an existing Auth identity based on email/password alone.
@@ -88,7 +88,7 @@ export async function signInSchoolOSUser(
         ? null
         : existingAuth.data.users.find((candidate) =>
             candidate.email?.toLowerCase() === email
-            && candidate.user_metadata?.schoolos_user_id === user.id
+            && candidate.app_metadata?.schoolos_user_id === user.id
           );
       if (!matchingAuthUser) {
         throw new Error('This account needs administrator-assisted Supabase Auth linking before it can sign in.');
@@ -97,7 +97,7 @@ export async function signInSchoolOSUser(
       const synchronized = await adminClient.auth.admin.updateUserById(authUserId, {
         password: authPassword,
         user_metadata: {
-          ...matchingAuthUser.user_metadata,
+          ...matchingAuthUser.app_metadata,
           schoolos_user_id: user.id,
           schoolos_role: user.role
         }
