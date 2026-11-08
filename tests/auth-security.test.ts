@@ -117,6 +117,7 @@ test('Teacher ID lookup resolves linked active teacher staff records and rejects
   const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   assert.match(storageSource, /direct\.role === 'accountant' \|\| direct\.role === 'teacher'/);
   assert.match(storageSource, /record\.status !== 'active'/);
+  assert.match(storageSource, /account\.role === 'accountant' \|\| account\.role === 'teacher'/);
   assert.match(storageSource, /account\.role === 'teacher' \|\| account\.role === 'accountant'/);
 });
 
