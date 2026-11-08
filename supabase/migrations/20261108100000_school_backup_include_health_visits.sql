@@ -1,4 +1,4 @@
--- Extend safe school backup restore to include clinic visit records.
+-- Extend safe school backup restore with all current academic modules and safe school profile settings.
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.schoolos_backup_json_snake(p_row JSONB)
