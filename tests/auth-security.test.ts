@@ -91,3 +91,24 @@ test('password changes version signed sessions and revoke old SchoolOS sessions'
   assert.match(apiSource, /await revokeUserSessions\(user\.id, user\.schoolId\)/);
   assert.match(apiSource, /await revokeUserSessions\(targetUser\.id, targetUser\.schoolId\)/);
 });
+
+
+test('Auth-linked users update their own SchoolOS profile through the stable auth mapping', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261108090000_fix_auth_user_update_rls_and_fk_indexes.sql', import.meta.url), 'utf8');
+  assert.match(migration, /DROP POLICY IF EXISTS users_update_scope/i);
+  assert.match(migration, /id::text = private\.auth_user_id\(\)/i);
+  assert.match(migration, /WITH CHECK[\s\S]*private\.auth_user_id\(\)/i);
+  assert.doesNotMatch(migration, /DROP TABLE|TRUNCATE TABLE|DELETE FROM public\.users/i);
+});
+
+test('missing composite foreign-key indexes are added without dropping existing indexes', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261108090000_fix_auth_user_update_rls_and_fk_indexes.sql', import.meta.url), 'utf8');
+  for (const indexName of [
+    'idx_exam_schedules_class_school_fk',
+    'idx_exam_schedules_subject_school_fk',
+    'idx_exam_seats_schedule_school_fk',
+    'idx_exam_seats_student_school_fk',
+    'idx_school_health_visits_recorded_by_fk'
+  ]) assert.match(migration, new RegExp('CREATE INDEX IF NOT EXISTS ' + indexName));
+  assert.doesNotMatch(migration, /DROP INDEX/i);
+});
