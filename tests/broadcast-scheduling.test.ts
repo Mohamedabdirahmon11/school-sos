@@ -6,6 +6,7 @@ const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/superadmin/BroadcastsView.tsx', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/20261108182000_platform_broadcast_notice_fanout_hardening.sql', import.meta.url), 'utf8');
 
 test('scheduled broadcasts are checked immediately and periodically by the server', () => {
   assert.match(server, /prepareRequestContext\(false, 'broadcast-scheduler'\)/);
@@ -18,8 +19,10 @@ test('scheduled broadcasts are checked immediately and periodically by the serve
 test('due broadcasts publish once and create a system audit record', () => {
   assert.match(storage, /queryRows<PlatformBroadcast>\('platform_broadcasts', \{ status: 'scheduled' \}\)/);
   assert.match(storage, /Date\.parse\(item\.scheduledFor\) > now/);
-  assert.match(storage, /\.in\('status', \['draft','scheduled'\]\)/);
+  assert.match(storage, /rpc\('schoolos_publish_platform_broadcast', \{ p_broadcast_id: id \}\)/);
   assert.match(storage, /PLATFORM_BROADCAST_AUTO_PUBLISHED/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.schoolos_publish_platform_broadcast/);
+  assert.match(migration, /ON CONFLICT \(id\) DO NOTHING/);
   assert.match(storage, /SchoolOS Scheduler/);
 });
 
