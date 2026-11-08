@@ -2498,8 +2498,12 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
 
   // Older teacher records store class/subject IDs directly on the teacher row.
   // Resolve them within this school only; never broaden access to all school subjects.
-  const legacyClassIds = Array.isArray(teacher.assignedClasses) ? [...new Set(teacher.assignedClasses.filter((id: unknown) => typeof id === 'string'))] : [];
-  const legacySubjectIds = Array.isArray(teacher.assignedSubjects) ? [...new Set(teacher.assignedSubjects.filter((id: unknown) => typeof id === 'string'))] : [];
+  const legacyClassIds: string[] = Array.isArray(teacher.assignedClasses)
+    ? [...new Set((teacher.assignedClasses as unknown[]).filter((id): id is string => typeof id === 'string'))]
+    : [];
+  const legacySubjectIds: string[] = Array.isArray(teacher.assignedSubjects)
+    ? [...new Set((teacher.assignedSubjects as unknown[]).filter((id): id is string => typeof id === 'string'))]
+    : [];
   if (!legacyClassIds.length || !legacySubjectIds.length) { res.json([]); return; }
   const [subjectRows, classRows] = await Promise.all([
     db.queryPage('subjects', { school_id: school.id, id: legacySubjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
