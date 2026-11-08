@@ -442,7 +442,7 @@ export interface AuditLog {
 export interface SuperAdminSettings {
   trialDays: number; // default 7
   graceDays: number; // default 7
-  platformCurrency: string; // default "USD"
+  platformCurrency: string; // default "ETB"
   readOnlyAfterExpiry: boolean; // default true
   requireSuperAdmin2FA: boolean; // default false
   lockoutThreshold: number; // default 5 attempts
