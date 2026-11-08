@@ -5097,7 +5097,6 @@ apiRouter.post('/superadmin/admins', requireAuth, requireSuperAdmin, async (req,
     isBlocked: false,
     failedLoginAttempts: 0
   } as any);
-  await db.flush();
   const actor = (req as any).user;
   db.logAudit({
     action: 'SUPER_ADMIN_CREATED',
@@ -5108,6 +5107,8 @@ apiRouter.post('/superadmin/admins', requireAuth, requireSuperAdmin, async (req,
     details: `Super Admin account created for ${email}. A temporary password was issued and must be changed at first login.`,
     severity: 'critical'
   });
+  // Wait for both the new account and its audit event to reach Supabase before responding.
+  await db.flush();
   res.status(201).json({ user: sanitizeUser(created), temporaryPassword, mustChangePassword: true });
 });
 
