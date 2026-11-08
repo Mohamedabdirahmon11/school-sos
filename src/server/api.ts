@@ -1602,18 +1602,34 @@ const bulkAcademicYearSchema = z.object({
 async function buildBulkAcademicYearPreview(targetYear: string) {
   const schools = await db.getSchools();
   const targetStart = Number(targetYear.slice(0, 4));
-  return schools.map(school => {
+  return Promise.all(schools.map(async school => {
     const current = String((school as any).academicYear || '');
     const currentStart = /^\d{4}-\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
-    let status: 'change' | 'unchanged' | 'warning' = 'change';
-    let warning = '';
-    if (current === targetYear) status = 'unchanged';
-    else if (currentStart !== null && targetStart < currentStart) {
-      status = 'warning';
-      warning = 'Target year is earlier than the current year of this school.';
+    const warnings: string[] = [];
+    if (current !== targetYear) {
+      if (currentStart !== null && targetStart < currentStart) {
+        warnings.push('Target year is earlier than the current year of this school.');
+      }
+      const schedules = await db.getExamSchedules(school.id);
+      const activeOtherYearExams = schedules.filter(schedule =>
+        ['draft', 'published'].includes(String(schedule.status)) && String(schedule.academicYear || '') !== targetYear
+      );
+      if (activeOtherYearExams.length) {
+        warnings.push(`${activeOtherYearExams.length} draft/published exam schedule(s) still belong to another academic year.`);
+      }
     }
-    return { id: school.id, name: school.name, code: (school as any).code || '', currentAcademicYear: current || null, status, warning };
-  });
+    const status: 'change' | 'unchanged' | 'warning' = current === targetYear
+      ? 'unchanged'
+      : warnings.length ? 'warning' : 'change';
+    return {
+      id: school.id,
+      name: school.name,
+      code: (school as any).code || '',
+      currentAcademicYear: current || null,
+      status,
+      warning: warnings.join(' ')
+    };
+  }));
 }
 
 apiRouter.post('/superadmin/academic-year/preview', requireAuth, requireSuperAdmin, async (req, res) => {
@@ -3863,6 +3879,34 @@ apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requ
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid exam configuration.' });
   }
+});
+
+apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  let allowedClassIds: Set<string> | null = null;
+
+  if (user.role === 'school_admin' || user.role === 'super_admin' || user.role === 'accountant') {
+    allowedClassIds = null;
+  } else if (user.role === 'student' || user.role === 'parent' || user.role === 'teacher') {
+    allowedClassIds = new Set(await getNoticeClassIds(school.id, user));
+  } else {
+    allowedClassIds = new Set();
+  }
+
+  const [allSchedules, classes, subjects] = await Promise.all([
+    db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
+  ]);
+  const schedules = allowedClassIds === null
+    ? allSchedules
+    : allSchedules.filter(schedule => allowedClassIds!.has(schedule.classId));
+  const classNames = new Map(classes.map(item => [item.id, item.name]));
+  const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
+  res.json(schedules.map(schedule => ({
+    ...schedule,
+    className: classNames.get(schedule.classId) || schedule.classId,
+    subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
+  })));
 });
 
 apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {

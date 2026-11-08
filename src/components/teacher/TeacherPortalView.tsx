@@ -62,6 +62,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const notices: SchoolNotice[] = Array.isArray(noticesData) ? noticesData : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
+  const publishedExamSchedulesState = useApi(
+    () => ApiClient.getPublishedExamSchedules(),
+    [school?.id, user?.id],
+    Boolean(school && classes.length)
+  );
+  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
+
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [assignmentDescription, setAssignmentDescription] = useState('');
   const [assignmentDueDate, setAssignmentDueDate] = useState('');
@@ -641,6 +648,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[#475569]">{item.description}</p>
               <p className="text-[11px] text-[#64748B]">{item.subjectName || item.subjectId} • {item.maxPoints} points</p>
             </div>)}</div>}
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+            <h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2>
+            {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-xs text-[#64748B]">No published exam schedules for your assigned classes.</p> : publishedExamSchedules.map((exam: any) => (
+              <div key={exam.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+                <p className="font-bold text-[#132A29]">{exam.examName} · {exam.className} · {exam.subjectName}</p>
+                <p className="mt-1 text-[#475569]">{exam.examDate} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)} · Room {exam.roomName}</p>
+              </div>
+            ))}
           </div>
 
           <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
