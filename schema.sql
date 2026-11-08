@@ -2805,9 +2805,26 @@ AS $function$
             FROM public.attendance_records
             WHERE school_id = p_school_id
               AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
-              AND status = 'present'
+              AND status IN ('present', 'late')
+              AND EXISTS (
+                SELECT 1 FROM public.students AS active_student
+                WHERE active_student.id = public.attendance_records.student_id
+                  AND active_student.school_id = p_school_id
+                  AND active_student.status = 'active'
+              )
           )::NUMERIC * 100
-          / (SELECT COUNT(*) FROM public.students WHERE school_id = p_school_id AND status = 'active')
+          / GREATEST(1,
+            (SELECT COUNT(*) FROM public.students WHERE school_id = p_school_id AND status = 'active')
+            - (SELECT COUNT(*) FROM public.attendance_records
+               WHERE school_id = p_school_id
+                 AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
+                 AND status = 'excused'
+                 AND EXISTS (
+                   SELECT 1 FROM public.students AS active_student
+                   WHERE active_student.id = public.attendance_records.student_id
+                     AND active_student.school_id = p_school_id
+                     AND active_student.status = 'active'
+                 )))
         )
       END,
       'todayCollection', COALESCE((
@@ -2818,9 +2835,9 @@ AS $function$
           AND voided_at IS NULL
       ), 0),
       'totalOutstanding', COALESCE((
-        SELECT SUM(CASE WHEN voided_at IS NOT NULL THEN amount_due ELSE remaining_amount END)
+        SELECT SUM(remaining_amount)
         FROM public.fee_payments
-        WHERE school_id = p_school_id
+        WHERE school_id = p_school_id AND voided_at IS NULL
       ), 0)
     ),
     'totalClasses', (
@@ -2833,6 +2850,12 @@ AS $function$
       WHERE school_id = p_school_id
         AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
         AND status IN ('present', 'late')
+              AND EXISTS (
+                SELECT 1 FROM public.students AS active_student
+                WHERE active_student.id = public.attendance_records.student_id
+                  AND active_student.school_id = p_school_id
+                  AND active_student.status = 'active'
+              )
     ),
     'recentStudents', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
