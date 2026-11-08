@@ -11,7 +11,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig } from '../types/index.ts';
+import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -1278,17 +1278,112 @@ apiRouter.get('/superadmin/dashboard', requireAuth, requireSuperAdmin, async (_r
   catch { res.status(503).json({ error: 'Unable to load the Super Admin dashboard.' }); }
 });
 
-apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, (req, res) => {
-  const updated = db.updateSettings(req.body);
+apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const allowedFields = new Set([
+    'trialDays', 'graceDays', 'platformCurrency', 'readOnlyAfterExpiry',
+    'requireSuperAdmin2FA', 'lockoutThreshold', 'lockoutDurationMinutes',
+    'sessionTimeoutMinutes', 'logSecurityEvents', 'backupSchedule',
+    'enabledLanguages', 'academicYearName', 'semester1Start', 'semester1End',
+    'semester2Start', 'semester2End'
+  ]);
+  const unknownFields = Object.keys(body).filter(field => !allowedFields.has(field));
+  if (unknownFields.length) {
+    res.status(400).json({ error: `Unsupported platform setting(s): ${unknownFields.join(', ')}.` });
+    return;
+  }
+
+  const updates: Record<string, any> = {};
+  const numericRules: Record<string, [number, number]> = {
+    trialDays: [1, 90],
+    graceDays: [0, 60],
+    lockoutThreshold: [3, 20],
+    lockoutDurationMinutes: [1, 1440],
+    sessionTimeoutMinutes: [5, 1440]
+  };
+  for (const [field, [min, max]] of Object.entries(numericRules)) {
+    if (body[field] === undefined) continue;
+    const value = Number(body[field]);
+    if (!Number.isInteger(value) || value < min || value > max) {
+      res.status(400).json({ error: `${field} must be a whole number between ${min} and ${max}.` });
+      return;
+    }
+    updates[field] = value;
+  }
+
+  for (const field of ['readOnlyAfterExpiry', 'requireSuperAdmin2FA', 'logSecurityEvents']) {
+    if (body[field] === undefined) continue;
+    if (typeof body[field] !== 'boolean') {
+      res.status(400).json({ error: `${field} must be true or false.` });
+      return;
+    }
+    updates[field] = body[field];
+  }
+
+  if (body.platformCurrency !== undefined) {
+    const currency = String(body.platformCurrency).toUpperCase();
+    if (!['ETB', 'USD', 'SOS'].includes(currency)) {
+      res.status(400).json({ error: 'platformCurrency must be ETB, USD, or SOS.' });
+      return;
+    }
+    updates.platformCurrency = currency;
+  }
+  if (body.backupSchedule !== undefined) {
+    if (!['daily', 'weekly', 'manual'].includes(String(body.backupSchedule))) {
+      res.status(400).json({ error: 'backupSchedule must be daily, weekly, or manual.' });
+      return;
+    }
+    updates.backupSchedule = body.backupSchedule;
+  }
+  if (body.enabledLanguages !== undefined) {
+    const languages = body.enabledLanguages;
+    if (!Array.isArray(languages) || !languages.every(value => ['en', 'so', 'am'].includes(value))
+      || !languages.includes('en') || new Set(languages).size !== languages.length) {
+      res.status(400).json({ error: 'enabledLanguages must contain unique supported languages and include English.' });
+      return;
+    }
+    updates.enabledLanguages = languages;
+  }
+  if (body.academicYearName !== undefined) {
+    if (typeof body.academicYearName !== 'string' || body.academicYearName.trim().length < 4 || body.academicYearName.trim().length > 50) {
+      res.status(400).json({ error: 'academicYearName must contain 4 to 50 characters.' });
+      return;
+    }
+    updates.academicYearName = body.academicYearName.trim();
+  }
+  for (const field of ['semester1Start', 'semester1End', 'semester2Start', 'semester2End']) {
+    if (body[field] === undefined) continue;
+    const value = body[field];
+    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) {
+      res.status(400).json({ error: `${field} must be a valid YYYY-MM-DD date.` });
+      return;
+    }
+    updates[field] = value;
+  }
+
+  if (!Object.keys(updates).length) {
+    res.status(400).json({ error: 'Provide at least one supported platform setting to update.' });
+    return;
+  }
+  const nextSettings = { ...db.getSettings(), ...updates };
+  const dateKeys = ['semester1Start', 'semester1End', 'semester2Start', 'semester2End'] as const;
+  const dates = dateKeys.map(key => Date.parse(`${nextSettings[key]}T00:00:00Z`));
+  if (dates.some(value => !Number.isFinite(value)) || !(dates[0] <= dates[1] && dates[1] < dates[2] && dates[2] <= dates[3])) {
+    res.status(400).json({ error: 'Academic dates must be ordered: Semester 1 start, Semester 1 end, Semester 2 start, Semester 2 end.' });
+    return;
+  }
+
+  const updated = db.updateSettings(updates as Partial<SuperAdminSettings>);
   db.logAudit({
     action: 'PLATFORM_SETTINGS_UPDATED',
     category: 'subscription',
     userId: (req as any).user.id,
     userName: (req as any).user.fullName,
     userRole: 'super_admin',
-    details: 'Platform settings and academic dates updated by Super Administrator.',
+    details: `Updated platform settings: ${Object.keys(updates).join(', ')}.`,
     severity: 'warning'
   });
+  await db.flush();
   res.json(updated);
 });
 
