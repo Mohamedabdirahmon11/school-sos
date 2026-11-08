@@ -55,14 +55,19 @@ BEGIN
     RAISE EXCEPTION 'Expected schoolos_replace_class_timetable(varchar,varchar,jsonb) to exist.';
   END IF;
 
-  v_occurrences := (
-    length(v_definition) - length(replace(v_definition, v_old, ''))
-  ) / length(v_old);
+  -- If the schema snapshot already includes the same two guards, do not
+  -- attempt to patch it a second time.
+  IF position('A teacher is already assigned during an overlapping timetable period.' in v_definition) = 0
+     OR position('A classroom is already reserved during an overlapping timetable period.' in v_definition) = 0 THEN
+    v_occurrences := (
+      length(v_definition) - length(replace(v_definition, v_old, ''))
+    ) / length(v_old);
 
-  IF v_occurrences <> 1 THEN
-    RAISE EXCEPTION 'Timetable replace function source did not match the expected version exactly once; found % matches. No function was changed.', v_occurrences;
+    IF v_occurrences <> 1 THEN
+      RAISE EXCEPTION 'Timetable replace function source did not match the expected version exactly once; found % matches. No function was changed.', v_occurrences;
+    END IF;
+
+    EXECUTE replace(v_definition, v_old, v_new);
   END IF;
-
-  EXECUTE replace(v_definition, v_old, v_new);
 END
 $migration$;
