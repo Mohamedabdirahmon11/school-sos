@@ -51,7 +51,7 @@ export const BulkAcademicYearPanel: React.FC = () => {
     <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
       <h2 className="text-sm font-bold text-[#132A29]">Apply academic year to all schools</h2>
       <p className="text-[11px] text-[#64748B]">
-        The platform value above is only the default for new schools. Each school keeps its own academic year. Use this to move every school to a new year in one step. Review the preview first; schools going backwards are skipped unless you include them.
+        The platform value above is only the default for new schools. Each school keeps its own academic year. Use this to move every school to a new year in one step. Review the preview first; backward changes and schools with draft/published exams for another year are skipped unless you include them.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
