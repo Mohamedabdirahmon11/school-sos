@@ -1760,6 +1760,7 @@ apiRouter.get('/superadmin/audit-logs/export-csv', requireAuth, requireSuperAdmi
 apiRouter.get('/superadmin/backup', requireAuth, requireSuperAdmin, async (req, res) => {
   const user = (req as any).user as User;
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', 'attachment; filename="schoolos-platform-backup.json"');
   db.logAudit({
     action: 'PLATFORM_BACKUP_DOWNLOADED',
@@ -1767,10 +1768,23 @@ apiRouter.get('/superadmin/backup', requireAuth, requireSuperAdmin, async (req, 
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: 'Downloaded a full platform backup snapshot.',
+    details: 'Generated a full platform backup snapshot.',
     severity: 'warning'
   });
-  res.json(await db.generatePlatformBackup());
+  try {
+    const backup = await db.generatePlatformBackup();
+    db.updateSettings({
+      lastBackupDate: new Date().toISOString(),
+      lastBackupStatus: 'success'
+    });
+    await db.flush();
+    backup.data.settings = db.getSettings();
+    res.json(backup);
+  } catch {
+    db.updateSettings({ lastBackupStatus: 'failed' });
+    await db.flush().catch(() => undefined);
+    res.status(503).json({ error: 'Platform backup could not be completed. No backup was marked as successful.' });
+  }
 });
 
 // ==============================================================================

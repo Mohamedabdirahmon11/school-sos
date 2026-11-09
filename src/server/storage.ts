@@ -179,9 +179,7 @@ const DEFAULT_SETTINGS: SuperAdminSettings = {
   lockoutDurationMinutes: 15,
   sessionTimeoutMinutes: 60,
   logSecurityEvents: true,
-  backupSchedule: 'daily',
-  lastBackupDate: new Date().toISOString(),
-  lastBackupStatus: 'success',
+  backupSchedule: 'manual',
   enabledLanguages: ['en', 'so'],
   academicYearName: '2026-2027',
   semester1Start: '2026-09-01',
@@ -3335,6 +3333,9 @@ class StorageEngine {
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toISOString()
     };
+    // Respect the platform-level security audit switch without suppressing
+    // subscription, finance, academic, school, or user audit history.
+    if (logData.category === 'security' && this.data.settings.logSecurityEvents === false) return log;
     this.data.auditLogs.unshift(log);
     // Keep max 10,000 logs in memory
     if (this.data.auditLogs.length > 10000) {
