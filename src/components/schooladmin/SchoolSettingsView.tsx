@@ -401,19 +401,19 @@ export const SchoolSettingsView: React.FC = () => {
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
-            {t('school_settings')} & Administration
+            School Settings
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Configure institutional identity, report card designs, multi-branch campuses, and notification gateways.
+            Manage your school profile, academic calendar, branches, documents, report cards, and backups in one place.
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-[#EAF1EF] p-1 text-xs shadow-sm md:w-fit">
+        <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#DCE7E4] bg-[#F5F8F7] p-2 text-xs shadow-sm sm:grid-cols-3 lg:grid-cols-6">
           <button
             type="button"
             onClick={() => setActiveTab('identity')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'identity' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
@@ -423,7 +423,7 @@ export const SchoolSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('academics')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'academics' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
@@ -433,7 +433,7 @@ export const SchoolSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('documents')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'documents' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
@@ -443,7 +443,7 @@ export const SchoolSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('branches')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'branches' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
@@ -453,7 +453,7 @@ export const SchoolSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('designer')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'designer' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
@@ -463,7 +463,7 @@ export const SchoolSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('backup')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'backup' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
