@@ -20,19 +20,26 @@ concurrency:
 
 jobs:
   backup:
-    name: Create encrypted-transport database export
+    name: Create off-site database backup
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.BACKUP_S3_REGION }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      BACKUP_S3_PREFIX: ${{ vars.BACKUP_S3_PREFIX || 'schoolos' }}
     steps:
-      - name: Check required database secret
+      - name: Check required private backup destination
         shell: bash
         run: |
-          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
-            echo "::error::Add SUPABASE_DB_URL as a repository Actions secret. Use the Supabase Session Pooler connection string; never commit it."
-            exit 1
-          fi
+          for name in SUPABASE_DB_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION BACKUP_S3_BUCKET; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required GitHub Actions secret/variable: $name. Configure a private S3 bucket and the documented secrets before enabling automated backups."
+              exit 1
+            fi
+          done
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
@@ -79,11 +86,10 @@ jobs:
           sha256sum backup/roles.sql backup/schema.sql backup/data.sql > backup/SHA256SUMS
           tar -czf schoolos-supabase-backup.tar.gz -C backup .
 
-      - name: Store private backup artifact
+      - name: Upload encrypted backup to private S3 bucket
         if: steps.policy.outputs.run_backup == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: schoolos-supabase-backup-${{ github.run_id }}
-          path: schoolos-supabase-backup.tar.gz
-          if-no-files-found: error
-          retention-days: 30
+        shell: bash
+        run: |
+          object_key="${BACKUP_S3_PREFIX%/}/schoolos-db-backup-$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_RUN_ID}.tar.gz"
+          aws s3 cp schoolos-supabase-backup.tar.gz "s3://${BACKUP_S3_BUCKET}/${object_key}" --sse AES256 --no-progress
+          echo "Backup uploaded to private S3 key: ${object_key}"
