@@ -3591,6 +3591,10 @@ apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (r
 apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned class teacher can submit daily attendance. School administrators can review absences and contact parents.' });
+    return;
+  }
   const { classId, date, records } = req.body;
 
   if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
@@ -3876,6 +3880,10 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
 apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only assigned teachers can enter and submit exam marks. School administrators can review and approve submitted results.' });
+    return;
+  }
   const { classId, subjectId, semester, marks } = req.body;
 
   if (!classId || typeof subjectId !== 'string' || !subjectId || !['Semester 1', 'Semester 2'].includes(semester) || !Array.isArray(marks) || marks.length < 1 || marks.length > 2000) {
