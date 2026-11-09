@@ -90,7 +90,7 @@ function invalidateListCache(table?: string) {
 
 function onboardingFieldErrors(body: Record<string, unknown>): string[] {
   const fields: Array<[string, string]> = [
-    ['name', 'name'], ['code', 'code'], ['email', 'email'], ['adminEmail', 'adminEmail'], ['adminPassword', 'adminPassword']
+    ['name', 'name'], ['code', 'code'], ['email', 'email'], ['adminEmail', 'adminEmail']
   ];
   const missing = fields.filter(([key]) => typeof body[key] !== 'string' || !(body[key] as string).trim()).map(([, label]) => label);
   if (body.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.adminEmail).trim())) missing.push('adminEmail (invalid email)');
@@ -1498,7 +1498,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}.`, fields: missing });
     return;
   }
-  const { name, code, address, city, phone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminPassword } = body;
+  const { name, code, address, city, phone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone } = body;
   const cleanCode = String(code).trim().toUpperCase();
   const cleanAdminEmail = String(adminEmail).trim().toLowerCase();
 
@@ -1540,7 +1540,8 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     }
   });
 
-  // Create First School Administrator
+  // Create First School Administrator with a one-time, easy-to-type temporary password.
+  const temporaryPassword = String(randomInt(100000, 1_000_000));
   let adminUser: User;
   try { adminUser = db.createUser({
     schoolId: school.id,
@@ -1549,7 +1550,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     fullName: adminName || `${name} Administrator`,
     email: cleanAdminEmail,
     phone: adminPhone || phone,
-    passwordHash: adminPassword,
+    passwordHash: hashPassword(temporaryPassword),
     mustChangePassword: true,
     isBlocked: false,
     failedLoginAttempts: 0
@@ -1567,7 +1568,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     severity: 'info'
   });
 
-  res.status(201).json({ school, admin: adminUser });
+  res.status(201).json({ school, admin: sanitizeUser(adminUser), temporaryPassword, mustChangePassword: true });
 });
 
 apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSuperAdmin, async (req, res) => {
@@ -3446,8 +3447,8 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
-  const temporaryPassword = randomBytes(12).toString('base64url');
-  const account = db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: temporaryPassword, mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0 });
+  const temporaryPassword = String(randomInt(100000, 1_000_000));
+  const account = db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(temporaryPassword), mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0 });
   const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions, status: 'active', userId: account.id });
   db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
   res.status(201).json({ ...staff, initialPassword: temporaryPassword });
@@ -3591,6 +3592,10 @@ apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (r
 apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned class teacher can submit daily attendance. School administrators can review absences and contact parents.' });
+    return;
+  }
   const { classId, date, records } = req.body;
 
   if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
@@ -3876,6 +3881,10 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
 apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only assigned teachers can enter and submit exam marks. School administrators can review and approve submitted results.' });
+    return;
+  }
   const { classId, subjectId, semester, marks } = req.body;
 
   if (!classId || typeof subjectId !== 'string' || !subjectId || !['Semester 1', 'Semester 2'].includes(semester) || !Array.isArray(marks) || marks.length < 1 || marks.length > 2000) {
@@ -4897,7 +4906,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(403).json({ error: 'Only staff account passwords can be reset here.' });
     return;
   }
-  const temporaryPassword = randomBytes(18).toString('base64url');
+  const temporaryPassword = String(randomInt(100000, 1_000_000));
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,

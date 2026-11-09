@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
+import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
@@ -24,23 +25,6 @@ import {
   Filter
 } from 'lucide-react';
 
-const schoolLocalDate = (timeZone?: string) => {
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'Africa/Addis_Ababa',
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    }).formatToParts(new Date());
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-    return `${values.year}-${values.month}-${values.day}`;
-  } catch {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-};
-
 const parentWhatsAppNumber = (student: Student) =>
   normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
 
@@ -49,11 +33,12 @@ export const AttendanceView: React.FC = () => {
   const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.whatsappPhone);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [date, setDate] = useState(() => schoolLocalDate(school?.timezone));
+  const [date, setDate] = useState(() => getSchoolLocalDate(school?.timezone));
+  const ethiopianCalendar = getEthiopianCalendarInfo(date, school?.timezone || 'Africa/Addis_Ababa');
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
-  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus | 'unrecorded'; note: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,11 +86,11 @@ export const AttendanceView: React.FC = () => {
       setPageStudents(firstPage);
       setServerPageInfo(firstPageInfo);
 
-      const map: Record<string, { status: AttendanceStatus; note: string }> = {};
+      const map: Record<string, { status: AttendanceStatus | 'unrecorded'; note: string }> = {};
       for (const std of allStudents) {
         const record = existingRecords.find(r => r.studentId === std.id);
         map[std.id] = {
-          status: record ? record.status : 'present',
+          status: record ? record.status : 'unrecorded',
           note: record?.note || ''
         };
       }
@@ -135,38 +120,6 @@ export const AttendanceView: React.FC = () => {
     }
   };
 
-  const handleMarkAllPresent = () => {
-    const updated: Record<string, { status: AttendanceStatus; note: string }> = {};
-    for (const std of students) {
-      updated[std.id] = {
-        status: 'present',
-        note: attendanceMap[std.id]?.note || ''
-      };
-    }
-    setAttendanceMap(updated);
-    setNotice('All students marked as Present. Click "Save Attendance" to commit.');
-  };
-
-  const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
-    setAttendanceMap(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        status
-      }
-    }));
-  };
-
-  const handleNoteChange = (studentId: string, note: string) => {
-    setAttendanceMap(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        note
-      }
-    }));
-  };
-
   const openAbsentStudentWhatsApp = (student: Student) => {
     if (!adminWhatsAppNumber) {
       setNotice('Marka hore School Settings geli lambarka WhatsApp-ka maamulka (+country code), kuna gal WhatsApp lambarkaas.');
@@ -189,35 +142,6 @@ export const AttendanceView: React.FC = () => {
     ].filter(Boolean).join('\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleSaveAttendance = async () => {
-    if (!selectedClassId || isReadOnly) return;
-    if (school?.attendanceRules?.requireExcusedReason) {
-      const missingReason = students.some(std => attendanceMap[std.id]?.status === 'excused' && !attendanceMap[std.id]?.note.trim());
-      if (missingReason) {
-        setNotice('Add a reason for every excused student before saving.');
-        return;
-      }
-    }
-    setIsSaving(true);
-    setNotice(null);
-
-    try {
-      const records = students.map(std => ({
-        studentId: std.id,
-        status: attendanceMap[std.id]?.status || 'present',
-        note: attendanceMap[std.id]?.note || ''
-      }));
-
-      await ApiClient.recordDailyAttendance(selectedClassId, date, records);
-      setNotice('Attendance saved. Ardayda maqneyd, WhatsApp ka fur fariinta diyaarsan, hubi, kadib adigu riix Send.');
-      setTimeout(() => setNotice(null), 4000);
-    } catch (err: any) {
-      setNotice(err.message || 'Failed to save attendance.');
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   // Stats calculation
@@ -245,29 +169,12 @@ export const AttendanceView: React.FC = () => {
             {t('attendance')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. For absent students, prepare a WhatsApp message and manually press Send in WhatsApp.
+            Review class attendance submitted by teachers. For absent students, prepare the parent message, open WhatsApp, and manually press Send in WhatsApp.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleMarkAllPresent}
-            disabled={isReadOnly || students.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]"
-          >
-            <Check className="w-3.5 h-3.5" />
-            {t('mark_all_present')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveAttendance}
-            disabled={isSaving || isReadOnly || students.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {isSaving ? 'Saving...' : 'Save Attendance'}
-          </button>
+        <div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-xs font-medium text-teal-900">
+          Class teachers submit attendance. Review absences here and contact parents from the school WhatsApp account.
         </div>
       </div>
 
@@ -302,6 +209,8 @@ export const AttendanceView: React.FC = () => {
             onChange={e => setDate(e.target.value)}
             className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
           />
+          <p className="mt-1 text-[11px] text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</p>
+          {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
         </div>
 
         <div>
@@ -377,66 +286,12 @@ export const AttendanceView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || 'N/A'}</td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(std.id, 'present')}
-                            disabled={isReadOnly}
-                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                              state.status === 'present'
-                                ? 'bg-emerald-600 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            P
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(std.id, 'absent')}
-                            disabled={isReadOnly}
-                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                              state.status === 'absent'
-                                ? 'bg-rose-600 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            A
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(std.id, 'late')}
-                            disabled={isReadOnly}
-                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                              state.status === 'late'
-                                ? 'bg-amber-600 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            L
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(std.id, 'excused')}
-                            disabled={isReadOnly}
-                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                              state.status === 'excused'
-                                ? 'bg-indigo-600 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            E
-                          </button>
+                        <div className="flex items-center justify-center">
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase ${state.status === 'present' ? 'bg-emerald-100 text-emerald-800' : state.status === 'absent' ? 'bg-rose-100 text-rose-800' : state.status === 'late' ? 'bg-amber-100 text-amber-800' : state.status === 'excused' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'}`}>{state.status}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <input
-                          type="text"
-                          value={state.note}
-                          onChange={e => handleNoteChange(std.id, e.target.value)}
-                          placeholder="Optional reason or note..."
-                          disabled={isReadOnly}
-                          className="w-full text-xs px-2.5 py-1 border border-[#CBD5E1] rounded focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
-                        />
+                        <span className="text-xs text-[#64748B]">{state.note || '—'}</span>
                       </td>
                       <td className="py-3 px-4">
                         {state.status === 'absent' ? (

@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -74,8 +75,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, { grade: string; feedback: string }>>({});
 
   // Attendance state
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const ethiopianCalendar = getEthiopianCalendarInfo(attendanceDate, school?.timezone || 'Africa/Addis_Ababa');
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
@@ -140,7 +142,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         note: attendanceMap[s.id]?.note || ''
       }));
       await ApiClient.recordDailyAttendance(selectedClassId, attendanceDate, records);
-      setNotice('Daily class attendance saved and synced with administration.');
+      setNotice('Daily class attendance saved. The school administrator can now review absences and contact parents.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to save attendance.');
@@ -356,6 +358,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 onChange={e => setAttendanceDate(e.target.value)}
                 className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
               />
+              <p className="mt-1 text-[11px] text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</p>
+              {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
             </div>
             <div>
               <button

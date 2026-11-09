@@ -180,30 +180,6 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
-  // Submit Marks
-  const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
-    setIsSaving(true);
-    try {
-      const formattedMarks = students.map(std => ({
-        studentId: std.id,
-        smallExamMarks: Number(marksInput[std.id]?.small || 0),
-        bigExamMarks: Number(marksInput[std.id]?.big || 0),
-        teacherRemarks: marksInput[std.id]?.remarks || '',
-        status
-      }));
-
-      await ApiClient.saveMarks(selectedClassId, selectedSubjectId, selectedSemester, formattedMarks);
-      setNotice(status === 'submitted' ? 'Marks submitted for Administrator Approval!' : 'Marks saved as Draft.');
-      await loadClassData();
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setNotice(err.message || 'Failed to save marks.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Admin Approve All Submitted Marks
   const handleApproveAll = async () => {
     if (isReadOnly) return;
@@ -302,7 +278,7 @@ export const ExamsResultsView: React.FC = () => {
             {t('exams_results')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
+            Review teacher-submitted school results, approve marks, and view semester rankings.
             {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
         </div>
@@ -316,7 +292,7 @@ export const ExamsResultsView: React.FC = () => {
               activeTab === 'entry_approval' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
           >
-            Mark Entry & Approval
+            Submitted Results & Approval
           </button>
           <button
             type="button"
@@ -410,23 +386,8 @@ export const ExamsResultsView: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-end gap-2">
-              <button
-                type="button"
-                onClick={() => handleSaveMarks('draft')}
-                disabled={isReadOnly || isSaving || students.length === 0}
-                className="flex-1 py-2 px-3 text-xs font-semibold text-[#334155] bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                Save Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveMarks('submitted')}
-                disabled={isReadOnly || isSaving || students.length === 0}
-                className="flex-1 py-2 px-3 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm"
-              >
-                Submit Marks
-              </button>
+            <div className="flex items-center text-xs font-medium text-[#0F766E]">
+              Teachers enter and submit marks from their Teacher Portal. This screen is for school review and approval.
             </div>
           </div>
 
@@ -493,7 +454,7 @@ export const ExamsResultsView: React.FC = () => {
                               min={0}
                               max={smallExamMax}
                               step={0.5}
-                              disabled={isApproved || isReadOnly}
+                              disabled
                               value={inp.small}
                               onChange={e => {
                                 const val = Math.min(smallExamMax, Math.max(0, parseFloat(e.target.value) || 0));
@@ -511,7 +472,7 @@ export const ExamsResultsView: React.FC = () => {
                               min={0}
                               max={bigExamMax}
                               step={0.5}
-                              disabled={isApproved || isReadOnly}
+                              disabled
                               value={inp.big}
                               onChange={e => {
                                 const val = Math.min(bigExamMax, Math.max(0, parseFloat(e.target.value) || 0));
@@ -553,7 +514,7 @@ export const ExamsResultsView: React.FC = () => {
                             <input
                               type="text"
                               value={inp.remarks}
-                              disabled={isApproved || isReadOnly}
+                              disabled
                               onChange={e => {
                                 const val = e.target.value;
                                 setMarksInput(prev => ({
