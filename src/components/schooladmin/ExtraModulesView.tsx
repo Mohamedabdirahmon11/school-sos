@@ -88,6 +88,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [inventoryName, setInventoryName] = useState('');
+  const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null);
   const [inventorySku, setInventorySku] = useState('');
   const [inventoryCategory, setInventoryCategory] = useState('General');
   const [inventoryUnit, setInventoryUnit] = useState('unit');
@@ -106,6 +107,66 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const [notice, setNotice] = useState<string | null>(null);
   const [moduleError, setModuleError] = useState<string | null>(null);
+  const [moduleSearch, setModuleSearch] = useState('');
+  const [modulePage, setModulePage] = useState(1);
+  const [moduleSortField, setModuleSortField] = useState('default');
+  const [moduleSortDirection, setModuleSortDirection] = useState<'asc' | 'desc'>('asc');
+  const modulePageSize = 10;
+  const moduleSortOptions: Record<string, Array<{ value: string; label: string }>> = {
+    library: [{ value: 'title', label: 'Title' }, { value: 'author', label: 'Author' }, { value: 'quantity', label: 'Copies' }, { value: 'dueDate', label: 'Due date' }, { value: 'status', label: 'Loan status' }],
+    transport: [{ value: 'name', label: 'Route' }, { value: 'vehicleNumber', label: 'Vehicle' }, { value: 'driverName', label: 'Driver' }, { value: 'feeAmount', label: 'Monthly fee' }, { value: 'capacity', label: 'Capacity' }],
+    discipline: [{ value: 'incidentDate', label: 'Incident date' }, { value: 'studentName', label: 'Student' }, { value: 'severity', label: 'Severity' }],
+    health: [{ value: 'visitDate', label: 'Visit date' }, { value: 'studentName', label: 'Student' }, { value: 'nurseName', label: 'Nurse' }],
+    inventory: [{ value: 'name', label: 'Item' }, { value: 'category', label: 'Category' }, { value: 'quantityOnHand', label: 'On-hand quantity' }, { value: 'unitCost', label: 'Unit cost' }]
+  };
+  const filterModuleRows = (rows: any[], fields: string[]) => {
+    const query = moduleSearch.trim().toLowerCase();
+    const filtered = query
+      ? rows.filter(row => fields.some(field => String(row?.[field] ?? '').toLowerCase().includes(query)))
+      : rows;
+    const sorted = moduleSortField === 'default' ? filtered : [...filtered].sort((left, right) => {
+      const a = left?.[moduleSortField];
+      const b = right?.[moduleSortField];
+      const comparison = typeof a === 'number' && typeof b === 'number'
+        ? a - b
+        : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      return moduleSortDirection === 'asc' ? comparison : -comparison;
+    });
+    const totalPages = Math.max(1, Math.ceil(sorted.length / modulePageSize));
+    const page = Math.min(modulePage, totalPages);
+    return {
+      rows: sorted.slice((page - 1) * modulePageSize, page * modulePageSize),
+      total: filtered.length,
+      totalPages,
+      page
+    };
+  };
+  const booksPage = filterModuleRows(books, ['title', 'author', 'isbn']);
+  const loansPage = filterModuleRows(libraryLoans, ['status', 'dueDate', 'studentId', 'bookId']);
+  const routesPage = filterModuleRows(routes, ['name', 'routeNumber', 'vehicleNumber', 'driverName', 'driverPhone']);
+  const assignmentsPage = filterModuleRows(busAssignments, ['studentId', 'routeId']);
+  const disciplinePage = filterModuleRows(disciplineLogs, ['studentName', 'studentId', 'incidentDate', 'infractionType', 'severity', 'actionTaken', 'notes']);
+  const healthPage = filterModuleRows(healthLogs, ['studentName', 'visitDate', 'symptoms', 'treatment', 'nurseName']);
+  const inventoryPage = filterModuleRows(inventory, ['name', 'sku', 'category', 'location']);
+
+  useEffect(() => {
+    setModuleSearch('');
+    setModulePage(1);
+    setModuleSortField('default');
+    setModuleSortDirection('asc');
+  }, [activeModule]);
+
+  const renderModulePagination = (page: { total: number; totalPages: number; page: number; rows: any[] }, label: string) => (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <span>{page.total === 0 ? `No ${label} found` : `Showing ${(page.page - 1) * modulePageSize + 1}–${Math.min(page.page * modulePageSize, page.total)} of ${page.total} ${label}`}</span>
+      {page.totalPages > 1 && <div className="flex items-center gap-2">
+        <button type="button" disabled={page.page <= 1} onClick={() => setModulePage(current => Math.max(1, current - 1))} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
+        <span>Page {page.page} of {page.totalPages}</span>
+        <button type="button" disabled={page.page >= page.totalPages} onClick={() => setModulePage(current => Math.min(page.totalPages, current + 1))} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+      </div>}
+    </div>
+  );
+
 
   useEffect(() => {
     if (!school || activeModule !== 'health') return;
@@ -157,11 +218,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     let cancelled = false;
     setLibraryLoading(true);
     setLibraryError(null);
-    Promise.all([ApiClient.getLibraryBooks(school.id), ApiClient.getLibraryLoans()])
-      .then(([bookRows, loanRows]) => {
+    Promise.all([
+      ApiClient.getLibraryBooks(school.id),
+      ApiClient.getLibraryLoans(),
+      ApiClient.getAllStudents(undefined, undefined)
+    ])
+      .then(([bookRows, loanRows, studentRows]) => {
         if (cancelled) return;
         setBooks(bookRows);
         setLibraryLoans(loanRows);
+        setStudents(studentRows);
         const firstAvailable = bookRows.find(book => loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0));
         setLoanBookId(current => bookRows.some(book => book.id === current &&
           loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0))
@@ -173,20 +239,45 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   }, [school?.id, activeModule]);
 
   useEffect(() => {
-    if (!school) return;
+    if (!school || activeModule !== 'transport') return;
+    let cancelled = false;
     setModuleError(null);
-    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch((err: any) => setModuleError(err.message || 'Unable to load transport routes.'));
-    ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch((err: any) => setModuleError(err.message || 'Unable to load students for transport.'));
-    ApiClient.getBusAssignments().then(setBusAssignments).catch((err: any) => setModuleError(err.message || 'Unable to load bus assignments.'));
-  }, [school]);
+    Promise.all([
+      ApiClient.getTransportRoutes(school.id),
+      ApiClient.getAllStudents(undefined, undefined),
+      ApiClient.getBusAssignments()
+    ]).then(([routeRows, studentRows, assignmentRows]) => {
+      if (cancelled) return;
+      setRoutes(routeRows);
+      setStudents(studentRows);
+      setBusAssignments(assignmentRows);
+      setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      setAssignmentRouteId(current => routeRows.some((route: any) => route.id === current) ? current : routeRows[0]?.id || '');
+    }).catch((err: any) => {
+      if (!cancelled) setModuleError(err.message || 'Unable to load transport records.');
+    });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
 
   useEffect(() => {
     if (!school || activeModule !== 'discipline') return;
     let cancelled = false;
     setDisciplineLoading(true);
     setDisciplineError(null);
-    ApiClient.getDisciplineIncidents()
-      .then(rows => { if (!cancelled) setDisciplineLogs(rows); })
+    Promise.all([ApiClient.getDisciplineIncidents(), ApiClient.getAllStudents(undefined, undefined)])
+      .then(([rows, studentRows]) => {
+        if (cancelled) return;
+        setStudents(studentRows);
+        const byId = new Map(studentRows.map((student: any) => [student.id, student]));
+        setDisciplineLogs(rows.map((row: any) => {
+          const student: any = byId.get(row.studentId);
+          return {
+            ...row,
+            studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId
+          };
+        }));
+        setIncidentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      })
       .catch((err: any) => { if (!cancelled) setDisciplineError(err.message || 'Unable to load discipline records.'); })
       .finally(() => { if (!cancelled) setDisciplineLoading(false); });
     return () => { cancelled = true; };
@@ -203,7 +294,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         severity: incidentSeverity, actionTaken: actionTaken.trim(), notes: incidentNotes.trim() || undefined,
         parentContacted
       });
-      setDisciplineLogs(rows => [created, ...rows]);
+      const student: any = students.find(item => item.id === incidentStudentId);
+      setDisciplineLogs(rows => [{
+        ...created,
+        studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : incidentStudentId
+      }, ...rows]);
       setInfractionType(''); setActionTaken(''); setIncidentNotes(''); setParentContacted(false);
       setNotice('Discipline incident saved securely.');
     } catch (err: any) {
@@ -236,24 +331,63 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     return () => { cancelled = true; };
   }, [activeModule, movementItemId]);
 
+  const resetInventoryForm = () => {
+    setEditingInventoryId(null);
+    setInventoryName('');
+    setInventorySku('');
+    setInventoryCategory('General');
+    setInventoryUnit('unit');
+    setInventoryReorderLevel('0');
+    setInventoryUnitCost('0');
+    setInventoryLocation('');
+  };
+
+  const handleEditInventoryItem = (item: any) => {
+    if (isReadOnly) return;
+    setEditingInventoryId(item.id);
+    setInventoryName(item.name || '');
+    setInventorySku(item.sku || '');
+    setInventoryCategory(item.category || 'General');
+    setInventoryUnit(item.unit || 'unit');
+    setInventoryReorderLevel(String(item.reorderLevel ?? 0));
+    setInventoryUnitCost(String(item.unitCost ?? 0));
+    setInventoryLocation(item.location || '');
+    setInventoryError(null);
+  };
+
   const handleCreateInventoryItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !inventoryName.trim()) return;
+    const reorderLevel = Number(inventoryReorderLevel);
+    const unitCost = Number(inventoryUnitCost);
+    if (!Number.isFinite(reorderLevel) || reorderLevel < 0 || !Number.isFinite(unitCost) || unitCost < 0) {
+      setInventoryError('Reorder level and unit cost must be valid non-negative numbers.');
+      return;
+    }
     setInventorySaving(true);
     setInventoryError(null);
     try {
-      const created = await ApiClient.createInventoryItem({
-        name: inventoryName.trim(), sku: inventorySku.trim() || undefined,
-        category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
-        reorderLevel: Number(inventoryReorderLevel), unitCost: Number(inventoryUnitCost),
-        location: inventoryLocation.trim() || undefined
-      });
-      setInventory(items => [created, ...items]);
-      setMovementItemId(created.id);
-      setInventoryName(''); setInventorySku(''); setInventoryLocation('');
-      setNotice('Inventory item created. Record opening stock using a stock-in movement.');
+      if (editingInventoryId) {
+        const updated = await ApiClient.updateInventoryItem(editingInventoryId, {
+          name: inventoryName.trim(), sku: inventorySku.trim() || '',
+          category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
+          reorderLevel, unitCost, location: inventoryLocation.trim()
+        });
+        setInventory(items => items.map(item => item.id === updated.id ? updated : item));
+        setNotice('Inventory item details updated.');
+      } else {
+        const created = await ApiClient.createInventoryItem({
+          name: inventoryName.trim(), sku: inventorySku.trim() || undefined,
+          category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
+          reorderLevel, unitCost, location: inventoryLocation.trim() || undefined
+        });
+        setInventory(items => [created, ...items]);
+        setMovementItemId(created.id);
+        setNotice('Inventory item created. Record opening stock using a stock-in movement.');
+      }
+      resetInventoryForm();
     } catch (err: any) {
-      setInventoryError(err.message || 'Unable to create inventory item.');
+      setInventoryError(err.message || (editingInventoryId ? 'Unable to update inventory item.' : 'Unable to create inventory item.'));
     } finally { setInventorySaving(false); }
   };
 
@@ -332,29 +466,37 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookTitle || !bookAuthor) return;
+    if (isReadOnly || !school || !bookTitle.trim() || !bookAuthor.trim() || librarySaving) return;
+    setLibraryError(null);
+    if (!Number.isInteger(bookCopies) || bookCopies < 1 || bookCopies > 100000) {
+      setLibraryError('Book copy count must be a whole number between 1 and 100,000.');
+      return;
+    }
+    setLibrarySaving(true);
     try {
       const b = await ApiClient.addLibraryBook({
         title: bookTitle.trim(),
         author: bookAuthor.trim(),
         isbn: bookIsbn.trim(),
         quantity: bookCopies
-      }, school?.id);
+      }, school.id);
       setBooks(prev => [...prev, b]);
       setShowAddBookModal(false);
       setBookTitle('');
       setBookAuthor('');
       setBookIsbn('');
+      setBookCopies(5);
       setNotice('Book added to library catalogue.');
-      setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message);
+      setLibraryError(err.message || 'Unable to add this book.');
+    } finally {
+      setLibrarySaving(false);
     }
   };
 
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!routeName || !driverName) return;
+    if (isReadOnly || !school || !routeName.trim() || !driverName.trim()) return;
     try {
       const r = await ApiClient.addTransportRoute({
         name: routeName,
@@ -378,18 +520,18 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setNotice('Transport route added.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message);
+      setModuleError(err.message || 'Unable to add this transport route.');
     }
   };
 
   const handleAssignBus = async () => {
-    if (!assignmentStudentId || !assignmentRouteId) return;
+    if (isReadOnly || !assignmentStudentId || !assignmentRouteId) return;
     try {
       const assignment = await ApiClient.setBusAssignment(assignmentStudentId, assignmentRouteId);
       setBusAssignments(current => [...current.filter(item => item.studentId !== assignment.studentId), assignment]);
       setNotice('Student assigned to the bus route. The configured route fee will be used for bus charges.');
     } catch (err: any) {
-      setNotice(err.message || 'Bus assignment failed.');
+      setModuleError(err.message || 'Bus assignment failed.');
     }
   };
 
@@ -429,6 +571,23 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         </div>
       </div>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="block w-full sm:max-w-sm">
+          <span className="sr-only">Search current module</span>
+          <input type="search" value={moduleSearch} onChange={event => { setModuleSearch(event.target.value); setModulePage(1); }} placeholder={`Search ${activeModule} records…`} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            Sort
+            <select value={moduleSortField} onChange={event => { setModuleSortField(event.target.value); setModulePage(1); }} className="rounded-lg border border-slate-300 bg-white px-2 py-2">
+              <option value="default">Default order</option>
+              {(moduleSortOptions[activeModule] || []).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => { setModuleSortDirection(current => current === 'asc' ? 'desc' : 'asc'); setModulePage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">{moduleSortDirection === 'asc' ? 'Ascending' : 'Descending'}</button>
+          {moduleSearch && <button type="button" onClick={() => { setModuleSearch(''); setModulePage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Clear search</button>}
+        </div>
+      </div>
       {notice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -455,6 +614,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             </button>
           </div>
 
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Catalogue titles</p><p className="mt-1 text-lg font-bold text-slate-800">{books.length}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Total copies</p><p className="mt-1 text-lg font-bold text-slate-800">{books.reduce((sum, book) => sum + Math.max(0, Number(book.quantity || 0)), 0)}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Books issued</p><p className="mt-1 text-lg font-bold text-slate-800">{libraryLoans.filter(loan => loan.status === 'issued').length}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Overdue loans</p><p className="mt-1 text-lg font-bold text-rose-700">{libraryLoans.filter(loan => loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)).length}</p></div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -471,8 +636,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <tr>
                     <td colSpan={4} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
                   </tr>
+                ) : booksPage.rows.length === 0 ? (
+                  <tr><td colSpan={4} className="p-6 text-center text-[#64748B]">No books match your search.</td></tr>
                 ) : (
-                  books.map(b => (
+                  booksPage.rows.map(b => (
                     <tr key={b.id} className="hover:bg-[#F8FAFC]">
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{b.title}</td>
                       <td className="px-4 py-2.5 text-[#475569]">{b.author}</td>
@@ -484,6 +651,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(booksPage, 'books')}
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-bold text-[#132A29]">Issue a book</h3>
@@ -514,7 +682,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <tr><th className="px-3 py-2">Book</th><th className="px-3 py-2">Student</th><th className="px-3 py-2">Issued</th><th className="px-3 py-2">Due</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Action</th></tr>
                     </thead>
                     <tbody className="divide-y divide-[#E2E8F0]">
-                      {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : libraryLoans.map(loan => {
+                      {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : loansPage.rows.map(loan => {
                         const book = books.find(row => row.id === loan.bookId);
                         const student = students.find(row => row.id === loan.studentId);
                         const overdue = loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -530,6 +698,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     </tbody>
                   </table>
                 </div>
+                {renderModulePagination(loansPage, 'loans')}
               </>
             )}
           </section>
@@ -572,8 +741,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <tr>
                     <td colSpan={7} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
+                ) : routesPage.rows.length === 0 ? (
+                  <tr><td colSpan={7} className="p-6 text-center text-[#64748B]">No routes match your search.</td></tr>
                 ) : (
-                  routes.map(r => (
+                  routesPage.rows.map(r => (
                     <tr key={r.id} className="hover:bg-[#F8FAFC]">
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{r.name}</td>
                       <td className="px-4 py-2.5 font-mono">{r.vehicleNumber}</td>
@@ -588,6 +759,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(routesPage, 'routes')}
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <h3 className="text-xs font-bold text-[#132A29]">Bus students</h3>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -604,15 +776,25 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </select>
               <button type="button" onClick={handleAssignBus} disabled={isReadOnly || !assignmentStudentId || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">Assign</button>
             </div>
-            {busAssignments.map(item => {
+            {assignmentsPage.rows.map(item => {
               const student = students.find(row => row.id === item.studentId);
               const route = routes.find(row => row.id === item.routeId);
               return <div key={item.id} className="flex items-center justify-between gap-3 text-xs border border-[#E2E8F0] rounded-lg p-3">
                 <span>{student ? `${student.firstName} ${student.lastName}` : item.studentId} · {route?.name || item.routeId}</span>
                 <span className="font-mono">{formatMoney(item.feeAmount, school?.currency)}</span>
-                <button type="button" disabled={isReadOnly} onClick={async () => { await ApiClient.removeBusAssignment(item.studentId); setBusAssignments(current => current.filter(row => row.id !== item.id)); }} className="text-rose-700 disabled:opacity-40">Remove</button>
+                <button type="button" disabled={isReadOnly} onClick={async () => {
+                  if (isReadOnly) return;
+                  try {
+                    await ApiClient.removeBusAssignment(item.studentId);
+                    setBusAssignments(current => current.filter(row => row.id !== item.id));
+                    setNotice('Student removed from the bus route.');
+                  } catch (err: any) {
+                    setModuleError(err.message || 'Unable to remove the bus assignment.');
+                  }
+                }} className="text-rose-700 disabled:opacity-40">Remove</button>
               </div>;
             })}
+            {renderModulePagination(assignmentsPage, 'bus assignments')}
           </section>
         </div>
       )}
@@ -624,6 +806,47 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span>Discipline & Behaviour Incidents</span>
           </h2>
+          {disciplineError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{disciplineError}</div>}
+          <form onSubmit={handleAddDisciplineIncident} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Student
+              <select required value={incidentStudentId} onChange={event => setIncidentStudentId(event.target.value)} disabled={isReadOnly || disciplineLoading || !students.length} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="">Select student</option>
+                {students.map((student: any) => <option key={student.id} value={student.id}>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')} · {student.studentId}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Incident date
+              <input required type="date" value={incidentDate} onChange={event => setIncidentDate(event.target.value)} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Incident / infraction
+              <input required maxLength={160} value={infractionType} onChange={event => setInfractionType(event.target.value)} disabled={isReadOnly} placeholder="Describe the incident" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Severity
+              <select value={incidentSeverity} onChange={event => setIncidentSeverity(event.target.value as 'low' | 'medium' | 'high')} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Action taken
+              <input maxLength={1000} value={actionTaken} onChange={event => setActionTaken(event.target.value)} disabled={isReadOnly} placeholder="Action or follow-up" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Notes
+              <input maxLength={2000} value={incidentNotes} onChange={event => setIncidentNotes(event.target.value)} disabled={isReadOnly} placeholder="Optional notes" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+              <input type="checkbox" checked={parentContacted} onChange={event => setParentContacted(event.target.checked)} disabled={isReadOnly} />
+              Parent contacted manually
+            </label>
+            <div className="flex items-end justify-end">
+              <button type="submit" disabled={isReadOnly || disciplineSaving || disciplineLoading || !incidentStudentId || !infractionType.trim()} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                {disciplineSaving ? 'Saving…' : 'Record incident'}
+              </button>
+            </div>
+          </form>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -637,19 +860,24 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {disciplineLogs.map(d => (
+                {disciplineLoading ? (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[#64748B]">Loading discipline records…</td></tr>
+                ) : disciplinePage.rows.length ? disciplinePage.rows.map(d => (
                   <tr key={d.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
+                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName || d.studentId}</td>
                     <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
                     <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (manual contact)' : 'No'}</td>
+                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken || '—'}</td>
+                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentContacted ? 'Yes (manual contact)' : 'No'}</td>
                   </tr>
-                ))}
+                )) : (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[#64748B]">{disciplineLogs.length ? 'No discipline records match your search.' : 'No discipline records have been recorded.'}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
+          {renderModulePagination(disciplinePage, 'discipline records')}
         </div>
       )}
 
@@ -708,7 +936,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <tbody className="divide-y divide-[#E2E8F0]">
                 {healthLoading ? (
                   <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>Loading clinic visits…</td></tr>
-                ) : healthLogs.length ? healthLogs.map(h => (
+                ) : healthPage.rows.length ? healthPage.rows.map(h => (
                   <tr key={h.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{h.visitDate}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{h.studentName}</td>
@@ -717,11 +945,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 text-[#0F766E] font-medium">{h.nurseName}</td>
                   </tr>
                 )) : (
-                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>No health visits have been recorded.</td></tr>
+                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>{healthLogs.length ? 'No health visits match your search.' : 'No health visits have been recorded.'}</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+          {renderModulePagination(healthPage, 'health visits')}
         </div>
       )}
 
@@ -742,24 +971,36 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <label className="text-xs font-medium text-[#475569]">Reorder level<input type="number" min="0" step="0.01" value={inventoryReorderLevel} onChange={e=>setInventoryReorderLevel(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Unit cost<input type="number" min="0" step="0.01" value={inventoryUnitCost} onChange={e=>setInventoryUnitCost(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Storage location<input maxLength={160} value={inventoryLocation} onChange={e=>setInventoryLocation(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
-              <div className="flex items-end"><button type="submit" disabled={isReadOnly||inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inventorySaving?'Saving…':'Add inventory item'}</button></div>
+              <div className="flex items-end gap-2">
+                <button type="submit" disabled={isReadOnly || inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                  {inventorySaving ? 'Saving…' : editingInventoryId ? 'Save changes' : 'Add inventory item'}
+                </button>
+                {editingInventoryId && <button type="button" disabled={inventorySaving} onClick={resetInventoryForm} className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Cancel</button>}
+              </div>
             </form>
             {inventoryLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading inventory…</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr><th className="p-2">Item</th><th className="p-2">SKU</th><th className="p-2">Category</th><th className="p-2">On hand</th><th className="p-2">Reorder at</th><th className="p-2">Unit cost</th><th className="p-2">Location</th><th className="p-2">Status</th><th className="p-2">Manage</th></tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {inventory.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
+                    {inventoryPage.rows.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
                       <td className="p-2 font-semibold text-[#132A29]">{item.name}</td><td className="p-2 font-mono">{item.sku||'—'}</td><td className="p-2">{item.category}</td>
                       <td className="p-2 font-mono">{item.quantityOnHand} {item.unit}</td><td className="p-2 font-mono">{item.reorderLevel}</td><td className="p-2 font-mono">{item.unitCost}</td><td className="p-2">{item.location||'—'}</td>
                       <td className="p-2"><span className={!item.isActive?'text-slate-500':item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{!item.isActive?'Archived':item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
-                      <td className="p-2"><button type="button" disabled={isReadOnly} onClick={()=>void handleToggleInventoryItem(item)} className="font-semibold text-[#0F766E] disabled:opacity-50">{item.isActive?'Archive':'Reactivate'}</button></td>
+                      <td className="p-2">
+                         <div className="flex flex-wrap gap-2">
+                           <button type="button" disabled={isReadOnly} onClick={() => handleEditInventoryItem(item)} className="font-semibold text-[#0F766E] disabled:opacity-50">Edit</button>
+                           <button type="button" disabled={isReadOnly} onClick={() => void handleToggleInventoryItem(item)} className="font-semibold text-slate-600 disabled:opacity-50">{item.isActive ? 'Archive' : 'Reactivate'}</button>
+                         </div>
+                       </td>
                     </tr>)}
                     {!inventory.length&&<tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
+                    {inventory.length > 0 && inventoryPage.rows.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items match your search.</td></tr>}
                   </tbody>
                 </table>
               </div>
             )}
+            {renderModulePagination(inventoryPage, 'inventory items')}
           </section>
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <form onSubmit={handleInventoryMovement} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
@@ -786,6 +1027,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
             <h2 className="text-base font-bold text-[#132A29] mb-4">Add Library Book</h2>
+            {libraryError && <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{libraryError}</div>}
             <form onSubmit={handleAddBook} className="space-y-4 text-xs">
               <div>
                 <label className="block font-medium">Book Title</label>
@@ -838,9 +1080,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold"
+                  disabled={librarySaving || isReadOnly}
+                  className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold disabled:opacity-50"
                 >
-                  Add Book
+                  {librarySaving ? 'Saving…' : 'Add Book'}
                 </button>
               </div>
             </form>

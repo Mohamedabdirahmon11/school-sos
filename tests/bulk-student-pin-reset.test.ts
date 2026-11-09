@@ -104,7 +104,8 @@ test('bulk reset assigns unique four-digit PINs atomically and updates student a
   assert.equal(studentUser?.lockedUntil, null);
   assert.equal(memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash, parentPinBefore);
   assert.equal(memory.rows('audit_logs').filter(row => row.action === 'STUDENT_BULK_PIN_RESET').length, 1);
-  assert.equal(JSON.stringify(memory.rows('students')).includes(body.pinSlips[0].newPin), false);
+  assert.equal(memory.rows('students').every(row => !Object.prototype.hasOwnProperty.call(row, 'pin')), true);
+  assert.notEqual(studentOne?.pinHash, '2468');
 });
 
 test('bulk reset rejects invalid PINs, duplicate IDs, and students from another school without partial changes', async () => {

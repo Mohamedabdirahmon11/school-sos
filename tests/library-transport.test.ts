@@ -8,6 +8,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/042_restrict_library_transport_writes.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const schoolSettings = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
 const isbnMigration = readFileSync(new URL('../supabase/migrations/043_library_isbn_constraints.sql', import.meta.url), 'utf8');
 
 test('library API errors are not converted into empty or fake successful catalogue data', () => {
@@ -35,7 +36,7 @@ test('transport route form captures fields supported by the API', () => {
 
 test('library and transport load errors are visible to the administrator', () => {
   assert.match(ui, /setLibraryError\(err\.message \|\| 'Unable to load library catalogue and lending records\.'/);
-  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport routes\.'/);
+  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport records\.'/);
   assert.match(ui, /role="alert"/);
 });
 
@@ -74,4 +75,136 @@ test('transport routes capture and display ordered neighborhood pickup stops', (
   assert.ok(ui.includes("r.stops.join(' → ')"));
   assert.ok(api.includes('const stops = body.stops ?? []'));
   assert.ok(api.includes('stops.length > 100'));
+});
+
+
+test('inventory items can be edited without rewriting stock quantity history', () => {
+  assert.match(ui, /const handleEditInventoryItem = \(item: any\)/);
+  assert.match(ui, /ApiClient\.updateInventoryItem\(editingInventoryId/);
+  assert.match(ui, /setInventory\(items => items\.map\(item => item\.id === updated\.id \? updated : item\)\)/);
+  assert.match(ui, /Record stock movement/);
+  assert.match(ui, /Record opening stock using a stock-in movement/);
+});
+
+test('extra-module write handlers enforce read-only mode and surface errors', () => {
+  const addBook = ui.slice(ui.indexOf('const handleAddBook'), ui.indexOf('const handleAddRoute'));
+  const addRoute = ui.slice(ui.indexOf('const handleAddRoute'), ui.indexOf('const handleAssignBus'));
+  assert.match(addBook, /if \(isReadOnly \|\| !school/);
+  assert.match(addBook, /setLibraryError\(err\.message/);
+  assert.match(addRoute, /if \(isReadOnly \|\| !school/);
+  assert.match(ui, /const handleAssignBus = async \(\) => \{\s*if \(isReadOnly \|\|/);
+  assert.match(ui, /const handleAssignBus[\s\S]*?setModuleError\(err\.message/);
+});
+
+
+test('clinic records are limited to the current school and school administrators', () => {
+  assert.match(api, /apiRouter\.get\('\/school\/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/school\/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(storage, /from\('school_health_visits'\)[\s\S]*?\.eq\('school_id', schoolId\)/);
+  assert.match(storage, /student\.schoolId !== input\.schoolId/);
+  assert.match(schema, /FOREIGN KEY \(student_id, school_id\) REFERENCES students\(id, school_id\)/);
+  assert.match(schema, /school_health_visits_read ON school_health_visits FOR SELECT TO authenticated/);
+});
+
+test('discipline records are school-scoped and write access is admin-only', () => {
+  assert.match(api, /apiRouter\.get\('\/school\/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/school\/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(storage, /getDisciplineIncidents\(schoolId: string\)[\s\S]*?queryRows<any>\('discipline_incidents', \{ school_id: schoolId \}\)/);
+  assert.match(storage, /getStudentById\(input\.studentId, input\.schoolId\)/);
+  assert.match(schema, /discipline_incidents_read ON discipline_incidents FOR SELECT TO authenticated/);
+});
+
+test('school settings and sidebar expose the agreed school administration modules', () => {
+  const settings = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
+  const sidebar = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  for (const tab of ["setActiveTab('identity')", "setActiveTab('academics')", "setActiveTab('documents')", "setActiveTab('branches')", "setActiveTab('designer')", "setActiveTab('backup')"]) {
+    assert.ok(settings.includes(tab), `School Settings tab is present: ${tab}`);
+  }
+  for (const view of ['sch_library', 'sch_transport', 'sch_inventory', 'sch_discipline', 'sch_health', 'sch_settings']) {
+    assert.ok(sidebar.includes(view), `Sidebar includes ${view}`);
+  }
+  for (const view of ['sch_library', 'sch_transport', 'sch_inventory', 'sch_discipline', 'sch_health']) {
+    assert.ok(app.includes(`activeView === '${view}'`), `App routes ${view}`);
+  }
+});
+
+
+test('resource module tables support search, bounded pagination, and filtered empty states', () => {
+  assert.match(ui, /type="search" value=\{moduleSearch\}/);
+  assert.match(ui, /const modulePageSize = 10/);
+  assert.match(ui, /rows: sorted\.slice\(\(page - 1\) \* modulePageSize, page \* modulePageSize\)/);
+  assert.match(ui, /renderModulePagination\(inventoryPage, 'inventory items'\)/);
+  assert.match(ui, /renderModulePagination\(healthPage, 'health visits'\)/);
+  assert.match(ui, /renderModulePagination\(disciplinePage, 'discipline records'\)/);
+  assert.match(ui, /No inventory items match your search/);
+  assert.match(ui, /No health visits match your search/);
+});
+
+
+test('resource tables provide field-based ascending and descending sorting', () => {
+  assert.match(ui, /const \[moduleSortField, setModuleSortField\] = useState\('default'\)/);
+  assert.match(ui, /const \[moduleSortDirection, setModuleSortDirection\] = useState<'asc' \| 'desc'>\('asc'\)/);
+  assert.match(ui, /moduleSortDirection === 'asc' \? comparison : -comparison/);
+  assert.match(ui, /setModuleSortDirection\(current => current === 'asc' \? 'desc' : 'asc'\)/);
+});
+
+test('library overview shows catalogue, copies, issued and overdue totals', () => {
+  assert.match(ui, /Catalogue titles/);
+  assert.match(ui, /Total copies/);
+  assert.match(ui, /Books issued/);
+  assert.match(ui, /Overdue loans/);
+});
+
+
+test('dedicated admin WhatsApp number is included in School Settings save payload', () => {
+  const saveIdentity = schoolSettings.slice(
+    schoolSettings.indexOf('const handleSaveIdentity'),
+    schoolSettings.indexOf('const saveSchoolSection')
+  );
+  assert.match(saveIdentity, /whatsappPhone:\s*normalizeWhatsAppNumber\(whatsappPhone\)/);
+  assert.match(saveIdentity, /if \(whatsappPhone\.trim\(\) && !normalizeWhatsAppNumber\(whatsappPhone\)\)/);
+});
+
+test('discipline module can create incidents and displays the persisted student and parent-contact fields', () => {
+  assert.match(ui, /<form onSubmit=\{handleAddDisciplineIncident\}/);
+  assert.match(ui, /value=\{incidentStudentId\}/);
+  assert.match(ui, /value=\{incidentDate\}/);
+  assert.match(ui, /value=\{infractionType\}/);
+  assert.match(ui, /value=\{incidentSeverity\}/);
+  assert.match(ui, /checked=\{parentContacted\}/);
+  assert.match(ui, /studentName:\s*student \?/);
+  assert.match(ui, /d\.parentContacted \? 'Yes \(manual contact\)' : 'No'/);
+  assert.doesNotMatch(ui, /d\.parentNotified/);
+  assert.match(ui, /disciplineLoading \?/);
+});
+
+
+test('inventory metadata updates remain school-scoped and cannot rewrite stock balances', () => {
+  const updateRoute = api.slice(api.indexOf("apiRouter.put('/inventory/:id'"), api.indexOf("apiRouter.get('/inventory/:id/transactions'"));
+  const updateStorage = storage.slice(storage.indexOf('public async updateInventoryItem('), storage.indexOf('public async adjustInventoryStock('));
+  assert.match(updateRoute, /requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission\('inventory_manage'\)/);
+  assert.doesNotMatch(updateRoute, /quantityOnHand|quantity_on_hand/);
+  assert.match(updateStorage, /\.eq\('school_id', schoolId\)\.eq\('id', itemId\)/);
+  assert.match(updateStorage, /updated_at/);
+});
+
+test('module forms surface save failures in the form where the administrator is working', () => {
+  assert.match(ui, /\{libraryError && <div role="alert" className="mb-3/);
+  assert.match(ui, /disabled=\{librarySaving \|\| isReadOnly\}/);
+  assert.match(ui, /\{disciplineError && <div role="alert"/);
+  assert.match(ui, /\{moduleError && <div role="alert"/);
+});
+
+test('transport data is loaded only when the Transport module is active', () => {
+  assert.match(ui, /if \(!school \|\| activeModule !== 'transport'\) return;/);
+  assert.match(ui, /ApiClient\.getTransportRoutes\(school\.id\)/);
+  assert.match(ui, /ApiClient\.getBusAssignments\(\)/);
+});
+
+
+test('Library lending loads the current school student list for book assignment', () => {
+  const libraryEffect = ui.slice(ui.indexOf("if (!school || activeModule !== 'library')"), ui.indexOf('const handleAddDisciplineIncident'));
+  assert.match(libraryEffect, /ApiClient\.getAllStudents\(undefined, undefined\)/);
+  assert.match(libraryEffect, /setStudents\(studentRows\)/);
 });
