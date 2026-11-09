@@ -53,6 +53,7 @@ export const ExamsResultsView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Exam timetable, room allocation, and seat list state
   const [examSchedules, setExamSchedules] = useState<any[]>([]);
@@ -73,6 +74,7 @@ export const ExamsResultsView: React.FC = () => {
   useEffect(() => {
     if (!school) return;
     setIsLoading(true);
+    setLoadError(null);
     Promise.all([
       ApiClient.getClasses(),
       ApiClient.getSubjects(),
@@ -88,6 +90,8 @@ export const ExamsResultsView: React.FC = () => {
         setBigExamMax(conf.bigExamMax || 10);
         setPassMarkPercentage(conf.passMarkPercentage || 50);
       }
+    }).catch((err: any) => {
+      setLoadError(err?.message || 'Unable to load classes, subjects, or exam configuration.');
     }).finally(() => setIsLoading(false));
   }, [school]);
 
@@ -110,6 +114,7 @@ export const ExamsResultsView: React.FC = () => {
   // Load students and marks for selected class & subject
   const loadClassData = async () => {
     if (!selectedClassId) return;
+    setLoadError(null);
     try {
       const [stdList, existingMarks] = await Promise.all([
         ApiClient.getAllStudents(selectedClassId),
@@ -140,6 +145,7 @@ export const ExamsResultsView: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
+      setLoadError(err?.message || 'Unable to load students, marks, or class rankings.');
     }
   };
 
@@ -290,6 +296,7 @@ export const ExamsResultsView: React.FC = () => {
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
             Percentage-based academic grading with Small Exam + Big Exam structure and semester rankings.
+            {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
         </div>
 
@@ -345,6 +352,7 @@ export const ExamsResultsView: React.FC = () => {
         </div>
       </div>
 
+      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => { if (!selectedClassId) { setLoadError(null); return; } void loadClassData(); }} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
