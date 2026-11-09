@@ -40,8 +40,8 @@ export interface SessionPayload {
 // -------------------------------------------------------------
 
 export function passwordPolicyError(password: unknown): string | null {
-  if (typeof password !== 'string' || password.length < 12) {
-    return 'Password must contain at least 12 characters.';
+  if (typeof password !== 'string' || password.length < 8) {
+    return 'Password must contain at least 8 characters.';
   }
   if (password.length > 128) return 'Password must not exceed 128 characters.';
   if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
