@@ -4,7 +4,7 @@
  * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
  * 3. Report Card Designer (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
- * 4. SMS / WhatsApp Notification Gateway (Provider credentials, queue status)
+ * 4. Administrator WhatsApp contact (manual parent messaging; no SMS provider)
  * 5. School Backup & Data Safety (Full JSON backup download, CSV exports)
  */
 
@@ -67,7 +67,7 @@ const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const SchoolSettingsView: React.FC = () => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'sms' | 'backup'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>('identity');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
