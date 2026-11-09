@@ -41,7 +41,7 @@ import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
-import { staffHasPermission } from '../lib/staff-permissions.ts';
+import { staffHasPermission, StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
 
 export const apiRouter = Router();
@@ -456,7 +456,7 @@ function requireSchoolAdminOrSuperAdmin(req: Request, res: Response, next: () =>
   next();
 }
 
-function requireSchoolAdminOrStaffPermission(permission: 'library_manage' | 'transport_manage') {
+function requireSchoolAdminOrStaffPermission(permission: StaffPermission) {
   return async (req: Request, res: Response, next: () => void) => {
     const user = (req as any).user as User;
     if (!user) {
@@ -481,13 +481,23 @@ function requireSchoolAdminOrStaffPermission(permission: 'library_manage' | 'tra
   };
 }
 
-function requireAccountantOrSuperAdmin(req: Request, res: Response, next: () => void) {
-  const user = (req as any).user as User;
-  if (!user || !['accountant', 'super_admin'].includes(user.role)) {
-    res.status(403).json({ error: 'School Accountant privilege required for money records.' });
-    return;
-  }
-  next();
+function requireAccountantOrSuperAdmin(permission: StaffPermission = 'fees_manage') {
+  return async (req: Request, res: Response, next: () => void) => {
+    const user = (req as any).user as User;
+    if (!user) { res.status(401).json({ error: 'Authentication required.' }); return; }
+    if (user.role === 'super_admin') { next(); return; }
+    if (user.role !== 'accountant') {
+      res.status(403).json({ error: 'Accountant or authorized staff access required.' });
+      return;
+    }
+    const school = (req as any).school as School;
+    const staff = await getStaffForRequest(req, user.id, school.id);
+    if (!staffHasPermission(staff, permission)) {
+      res.status(403).json({ error: 'Your staff account does not have permission for this action.' });
+      return;
+    }
+    next();
+  };
 }
 
 function requireImportSchoolAccess(req: Request, res: Response, next: () => void) {
@@ -500,6 +510,7 @@ function requireImportSchoolAccess(req: Request, res: Response, next: () => void
 
 function requireSchoolStaff(req: Request, res: Response, next: () => void) {
   const user = (req as any).user as User;
+  if (user?.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'grades_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view exam results.' }); return false; }
   if (!user || !['school_admin', 'super_admin', 'teacher', 'accountant'].includes(user.role)) {
     res.status(403).json({ error: 'School staff access required.' });
     return;
@@ -2270,6 +2281,7 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   const user = (req as any).user as User;
   const school = (req as any).school as School;
   if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view school reports.' }); return; }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'reports_export')) { res.status(403).json({ error: 'Your staff account does not have permission to view reports.' }); return; }
   try {
     const summary = await db.getSchoolDashboardSummary(school.id);
     const stats = summary?.stats || {};
@@ -2319,7 +2331,7 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   }
 });
 
-apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('reports_export'), async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
   if (!['accountant', 'super_admin'].includes(user.role)) {
@@ -3466,7 +3478,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   res.status(201).json({ ...teacher, initialPin });
 });
 
-const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export']);
+const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -3535,10 +3547,10 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
   res.json(updated);
 });
 
-apiRouter.get('/school/admissions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/admissions', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   res.json(await db.getAdmissionApplications((req as any).school.id));
 });
-apiRouter.post('/school/admissions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/school/admissions', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   const school = (req as any).school;
   const { firstName, middleName, lastName, gender, gradeApplying, classId, fatherPhone, motherPhone } = req.body || {};
   if (![firstName, lastName, gradeApplying, classId].every(value => typeof value === 'string' && value.trim()) || !['male', 'female'].includes(gender)) { res.status(400).json({ error: 'First and last name, gender, grade and class are required.' }); return; }
@@ -3549,7 +3561,7 @@ apiRouter.post('/school/admissions', requireAuth, requireSchoolAdminOrSuperAdmin
   await db.flush();
   res.status(201).json(application);
 });
-apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   const school = (req as any).school;
   const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
   if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
@@ -3561,7 +3573,7 @@ apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolAdmin
   await db.flush();
   res.json(rejected);
 });
-apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   const school = (req as any).school;
   const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
   if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
@@ -3609,6 +3621,7 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
     res.status(400).json({ error: 'classId and date (YYYY-MM-DD) are required.' });
     return;
   }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view attendance.' }); return; }
   if (!await canAccessTeachingClass(req, res, classId as string)) return;
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
@@ -4004,7 +4017,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 });
 
-apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { markIds } = req.body;
@@ -4103,12 +4116,12 @@ apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmi
 // 7. CASH-ONLY FEES & CLASS-RANGE LEDGER
 // ==============================================================================
 
-apiRouter.get('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/fees/structures', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getFeeStructures(school.id));
 });
 
-apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/fees/structures', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const body = req.body || {};
   if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120 || !['monthly_tuition', 'annual_registration', 'bus', 'custom'].includes(body.feeType) || !Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0 || Number(body.amount) > 9999999999.99 || !['monthly', 'annual', 'one_time'].includes(body.cadence)) {
@@ -4135,7 +4148,7 @@ apiRouter.post('/fees/structures', requireAuth, requireAccountantOrSuperAdmin, r
   res.status(201).json(item);
 });
 
-apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.put('/fees/structures/:id', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const existing = (await db.getFeeStructures(school.id)).find(item => item.id === req.params.id);
   if (!existing) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
@@ -4171,7 +4184,7 @@ apiRouter.put('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin
   res.json(updated);
 });
 
-apiRouter.delete('/fees/structures/:id', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/fees/structures/:id', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const structure = (await db.getFeeStructures(school.id)).find(item => item.id === req.params.id);
   if (!structure) { res.status(404).json({ error: 'Fee structure not found.' }); return; }
@@ -4187,6 +4200,7 @@ apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, r
   const user = (req as any).user as User;
   const { studentId } = req.query;
   if (!['school_admin', 'accountant', 'super_admin', 'parent', 'student'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view student fee records.' }); return; }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'fees_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view fee records.' }); return; }
   if (studentId && !await canAccessStudentRecord(user, studentId as string)) {
     res.status(403).json({ error: 'You do not have access to this student fee record.' });
     return;
@@ -4198,7 +4212,7 @@ apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, r
   void sendDatabasePage(req, res, 'fee_payments', { school_id: school.id, student_id: studentId as string });
 });
 
-apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
@@ -4211,7 +4225,7 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireAccountantO
 });
 
 // Record Cash Payment only!
-apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
@@ -4250,7 +4264,7 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireAccountantOrSuperAdmin, req
   }
 });
 
-apiRouter.get('/fees/daily-income', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/fees/daily-income', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   let schoolLocalDate: string;
   try {
@@ -4292,7 +4306,7 @@ apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, re
   void sendDatabasePage(req, res, 'payroll_records', { school_id: school.id, user_id: user.id, payroll_month: typeof req.query.month === 'string' ? req.query.month : undefined });
 });
 
-apiRouter.get('/payroll/staff', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/payroll/staff', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const [teachers, staffRows] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id)]);
   const employees = [
@@ -4302,12 +4316,12 @@ apiRouter.get('/payroll/staff', requireAuth, requireAccountantOrSuperAdmin, requ
   res.json(employees);
 });
 
-apiRouter.get('/payroll', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/payroll', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const school = (req as any).school as School;
   void sendDatabasePage(req, res, 'payroll_records', { school_id: school.id, payroll_month: typeof req.query.month === 'string' ? req.query.month : undefined });
 });
 
-apiRouter.post('/payroll', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/payroll', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const school = (req as any).school as School; const user = (req as any).user as User;
   const month = typeof req.body?.month === 'string' ? req.body.month : '';
   const selections = req.body?.staff;
@@ -4334,7 +4348,7 @@ apiRouter.post('/payroll', requireAuth, requireAccountantOrSuperAdmin, requireSc
   await db.flush(); res.status(201).json(created);
 });
 
-apiRouter.post('/payroll/:id/approve', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/payroll/:id/approve', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.status !== 'draft') { res.status(409).json({ error: 'Only a draft payroll record can be approved.' }); return; }
@@ -4343,7 +4357,7 @@ apiRouter.post('/payroll/:id/approve', requireAuth, requireAccountantOrSuperAdmi
   await db.flush(); res.json(updated);
 });
 
-apiRouter.post('/payroll/:id/pay', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/payroll/:id/pay', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
   if (!record || record.status !== 'approved') { res.status(409).json({ error: 'Only an approved payroll record can be marked paid.' }); return; }
@@ -4365,7 +4379,7 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
     `Deduction total: ${formatMoney(record.deductionTotal || 0, school.currency)}`, `Net salary: ${formatMoney(record.netSalary, school.currency)}`]]);
 });
 
-apiRouter.get('/fees/arrears', requireAuth, requireAccountantOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/fees/arrears', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getArrearsList(school.id));
 });
@@ -4462,12 +4476,12 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
 // ==============================================================================
 
 // INVENTORY
-apiRouter.get('/inventory', requireAuth, requireSchoolContext, async (req,res) => {
+apiRouter.get('/inventory', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('inventory_manage'), async (req,res) => {
  const user=(req as any).user as User, school=(req as any).school as School;
  if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory access is restricted.'});return;}
  res.json(await db.getInventoryItems(school.id));
 });
-apiRouter.post('/inventory', requireAuth, requireSchoolContext, async(req,res)=>{
+apiRouter.post('/inventory', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('inventory_manage'), async(req,res)=>{
  const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
  if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
  const name=typeof body.name==='string'?body.name.trim():'', sku=typeof body.sku==='string'?body.sku.trim():'';
@@ -4478,7 +4492,7 @@ apiRouter.post('/inventory', requireAuth, requireSchoolContext, async(req,res)=>
  db.logAudit({action:'INVENTORY_ITEM_CREATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Created inventory item ${name}.`,severity:'info'});res.status(201).json(item);
  }catch(error:any){res.status(error?.code==='23505'||/duplicate/i.test(String(error?.message))?409:503).json({error:'Unable to create inventory item. Check whether its SKU is already in use.'});}
 });
-apiRouter.put('/inventory/:id', requireAuth, requireSchoolContext, async(req,res)=>{
+apiRouter.put('/inventory/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('inventory_manage'), async(req,res)=>{
  const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
  if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
  const updates:Record<string,any>={};
@@ -4489,13 +4503,13 @@ apiRouter.put('/inventory/:id', requireAuth, requireSchoolContext, async(req,res
  try{const item=await db.updateInventoryItem(school.id,req.params.id,updates);if(!item){res.status(404).json({error:'Inventory item not found.'});return;}db.logAudit({action:'INVENTORY_ITEM_UPDATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Updated inventory item ${item.name}.`,severity:'info'});res.json(item);}
  catch{res.status(503).json({error:'Unable to update this inventory item.'});}
 });
-apiRouter.get('/inventory/:id/transactions', requireAuth, requireSchoolContext, async(req,res)=>{
+apiRouter.get('/inventory/:id/transactions', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('inventory_manage'), async(req,res)=>{
  const user=(req as any).user as User, school=(req as any).school as School;
  if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory access is restricted.'});return;}
  const item=(await db.getInventoryItems(school.id)).find((row:any)=>row.id===req.params.id);if(!item){res.status(404).json({error:'Inventory item not found.'});return;}
  res.json((await db.getInventoryTransactions(school.id,item.id)).sort((a:any,b:any)=>String(b.createdAt).localeCompare(String(a.createdAt))));
 });
-apiRouter.post('/inventory/:id/transactions', requireAuth, requireSchoolContext, async(req,res)=>{
+apiRouter.post('/inventory/:id/transactions', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('inventory_manage'), async(req,res)=>{
  const user=(req as any).user as User, school=(req as any).school as School, body=req.body||{};
  if(!['school_admin','super_admin','accountant'].includes(user.role)){res.status(403).json({error:'Inventory management permission is required.'});return;}
  const transactionType=body.transactionType, quantity=Number(body.quantity), unitCost=Number(body.unitCost??0);
