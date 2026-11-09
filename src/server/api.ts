@@ -522,7 +522,7 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
       ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
       : { items: [] as any[] };
     const isFormTeacher = Boolean(teacher && (
-      klass.classTeacherId === teacher.id ||
+      klass.classTeacherId === user.id ||
       (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(classId))
     ));
     if (!assignment.items.length && !isFormTeacher) {
@@ -543,7 +543,7 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     if (!teacher) return false;
     const klass = await db.getClassById(student.classId, student.schoolId);
     if (klass && (
-      klass.classTeacherId === teacher.id ||
+      klass.classTeacherId === user.id ||
       (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
     )) return true;
     const assignment = await db.queryPage('class_subjects', {
@@ -2423,7 +2423,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
   const formTeacherClassIds = new Set<string>(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses : []);
   const formTeacherClasses = allClasses.filter((klass: any) =>
-    klass.classTeacherId === teacher.id || formTeacherClassIds.has(klass.id)
+    klass.classTeacherId === user.id || formTeacherClassIds.has(klass.id)
   );
   const assignedPairs = new Set<string>();
   const result: any[] = [];
@@ -3908,7 +3908,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     const teacher = teacherPage.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
     const isFormTeacher = Boolean(teacher && klass && (
-      klass.classTeacherId === teacher.id ||
+      klass.classTeacherId === user.id ||
       (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(String(classId)))
     ));
     const assignment = teacher
@@ -3951,7 +3951,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     const teacherRecord = teacher.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
     const isFormTeacher = Boolean(klass && (
-      klass.classTeacherId === teacherRecord.id ||
+      klass.classTeacherId === user.id ||
       (Array.isArray(teacherRecord.assignedClasses) && teacherRecord.assignedClasses.includes(String(classId)))
     ));
     const assignment = await db.queryPage('class_subjects', {
