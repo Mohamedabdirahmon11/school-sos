@@ -71,7 +71,6 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [addAdminName, setAddAdminName] = useState('');
   const [addAdminEmail, setAddAdminEmail] = useState('');
   const [addAdminPhone, setAddAdminPhone] = useState('');
-  const [addAdminPass, setAddAdminPass] = useState('');
   const [addStudentAccess, setAddStudentAccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,12 +130,12 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         adminName: addAdminName,
         adminEmail: addAdminEmail,
         adminPhone: addAdminPhone,
-        adminPassword: addAdminPass,
         studentAccessEnabled: addStudentAccess
       });
 
       setShowAddModal(false);
       setActionNotice(`School "${res.school.name}" onboarded successfully.`);
+      if (res.temporaryPassword) window.alert(`School administrator temporary password:\n\n${res.temporaryPassword}\n\nShare it securely with the administrator. They must set a new password at first sign-in.`);
       // Reset form
       setAddName('');
       setAddCode('');
@@ -641,16 +640,8 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block font-medium text-[#334155]">Initial Password</label>
-                  <PasswordInput
-                    label="initial administrator password"
-                    required
-                    value={addAdminPass}
-                    onChange={e => setAddAdminPass(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 font-mono border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white"
-                  />
-                  <p className="text-[11px] text-[#64748B] mt-0.5">Admin will be forced to set their own password on first login.</p>
+                <div className="col-span-2 rounded-lg border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">
+                  A temporary six-digit password is generated automatically. The school administrator sets a personal password at first sign-in.
                 </div>
               </div>
 
