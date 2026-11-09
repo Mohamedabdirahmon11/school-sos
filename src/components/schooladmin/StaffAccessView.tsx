@@ -24,7 +24,8 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'library_manage', label: 'Library Catalog & Loans' },
   { id: 'transport_manage', label: 'Transport Fleet & Student Routes' },
   { id: 'inventory_manage', label: 'School Inventory & Asset Registry' },
-  { id: 'reports_export', label: 'Export Reports & Financial CSVs' }
+  { id: 'reports_export', label: 'Export Reports & Financial CSVs' },
+  { id: 'payroll_manage', label: 'Payroll Management (Create, approve and pay salaries)' }
 ];
 
 export const StaffAccessView: React.FC = () => {
