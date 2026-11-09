@@ -86,7 +86,7 @@ export const AttendanceView: React.FC = () => {
       setPageStudents(firstPage);
       setServerPageInfo(firstPageInfo);
 
-      const map: Record<string, { status: AttendanceStatus; note: string }> = {};
+      const map: Record<string, { status: AttendanceStatus | 'unrecorded'; note: string }> = {};
       for (const std of allStudents) {
         const record = existingRecords.find(r => r.studentId === std.id);
         map[std.id] = {
