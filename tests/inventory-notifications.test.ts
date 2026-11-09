@@ -27,7 +27,7 @@ test('inventory movements are tenant-bound, serialized, and cannot create negati
 test('parent absence messages use the administrator WhatsApp account and require manual Send', () => {
   assert.match(settingsUi, /Official School Telephone/);
   assert.match(settingsUi, /Admin WhatsApp Number/);
-  assert.match(settingsUi, /maamuluhu ayaa riixaya Send/);
+  assert.match(attendanceUi, /maamuluhu ayaa riixaya Send/);
   assert.match(attendanceUi, /https:\/\/wa\.me\//);
   assert.match(attendanceUi, /parentWhatsAppNumber/);
   assert.match(attendanceUi, /normalizeWhatsAppNumber\(school\?\.whatsappPhone\)/);
