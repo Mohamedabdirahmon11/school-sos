@@ -132,6 +132,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const healthPage = filterModuleRows(healthLogs, ['studentName', 'visitDate', 'symptoms', 'treatment', 'nurseName']);
   const inventoryPage = filterModuleRows(inventory, ['name', 'sku', 'category', 'location']);
 
+  useEffect(() => {
+    setModuleSearch('');
+    setModulePage(1);
+  }, [activeModule]);
+
   const renderModulePagination = (page: { total: number; totalPages: number; page: number; rows: any[] }, label: string) => (
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
       <span>{page.total === 0 ? `No ${label} found` : `Showing ${(page.page - 1) * modulePageSize + 1}–${Math.min(page.page * modulePageSize, page.total)} of ${page.total} ${label}`}</span>
@@ -562,6 +567,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <tr>
                     <td colSpan={4} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
                   </tr>
+                ) : booksPage.rows.length === 0 ? (
+                  <tr><td colSpan={4} className="p-6 text-center text-[#64748B]">No books match your search.</td></tr>
                 ) : (
                   booksPage.rows.map(b => (
                     <tr key={b.id} className="hover:bg-[#F8FAFC]">
@@ -587,7 +594,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 <form onSubmit={handleIssueLibraryLoan} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   <select required value={loanBookId} onChange={e => setLoanBookId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
                     <option value="">Select available book</option>
-                    {booksPage.rows.map(book => {
+                    {books.map(book => {
                       const active = libraryLoans.filter(loan => loan.bookId === book.id && loan.status === 'issued').length;
                       const available = Math.max(0, Number(book.quantity || 0) - active);
                       return available > 0 ? <option key={book.id} value={book.id}>{book.title} · {available} available</option> : null;
@@ -665,6 +672,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <tr>
                     <td colSpan={7} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
+                ) : routesPage.rows.length === 0 ? (
+                  <tr><td colSpan={7} className="p-6 text-center text-[#64748B]">No routes match your search.</td></tr>
                 ) : (
                   routesPage.rows.map(r => (
                     <tr key={r.id} className="hover:bg-[#F8FAFC]">
@@ -822,7 +831,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td className="px-4 py-2.5 text-[#0F766E] font-medium">{h.nurseName}</td>
                   </tr>
                 )) : (
-                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>No health visits have been recorded.</td></tr>
+                  <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>{healthLogs.length ? 'No health visits match your search.' : 'No health visits have been recorded.'}</td></tr>
                 )}
               </tbody>
             </table>
