@@ -968,7 +968,13 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
   const normalizedRole = normalizeRole(storedUser.role);
-  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
+  // The staff sign-in screen is shared by Super Admin and School Admin.
+  // The submitted tab defaults to school_admin, so resolve the actual admin
+  // role from the matched account instead of rejecting a Super Admin login.
+  const sharedAdminLogin = requestedRole === 'school_admin'
+    && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin')
+    && identifier.includes('@');
+  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole && !sharedAdminLogin) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
     res.status(401).json({ error: 'Invalid email or password.' });
