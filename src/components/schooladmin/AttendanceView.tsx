@@ -38,7 +38,7 @@ export const AttendanceView: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
-  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus | 'unrecorded'; note: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export const AttendanceView: React.FC = () => {
       for (const std of allStudents) {
         const record = existingRecords.find(r => r.studentId === std.id);
         map[std.id] = {
-          status: record ? record.status : 'present',
+          status: record ? record.status : 'unrecorded',
           note: record?.note || ''
         };
       }
@@ -287,7 +287,7 @@ export const AttendanceView: React.FC = () => {
                       <td className="py-3 px-4 font-mono text-[#64748B]">{std.fatherPhone || 'N/A'}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center">
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase ${state.status === 'present' ? 'bg-emerald-100 text-emerald-800' : state.status === 'absent' ? 'bg-rose-100 text-rose-800' : state.status === 'late' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'}`}>{state.status}</span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase ${state.status === 'present' ? 'bg-emerald-100 text-emerald-800' : state.status === 'absent' ? 'bg-rose-100 text-rose-800' : state.status === 'late' ? 'bg-amber-100 text-amber-800' : state.status === 'excused' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'}`}>{state.status}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
