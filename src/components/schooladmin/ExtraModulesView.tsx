@@ -218,11 +218,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     let cancelled = false;
     setLibraryLoading(true);
     setLibraryError(null);
-    Promise.all([ApiClient.getLibraryBooks(school.id), ApiClient.getLibraryLoans()])
-      .then(([bookRows, loanRows]) => {
+    Promise.all([
+      ApiClient.getLibraryBooks(school.id),
+      ApiClient.getLibraryLoans(),
+      ApiClient.getAllStudents(undefined, undefined)
+    ])
+      .then(([bookRows, loanRows, studentRows]) => {
         if (cancelled) return;
         setBooks(bookRows);
         setLibraryLoans(loanRows);
+        setStudents(studentRows);
         const firstAvailable = bookRows.find(book => loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0));
         setLoanBookId(current => bookRows.some(book => book.id === current &&
           loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0))
