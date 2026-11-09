@@ -3052,8 +3052,7 @@ AS $function$
         'id', student.id,
         'studentId', student.student_id,
         'name', concat_ws(' ', student.first_name, NULLIF(student.middle_name, ''), student.last_name),
-        'className', COALESCE(class_row.name, 'Class not assigned'),
-        'daysAbsent', 1
+        'className', COALESCE(class_row.name, 'Class not assigned')
       ) ORDER BY class_row.grade_level NULLS LAST, class_row.name, student.last_name, student.first_name)
       FROM public.attendance_records AS attendance
       JOIN public.students AS student
