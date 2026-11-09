@@ -21,6 +21,7 @@ test('finance, payroll, admissions, inventory, grades and reports enforce staff 
   }
   assert.match(api, /getStaffForRequest\(req, user\.id, school\.id\), 'fees_manage'/);
   assert.match(api, /requireAccountantOrSuperAdmin\('payroll_manage'\)/);
+  assert.match(api, /apiRouter\.get\('\/promotions\/history', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission\('grades_manage'\)/);
 });
 
 test('year-end promotion uses one database transaction and maps the history schema correctly', () => {
