@@ -1800,7 +1800,7 @@ apiRouter.get('/superadmin/backup', requireAuth, requireSuperAdmin, async (req, 
       userName: user.fullName,
       userRole: user.role,
       details: 'Platform export generation or persistence failed.',
-      severity: 'error'
+      severity: 'critical'
     });
     await db.flush().catch(() => undefined);
     res.status(503).json({ error: 'Platform backup could not be completed. No backup was marked as successful.' });
