@@ -2960,7 +2960,8 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     roleFilter = terms.join(',');
   } else if (user.role === 'parent') {
     const ids = (user.linkedStudentIds || []).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
-    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...(user.phone ? [`father_phone.eq.${user.phone}`, `mother_phone.eq.${user.phone}`] : [])];
+    const parentPhones = [...new Set([user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone?.trim())))];
+    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`])];
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
@@ -4583,7 +4584,7 @@ apiRouter.delete('/school/events/:id', requireAuth, requireSchoolContext, requir
 });
 
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const user = (req as any).user as User;
   const filters: Record<string, any> = { school_id: school.id, is_active: true };
   if (!['school_admin', 'super_admin', 'accountant'].includes(user.role)) {
@@ -4591,7 +4592,13 @@ apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) =>
     const classIds = await getNoticeClassIds(school.id, user);
     const terms = ['audience.eq.all', 'audience.eq.school', `audience.eq.${audience}`];
     if (classIds.length) terms.push(`and(audience.eq.class,class_id.in.(${[...new Set(classIds)].join(',')}))`);
-    await sendDatabasePage(req, res, 'school_notices', filters, terms.join(','));
+    let schoolToday: string;
+    try {
+      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+    } catch {
+      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
+    }
+    await sendDatabasePage(req, res, 'school_notices', filters, `and(publish_date.lte.${schoolToday},or(${terms.join(',')}))`);
     return;
   }
   await sendDatabasePage(req, res, 'school_notices', filters);
@@ -4605,6 +4612,9 @@ apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) =
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
   const audience = req.body?.audience;
   const classId = typeof req.body?.classId === 'string' ? req.body.classId : undefined;
+  const publishDate = typeof req.body?.publishDate === 'string' ? req.body.publishDate.trim().slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: ((req as any).school as School).timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  const parsedPublishDate = new Date(`${publishDate}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(publishDate) || Number.isNaN(parsedPublishDate.getTime()) || parsedPublishDate.toISOString().slice(0, 10) !== publishDate) return res.status(400).json({ error: 'Publish date must be a valid calendar date.' });
   if (!['all', 'school', 'teachers', 'parents', 'students', 'class'].includes(audience)) return res.status(400).json({ error: 'Choose a supported notice audience.' });
   if (!title || title.length > 200 || !content || content.length > 10000) return res.status(400).json({ error: 'Notice title and content are required and must be within the allowed length.' });
   if (audience === 'class' && (!classId || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
@@ -4612,7 +4622,7 @@ apiRouter.post('/notices', requireAuth, requireSchoolContext, async (req, res) =
   const notice = db.createNotice({
     title, content, audience, ...(audience === 'class' ? { classId } : {}),
     isPinned: req.body?.isPinned === true,
-    publishDate: typeof req.body?.publishDate === 'string' && !Number.isNaN(Date.parse(req.body.publishDate)) ? req.body.publishDate : new Date().toISOString(),
+    publishDate,
     schoolId: school.id, authorName: user.fullName, authorRole: user.role, isActive: true
   });
   res.status(201).json(notice);
@@ -4626,12 +4636,18 @@ apiRouter.put('/notices/:id', requireAuth, requireSchoolContext, async (req, res
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
   const audience = req.body?.audience;
   const classId = typeof req.body?.classId === 'string' ? req.body.classId : undefined;
+  const publishDate = typeof req.body?.publishDate === 'string' ? req.body.publishDate.trim().slice(0, 10) : undefined;
+  if (publishDate !== undefined) {
+    const parsedPublishDate = new Date(`${publishDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(publishDate) || Number.isNaN(parsedPublishDate.getTime()) || parsedPublishDate.toISOString().slice(0, 10) !== publishDate) return res.status(400).json({ error: 'Publish date must be a valid calendar date.' });
+  }
   if (!title || title.length > 200 || !content || content.length > 10000 || !['all', 'school', 'class', 'teachers', 'parents', 'students'].includes(audience)) return res.status(400).json({ error: 'Valid notice title, content and audience are required.' });
   if (audience === 'class' && (!classId || !(await db.getClassById(classId, school.id)))) return res.status(400).json({ error: 'A valid class is required for a class notice.' });
   if (req.body?.isPinned !== undefined && typeof req.body.isPinned !== 'boolean') return res.status(400).json({ error: 'Pinned must be true or false.' });
   const updated = await db.updateNotice(req.params.id, school.id, {
     title, content, audience, ...(audience === 'class' ? { classId } : { classId: undefined }),
-    isPinned: req.body?.isPinned === true
+    isPinned: req.body?.isPinned === true,
+    ...(publishDate ? { publishDate } : {})
   });
   if (!updated) return res.status(404).json({ error: 'Notice not found.' });
   res.json(updated);
@@ -4668,8 +4684,13 @@ apiRouter.post('/notices/read-batch', requireAuth, requireSchoolContext, async (
 apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
   const schoolId = (req as any).school.id;
+  const school = (req as any).school as School;
   const notice = (await db.getNotices(schoolId)).find(item => item.id === req.params.id && item.isActive !== false);
   if (!notice) return res.status(404).json({ error: 'Notice not found.' });
+  let schoolToday: string;
+  try { schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date()); }
+  catch { schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date()); }
+  if (String(notice.publishDate || '').slice(0, 10) > schoolToday && !['school_admin', 'super_admin', 'accountant'].includes(user.role)) return res.status(404).json({ error: 'Notice not found.' });
   const roleAudience = user.role === 'teacher' ? 'teachers' : user.role === 'parent' ? 'parents' : 'students';
   const classIds = await getNoticeClassIds(schoolId, user);
   const visible = ['school_admin', 'super_admin', 'accountant'].includes(user.role) || ['all', 'school', roleAudience].includes(notice.audience) || notice.audience === 'class' && Boolean(notice.classId && classIds.includes(notice.classId));
