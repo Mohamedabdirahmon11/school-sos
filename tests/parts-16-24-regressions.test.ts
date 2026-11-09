@@ -20,7 +20,7 @@ test('finance, payroll, admissions, inventory, grades and reports enforce staff 
     assert.ok(staffUi.includes(`id: '${permission}'`), `staff UI exposes ${permission}`);
   }
   assert.match(api, /getStaffForRequest\(req, user\.id, school\.id\), 'fees_manage'/);
-  assert.match(api, /getStaffForRequest\(req, user\.id, school\.id\), 'payroll_manage'/);
+  assert.match(api, /requireAccountantOrSuperAdmin\('payroll_manage'\)/);
 });
 
 test('year-end promotion uses one database transaction and maps the history schema correctly', () => {
