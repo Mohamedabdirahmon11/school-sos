@@ -914,3 +914,79 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* School Admin finishing pass: consistent controls, dialogs, filters and responsive data surfaces. */
+.school-admin-design main {
+  color: var(--admin-ink);
+  scrollbar-gutter: stable;
+}
+.school-admin-design main > div > :is(.flex, .grid) { min-width: 0; }
+.school-admin-design main :is(input, select, textarea) {
+  color: #203a35;
+  background-color: #fff;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgba(16,37,34,.025);
+}
+.school-admin-design main :is(input, select, textarea)::placeholder { color: #94a6a1; }
+.school-admin-design main :is(input, select, textarea):disabled {
+  background: #f1f5f4;
+  color: #84938f;
+  cursor: not-allowed;
+}
+.school-admin-design main button {
+  min-height: 36px;
+  font-weight: 600;
+}
+.school-admin-design main button[class*="bg-[#0e8078]"],
+.school-admin-design main button[class*="bg-[#0F766E]"] {
+  box-shadow: 0 2px 5px rgba(14,128,120,.13);
+}
+.school-admin-design main :is([role="dialog"], .fixed.inset-0 > .bg-white) {
+  max-height: min(90dvh, 900px);
+  overflow-y: auto;
+}
+.school-admin-design main .overflow-x-auto {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.school-admin-design main table tbody tr:last-child td { border-bottom: 0; }
+.school-admin-design main table tbody tr { transition: background-color .14s ease; }
+.school-admin-design main :is(.bg-emerald-50, .bg-amber-50, .bg-rose-50, .bg-sky-50) {
+  border-radius: 11px;
+}
+.school-admin-design main label {
+  color: #425b55;
+  font-weight: 600;
+}
+.school-admin-design main :is(.grid.grid-cols-1, .grid.grid-cols-2, .grid.grid-cols-3) {
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .school-admin-design main > div {
+    padding: 18px 14px 26px;
+    gap: 18px;
+  }
+  .school-admin-design main h1 { font-size: 21px; }
+  .school-admin-design main :is(button, a[role="button"]) { min-height: 40px; }
+  .school-admin-design main table { min-width: 660px; }
+  .school-admin-design main .fixed.inset-0 {
+    align-items: flex-end;
+    padding: 10px;
+  }
+  .school-admin-design main .fixed.inset-0 > .bg-white {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    border-radius: 20px 20px 14px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-design *, .school-admin-design *::before, .school-admin-design *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

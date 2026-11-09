@@ -1,45 +1,13 @@
-/**
- * Responsive Sidebar Navigation for SchoolOS
- * Dark green-teal sidebar (~#0B2B2A), teal primary (#0F766E), high density layout
- */
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import {
-  LayoutDashboard,
-  Building2,
-  Receipt,
-  Users,
-  BarChart3,
-  Radio,
-  LifeBuoy,
-  Settings,
-  GraduationCap,
-  UserCheck,
-  PhoneCall,
-  Layers,
-  BookOpen,
-  CalendarDays,
-  CalendarCheck,
-  FileSpreadsheet,
-  FileCheck2,
-  CreditCard,
-  BellRing,
-  MessageSquare,
-  UserPlus,
-  ShieldCheck,
-  FileText,
-  Sliders,
-  Library,
-  Bus,
-  AlertTriangle,
-  HeartPulse,
-  Award,
-  Wallet,
-  Boxes,
-  Compass
+  LayoutDashboard, Building2, Receipt, Users, BarChart3, Radio, LifeBuoy,
+  Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
+  CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
+  UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
+  HeartPulse, Award, Wallet, Boxes, ChevronRight
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -49,191 +17,133 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type NavGroup = { title: string; items: NavItem[] };
+
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
   const { user, school, t, inspectedSchool } = useAuth();
   const role = user?.role || 'school_admin';
-  const unreadNoticesState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(user && school));
-  const unreadNotices = unreadNoticesState.data?.count || 0;
+  const unreadState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(user && school));
+  const unread = unreadState.data?.count || 0;
+
   useEffect(() => {
     if (!user || !school) return;
-    const refreshUnread = () => unreadNoticesState.retry();
-    const refreshInterval = window.setInterval(refreshUnread, 60_000);
-    window.addEventListener('schoolos:notices-read', refreshUnread);
+    const refresh = () => unreadState.retry();
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener('schoolos:notices-read', refresh);
     return () => {
-      window.clearInterval(refreshInterval);
-      window.removeEventListener('schoolos:notices-read', refreshUnread);
+      window.clearInterval(timer);
+      window.removeEventListener('schoolos:notices-read', refresh);
     };
-  }, [user?.id, school?.id, unreadNoticesState.retry]);
-  const noticeLabel = unreadNotices ? `${t('notice_board')} (${unreadNotices})` : t('notice_board');
+  }, [user?.id, school?.id, unreadState.retry]);
 
-  // Navigation Items defined per Role
-  const getNavItems = () => {
-    if (role === 'super_admin' && !inspectedSchool) {
-      return [
-        { id: 'sa_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sa_schools', label: t('schools'), icon: Building2 },
-        { id: 'sa_plans', label: t('plans_billing'), icon: Receipt },
-        { id: 'sa_users', label: t('users'), icon: Users },
-        { id: 'sa_analytics', label: t('analytics'), icon: BarChart3 },
-        { id: 'sa_broadcasts', label: t('broadcasts'), icon: Radio },
-        { id: 'sa_support', label: t('support_audit'), icon: LifeBuoy },
-        { id: 'sa_settings', label: t('platform_settings'), icon: Settings }
-      ];
-    }
+  const noticeLabel = unread ? `${t('notice_board')} · ${unread > 99 ? '99+' : unread}` : t('notice_board');
+  const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label, icon });
+  const groups: NavGroup[] = (() => {
+    if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform', items: [
+      item('sa_dashboard', t('dashboard'), LayoutDashboard), item('sa_schools', t('schools'), Building2),
+      item('sa_plans', t('plans_billing'), Receipt), item('sa_users', t('users'), Users),
+      item('sa_analytics', t('analytics'), BarChart3), item('sa_broadcasts', t('broadcasts'), Radio),
+      item('sa_support', t('support_audit'), LifeBuoy), item('sa_settings', t('platform_settings'), Settings)
+    ] }];
+    if (role === 'teacher') return [{ title: 'Teaching', items: [
+      item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
+      item('t_attendance', t('attendance'), CalendarCheck), item('t_grades', t('exams_results'), FileSpreadsheet),
+      item('t_assignments', t('assignments'), FileCheck2), item('t_notices', noticeLabel, BellRing),
+      item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
+    ] }];
+    if (role === 'parent') return [{ title: 'Family', items: [
+      item('p_overview', t('dashboard'), LayoutDashboard), item('p_attendance', t('attendance'), CalendarCheck),
+      item('p_results', t('exams_results'), FileSpreadsheet), item('p_fees', t('fees_payments'), CreditCard),
+      item('p_notices', noticeLabel, BellRing), item('p_messages', t('messages'), MessageSquare)
+    ] }];
+    if (role === 'student') return [{ title: 'My learning', items: [
+      item('st_dashboard', t('dashboard'), LayoutDashboard), item('st_timetable', t('timetable'), CalendarDays),
+      item('st_assignments', t('assignments'), FileCheck2), item('st_results', t('exams_results'), FileSpreadsheet),
+      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing),
+      item('st_messages', t('messages'), MessageSquare)
+    ] }];
+    if (role === 'accountant') return [{ title: 'Finance', items: [
+      item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_fees', t('fees_payments'), CreditCard),
+      item('sch_reports', t('reports_export'), BarChart3), item('sch_payroll', t('payroll_management'), Wallet)
+    ] }];
 
-    if (role === 'teacher') {
-      return [
-        { id: 't_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 't_timetable', label: t('timetable'), icon: CalendarDays },
-        { id: 't_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 't_grades', label: t('exams_results'), icon: FileSpreadsheet },
-        { id: 't_assignments', label: t('assignments'), icon: FileCheck2 },
-        { id: 't_notices', label: noticeLabel, icon: BellRing },
-        { id: 't_messages', label: t('messages'), icon: MessageSquare },
-        { id: 't_payslips', label: t('payroll_payslip'), icon: Wallet }
-      ];
-    }
-
-    if (role === 'parent') {
-      return [
-        { id: 'p_overview', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'p_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 'p_results', label: t('exams_results'), icon: FileSpreadsheet },
-        { id: 'p_fees', label: t('fees_payments'), icon: CreditCard },
-        { id: 'p_notices', label: noticeLabel, icon: BellRing },
-        { id: 'p_messages', label: t('messages'), icon: MessageSquare }
-      ];
-    }
-
-    if (role === 'student') {
-      return [
-        { id: 'st_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'st_timetable', label: t('timetable'), icon: CalendarDays },
-        { id: 'st_assignments', label: t('assignments'), icon: FileCheck2 },
-        { id: 'st_results', label: t('exams_results'), icon: FileSpreadsheet },
-        { id: 'st_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 'st_notices', label: noticeLabel, icon: BellRing }
-        ,{ id: 'st_messages', label: t('messages'), icon: MessageSquare }
-      ];
-    }
-
-    if (role === 'accountant') {
-      return [
-        { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
-        { id: 'sch_reports', label: t('reports_export'), icon: BarChart3 },
-        { id: 'sch_payroll', label: t('payroll_management'), icon: Wallet }
-      ];
-    }
-
-    // Default: School Admin (Full Suite)
     return [
-      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-      { id: 'sch_students', label: t('students'), icon: GraduationCap },
-      { id: 'sch_teachers', label: t('teachers'), icon: UserCheck },
-      { id: 'sch_parents', label: t('parents_contacts'), icon: PhoneCall },
-      { id: 'sch_classes', label: t('classes'), icon: Layers },
-      { id: 'sch_subjects', label: t('subjects'), icon: BookOpen },
-      { id: 'sch_timetable', label: t('timetable'), icon: CalendarDays },
-      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
-      { id: 'sch_exams', label: t('exams_results'), icon: FileSpreadsheet },
-      { id: 'sch_promotion', label: 'Promotion & Alumni', icon: Award },
-      { id: 'sch_events', label: t('events_holidays'), icon: CalendarDays },
-      { id: 'sch_notices', label: noticeLabel, icon: BellRing },
-      { id: 'sch_messages', label: t('messages'), icon: MessageSquare },
-      { id: 'sch_admissions', label: t('admissions'), icon: UserPlus },
-      { id: 'sch_staff', label: t('staff_access'), icon: ShieldCheck },
-      { id: 'sch_reports', label: t('reports_export'), icon: BarChart3 },
-      { id: 'sch_report_cards', label: t('report_cards'), icon: FileText },
-      { id: 'sch_settings', label: t('school_settings'), icon: Sliders },
-      // Extra Modules
-      { id: 'sch_library', label: t('library'), icon: Library },
-      { id: 'sch_transport', label: t('transport'), icon: Bus },
-      { id: 'sch_discipline', label: t('discipline'), icon: AlertTriangle },
-      { id: 'sch_health', label: t('health_nurse'), icon: HeartPulse },
-      { id: 'sch_inventory', label: t('inventory'), icon: Boxes },
-      { id: 'sch_support', label: t('support_audit'), icon: LifeBuoy }
+      { title: 'Overview', items: [item('sch_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'People & admissions', items: [
+        item('sch_students', t('students'), GraduationCap), item('sch_teachers', t('teachers'), UserCheck),
+        item('sch_parents', t('parents_contacts'), PhoneCall), item('sch_admissions', t('admissions'), UserPlus),
+        item('sch_staff', t('staff_access'), ShieldCheck)
+      ] },
+      { title: 'Academic management', items: [
+        item('sch_classes', t('classes'), Layers), item('sch_subjects', t('subjects'), BookOpen),
+        item('sch_timetable', t('timetable'), CalendarDays), item('sch_attendance', t('attendance'), CalendarCheck),
+        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText),
+        item('sch_promotion', 'Promotion & Alumni', Award)
+      ] },
+      { title: 'Communication', items: [
+        item('sch_notices', noticeLabel, BellRing), item('sch_messages', t('messages'), MessageSquare),
+        item('sch_events', t('events_holidays'), CalendarDays)
+      ] },
+      { title: 'Reports & insights', items: [
+        item('sch_reports', t('reports_export'), BarChart3)
+      ] },
+      { title: 'School resources', items: [
+        item('sch_library', t('library'), Library), item('sch_transport', t('transport'), Bus),
+        item('sch_inventory', t('inventory'), Boxes), item('sch_discipline', t('discipline'), AlertTriangle),
+        item('sch_health', t('health_nurse'), HeartPulse)
+      ] },
+      { title: 'Administration', items: [
+        item('sch_settings', t('school_settings'), Sliders), item('sch_support', t('support_audit'), LifeBuoy)
+      ] }
     ];
-  };
+  })();
 
-  const navItems = getNavItems();
-
-  const handleItemClick = (id: string) => {
+  const handleNavigate = (id: string) => {
     onNavigate(id);
-    if (onCloseMobile) onCloseMobile();
+    onCloseMobile?.();
   };
 
-  return (
-    <>
-      {/* Mobile backdrop */}
-      {isOpenMobile && (
-        <div 
-          onClick={onCloseMobile}
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-        />
-      )}
-
-      <aside className={`
-        fixed md:static inset-y-0 left-0 z-40
-        w-[250px] h-[100dvh] bg-[#0B2B2A] text-white flex flex-col shrink-0 md:sticky md:top-0 md:self-start
-        transition-transform duration-200 ease-in-out
-        ${isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
-        {/* Brand / Tenant Header */}
-        <div className="h-[76px] px-4 flex items-center justify-between border-b border-[#143D3B] shrink-0 super-admin-brand">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#15998F] to-[#0F766E] flex items-center justify-center font-bold text-base tracking-wider shrink-0 text-white shadow-lg shadow-black/20 ring-1 ring-white/10">
-              S
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold tracking-tight text-white truncate">
-                {role === 'super_admin' && !inspectedSchool ? 'SchoolOS' : school ? school.name : 'SchoolOS Cloud'}
-              </h1>
-              <p className="text-[10px] text-[#A0BCBA] uppercase font-mono tracking-wider truncate">
-                {role === 'super_admin' && !inspectedSchool ? 'PLATFORM CONSOLE' : school ? `Code: ${school.code}` : 'Multi-School SaaS'}
-              </p>
-            </div>
-          </div>
+  return <>
+    {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[276px] shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="flex h-[82px] shrink-0 items-center gap-3 border-b border-white/10 px-5">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 text-lg font-black text-white shadow-lg shadow-teal-950/40">S</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-bold tracking-tight">{role === 'super_admin' && !inspectedSchool ? 'SchoolOS' : school?.name || 'SchoolOS Cloud'}</div>
+          <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[.16em] text-teal-200/70">{role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : school ? `School code · ${school.code}` : 'School workspace'}</div>
         </div>
+        <button onClick={onCloseMobile} aria-label="Close menu" className="rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
+      </div>
 
-        {/* Navigation Links (Scrollable with custom sleek scrollbar) */}
-        <nav aria-label="Main navigation" className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-1 ${role === 'super_admin' && !inspectedSchool ? 'super-admin-nav' : ''}`}>
-          {role === 'super_admin' && !inspectedSchool && (
-            <div className="px-3 pb-2 pt-1 text-[9px] font-bold tracking-[.18em] uppercase text-[#86aaa4]">Workspace</div>
-          )}
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = currentView === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleItemClick(item.id)}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[12px] font-semibold super-admin-nav-item
-                  transition-colors whitespace-nowrap text-left
-                  ${isActive
-                    ? 'bg-[#0F766E] text-white shadow-sm'
-                    : 'text-[#CBD5E1] hover:bg-[#143D3B] hover:text-white'
-                  }
-                `}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#A0BCBA]'}`} />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Footer Role Banner */}
-        <div className="p-3 border-t border-[#143D3B] bg-[#08201F] text-[11px] text-[#A0BCBA] flex items-center justify-between">
-          <div className="flex items-center gap-1.5 truncate">
-            <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-            <span className="capitalize truncate font-medium text-white">{role.replace('_', ' ')}</span>
+      <nav aria-label="Main navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]">
+        {groups.map(group => <section key={group.title}>
+          <h2 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50">{group.title}</h2>
+          <div className="space-y-1">
+            {group.items.map(entry => {
+              const Icon = entry.icon;
+              const active = currentView === entry.id;
+              return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
+                className={`group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? 'bg-teal-500 text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10' : 'text-slate-300 hover:bg-white/[.075] hover:text-white'}`}>
+                <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-white' : 'text-teal-100/65 group-hover:text-teal-100'}`}/>
+                <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white"/>}
+              </button>;
+            })}
           </div>
-          <span className="font-mono text-[10px] text-[#64748B]">v2.6.0</span>
+        </section>)}
+      </nav>
+
+      <div className="shrink-0 border-t border-white/10 bg-black/10 px-4 py-4">
+        <div className="flex items-center gap-2.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,.12)]"/>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold capitalize text-white">{role.replace(/_/g, ' ')}</p>
+            <p className="truncate text-[10px] text-teal-100/45">{user?.fullName || 'Signed in'}</p>
+          </div>
+          <span className="text-[10px] font-medium tracking-wide text-teal-100/35">v2.6</span>
         </div>
-      </aside>
-    </>
-  );
+      </div>
+    </aside>
+  </>;
 };
