@@ -57,6 +57,8 @@ test('off-site backups follow the saved daily or weekly policy and use a private
   assert.ok(backupWorkflow.includes('secrets.SUPABASE_DB_URL'));
   assert.ok(backupWorkflow.includes('backup_schedule'));
   assert.ok(backupWorkflow.includes('weekly'));
+  assert.ok(backupWorkflow.includes('--db-url "$SUPABASE_DB_URL"'));
+  assert.ok(!backupWorkflow.includes('--remote='));
   assert.ok(backupWorkflow.includes('aws s3 cp'));
   assert.ok(backupWorkflow.includes('--sse AES256'));
   assert.ok(backupWorkflow.includes('BACKUP_S3_BUCKET'));

@@ -21,7 +21,7 @@ The workflow reads `super_admin_settings.backup_schedule`:
 4. Optionally add the Actions variable `BACKUP_S3_PREFIX`; it defaults to `schoolos`.
 5. Run **Actions → Supabase Database Backup → Run workflow** once with `force=true`. Confirm the object appears in the private S3 bucket and verify its checksum after download.
 
-The backup is sent over TLS and uploaded with SSE-S3 encryption. The workflow does not store database exports in Git, GitHub releases, or GitHub Actions artifacts. This matters because the SchoolOS source repository is currently public. Keep the S3 bucket private and do not add public-read ACLs or public bucket policies.
+The database dump uses the documented Supabase CLI `--db-url` option, is sent over TLS, and is uploaded with SSE-S3 encryption. The workflow does not store database exports in Git, GitHub releases, or GitHub Actions artifacts. This matters because the SchoolOS source repository is currently public. Keep the S3 bucket private and do not add public-read ACLs or public bucket policies.
 
 ## Restore procedure
 

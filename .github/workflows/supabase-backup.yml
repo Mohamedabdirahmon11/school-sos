@@ -79,9 +79,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p backup
-          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/roles.sql --role-only
-          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/schema.sql
-          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/data.sql --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/data.sql --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes"
           printf 'created_at_utc=%s\nfrequency=%s\n' "$(date -u +%FT%TZ)" "${{ steps.policy.outputs.frequency }}" > backup/manifest.txt
           sha256sum backup/roles.sql backup/schema.sql backup/data.sql > backup/SHA256SUMS
           tar -czf schoolos-supabase-backup.tar.gz -C backup .
