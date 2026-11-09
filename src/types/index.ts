@@ -81,8 +81,7 @@ export interface School {
   code: string; // e.g., "MOG01"
   address: string;
   city: string;
-  phone: string;
-  email: string;
+ 
   logoUrl?: string;
   brandColor?: string; // Default "#0F766E"
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS
