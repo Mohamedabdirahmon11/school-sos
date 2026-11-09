@@ -56,7 +56,11 @@ test('off-site backups follow the saved daily or weekly policy and use a private
   assert.ok(backupWorkflow.includes('secrets.SUPABASE_DB_URL'));
   assert.ok(backupWorkflow.includes('backup_schedule'));
   assert.ok(backupWorkflow.includes('weekly'));
-  assert.ok(backupWorkflow.includes('retention-days: 30'));
+  assert.ok(backupWorkflow.includes('aws s3 cp'));
+  assert.ok(backupWorkflow.includes('--sse AES256'));
+  assert.ok(backupWorkflow.includes('BACKUP_S3_BUCKET'));
+  assert.ok(!backupWorkflow.includes('upload-artifact'));
+  assert.ok(backupDocs.includes('private Amazon S3 bucket'));
   assert.ok(backupWorkflow.includes('SHA256SUMS'));
   assert.ok(backupDocs.includes('new/empty recovery project'));
   assert.ok(backupDocs.includes('do not back up Storage object bytes'));
