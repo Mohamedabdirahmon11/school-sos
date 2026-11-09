@@ -373,22 +373,30 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !school || !bookTitle.trim() || !bookAuthor.trim() || librarySaving) return;
+    if (!Number.isInteger(bookCopies) || bookCopies < 1 || bookCopies > 100000) {
+      setLibraryError('Book copy count must be a whole number between 1 and 100,000.');
+      return;
+    }
+    setLibrarySaving(true);
+    setLibraryError(null);
     try {
       const b = await ApiClient.addLibraryBook({
         title: bookTitle.trim(),
         author: bookAuthor.trim(),
         isbn: bookIsbn.trim(),
         quantity: bookCopies
-      }, school?.id);
+      }, school.id);
       setBooks(prev => [...prev, b]);
       setShowAddBookModal(false);
       setBookTitle('');
       setBookAuthor('');
       setBookIsbn('');
+      setBookCopies(5);
       setNotice('Book added to library catalogue.');
-      setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message);
+      setLibraryError(err.message || 'Unable to add this book.');
+    } finally {
+      setLibrarySaving(false);
     }
   };
 
@@ -650,7 +658,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               return <div key={item.id} className="flex items-center justify-between gap-3 text-xs border border-[#E2E8F0] rounded-lg p-3">
                 <span>{student ? `${student.firstName} ${student.lastName}` : item.studentId} · {route?.name || item.routeId}</span>
                 <span className="font-mono">{formatMoney(item.feeAmount, school?.currency)}</span>
-                <button type="button" disabled={isReadOnly} onClick={async () => { await ApiClient.removeBusAssignment(item.studentId); setBusAssignments(current => current.filter(row => row.id !== item.id)); }} className="text-rose-700 disabled:opacity-40">Remove</button>
+                <button type="button" disabled={isReadOnly} onClick={async () => {
+                  if (isReadOnly) return;
+                  try {
+                    await ApiClient.removeBusAssignment(item.studentId);
+                    setBusAssignments(current => current.filter(row => row.id !== item.id));
+                    setNotice('Student removed from the bus route.');
+                  } catch (err: any) {
+                    setModuleError(err.message || 'Unable to remove the bus assignment.');
+                  }
+                }} className="text-rose-700 disabled:opacity-40">Remove</button>
               </div>;
             })}
           </section>
@@ -782,7 +799,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <label className="text-xs font-medium text-[#475569]">Reorder level<input type="number" min="0" step="0.01" value={inventoryReorderLevel} onChange={e=>setInventoryReorderLevel(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Unit cost<input type="number" min="0" step="0.01" value={inventoryUnitCost} onChange={e=>setInventoryUnitCost(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Storage location<input maxLength={160} value={inventoryLocation} onChange={e=>setInventoryLocation(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
-              <div className="flex items-end"><button type="submit" disabled={isReadOnly||inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inventorySaving ? 'Saving…' : editingInventoryId ? 'Save changes' : 'Add inventory item'}</button></div>
+              <div className="flex items-end gap-2">
+                <button type="submit" disabled={isReadOnly || inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                  {inventorySaving ? 'Saving…' : editingInventoryId ? 'Save changes' : 'Add inventory item'}
+                </button>
+                {editingInventoryId && <button type="button" disabled={inventorySaving} onClick={resetInventoryForm} className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Cancel</button>}
+              </div>
             </form>
             {inventoryLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading inventory…</p> : (
               <div className="overflow-x-auto">
