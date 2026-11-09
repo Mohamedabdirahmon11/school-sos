@@ -11,7 +11,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { db } from './storage.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig } from '../types/index.ts';
+import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -1232,8 +1232,8 @@ apiRouter.get('/superadmin/analytics', requireAuth, requireSuperAdmin, async (_r
     const schools = await db.getSchools();
     const directory = await Promise.all(schools.map(async school => {
       const [students, teachers] = await Promise.all([
-        db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
-        db.queryPage('teachers', { school_id: school.id }, 1, 1, undefined, 'id')
+        db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+        db.queryPage('teachers', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id')
       ]);
       return { ...school, studentCount: students.total, teacherCount: teachers.total };
     }));
@@ -1250,13 +1250,22 @@ apiRouter.get('/superadmin/analytics', requireAuth, requireSuperAdmin, async (_r
       return Number.isFinite(lastLogin) && lastLogin >= cutoff;
     }).length;
     const invoices = await db.getSubscriptionInvoices();
-    const totalPaidBillings = invoices.filter(invoice => invoice.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+    const platformCurrency = String(db.getSettings().platformCurrency || 'ETB').toUpperCase();
+    const paidBillingsByCurrency = invoices.reduce((totals: Record<string, number>, invoice) => {
+      if (invoice.status !== 'paid') return totals;
+      const currency = String(invoice.currency || platformCurrency).toUpperCase();
+      totals[currency] = (totals[currency] || 0) + Number(invoice.amount || 0);
+      return totals;
+    }, {});
+    const totalPaidBillings = Number(paidBillingsByCurrency[platformCurrency] || 0);
     res.json({
       schools: directory,
       activeSchools: directory.filter(school => school.subscription?.status === 'active').length,
       totalStudents: directory.reduce((sum, school) => sum + school.studentCount, 0),
       totalTeachers: directory.reduce((sum, school) => sum + school.teacherCount, 0),
       activeUsers30Days,
+      platformCurrency,
+      paidBillingsByCurrency,
       totalPaidBillings
     });
   } catch {
@@ -1269,17 +1278,116 @@ apiRouter.get('/superadmin/dashboard', requireAuth, requireSuperAdmin, async (_r
   catch { res.status(503).json({ error: 'Unable to load the Super Admin dashboard.' }); }
 });
 
-apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, (req, res) => {
-  const updated = db.updateSettings(req.body);
+apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const allowedFields = new Set([
+    'trialDays', 'graceDays', 'platformCurrency', 'readOnlyAfterExpiry',
+    'requireSuperAdmin2FA', 'lockoutThreshold', 'lockoutDurationMinutes',
+    'sessionTimeoutMinutes', 'logSecurityEvents', 'backupSchedule',
+    'enabledLanguages', 'academicYearName', 'semester1Start', 'semester1End',
+    'semester2Start', 'semester2End'
+  ]);
+  const readOnlyFields = new Set(['id', 'updatedAt', 'lastBackupDate', 'lastBackupStatus']);
+  const unknownFields = Object.keys(body).filter(field => !allowedFields.has(field) && !readOnlyFields.has(field));
+  if (unknownFields.length) {
+    res.status(400).json({ error: `Unsupported platform setting(s): ${unknownFields.join(', ')}.` });
+    return;
+  }
+
+  const updates: Record<string, any> = {};
+  const numericRules: Record<string, [number, number]> = {
+    trialDays: [1, 90],
+    graceDays: [0, 60],
+    lockoutThreshold: [3, 10],
+    lockoutDurationMinutes: [5, 120],
+    sessionTimeoutMinutes: [15, 360]
+  };
+  for (const [field, [min, max]] of Object.entries(numericRules)) {
+    if (body[field] === undefined) continue;
+    const value = Number(body[field]);
+    if (!Number.isInteger(value) || value < min || value > max) {
+      res.status(400).json({ error: `${field} must be a whole number between ${min} and ${max}.` });
+      return;
+    }
+    updates[field] = value;
+  }
+
+  for (const field of ['readOnlyAfterExpiry', 'requireSuperAdmin2FA', 'logSecurityEvents']) {
+    if (body[field] === undefined) continue;
+    if (typeof body[field] !== 'boolean') {
+      res.status(400).json({ error: `${field} must be true or false.` });
+      return;
+    }
+    updates[field] = body[field];
+  }
+
+  if (body.platformCurrency !== undefined) {
+    const currency = String(body.platformCurrency).toUpperCase();
+    if (!['ETB', 'USD', 'SOS'].includes(currency)) {
+      res.status(400).json({ error: 'platformCurrency must be ETB, USD, or SOS.' });
+      return;
+    }
+    updates.platformCurrency = currency;
+  }
+  if (body.backupSchedule !== undefined) {
+    if (!['daily', 'weekly', 'manual'].includes(String(body.backupSchedule))) {
+      res.status(400).json({ error: 'backupSchedule must be daily, weekly, or manual.' });
+      return;
+    }
+    updates.backupSchedule = body.backupSchedule;
+  }
+  if (body.enabledLanguages !== undefined) {
+    const languages = body.enabledLanguages;
+    if (!Array.isArray(languages) || !languages.every(value => ['en', 'so', 'am'].includes(value))
+      || !languages.includes('en') || new Set(languages).size !== languages.length) {
+      res.status(400).json({ error: 'enabledLanguages must contain unique supported languages and include English.' });
+      return;
+    }
+    updates.enabledLanguages = languages;
+  }
+  if (body.academicYearName !== undefined) {
+    if (typeof body.academicYearName !== 'string' || body.academicYearName.trim().length < 4 || body.academicYearName.trim().length > 50) {
+      res.status(400).json({ error: 'academicYearName must contain 4 to 50 characters.' });
+      return;
+    }
+    updates.academicYearName = body.academicYearName.trim();
+  }
+  for (const field of ['semester1Start', 'semester1End', 'semester2Start', 'semester2End']) {
+    if (body[field] === undefined) continue;
+    const value = body[field];
+    const parsedDate = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T00:00:00Z`)
+      : null;
+    if (!parsedDate || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== value) {
+      res.status(400).json({ error: `${field} must be a valid YYYY-MM-DD date.` });
+      return;
+    }
+    updates[field] = value;
+  }
+
+  if (!Object.keys(updates).length) {
+    res.status(400).json({ error: 'Provide at least one supported platform setting to update.' });
+    return;
+  }
+  const nextSettings = { ...db.getSettings(), ...updates };
+  const dateKeys = ['semester1Start', 'semester1End', 'semester2Start', 'semester2End'] as const;
+  const dates = dateKeys.map(key => Date.parse(`${nextSettings[key]}T00:00:00Z`));
+  if (dates.some(value => !Number.isFinite(value)) || !(dates[0] <= dates[1] && dates[1] < dates[2] && dates[2] <= dates[3])) {
+    res.status(400).json({ error: 'Academic dates must be ordered: Semester 1 start, Semester 1 end, Semester 2 start, Semester 2 end.' });
+    return;
+  }
+
+  const updated = db.updateSettings(updates as Partial<SuperAdminSettings>);
   db.logAudit({
     action: 'PLATFORM_SETTINGS_UPDATED',
     category: 'subscription',
     userId: (req as any).user.id,
     userName: (req as any).user.fullName,
     userRole: 'super_admin',
-    details: 'Platform settings and academic dates updated by Super Administrator.',
+    details: `Updated platform settings: ${Object.keys(updates).join(', ')}.`,
     severity: 'warning'
   });
+  await db.flush();
   res.json(updated);
 });
 
@@ -1331,12 +1439,21 @@ apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, async (re
   res.json(updated);
 });
 
-apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (_req, res) => {
-  const schools = await db.getSchools();
+apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
+  const allowedStatuses = new Set(['active', 'trial', 'grace', 'read_only', 'suspended']);
+  const schools = (await db.getSchools()).filter(school => {
+    const matchesSearch = !search || [school.name, school.code, school.city, school.email]
+      .some(value => String(value || '').toLowerCase().includes(search));
+    const matchesStatus = requestedStatus === 'all' || !allowedStatuses.has(requestedStatus)
+      || school.subscription?.status === requestedStatus;
+    return matchesSearch && matchesStatus;
+  });
   const directory = await Promise.all(schools.map(async school => {
     const [students, teachers] = await Promise.all([
-      db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
-      db.queryPage('teachers', { school_id: school.id }, 1, 1, undefined, 'id')
+      db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+      db.queryPage('teachers', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id')
     ]);
     return { ...school, studentCount: students.total, teacherCount: teachers.total };
   }));
@@ -1423,29 +1540,73 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
 });
 
 apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { status, plan, cadence, validUntil, studentAccessEnabled } = req.body;
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const { status, plan, cadence, validUntil, studentAccessEnabled, monthsToAdd, graceDays } = body;
   const school = await db.getSchoolById(req.params.id);
   if (!school) {
     res.status(404).json({ error: 'School not found.' });
     return;
   }
 
+  const allowedStatuses = ['trial', 'active', 'grace', 'read_only', 'suspended'];
+  const allowedPlans = ['basic', 'standard', 'premium'];
+  const allowedCadences = ['trial', 'monthly', 'yearly', 'lifetime'];
+  if (status !== undefined && !allowedStatuses.includes(String(status))) {
+    res.status(400).json({ error: 'Invalid subscription status.' }); return;
+  }
+  if (plan !== undefined && !allowedPlans.includes(String(plan))) {
+    res.status(400).json({ error: 'Invalid subscription plan.' }); return;
+  }
+  if (cadence !== undefined && !allowedCadences.includes(String(cadence))) {
+    res.status(400).json({ error: 'Invalid subscription billing cadence.' }); return;
+  }
+  if (studentAccessEnabled !== undefined && typeof studentAccessEnabled !== 'boolean') {
+    res.status(400).json({ error: 'studentAccessEnabled must be true or false.' }); return;
+  }
+  if (graceDays !== undefined && (!Number.isInteger(Number(graceDays)) || Number(graceDays) < 0 || Number(graceDays) > 60)) {
+    res.status(400).json({ error: 'graceDays must be a whole number from 0 to 60.' }); return;
+  }
+  if (monthsToAdd !== undefined && (!Number.isInteger(Number(monthsToAdd)) || Number(monthsToAdd) < 1 || Number(monthsToAdd) > 120)) {
+    res.status(400).json({ error: 'monthsToAdd must be a whole number from 1 to 120.' }); return;
+  }
+  if (validUntil !== undefined && (typeof validUntil !== 'string' || !Number.isFinite(Date.parse(validUntil)))) {
+    res.status(400).json({ error: 'validUntil must be a valid date.' }); return;
+  }
+
   const updates: Partial<School> = {};
-  if (studentAccessEnabled !== undefined) {
-    updates.studentAccessEnabled = Boolean(studentAccessEnabled);
+  if (studentAccessEnabled !== undefined) updates.studentAccessEnabled = studentAccessEnabled;
+
+  const subscriptionUpdates: Record<string, any> = {};
+  if (status !== undefined) subscriptionUpdates.status = status;
+  if (plan !== undefined) subscriptionUpdates.plan = plan;
+  if (cadence !== undefined) subscriptionUpdates.cadence = cadence;
+  if (graceDays !== undefined) subscriptionUpdates.graceDays = Number(graceDays);
+  if (validUntil !== undefined) subscriptionUpdates.validUntil = new Date(validUntil).toISOString();
+  if (cadence === 'lifetime' && validUntil === undefined) {
+    const lifetimeExpiry = new Date();
+    lifetimeExpiry.setUTCFullYear(lifetimeExpiry.getUTCFullYear() + 100);
+    lifetimeExpiry.setUTCHours(0, 0, 0, 0);
+    subscriptionUpdates.validUntil = lifetimeExpiry.toISOString();
   }
 
-  if (status || plan || cadence || validUntil) {
-    updates.subscription = {
-      ...(school.subscription || {}),
-      ...(status ? { status } : {}),
-      ...(plan ? { plan } : {}),
-      ...(cadence ? { cadence } : {}),
-      ...(validUntil ? { validUntil } : {})
-    };
+  if (monthsToAdd !== undefined && (cadence ?? school.subscription?.cadence) !== 'lifetime' && validUntil === undefined) {
+    const currentTime = Date.now();
+    const previousCadence = school.subscription?.cadence;
+    const parsedExpiry = previousCadence === 'lifetime' ? Number.NaN : Date.parse(String(school.subscription?.validUntil || ''));
+    const baseDate = new Date(Number.isFinite(parsedExpiry) && parsedExpiry > currentTime ? parsedExpiry : currentTime);
+    const originalDay = baseDate.getUTCDate();
+    baseDate.setUTCDate(1);
+    baseDate.setUTCMonth(baseDate.getUTCMonth() + Number(monthsToAdd));
+    const lastDay = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + 1, 0)).getUTCDate();
+    baseDate.setUTCDate(Math.min(originalDay, lastDay));
+    subscriptionUpdates.validUntil = baseDate.toISOString();
   }
 
+  if (Object.keys(subscriptionUpdates).length) {
+    updates.subscription = { ...(school.subscription || {}), ...subscriptionUpdates };
+  }
   const updated = db.updateSchool(school.id, updates);
+  if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
   invalidateAuthenticatedSnapshot(undefined, undefined, school.id);
   db.logAudit({
     action: 'SUBSCRIPTION_UPDATED',
@@ -1455,10 +1616,10 @@ apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSupe
     userId: (req as any).user.id,
     userName: (req as any).user.fullName,
     userRole: 'super_admin',
-    details: `Updated subscription for ${school.name}. Status: ${updated?.subscription.status}.`,
+    details: `Updated subscription for ${school.name}: ${Object.keys(subscriptionUpdates).join(', ') || 'student portal access'}.`,
     severity: 'warning'
   });
-
+  await db.flush();
   res.json(updated);
 });
 

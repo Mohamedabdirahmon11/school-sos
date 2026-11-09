@@ -3,26 +3,44 @@
  * Attendance aggregates, 30-day active users, fees collected by schools, tier mix, CSV export
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { formatMoney } from '../../lib/money.ts';
 import { BarChart3, Download, TrendingUp, Users, DollarSign, CalendarCheck, FileText } from 'lucide-react';
 
 export const AnalyticsView: React.FC = () => {
   const [analytics, setAnalytics] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const schools = analytics?.schools || [];
   const totalStudents = Number(analytics?.totalStudents) || 0;
   const totalTeachers = Number(analytics?.totalTeachers) || 0;
   const activeUsers = Number(analytics?.activeUsers30Days) || 0;
   const totalInvoiced = Number(analytics?.totalPaidBillings) || 0;
+  const platformCurrency = String(analytics?.platformCurrency || 'ETB').toUpperCase();
+  const paidBillingsByCurrency = analytics?.paidBillingsByCurrency && typeof analytics.paidBillingsByCurrency === 'object'
+    ? analytics.paidBillingsByCurrency as Record<string, number>
+    : {};
+  const otherCurrencyTotals = Object.entries(paidBillingsByCurrency)
+    .filter(([currency]) => currency !== platformCurrency)
+    .map(([currency, amount]) => `${currency} ${Number(amount || 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   const activeSchools = Number(analytics?.activeSchools) || 0;
 
-  useEffect(() => {
-    ApiClient.getPlatformAnalytics()
-      .then(setAnalytics)
-      .catch(error => console.error(error))
-      .finally(() => setIsLoading(false));
+  const loadAnalytics = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      setAnalytics(await ApiClient.getPlatformAnalytics());
+    } catch (error: any) {
+      setLoadError(error.message || 'Unable to load platform analytics.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics]);
 
   // Export Analytics CSV
   const handleExportCSV = () => {
@@ -32,7 +50,11 @@ export const AnalyticsView: React.FC = () => {
       return '"' + safe.replace(/"/g, '""') + '"';
     };
     const rows = [
-      ['School Name', 'School Code', 'Plan', 'Status', 'Students', 'Teachers', 'Valid Until'],
+      ['Platform Currency', platformCurrency],
+      ['Paid Subscription Invoices', totalInvoiced],
+      ...otherCurrencyTotals.map(value => ['Paid Invoices - Other Currency', value]),
+      [],
+      ['School Name', 'School Code', 'Plan', 'Status', 'Active Students', 'Active Teachers', 'Valid Until'],
       ...(schools as any[]).map(s => {
         const subscription = s.subscription || {};
         const validUntil = typeof subscription.validUntil === 'string' ? subscription.validUntil.slice(0, 10) : '';
@@ -50,6 +72,13 @@ export const AnalyticsView: React.FC = () => {
   };
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading platform analytics…</div>;
+  if (loadError) return (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Platform analytics could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void loadAnalytics()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -89,8 +118,11 @@ export const AnalyticsView: React.FC = () => {
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">
           <span className="text-xs text-[#64748B] font-medium uppercase tracking-wider">Total SaaS Billings</span>
-          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">${totalInvoiced.toLocaleString()}</p>
-          <p className="text-[11px] text-[#64748B] mt-1">Paid subscription invoices</p>
+          <p className="text-2xl font-bold font-mono text-[#132A29] mt-2">{formatMoney(totalInvoiced, platformCurrency)}</p>
+          <p className="text-[11px] text-[#64748B] mt-1">Paid invoices in {platformCurrency}</p>
+          {otherCurrencyTotals.length > 0 && (
+            <p className="text-[10px] text-[#64748B] mt-1">Other currencies: {otherCurrencyTotals.join(' · ')}</p>
+          )}
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[#E2E8F0]">

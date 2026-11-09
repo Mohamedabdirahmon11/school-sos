@@ -5,7 +5,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { School, PlanTier, SubscriptionCadence, SubscriptionStatus } from '../../types/index.ts';
+import { School, PlanTier, SubscriptionCadence, SubscriptionStatus, PlanConfig } from '../../types/index.ts';
+import { formatMoney } from '../../lib/money.ts';
 import { PasswordInput } from '../common/PasswordInput.tsx';
 import { 
   Building2, 
@@ -40,8 +41,26 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [planOptions, setPlanOptions] = useState<PlanConfig[]>([]);
+  const [platformCurrency, setPlatformCurrency] = useState('ETB');
+  const [plansError, setPlansError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([ApiClient.getPlans(), ApiClient.getSettings()])
+      .then(([plans, settings]) => {
+        if (cancelled) return;
+        setPlanOptions(plans);
+        setPlatformCurrency(String(settings.platformCurrency || 'ETB').toUpperCase());
+      })
+      .catch((error: any) => {
+        if (!cancelled) setPlansError(error.message || 'Unable to load subscription plan prices.');
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Add School Form State
   const [addName, setAddName] = useState('');
@@ -64,6 +83,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
 
   const fetchSchools = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const list = await ApiClient.getSchools({ search, status: statusFilter });
       setSchools(list);
@@ -72,7 +92,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         if (found) loadSchoolDetail(found.id);
       }
     } catch (err: any) {
-      console.error(err);
+      setLoadError(err.message || 'Unable to load the school directory.');
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +107,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       const detail = await ApiClient.getSchoolDetails(id);
       setSelectedSchool(detail);
       if (detail && detail.school) {
-        setSubPlan(detail.school.subscription?.plan || 'plan-standard');
+        setSubPlan(detail.school.subscription?.plan || 'standard');
         setSubGraceDays(detail.school.subscription?.graceDays || 7);
         setSubStatus(detail.school.subscription?.status || 'active');
       }
@@ -236,6 +256,12 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{actionNotice}</span>
+        </div>
+      )}
+      {loadError && (
+        <div role="alert" className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-800 flex items-center justify-between gap-3">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void fetchSchools()} className="font-semibold underline">Retry loading</button>
         </div>
       )}
 
@@ -549,10 +575,19 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                     onChange={e => setAddPlan(e.target.value as PlanTier)}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   >
-                    <option value="basic">Basic ($39/mo)</option>
-                    <option value="standard">Standard ($89/mo)</option>
-                    <option value="premium">Premium Enterprise ($179/mo)</option>
+                    {planOptions.length > 0 ? planOptions.map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({formatMoney(plan.monthlyPrice, platformCurrency)}/mo)
+                      </option>
+                    )) : (
+                      <>
+                        <option value="basic">Basic</option>
+                        <option value="standard">Standard</option>
+                        <option value="premium">Premium Enterprise</option>
+                      </>
+                    )}
                   </select>
+                  {plansError && <p role="alert" className="mt-1 text-[10px] text-rose-700">{plansError}</p>}
                 </div>
                 <div>
                   <label className="block font-medium text-[#334155]">Subscription Cadence</label>

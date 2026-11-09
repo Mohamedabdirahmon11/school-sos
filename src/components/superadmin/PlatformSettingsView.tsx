@@ -8,7 +8,7 @@
  * 5. Database Backups: On-demand backup snapshot & platform JSON download
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { SuperAdminSettings } from '../../types/index.ts';
 import { 
@@ -29,10 +29,20 @@ export const PlatformSettingsView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadSettings = useCallback(async () => {
+    setLoadError(null);
+    try {
+      setSettings(await ApiClient.getSettings());
+    } catch (error: any) {
+      setLoadError(error.message || 'Unable to load platform settings.');
+    }
+  }, []);
 
   useEffect(() => {
-    ApiClient.getSettings().then(setSettings).catch(console.error);
-  }, []);
+    void loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +91,13 @@ export const PlatformSettingsView: React.FC = () => {
     setSettings({ ...settings, enabledLanguages: list });
   };
 
-  if (!settings) return <div className="p-6 text-xs text-[#64748B]">Loading settings...</div>;
+  if (!settings) return loadError ? (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Platform settings could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void loadSettings()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  ) : <div role="status" aria-busy="true" className="p-6 text-xs text-[#64748B]">Loading settings...</div>;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
@@ -247,7 +263,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, lockoutThreshold: parseInt(e.target.value, 10) || 5 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Locks after 5 failed attempts</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Locks after {settings.lockoutThreshold} failed attempts</p>
             </div>
 
             <div>
@@ -260,7 +276,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, lockoutDurationMinutes: parseInt(e.target.value, 10) || 15 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Account locked for 15 minutes</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Account locked for {settings.lockoutDurationMinutes} minutes</p>
             </div>
 
             <div>
@@ -273,7 +289,7 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, sessionTimeoutMinutes: parseInt(e.target.value, 10) || 60 })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
               />
-              <p className="text-[10px] text-[#64748B] mt-0.5">Default 60 minutes</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">Session expires after {settings.sessionTimeoutMinutes} minutes</p>
             </div>
           </div>
 

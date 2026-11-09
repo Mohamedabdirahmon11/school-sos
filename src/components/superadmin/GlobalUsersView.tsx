@@ -14,16 +14,18 @@ export const GlobalUsersView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
   const fetchUsers = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await ApiClient.getGlobalUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error(err);
+      setLoadError(err.message || 'Unable to load global users.');
     } finally {
       setIsLoading(false);
     }
@@ -76,6 +78,13 @@ export const GlobalUsersView: React.FC = () => {
   });
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading user directory…</div>;
+  if (loadError) return (
+    <div role="alert" className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+      <p className="font-semibold">Platform users could not be loaded.</p>
+      <p className="mt-1">{loadError}</p>
+      <button type="button" onClick={() => void fetchUsers()} className="mt-3 font-semibold underline">Retry loading</button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">

@@ -17,7 +17,7 @@ export const DEFAULT_GRADING_SCALE: GradingBand[] = [
   { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
 ];
 export const DEFAULT_ATTENDANCE_RULES = { lateAfterMinutes: 15, absentAfterMinutes: 0, requireExcusedReason: true, allowParentExcuses: false };
-export const DEFAULT_CLASS_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+export const DEFAULT_CLASS_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 export const DEFAULT_TERMS = { semester1Start: '', semester1End: '', semester2Start: '', semester2End: '' };
 export const DEFAULT_NOTIFICATION_PREFERENCES = { email: true, sms: true, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 
