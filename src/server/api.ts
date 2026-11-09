@@ -4091,7 +4091,7 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
 });
 
 // Year-End Promotion Confirmation
-apiRouter.get('/promotions/history', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/promotions/history', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getPromotionHistory(school.id));
 });
