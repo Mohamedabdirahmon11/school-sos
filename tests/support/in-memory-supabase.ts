@@ -185,6 +185,64 @@ export class InMemorySupabase {
       else sequenceRows.push({ id: sequenceId, schoolId, academicYear, nextValue });
       return { data: nextValue, error: null };
     }
+    if (name === 'schoolos_confirm_year_end_promotions') {
+      const schoolId = String(args?.p_school_id || '');
+      const classId = String(args?.p_class_id || '');
+      const source = this.rows('classes').find(row => row.id === classId && row.school_id === schoolId && row.is_archived !== true);
+      if (!source) return { data: null, error: { message: 'Promotion source class was not found or is archived.' } };
+      const rows = Array.isArray(args?.p_promotions) ? args.p_promotions : [];
+      const students = this.rows('students').filter(row => row.school_id === schoolId && row.class_id === classId);
+      if (this.rows('promotions').some(row => row.school_id === schoolId && row.class_from_id === classId && row.academic_year_from === args?.p_academic_year_from)) {
+        return { data: null, error: { message: 'This class has already been processed for the selected academic year.' } };
+      }
+      if (rows.length !== students.length || new Set(rows.map(row => row.student_id)).size !== rows.length ||
+          rows.some(row => !students.some(student => student.id === row.student_id))) {
+        return { data: null, error: { message: 'Promotion confirmation must include every student exactly once.' } };
+      }
+      const targets = new Map<string, any>();
+      for (const row of rows.filter(item => item.decision === 'promoted')) {
+        const target = this.rows('classes').find(item => item.id === row.class_to_id && item.school_id === schoolId && item.is_archived !== true);
+        if (!target) return { data: null, error: { message: 'A promotion target class is unavailable or belongs to another school.' } };
+        targets.set(target.id, target);
+      }
+      const incoming = new Map<string, number>();
+      const outgoing = new Map<string, number>();
+      for (const row of rows.filter(item => item.decision === 'promoted' && item.class_to_id !== classId)) {
+        incoming.set(row.class_to_id, (incoming.get(row.class_to_id) || 0) + 1);
+        outgoing.set(classId, (outgoing.get(classId) || 0) + 1);
+      }
+      for (const [targetId, count] of incoming) {
+        const target = targets.get(targetId)!;
+        const current = this.rows('students').filter(item => item.school_id === schoolId && item.class_id === targetId).length;
+        if (current - (outgoing.get(targetId) || 0) + count > Number(target.capacity)) {
+          return { data: null, error: { message: `Target class ${target.name} does not have enough capacity.` } };
+        }
+      }
+      const now = new Date().toISOString();
+      const created = rows.map((row, index) => ({
+        id: `prm-test-${Date.now()}-${index}`, school_id: schoolId,
+        academic_year_from: args.p_academic_year_from, academic_year_to: args.p_academic_year_to,
+        class_from_id: classId, class_to_id: row.decision === 'promoted' ? row.class_to_id : classId,
+        student_id: row.student_id, yearly_percentage: row.yearly_percentage,
+        yearly_rank: row.yearly_rank, decision: row.decision,
+        notes: row.admin_override ? `ADMIN OVERRIDE: ${String(row.notes || '').trim()}` : row.notes,
+        processed_by: args.p_processed_by, processed_at: now
+      }));
+      this.rows('promotions').push(...created);
+      this.rows('promotion_history').push(...created.map((row, index) => ({
+        id: `prh-test-${Date.now()}-${index}`, school_id: schoolId,
+        academic_year_from: row.academic_year_from, academic_year_to: row.academic_year_to,
+        class_id: classId, student_id: row.student_id, yearly_percentage: row.yearly_percentage,
+        yearly_rank: row.yearly_rank, decision: row.decision, processed_by: row.processed_by, processed_at: now
+      })));
+      for (const row of rows.filter(item => item.decision === 'promoted' && item.class_to_id !== classId)) {
+        const student = students.find(item => item.id === row.student_id)!;
+        const target = targets.get(row.class_to_id)!;
+        student.class_id = target.id;
+        student.branch_id = target.branch_id ?? null;
+      }
+      return { data: created, error: null };
+    }
     if (name === 'schoolos_apply_fee_installment') {
       const payment = this.rows('fee_payments').find(row =>
         String(row.id) === String(args?.p_payment_id)

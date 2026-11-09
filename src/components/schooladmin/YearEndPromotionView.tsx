@@ -42,24 +42,34 @@ export const YearEndPromotionView: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch initial classes and config
-  useEffect(() => {
+  // Fetch initial classes and config; expose a retry action when the database is unavailable.
+  const loadInitialData = async () => {
     if (!school) return;
     setLoading(true);
-    Promise.all([
-      ApiClient.getClasses(),
-      ApiClient.getExamConfig(),
-      ApiClient.getPromotionHistory()
-    ]).then(([clsList, conf, archived]) => {
+    setError(null);
+    try {
+      const [clsList, conf, archived] = await Promise.all([
+        ApiClient.getClasses(),
+        ApiClient.getExamConfig(),
+        ApiClient.getPromotionHistory()
+      ]);
       setClasses(clsList);
       setHistory(archived);
       if (clsList.length > 0) {
-        setSelectedClassId(clsList[0].id);
-        if (clsList.length > 1) setTargetClassId(clsList[1].id);
+        setSelectedClassId(current => current || clsList[0].id);
+        if (clsList.length > 1) setTargetClassId(current => current || clsList[1].id);
       }
       setExamConfig(conf);
-    }).finally(() => setLoading(false));
-  }, [school]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load promotion setup and history.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadInitialData();
+  }, [school?.id]);
 
   // Load class yearly rankings when class changes
   const loadClassRankings = async () => {
@@ -202,6 +212,7 @@ export const YearEndPromotionView: React.FC = () => {
         <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
           <span>{error}</span>
+          <button type="button" onClick={() => void loadInitialData()} className="ml-auto font-bold underline">Retry</button>
         </div>
       )}
 

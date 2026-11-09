@@ -1,4 +1,4 @@
-export type StaffPermission = 'fees_manage' | 'admissions_manage' | 'attendance_manage' | 'grades_manage' | 'library_manage' | 'transport_manage' | 'inventory_manage' | 'reports_export';
+export type StaffPermission = 'fees_manage' | 'admissions_manage' | 'attendance_manage' | 'grades_manage' | 'library_manage' | 'transport_manage' | 'inventory_manage' | 'reports_export' | 'payroll_manage';
 
 export interface StaffPermissionRecord {
   status?: string | null;

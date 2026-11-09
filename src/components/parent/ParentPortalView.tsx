@@ -23,11 +23,11 @@ export const ParentPortalView: React.FC = () => {
   const { user, school, t } = useAuth();
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const childrenState = useApi(async () => {
-    const all = await ApiClient.getSchoolStudents({ schoolId: school?.id });
+    const all = await ApiClient.getSchoolStudents({ schoolId: school?.id, page: 1, pageSize: 100 });
     return (Array.isArray(all) ? all : []).filter(s =>
-      user?.linkedStudentIds?.includes(s.id) || s.fatherPhone === user?.phone || s.motherPhone === user?.phone
+      user?.linkedStudentIds?.includes(s.id) || s.fatherPhone === user?.phone || s.motherPhone === user?.phone || s.fatherPhone === user?.parentPhone || s.motherPhone === user?.parentPhone
     );
-  }, [school?.id, user?.id, user?.phone, user?.linkedStudentIds?.join(',')], Boolean(school));
+  }, [school?.id, user?.id, user?.phone, user?.parentPhone, user?.linkedStudentIds?.join(',')], Boolean(school));
   const children: any[] = childrenState.data ?? [];
   const currentChild = children[selectedChildIndex];
   const childState = useApi(

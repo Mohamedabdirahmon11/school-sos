@@ -28,6 +28,7 @@ export const TimetableView: React.FC = () => {
   const [swapMode, setSwapMode] = useState(false);
   const [firstSwapSlot, setFirstSwapSlot] = useState<string | null>(null);
   const [unfilledSlots, setUnfilledSlots] = useState<Array<{ subjectId: string; teacherId: string; occurrence: number }>>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -55,6 +56,7 @@ export const TimetableView: React.FC = () => {
 
   const fetchData = async () => {
     if (!school) return;
+    setLoadError(null);
     try {
       const [clsList, subList, tchList, schedule, schoolSettings, unavailable] = await Promise.all([
         ApiClient.getClasses(),
@@ -79,7 +81,7 @@ export const TimetableView: React.FC = () => {
 
       if (tchList.length && !selectedTeacherId) setSelectedTeacherId(tchList[0].id);
     } catch (err) {
-      console.error(err);
+      setLoadError(err instanceof Error ? err.message : 'Unable to load timetable settings and assignments.');
     }
   };
 
@@ -180,6 +182,9 @@ export const TimetableView: React.FC = () => {
             Class schedule grid with real-time teacher and classroom conflict validation
           </p>
         </div>
+        {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:max-w-md">
+          <p>{loadError}</p><button type="button" onClick={() => void fetchData()} className="mt-2 font-bold underline">Retry loading timetable</button>
+        </div>}
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">

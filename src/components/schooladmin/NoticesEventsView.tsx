@@ -41,6 +41,7 @@ export const NoticesEventsView: React.FC = () => {
   const [noticeContent, setNoticeContent] = useState('');
   const [noticeAudience, setNoticeAudience] = useState<SchoolNotice['audience']>('all');
   const [noticePinned, setNoticePinned] = useState(false);
+  const [noticePublishDate, setNoticePublishDate] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date()));
   const [editingNotice, setEditingNotice] = useState<SchoolNotice | null>(null);
   const [noticeClassId, setNoticeClassId] = useState('');
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
@@ -118,7 +119,7 @@ export const NoticesEventsView: React.FC = () => {
         audience: noticeAudience,
         classId: noticeAudience === 'class' ? noticeClassId : undefined,
         isPinned: noticePinned,
-        publishDate: new Date().toISOString()
+        publishDate: noticePublishDate
       };
       if (editingNotice) await ApiClient.updateNotice(editingNotice.id, noticePayload);
       else await ApiClient.createNotice(noticePayload);
@@ -127,6 +128,7 @@ export const NoticesEventsView: React.FC = () => {
       setEditingNotice(null);
       setNoticeTitle('');
       setNoticeContent('');
+      setNoticePublishDate(new Intl.DateTimeFormat('en-CA', { timeZone: school?.timezone || 'Africa/Addis_Ababa' }).format(new Date()));
       await fetchData();
     } catch (err: any) {
       alert(err.message);
@@ -140,6 +142,7 @@ export const NoticesEventsView: React.FC = () => {
     setNoticeAudience(notice.audience);
     setNoticePinned(notice.isPinned);
     setNoticeClassId(notice.classId || '');
+    setNoticePublishDate(String(notice.publishDate || '').slice(0, 10) || new Intl.DateTimeFormat('en-CA', { timeZone: school?.timezone || 'Africa/Addis_Ababa' }).format(new Date()));
     setShowNoticeModal(true);
   };
 
@@ -318,6 +321,8 @@ export const NoticesEventsView: React.FC = () => {
                 <option value="all">{t('audience_everyone')}</option><option value="school">{t('audience_school')}</option><option value="class">{t('audience_class')}</option><option value="parents">{t('parent')}</option><option value="teachers">{t('teacher')}</option><option value="students">{t('student')}</option>
               </select>
               {noticeAudience === 'class' && <select required value={noticeClassId} onChange={e => setNoticeClassId(e.target.value)} className="w-full px-3 py-2 text-xs border rounded-lg"><option value="">{t('choose_class')}</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+              <label className="block text-xs font-medium text-slate-700">Publish on <input required type="date" value={noticePublishDate} onChange={e => setNoticePublishDate(e.target.value)} className="mt-1 block w-full px-3 py-2 border rounded-lg" /></label>
+              <p className="text-[11px] text-slate-500">Parents, students and teachers will only see this notice on or after its publish date.</p>
               <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={noticePinned} onChange={e => setNoticePinned(e.target.checked)} />{t('pin_notice')}</label>
               <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowNoticeModal(false)} className="px-3 py-2 text-xs">{t('cancel')}</button><button type="submit" className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-xs">{t('save')}</button></div>
             </form>

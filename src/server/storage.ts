@@ -252,6 +252,7 @@ const TABLE_FIELD_MAP: Record<string, Record<string, string>> = {
   subjects: { creditUnits: 'credit_units', assignedTeacherIds: 'assigned_teacher_ids' },
   school_notices: { audience: 'audience', isPinned: 'is_pinned', publishDate: 'publish_date', authorName: 'author_name', authorRole: 'author_role', classId: 'class_id', isActive: 'is_active' },
   direct_messages: { recipientId: 'recipient_id', senderId: 'sender_id', senderRole: 'sender_role', senderName: 'sender_name', isRead: 'is_read' },
+  promotion_history: { classFromId: 'class_id' },
   fee_payments: { receiptNumber: 'receipt_number', studentId: 'student_id', feeType: 'fee_type', feeStructureId: 'fee_structure_id', idempotencyKey: 'idempotency_key', paymentMethod: 'payment_method', recordedBy: 'recorded_by', voidedAt: 'voided_at', voidedBy: 'voided_by', voidReason: 'void_reason', idempotencyKeys: 'idempotency_keys' }
 };
 
@@ -277,7 +278,9 @@ function fromSupabaseRow(row: Record<string, any>, table = ''): Record<string, a
     // The reverse alias must therefore be resolved with the source table.
     const field = key === 'pin_hash' && table === 'users'
       ? 'pin'
-      : DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+      : key === 'class_id' && table === 'promotion_history'
+        ? 'classFromId'
+        : DB_FIELD_ALIASES[key] || key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
     return [field, value];
   }));
 }
@@ -2392,16 +2395,18 @@ class StorageEngine {
   ): Promise<PromotionRecord[]> {
     if (!Number.isInteger(topN) || topN < 1) throw new Error('topN must be a positive whole number.');
     const sourceClass = await this.getClassById(classId, schoolId);
-    if (!sourceClass) throw new Error('Promotion source class was not found in this school.');
+    if (!sourceClass || sourceClass.isArchived) throw new Error('Promotion source class was not found or is archived in this school.');
     const rankings = await this.getClassYearlyRankings(schoolId, classId);
     const rankByStudent = new Map(rankings.map((row, index) => [row.student.id, { ...row, rank: index + 1 }]));
-    const targetClasses = new Map<string, SchoolClass>();
     if (new Set(promotions.map(row => row.studentId)).size !== promotions.length || promotions.length !== rankings.length) {
       throw new Error('Confirmations must include each student in the selected class exactly once.');
     }
+
+    const targetClasses = new Map<string, SchoolClass>();
     for (const promotion of promotions) {
       const rank = rankByStudent.get(promotion.studentId);
       if (!rank || promotion.classFromId !== classId) throw new Error('Promotion includes a student outside the selected class.');
+      if (!['promoted', 'repeated'].includes(promotion.decision)) throw new Error('Promotion decision is invalid.');
       const eligible = rank.isPass && rank.rank <= topN;
       const isDefaultDecision = (eligible && promotion.decision === 'promoted') || (!eligible && promotion.decision === 'repeated');
       if (!isDefaultDecision && (!promotion.adminOverride || !promotion.notes?.trim())) {
@@ -2418,6 +2423,7 @@ class StorageEngine {
       if (promotion.adminOverride) promotion.notes = `ADMIN OVERRIDE: ${promotion.notes!.trim()}`;
     }
 
+    // Fast user-facing capacity validation; the database RPC repeats this under row locks.
     const incomingByClass = new Map<string, number>();
     const outgoingByClass = new Map<string, number>();
     for (const promotion of promotions) {
@@ -2437,40 +2443,31 @@ class StorageEngine {
     const config = await this.getExamConfig(schoolId);
     const yrFrom = config.academicYear;
     const [startYr, endYr] = yrFrom.split('-').map(Number);
+    if (!Number.isInteger(startYr) || !Number.isInteger(endYr)) throw new Error('The school academic year is not configured correctly.');
     const yrTo = `${startYr + 1}-${endYr + 1}`;
-    const now = new Date().toISOString();
-    const created: PromotionRecord[] = [];
-
-    for (const p of promotions) {
-      const rec: PromotionRecord = {
-        id: `prm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        schoolId,
-        academicYearFrom: yrFrom,
-        academicYearTo: yrTo,
-        classFromId: p.classFromId,
-        classToId: p.decision === 'promoted' ? p.classToId : p.classFromId,
-        studentId: p.studentId,
-        yearlyPercentage: p.yearlyPercentage,
-        yearlyRank: p.yearlyRank,
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic year-end promotion is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_confirm_year_end_promotions', {
+      p_school_id: schoolId,
+      p_class_id: classId,
+      p_academic_year_from: yrFrom,
+      p_academic_year_to: yrTo,
+      p_processed_by: processedBy,
+      p_promotions: promotions.map(p => ({
+        student_id: p.studentId,
+        class_to_id: p.decision === 'promoted' ? p.classToId : null,
         decision: p.decision,
-        notes: p.notes,
-        processedBy,
-        processedAt: now
-      };
-      this.data.promotions.push(rec);
-      this.data.promotionHistory.push(rec);
-      created.push(rec);
-
-      // If promoted to next class, update student record
-      if (p.decision === 'promoted' && p.classToId) {
-        const targetClass = targetClasses.get(p.classToId);
-        await this.updateStudent(p.studentId, {
-          classId: p.classToId,
-          branchId: (targetClass?.branchId ?? null) as any
-        }, schoolId);
-      }
-    }
-
+        yearly_percentage: p.yearlyPercentage,
+        yearly_rank: p.yearlyRank,
+        notes: p.notes || null,
+        admin_override: p.adminOverride === true
+      }))
+    });
+    this.recordQuery('rpc:schoolos_confirm_year_end_promotions', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Year-end promotions could not be saved atomically.');
+    if (!Array.isArray(data) || data.length !== promotions.length) throw new Error('Database returned an incomplete promotion confirmation.');
+    const created = data.map((row: Record<string, any>) => fromSupabaseRow(row, 'promotions') as PromotionRecord);
     this.logAudit({
       action: 'YEAR_END_PROMOTION_CONFIRMED',
       category: 'academics',
@@ -2481,8 +2478,7 @@ class StorageEngine {
       details: `Processed year-end promotions for ${created.length} students from ${yrFrom} to ${yrTo}.`,
       severity: 'info'
     });
-
-    this.save();
+    await this.flush();
     return created;
   }
 
@@ -3082,9 +3078,11 @@ class StorageEngine {
       this.queryRows<any>('notice_reads', { school_id: schoolId, user_id: userId })
     ]);
     const readIds = new Set(reads.map(row => row.noticeId));
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
     const count = notices.filter(notice => {
+      const published = String(notice.publishDate || '').slice(0, 10) <= today;
       const visible = ['school_admin', 'super_admin', 'accountant'].includes(role) || ['all', 'school'].includes(notice.audience) || notice.audience === role + 's' || notice.audience === 'class' && Boolean(notice.classId && classIds.includes(notice.classId));
-      return visible && !readIds.has(notice.id);
+      return published && visible && !readIds.has(notice.id);
     }).length;
     noticeCountCache.set(cacheKey, { count, expiresAt: Date.now() + NOTICE_COUNT_TTL_MS });
     return count;
