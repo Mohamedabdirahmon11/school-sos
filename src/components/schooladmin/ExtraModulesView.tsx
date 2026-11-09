@@ -373,6 +373,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !school || !bookTitle.trim() || !bookAuthor.trim() || librarySaving) return;
+    setLibrarySaving(true);
+    setLibraryError(null);
     if (!Number.isInteger(bookCopies) || bookCopies < 1 || bookCopies > 100000) {
       setLibraryError('Book copy count must be a whole number between 1 and 100,000.');
       return;
