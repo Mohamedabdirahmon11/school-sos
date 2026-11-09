@@ -472,7 +472,7 @@ export const ExamsResultsView: React.FC = () => {
                               min={0}
                               max={bigExamMax}
                               step={0.5}
-                              disabled={isApproved || isReadOnly}
+                              disabled
                               value={inp.big}
                               onChange={e => {
                                 const val = Math.min(bigExamMax, Math.max(0, parseFloat(e.target.value) || 0));
@@ -514,7 +514,7 @@ export const ExamsResultsView: React.FC = () => {
                             <input
                               type="text"
                               value={inp.remarks}
-                              disabled={isApproved || isReadOnly}
+                              disabled
                               onChange={e => {
                                 const val = e.target.value;
                                 setMarksInput(prev => ({
