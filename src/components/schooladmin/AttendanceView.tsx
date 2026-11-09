@@ -31,10 +31,10 @@ const parentWhatsAppNumber = (student: Student) =>
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.whatsappPhone);
-  const ethiopianCalendar = getEthiopianCalendarInfo(date, school?.timezone || 'Africa/Addis_Ababa');
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [date, setDate] = useState(() => getSchoolLocalDate(school?.timezone));
+  const ethiopianCalendar = getEthiopianCalendarInfo(date, school?.timezone || 'Africa/Addis_Ababa');
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
