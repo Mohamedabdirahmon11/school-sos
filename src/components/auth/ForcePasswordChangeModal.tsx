@@ -70,9 +70,10 @@ export const ForcePasswordChangeModal: React.FC = () => {
               onChange={e => setPassword(e.target.value)}
               minLength={8}
               autoComplete="new-password"
-              placeholder="Minimum 8 characters"
+              placeholder="8+ characters with letters and a number"
               className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
             />
+            <p className="mt-1 text-[11px] text-[#64748B]">Use at least 8 characters, including uppercase, lowercase, and a number.</p>
           </div>
 
           <div>
