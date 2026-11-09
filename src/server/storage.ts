@@ -2449,8 +2449,6 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Year-end promotions could not be saved atomically.');
     if (!Array.isArray(data) || data.length !== promotions.length) throw new Error('Database returned an incomplete promotion confirmation.');
     const created = data.map((row: Record<string, any>) => fromSupabaseRow(row, 'promotions') as PromotionRecord);
-    this.data.promotions.push(...created);
-    this.data.promotionHistory.push(...created.map(record => ({ ...record, classToId: undefined })));
     this.logAudit({
       action: 'YEAR_END_PROMOTION_CONFIRMED',
       category: 'academics',
