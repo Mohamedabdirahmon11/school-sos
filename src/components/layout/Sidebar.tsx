@@ -7,7 +7,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ClipboardList, ChevronRight
+  HeartPulse, Award, Wallet, Boxes, ChevronRight
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -85,9 +85,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_notices', noticeLabel, BellRing), item('sch_messages', t('messages'), MessageSquare),
         item('sch_events', t('events_holidays'), CalendarDays)
       ] },
-      { title: 'Finance & reports', items: [
-        item('sch_reports', t('reports_export'), BarChart3), item('sch_fees', t('fees_payments'), CreditCard),
-        item('sch_payroll', t('payroll_management'), Wallet)
+      { title: 'Reports & insights', items: [
+        item('sch_reports', t('reports_export'), BarChart3)
       ] },
       { title: 'School resources', items: [
         item('sch_library', t('library'), Library), item('sch_transport', t('transport'), Bus),
