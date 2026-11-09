@@ -14,18 +14,18 @@ import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
-import { 
-  Building2, 
-  Palette, 
-  Sliders, 
-  Save, 
-  CheckCircle2, 
-  GitBranch, 
+import {
+  Building2,
+  Palette,
+  Sliders,
+  Save,
+  CheckCircle2,
+  GitBranch,
   FileText,
-  Database, 
-  Download, 
-  Plus, 
-  Eye, 
+  Database,
+  Download,
+  Plus,
+  Eye,
   Check,
   AlertCircle,
   ImagePlus,
@@ -80,6 +80,8 @@ export const SchoolSettingsView: React.FC = () => {
   const [address, setAddress] = useState(school?.address || '');
   const [city, setCity] = useState(school?.city || '');
   const [phone, setPhone] = useState(school?.phone || '');
+
+  const [whatsappPhone, setWhatsappPhone] = useState(school?.whatsappPhone || '');
   const [email, setEmail] = useState(school?.email || '');
   const [currency, setCurrency] = useState(school?.currency || 'ETB');
   const [language, setLanguage] = useState(school?.language || 'en');
@@ -136,7 +138,7 @@ export const SchoolSettingsView: React.FC = () => {
     if (isReadOnly || !school) return;
     setError(null);
     if (!name.trim()) { setError('Official school name is required.'); return; }
-    if (phone.trim() && !normalizeWhatsAppNumber(phone)) { setError('WhatsApp number must include an international country code, for example +2519XXXXXXXX.'); return; }
+    if (whatsappPhone.trim() && !normalizeWhatsAppNumber(whatsappPhone)) { setError('Admin WhatsApp number must include an international country code, for example +2519XXXXXXXX.'); return; }
     if (!/^#[0-9a-f]{6}$/i.test(brandColor)) { setError('Brand color must be a six-digit hex color such as #0F766E.'); return; }
     const capacity = Number(defaultClassCapacity);
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) { setError('Default class capacity must be a whole number between 1 and 500.'); return; }
@@ -156,8 +158,7 @@ export const SchoolSettingsView: React.FC = () => {
           logoUrl,
           address,
           city,
-          phone,
-          email,
+
           currency,
           language,
           timezone,
@@ -490,7 +491,7 @@ export const SchoolSettingsView: React.FC = () => {
       {activeTab === 'identity' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-3xl space-y-5">
           <div className="flex items-center gap-4 pb-4 border-b border-[#E2E8F0]">
-            <div 
+            <div
               className="w-14 h-14 rounded-xl text-white font-bold text-xl flex items-center justify-center shadow-xs"
               style={{ backgroundColor: brandColor }}
             >
@@ -591,14 +592,26 @@ export const SchoolSettingsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Official Telephone / WhatsApp maamulka</label>
-                <p className="mb-1 text-[11px] text-[#64748B]">Lambarkan maamulka ayaa WhatsApp u adeegsanaya; fariinta waalidka waxaa laga furaa Attendance, maamuluhu ayaa riixaya Send.</p>
+                <label className="block font-semibold text-[#334155] mb-1">Official School Telephone</label>
+                <p className="mb-1 text-[11px] text-[#64748B]">Lambarka guud ee dugsiga; kama beddelmayo WhatsApp-ka maamulka.</p>
                 <input
                   type="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Admin WhatsApp Number</label>
+                <p className="mb-1 text-[11px] text-[#64748B]">Geli lambarka gaarka ah ee maamulka WhatsApp ku isticmaalo, oo leh country code (+251...).</p>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="+2519XXXXXXXX"
+                  value={whatsappPhone}
+                  onChange={e => setWhatsappPhone(e.target.value)}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                 />
               </div>

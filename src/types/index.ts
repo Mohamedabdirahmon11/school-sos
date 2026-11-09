@@ -83,6 +83,8 @@ export interface School {
   city: string;
   phone: string;
   email: string;
+  whatsappPhone?: string;
+
   logoUrl?: string;
   brandColor?: string; // Default "#0F766E"
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS

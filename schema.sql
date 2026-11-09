@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS schools (
   city VARCHAR(100) NOT NULL,
   phone VARCHAR(50) NOT NULL,
   email VARCHAR(150) NOT NULL,
+  whatsapp_phone VARCHAR(50),
   logo_url TEXT,
   brand_color VARCHAR(20) NOT NULL DEFAULT '#0F766E',
   currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
