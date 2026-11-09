@@ -61,7 +61,9 @@ test('school dashboard schema supplies real weekly attendance trend and absent s
   assert.match(dashboard, /generate_series\(0, 6\)/);
   assert.match(dashboard, /'absentStudents'/);
   assert.match(dashboard, /attendance\.status = 'absent'/);
-  assert.match(dashboard, /attendanceRecordedToday: number\(value\.attendanceRecordedToday\)/);
+  const dashboardView = source('../src/components/schooladmin/SchoolDashboard.tsx');
+  assert.match(dashboardView, /attendanceRecordedToday: number\(value\.attendanceRecordedToday\)/);
+  assert.match(dashboardView, /'Not recorded'/);
   assert.match(dashboard, /active_student\.status = 'active'/);
   assert.match(dashboard, /school_id = p_school_id/);
 });
