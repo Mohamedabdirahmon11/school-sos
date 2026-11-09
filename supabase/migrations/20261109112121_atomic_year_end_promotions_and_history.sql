@@ -27,20 +27,10 @@ BEGIN
 
   SELECT * INTO v_source
   FROM public.classes
-  WHERE id = p_class_id AND school_id = p_school_id AND is_archived = false
-  FOR UPDATE;
+  WHERE id = p_class_id AND school_id = p_school_id AND is_archived = false;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Promotion source class was not found or is archived.';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM public.promotions
-    WHERE school_id = p_school_id
-      AND class_from_id = p_class_id
-      AND academic_year_from = p_academic_year_from
-  ) THEN
-    RAISE EXCEPTION 'This class has already been processed for the selected academic year.';
   END IF;
 
   SELECT count(*) INTO v_expected_count
@@ -91,6 +81,15 @@ BEGIN
     )
   ORDER BY c.id
   FOR UPDATE;
+
+  IF EXISTS (
+    SELECT 1 FROM public.promotions
+    WHERE school_id = p_school_id
+      AND class_from_id = p_class_id
+      AND academic_year_from = p_academic_year_from
+  ) THEN
+    RAISE EXCEPTION 'This class has already been processed for the selected academic year.';
+  END IF;
 
   IF EXISTS (
     SELECT 1
