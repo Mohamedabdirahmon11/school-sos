@@ -50,3 +50,16 @@ test('existing school-scoped bulk PIN, teacher ID/PIN, and admission atomic work
   assert.match(api, /queryAllRows\('users', \{ school_id: school\.id \}, 'id,staff_id'\)/);
   assert.match(api, /db\.approveAdmissionAtomically\(/);
 });
+
+test('school dashboard schema supplies real weekly attendance trend and absent students', () => {
+  const schema = source('../schema.sql');
+  const start = schema.lastIndexOf('CREATE OR REPLACE FUNCTION public.school_dashboard_summary');
+  const dashboard = schema.slice(start);
+  assert.ok(start >= 0, 'school dashboard summary function exists');
+  assert.match(dashboard, /'attendanceTrend'/);
+  assert.match(dashboard, /generate_series\(0, 6\)/);
+  assert.match(dashboard, /'absentStudents'/);
+  assert.match(dashboard, /attendance\.status = 'absent'/);
+  assert.match(dashboard, /active_student\.status = 'active'/);
+  assert.match(dashboard, /school_id = p_school_id/);
+});
