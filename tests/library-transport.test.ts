@@ -8,6 +8,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/042_restrict_library_transport_writes.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+const schoolSettings = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
 const isbnMigration = readFileSync(new URL('../supabase/migrations/043_library_isbn_constraints.sql', import.meta.url), 'utf8');
 
 test('library API errors are not converted into empty or fake successful catalogue data', () => {
@@ -153,4 +154,27 @@ test('library overview shows catalogue, copies, issued and overdue totals', () =
   assert.match(ui, /Total copies/);
   assert.match(ui, /Books issued/);
   assert.match(ui, /Overdue loans/);
+});
+
+
+test('dedicated admin WhatsApp number is included in School Settings save payload', () => {
+  const saveIdentity = schoolSettings.slice(
+    schoolSettings.indexOf('const handleSaveIdentity'),
+    schoolSettings.indexOf('const saveSchoolSection')
+  );
+  assert.match(saveIdentity, /whatsappPhone:\s*normalizeWhatsAppNumber\(whatsappPhone\)/);
+  assert.match(saveIdentity, /if \(whatsappPhone\.trim\(\) && !normalizeWhatsAppNumber\(whatsappPhone\)\)/);
+});
+
+test('discipline module can create incidents and displays the persisted student and parent-contact fields', () => {
+  assert.match(ui, /<form onSubmit=\{handleAddDisciplineIncident\}/);
+  assert.match(ui, /value=\{incidentStudentId\}/);
+  assert.match(ui, /value=\{incidentDate\}/);
+  assert.match(ui, /value=\{infractionType\}/);
+  assert.match(ui, /value=\{incidentSeverity\}/);
+  assert.match(ui, /checked=\{parentContacted\}/);
+  assert.match(ui, /studentName:\s*student \?/);
+  assert.match(ui, /d\.parentContacted \? 'Yes \(manual contact\)' : 'No'/);
+  assert.doesNotMatch(ui, /d\.parentNotified/);
+  assert.match(ui, /disciplineLoading \?/);
 });
