@@ -94,3 +94,36 @@ test('extra-module write handlers enforce read-only mode and surface errors', ()
   assert.match(ui, /const handleAssignBus = async \(\) => \{\s*if \(isReadOnly \|\|/);
   assert.match(ui, /const handleAssignBus[\s\S]*?setModuleError\(err\.message/);
 });
+
+
+test('clinic records are limited to the current school and school administrators', () => {
+  assert.match(api, /apiRouter\.get\('\/school\/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/school\/health-visits', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(storage, /from\('school_health_visits'\)[\s\S]*?\.eq\('school_id', schoolId\)/);
+  assert.match(storage, /student\.schoolId !== input\.schoolId/);
+  assert.match(schema, /FOREIGN KEY \(student_id, school_id\) REFERENCES students\(id, school_id\)/);
+  assert.match(schema, /school_health_visits_read ON school_health_visits FOR SELECT TO authenticated/);
+});
+
+test('discipline records are school-scoped and write access is admin-only', () => {
+  assert.match(api, /apiRouter\.get\('\/school\/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/school\/discipline', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(storage, /getDisciplineIncidents\(schoolId: string\)[\s\S]*?queryRows<any>\('discipline_incidents', \{ school_id: schoolId \}\)/);
+  assert.match(storage, /getStudentById\(input\.studentId, input\.schoolId\)/);
+  assert.match(schema, /discipline_incidents_read ON discipline_incidents FOR SELECT TO authenticated/);
+});
+
+test('school settings and sidebar expose the agreed school administration modules', () => {
+  const settings = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
+  const sidebar = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  for (const tab of ["setActiveTab('identity')", "setActiveTab('academics')", "setActiveTab('documents')", "setActiveTab('branches')", "setActiveTab('designer')", "setActiveTab('backup')"]) {
+    assert.ok(settings.includes(tab), `School Settings tab is present: ${tab}`);
+  }
+  for (const view of ['sch_library', 'sch_transport', 'sch_inventory', 'sch_discipline', 'sch_health', 'sch_settings']) {
+    assert.ok(sidebar.includes(view), `Sidebar includes ${view}`);
+  }
+  for (const view of ['sch_library', 'sch_transport', 'sch_inventory', 'sch_discipline', 'sch_health']) {
+    assert.ok(app.includes(`activeView === '${view}'`), `App routes ${view}`);
+  }
+});
