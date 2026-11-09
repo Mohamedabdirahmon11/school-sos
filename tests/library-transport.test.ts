@@ -75,3 +75,23 @@ test('transport routes capture and display ordered neighborhood pickup stops', (
   assert.ok(api.includes('const stops = body.stops ?? []'));
   assert.ok(api.includes('stops.length > 100'));
 });
+
+
+test('inventory items can be edited without rewriting stock quantity history', () => {
+  assert.match(ui, /const handleEditInventoryItem = \(item: any\)/);
+  assert.match(ui, /ApiClient\.updateInventoryItem\(editingInventoryId/);
+  assert.match(ui, /setInventory\(items => items\.map\(item => item\.id === updated\.id \? updated : item\)\)/);
+  assert.match(ui, /Record stock movement/);
+  assert.match(ui, /Record opening stock using a stock-in movement/);
+});
+
+test('extra-module write handlers enforce read-only mode and surface errors', () => {
+  const addBook = ui.slice(ui.indexOf('const handleAddBook'), ui.indexOf('const handleAddRoute'));
+  const addRoute = ui.slice(ui.indexOf('const handleAddRoute'), ui.indexOf('const handleAssignBus'));
+  const assignBus = ui.slice(ui.indexOf('const handleAssignBus'), ui.indexOf('return ('));
+  assert.match(addBook, /if \(isReadOnly \|\| !school/);
+  assert.match(addBook, /setLibraryError\(err\.message/);
+  assert.match(addRoute, /if \(isReadOnly \|\| !school/);
+  assert.match(assignBus, /if \(isReadOnly \|\|/);
+  assert.match(assignBus, /setModuleError/);
+});
