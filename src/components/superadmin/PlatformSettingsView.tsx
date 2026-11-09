@@ -30,6 +30,7 @@ export const PlatformSettingsView: React.FC = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
     setLoadError(null);
@@ -48,13 +49,14 @@ export const PlatformSettingsView: React.FC = () => {
     e.preventDefault();
     if (!settings) return;
     setIsSaving(true);
+    setSaveError(null);
     try {
       const updated = await ApiClient.updateSettings(settings);
       setSettings(updated);
       setNotice('Platform configuration saved and live across all tenants.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
-      alert(err.message);
+      setSaveError(err.message || 'Unable to save platform settings.');
     } finally {
       setIsSaving(false);
     }
@@ -70,10 +72,11 @@ export const PlatformSettingsView: React.FC = () => {
       a.href = url;
       a.download = `schoolos_platform_backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
-      setNotice('Platform backup snapshot downloaded successfully.');
+      setNotice('Verified platform backup generated and downloaded successfully.');
+      setSettings(await ApiClient.getSettings());
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to download backup');
+      setSaveError(err.message || 'Failed to generate platform backup.');
     } finally {
       setIsBackingUp(false);
     }
@@ -109,6 +112,8 @@ export const PlatformSettingsView: React.FC = () => {
           Global subscription rules, session policies, brute-force lockouts, and synchronized academic calendar
         </p>
       </div>
+
+      {saveError && <div role="alert" className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-800">{saveError}</div>}
 
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800 flex items-center gap-2">
@@ -295,8 +300,20 @@ export const PlatformSettingsView: React.FC = () => {
 
           <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]">
             <div>
+              <p className="font-semibold text-[#132A29]">Record security events</p>
+              <p className="text-[11px] text-[#64748B]">Controls security-category audit records such as lockouts and security changes. Other audit categories remain recorded.</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.logSecurityEvents}
+              onChange={e => setSettings({ ...settings, logSecurityEvents: e.target.checked })}
+              className="w-4 h-4 text-[#0F766E] rounded"
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]">
+            <div>
               <p className="font-semibold text-[#132A29]">Enable 2FA feature</p>
-              <p className="text-[11px] text-[#64748B]">Off by default. When enabled, the retained Super Admin TOTP setup and verification endpoints are available.</p>
+              <p className="text-[11px] text-[#64748B]">Optional Super Admin TOTP protection. Leave off unless you intentionally configure and test 2FA.</p>
             </div>
             <input
               type="checkbox"
@@ -326,46 +343,67 @@ export const PlatformSettingsView: React.FC = () => {
               <span className="text-[10px] uppercase font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">Enabled</span>
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-[#132A29]">Somali (SO)</p>
-                <p className="text-[10px] text-[#64748B]">Af-Soomaali</p>
-              </div>
-              <span className="text-[10px] uppercase font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">Enabled</span>
-            </div>
-
-            <div className="p-3 border rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-50"
-                 onClick={() => toggleLanguage('am')}>
-              <div>
-                <p className="font-semibold text-[#132A29]">Amharic (AM)</p>
-                <p className="text-[10px] text-[#64748B]">አማርኛ</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.enabledLanguages.includes('am')}
-                onChange={() => toggleLanguage('am')}
-                className="w-4 h-4 text-[#0F766E] rounded"
-              />
-            </div>
+            {(['so', 'am'] as const).map(code => (
+              <label key={code} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-50">
+                <span>
+                  <span className="block font-semibold text-[#132A29]">{code === 'so' ? 'Somali (SO)' : 'Amharic (AM)'}</span>
+                  <span className="block text-[10px] text-[#64748B]">{code === 'so' ? 'Af-Soomaali' : 'አማርኛ'}</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.enabledLanguages.includes(code)}
+                  onChange={() => toggleLanguage(code)}
+                  className="w-4 h-4 text-[#0F766E] rounded"
+                />
+              </label>
+            ))}
           </div>
         </div>
 
         {/* Database Backup & Disaster Recovery */}
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <Database className="w-4 h-4 text-[#0F766E]" />
-              <span>Database Backups & Disaster Recovery</span>
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#0F766E]" />
+                <span>Database Backups & Disaster Recovery</span>
+              </h2>
+              <p className="mt-1 text-[11px] text-[#64748B]">A manual full-platform JSON snapshot is available. The selected frequency is saved as a policy preference; automatic scheduled backups are not yet running.</p>
+            </div>
             <button
               type="button"
               onClick={handleDownloadPlatformBackup}
               disabled={isBackingUp}
-              className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] disabled:opacity-60 text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isBackingUp ? 'Generating...' : 'Download Full Backup (JSON)'}</span>
+              <span>{isBackingUp ? 'Generating...' : 'Generate & Download Backup'}</span>
             </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-medium text-[#334155]">Preferred Backup Frequency</label>
+              <select
+                value={settings.backupSchedule}
+                onChange={e => setSettings({ ...settings, backupSchedule: e.target.value as SuperAdminSettings['backupSchedule'] })}
+                className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+              >
+                <option value="daily">Daily (preference)</option>
+                <option value="weekly">Weekly (preference)</option>
+                <option value="manual">Manual only</option>
+              </select>
+            </div>
+            <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+              <p className="font-medium text-[#334155]">Last verified platform backup</p>
+              <p className="mt-1 text-[11px] text-[#64748B]">
+                {settings.lastBackupDate && settings.lastBackupStatus === 'success'
+                  ? new Date(settings.lastBackupDate).toLocaleString()
+                  : settings.lastBackupStatus === 'failed'
+                    ? 'Last backup attempt failed'
+                    : 'No verified backup recorded'}
+              </p>
+              {settings.lastBackupStatus === 'failed' && <p className="mt-1 text-[10px] text-rose-700">Generate a new backup and verify the download.</p>}
+            </div>
           </div>
         </div>
 
