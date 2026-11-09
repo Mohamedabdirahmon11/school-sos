@@ -46,7 +46,7 @@ const parentWhatsAppNumber = (student: Student) =>
 
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
-  const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.phone);
+  const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.whatsappPhone);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [date, setDate] = useState(() => schoolLocalDate(school?.timezone));
@@ -185,7 +185,7 @@ export const AttendanceView: React.FC = () => {
       className ? `Fasalka: ${className}.` : '',
       'Fadlan nala soo xiriir si aan u xaqiijino xaaladdiisa. Mahadsanid.',
       school?.name || '',
-      adminWhatsAppNumber ? `Xiriirka dugsiga: +${adminWhatsAppNumber}` : ''
+      adminWhatsAppNumber ? `WhatsApp-ka maamulka: +${adminWhatsAppNumber}` : ''
     ].filter(Boolean).join('\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
