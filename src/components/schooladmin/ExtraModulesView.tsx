@@ -107,6 +107,42 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const [notice, setNotice] = useState<string | null>(null);
   const [moduleError, setModuleError] = useState<string | null>(null);
+  const [moduleSearch, setModuleSearch] = useState('');
+  const [modulePage, setModulePage] = useState(1);
+  const modulePageSize = 10;
+  const filterModuleRows = (rows: any[], fields: string[]) => {
+    const query = moduleSearch.trim().toLowerCase();
+    const filtered = query
+      ? rows.filter(row => fields.some(field => String(row?.[field] ?? '').toLowerCase().includes(query)))
+      : rows;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / modulePageSize));
+    const page = Math.min(modulePage, totalPages);
+    return {
+      rows: filtered.slice((page - 1) * modulePageSize, page * modulePageSize),
+      total: filtered.length,
+      totalPages,
+      page
+    };
+  };
+  const booksPage = filterModuleRows(books, ['title', 'author', 'isbn']);
+  const loansPage = filterModuleRows(libraryLoans, ['status', 'dueDate', 'studentId', 'bookId']);
+  const routesPage = filterModuleRows(routes, ['name', 'routeNumber', 'vehicleNumber', 'driverName', 'driverPhone']);
+  const assignmentsPage = filterModuleRows(busAssignments, ['studentId', 'routeId']);
+  const disciplinePage = filterModuleRows(disciplineLogs, ['studentName', 'studentId', 'incidentDate', 'infractionType', 'severity', 'actionTaken', 'notes']);
+  const healthPage = filterModuleRows(healthLogs, ['studentName', 'visitDate', 'symptoms', 'treatment', 'nurseName']);
+  const inventoryPage = filterModuleRows(inventory, ['name', 'sku', 'category', 'location']);
+
+  const renderModulePagination = (page: { total: number; totalPages: number; page: number; rows: any[] }, label: string) => (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <span>{page.total === 0 ? `No ${label} found` : `Showing ${(page.page - 1) * modulePageSize + 1}–${Math.min(page.page * modulePageSize, page.total)} of ${page.total} ${label}`}</span>
+      {page.totalPages > 1 && <div className="flex items-center gap-2">
+        <button type="button" disabled={page.page <= 1} onClick={() => setModulePage(current => Math.max(1, current - 1))} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
+        <span>Page {page.page} of {page.totalPages}</span>
+        <button type="button" disabled={page.page >= page.totalPages} onClick={() => setModulePage(current => Math.min(page.totalPages, current + 1))} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+      </div>}
+    </div>
+  );
+
 
   useEffect(() => {
     if (!school || activeModule !== 'health') return;
@@ -477,6 +513,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         </div>
       </div>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="block w-full sm:max-w-sm">
+          <span className="sr-only">Search current module</span>
+          <input type="search" value={moduleSearch} onChange={event => { setModuleSearch(event.target.value); setModulePage(1); }} placeholder={`Search ${activeModule} records…`} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
+        </label>
+        {moduleSearch && <button type="button" onClick={() => { setModuleSearch(''); setModulePage(1); }} className="self-start rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Clear search</button>}
+      </div>
       {notice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -520,7 +563,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td colSpan={4} className="p-6 text-center text-[#64748B]">No books catalogued yet.</td>
                   </tr>
                 ) : (
-                  books.map(b => (
+                  booksPage.rows.map(b => (
                     <tr key={b.id} className="hover:bg-[#F8FAFC]">
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{b.title}</td>
                       <td className="px-4 py-2.5 text-[#475569]">{b.author}</td>
@@ -532,6 +575,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(booksPage, 'books')}
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-bold text-[#132A29]">Issue a book</h3>
@@ -543,7 +587,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 <form onSubmit={handleIssueLibraryLoan} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   <select required value={loanBookId} onChange={e => setLoanBookId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
                     <option value="">Select available book</option>
-                    {books.map(book => {
+                    {booksPage.rows.map(book => {
                       const active = libraryLoans.filter(loan => loan.bookId === book.id && loan.status === 'issued').length;
                       const available = Math.max(0, Number(book.quantity || 0) - active);
                       return available > 0 ? <option key={book.id} value={book.id}>{book.title} · {available} available</option> : null;
@@ -562,7 +606,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <tr><th className="px-3 py-2">Book</th><th className="px-3 py-2">Student</th><th className="px-3 py-2">Issued</th><th className="px-3 py-2">Due</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Action</th></tr>
                     </thead>
                     <tbody className="divide-y divide-[#E2E8F0]">
-                      {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : libraryLoans.map(loan => {
+                      {libraryLoans.length === 0 ? <tr><td colSpan={6} className="p-5 text-center text-[#64748B]">No lending records yet.</td></tr> : loansPage.rows.map(loan => {
                         const book = books.find(row => row.id === loan.bookId);
                         const student = students.find(row => row.id === loan.studentId);
                         const overdue = loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -578,6 +622,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     </tbody>
                   </table>
                 </div>
+                {renderModulePagination(loansPage, 'loans')}
               </>
             )}
           </section>
@@ -621,7 +666,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                     <td colSpan={7} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
                 ) : (
-                  routes.map(r => (
+                  routesPage.rows.map(r => (
                     <tr key={r.id} className="hover:bg-[#F8FAFC]">
                       <td className="px-4 py-2.5 font-semibold text-[#132A29]">{r.name}</td>
                       <td className="px-4 py-2.5 font-mono">{r.vehicleNumber}</td>
@@ -636,6 +681,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(routesPage, 'routes')}
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <h3 className="text-xs font-bold text-[#132A29]">Bus students</h3>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -652,7 +698,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </select>
               <button type="button" onClick={handleAssignBus} disabled={isReadOnly || !assignmentStudentId || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">Assign</button>
             </div>
-            {busAssignments.map(item => {
+            {assignmentsPage.rows.map(item => {
               const student = students.find(row => row.id === item.studentId);
               const route = routes.find(row => row.id === item.routeId);
               return <div key={item.id} className="flex items-center justify-between gap-3 text-xs border border-[#E2E8F0] rounded-lg p-3">
@@ -670,6 +716,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 }} className="text-rose-700 disabled:opacity-40">Remove</button>
               </div>;
             })}
+            {renderModulePagination(assignmentsPage, 'bus assignments')}
           </section>
         </div>
       )}
@@ -694,7 +741,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {disciplineLogs.map(d => (
+                {disciplinePage.rows.map(d => (
                   <tr key={d.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
@@ -707,6 +754,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(disciplinePage, 'discipline records')}
         </div>
       )}
 
@@ -765,7 +813,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <tbody className="divide-y divide-[#E2E8F0]">
                 {healthLoading ? (
                   <tr><td className="px-4 py-6 text-center text-[#64748B]" colSpan={5}>Loading clinic visits…</td></tr>
-                ) : healthLogs.length ? healthLogs.map(h => (
+                ) : healthPage.rows.length ? healthPage.rows.map(h => (
                   <tr key={h.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{h.visitDate}</td>
                     <td className="px-4 py-2.5 font-semibold text-[#132A29]">{h.studentName}</td>
@@ -779,6 +827,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </tbody>
             </table>
           </div>
+          {renderModulePagination(healthPage, 'health visits')}
         </div>
       )}
 
@@ -811,7 +860,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr><th className="p-2">Item</th><th className="p-2">SKU</th><th className="p-2">Category</th><th className="p-2">On hand</th><th className="p-2">Reorder at</th><th className="p-2">Unit cost</th><th className="p-2">Location</th><th className="p-2">Status</th><th className="p-2">Manage</th></tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {inventory.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
+                    {inventoryPage.rows.map(item=><tr key={item.id} className="hover:bg-[#F8FAFC]">
                       <td className="p-2 font-semibold text-[#132A29]">{item.name}</td><td className="p-2 font-mono">{item.sku||'—'}</td><td className="p-2">{item.category}</td>
                       <td className="p-2 font-mono">{item.quantityOnHand} {item.unit}</td><td className="p-2 font-mono">{item.reorderLevel}</td><td className="p-2 font-mono">{item.unitCost}</td><td className="p-2">{item.location||'—'}</td>
                       <td className="p-2"><span className={!item.isActive?'text-slate-500':item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{!item.isActive?'Archived':item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
@@ -823,10 +872,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                        </td>
                     </tr>)}
                     {!inventory.length&&<tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
+                    {inventory.length > 0 && inventoryPage.rows.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items match your search.</td></tr>}
                   </tbody>
                 </table>
               </div>
             )}
+            {renderModulePagination(inventoryPage, 'inventory items')}
           </section>
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <form onSubmit={handleInventoryMovement} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3 shadow-xs">
