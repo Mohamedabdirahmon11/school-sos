@@ -81,6 +81,9 @@ export interface School {
   code: string; // e.g., "MOG01"
   address: string;
   city: string;
+  phone: string;
+  email: string;
+  whatsappPhone?: string;
  
   logoUrl?: string;
   brandColor?: string; // Default "#0F766E"
