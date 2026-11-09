@@ -64,7 +64,7 @@ export const PlansBillingView: React.FC = () => {
     setPayingInvoiceId(id);
     try {
       await ApiClient.payInvoice(id);
-      setNotice('Invoice marked as paid and receipt generated. Subscription access was updated according to its plan.');
+      setNotice('Payment manually recorded as received and receipt generated. No online payment was charged.');
       await fetchData();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
@@ -106,6 +106,9 @@ export const PlansBillingView: React.FC = () => {
           </h1>
           <p className="text-xs text-[#64748B]">
             Configure SaaS pricing tiers, generate duplicate-safe recurring invoices, and issue receipts
+          </p>
+          <p className="mt-1 text-[11px] text-amber-700">
+            Recording a payment here is manual reconciliation after funds are received; this screen does not charge a card or connect to a payment gateway.
           </p>
         </div>
         <button
@@ -244,7 +247,7 @@ export const PlansBillingView: React.FC = () => {
                             disabled={payingInvoiceId !== null}
                             className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {payingInvoiceId === inv.id ? 'Processing…' : 'Mark Paid'}
+                            {payingInvoiceId === inv.id ? 'Recording…' : 'Record Received'}
                           </button>
                         )}
                         <button

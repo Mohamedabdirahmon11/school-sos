@@ -368,7 +368,7 @@ export const PlatformSettingsView: React.FC = () => {
                 <Database className="w-4 h-4 text-[#0F766E]" />
                 <span>Database Backups & Disaster Recovery</span>
               </h2>
-              <p className="mt-1 text-[11px] text-[#64748B]">A manual full-platform JSON snapshot is available. The selected frequency is saved as a policy preference; automatic scheduled backups are not yet running.</p>
+              <p className="mt-1 text-[11px] text-[#64748B]">Manual JSON export is available. Daily/weekly off-site database backups run through GitHub Actions after the private SUPABASE_DB_URL secret is configured. The JSON export excludes credentials and is not a full-platform restore image.</p>
             </div>
             <button
               type="button"
@@ -388,8 +388,8 @@ export const PlatformSettingsView: React.FC = () => {
                 onChange={e => setSettings({ ...settings, backupSchedule: e.target.value as SuperAdminSettings['backupSchedule'] })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
               >
-                <option value="daily">Daily (preference)</option>
-                <option value="weekly">Weekly (preference)</option>
+                <option value="daily">Daily (off-site backup)</option>
+                <option value="weekly">Weekly (off-site backup)</option>
                 <option value="manual">Manual only</option>
               </select>
             </div>
