@@ -1,0 +1,89 @@
+name: Supabase Database Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run a backup even when the platform preference is manual or not due today
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schoolos-supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Create encrypted-transport database export
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Check required database secret
+        shell: bash
+        run: |
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo "::error::Add SUPABASE_DB_URL as a repository Actions secret. Use the Supabase Session Pooler connection string; never commit it."
+            exit 1
+          fi
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Check configured backup frequency
+        id: policy
+        shell: bash
+        env:
+          FORCE_BACKUP: ${{ inputs.force || 'false' }}
+        run: |
+          frequency="$(psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atqc "select coalesce((select backup_schedule from public.super_admin_settings where id = 'default'), 'manual')")"
+          weekday="$(date -u +%u)"
+          run_backup=false
+          case "$frequency" in
+            daily) run_backup=true ;;
+            weekly) [[ "$weekday" == "1" ]] && run_backup=true ;;
+            manual) run_backup=false ;;
+            *)
+              echo "::error::Unsupported backup_schedule value: $frequency"
+              exit 1
+              ;;
+          esac
+          if [[ "$FORCE_BACKUP" == "true" ]]; then run_backup=true; fi
+          echo "frequency=$frequency" >> "$GITHUB_OUTPUT"
+          echo "run_backup=$run_backup" >> "$GITHUB_OUTPUT"
+          echo "Backup policy: $frequency; run: $run_backup (UTC)."
+
+      - name: Dump database roles, schema, and data
+        if: steps.policy.outputs.run_backup == 'true'
+        shell: bash
+        run: |
+          mkdir -p backup
+          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --remote="$SUPABASE_DB_URL" -f backup/data.sql --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          printf 'created_at_utc=%s\nfrequency=%s\n' "$(date -u +%FT%TZ)" "${{ steps.policy.outputs.frequency }}" > backup/manifest.txt
+          sha256sum backup/roles.sql backup/schema.sql backup/data.sql > backup/SHA256SUMS
+          tar -czf schoolos-supabase-backup.tar.gz -C backup .
+
+      - name: Store private backup artifact
+        if: steps.policy.outputs.run_backup == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoolos-supabase-backup-${{ github.run_id }}
+          path: schoolos-supabase-backup.tar.gz
+          if-no-files-found: error
+          retention-days: 30
