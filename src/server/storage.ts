@@ -2182,6 +2182,23 @@ class StorageEngine {
     submittedBy: string
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
+    // Fast user-facing capacity validation; the database RPC repeats this under row locks.
+    const incomingByClass = new Map<string, number>();
+    const outgoingByClass = new Map<string, number>();
+    for (const promotion of promotions) {
+      if (promotion.decision !== 'promoted' || !promotion.classToId || promotion.classToId === promotion.classFromId) continue;
+      incomingByClass.set(promotion.classToId, (incomingByClass.get(promotion.classToId) || 0) + 1);
+      outgoingByClass.set(promotion.classFromId, (outgoingByClass.get(promotion.classFromId) || 0) + 1);
+    }
+    for (const [targetClassId, incomingCount] of incomingByClass) {
+      const targetClass = targetClasses.get(targetClassId)!;
+      const currentCount = await this.queryPage('students', { school_id: schoolId, class_id: targetClassId }, 1, 1, undefined, 'id');
+      const outgoingCount = outgoingByClass.get(targetClassId) || 0;
+      if (currentCount.total - outgoingCount + incomingCount > targetClass.capacity) {
+        throw new Error(`Target class ${targetClass.name} does not have enough capacity for this promotion.`);
+      }
+    }
+
     const config = await this.getExamConfig(schoolId);
     const maxTotal = (config.smallExamMax || 10) + (config.bigExamMax || 10);
     for (const mark of marks) {
@@ -2402,6 +2419,7 @@ class StorageEngine {
       throw new Error('Confirmations must include each student in the selected class exactly once.');
     }
 
+    const targetClasses = new Map<string, SchoolClass>();
     for (const promotion of promotions) {
       const rank = rankByStudent.get(promotion.studentId);
       if (!rank || promotion.classFromId !== classId) throw new Error('Promotion includes a student outside the selected class.');
@@ -2415,6 +2433,7 @@ class StorageEngine {
         if (!promotion.classToId) throw new Error('Target class must belong to this school.');
         const targetClass = await this.getClassById(promotion.classToId, schoolId);
         if (!targetClass || targetClass.isArchived) throw new Error('Target class must be an active class in this school.');
+        targetClasses.set(targetClass.id, targetClass);
       }
       promotion.yearlyPercentage = rank.yearlyPercentage;
       promotion.yearlyRank = rank.rank;
