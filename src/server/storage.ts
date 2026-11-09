@@ -3328,20 +3328,14 @@ class StorageEngine {
   // AUDIT LOGS & CSV EXPORT
   // -------------------------------------------------------------
   public logAudit(logData: Omit<AuditLog, 'id' | 'timestamp'>): AuditLog {
-    // Respect the platform-level security audit switch without suppressing
-    // subscription, finance, academic, school, or user audit history.
-    if (logData.category === 'security' && this.data.settings.logSecurityEvents === false) {
-      return {
-        ...logData,
-        id: '',
-        timestamp: new Date().toISOString()
-      };
-    }
     const log: AuditLog = {
       ...logData,
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toISOString()
     };
+    // Respect the platform-level security audit switch without suppressing
+    // subscription, finance, academic, school, or user audit history.
+    if (logData.category === 'security' && this.data.settings.logSecurityEvents === false) return log;
     this.data.auditLogs.unshift(log);
     // Keep max 10,000 logs in memory
     if (this.data.auditLogs.length > 10000) {
