@@ -169,7 +169,7 @@ export const AttendanceView: React.FC = () => {
             {t('attendance')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Review class attendance submitted by teachers. For absent students, prepare the parent message in WhatsApp and manually press Send.
+            Review class attendance submitted by teachers. For absent students, prepare the parent message, open WhatsApp, and manually press Send in WhatsApp.
           </p>
         </div>
 
