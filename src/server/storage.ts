@@ -297,7 +297,7 @@ const PLATFORM_BACKUP_EXCLUDED_FIELDS = new Set([
   'password', 'passwordhash', 'pinhash', 'pin', 'twofactorsecret',
   'pendingtwofactorsecret', 'recoverycodes', 'apikey', 'apisecret',
   'webhookurl', 'accesstoken', 'refreshtoken', 'sessiontoken',
-  'token', 'tokenhash', 'smtpPassword'.toLowerCase(), 'service_role_key',
+  'token', 'tokenhash', 'smtppassword', 'servicerolekey', 'privatekey',
   'sessions', 'usersessions', 'lockoutcounters', 'lockoutcounterrows',
   'failedloginattempts', 'lockeduntil'
 ]);
