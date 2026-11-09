@@ -52,12 +52,12 @@ test('subscription invoice action is explicitly manual reconciliation, not a pay
 });
 
 test('off-site backups follow the saved daily or weekly policy and use a private artifact', () => {
-  assert.match(backupWorkflow, /cron: '0 2 \\* \\* \\*'/);
-  assert.match(backupWorkflow, /secrets\\.SUPABASE_DB_URL/);
-  assert.match(backupWorkflow, /backup_schedule/);
-  assert.match(backupWorkflow, /weekly/);
-  assert.match(backupWorkflow, /retention-days: 30/);
-  assert.match(backupWorkflow, /SHA256SUMS/);
-  assert.match(backupDocs, /new\\/empty recovery project/);
-  assert.match(backupDocs, /does not back up Storage object bytes/);
+  assert.ok(backupWorkflow.includes("cron: '0 2 * * *'"));
+  assert.ok(backupWorkflow.includes('secrets.SUPABASE_DB_URL'));
+  assert.ok(backupWorkflow.includes('backup_schedule'));
+  assert.ok(backupWorkflow.includes('weekly'));
+  assert.ok(backupWorkflow.includes('retention-days: 30'));
+  assert.ok(backupWorkflow.includes('SHA256SUMS'));
+  assert.ok(backupDocs.includes('new/empty recovery project'));
+  assert.ok(backupDocs.includes('does not back up Storage object bytes'));
 });
