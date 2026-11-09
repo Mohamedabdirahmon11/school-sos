@@ -1,6 +1,6 @@
 # Supabase live-schema reconciliation notes
 
-Checked against the configured Supabase project `school management 3` on 2026-11-08 and the repository `main` schema/migration tree.
+Checked against the configured Supabase project `school management 3` on 2026-11-09 and the repository `main` schema/migration tree.
 
 ## Live migration history entries without matching checked-in source files
 
@@ -47,3 +47,21 @@ The Supabase Security Advisor also reports leaked-password protection disabled. 
 ## Safety
 
 No school, student, teacher, fee, invoice, or user records were deleted or rewritten as part of this source reconciliation. The migration uses idempotent DDL and function replacements; it does not backfill or reset credentials.
+
+## Applied migrations whose checked-in source uses a different version prefix
+
+The live migration history also contains these applied entries:
+
+- `20261109073451 school_backup_restore_exam_health_tables`
+- `20261109073501 timetable_shift_settings_source_sync`
+- `20261109073507 enforce_atomic_timetable_conflicts`
+- `20261109073514 shift_aware_timetable_swap_conflict_guard`
+
+The repository contains matching migration bodies by name, but their checked-in
+filenames use the `20261108...` version prefixes instead of the live
+`20261109...` versions. This is a migration-history version mismatch, not a
+missing live database object. The checked-in scripts are idempotent/guarded,
+but Supabase CLI may consider the differently-versioned files pending. Do not
+blindly replay them or rewrite production migration history. Before deploying
+from a fresh environment, reconcile these four version identifiers with the
+verified live history using the normal migration review process.
