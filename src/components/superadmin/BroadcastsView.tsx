@@ -69,7 +69,7 @@ export const BroadcastsView: React.FC = () => {
 
       setTitle('');
       setMessage('');
-      setNotice(sendOption === 'now' ? 'Platform notice published to the selected schools’ notice feeds.' : 'Broadcast scheduled.');
+      setNotice(sendOption === 'now' ? 'Notice published to the selected schools’ in-app notice feeds.' : 'Broadcast scheduled.');
       await fetchBroadcasts();
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
@@ -83,7 +83,7 @@ export const BroadcastsView: React.FC = () => {
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-          Platform Broadcasts & Announcements
+          Platform Notices & Announcements
         </h1>
         <p className="text-xs text-[#64748B]">
           Dispatch system messages to schools, administrators, and faculties marked "From platform"
@@ -207,7 +207,7 @@ export const BroadcastsView: React.FC = () => {
               className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>{sendOption === 'now' ? 'Dispatch Broadcast Now' : 'Save Scheduled Broadcast'}</span>
+              <span>{sendOption === 'now' ? 'Publish Notice Now' : 'Save Scheduled Broadcast'}</span>
             </button>
           </form>
         </div>
@@ -215,8 +215,8 @@ export const BroadcastsView: React.FC = () => {
         {/* History Table */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs lg:col-span-2">
           <div className="px-5 py-4 border-b border-[#E2E8F0]">
-            <h2 className="text-sm font-bold text-[#132A29]">Broadcast History & Queue</h2>
-            <p className="text-[11px] text-[#64748B]">All sent and queued platform announcements</p>
+            <h2 className="text-sm font-bold text-[#132A29]">Notice Publishing History & Queue</h2>
+            <p className="text-[11px] text-[#64748B]">Published and scheduled in-app notices</p>
           </div>
 
           <div className="divide-y divide-[#E2E8F0]">
