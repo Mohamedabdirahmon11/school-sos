@@ -42,3 +42,15 @@ test('password policy requires 8 characters, mixed case, and a number', () => {
   assert.match(passwordPolicyError('Abcdefghij123'.repeat(10)) || '', /128 characters/);
   assert.match(passwordPolicyError(undefined) || '', /8 characters/);
 });
+
+
+test('new school administrator temporary passwords are hashed and changed on first sign-in', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const schoolsSource = readFileSync(new URL('../src/components/superadmin/SchoolsView.tsx', import.meta.url), 'utf8');
+  assert.match(apiSource, /const temporaryPassword = String\\(randomInt\\(100000, 1_000_000\\)\\)/);
+  assert.match(apiSource, /passwordHash: hashPassword\\(temporaryPassword\\)/);
+  assert.match(apiSource, /admin: sanitizeUser\\(adminUser\\), temporaryPassword, mustChangePassword: true/);
+  assert.doesNotMatch(apiSource, /passwordHash: adminPassword/);
+  assert.match(schoolsSource, /res\\.temporaryPassword/);
+  assert.doesNotMatch(schoolsSource, /addAdminPass/);
+});
