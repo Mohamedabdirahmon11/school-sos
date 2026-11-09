@@ -510,7 +510,6 @@ function requireImportSchoolAccess(req: Request, res: Response, next: () => void
 
 function requireSchoolStaff(req: Request, res: Response, next: () => void) {
   const user = (req as any).user as User;
-  if (user?.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'grades_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view exam results.' }); return false; }
   if (!user || !['school_admin', 'super_admin', 'teacher', 'accountant'].includes(user.role)) {
     res.status(403).json({ error: 'School staff access required.' });
     return;
@@ -3617,6 +3616,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolConte
 
 apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
+  const user = (req as any).user as User;
   const { classId, date } = req.query;
   if (!classId || !date) {
     res.status(400).json({ error: 'classId and date (YYYY-MM-DD) are required.' });
@@ -4044,6 +4044,7 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
 async function canReadClassResults(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
+  if (user?.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'grades_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view exam results.' }); return false; }
   if (!user || !['school_admin', 'super_admin', 'teacher', 'accountant'].includes(user.role)) {
     res.status(403).json({ error: 'Results access is limited to school staff.' });
     return false;
