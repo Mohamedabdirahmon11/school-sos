@@ -14,9 +14,10 @@ test('WhatsApp numbers must be explicitly international and normalize to wa.me d
   assert.equal(normalizeWhatsAppNumber('+251ABC1234567'), null);
 });
 
-test('school WhatsApp contact is validated by the server settings sanitizer', () => {
-  assert.equal(sanitizeSchoolSettings({ phone: '+251912345678' }).phone, '+251912345678');
-  assert.throws(() => sanitizeSchoolSettings({ phone: '0912345678' }), /international number/);
+test('school telephone and administrator WhatsApp are validated independently', () => {
+  assert.equal(sanitizeSchoolSettings({ phone: '011 1234567' }).phone, '011 1234567');
+  assert.equal(sanitizeSchoolSettings({ whatsappPhone: '+251912345678' }).whatsappPhone, '+251912345678');
+  assert.throws(() => sanitizeSchoolSettings({ whatsappPhone: '0912345678' }), /international number/);
 });
 
 test('attendance and manual WhatsApp actions use the same validator and never auto-send', () => {
@@ -29,7 +30,8 @@ test('attendance and manual WhatsApp actions use the same validator and never au
   assert.ok(attendance.includes('window.open(url'));
   assert.ok(attendance.includes('if (!adminWhatsAppNumber)'));
   assert.ok(attendance.includes('window.open(url, \'_blank\''));
-  assert.ok(settings.includes('if (phone.trim() && !normalizeWhatsAppNumber(phone))'));
+  assert.ok(settings.includes('if (whatsappPhone.trim() && !normalizeWhatsAppNumber(whatsappPhone))'));
+  assert.ok(attendance.includes('normalizeWhatsAppNumber(school?.whatsappPhone)'));
   assert.ok(api.includes('Paid provider settings and queued delivery endpoints are intentionally disabled.'));
   assert.match(guide, /administrator-owned WhatsApp account/);
   assert.match(guide, /does not send WhatsApp messages automatically/);
