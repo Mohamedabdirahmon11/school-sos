@@ -158,6 +158,7 @@ export const SchoolSettingsView: React.FC = () => {
           logoUrl,
           address,
           city,
+          whatsappPhone: normalizeWhatsAppNumber(whatsappPhone) || '',
 
           currency,
           language,
