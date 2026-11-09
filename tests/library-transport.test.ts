@@ -201,3 +201,10 @@ test('transport data is loaded only when the Transport module is active', () => 
   assert.match(ui, /ApiClient\.getTransportRoutes\(school\.id\)/);
   assert.match(ui, /ApiClient\.getBusAssignments\(\)/);
 });
+
+
+test('Library lending loads the current school student list for book assignment', () => {
+  const libraryEffect = ui.slice(ui.indexOf("if (!school || activeModule !== 'library')"), ui.indexOf('const handleAddDisciplineIncident'));
+  assert.match(libraryEffect, /ApiClient\.getAllStudents\(undefined, undefined\)/);
+  assert.match(libraryEffect, /setStudents\(studentRows\)/);
+});
