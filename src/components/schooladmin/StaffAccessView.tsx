@@ -19,8 +19,8 @@ import {
 const AVAILABLE_PERMISSIONS = [
   { id: 'fees_manage', label: 'Fees & Finance Ledger (Record payments, issue receipts)' },
   { id: 'admissions_manage', label: 'Student Admissions (Review and admit new applicants)' },
-  { id: 'attendance_manage', label: 'Attendance Management (Mark and override records)' },
-  { id: 'grades_manage', label: 'Exam Grades & Report Cards (Enter & lock exam marks)' },
+  { id: 'attendance_manage', label: 'Attendance Review (View class attendance and absences)' },
+  { id: 'grades_manage', label: 'Exam Results Review (Review and approve submitted marks)' },
   { id: 'library_manage', label: 'Library Catalog & Loans' },
   { id: 'transport_manage', label: 'Transport Fleet & Student Routes' },
   { id: 'inventory_manage', label: 'School Inventory & Asset Registry' },
