@@ -1078,7 +1078,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   disabled={librarySaving || isReadOnly}
                   className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold disabled:opacity-50"
                 >
-                  {librarySaving ? 'Saving…' : 'Add Book'
+                  {librarySaving ? 'Saving…' : 'Add Book'}
                 </button>
               </div>
             </form>
