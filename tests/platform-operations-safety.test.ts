@@ -7,6 +7,8 @@ const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 const billing = readFileSync(new URL('../src/components/superadmin/PlansBillingView.tsx', import.meta.url), 'utf8');
+const backupWorkflow = readFileSync(new URL('../.github/workflows/supabase-backup.yml', import.meta.url), 'utf8');
+const backupDocs = readFileSync(new URL('../docs/automated-backups.md', import.meta.url), 'utf8');
 
 test('platform backup recursively excludes credentials, active sessions, and lockout state', () => {
   const source = {
@@ -47,4 +49,15 @@ test('subscription invoice action is explicitly manual reconciliation, not a pay
   assert.match(billing, /manual reconciliation after funds are received/);
   assert.match(billing, /No online payment was charged/);
   assert.match(billing, /Record Received/);
+});
+
+test('off-site backups follow the saved daily or weekly policy and use a private artifact', () => {
+  assert.match(backupWorkflow, /cron: '0 2 \\* \\* \\*'/);
+  assert.match(backupWorkflow, /secrets\\.SUPABASE_DB_URL/);
+  assert.match(backupWorkflow, /backup_schedule/);
+  assert.match(backupWorkflow, /weekly/);
+  assert.match(backupWorkflow, /retention-days: 30/);
+  assert.match(backupWorkflow, /SHA256SUMS/);
+  assert.match(backupDocs, /new\\/empty recovery project/);
+  assert.match(backupDocs, /does not back up Storage object bytes/);
 });
