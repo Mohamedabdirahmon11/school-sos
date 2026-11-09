@@ -359,7 +359,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
               />
               <p className="mt-1 text-[11px] text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</p>
-              {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>
+              {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
             </div>
             <div>
               <button
