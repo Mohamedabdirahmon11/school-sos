@@ -1762,15 +1762,6 @@ apiRouter.get('/superadmin/backup', requireAuth, requireSuperAdmin, async (req, 
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', 'attachment; filename="schoolos-platform-backup.json"');
-  db.logAudit({
-    action: 'PLATFORM_BACKUP_DOWNLOADED',
-    category: 'security',
-    userId: user.id,
-    userName: user.fullName,
-    userRole: user.role,
-    details: 'Generated a full platform backup snapshot.',
-    severity: 'warning'
-  });
   try {
     const backup = await db.generatePlatformBackup();
     db.updateSettings({
@@ -1779,9 +1770,38 @@ apiRouter.get('/superadmin/backup', requireAuth, requireSuperAdmin, async (req, 
     });
     await db.flush();
     backup.data.settings = db.getSettings();
+    const checksumPayload = JSON.stringify({
+      backupDate: backup.backupDate,
+      version: backup.version,
+      manifest: backup.manifest,
+      data: backup.data
+    });
+    (backup as any).checksum = {
+      algorithm: 'sha256',
+      value: createHash('sha256').update(checksumPayload).digest('hex')
+    };
+    db.logAudit({
+      action: 'PLATFORM_BACKUP_DOWNLOADED',
+      category: 'security',
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      details: 'Generated and verified a platform export; credentials and active sessions were excluded.',
+      severity: 'warning'
+    });
+    await db.flush();
     res.json(backup);
   } catch {
     db.updateSettings({ lastBackupStatus: 'failed' });
+    db.logAudit({
+      action: 'PLATFORM_BACKUP_FAILED',
+      category: 'security',
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      details: 'Platform export generation or persistence failed.',
+      severity: 'error'
+    });
     await db.flush().catch(() => undefined);
     res.status(503).json({ error: 'Platform backup could not be completed. No backup was marked as successful.' });
   }
