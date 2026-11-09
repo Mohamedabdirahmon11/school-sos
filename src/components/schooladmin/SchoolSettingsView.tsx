@@ -79,6 +79,7 @@ export const SchoolSettingsView: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState(school?.logoUrl || '');
   const [address, setAddress] = useState(school?.address || '');
   const [city, setCity] = useState(school?.city || '');
+  const [phone, setPhone] = useState(school?.phone || '');
  
   const [whatsappPhone, setWhatsappPhone] = useState(school?.whatsappPhone || '');
   const [email, setEmail] = useState(school?.email || '');
