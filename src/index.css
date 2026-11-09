@@ -792,7 +792,6 @@
 }
 .school-admin-design main :is(input, select, textarea),
 .super-admin-design main :is(input, select, textarea) {
-  width: auto;
   max-width: 100%;
   min-width: 0;
   transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
