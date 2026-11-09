@@ -70,16 +70,17 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleCapacity, setScheduleCapacity] = useState(40);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
 
-  // Load classes, subjects, exam config
-  useEffect(() => {
+  // Load classes, subjects, and exam configuration with a retryable failure state.
+  const loadExamSetup = async () => {
     if (!school) return;
     setIsLoading(true);
     setLoadError(null);
-    Promise.all([
-      ApiClient.getClasses(),
-      ApiClient.getSubjects(),
-      ApiClient.getExamConfig()
-    ]).then(([cls, subs, conf]) => {
+    try {
+      const [cls, subs, conf] = await Promise.all([
+        ApiClient.getClasses(),
+        ApiClient.getSubjects(),
+        ApiClient.getExamConfig()
+      ]);
       setClasses(cls);
       if (cls.length > 0) setSelectedClassId(cls[0].id);
       setSubjects(subs);
@@ -90,9 +91,15 @@ export const ExamsResultsView: React.FC = () => {
         setBigExamMax(conf.bigExamMax || 10);
         setPassMarkPercentage(conf.passMarkPercentage || 50);
       }
-    }).catch((err: any) => {
+    } catch (err: any) {
       setLoadError(err?.message || 'Unable to load classes, subjects, or exam configuration.');
-    }).finally(() => setIsLoading(false));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadExamSetup();
   }, [school]);
 
   useEffect(() => {
@@ -352,7 +359,7 @@ export const ExamsResultsView: React.FC = () => {
         </div>
       </div>
 
-      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => { if (!selectedClassId) { setLoadError(null); return; } void loadClassData(); }} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
+      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => void (classes.length && subjects.length ? loadClassData() : loadExamSetup())} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
