@@ -53,8 +53,8 @@ export const NoticesEventsView: React.FC = () => {
     try {
       const [eventsList, noticesList, classList] = await Promise.all([
         ApiClient.request<SchoolEvent[]>('/school/events'),
-        ApiClient.getNotices({ page: noticePage, pageSize: 20 }).catch(() => []),
-        ApiClient.request<Array<{ id: string; name: string }>>('/classes').catch(() => [])
+        ApiClient.getNotices({ page: noticePage, pageSize: 20 }),
+        ApiClient.request<Array<{ id: string; name: string }>>('/classes')
       ]);
       setEvents(eventsList);
       setNotices(noticesList);
@@ -62,7 +62,7 @@ export const NoticesEventsView: React.FC = () => {
       setNoticePageInfo((noticesList as any).pagination || null);
     } catch (err: any) {
       console.error(err);
-      setError('Failed to fetch events and notices.');
+      setError(err instanceof Error ? err.message : 'Failed to fetch events, notices, or classes.');
     } finally {
       setLoading(false);
     }
@@ -171,7 +171,7 @@ export const NoticesEventsView: React.FC = () => {
         </div>
       </div>
 
-      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => void fetchData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
 
       {/* Tabs */}
       <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
@@ -201,7 +201,7 @@ export const NoticesEventsView: React.FC = () => {
 
       {activeTab === 'events' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.length === 0 ? (
+          {error ? null : events.length === 0 ? (
             <div className="col-span-full bg-white p-12 text-center rounded-xl border border-dashed border-slate-300">
               <CalendarDays className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <p className="text-xs text-slate-600 font-medium">No calendar events or holidays posted yet.</p>
@@ -264,7 +264,7 @@ export const NoticesEventsView: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {notices.length === 0 ? (
+          {error ? null : notices.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-xl border border-dashed border-slate-300">
               <Bell className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <p className="text-xs text-slate-600">No notices posted for this school.</p>
