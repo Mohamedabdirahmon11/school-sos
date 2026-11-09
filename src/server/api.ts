@@ -9,6 +9,8 @@ import { Router, Request, Response } from 'express';
 import express from 'express';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
+import { createClient } from '@supabase/supabase-js';
+import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
 import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig, SuperAdminSettings } from '../types/index.ts';
@@ -981,8 +983,31 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // Verify Scrypt Password Hash
-  const isPasswordValid = verifyPassword(password, user.passwordHash) || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
+  // Supabase Auth is the source of truth for accounts linked through auth_user_id.
+  // Keep legacy scrypt/PIN verification only for accounts that have not been migrated.
+  let isPasswordValid = false;
+  const authUserId = String((user as any).authUserId || '').trim();
+  if (authUserId) {
+    if (isSupabaseConfigured && user.email) {
+      try {
+        // Use an isolated server-side client so password sign-in cannot mutate the
+        // shared service-role client's auth state or any other request context.
+        const authClient = createClient(supabaseUrl, supabaseKey, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        const { data, error } = await authClient.auth.signInWithPassword({
+          email: user.email,
+          password
+        });
+        isPasswordValid = !error && data.user?.id === authUserId;
+      } catch {
+        isPasswordValid = false;
+      }
+    }
+  } else {
+    isPasswordValid = verifyPassword(password, user.passwordHash)
+      || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
+  }
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
