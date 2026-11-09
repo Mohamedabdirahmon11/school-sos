@@ -58,6 +58,9 @@ export const YearEndPromotionView: React.FC = () => {
         if (clsList.length > 1) setTargetClassId(clsList[1].id);
       }
       setExamConfig(conf);
+      setError(null);
+    }).catch(err => {
+      setError(err instanceof Error ? err.message : 'Unable to load promotion setup and history.');
     }).finally(() => setLoading(false));
   }, [school]);
 
