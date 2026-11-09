@@ -57,9 +57,11 @@ test('school dashboard schema supplies real weekly attendance trend and absent s
   const dashboard = schema.slice(start);
   assert.ok(start >= 0, 'school dashboard summary function exists');
   assert.match(dashboard, /'attendanceTrend'/);
+  assert.match(dashboard, /'attendanceRecordedToday'/);
   assert.match(dashboard, /generate_series\(0, 6\)/);
   assert.match(dashboard, /'absentStudents'/);
   assert.match(dashboard, /attendance\.status = 'absent'/);
+  assert.match(dashboard, /attendanceRecordedToday: number\(value\.attendanceRecordedToday\)/);
   assert.match(dashboard, /active_student\.status = 'active'/);
   assert.match(dashboard, /school_id = p_school_id/);
 });
