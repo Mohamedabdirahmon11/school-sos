@@ -294,6 +294,12 @@ export function mapStorageRowToDatabase(table: string, row: Record<string, any>)
   return result;
 }
 
+export function lockoutAttemptCountFromRow(row: Record<string, any>): number {
+  const value = row.count ?? row.attemptCount ?? row.attempt_count;
+  const count = Number(value ?? 0);
+  return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+}
+
 function toSupabaseRow(row: Record<string, any>, table = ''): Record<string, any> {
   return mapStorageRowToDatabase(table, row);
 }
@@ -598,7 +604,7 @@ class StorageEngine {
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
         this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
-          count: row.attemptCount, firstFailedAt: new Date(row.firstFailedAt).getTime(),
+          count: lockoutAttemptCountFromRow(row), firstFailedAt: new Date(row.firstFailedAt).getTime(),
           lockedUntil: row.lockedUntil ? new Date(row.lockedUntil).getTime() : null
         }]));
       }
