@@ -24,6 +24,6 @@ test('teachers enter exam marks and school administrators only review and approv
   assert.match(admin, /handleApproveAll/);
   assert.match(api, /Only assigned teachers can enter and submit exam marks/);
   assert.match(api, /isFormTeacher/);
-  assert.match(api, /classTeacherId === teacher\.id/);
+  assert.match(api, /classTeacherId === user\.id/);
   assert.match(api, /form-teacher-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
