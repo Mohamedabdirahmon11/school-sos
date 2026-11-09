@@ -1022,6 +1022,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
             <h2 className="text-base font-bold text-[#132A29] mb-4">Add Library Book</h2>
+            {libraryError && <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{libraryError}</div>}
             <form onSubmit={handleAddBook} className="space-y-4 text-xs">
               <div>
                 <label className="block font-medium">Book Title</label>
@@ -1074,9 +1075,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold"
+                  disabled={librarySaving || isReadOnly}
+                  className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold disabled:opacity-50"
                 >
-                  Add Book
+                  {librarySaving ? 'Saving…' : 'Add Book'
                 </button>
               </div>
             </form>
