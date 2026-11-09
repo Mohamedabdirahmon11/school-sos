@@ -234,20 +234,45 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   }, [school?.id, activeModule]);
 
   useEffect(() => {
-    if (!school) return;
+    if (!school || activeModule !== 'transport') return;
+    let cancelled = false;
     setModuleError(null);
-    ApiClient.getTransportRoutes(school.id).then(setRoutes).catch((err: any) => setModuleError(err.message || 'Unable to load transport routes.'));
-    ApiClient.getAllStudents(undefined, undefined).then(setStudents).catch((err: any) => setModuleError(err.message || 'Unable to load students for transport.'));
-    ApiClient.getBusAssignments().then(setBusAssignments).catch((err: any) => setModuleError(err.message || 'Unable to load bus assignments.'));
-  }, [school]);
+    Promise.all([
+      ApiClient.getTransportRoutes(school.id),
+      ApiClient.getAllStudents(undefined, undefined),
+      ApiClient.getBusAssignments()
+    ]).then(([routeRows, studentRows, assignmentRows]) => {
+      if (cancelled) return;
+      setRoutes(routeRows);
+      setStudents(studentRows);
+      setBusAssignments(assignmentRows);
+      setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      setAssignmentRouteId(current => routeRows.some((route: any) => route.id === current) ? current : routeRows[0]?.id || '');
+    }).catch((err: any) => {
+      if (!cancelled) setModuleError(err.message || 'Unable to load transport records.');
+    });
+    return () => { cancelled = true; };
+  }, [school?.id, activeModule]);
 
   useEffect(() => {
     if (!school || activeModule !== 'discipline') return;
     let cancelled = false;
     setDisciplineLoading(true);
     setDisciplineError(null);
-    ApiClient.getDisciplineIncidents()
-      .then(rows => { if (!cancelled) setDisciplineLogs(rows); })
+    Promise.all([ApiClient.getDisciplineIncidents(), ApiClient.getAllStudents(undefined, undefined)])
+      .then(([rows, studentRows]) => {
+        if (cancelled) return;
+        setStudents(studentRows);
+        const byId = new Map(studentRows.map((student: any) => [student.id, student]));
+        setDisciplineLogs(rows.map((row: any) => {
+          const student: any = byId.get(row.studentId);
+          return {
+            ...row,
+            studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId
+          };
+        }));
+        setIncidentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      })
       .catch((err: any) => { if (!cancelled) setDisciplineError(err.message || 'Unable to load discipline records.'); })
       .finally(() => { if (!cancelled) setDisciplineLoading(false); });
     return () => { cancelled = true; };
@@ -264,7 +289,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         severity: incidentSeverity, actionTaken: actionTaken.trim(), notes: incidentNotes.trim() || undefined,
         parentContacted
       });
-      setDisciplineLogs(rows => [created, ...rows]);
+      const student: any = students.find(item => item.id === incidentStudentId);
+      setDisciplineLogs(rows => [{
+        ...created,
+        studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : incidentStudentId
+      }, ...rows]);
       setInfractionType(''); setActionTaken(''); setIncidentNotes(''); setParentContacted(false);
       setNotice('Discipline incident saved securely.');
     } catch (err: any) {
@@ -772,6 +801,47 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span>Discipline & Behaviour Incidents</span>
           </h2>
+          {disciplineError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{disciplineError}</div>}
+          <form onSubmit={handleAddDisciplineIncident} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Student
+              <select required value={incidentStudentId} onChange={event => setIncidentStudentId(event.target.value)} disabled={isReadOnly || disciplineLoading || !students.length} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="">Select student</option>
+                {students.map((student: any) => <option key={student.id} value={student.id}>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')} · {student.studentId}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Incident date
+              <input required type="date" value={incidentDate} onChange={event => setIncidentDate(event.target.value)} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Incident / infraction
+              <input required maxLength={160} value={infractionType} onChange={event => setInfractionType(event.target.value)} disabled={isReadOnly} placeholder="Describe the incident" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Severity
+              <select value={incidentSeverity} onChange={event => setIncidentSeverity(event.target.value as 'low' | 'medium' | 'high')} disabled={isReadOnly} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Action taken
+              <input maxLength={1000} value={actionTaken} onChange={event => setActionTaken(event.target.value)} disabled={isReadOnly} placeholder="Action or follow-up" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">
+              Notes
+              <input maxLength={2000} value={incidentNotes} onChange={event => setIncidentNotes(event.target.value)} disabled={isReadOnly} placeholder="Optional notes" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+              <input type="checkbox" checked={parentContacted} onChange={event => setParentContacted(event.target.checked)} disabled={isReadOnly} />
+              Parent contacted manually
+            </label>
+            <div className="flex items-end justify-end">
+              <button type="submit" disabled={isReadOnly || disciplineSaving || disciplineLoading || !incidentStudentId || !infractionType.trim()} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                {disciplineSaving ? 'Saving…' : 'Record incident'}
+              </button>
+            </div>
+          </form>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
@@ -785,16 +855,20 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {disciplinePage.rows.map(d => (
+                {disciplineLoading ? (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[#64748B]">Loading discipline records…</td></tr>
+                ) : disciplinePage.rows.length ? disciplinePage.rows.map(d => (
                   <tr key={d.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-4 py-2.5 font-mono text-[#64748B]">{d.incidentDate}</td>
-                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName}</td>
+                    <td className="px-4 py-2.5 font-semibold text-[#132A29]">{d.studentName || d.studentId}</td>
                     <td className="px-4 py-2.5 text-[#334155]">{d.infractionType}</td>
                     <td className="px-4 py-2.5 capitalize font-medium text-amber-700">{d.severity}</td>
-                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentNotified ? 'Yes (manual contact)' : 'No'}</td>
+                    <td className="px-4 py-2.5 text-[#475569]">{d.actionTaken || '—'}</td>
+                    <td className="px-4 py-2.5 text-emerald-700 font-medium">{d.parentContacted ? 'Yes (manual contact)' : 'No'}</td>
                   </tr>
-                ))}
+                )) : (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[#64748B]">{disciplineLogs.length ? 'No discipline records match your search.' : 'No discipline records have been recorded.'}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
