@@ -88,6 +88,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [inventoryName, setInventoryName] = useState('');
+  const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null);
   const [inventorySku, setInventorySku] = useState('');
   const [inventoryCategory, setInventoryCategory] = useState('General');
   const [inventoryUnit, setInventoryUnit] = useState('unit');
@@ -236,24 +237,63 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     return () => { cancelled = true; };
   }, [activeModule, movementItemId]);
 
+  const resetInventoryForm = () => {
+    setEditingInventoryId(null);
+    setInventoryName('');
+    setInventorySku('');
+    setInventoryCategory('General');
+    setInventoryUnit('unit');
+    setInventoryReorderLevel('0');
+    setInventoryUnitCost('0');
+    setInventoryLocation('');
+  };
+
+  const handleEditInventoryItem = (item: any) => {
+    if (isReadOnly) return;
+    setEditingInventoryId(item.id);
+    setInventoryName(item.name || '');
+    setInventorySku(item.sku || '');
+    setInventoryCategory(item.category || 'General');
+    setInventoryUnit(item.unit || 'unit');
+    setInventoryReorderLevel(String(item.reorderLevel ?? 0));
+    setInventoryUnitCost(String(item.unitCost ?? 0));
+    setInventoryLocation(item.location || '');
+    setInventoryError(null);
+  };
+
   const handleCreateInventoryItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !inventoryName.trim()) return;
+    const reorderLevel = Number(inventoryReorderLevel);
+    const unitCost = Number(inventoryUnitCost);
+    if (!Number.isFinite(reorderLevel) || reorderLevel < 0 || !Number.isFinite(unitCost) || unitCost < 0) {
+      setInventoryError('Reorder level and unit cost must be valid non-negative numbers.');
+      return;
+    }
     setInventorySaving(true);
     setInventoryError(null);
     try {
-      const created = await ApiClient.createInventoryItem({
-        name: inventoryName.trim(), sku: inventorySku.trim() || undefined,
-        category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
-        reorderLevel: Number(inventoryReorderLevel), unitCost: Number(inventoryUnitCost),
-        location: inventoryLocation.trim() || undefined
-      });
-      setInventory(items => [created, ...items]);
-      setMovementItemId(created.id);
-      setInventoryName(''); setInventorySku(''); setInventoryLocation('');
-      setNotice('Inventory item created. Record opening stock using a stock-in movement.');
+      if (editingInventoryId) {
+        const updated = await ApiClient.updateInventoryItem(editingInventoryId, {
+          name: inventoryName.trim(), sku: inventorySku.trim() || '',
+          category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
+          reorderLevel, unitCost, location: inventoryLocation.trim()
+        });
+        setInventory(items => items.map(item => item.id === updated.id ? updated : item));
+        setNotice('Inventory item details updated.');
+      } else {
+        const created = await ApiClient.createInventoryItem({
+          name: inventoryName.trim(), sku: inventorySku.trim() || undefined,
+          category: inventoryCategory.trim() || 'General', unit: inventoryUnit.trim() || 'unit',
+          reorderLevel, unitCost, location: inventoryLocation.trim() || undefined
+        });
+        setInventory(items => [created, ...items]);
+        setMovementItemId(created.id);
+        setNotice('Inventory item created. Record opening stock using a stock-in movement.');
+      }
+      resetInventoryForm();
     } catch (err: any) {
-      setInventoryError(err.message || 'Unable to create inventory item.');
+      setInventoryError(err.message || (editingInventoryId ? 'Unable to update inventory item.' : 'Unable to create inventory item.'));
     } finally { setInventorySaving(false); }
   };
 
@@ -332,7 +372,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookTitle || !bookAuthor) return;
+    if (isReadOnly || !school || !bookTitle.trim() || !bookAuthor.trim() || librarySaving) return;
     try {
       const b = await ApiClient.addLibraryBook({
         title: bookTitle.trim(),
@@ -354,7 +394,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!routeName || !driverName) return;
+    if (isReadOnly || !school || !routeName.trim() || !driverName.trim()) return;
     try {
       const r = await ApiClient.addTransportRoute({
         name: routeName,
@@ -383,7 +423,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   };
 
   const handleAssignBus = async () => {
-    if (!assignmentStudentId || !assignmentRouteId) return;
+    if (isReadOnly || !assignmentStudentId || !assignmentRouteId) return;
     try {
       const assignment = await ApiClient.setBusAssignment(assignmentStudentId, assignmentRouteId);
       setBusAssignments(current => [...current.filter(item => item.studentId !== assignment.studentId), assignment]);
@@ -742,7 +782,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <label className="text-xs font-medium text-[#475569]">Reorder level<input type="number" min="0" step="0.01" value={inventoryReorderLevel} onChange={e=>setInventoryReorderLevel(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Unit cost<input type="number" min="0" step="0.01" value={inventoryUnitCost} onChange={e=>setInventoryUnitCost(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
               <label className="text-xs font-medium text-[#475569]">Storage location<input maxLength={160} value={inventoryLocation} onChange={e=>setInventoryLocation(e.target.value)} className="mt-1 w-full rounded border border-[#CBD5E1] p-2" /></label>
-              <div className="flex items-end"><button type="submit" disabled={isReadOnly||inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inventorySaving?'Saving…':'Add inventory item'}</button></div>
+              <div className="flex items-end"><button type="submit" disabled={isReadOnly||inventorySaving} className="w-full rounded bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inventorySaving ? 'Saving…' : editingInventoryId ? 'Save changes' : 'Add inventory item'}</button></div>
             </form>
             {inventoryLoading ? <p role="status" className="py-5 text-center text-xs text-[#64748B]">Loading inventory…</p> : (
               <div className="overflow-x-auto">
@@ -753,7 +793,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="p-2 font-semibold text-[#132A29]">{item.name}</td><td className="p-2 font-mono">{item.sku||'—'}</td><td className="p-2">{item.category}</td>
                       <td className="p-2 font-mono">{item.quantityOnHand} {item.unit}</td><td className="p-2 font-mono">{item.reorderLevel}</td><td className="p-2 font-mono">{item.unitCost}</td><td className="p-2">{item.location||'—'}</td>
                       <td className="p-2"><span className={!item.isActive?'text-slate-500':item.quantityOnHand<=item.reorderLevel?'font-semibold text-rose-700':'text-emerald-700'}>{!item.isActive?'Archived':item.quantityOnHand<=item.reorderLevel?'Low stock':'In stock'}</span></td>
-                      <td className="p-2"><button type="button" disabled={isReadOnly} onClick={()=>void handleToggleInventoryItem(item)} className="font-semibold text-[#0F766E] disabled:opacity-50">{item.isActive?'Archive':'Reactivate'}</button></td>
+                      <td className="p-2">
+                         <div className="flex flex-wrap gap-2">
+                           <button type="button" disabled={isReadOnly} onClick={() => handleEditInventoryItem(item)} className="font-semibold text-[#0F766E] disabled:opacity-50">Edit</button>
+                           <button type="button" disabled={isReadOnly} onClick={() => void handleToggleInventoryItem(item)} className="font-semibold text-slate-600 disabled:opacity-50">{item.isActive ? 'Archive' : 'Reactivate'}</button>
+                         </div>
+                       </td>
                     </tr>)}
                     {!inventory.length&&<tr><td colSpan={9} className="p-6 text-center text-[#64748B]">No inventory items yet. Add the first item above.</td></tr>}
                   </tbody>
