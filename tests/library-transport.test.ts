@@ -88,10 +88,9 @@ test('inventory items can be edited without rewriting stock quantity history', (
 test('extra-module write handlers enforce read-only mode and surface errors', () => {
   const addBook = ui.slice(ui.indexOf('const handleAddBook'), ui.indexOf('const handleAddRoute'));
   const addRoute = ui.slice(ui.indexOf('const handleAddRoute'), ui.indexOf('const handleAssignBus'));
-  const assignBus = ui.slice(ui.indexOf('const handleAssignBus'), ui.indexOf('return ('));
   assert.match(addBook, /if \(isReadOnly \|\| !school/);
   assert.match(addBook, /setLibraryError\(err\.message/);
   assert.match(addRoute, /if \(isReadOnly \|\| !school/);
-  assert.match(assignBus, /if \(isReadOnly \|\|/);
-  assert.match(assignBus, /setModuleError/);
+  assert.match(ui, /const handleAssignBus = async \(\) => \{\s*if \(isReadOnly \|\|/);
+  assert.match(ui, /const handleAssignBus[\s\S]*?setModuleError\(err\.message/);
 });
