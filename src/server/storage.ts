@@ -179,9 +179,7 @@ const DEFAULT_SETTINGS: SuperAdminSettings = {
   lockoutDurationMinutes: 15,
   sessionTimeoutMinutes: 60,
   logSecurityEvents: true,
-  backupSchedule: 'daily',
-  lastBackupDate: new Date().toISOString(),
-  lastBackupStatus: 'success',
+  backupSchedule: 'manual',
   enabledLanguages: ['en', 'so'],
   academicYearName: '2026-2027',
   semester1Start: '2026-09-01',
@@ -3330,6 +3328,15 @@ class StorageEngine {
   // AUDIT LOGS & CSV EXPORT
   // -------------------------------------------------------------
   public logAudit(logData: Omit<AuditLog, 'id' | 'timestamp'>): AuditLog {
+    // Respect the platform-level security audit switch without suppressing
+    // subscription, finance, academic, school, or user audit history.
+    if (logData.category === 'security' && this.data.settings.logSecurityEvents === false) {
+      return {
+        ...logData,
+        id: '',
+        timestamp: new Date().toISOString()
+      };
+    }
     const log: AuditLog = {
       ...logData,
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
