@@ -29,6 +29,7 @@ export function normalizeSchoolDashboardData(data: unknown) {
       totalTeachers: number(rawStats.totalTeachers),
       totalClasses: number(rawStats.totalClasses ?? value.totalClasses),
       attendanceRate: number(rawStats.attendanceRate),
+      attendanceRecordedToday: number(value.attendanceRecordedToday),
       todayCollection: number(rawStats.todayCollection ?? rawStats.totalCollected),
       totalOutstanding: number(rawStats.totalOutstanding ?? rawStats.outstandingFees),
     },
@@ -75,7 +76,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Students" value={totalStudents.toLocaleString()} onClick={()=>onNavigate('sch_students')}/>
       <Metric label="Teachers" value={totalTeachers.toLocaleString()} onClick={()=>onNavigate('sch_teachers')}/>
-      <Metric label="Attendance today" value={`${attendanceRate}%`} hint="Today" onClick={()=>onNavigate('sch_attendance')}/>
+      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? `${attendanceRate}%` : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Today' : 'Awaiting register'} onClick={()=>onNavigate('sch_attendance')}/>
       <Metric label="Classes" value={totalClasses.toLocaleString()} hint="School classes" onClick={()=>onNavigate('sch_classes')}/>
     </section>
 
