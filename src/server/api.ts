@@ -515,13 +515,18 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
     res.status(404).json({ error: 'Class not found in this school.' });
     return false;
   }
-  if (user.role === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-    const assignment = teacher.items.length
-      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
+  if (normalizeRole(user.role) === 'teacher') {
+    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+    const teacher = teacherPage.items[0] as any;
+    const assignment = teacher
+      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
       : { items: [] as any[] };
-    if (!assignment.items.length) {
-      res.status(403).json({ error: 'You may only access your actively assigned classes.' });
+    const isFormTeacher = Boolean(teacher && (
+      klass.classTeacherId === user.id ||
+      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(classId))
+    ));
+    if (!assignment.items.length && !isFormTeacher) {
+      res.status(403).json({ error: 'You may only access classes assigned to you as a subject teacher or form teacher.' });
       return false;
     }
   }
@@ -533,10 +538,16 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
   if (user.role === 'super_admin' || user.role === 'school_admin' || user.role === 'accountant') return true;
   if (user.role === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: student.schoolId, user_id: user.id }, 1, 1, undefined, 'id');
-    if (!teacher.items.length) return false;
+    const teacherPage = await db.queryPage('teachers', { school_id: student.schoolId, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+    const teacher = teacherPage.items[0] as any;
+    if (!teacher) return false;
+    const klass = await db.getClassById(student.classId, student.schoolId);
+    if (klass && (
+      klass.classTeacherId === user.id ||
+      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
+    )) return true;
     const assignment = await db.queryPage('class_subjects', {
-      school_id: student.schoolId, teacher_id: teacher.items[0].id, class_id: student.classId, is_active: 'true'
+      school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, is_active: 'true'
     }, 1, 1, undefined, 'id');
     return assignment.items.length > 0;
   }
@@ -2404,21 +2415,49 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-  if (!teacherPage.items.length) { res.json([]); return; }
-  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacherPage.items[0].id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
-  if (!assignments.items.length) { res.json([]); return; }
-  const [subjectRows, classRows] = await Promise.all([
-    db.queryPage('subjects', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.subjectId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects),
-    db.queryPage('classes', { school_id: school.id, id: [...new Set(assignments.items.map((item: any) => item.classId))] }, 1, 100, undefined, LIST_QUERY_COLUMNS.classes)
-  ]);
-  const subjectsById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
-  const classesById = new Map(classRows.items.map((item: any) => [item.id, item]));
-  res.json(assignments.items.flatMap((item: any) => {
-    const subject = subjectsById.get(item.subjectId);
-    const klass = classesById.get(item.classId);
-    return subject && klass ? [{ ...item, subject, class: klass }] : [];
-  }));
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+  const teacher = teacherPage.items[0] as any;
+  if (!teacher) { res.json([]); return; }
+
+  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
+  const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
+  const formTeacherClassIds = new Set<string>(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses : []);
+  const formTeacherClasses = allClasses.filter((klass: any) =>
+    klass.classTeacherId === user.id || formTeacherClassIds.has(klass.id)
+  );
+  const assignedPairs = new Set<string>();
+  const result: any[] = [];
+
+  for (const item of assignments.items as any[]) {
+    const klass = allClasses.find((row: any) => row.id === item.classId);
+    const subject = allSubjects.find((row: any) => row.id === item.subjectId);
+    if (!klass || !subject) continue;
+    const key = `${klass.id}:${subject.id}`;
+    assignedPairs.add(key);
+    result.push({ ...item, subject, class: klass, isFormTeacher: false });
+  }
+
+  // A form teacher is responsible for the whole class, so they can enter marks
+  // for every active subject in that class, even when another teacher teaches it.
+  for (const klass of formTeacherClasses) {
+    for (const subject of allSubjects) {
+      const key = `${klass.id}:${subject.id}`;
+      if (assignedPairs.has(key)) continue;
+      result.push({
+        id: `form-teacher-${klass.id}-${subject.id}`,
+        schoolId: school.id,
+        classId: klass.id,
+        subjectId: subject.id,
+        subject,
+        class: klass,
+        periodsPerWeek: 0,
+        smallExamEnabled: true,
+        bigExamEnabled: true,
+        isFormTeacher: true
+      });
+    }
+  }
+  res.json(result);
 });
 
 apiRouter.post('/subjects', requireAuth, requireSchoolContext, (req, res) => {
@@ -3844,12 +3883,20 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     }
     let marks = await db.getStudentMarks(school.id, studentId as string);
     if (normalizeRole(user.role) === 'teacher') {
-      const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-      if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
-      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
+      const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+      const teacher = teacherPage.items[0] as any;
+      if (!teacher) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
+      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
       const student = await db.getStudentById(studentId as string, school.id);
-      const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
-      marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+      const klass = student ? await db.getClassById(student.classId, school.id) : null;
+      const isFormTeacher = Boolean(student && klass && (
+        klass.classTeacherId === user.id ||
+        (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
+      ));
+      if (!isFormTeacher) {
+        const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
+        marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+      }
     }
     const subjectIds = [...new Set(marks.map(mark => mark.subjectId))];
     const subjects = subjectIds.length
@@ -3865,11 +3912,17 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
   }
   if (user.role === 'teacher') {
     if (!subjectId) { res.status(400).json({ error: 'subjectId is required for teacher results access.' }); return; }
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-    const assignment = teacher.items.length
-      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id')
+    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+    const teacher = teacherPage.items[0] as any;
+    const klass = await db.getClassById(String(classId), school.id);
+    const isFormTeacher = Boolean(teacher && klass && (
+      klass.classTeacherId === user.id ||
+      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(String(classId)))
+    ));
+    const assignment = teacher
+      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id')
       : { items: [] as any[] };
-    if (!assignment.items.length) { res.status(403).json({ error: 'You may only access marks for your assigned class and subject.' }); return; }
+    if (!assignment.items.length && !isFormTeacher) { res.status(403).json({ error: 'You may only access results for your assigned subject or form-teacher class.' }); return; }
   }
   if (user.role === 'parent' || user.role === 'student') {
     res.status(403).json({ error: 'A student ID is required for this results request.' });
@@ -3898,20 +3951,26 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     return;
   }
   if (normalizeRole(user.role) === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
     if (!teacher.items.length) {
       res.status(403).json({ error: 'Your teacher profile is not linked to this school.' });
       return;
     }
+    const teacherRecord = teacher.items[0] as any;
+    const klass = await db.getClassById(String(classId), school.id);
+    const isFormTeacher = Boolean(klass && (
+      klass.classTeacherId === user.id ||
+      (Array.isArray(teacherRecord.assignedClasses) && teacherRecord.assignedClasses.includes(String(classId)))
+    ));
     const assignment = await db.queryPage('class_subjects', {
       school_id: school.id,
       class_id: classId,
       subject_id: subjectId,
-      teacher_id: teacher.items[0].id,
+      teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    if (!assignment.total) {
-      res.status(403).json({ error: 'You may only enter marks for subjects actively assigned to you in this class.' });
+    if (!assignment.total && !isFormTeacher) {
+      res.status(403).json({ error: 'You may only enter marks for subjects assigned to you or classes where you are the form teacher.' });
       return;
     }
   }
