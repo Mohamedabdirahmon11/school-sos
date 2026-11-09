@@ -25,14 +25,16 @@ export const MessagesView: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [searchContact, setSearchContact] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
-    if (!school || !user) return;
+    if (!school || !user) { setLoading(false); return; }
     setLoading(true);
+    setError(null);
     try {
       const [msgData, uData] = await Promise.all([
-        ApiClient.getMessages({ page, pageSize: 20 }).catch(() => []),
-        ApiClient.getMessageContacts().catch(() => [])
+        ApiClient.getMessages({ page, pageSize: 20 }),
+        ApiClient.getMessageContacts()
       ]);
 
       setMessages(msgData);
@@ -45,6 +47,7 @@ export const MessagesView: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to load messages and contacts.');
     } finally {
       setLoading(false);
     }
@@ -86,6 +89,7 @@ export const MessagesView: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to send this message.');
     }
   };
 
@@ -111,6 +115,8 @@ export const MessagesView: React.FC = () => {
         </button>
       </div>
 
+      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => void fetchData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
+
       <div className="flex-1 bg-white rounded-xl border border-[#E2E8F0] overflow-hidden flex flex-col md:flex-row shadow-xs">
         {/* Contact List */}
         <div className="w-full md:w-80 min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
@@ -128,7 +134,7 @@ export const MessagesView: React.FC = () => {
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-slate-100">
-            {filteredContacts.length === 0 ? (
+            {error ? null : filteredContacts.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400">No contacts available.</div>
             ) : (
               filteredContacts.map(c => {

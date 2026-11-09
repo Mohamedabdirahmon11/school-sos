@@ -44,21 +44,6 @@ const schoolLocalDate = (timeZone?: string) => {
 const parentWhatsAppNumber = (student: Student) =>
   normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
 
-const getSchoolLocalDate = (timeZone?: string): string => {
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'Africa/Addis_Ababa',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(new Date());
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-    return `${values.year}-${values.month}-${values.day}`;
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-};
-
 export const AttendanceView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.phone);
@@ -72,20 +57,33 @@ export const AttendanceView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  const loadClasses = async () => {
     if (!school) return;
-    ApiClient.getClasses().then(cls => {
+    setLoadError(null);
+    setIsLoading(true);
+    try {
+      const cls = await ApiClient.getClasses();
       setClasses(cls);
-      if (cls.length > 0) setSelectedClassId(cls[0].id);
-    });
+      if (cls.length > 0) setSelectedClassId(current => current && cls.some(item => item.id === current) ? current : cls[0].id);
+    } catch (err: any) {
+      setLoadError(err?.message || 'Unable to load school classes.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadClasses();
   }, [school]);
 
   const loadAttendanceSheet = async () => {
     if (!school || !selectedClassId) return;
     setIsLoading(true);
+    setLoadError(null);
     try {
       const [firstPage, existingRecords] = await Promise.all([
         ApiClient.getStudents(selectedClassId, undefined, 1, 20),
@@ -114,6 +112,7 @@ export const AttendanceView: React.FC = () => {
       setAttendanceMap(map);
     } catch (err: any) {
       console.error(err);
+      setLoadError(err?.message || 'Unable to load the attendance register.');
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +211,7 @@ export const AttendanceView: React.FC = () => {
       }));
 
       await ApiClient.recordDailyAttendance(selectedClassId, date, records);
-      setNotice('Attendance saved. Ardayda maqneyd, riix badhanka WhatsApp si aad fariin ugu dirto waalid kasta.');
+      setNotice('Attendance saved. Ardayda maqneyd, WhatsApp ka fur fariinta diyaarsan, hubi, kadib adigu riix Send.');
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to save attendance.');
@@ -246,7 +245,7 @@ export const AttendanceView: React.FC = () => {
             {t('attendance')}
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Take official daily class attendance. Absent students automatically trigger parent notifications.
+            Take official daily class attendance. For absent students, prepare a WhatsApp message and manually press Send in WhatsApp.
           </p>
         </div>
 
@@ -272,6 +271,7 @@ export const AttendanceView: React.FC = () => {
         </div>
       </div>
 
+      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => void (selectedClassId ? loadAttendanceSheet() : loadClasses())} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
@@ -345,7 +345,9 @@ export const AttendanceView: React.FC = () => {
 
       {/* Daily Attendance Student Register Table */}
       <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)]">
-        {isLoading ? (
+        {loadError ? (
+          <div className="p-8 text-center text-xs text-rose-700">Attendance data could not be loaded. Use Retry above.</div>
+        ) : isLoading ? (
           <div className="p-8 text-center text-xs text-[#64748B]">Loading student attendance register...</div>
         ) : filteredStudents.length === 0 ? (
           <div className="p-8 text-center text-xs text-[#64748B]">

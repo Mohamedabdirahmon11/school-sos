@@ -2190,7 +2190,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
       const teaching = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
       const classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
       if (!classIds.length) {
-        res.json({ stats: { totalStudents: 0, totalTeachers: 1, attendanceRate: 0 }, totalClasses: 0, todayAttendance: 0, recentStudents: [], notices: [] });
+        res.json({ stats: { totalStudents: 0, totalTeachers: 1, attendanceRate: 0 }, totalClasses: 0, attendanceRecordedToday: 0, todayAttendance: 0, recentStudents: [], notices: [] });
         return;
       }
       const [allStudents, allAttendance, notices] = await Promise.all([
@@ -2215,6 +2215,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
           attendanceRate: attendanceDenominator ? Math.round(attended * 100 / attendanceDenominator) : 0
         },
         totalClasses: classIds.length,
+        attendanceRecordedToday: today.length,
         todayAttendance: attended,
         recentStudents: scopedStudents
           .slice()

@@ -4,7 +4,7 @@
  * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
  * 3. Report Card Designer (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
- * 4. SMS / WhatsApp Notification Gateway (Provider credentials, queue status)
+ * 4. Administrator WhatsApp contact (manual parent messaging; no SMS provider)
  * 5. School Backup & Data Safety (Full JSON backup download, CSV exports)
  */
 
@@ -62,12 +62,12 @@ const defaultGradingScale: GradingBand[] = [
 ];
 const defaultTerms = { semester1Start: '', semester1End: '', semester2Start: '', semester2End: '' };
 const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, requireExcusedReason: true, allowParentExcuses: false };
-const defaultNotificationPreferences = { email: true, sms: true, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
-const defaultClassLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
+const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const SchoolSettingsView: React.FC = () => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'sms' | 'backup'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>('identity');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -102,7 +102,7 @@ export const SchoolSettingsView: React.FC = () => {
   const [reportCardFooter, setReportCardFooter] = useState(school?.reportCardFooter || '');
   const [receiptHeader, setReceiptHeader] = useState(school?.receiptHeader || '');
   const [receiptFooter, setReceiptFooter] = useState(school?.receiptFooter || '');
-  const [notificationPreferences, setNotificationPreferences] = useState(school?.notificationPreferences || defaultNotificationPreferences);
+  const [notificationPreferences, setNotificationPreferences] = useState({ ...defaultNotificationPreferences, ...(school?.notificationPreferences || {}), sms: false });
 
   // Branches State
   const [branches, setBranches] = useState<SchoolBranch[]>([]);
@@ -266,7 +266,7 @@ export const SchoolSettingsView: React.FC = () => {
       reportCardFooter,
       receiptHeader,
       receiptFooter,
-      notificationPreferences
+      notificationPreferences: { ...notificationPreferences, sms: false }
     }, 'Document headers, footers, and notification preferences saved successfully!');
   };
 
@@ -752,10 +752,10 @@ export const SchoolSettingsView: React.FC = () => {
             <div className="space-y-2">
               <label className="font-semibold text-[#334155]">{t('settings_class_levels')}</label>
               <div className="grid grid-cols-6 gap-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(level => (
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(level => (
                   <label key={level} className="flex items-center justify-center gap-1 rounded-lg border border-[#E2E8F0] py-1.5 cursor-pointer hover:bg-slate-50">
                     <input type="checkbox" checked={classLevels.includes(level)} onChange={e => setClassLevels(prev => e.target.checked ? [...prev, level].sort((a, b) => a - b) : prev.filter(item => item !== level))} className="accent-[#0F766E]" />
-                    <span>{level}</span>
+                    <span>{level === 0 ? 'KG' : level}</span>
                   </label>
                 ))}
               </div>
@@ -842,7 +842,6 @@ export const SchoolSettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {([
                 ['email', 'Email notifications'],
-                ['sms', 'SMS notifications'],
                 ['inApp', 'In-app notifications'],
                 ['attendanceAlerts', 'Attendance alerts'],
                 ['feeReminders', 'Fee reminders'],
