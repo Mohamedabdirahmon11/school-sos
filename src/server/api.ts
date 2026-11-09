@@ -4372,6 +4372,7 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
   const user = (req as any).user as User; const school = (req as any).school as School;
   if (!['school_admin', 'accountant', 'teacher', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to school staff.' }); return; }
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
+  if (user.role === 'accountant' && record && record.userId !== user.id && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'payroll_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view other staff payroll records.' }); return; }
   if (!record || record.userId !== user.id && !['accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'Payslip access is limited to your own payroll record.' }); return; }
   const line = (item: any) => `${item.label}: ${formatMoney(Number(item.amount) || 0, school.currency)}`;
   sendPdf(res, `payslip-${record.staffName}-${record.payrollMonth}`, [[school.name, 'PAYSLIP', `Staff: ${record.staffName}`, `Month: ${record.payrollMonth}`, `Status: ${record.status}`,
@@ -4456,6 +4457,7 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const payment = await db.getFeePaymentById(req.params.paymentId, school.id);
   if (!payment) { res.status(404).json({ error: 'Receipt not found.' }); return; }
   const user = (req as any).user as User;
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'fees_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view receipts.' }); return; }
   if (!['accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
