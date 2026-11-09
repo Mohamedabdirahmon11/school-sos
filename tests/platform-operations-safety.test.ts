@@ -59,5 +59,5 @@ test('off-site backups follow the saved daily or weekly policy and use a private
   assert.ok(backupWorkflow.includes('retention-days: 30'));
   assert.ok(backupWorkflow.includes('SHA256SUMS'));
   assert.ok(backupDocs.includes('new/empty recovery project'));
-  assert.ok(backupDocs.includes('does not back up Storage object bytes'));
+  assert.ok(backupDocs.includes('do not back up Storage object bytes'));
 });
