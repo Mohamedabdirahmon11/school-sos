@@ -127,3 +127,15 @@ test('school settings and sidebar expose the agreed school administration module
     assert.ok(app.includes(`activeView === '${view}'`), `App routes ${view}`);
   }
 });
+
+
+test('resource module tables support search, bounded pagination, and filtered empty states', () => {
+  assert.match(ui, /type="search" value=\{moduleSearch\}/);
+  assert.match(ui, /const modulePageSize = 10/);
+  assert.match(ui, /rows: filtered\.slice\(\(page - 1\) \* modulePageSize, page \* modulePageSize\)/);
+  assert.match(ui, /renderModulePagination\(inventoryPage, 'inventory items'\)/);
+  assert.match(ui, /renderModulePagination\(healthPage, 'health visits'\)/);
+  assert.match(ui, /renderModulePagination\(disciplinePage, 'discipline records'\)/);
+  assert.match(ui, /No inventory items match your search/);
+  assert.match(ui, /No health visits match your search/);
+});
