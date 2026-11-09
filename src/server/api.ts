@@ -3883,12 +3883,20 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     }
     let marks = await db.getStudentMarks(school.id, studentId as string);
     if (normalizeRole(user.role) === 'teacher') {
-      const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-      if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
-      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
+      const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+      const teacher = teacherPage.items[0] as any;
+      if (!teacher) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
+      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
       const student = await db.getStudentById(studentId as string, school.id);
-      const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
-      marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+      const klass = student ? await db.getClassById(student.classId, school.id) : null;
+      const isFormTeacher = Boolean(student && klass && (
+        klass.classTeacherId === user.id ||
+        (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
+      ));
+      if (!isFormTeacher) {
+        const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
+        marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+      }
     }
     const subjectIds = [...new Set(marks.map(mark => mark.subjectId))];
     const subjects = subjectIds.length
