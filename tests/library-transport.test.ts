@@ -139,3 +139,18 @@ test('resource module tables support search, bounded pagination, and filtered em
   assert.match(ui, /No inventory items match your search/);
   assert.match(ui, /No health visits match your search/);
 });
+
+
+test('resource tables provide field-based ascending and descending sorting', () => {
+  assert.match(ui, /const \[moduleSortField, setModuleSortField\] = useState\('default'\)/);
+  assert.match(ui, /const \[moduleSortDirection, setModuleSortDirection\] = useState<'asc' \| 'desc'>\('asc'\)/);
+  assert.match(ui, /moduleSortDirection === 'asc' \? comparison : -comparison/);
+  assert.match(ui, /setModuleSortDirection\(current => current === 'asc' \? 'desc' : 'asc'\)/);
+});
+
+test('library overview shows catalogue, copies, issued and overdue totals', () => {
+  assert.match(ui, /Catalogue titles/);
+  assert.match(ui, /Total copies/);
+  assert.match(ui, /Books issued/);
+  assert.match(ui, /Overdue loans/);
+});
