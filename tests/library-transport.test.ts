@@ -36,7 +36,7 @@ test('transport route form captures fields supported by the API', () => {
 
 test('library and transport load errors are visible to the administrator', () => {
   assert.match(ui, /setLibraryError\(err\.message \|\| 'Unable to load library catalogue and lending records\.'/);
-  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport routes\.'/);
+  assert.match(ui, /setModuleError\(err\.message \|\| 'Unable to load transport records\.'/);
   assert.match(ui, /role="alert"/);
 });
 
