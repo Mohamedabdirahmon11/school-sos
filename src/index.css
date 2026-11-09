@@ -750,3 +750,167 @@
   transition: filter .18s ease, transform .18s ease;
 }
 .super-admin-design .sa-revenue-chart > div:hover > div { filter: brightness(1.08); transform: scaleY(1.015); transform-origin: bottom; }
+
+
+/* --------------------------------------------------------------------------
+   Admin experience refresh — consistent visual language across every module.
+   Presentation-only: preserves existing page structure, handlers and data flow.
+   -------------------------------------------------------------------------- */
+:root {
+  --ui-ink: #172b3b;
+  --ui-muted: #647789;
+  --ui-line: #e3eaf0;
+  --ui-surface: #ffffff;
+  --ui-canvas: #f4f7fa;
+  --ui-accent: #16877f;
+  --ui-accent-soft: #e9f6f3;
+}
+.school-admin-design,
+.super-admin-design {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.school-admin-design main,
+.super-admin-design main {
+  color: var(--ui-ink);
+}
+.school-admin-design main > div,
+.super-admin-design main > div {
+  display: flow-root;
+}
+.school-admin-design main :is(section, article),
+.super-admin-design main :is(section, article) {
+  min-width: 0;
+}
+.school-admin-design main :is(.bg-white, [class*="bg-white/"]),
+.super-admin-design main :is(.bg-white, [class*="bg-white/"]) {
+  background-color: var(--ui-surface);
+}
+.school-admin-design main :is(.border, .border-b, .border-t),
+.super-admin-design main :is(.border, .border-b, .border-t) {
+  border-color: var(--ui-line);
+}
+.school-admin-design main :is(input, select, textarea),
+.super-admin-design main :is(input, select, textarea) {
+  max-width: 100%;
+  min-width: 0;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.school-admin-design main :is(input, select, textarea):focus,
+.super-admin-design main :is(input, select, textarea):focus {
+  border-color: var(--ui-accent) !important;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(22,135,127,.13) !important;
+}
+.school-admin-design main textarea,
+.super-admin-design main textarea {
+  min-height: 92px;
+  line-height: 1.55;
+}
+.school-admin-design main input[type="checkbox"],
+.school-admin-design main input[type="radio"],
+.super-admin-design main input[type="checkbox"],
+.super-admin-design main input[type="radio"] {
+  width: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  height: 16px;
+  accent-color: var(--ui-accent);
+  box-shadow: none !important;
+}
+.school-admin-design main label,
+.super-admin-design main label {
+  display: block;
+  margin-bottom: 5px;
+  color: #526779;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .012em;
+}
+.school-admin-design main :is(button, a),
+.super-admin-design main :is(button, a) {
+  -webkit-tap-highlight-color: transparent;
+}
+.school-admin-design main button:active:not(:disabled),
+.super-admin-design main button:active:not(:disabled) {
+  transform: translateY(0);
+}
+.school-admin-design main button:disabled,
+.super-admin-design main button:disabled {
+  opacity: .58;
+}
+.school-admin-design main table,
+.super-admin-design main table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.school-admin-design main table thead th,
+.super-admin-design main table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.school-admin-design main table tbody tr,
+.super-admin-design main table tbody tr {
+  transition: background-color .14s ease;
+}
+.school-admin-design main :is(.overflow-x-auto, [class*="overflow-auto"]),
+.super-admin-design main :is(.overflow-x-auto, [class*="overflow-auto"]) {
+  scrollbar-width: thin;
+  scrollbar-color: #c5d2dc transparent;
+}
+.school-admin-design main [role="dialog"],
+.super-admin-design main [role="dialog"] {
+  background: #fff;
+}
+.school-admin-design main :is(.grid, .flex) > *,
+.super-admin-design main :is(.grid, .flex) > * {
+  min-width: 0;
+}
+.school-admin-design main :is(.text-xs, .text-\[11px\], .text-\[10px\]),
+.super-admin-design main :is(.text-xs, .text-\[11px\], .text-\[10px\]) {
+  line-height: 1.5;
+}
+.school-admin-design main h1 + p,
+.super-admin-design main h1 + p {
+  color: var(--ui-muted);
+}
+.school-admin-design main :is(.rounded-lg, .rounded-xl, .rounded-2xl),
+.super-admin-design main :is(.rounded-lg, .rounded-xl, .rounded-2xl) {
+  background-clip: padding-box;
+}
+.school-admin-design main :is(.bg-\[\#F8FAFC\], .bg-slate-50, .bg-gray-50),
+.super-admin-design main :is(.bg-\[\#F8FAFC\], .bg-slate-50, .bg-gray-50) {
+  background-color: #f7f9fb;
+}
+.school-admin-design main :is(.bg-\[\#F0FDFA\], .bg-emerald-50),
+.super-admin-design main :is(.bg-\[\#F0FDFA\], .bg-emerald-50) {
+  background-color: var(--ui-accent-soft);
+}
+@media (max-width: 767px) {
+  .school-admin-design main :is(.grid-cols-2, .grid-cols-3, .grid-cols-4) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .super-admin-design main :is(.grid-cols-2, .grid-cols-3, .grid-cols-4) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .school-admin-design main :is(input, select, textarea),
+  .super-admin-design main :is(input, select, textarea) {
+    font-size: 14px;
+  }
+}
+@media (max-width: 420px) {
+  .super-admin-design main :is(.grid-cols-2, .grid-cols-3, .grid-cols-4) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-design *,
+  .super-admin-design * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
