@@ -102,7 +102,7 @@ export const SchoolSettingsView: React.FC = () => {
   const [reportCardFooter, setReportCardFooter] = useState(school?.reportCardFooter || '');
   const [receiptHeader, setReceiptHeader] = useState(school?.receiptHeader || '');
   const [receiptFooter, setReceiptFooter] = useState(school?.receiptFooter || '');
-  const [notificationPreferences, setNotificationPreferences] = useState(school?.notificationPreferences || defaultNotificationPreferences);
+  const [notificationPreferences, setNotificationPreferences] = useState({ ...defaultNotificationPreferences, ...(school?.notificationPreferences || {}), sms: false });
 
   // Branches State
   const [branches, setBranches] = useState<SchoolBranch[]>([]);
@@ -266,7 +266,7 @@ export const SchoolSettingsView: React.FC = () => {
       reportCardFooter,
       receiptHeader,
       receiptFooter,
-      notificationPreferences
+      notificationPreferences: { ...notificationPreferences, sms: false }
     }, 'Document headers, footers, and notification preferences saved successfully!');
   };
 
