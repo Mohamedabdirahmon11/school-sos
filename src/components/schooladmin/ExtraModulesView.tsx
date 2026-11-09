@@ -109,16 +109,33 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [moduleError, setModuleError] = useState<string | null>(null);
   const [moduleSearch, setModuleSearch] = useState('');
   const [modulePage, setModulePage] = useState(1);
+  const [moduleSortField, setModuleSortField] = useState('default');
+  const [moduleSortDirection, setModuleSortDirection] = useState<'asc' | 'desc'>('asc');
   const modulePageSize = 10;
+  const moduleSortOptions: Record<string, Array<{ value: string; label: string }>> = {
+    library: [{ value: 'title', label: 'Title' }, { value: 'author', label: 'Author' }, { value: 'quantity', label: 'Copies' }, { value: 'dueDate', label: 'Due date' }, { value: 'status', label: 'Loan status' }],
+    transport: [{ value: 'name', label: 'Route' }, { value: 'vehicleNumber', label: 'Vehicle' }, { value: 'driverName', label: 'Driver' }, { value: 'feeAmount', label: 'Monthly fee' }, { value: 'capacity', label: 'Capacity' }],
+    discipline: [{ value: 'incidentDate', label: 'Incident date' }, { value: 'studentName', label: 'Student' }, { value: 'severity', label: 'Severity' }],
+    health: [{ value: 'visitDate', label: 'Visit date' }, { value: 'studentName', label: 'Student' }, { value: 'nurseName', label: 'Nurse' }],
+    inventory: [{ value: 'name', label: 'Item' }, { value: 'category', label: 'Category' }, { value: 'quantityOnHand', label: 'On-hand quantity' }, { value: 'unitCost', label: 'Unit cost' }]
+  };
   const filterModuleRows = (rows: any[], fields: string[]) => {
     const query = moduleSearch.trim().toLowerCase();
     const filtered = query
       ? rows.filter(row => fields.some(field => String(row?.[field] ?? '').toLowerCase().includes(query)))
       : rows;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / modulePageSize));
+    const sorted = moduleSortField === 'default' ? filtered : [...filtered].sort((left, right) => {
+      const a = left?.[moduleSortField];
+      const b = right?.[moduleSortField];
+      const comparison = typeof a === 'number' && typeof b === 'number'
+        ? a - b
+        : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      return moduleSortDirection === 'asc' ? comparison : -comparison;
+    });
+    const totalPages = Math.max(1, Math.ceil(sorted.length / modulePageSize));
     const page = Math.min(modulePage, totalPages);
     return {
-      rows: filtered.slice((page - 1) * modulePageSize, page * modulePageSize),
+      rows: sorted.slice((page - 1) * modulePageSize, page * modulePageSize),
       total: filtered.length,
       totalPages,
       page
@@ -135,6 +152,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   useEffect(() => {
     setModuleSearch('');
     setModulePage(1);
+    setModuleSortField('default');
+    setModuleSortDirection('asc');
   }, [activeModule]);
 
   const renderModulePagination = (page: { total: number; totalPages: number; page: number; rows: any[] }, label: string) => (
@@ -523,7 +542,17 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           <span className="sr-only">Search current module</span>
           <input type="search" value={moduleSearch} onChange={event => { setModuleSearch(event.target.value); setModulePage(1); }} placeholder={`Search ${activeModule} records…`} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
         </label>
-        {moduleSearch && <button type="button" onClick={() => { setModuleSearch(''); setModulePage(1); }} className="self-start rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Clear search</button>}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            Sort
+            <select value={moduleSortField} onChange={event => { setModuleSortField(event.target.value); setModulePage(1); }} className="rounded-lg border border-slate-300 bg-white px-2 py-2">
+              <option value="default">Default order</option>
+              {(moduleSortOptions[activeModule] || []).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => { setModuleSortDirection(current => current === 'asc' ? 'desc' : 'asc'); setModulePage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">{moduleSortDirection === 'asc' ? 'Ascending' : 'Descending'}</button>
+          {moduleSearch && <button type="button" onClick={() => { setModuleSearch(''); setModulePage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Clear search</button>}
+        </div>
       </div>
       {notice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
@@ -551,6 +580,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             </button>
           </div>
 
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Catalogue titles</p><p className="mt-1 text-lg font-bold text-slate-800">{books.length}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Total copies</p><p className="mt-1 text-lg font-bold text-slate-800">{books.reduce((sum, book) => sum + Math.max(0, Number(book.quantity || 0)), 0)}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Books issued</p><p className="mt-1 text-lg font-bold text-slate-800">{libraryLoans.filter(loan => loan.status === 'issued').length}</p></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Overdue loans</p><p className="mt-1 text-lg font-bold text-rose-700">{libraryLoans.filter(loan => loan.status === 'issued' && loan.dueDate < new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)).length}</p></div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-xs">
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
