@@ -9,6 +9,7 @@ const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 const billing = readFileSync(new URL('../src/components/superadmin/PlansBillingView.tsx', import.meta.url), 'utf8');
 const backupWorkflow = readFileSync(new URL('../.github/workflows/supabase-backup.yml', import.meta.url), 'utf8');
 const backupDocs = readFileSync(new URL('../docs/automated-backups.md', import.meta.url), 'utf8');
+const invoiceMigration = readFileSync(new URL('../supabase/migrations/030_atomic_subscription_invoice_payment.sql', import.meta.url), 'utf8');
 
 test('platform backup recursively excludes credentials, active sessions, and lockout state', () => {
   const source = {
@@ -64,4 +65,21 @@ test('off-site backups follow the saved daily or weekly policy and use a private
   assert.ok(backupWorkflow.includes('SHA256SUMS'));
   assert.ok(backupDocs.includes('new/empty recovery project'));
   assert.ok(backupDocs.includes('do not back up Storage object bytes'));
+});
+
+test('platform analytics count active school records and paid invoice totals by currency', () => {
+  const analyticsRoute = api.slice(api.indexOf("apiRouter.get('/superadmin/analytics'"), api.indexOf("apiRouter.get('/superadmin/dashboard'"));
+  assert.match(analyticsRoute, /students', \{ school_id: school\.id, status: 'active' \}/);
+  assert.match(analyticsRoute, /teachers', \{ school_id: school\.id, status: 'active' \}/);
+  assert.match(analyticsRoute, /activeUsers30Days/);
+  assert.match(analyticsRoute, /paidBillingsByCurrency/);
+  assert.match(analyticsRoute, /invoice\.status !== 'paid'/);
+});
+
+test('subscription invoice settlement is atomic, idempotent, and updates subscription validity', () => {
+  assert.match(storage, /rpc\('schoolos_mark_subscription_invoice_paid', \{ p_invoice_id: id \}\)/);
+  assert.match(invoiceMigration, /FOR UPDATE/);
+  assert.match(invoiceMigration, /IF invoice_row\.status = 'paid' THEN\s+RETURN invoice_row/);
+  assert.match(invoiceMigration, /UPDATE public\.school_subscriptions/);
+  assert.match(invoiceMigration, /REVOKE ALL ON FUNCTION public\.schoolos_mark_subscription_invoice_paid/);
 });
