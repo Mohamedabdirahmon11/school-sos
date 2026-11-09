@@ -426,7 +426,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setNotice('Transport route added.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message);
+      setModuleError(err.message || 'Unable to add this transport route.');
     }
   };
 
@@ -437,7 +437,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setBusAssignments(current => [...current.filter(item => item.studentId !== assignment.studentId), assignment]);
       setNotice('Student assigned to the bus route. The configured route fee will be used for bus charges.');
     } catch (err: any) {
-      setNotice(err.message || 'Bus assignment failed.');
+      setModuleError(err.message || 'Bus assignment failed.');
     }
   };
 
