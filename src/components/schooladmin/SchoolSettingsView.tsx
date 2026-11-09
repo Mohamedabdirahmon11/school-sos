@@ -14,18 +14,18 @@ import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
-import { 
-  Building2, 
-  Palette, 
-  Sliders, 
-  Save, 
-  CheckCircle2, 
-  GitBranch, 
+import {
+  Building2,
+  Palette,
+  Sliders,
+  Save,
+  CheckCircle2,
+  GitBranch,
   FileText,
-  Database, 
-  Download, 
-  Plus, 
-  Eye, 
+  Database,
+  Download,
+  Plus,
+  Eye,
   Check,
   AlertCircle,
   ImagePlus,
@@ -80,7 +80,7 @@ export const SchoolSettingsView: React.FC = () => {
   const [address, setAddress] = useState(school?.address || '');
   const [city, setCity] = useState(school?.city || '');
   const [phone, setPhone] = useState(school?.phone || '');
- 
+
   const [whatsappPhone, setWhatsappPhone] = useState(school?.whatsappPhone || '');
   const [email, setEmail] = useState(school?.email || '');
   const [currency, setCurrency] = useState(school?.currency || 'ETB');
@@ -158,7 +158,7 @@ export const SchoolSettingsView: React.FC = () => {
           logoUrl,
           address,
           city,
- 
+
           currency,
           language,
           timezone,
@@ -491,7 +491,7 @@ export const SchoolSettingsView: React.FC = () => {
       {activeTab === 'identity' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-3xl space-y-5">
           <div className="flex items-center gap-4 pb-4 border-b border-[#E2E8F0]">
-            <div 
+            <div
               className="w-14 h-14 rounded-xl text-white font-bold text-xl flex items-center justify-center shadow-xs"
               style={{ backgroundColor: brandColor }}
             >
