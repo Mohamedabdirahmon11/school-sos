@@ -411,13 +411,36 @@ test('concurrent attendance submissions converge on one daily row without automa
   assert.equal(created.status, 201, await created.clone().text());
   const student = await created.json();
   const date = '2026-11-03';
+  const teacherUser = storage.db.createUser({
+    schoolId: school.id, role: 'teacher', staffId: 'ATTENDANCE-TEACHER-01',
+    fullName: 'Attendance Teacher', email: 'attendance-teacher@example.test',
+    passwordHash: '', isBlocked: false
+  } as any);
+  memory.rows('teachers').push({ id: 'attendance-teacher-profile', school_id: school.id, user_id: teacherUser.id });
+  memory.rows('class_subjects').push({
+    id: 'attendance-teacher-assignment', school_id: school.id,
+    teacher_id: 'attendance-teacher-profile', class_id: klass.id,
+    subject_id: 'attendance-test-subject', is_active: 'true'
+  });
+  const teacherSessionId = 'attendance-teacher-session';
+  const teacherToken = (await import('../src/server/auth-security.ts')).createSignedSessionToken({
+    sessionId: teacherSessionId, userId: teacherUser.id, role: 'teacher',
+    schoolId: school.id, createdAt: Date.now(), expiresAt: Date.now() + 60_000
+  });
+  memory.rows('user_sessions').push({
+    id: teacherSessionId, userId: teacherUser.id, userRole: 'teacher',
+    schoolId: school.id, ipAddress: '127.0.0.1', userAgent: 'test',
+    createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    lastActivityAt: new Date().toISOString()
+  });
+  const teacherHeaders = { Cookie: `schoolos_session=${teacherToken}`, 'Content-Type': 'application/json' };
   const invalidNote = await fetch(`${baseUrl}/attendance`, {
-    method: 'POST', headers,
+    method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
   });
   assert.equal(invalidNote.status, 400);
   const submit = () => fetch(`${baseUrl}/attendance`, {
-    method: 'POST', headers,
+    method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent' }] })
   });
   const [first, retry] = await Promise.all([submit(), submit()]);
