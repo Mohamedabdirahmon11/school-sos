@@ -178,3 +178,26 @@ test('discipline module can create incidents and displays the persisted student 
   assert.doesNotMatch(ui, /d\.parentNotified/);
   assert.match(ui, /disciplineLoading \?/);
 });
+
+
+test('inventory metadata updates remain school-scoped and cannot rewrite stock balances', () => {
+  const updateRoute = api.slice(api.indexOf("apiRouter.put('/inventory/:id'"), api.indexOf("apiRouter.get('/inventory/:id/transactions'"));
+  const updateStorage = storage.slice(storage.indexOf('public async updateInventoryItem('), storage.indexOf('public async adjustInventoryStock('));
+  assert.match(updateRoute, /requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission\('inventory_manage'\)/);
+  assert.doesNotMatch(updateRoute, /quantityOnHand|quantity_on_hand/);
+  assert.match(updateStorage, /\.eq\('school_id', schoolId\)\.eq\('id', itemId\)/);
+  assert.match(updateStorage, /updated_at/);
+});
+
+test('module forms surface save failures in the form where the administrator is working', () => {
+  assert.match(ui, /\{libraryError && <div role="alert" className="mb-3/);
+  assert.match(ui, /disabled=\{librarySaving \|\| isReadOnly\}/);
+  assert.match(ui, /\{disciplineError && <div role="alert"/);
+  assert.match(ui, /\{moduleError && <div role="alert"/);
+});
+
+test('transport data is loaded only when the Transport module is active', () => {
+  assert.match(ui, /if \(!school \|\| activeModule !== 'transport'\) return;/);
+  assert.match(ui, /ApiClient\.getTransportRoutes\(school\.id\)/);
+  assert.match(ui, /ApiClient\.getBusAssignments\(\)/);
+});
