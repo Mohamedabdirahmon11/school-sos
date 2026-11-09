@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculateSubscriptionGraceEnd, shouldTouchSession } from '../src/server/storage.ts';
+import { calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession } from '../src/server/storage.ts';
 
 test('session refresh persistence is throttled to at most once per minute', () => {
   const now = Date.UTC(2026, 10, 3, 12, 0, 0);
@@ -41,4 +41,12 @@ test('subscription grace periods preserve an explicitly configured zero days', (
 test('subscription grace periods use platform defaults only when school setting is absent', () => {
   const validUntil = '2026-11-03T00:00:00.000Z';
   assert.equal(calculateSubscriptionGraceEnd(validUntil, undefined, 3).toISOString(), '2026-11-06T00:00:00.000Z');
+});
+
+test('lockout counter rows read the canonical attempt_count alias without producing NaN', () => {
+  assert.equal(lockoutAttemptCountFromRow({ count: 3 }), 3);
+  assert.equal(lockoutAttemptCountFromRow({ attemptCount: 4 }), 4);
+  assert.equal(lockoutAttemptCountFromRow({ attempt_count: 5 }), 5);
+  assert.equal(lockoutAttemptCountFromRow({ count: undefined }), 0);
+  assert.equal(lockoutAttemptCountFromRow({ count: Number.NaN }), 0);
 });
