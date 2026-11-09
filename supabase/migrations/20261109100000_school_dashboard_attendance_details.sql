@@ -65,6 +65,18 @@ AS $function$
       SELECT COUNT(*) FROM public.classes
       WHERE school_id = p_school_id AND is_archived = FALSE
     ),
+    'attendanceRecordedToday', (
+      SELECT COUNT(*)
+      FROM public.attendance_records
+      WHERE school_id = p_school_id
+        AND date = (now() AT TIME ZONE COALESCE((SELECT timezone FROM public.schools WHERE id = p_school_id), 'Africa/Addis_Ababa'))::date
+        AND EXISTS (
+          SELECT 1 FROM public.students AS active_student
+          WHERE active_student.id = public.attendance_records.student_id
+            AND active_student.school_id = p_school_id
+            AND active_student.status = 'active'
+        )
+    ),
     'todayAttendance', (
       SELECT COUNT(*)
       FROM public.attendance_records
