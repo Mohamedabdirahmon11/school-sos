@@ -3059,9 +3059,11 @@ class StorageEngine {
       this.queryRows<any>('notice_reads', { school_id: schoolId, user_id: userId })
     ]);
     const readIds = new Set(reads.map(row => row.noticeId));
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
     const count = notices.filter(notice => {
+      const published = String(notice.publishDate || '').slice(0, 10) <= today;
       const visible = ['school_admin', 'super_admin', 'accountant'].includes(role) || ['all', 'school'].includes(notice.audience) || notice.audience === role + 's' || notice.audience === 'class' && Boolean(notice.classId && classIds.includes(notice.classId));
-      return visible && !readIds.has(notice.id);
+      return published && visible && !readIds.has(notice.id);
     }).length;
     noticeCountCache.set(cacheKey, { count, expiresAt: Date.now() + NOTICE_COUNT_TTL_MS });
     return count;
