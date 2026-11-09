@@ -7,7 +7,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronRight
+  HeartPulse, Award, Boxes, ChevronRight
 } from 'lucide-react';
 
 interface SidebarProps {
