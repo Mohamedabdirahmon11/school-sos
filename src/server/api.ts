@@ -3943,7 +3943,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     return;
   }
   if (normalizeRole(user.role) === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
     if (!teacher.items.length) {
       res.status(403).json({ error: 'Your teacher profile is not linked to this school.' });
       return;
