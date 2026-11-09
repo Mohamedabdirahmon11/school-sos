@@ -292,6 +292,26 @@ export function mapStorageRowToDatabase(table: string, row: Record<string, any>)
   return result;
 }
 
+
+const PLATFORM_BACKUP_EXCLUDED_FIELDS = new Set([
+  'password', 'passwordhash', 'pinhash', 'pin', 'twofactorsecret',
+  'pendingtwofactorsecret', 'recoverycodes', 'apikey', 'apisecret',
+  'webhookurl', 'accesstoken', 'refreshtoken', 'sessiontoken',
+  'token', 'tokenhash', 'smtpPassword'.toLowerCase(), 'service_role_key',
+  'sessions', 'usersessions', 'lockoutcounters', 'lockoutcounterrows',
+  'failedloginattempts', 'lockeduntil'
+]);
+
+/** Remove authentication material and short-lived security state from portable platform exports. */
+export function sanitizePlatformBackupValue(value: unknown): any {
+  if (Array.isArray(value)) return value.map(sanitizePlatformBackupValue);
+  if (!value || typeof value !== 'object') return value;
+  const safeEntries = Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !PLATFORM_BACKUP_EXCLUDED_FIELDS.has(key.replace(/[_-]/g, '').toLowerCase()))
+    .map(([key, entry]) => [key, sanitizePlatformBackupValue(entry)]);
+  return Object.fromEntries(safeEntries);
+}
+
 export function lockoutAttemptCountFromRow(row: Record<string, any>): number {
   const value = row.count ?? row.attemptCount ?? row.attempt_count;
   const count = Number(value ?? 0);
@@ -3438,24 +3458,34 @@ class StorageEngine {
   public async generatePlatformBackup() {
     const data = this.createEmptySchema();
     for (const [table, key] of Object.entries(TABLE_DATA_KEYS)) {
-      if (table === 'lockout_counters') continue;
+      // Active sessions and lockout counters are transient security state, not backup data.
+      if (table === 'lockout_counters' || table === 'user_sessions') continue;
       (data as any)[key] = await this.queryRows(table, {});
     }
     data.timetableSettings = await this.queryRows('timetable_settings', {});
     data.teacherUnavailability = await this.queryRows('teacher_unavailability', {});
-    data.lockoutCounterRows = await this.queryRows('lockout_counters', {});
-    data.lockoutCounters = Object.fromEntries(data.lockoutCounterRows.map((row: any) => [row.id, {
-      count: Number(row.count),
-      firstFailedAt: new Date(row.firstFailedAt),
-      lockedUntil: row.lockedUntil ? new Date(row.lockedUntil) : null
-    }]));
     data.schools = await this.getSchools();
     await this.queryRows('super_admin_settings', {});
     data.settings = { ...this.data.settings };
+
+    const safeData = sanitizePlatformBackupValue(data) as DatabaseSchema;
+    const tableCounts: Record<string, number> = {};
+    for (const [table, key] of Object.entries(TABLE_DATA_KEYS)) {
+      if (table === 'lockout_counters' || table === 'user_sessions') continue;
+      const rows = (safeData as any)[key];
+      if (Array.isArray(rows)) tableCounts[table] = rows.length;
+    }
     return {
       backupDate: new Date().toISOString(),
-      version: '1.0.0',
-      data
+      version: '1.1.0',
+      manifest: {
+        format: 'schoolos-platform-export',
+        credentialsIncluded: false,
+        activeSessionsIncluded: false,
+        restoreSupport: 'School-scoped merge restore only; full-platform restore is not supported.',
+        tableCounts
+      },
+      data: safeData
     };
   }
 
