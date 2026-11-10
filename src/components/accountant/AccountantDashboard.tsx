@@ -227,7 +227,7 @@ export const AccountantDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Total Collected</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Collected This Month</span>
             <div className="w-8 h-8 rounded-lg bg-teal-50 text-[#0F766E] flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -434,6 +434,14 @@ export const AccountantDashboard: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] text-slate-500">Showing {payments.length ? (receiptPage - 1) * (receiptPageData?.pageSize || 20) + 1 : 0}–{(receiptPage - 1) * (receiptPageData?.pageSize || 20) + payments.length} of {receiptPageData?.total || 0} receipts</p>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={receiptPage <= 1 || loading} onClick={() => setReceiptPage(page => Math.max(1, page - 1))} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Previous</button>
+            <span className="text-[11px] text-slate-500">Page {receiptPageData?.page || receiptPage} of {Math.max(1, receiptPageData?.totalPages || 1)}</span>
+            <button type="button" disabled={receiptPage >= (receiptPageData?.totalPages || 1) || loading} onClick={() => setReceiptPage(page => page + 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
 
