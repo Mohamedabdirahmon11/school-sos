@@ -24,7 +24,7 @@ export const WhatsAppRemindersView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openedIds, setOpenedIds] = useState<string[]>([]);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState('Dear {parentName}, this is a reminder that the monthly class fee for {studentName} ({className}) for {month} is {amount}. Please contact {schoolName} to confirm the remaining balance. If you have already paid, kindly ignore this message. Thank you.');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const month = currentMonthLabel(school?.timezone);
@@ -144,7 +144,7 @@ export const WhatsAppRemindersView: React.FC = () => {
             <select value={classFilter} onChange={event => setClassFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500"><option value="all">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           </div>
           {loading ? <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500"><Loader2 size={17} className="animate-spin"/> Loading students…</div> : visibleStudents.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">No unpaid or partially paid students found for this filter.</div> : <>
-            <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={visibleStudents.every(student => selectedIds.includes(student.id))} onChange={toggleVisible} className="rounded border-slate-300"/> Select visible ({visibleStudents.length})</label><span className="text-[11px] text-slate-400">{selectedIds.length} selected</span></div>
+            <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={visibleStudents.length > 0 && visibleStudents.every(student => selectedIds.includes(student.id))} onChange={toggleVisible} className="rounded border-slate-300"/> Select visible ({visibleStudents.length})</label><span className="text-[11px] text-slate-400">{selectedIds.length} selected</span></div>
             <div className="max-h-[440px] space-y-1 overflow-y-auto pr-1">{visibleStudents.map(student => {
               const classItem = classById.get(student.classId);
               const parentPhone = student.fatherPhone || student.motherPhone;
