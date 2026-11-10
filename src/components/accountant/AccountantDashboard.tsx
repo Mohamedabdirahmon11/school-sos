@@ -556,13 +556,7 @@ export const AccountantDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Payment Method</label>
-                <div className="px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-semibold text-slate-800 flex items-center gap-1.5">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Cash payment (currently supported)</span>
-                </div>
-              </div>
+
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Billing Month</label>
