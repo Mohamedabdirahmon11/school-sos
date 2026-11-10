@@ -2362,8 +2362,8 @@ class StorageEngine {
 
   public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string): Promise<{ count: number }> {
     const [assignments, students, marks] = await Promise.all([
-      this.queryPage<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' }, 1, 100, undefined, 'id,class_id,subject_id,teacher_id'),
-      this.queryPage<Student>('students', { school_id: schoolId, class_id: classId }, 1, 2000, undefined, 'id'),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' }),
+      this.queryRows<Student>('students', { school_id: schoolId, class_id: classId }),
       this.getMarks(schoolId, classId, undefined, semester)
     ]);
     if (!assignments.items.length) throw new Error('This class has no active subject assignments.');
