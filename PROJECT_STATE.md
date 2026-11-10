@@ -2,29 +2,26 @@
 
 Updated: 2026-11-10
 
-## Done
-- Accountant finance workspace PR #59 is merged into main (merge commit `f426a4b4e0e32957f299cdd8d2e89cd1832aa654`).
-- Fee collection supports Cash, Bank Transfer, and Mobile Money; receipts and cashbook preserve the selected method.
-- Added school-scoped Expenses & Cashbook, payroll/report integration where authorized, bank reconciliation, audit history, and backup/restore support.
-- Applied migrations 060 and 061 to the intended Supabase project `school management 3` (`rhpazlnjqsmzngxatnwd`); existing records were preserved.
-- Verified both new tables exist with RLS enabled and 8 tenant-scoped policies; verified the installment RPC signature and payment-method constraint.
-- Applied migration 062 with indexes for all five new Accountant foreign keys.
-- CI for PR #59 passed TypeScript, 196/196 tests, route parity, RLS source audit, and production build.
+## Accountant — merged and verified
+- PR #59 finance ledger and payment-channel support merged; fee payments, receipts, cashbook, expenses, and reconciliation are school-scoped.
+- PR #60 FK indexes and canonical schema synchronization merged.
+- PR #62 Accountant workspace redesign merged; Accountant navigation, desktop/mobile shell, forms, tables, and dialogs use an isolated visual theme.
+- PR #63 permission visibility fixes merged as `7a82ea95f8c2fa77369596f297d646d177c8aff0`. CI passed TypeScript, full configured tests, route parity, RLS source audit, and production build. Accountant users without `fees_manage` no longer see fee/expense mobile shortcuts, payment-record action, or receipt-void action.
+- Controlled finance DB tests were run in rollback-only transactions for Cash, Bank Transfer, Mobile Money, partial installments, and bank reconciliation. Test records were rolled back; live financial records were not changed.
+- Applied migrations 060, 061, and 062 to the intended Supabase project `school management 3` (`rhpazlnjqsmzngxatnwd`); expense and bank-statement tables have RLS and school-scoped policies.
 
-## Done
-- Unified staff login: Super Admin, School Admin, and Accountant use one sign-in form; the authenticated account role determines the dashboard. Email or phone identifiers are accepted where the account has that identifier. Role-based authorization and school scoping remain server-enforced.
+## Accountant — in progress
+- PR #64 adds CSV statement parsing, preview, downloadable template, validation, duplicate skipping, and a tenant-scoped batch insert. Parser and HTTP regression tests are included. CI has not yet been confirmed; do not merge until all checks pass.
+- Split-settlement reconciliation (one bank statement line matched to multiple receipts/expenses) is not implemented. It needs a separate reviewed migration and accounting model; do not approximate it by changing existing one-to-one links.
+- A live browser review of the redesigned Accountant screens on desktop and mobile is still required. Automated build checks are not a substitute for visual review.
+- Bank-provider connections and automatic bank-feed synchronization are not included.
 
-## In progress
-- Accountant foreign-key indexes and canonical schema synchronization are merged in PR #60.
-- Controlled live transaction tests (Cash, Bank Transfer, Mobile Money, partial installments, receipts, and reconciliation) remain pending; no financial test transactions were inserted.
-- Accountant payroll/report access remains a School Admin permission decision. The live Accountant record currently has `fees_manage`, not `payroll_manage` or `reports_export`.
+## Supabase review
+- Latest Security Advisor: one actionable warning remains — leaked-password protection is disabled. The owner must enable it in Supabase Auth password security settings.
+- INFO findings for `password_reset_codes` and `subscription_reminders` report RLS enabled without policies; prior privilege review found no anon/authenticated table access. Do not add permissive policies without a specific access requirement.
+- Performance Advisor currently reports unused-index INFO findings. Do not drop indexes solely from this snapshot; verify workload/query plans first.
 
-## Next
-- Merge the FK-index/schema follow-up PR.
-- Run controlled end-to-end finance tests with approved test records.
-- Review the remaining Supabase advisors and fix only confirmed issues without weakening tenant isolation.
-
-## Known scope limits
-- Bank statement rows are entered manually; CSV statement import and bank-provider integration are not included.
-- Reconciliation matches one full receipt or expense to one statement row (±0.01); splitting a bank settlement across multiple partial receipts is not implemented.
-- No production financial transactions or staff permission grants were changed.
+## Safety and release
+- Preserve existing school and financial data. No production finance records were deleted or modified during these changes.
+- GitHub merge does not itself deploy the hosting environment. Production deployment and live sign-in/user-journey verification remain separate checks.
+- The intended Supabase project is Frankfurt/EU Central project `rhpazlnjqsmzngxatnwd`; do not use the alternate Paris project.
