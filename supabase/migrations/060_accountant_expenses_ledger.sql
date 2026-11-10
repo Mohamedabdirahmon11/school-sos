@@ -46,7 +46,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_backup JSONB;
   v_tables JSONB;
@@ -246,7 +246,7 @@ BEGIN
 
   RETURN jsonb_build_object('school_id', v_school_id, 'mode', 'merge', 'restored', v_counts);
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.schoolos_restore_school_backup(JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_restore_school_backup(JSONB) TO service_role;
