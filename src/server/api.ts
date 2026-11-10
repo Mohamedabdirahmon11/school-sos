@@ -4244,7 +4244,9 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireSchoolConte
   const school = (req as any).school as School;
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
-  const payment = await db.voidFeePayment(req.params.paymentId, school.id, user.id, reason);
+  let payment;
+  try { payment = await db.voidFeePayment(req.params.paymentId, school.id, user.id, reason); }
+  catch (error: any) { res.status(409).json({ error: error?.message || 'This receipt cannot be voided.' }); return; }
   if (!payment) { res.status(409).json({ error: 'Payment was not found or has already been voided.' }); return; }
   db.logAudit({ action: 'FEE_PAYMENT_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided receipt ${payment.receiptNumber}. Reason: ${reason}`, severity: 'warning' });
   await db.flush();
@@ -4455,7 +4457,9 @@ apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireA
   const user = (req as any).user as User;
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
-  const expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason);
+  let expense;
+  try { expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason); }
+  catch (error: any) { res.status(409).json({ error: error?.message || 'This expense cannot be voided.' }); return; }
   if (!expense) { res.status(409).json({ error: 'Expense was not found or has already been voided.' }); return; }
   db.logAudit({ action: 'SCHOOL_EXPENSE_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided expense ${expense.id}. Reason: ${reason}`, severity: 'warning' });
   await db.flush();
