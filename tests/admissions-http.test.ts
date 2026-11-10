@@ -446,7 +446,7 @@ test('concurrent attendance submissions converge on one daily row without automa
   const subjectOnlyAttempt = await submit();
   assert.equal(subjectOnlyAttempt.status, 403, 'subject assignment alone must not grant Form Teacher attendance permission');
   await storage.db.updateClass(klass.id, { classTeacherId: teacherUser.id }, school.id);
-  const invalidNote = await fetch(`${baseUrl}/attendance`,
+  const invalidNote = await fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
   });
