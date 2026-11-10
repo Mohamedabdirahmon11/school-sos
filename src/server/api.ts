@@ -3015,6 +3015,134 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   res.json({ slots: generated, unfilled });
 });
 
+apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  if (req.body?.allClasses !== true) { res.status(400).json({ error: 'Confirm that all active classes should be regenerated.' }); return; }
+  const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
+  if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
+
+  const [assignments, allSlots, unavailable, settings, allClassRows] = await Promise.all([
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
+    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
+    db.getTimetableSettings(school.id),
+    queryAllRows('classes', { school_id: school.id }, 'id,shift')
+  ]);
+  const classById = new Map(classes.map((klass: any) => [klass.id, klass]));
+  const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
+  const targetIds = new Set(classes.map((klass: any) => klass.id));
+  // Keep existing schedules for classes with no valid subject assignments.
+  let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId));
+  const generatedSlots: TimetableSlot[] = [];
+  const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
+  const skipped: Array<{ classId: string; className: string; reason: string }> = [];
+  const replacements: Array<{ classId: string; slots: TimetableSlot[] }> = [];
+
+  for (const klass of classes) {
+    const classAssignments = assignments.filter((item: any) => item.classId === klass.id);
+    const schedulable = classAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
+    if (!schedulable.length) {
+      skipped.push({ classId: klass.id, className: klass.name, reason: 'No active subject assignments with periods per week.' });
+      continue;
+    }
+    const targetShift = Number(klass.shift) === 2 ? 2 : 1;
+    const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+    const occupied = new Set(sameShiftSlots.filter((slot: any) => slot.teacherId).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
+    const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
+    const generatedForClass: TimetableSlot[] = [];
+    const dayLoad = new Map<string, number>();
+    const periodLoad = new Map<number, number>();
+    const subjectDayLoad = new Map<string, number>();
+    const lessonQueue: any[] = [];
+    for (const assignment of schedulable) {
+      for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) lessonQueue.push({ ...assignment, occurrence });
+    }
+    for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
+    }
+    const candidates = TIMETABLE_DAYS.flatMap(day =>
+      Array.from({ length: 6 }, (_, index) => ({ day, period: index + 1 }))
+        .filter(item => !(item.day === 'Friday' && item.period === 6))
+    );
+    for (const assignment of lessonQueue) {
+      const available = candidates.filter(({ day, period }) => {
+        const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
+        const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
+        const roomBusy = Boolean(roomKey) && sameShiftSlots.some(slot =>
+          slot.dayOfWeek === day && slot.periodNumber === period &&
+          String(slot.roomNumber || '').trim().toLowerCase() === roomKey
+        );
+        return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+          && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
+          && !roomBusy;
+      });
+      if (!available.length) {
+        unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+        continue;
+      }
+      const ranked = available.map(candidate => {
+        const { day, period } = candidate;
+        const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+        const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
+        const score = (hasAdjacentSameSubject ? 1000 : 0)
+          + (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) * 35
+          + (dayLoad.get(day) || 0) * 3
+          + (periodLoad.get(period) || 0) * 1.5
+          + Math.random();
+        return { ...candidate, score };
+      }).sort((left, right) => left.score - right.score);
+      const { day, period } = ranked[0];
+      const slot: TimetableSlot = {
+        id: `tt-${randomUUID()}`, schoolId: school.id, classId: klass.id,
+        dayOfWeek: day, periodNumber: period,
+        ...getTimetablePeriodTimes(settings, period, targetShift),
+        subjectId: assignment.subjectId, teacherId: assignment.teacherId || '',
+        roomNumber: klass.roomNumber || ''
+      };
+      generatedForClass.push(slot);
+      if (assignment.teacherId) occupied.add(`${day}:${period}:${assignment.teacherId}`);
+      dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
+      periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
+      subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+    }
+    for (const assignment of classAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
+      unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+    }
+    if (!generatedForClass.length) {
+      skipped.push({ classId: klass.id, className: klass.name, reason: 'No timetable periods could be placed; the previous timetable was kept.' });
+      continue;
+    }
+    replacements.push({ classId: klass.id, slots: generatedForClass });
+    generatedSlots.push(...generatedForClass);
+    workingSlots.push(...generatedForClass);
+  }
+
+  if (!replacements.length) {
+    res.status(400).json({ error: 'No class had enough valid subject assignments to generate a timetable. Existing timetables were kept.', skipped });
+    return;
+  }
+
+  const previousByClass = new Map<string, TimetableSlot[]>();
+  for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId));
+  const written: string[] = [];
+  try {
+    for (const replacement of replacements) {
+      await db.replaceTimetableForClass(school.id, replacement.classId, replacement.slots);
+      written.push(replacement.classId);
+    }
+  } catch {
+    // Restore any class timetable already replaced if a later class write fails.
+    for (const classId of written.reverse()) {
+      try { await db.replaceTimetableForClass(school.id, classId, previousByClass.get(classId) || []); } catch { /* surfaced as a failed bulk operation */ }
+    }
+    res.status(409).json({ error: 'Bulk generation could not be completed. Previously replaced class timetables were restored where possible.' });
+    return;
+  }
+  res.json({ slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId) });
+});
+
+
 // ==============================================================================
 // 4. STUDENTS & TEACHERS
 // ==============================================================================
