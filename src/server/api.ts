@@ -2580,13 +2580,17 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
 
 const TIMETABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
 async function nextSchoolStaffId(school: School): Promise<string> {
-  const users = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
-  const used = new Set(users.map((user: any) => String(user.staffId || '').toUpperCase()).filter(Boolean));
-  let sequence = users.length + 1;
+  const [users, teachers] = await Promise.all([
+    queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
+    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
+  ]);
+  const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
+  let sequence = 1;
   let id = '';
-  do { id = `T${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
+  do { id = 'T' + String(sequence++).padStart(4, '0'); } while (used.has(id));
   return id;
 }
+
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
 const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
