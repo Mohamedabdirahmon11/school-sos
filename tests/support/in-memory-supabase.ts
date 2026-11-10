@@ -267,6 +267,65 @@ export class InMemorySupabase {
       });
       return { data: payment, error: null };
     }
+    if (name === 'schoolos_allocate_bank_statement') {
+      const schoolId = String(args?.p_school_id || '');
+      const entryId = String(args?.p_statement_entry_id || '');
+      const paymentId = args?.p_payment_id ? String(args.p_payment_id) : null;
+      const expenseId = args?.p_expense_id ? String(args.p_expense_id) : null;
+      const amount = Number(args?.p_amount);
+      if (!schoolId || !entryId || !args?.p_created_by || !Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== amount * 100 || Boolean(paymentId) === Boolean(expenseId)) {
+        return { data: null, error: { message: 'Invalid bank statement allocation details.' } };
+      }
+      const entry = this.rows('bank_statement_entries').find(row =>
+        String(row.id) === entryId && String(row.school_id ?? row.schoolId) === schoolId);
+      if (!entry) return { data: null, error: { message: 'Bank statement line not found for this school.' } };
+      if (entry.matched_at || entry.matchedAt || entry.matched_payment_id || entry.matched_expense_id) {
+        return { data: null, error: { message: 'This bank statement line was already reconciled.' } };
+      }
+      const allocations = this.rows('bank_statement_allocations');
+      const statementAllocated = allocations.filter(row => String(row.statement_entry_id ?? row.statementEntryId) === entryId && String(row.school_id ?? row.schoolId) === schoolId)
+        .reduce((sum, row) => sum + Number(row.amount), 0);
+      if (statementAllocated + amount > Number(entry.amount) + 0.0001) {
+        return { data: null, error: { message: 'Allocation exceeds the remaining bank statement amount.' } };
+      }
+      let targetId: string;
+      if (paymentId) {
+        if (String(entry.direction) !== 'credit') return { data: null, error: { message: 'Bank debits must be allocated to expenses.' } };
+        const payment = this.rows('fee_payments').find(row => String(row.id) === paymentId && String(row.school_id ?? row.schoolId) === schoolId);
+        if (!payment || payment.voided_at || payment.voidedAt || !['Bank Transfer', 'Mobile Money'].includes(String(payment.payment_method ?? payment.paymentMethod))) {
+          return { data: null, error: { message: 'Choose a valid, non-void bank/mobile fee receipt from this school.' } };
+        }
+        const targetAllocated = allocations.filter(row => String(row.payment_id ?? row.paymentId) === paymentId && String(row.school_id ?? row.schoolId) === schoolId)
+          .reduce((sum, row) => sum + Number(row.amount), 0);
+        if (targetAllocated + amount > Number(payment.amount_paid ?? payment.amountPaid) + 0.0001) {
+          return { data: null, error: { message: 'Allocation exceeds the unreconciled receipt amount.' } };
+        }
+        targetId = paymentId;
+      } else {
+        if (String(entry.direction) !== 'debit') return { data: null, error: { message: 'Bank credits must be allocated to fee receipts.' } };
+        const expense = this.rows('school_expenses').find(row => String(row.id) === expenseId && String(row.school_id ?? row.schoolId) === schoolId);
+        if (!expense || String(expense.status) !== 'posted' || expense.voided_at || expense.voidedAt || !['bank_transfer', 'mobile_money'].includes(String(expense.payment_method ?? expense.paymentMethod))) {
+          return { data: null, error: { message: 'Choose a valid, posted bank/mobile expense from this school.' } };
+        }
+        const targetAllocated = allocations.filter(row => String(row.expense_id ?? row.expenseId) === expenseId && String(row.school_id ?? row.schoolId) === schoolId)
+          .reduce((sum, row) => sum + Number(row.amount), 0);
+        if (targetAllocated + amount > Number(expense.amount) + 0.0001) {
+          return { data: null, error: { message: 'Allocation exceeds the unreconciled expense amount.' } };
+        }
+        targetId = expenseId!;
+      }
+      const duplicate = allocations.some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId &&
+        String(row.statement_entry_id ?? row.statementEntryId) === entryId &&
+        String(paymentId ? row.payment_id ?? row.paymentId ?? '' : row.expense_id ?? row.expenseId ?? '') === targetId);
+      if (duplicate) return { data: null, error: { message: 'This receipt or expense already has an allocation on this statement line.' } };
+      const row = {
+        id: `bsa-test-${Date.now()}-${allocations.length}`, school_id: schoolId, statement_entry_id: entryId,
+        payment_id: paymentId, expense_id: expenseId, amount, created_by: args.p_created_by, created_at: new Date().toISOString()
+      };
+      allocations.push(row);
+      return { data: row, error: null };
+    }
     if (name === 'schoolos_void_fee_payment') {
       const payment = this.rows('fee_payments').find(row =>
         String(row.id) === String(args?.p_payment_id)
