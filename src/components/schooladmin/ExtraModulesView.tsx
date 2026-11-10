@@ -773,7 +773,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
             <div className="flex flex-col sm:flex-row gap-2">
               <select value={assignmentStudentId} onChange={e => setAssignmentStudentId(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
                 <option value="">Select student</option>
-                {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
+                {students.filter(student => student.status === 'active').map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
               </select>
               <select value={assignmentRouteId} onChange={e => setAssignmentRouteId(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
                 <option value="">Select route</option>
