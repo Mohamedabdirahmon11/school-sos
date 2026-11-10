@@ -1182,10 +1182,13 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Expense storage is unavailable.');
     const startedAt = performance.now();
-    const { data, error } = await client.from('school_expenses').update(toSupabaseRow({ status: 'void', voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason }, 'school_expenses')).eq('id', id).eq('school_id', schoolId).eq('status', 'posted').select('*').maybeSingle();
-    this.recordQuery('school_expenses', 'update', startedAt);
+    const { data, error } = await client.rpc('schoolos_void_school_expense', {
+      p_expense_id: id, p_school_id: schoolId, p_user_id: userId, p_reason: reason
+    });
+    this.recordQuery('school_expenses', 'void_rpc', startedAt);
     if (error) throw new Error(`Unable to void school expense: ${error.message}`);
-    return data ? fromSupabaseRow(data, 'school_expenses') as SchoolExpense : null;
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'school_expenses') as SchoolExpense : null;
   }
 
   public async getBankStatementEntries(schoolId: string): Promise<import('../types/index.ts').BankStatementEntry[]> {
