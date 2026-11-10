@@ -280,11 +280,7 @@ export const TimetableView: React.FC = () => {
           <label className="space-y-1"><span>Break minutes</span><input type="number" min="0" max="120" value={settings.shift2BreakMinutes} onChange={e => setSettings(prev => ({ ...prev, shift2BreakMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
           <button onClick={handleSaveSettings} disabled={isReadOnly} className="px-3 py-2 rounded-lg bg-slate-100 text-xs disabled:opacity-50">{t('timetable_save_times')}</button>
         </div>
-      </section>
-
-
-
-        </div>
+      </div>
       </details>
       <style>{`@page { size: A4 portrait; margin: 12mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-class { break-after: page; page-break-after: always; min-height: 250mm; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden">
