@@ -964,6 +964,17 @@ export class ApiClient {
     return this.request<{ month: string; totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; payrollExpenseTotal: number; payrollExpenseCount: number; payrollIncluded: boolean; netCashflow: number }>(`/fees/monthly-summary?${query.toString()}`);
   }
 
+  public static async getBankReconciliation() {
+    return this.request<{ entries: import('../types/index.ts').BankStatementEntry[]; unmatchedPayments: FeePayment[]; unmatchedExpenses: SchoolExpense[] }>('/bank-reconciliation');
+  }
+
+  public static async createBankStatementEntry(data: { statementDate: string; description: string; direction: 'credit' | 'debit'; amount: number; reference?: string; bankAccountLabel?: string }) {
+    return this.request<import('../types/index.ts').BankStatementEntry>('/bank-reconciliation', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async matchBankStatementEntry(id: string, match: { paymentId?: string; expenseId?: string }) {
+    return this.request<import('../types/index.ts').BankStatementEntry>(`/bank-reconciliation/${encodeURIComponent(id)}/match`, { method: 'POST', body: JSON.stringify(match) });
+  }
   public static async getSchoolExpenses() {
     return this.request<SchoolExpense[]>('/expenses');
   }
