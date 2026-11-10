@@ -21,11 +21,17 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   const source = db.createClass({ schoolId: school.id, name: 'Grade 1', gradeLevel: 1, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const target = db.createClass({ schoolId: school.id, name: 'Grade 2', gradeLevel: 2, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
+  await memory.from('class_subjects').insert([{
+    id: 'class-subject-math', school_id: school.id, class_id: source.id,
+    subject_id: subject.id, teacher_id: 'teacher-profile-1', periods_per_week: 3,
+    small_exam_enabled: true, big_exam_enabled: true, is_active: true
+  }]);
   const students = [90, 70, 60, 40].map((score, index) => db.createStudent({
     schoolId: school.id, studentId: `ACAD-${index + 1}`, firstName: `Pupil${index + 1}`, middleName: '', lastName: 'Test', gender: 'female',
     admissionDate: '2026-01-01', fatherPhone: '', classId: source.id, status: 'active'
   } as any));
-  await db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
+  await assert.rejects(() => db.forwardClassMarks(school.id, source.id, 'Semester 1', 'fomester-1'), /Cannot forward results yet/);
+    await db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
   await assert.rejects(() => db.updateExamConfig(school.id, { smallExamMax: 0 }), /maximum marks/);
   await assert.rejects(() => db.updateExamConfig(school.id, { passMarkPercentage: 101 }), /pass mark/);
   await db.flush();
@@ -43,6 +49,8 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   const unapprovedYearlyRanks = await db.getClassYearlyRankings(school.id, source.id);
   assert.equal(unapprovedYearlyRanks.every(row => row.subjectResults.length === 0), true, 'draft/submitted marks must not affect official yearly rankings');
 
+  await db.forwardClassMarks(school.id, source.id, 'Semester 1', 'fomester-1');
+  await db.forwardClassMarks(school.id, source.id, 'Semester 2', 'fomester-1');
   const approved = db.approveMarks(school.id, [...firstSemester, ...secondSemester].map(mark => mark.id), 'admin-1');
   assert.equal(approved.length, 8);
   await db.flush();
