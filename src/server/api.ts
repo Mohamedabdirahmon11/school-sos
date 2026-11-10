@@ -990,12 +990,17 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
   const normalizedRole = normalizeRole(storedUser.role);
-  // The staff sign-in screen is shared by Super Admin and School Admin.
-  // The submitted tab defaults to school_admin, so resolve the actual admin
-  // role from the matched account instead of rejecting a Super Admin login.
+  // The shared staff sign-in resolves Super Admin, School Admin, and Accountant
+  // from the matched account while keeping a single staff login form.
   const sharedAdminLogin = requestedRole === 'school_admin'
     && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin' || normalizedRole === 'accountant');
-  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole && !sharedAdminLogin) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
+  // Teachers may use their school-issued staff ID on the same form. Require an
+  // exact match with the account's stored staff ID before accepting this role.
+  const sharedTeacherLogin = requestedRole === 'school_admin'
+    && normalizedRole === 'teacher'
+    && validStaffId(normalizeStaffId(identifier))
+    && normalizeStaffId(storedUser.staffId) === normalizeStaffId(identifier);
+  if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole && !sharedAdminLogin && !sharedTeacherLogin) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
     res.status(401).json({ error: 'Invalid email or password.' });
