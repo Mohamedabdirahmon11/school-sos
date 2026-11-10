@@ -31,6 +31,7 @@ export const TimetableView: React.FC = () => {
   const [unfilledSlots, setUnfilledSlots] = useState<Array<{ subjectId: string; teacherId: string; occurrence: number }>>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
+  const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -69,6 +70,7 @@ export const TimetableView: React.FC = () => {
         ApiClient.getTeacherUnavailability()
       ]);
       setClasses(clsList);
+      setDisplayClassIds(current => current.length ? current.filter(id => clsList.some(item => item.id === id)).slice(0, 5) : clsList.slice(0, 5).map(item => item.id));
       setSubjects(subList);
       setTeachers(tchList);
       setTimetable(schedule);
@@ -206,8 +208,11 @@ export const TimetableView: React.FC = () => {
     };
     return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
   });
+  const displayedClasses = viewMode === 'teacher'
+    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
+    : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const handlePrintAllClasses = () => {
-    if (!orderedClasses.length) { setNotice('No KG–Grade 5 classes are available to print.'); return; }
+    if (!displayedClasses.length) { setNotice('Select at least one class (maximum five) with a timetable to print.'); return; }
     setPrintAllClasses(true);
     window.setTimeout(() => {
       window.print();
@@ -223,7 +228,7 @@ export const TimetableView: React.FC = () => {
             Timetable Matrix & Clash Detector
           </h1>
           <p className="text-xs text-[#64748B]">
-            Class schedule grid with real-time teacher and classroom conflict validation
+            Separate class schedules. Subjects and lesson times only; teacher names stay off the student timetable.
           </p>
         </div>
         {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:max-w-md">
@@ -311,11 +316,11 @@ export const TimetableView: React.FC = () => {
         </div>
       </section>
 
-      <style>{`@media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 12mm; background: white; } .timetable-print-class { break-after: page; page-break-after: always; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
+      <style>{`@page { size: A4 portrait; margin: 12mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-class { break-after: page; page-break-after: always; min-height: 250mm; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden">
         <h1 className="mb-2 text-2xl font-bold">{school?.name || 'School'} · Timetables</h1>
-        <p className="mb-6 text-sm">KG to Grade 5 · All classes</p>
-        {orderedClasses.map(klass => (
+        <p className="mb-6 text-sm">Selected classes · one A4 page per class</p>
+        {displayedClasses.map(klass => (
           <article key={klass.id} className="timetable-print-class mb-8">
             <h2 className="mb-3 text-lg font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
             <table className="w-full border-collapse text-xs">
@@ -323,8 +328,7 @@ export const TimetableView: React.FC = () => {
               <tbody>{days.map(day => <tr key={day}><th className="border p-2 text-left">{day}</th>{periods.map(period => {
                 const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                 const subject = subjects.find(item => item.id === slot?.subjectId);
-                const teacher = teachers.find(item => item.id === slot?.teacherId);
-                return <td key={period} className="border p-2 text-center">{day === 'Friday' && period === 6 ? '—' : slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{teacher?.fullName || ''}</span><span className="block">{slot.startTime}–{slot.endTime}</span></> : '—'}</td>;
+                return <td key={period} className="border p-2 text-center">{day === 'Friday' && period === 6 ? '—' : slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : '—'}</td>;
               })}</tr>)}</tbody>
             </table>
           </article>
