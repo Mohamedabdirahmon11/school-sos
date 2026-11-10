@@ -1745,7 +1745,7 @@ CREATE POLICY teachers_role_scope ON teachers AS RESTRICTIVE FOR SELECT TO authe
 DROP POLICY IF EXISTS subscription_invoices_scope ON subscription_invoices;
 CREATE POLICY subscription_invoices_scope ON subscription_invoices
   FOR SELECT TO authenticated
-  USING (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id());
+  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant')));
 
 DROP POLICY IF EXISTS broadcasts_target_scope ON platform_broadcasts;
 CREATE POLICY broadcasts_target_scope ON platform_broadcasts
