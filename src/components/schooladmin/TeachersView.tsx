@@ -106,6 +106,18 @@ export const TeachersView: React.FC = () => {
     }
   };
 
+  const handleResetTeacherPin = async (teacher: Teacher) => {
+    if (isReadOnly) return;
+    if (!confirm(`Reset the sign-in PIN for ${teacher.fullName}? The new PIN will be shown once.`)) return;
+    try {
+      const result = await ApiClient.resetTeacherPin(teacher.id);
+      setInitialPassword(`Teacher: ${result.teacher.fullName}\nTeacher ID: ${result.teacher.staffId}\nNew PIN: ${result.newPin}`);
+      setNotice('Teacher PIN reset. Copy or securely share the new PIN.');
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not reset teacher PIN.');
+    }
+  };
+
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName) return;
@@ -207,6 +219,10 @@ export const TeachersView: React.FC = () => {
                     <button type="button" onClick={() => openTeacherEditor(t)} disabled={isReadOnly}
                       className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 font-semibold text-[#0F766E] hover:bg-[#F0FDFA] disabled:opacity-50">
                       <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                    <button type="button" onClick={() => void handleResetTeacherPin(t)} disabled={isReadOnly}
+                      className="ml-1 inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-2 font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50">
+                      Reset PIN
                     </button>
                   </td>
                 </tr>
