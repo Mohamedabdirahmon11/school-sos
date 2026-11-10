@@ -3,7 +3,7 @@
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
  * 2. Exam marks: Small Exam + Big Exam -> Percentage only (no letter grades or GPA)
- * 3. Save Draft & Submit for Admin Approval (locked once approved)
+ * 3. Subject teachers submit their assigned subjects to the Fomester; the Fomester forwards the complete class to Admin.
  * 4. Personal teaching schedule & notices
  */
 
