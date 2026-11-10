@@ -670,6 +670,10 @@ export class ApiClient {
     });
   }
 
+  public static async resetTeacherPin(id: string) {
+    return this.request<{ success: boolean; newPin: string; teacher: Teacher }>(`/teachers/${encodeURIComponent(id)}/reset-pin`, { method: 'POST' });
+  }
+
   public static async getSchoolDashboard(schoolId?: string) {
     const data = await this.request<any>('/school/dashboard');
     if (data && typeof data === 'object') return data;
