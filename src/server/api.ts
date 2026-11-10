@@ -2935,26 +2935,73 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
   const generated: TimetableSlot[] = [];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
-  const load = new Map<string, number>();
-  const ordered = schedulableAssignments.sort((a: any, b: any) => Number(b.periodsPerWeek) - Number(a.periodsPerWeek));
-  for (const assignment of ordered) {
-    for (let occurrence = 1; occurrence <= assignment.periodsPerWeek; occurrence += 1) {
-      let placed = false;
-      const days = [...TIMETABLE_DAYS].sort((a, b) => (load.get(`${assignment.subjectId}:${a}`) || 0) - (load.get(`${assignment.subjectId}:${b}`) || 0));
-      for (let period = 1; period <= 6; period += 1) {
-        for (const day of days) {
-          if (day === 'Friday' && period === 6) continue;
-          const key = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
-          if ((key && (occupied.has(key) || blocked.has(key))) || occupiedRooms.has(`${day}:${period}`) || generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)) continue;
-          generated.push({ id: `tt-${randomUUID()}`, schoolId: school.id, classId, dayOfWeek: day, periodNumber: period, ...getTimetablePeriodTimes(settings, period, targetShift), subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', roomNumber: klass.roomNumber || '' });
-          if (key) occupied.add(key); load.set(`${assignment.subjectId}:${day}`, (load.get(`${assignment.subjectId}:${day}`) || 0) + 1); placed = true; break;
-        }
-        if (placed) break;
-      }
-      if (!placed) unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId, occurrence });
+  const dayLoad = new Map<string, number>();
+  const periodLoad = new Map<number, number>();
+  const subjectDayLoad = new Map<string, number>();
+  const lessonQueue: any[] = [];
+  for (const assignment of schedulableAssignments) {
+    for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) {
+      lessonQueue.push({ ...assignment, occurrence });
     }
   }
-  for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+  // Shuffle lesson order so subjects are interleaved instead of being placed
+  // in long consecutive blocks (e.g. all Maths, then all English).
+  for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
+  }
+  const candidates = TIMETABLE_DAYS.flatMap(day =>
+    Array.from({ length: 6 }, (_, index) => ({ day, period: index + 1 }))
+      .filter(item => !(item.day === 'Friday' && item.period === 6))
+  );
+  for (const assignment of lessonQueue) {
+    const available = candidates.filter(({ day, period }) => {
+      const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
+      return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+        && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
+        && !occupiedRooms.has(`${day}:${period}`);
+    });
+    if (!available.length) {
+      unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+      continue;
+    }
+    const ranked = available.map(candidate => {
+      const { day, period } = candidate;
+      const sameSubjectToday = generated.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+      const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
+      const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+      const classDayCount = dayLoad.get(day) || 0;
+      const periodCount = periodLoad.get(period) || 0;
+      // Strongly avoid consecutive identical subjects; spread repeated lessons
+      // across different days and balance the class workload by day/period.
+      const score = (hasAdjacentSameSubject ? 1000 : 0)
+        + sameSubjectCount * 35
+        + classDayCount * 3
+        + periodCount * 1.5
+        + Math.random();
+      return { ...candidate, score };
+    }).sort((left, right) => left.score - right.score);
+    const { day, period } = ranked[0];
+    const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
+    generated.push({
+      id: `tt-${randomUUID()}`,
+      schoolId: school.id,
+      classId,
+      dayOfWeek: day,
+      periodNumber: period,
+      ...getTimetablePeriodTimes(settings, period, targetShift),
+      subjectId: assignment.subjectId,
+      teacherId: assignment.teacherId || '',
+      roomNumber: klass.roomNumber || ''
+    });
+    if (teacherKey) occupied.add(teacherKey);
+    dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
+    periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
+    subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+  }
+  for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
+    unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+  }
   try { await db.replaceTimetableForClass(school.id, classId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
   res.json({ slots: generated, unfilled });
