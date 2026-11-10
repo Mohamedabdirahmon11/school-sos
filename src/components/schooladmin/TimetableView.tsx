@@ -175,21 +175,6 @@ export const TimetableView: React.FC = () => {
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
   };
 
-  const handleGenerate = async () => {
-    if (!selectedClassId || isReadOnly) return;
-    setNotice('Jadwalka fasalka ayaa la diyaarinayaa…');
-    try {
-      const result = await ApiClient.generateTimetable(selectedClassId);
-      setTimetable(current => [...current.filter(slot => slot.classId !== selectedClassId), ...result.slots]);
-      const unfilledCount = result.unfilled.length;
-      setNotice(unfilledCount
-        ? `Jadwalka waa la sameeyay; ${unfilledCount} cashar lama meelayn. Hubi maaddooyinka iyo macallimiinta fasalka.`
-        : `Jadwalka ${classes.find(item => item.id === selectedClassId)?.name || ''} si guul leh ayaa loo sameeyay.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Auto-generate timetable wuu fashilmay.');
-    }
-  };
-
   const handleGenerateAll = async () => {
     if (isReadOnly || !classes.length) return;
     if (!window.confirm('Dhammaan fasallada jadwalkooda ma dib ayaa loo sameeyaa? Jadwalkii hore ee fasallada leh maaddooyin loo qoondeeyay waa la beddelayaa.')) return;
