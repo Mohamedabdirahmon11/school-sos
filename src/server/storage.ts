@@ -1886,6 +1886,7 @@ class StorageEngine {
     if (idx === -1) return null;
     this.data.classes[idx] = { ...this.data.classes[idx], ...updates };
     this.save();
+    await this.flush();
     return this.data.classes[idx];
   }
 
