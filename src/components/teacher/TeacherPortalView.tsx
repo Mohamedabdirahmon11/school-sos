@@ -58,10 +58,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const classes: SchoolClass[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class])).values()] as SchoolClass[];
   const subjects: Subject[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
-  const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacher === true);
+  const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
   const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
   const allClassSubjects = uniqueSubjects(classAssignments);
-  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
+  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher || assignment.canEditMarks === true));
   const classSubjects: Subject[] = editableClassSubjects;
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
