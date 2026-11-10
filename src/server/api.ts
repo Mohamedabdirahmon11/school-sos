@@ -4211,6 +4211,14 @@ apiRouter.delete('/fees/structures/:id', requireAuth, requireSchoolContext, requ
   res.json({ success: await db.deleteFeeStructure(req.params.id, school.id) });
 });
 
+apiRouter.get('/fees/receipts', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+  const result = await db.queryPage<FeePayment>('fee_payments', { school_id: school.id }, page, pageSize);
+  res.json({ items: result.items, total: result.total, page: result.page, pageSize: result.pageSize, totalPages: Math.ceil(result.total / result.pageSize) });
+});
+
 apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
