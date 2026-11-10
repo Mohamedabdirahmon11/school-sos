@@ -2587,6 +2587,16 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
 
 const TIMETABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
 async function nextSchoolStaffId(school: School): Promise<string> {
+  const users = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
+  const used = new Set(users.map((user: any) => String(user.staffId || '').toUpperCase()).filter(Boolean));
+  const schoolTag = String(school.code || 'SCHOOL').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) || 'SCHOOL';
+  let sequence = users.length + 1;
+  let id = '';
+  do { id = 'STF-' + schoolTag + '-' + String(sequence++).padStart(4, '0'); } while (used.has(id));
+  return id;
+}
+
+async function nextSchoolTeacherId(school: School): Promise<string> {
   const [users, teachers] = await Promise.all([
     queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
     queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
@@ -3733,8 +3743,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = normalizeStaffId(body.staffId) || await nextSchoolStaffId(school);
-  if (!validStaffId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
+  const staffId = normalizeStaffId(body.staffId) || await nextSchoolTeacherId(school);
+  if (!validTeacherId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
   const [usedStaffIds, existingTeachers] = await Promise.all([
     queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
     queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
@@ -3790,7 +3800,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
-const validStaffId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
+const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
+const validTeacherId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
