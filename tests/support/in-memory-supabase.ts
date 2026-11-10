@@ -333,6 +333,13 @@ export class InMemorySupabase {
         && String(row.schoolId ?? row.school_id) === String(args?.p_school_id)
       );
       if (!payment || payment.voidedAt || payment.voided_at) return { data: null, error: null };
+      const paymentId = String(args?.p_payment_id);
+      const schoolId = String(args?.p_school_id);
+      const hasAllocation = this.rows('bank_statement_allocations').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.payment_id ?? row.paymentId) === paymentId);
+      const hasLegacyMatch = this.rows('bank_statement_entries').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_payment_id ?? row.matchedPaymentId) === paymentId);
+      if (hasAllocation || hasLegacyMatch) return { data: null, error: { message: 'This receipt is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.' } };
       const now = new Date().toISOString();
       Object.assign(payment, {
         voidedAt: now,
@@ -343,6 +350,23 @@ export class InMemorySupabase {
         void_reason: String(args?.p_reason || '').trim()
       });
       return { data: payment, error: null };
+    }
+    if (name === 'schoolos_void_school_expense') {
+      const expenseId = String(args?.p_expense_id || '');
+      const schoolId = String(args?.p_school_id || '');
+      const expense = this.rows('school_expenses').find(row =>
+        String(row.id) === expenseId && String(row.school_id ?? row.schoolId) === schoolId && String(row.status) === 'posted');
+      if (!expense) return { data: null, error: null };
+      const hasAllocation = this.rows('bank_statement_allocations').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.expense_id ?? row.expenseId) === expenseId);
+      const hasLegacyMatch = this.rows('bank_statement_entries').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_expense_id ?? row.matchedExpenseId) === expenseId);
+      if (hasAllocation || hasLegacyMatch) return { data: null, error: { message: 'This expense is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.' } };
+      Object.assign(expense, {
+        status: 'void', voidedAt: new Date().toISOString(), voided_at: new Date().toISOString(),
+        voidedBy: args?.p_user_id, voided_by: args?.p_user_id, voidReason: args?.p_reason, void_reason: args?.p_reason
+      });
+      return { data: expense, error: null };
     }
     if (name === 'schoolos_restore_school_backup') {
       const payload = args?.p_payload || {};
