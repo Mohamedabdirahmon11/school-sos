@@ -25,6 +25,7 @@ test('bank statement lines are school scoped and cannot be matched to the wrong 
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_statement_matched_payment/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_statement_matched_expense/);
   assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(storage, /'school_expenses', 'bank_statement_entries'/);
   assert.match(screen, /Bank reconciliation/);
   assert.match(screen, /Save statement line/);
 });
