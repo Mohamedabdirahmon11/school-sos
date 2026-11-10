@@ -22,6 +22,8 @@ const today = () => {
 export const AccountantExpensesView: React.FC = () => {
   const { school } = useAuth();
   const [rows, setRows] = useState<SchoolExpense[]>([]);
+  const [month, setMonth] = useState(today().slice(0, 7));
+  const [monthlySummary, setMonthlySummary] = useState<{ totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; netCashflow: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -38,10 +40,13 @@ export const AccountantExpensesView: React.FC = () => {
 
   const reload = useCallback(async () => {
     setLoading(true); setError('');
-    try { const result = await ApiClient.getSchoolExpenses(); setRows(Array.isArray(result) ? result : []); }
+    try {
+      const [result, summary] = await Promise.all([ApiClient.getSchoolExpenses(), ApiClient.getMonthlyFinanceSummary(month)]);
+      setRows(Array.isArray(result) ? result : []); setMonthlySummary(summary);
+    }
     catch (reason: any) { setError(reason?.message || 'Expenses could not be loaded.'); }
     finally { setLoading(false); }
-  }, []);
+  }, [month]);
   useEffect(() => { void reload(); }, [reload]);
 
   const posted = useMemo(() => rows.filter(row => row.status === 'posted'), [rows]);
@@ -79,6 +84,11 @@ export const AccountantExpensesView: React.FC = () => {
 
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
     {success && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{success}</div>}
+
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-sm font-bold text-[#132A29]">Income vs expenses</h2><p className="mt-1 text-xs text-slate-500">Monthly cash movement · voided receipts and expenses are excluded</p></div><label className="text-xs font-semibold text-slate-600">Reporting month<input type="month" value={month} onChange={event => setMonth(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Fee income</p><p className="mt-1 text-lg font-bold text-emerald-950">{money(Number(monthlySummary?.totalIncome) || 0)}</p><p className="text-[10px] text-emerald-800">{monthlySummary?.incomeCount || 0} receipts</p></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Expenses</p><p className="mt-1 text-lg font-bold text-amber-950">{money(Number(monthlySummary?.totalExpenses) || 0)}</p><p className="text-[10px] text-amber-800">{monthlySummary?.expenseCount || 0} entries</p></div><div className="rounded-xl bg-slate-100 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Net cash movement</p><p className={`mt-1 text-lg font-bold ${(monthlySummary?.netCashflow || 0) >= 0 ? 'text-slate-950' : 'text-rose-700'}`}>{money(Number(monthlySummary?.netCashflow) || 0)}</p><p className="text-[10px] text-slate-500">Income minus expenses</p></div></div>
+    </section>
 
     <section className="grid gap-3 sm:grid-cols-3">
       <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total posted expenses</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(total)}</p><p className="mt-1 text-xs text-slate-500">{posted.length} active records</p></article>
