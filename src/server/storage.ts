@@ -2582,6 +2582,7 @@ class StorageEngine {
       academicYear: string;
       month: string;
       feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom';
+      paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money';
       amountDue: number;
       amountPaid: number;
       recordedBy: string;
@@ -2660,7 +2661,7 @@ class StorageEngine {
       paymentData.amountDue = Number(matching.amount);
     }
     if (!Number.isFinite(paymentData.amountDue) || !Number.isFinite(paymentData.amountPaid) || paymentData.amountDue < 0 || paymentData.amountPaid < 0 || paymentData.amountPaid > paymentData.amountDue) {
-      throw new Error('Payment amounts must be valid, non-negative values and cash paid cannot exceed the amount due.');
+      throw new Error('Payment amounts must be valid, non-negative values and payment amount cannot exceed the amount due.');
     }
     const installmentUsesMonth = paymentData.feeType === 'monthly_tuition'
       || paymentData.feeType === 'bus'
@@ -2724,7 +2725,7 @@ class StorageEngine {
       amountDue: paymentData.amountDue,
       amountPaid: paymentData.amountPaid,
       remainingAmount: remaining,
-      paymentMethod: 'Cash', // Strictly Cash only
+      paymentMethod: paymentData.paymentMethod || 'Cash'
       status,
       date: new Date().toISOString().split('T')[0],
       recordedBy: paymentData.recordedBy,
@@ -2735,13 +2736,13 @@ class StorageEngine {
     this.data.feePayments.push(payment);
 
     this.logAudit({
-      action: 'CASH_FEE_PAYMENT_RECORDED',
+      action: 'FEE_PAYMENT_RECORDED',
       category: 'finance',
       schoolId: paymentData.schoolId,
       userId: paymentData.recordedBy,
       userName: 'Cashier / Accountant',
       userRole: 'accountant',
-      details: `Recorded cash payment (Receipt #${receiptNumber}) for student ID ${paymentData.studentId}.`,
+      details: `Recorded ${payment.paymentMethod} payment (Receipt #${receiptNumber}) for student ID ${paymentData.studentId}.`,
       severity: 'info'
     });
 
