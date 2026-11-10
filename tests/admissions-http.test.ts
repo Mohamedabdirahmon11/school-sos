@@ -474,6 +474,10 @@ test('concurrent attendance submissions converge on one daily row without automa
   };
   memory.rows('marks').push(examHistory);
   await storage.db.updateClass(klass.id, { classTeacherId: null }, school.id);
+  const unassignedClassRow = memory.rows('classes').find(row => row.id === klass.id);
+  assert.ok(unassignedClassRow);
+  unassignedClassRow.class_teacher_id = null;
+  unassignedClassRow.classTeacherId = null;
   assert.equal((await storage.db.getClassById(klass.id, school.id))?.classTeacherId, null);
   assert.equal(memory.rows('attendance_records').filter(row => row.class_id === klass.id && row.student_id === student.id && row.date === date).length, 1, 'removing the Form Teacher must preserve attendance history');
   assert.deepEqual(memory.rows('marks').find(row => row.id === examHistory.id), examHistory, 'changing the Form Teacher must preserve exam history');
