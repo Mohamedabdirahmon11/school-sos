@@ -8,7 +8,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronRight
+  HeartPulse, Award, Wallet, Boxes, ChevronRight, MessageCircle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -92,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       ] },
       { title: 'Communication', items: [
         item('sch_notices', noticeLabel, BellRing), item('sch_messages', t('messages'), MessageSquare),
+        item('sch_whatsapp', 'WhatsApp parent reminders', MessageCircle),
         item('sch_events', t('events_holidays'), CalendarDays)
       ] },
       { title: 'Reports & insights', items: [
