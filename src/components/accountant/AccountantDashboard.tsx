@@ -27,11 +27,12 @@ export const AccountantDashboard: React.FC = () => {
   const { school, user } = useAuth();
   const now = new Date();
   const reportingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const reportingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const [receiptPage, setReceiptPage] = useState(1);
   const dashboardData = useApi(() => Promise.all([
     ApiClient.getStudents(), ApiClient.getFeeReceiptPage(receiptPage, 20), ApiClient.getFeeStructures(),
-    ApiClient.getDailyIncome(), ApiClient.getArrears(), ApiClient.getMonthlyFinanceSummary(reportingMonth)
-  ]), [school?.id, reportingMonth, receiptPage], Boolean(school));
+    ApiClient.getDailyIncome(reportingDate), ApiClient.getArrears(), ApiClient.getMonthlyFinanceSummary(reportingMonth)
+  ]), [school?.id, reportingMonth, reportingDate, receiptPage], Boolean(school));
   const [studentRows, paymentRows, structureRows, dailyIncome, arrearsRows, monthlySummary] = dashboardData.data || [[], [], [], null, [], null];
   const students: Student[] = Array.isArray(studentRows) ? studentRows : [];
   const receiptPageData = paymentRows as { items?: FeePayment[]; total?: number; page?: number; pageSize?: number; totalPages?: number } | null;
