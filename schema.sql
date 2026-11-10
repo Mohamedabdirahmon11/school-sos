@@ -41,7 +41,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE mark_status_enum AS ENUM ('draft', 'submitted', 'approved');
+  CREATE TYPE mark_status_enum AS ENUM ('draft', 'submitted', 'form_teacher_submitted', 'approved');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
