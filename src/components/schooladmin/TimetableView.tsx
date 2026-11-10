@@ -346,6 +346,7 @@ export const TimetableView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {days.map(day => (
                     <tr key={day}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
