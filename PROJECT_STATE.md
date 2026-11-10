@@ -12,7 +12,8 @@ Updated: 2026-11-10
 
 ## Accountant — in progress
 - PR #64 is DONE and merged as `4eaea446e4ef0344ac72fc72d4351cbb5a1936e8`. It adds validated CSV statement import (preview, template, duplicate skipping, 500-row cap, tenant-scoped atomic bulk insert), plus school-timezone defaults and summaries across Accountant dashboard, expenses, and payroll. Parser and HTTP regression tests pass. GitHub Actions run `42783208889` (#1869) passed TypeScript, tests, route parity, RLS audit, and production build.
-- PR in progress adds a dedicated allocation ledger and atomic RPC for split settlements. It permits one statement line to allocate across multiple receipts/expenses and one receipt/expense across multiple statement lines, with school scoping and amount caps. Do not merge or apply its migration until CI and schema verification pass.
+- PR #66 merged split-settlement allocation ledger and atomic RPC; migration 063 is applied to the intended Supabase project. It permits one statement line to allocate across multiple receipts/expenses and one receipt/expense across multiple statement lines, with school scoping and amount caps. Reconciled receipts/expenses are protected from voiding, and allocations are included in school backups.
+- A follow-up FK-index migration is in progress to clear the four new unindexed-FK advisories.
 - A live browser review of the redesigned Accountant screens on desktop and mobile is still required. Automated build checks are not a substitute for visual review.
 - Bank-provider connections and automatic bank-feed synchronization are not included.
 
