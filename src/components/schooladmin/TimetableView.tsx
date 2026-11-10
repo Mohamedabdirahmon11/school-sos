@@ -180,7 +180,6 @@ export const TimetableView: React.FC = () => {
     }
   };
 
-  const selectedClass = classes.find(c => c.id === selectedClassId);
   const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
       const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
@@ -239,7 +238,7 @@ export const TimetableView: React.FC = () => {
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
           </>}
           
-          <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]">Print A4 (max 5)</button>
+          <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]"><Printer className="w-3.5 h-3.5" /> Print A4 (max 5)</button>
 
           <button
             onClick={() => {
