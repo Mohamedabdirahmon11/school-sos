@@ -44,14 +44,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
     ApiClient.getTimetable(undefined, user?.id),
-    ApiClient.getNotices()
+    ApiClient.getNotices(),
+    ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
-  const [assignmentsData, examConfigData, timetableData, noticesData] = initialData.data || [[], null, [], []];
+  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || [[], null, [], [], []];
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
   const classes: SchoolClass[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class])).values()] as SchoolClass[];
-  const formTeacherClasses = classes.filter(klass => klass.classTeacherId === user?.id);
+  const formTeacherClasses: SchoolClass[] = Array.isArray(formTeacherClassesData) ? formTeacherClassesData : [];
   const subjects: Subject[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
   const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
@@ -142,7 +143,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
     });
     return () => { cancelled = true; };
-  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments]);
+  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses]);
 
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
