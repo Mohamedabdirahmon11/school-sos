@@ -3955,12 +3955,6 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     return;
   }
   const normalizedClassId = classId.trim();
-  const attendanceClass = await db.getClassById(normalizedClassId, school.id);
-  if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
-  if (attendanceClass.classTeacherId !== user.id) {
-    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
-    return;
-  }
   const parsedDate = new Date(`${date}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
@@ -4001,6 +3995,12 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   }
   if (normalizedRecords.length !== classStudentIds.size || [...classStudentIds].some(studentId => !seenStudentIds.has(studentId))) {
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
+    return;
+  }
+  const attendanceClass = await db.getClassById(normalizedClassId, school.id);
+  if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
+  if (attendanceClass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
     return;
   }
 
