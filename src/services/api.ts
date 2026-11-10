@@ -850,6 +850,13 @@ export class ApiClient {
     });
   }
 
+  public static async forwardClassMarks(classId: string, semester: string) {
+    return this.request<{ success: boolean; forwardedCount: number }>('/exams/forward-class', {
+      method: 'POST',
+      body: JSON.stringify({ classId, semester })
+    });
+  }
+
   public static async approveMarks(markIds: string[]) {
     return this.request<{ success: boolean; approvedCount: number }>('/exams/approve', {
       method: 'POST',
