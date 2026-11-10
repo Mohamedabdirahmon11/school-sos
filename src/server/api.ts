@@ -4460,7 +4460,7 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
-  const [payments, expenses, students] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id)]);
+  const [payments, expenses, students, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id), db.getPayrollRecords(school.id, undefined, month)]);
   const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
   const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
     id: payment.id, date: payment.date, type: 'income' as const, description: `Fee payment · ${studentById.get(payment.studentId) || payment.studentId}`,
@@ -4472,7 +4472,12 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
     category: expense.category, amount: Number(expense.amount) || 0, method: expense.paymentMethod,
     reference: expense.reference || '', status: expense.status
   }));
-  const entries = [...incomeEntries, ...expenseEntries].sort((left, right) => right.date.localeCompare(left.date));
+  const payrollEntries = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))).map(record => ({
+    id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
+    description: `Payroll · ${record.staffName || record.staffId || record.userId}`, category: 'salaries',
+    amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted'
+  }));
+  const entries = [...incomeEntries, ...expenseEntries, ...payrollEntries].sort((left, right) => right.date.localeCompare(left.date));
   res.json(entries);
 });
 
@@ -4480,12 +4485,14 @@ apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requir
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
-  const [payments, expenses] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id)]);
+  const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getPayrollRecords(school.id, undefined, month)]);
   const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
   const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
+  const paidPayroll = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month)));
   const totalIncome = incomeRows.reduce((sum, payment) => sum + (Number(payment.amountPaid) || 0), 0);
-  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
-  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length, netCashflow: totalIncome - totalExpenses });
+  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
+    + paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0);
+  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + paidPayroll.length, payrollExpenseTotal: paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0), payrollExpenseCount: paidPayroll.length, netCashflow: totalIncome - totalExpenses });
 });
 
 // ==============================================================================
