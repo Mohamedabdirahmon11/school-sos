@@ -2679,7 +2679,7 @@ class StorageEngine {
   private async recordCashFeePaymentInternal(paymentData: {
     schoolId: string; studentId: string; academicYear: string; month: string;
     feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom'; amountDue: number; amountPaid: number;
-    recordedBy: string; notes?: string; idempotencyKey?: string; feeStructureId?: string;
+    paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money'; recordedBy: string; notes?: string; idempotencyKey?: string; feeStructureId?: string;
   }): Promise<FeePayment> {
     const student = await this.getStudentById(paymentData.studentId, paymentData.schoolId);
     if (!student || student.schoolId !== paymentData.schoolId) throw new Error('Student is not part of this school.');
@@ -2730,7 +2730,8 @@ class StorageEngine {
         p_amount_paid: paymentData.amountPaid,
         p_recorded_by: paymentData.recordedBy,
         p_notes: paymentData.notes || null,
-        p_idempotency_key: paymentData.idempotencyKey || null
+        p_idempotency_key: paymentData.idempotencyKey || null,
+        p_payment_method: paymentData.paymentMethod || 'Cash'
       });
       this.recordQuery('rpc:schoolos_apply_fee_installment', 'call', startedAt);
       if (error) throw new Error(error.message || 'Unable to apply this fee installment.');
