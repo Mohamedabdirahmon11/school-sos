@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS schools (
   timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Addis_Ababa',
   academic_year VARCHAR(50) NOT NULL DEFAULT '2026-2027',
   current_semester VARCHAR(50) NOT NULL DEFAULT 'Semester 1',
+  setup_progress JSONB NOT NULL DEFAULT '{"currentStep": 1, "completedSteps": [], "skippedSteps": [], "completedAt": null}'::JSONB,
   terms JSONB NOT NULL DEFAULT '{"semester1Start": "", "semester1End": "", "semester2Start": "", "semester2End": ""}'::JSONB,
   grading_scale JSONB NOT NULL DEFAULT '[{"minPercentage": 90, "label": "A", "remark": "Excellent"}, {"minPercentage": 80, "label": "B", "remark": "Very good"}, {"minPercentage": 70, "label": "C", "remark": "Good"}, {"minPercentage": 60, "label": "D", "remark": "Satisfactory"}, {"minPercentage": 0, "label": "F", "remark": "Below pass mark"}]'::JSONB,
   attendance_rules JSONB NOT NULL DEFAULT '{"lateAfterMinutes": 15, "absentAfterMinutes": 0, "requireExcusedReason": true, "allowParentExcuses": false}'::JSONB,
