@@ -46,6 +46,7 @@ const StaffAccessView = React.lazy(() => import('./components/schooladmin/StaffA
 const ReportsView = React.lazy(() => import('./components/schooladmin/ReportsView.tsx').then(module => ({ default: module.ReportsView })));
 const AccountantDashboard = React.lazy(() => import('./components/accountant/AccountantDashboard.tsx').then(module => ({ default: module.AccountantDashboard })));
 const AccountantExpensesView = React.lazy(() => import('./components/accountant/AccountantExpensesView.tsx').then(module => ({ default: module.AccountantExpensesView })));
+const AccountantBankReconciliationView = React.lazy(() => import('./components/accountant/AccountantBankReconciliationView.tsx').then(module => ({ default: module.AccountantBankReconciliationView })));
 const AccountantPayrollView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.AccountantPayrollView })));
 const StaffPayslipsView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.StaffPayslipsView })));
 const TeacherPortalView = React.lazy(() => import('./components/teacher/TeacherPortalView.tsx').then(module => ({ default: module.TeacherPortalView })));
@@ -135,6 +136,7 @@ const AppContent: React.FC = () => {
       : user.role === 'accountant' && (
         requestedView === 'sch_fees' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'acc_expenses' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'acc_bank_reconciliation' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'sch_payroll' && !hasStaffNavigationPermission(user.permissions, 'payroll_manage')
         || requestedView === 'sch_reports' && !hasStaffNavigationPermission(user.permissions, 'reports_export')
       ) ? 'acc_dashboard' : requestedView;
