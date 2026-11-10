@@ -27,13 +27,15 @@ export const AccountantDashboard: React.FC = () => {
   const { school, user } = useAuth();
   const now = new Date();
   const reportingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [receiptPage, setReceiptPage] = useState(1);
   const dashboardData = useApi(() => Promise.all([
-    ApiClient.getStudents(), ApiClient.getFeePayments(), ApiClient.getFeeStructures(),
+    ApiClient.getStudents(), ApiClient.getFeeReceiptPage(receiptPage, 20), ApiClient.getFeeStructures(),
     ApiClient.getDailyIncome(), ApiClient.getArrears(), ApiClient.getMonthlyFinanceSummary(reportingMonth)
-  ]), [school?.id, reportingMonth], Boolean(school));
+  ]), [school?.id, reportingMonth, receiptPage], Boolean(school));
   const [studentRows, paymentRows, structureRows, dailyIncome, arrearsRows, monthlySummary] = dashboardData.data || [[], [], [], null, [], null];
   const students: Student[] = Array.isArray(studentRows) ? studentRows : [];
-  const payments: FeePayment[] = Array.isArray(paymentRows) ? paymentRows : [];
+  const receiptPageData = paymentRows as { items?: FeePayment[]; total?: number; page?: number; pageSize?: number; totalPages?: number } | null;
+  const payments: FeePayment[] = Array.isArray(receiptPageData?.items) ? receiptPageData.items : [];
   const feeStructures: FeeStructureItem[] = Array.isArray(structureRows) ? structureRows : [];
   const loading = dashboardData.loading;
   const [search, setSearch] = useState('');
@@ -90,6 +92,7 @@ export const AccountantDashboard: React.FC = () => {
 
       setMessage(`Payment recorded! Official Receipt Number: ${payment.receiptNumber}`);
       setShowPayModal(false);
+      setReceiptPage(1);
       setSelectedReceipt(payment);
       setNotes('');
       setAmountDue('');
