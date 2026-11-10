@@ -2,7 +2,7 @@
  * Multi-Tenant Persistent Storage & Rule Engine for SchoolOS
  * Handles database operations, tenant scoping, Supabase synchronization,
  * subscription state machine, lockout protection, once-per-day attendance,
- * percentage-based small/big exam grading, cash-only fees, and audit logging.
+ * percentage-based small/big exam grading, multi-channel fee collection, and audit logging.
  */
 
 import {
