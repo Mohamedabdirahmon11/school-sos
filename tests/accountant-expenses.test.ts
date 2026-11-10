@@ -21,6 +21,9 @@ test('expense endpoints are school-scoped and use the existing finance permissio
   assert.ok(api.includes("payment.voidedAt ? 'void' : 'posted'"));
   assert.ok(api.includes("payment.date?.startsWith(month)"));
   assert.ok(api.includes('netCashflow: totalIncome - totalExpenses'));
+  assert.ok(api.includes("record.status === 'paid'"));
+  assert.ok(api.includes('payrollExpenseTotal: paidPayroll.reduce'));
+  assert.ok(api.includes("method: 'payroll'"));
 });
 
 test('expense ledger migration enforces tenant RLS, positive values, and no hard deletes', () => {
