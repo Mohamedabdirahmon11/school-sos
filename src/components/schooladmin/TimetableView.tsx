@@ -357,7 +357,7 @@ export const TimetableView: React.FC = () => {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {displayedClasses.map(klass => (
           <article key={klass.id} className="min-w-0 overflow-hidden rounded-xl border border-[#DCE7E4] bg-white shadow-sm">
             <header className="flex items-center justify-between gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3">
@@ -368,7 +368,7 @@ export const TimetableView: React.FC = () => {
               {!isReadOnly && <button type="button" onClick={() => { setSelectedClassId(klass.id); setRoomNumber(klass.roomNumber || ''); setShowAddModal(true); }} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
             </header>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] border-collapse text-[10px]">
+              <table className="w-full border-collapse text-[9px]">
                 <thead className="bg-white text-[#64748B]">
                   <tr>
                     <th className="w-16 border-b border-r p-2 text-left">Day</th>
@@ -384,7 +384,7 @@ export const TimetableView: React.FC = () => {
                         const subject = subjects.find(item => item.id === slot?.subjectId);
                         const isClosedPeriod = day === 'Friday' && period === 6;
                         return (
-                          <td key={period} className="h-16 min-w-[76px] border-b border-r p-1 text-center align-middle">
+                          <td key={period} className="h-14 border-b border-r p-1 text-center align-middle">
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
                                 onClick={() => { if (swapMode) void handleSwapSlot(slot); else if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
