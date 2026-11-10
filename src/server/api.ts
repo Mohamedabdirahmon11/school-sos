@@ -43,6 +43,7 @@ import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
+import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 
 export const apiRouter = Router();
 
@@ -2206,6 +2207,13 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
   }
   try {
     const school = (req as any).school as School;
+    if (role === 'school_admin' && !school.setupProgress?.completedAt) {
+      res.status(423).json({
+        error: 'Complete the first-time school setup before opening the dashboard.',
+        code: 'SCHOOL_SETUP_REQUIRED'
+      });
+      return;
+    }
     if (role === 'teacher') {
       const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
@@ -5258,6 +5266,128 @@ apiRouter.post('/school/discipline', requireAuth, requireSchoolContext, requireS
 apiRouter.get('/school/transport', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getTransportRoutes(school.id));
+});
+
+async function getSchoolSetupState(school: School) {
+  const [
+    classes,
+    subjects,
+    teachers,
+    students,
+    guardianStudents,
+    timetable,
+    examConfigs,
+    feeStructures
+  ] = await Promise.all([
+    queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
+    db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
+    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id,user_id'),
+    db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
+    db.queryPage('students', { school_id: school.id }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
+    db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
+    db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
+    db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
+  ]);
+  const teacherUserIds = teachers.map((teacher: any) => String(teacher.userId || '')).filter(Boolean);
+  const teacherAccounts = teacherUserIds.length
+    ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
+    : [];
+  const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
+  const checklist = buildSchoolSetupChecklist(school, {
+    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    subjectCount: subjects.total,
+    teachers: teachers.map((teacher: any) => {
+      const account = accountsById.get(String(teacher.userId || '')) as any;
+      return {
+        staffId: teacher.staffId,
+        userId: teacher.userId,
+        hasLogin: account?.role === 'teacher' && ((typeof account.passwordHash === 'string' && account.passwordHash.length >= 20) || (typeof account.pinHash === 'string' && account.pinHash.length >= 20))
+      };
+    }),
+    studentCount: students.total,
+    guardianContactCount: guardianStudents.total,
+    timetableSlotCount: timetable.total,
+    hasExamConfig: examConfigs.total > 0,
+    feeStructureCount: feeStructures.total
+  });
+  const progress = normalizeSchoolSetupProgress(school.setupProgress);
+  return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
+}
+
+apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  try {
+    res.json(await getSchoolSetupState(school));
+  } catch {
+    res.status(503).json({ error: 'School setup progress could not be loaded. Please retry.' });
+  }
+});
+
+apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  let input;
+  try {
+    input = sanitizeSchoolSetupProgressUpdate(req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Setup progress is invalid.' });
+    return;
+  }
+
+  let state;
+  try {
+    state = await getSchoolSetupState(school);
+  } catch {
+    res.status(503).json({ error: 'School setup checks could not be completed. No progress was changed.' });
+    return;
+  }
+
+  let progress;
+  try {
+    progress = applySchoolSetupProgressUpdate(state.progress, input, state.checklist, new Date().toISOString());
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Setup progress could not be updated.' });
+    return;
+  }
+
+  let loadedSchool: School | null;
+  try {
+    loadedSchool = await db.getSchoolById(school.id);
+  } catch {
+    res.status(503).json({ error: 'School setup progress could not be saved. Please retry.' });
+    return;
+  }
+  if (!loadedSchool) {
+    res.status(404).json({ error: 'School was not found. No setup progress was saved.' });
+    return;
+  }
+  const updated = db.updateSchool(school.id, { setupProgress: progress });
+  if (!updated) {
+    res.status(404).json({ error: 'School was not found. No setup progress was saved.' });
+    return;
+  }
+  try {
+    await db.flush();
+  } catch {
+    res.status(503).json({ error: 'Setup progress could not be saved. Please retry.' });
+    return;
+  }
+
+  if (progress.completedAt && !state.progress.completedAt) {
+    db.logAudit({
+      action: 'SCHOOL_SETUP_COMPLETED',
+      category: 'school',
+      schoolId: school.id,
+      schoolName: school.name,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      details: 'Completed the first-time School Admin setup wizard.',
+      severity: 'info'
+    });
+    try { await db.flush(); } catch { /* The completed setup state was already persisted. */ }
+  }
+  res.json({ progress, checklist: state.checklist, canFinish: canFinishSchoolSetup(progress, state.checklist) });
 });
 
 apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
