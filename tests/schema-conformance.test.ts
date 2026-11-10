@@ -55,6 +55,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
   assert.ok(definitions.has('payroll_records'), 'payroll persistence is represented in the schema');
   assert.ok(definitions.has('school_expenses'), 'school expense ledger persistence is represented in the schema');
+  assert.ok(definitions.has('bank_statement_entries'), 'bank reconciliation persistence is represented in the schema');
   assert.ok(definitions.has('inventory_items'), 'inventory item persistence is represented in the schema');
   assert.ok(definitions.has('inventory_transactions'), 'inventory stock ledger is represented in the schema');
   assert.match(sql, /schoolos_adjust_inventory/i);
