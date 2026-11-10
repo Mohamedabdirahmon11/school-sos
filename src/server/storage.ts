@@ -2320,8 +2320,9 @@ class StorageEngine {
       );
 
       if (existingIdx >= 0) {
-        // Only allow update if not already approved
-        if (this.data.marks[existingIdx].status === 'approved') continue;
+        // Subject teachers may edit drafts only. Submitted marks stay locked
+        // while the Fomester reviews and forwards the complete class result.
+        if (this.data.marks[existingIdx].status !== 'draft') continue;
 
         this.data.marks[existingIdx].smallExamMarks = m.smallExamMarks;
         this.data.marks[existingIdx].bigExamMarks = m.bigExamMarks;
