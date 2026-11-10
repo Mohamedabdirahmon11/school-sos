@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
-import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2 } from 'lucide-react';
+import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2, WandSparkles } from 'lucide-react';
 
 export const TimetableView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -55,31 +55,57 @@ export const TimetableView: React.FC = () => {
   const fetchData = async () => {
     if (!school) return;
     setLoadError(null);
-    try {
-      const [clsList, subList, tchList, schedule, schoolSettings] = await Promise.all([
-        ApiClient.getClasses(),
-        ApiClient.getSubjects(school.id),
-        ApiClient.getTeachers(school.id),
-        ApiClient.getTimetable(),
-        ApiClient.getTimetableSettings()
-      ]);
-      setClasses(clsList);
-      setDisplayClassIds(current => current.length ? current.filter(id => clsList.some(item => item.id === id)).slice(0, 5) : clsList.slice(0, 5).map(item => item.id));
-      setSubjects(subList);
-      setTeachers(tchList);
-      setTimetable(schedule);
-      setSettings({ firstPeriodStart: schoolSettings.firstPeriodStart || '08:00', periodMinutes: schoolSettings.periodMinutes || 40, breakAfterPeriod: schoolSettings.breakAfterPeriod || 3, breakMinutes: schoolSettings.breakMinutes ?? 20, shift2FirstPeriodStart: schoolSettings.shift2FirstPeriodStart || '13:00', shift2PeriodMinutes: schoolSettings.shift2PeriodMinutes || 40, shift2BreakAfterPeriod: schoolSettings.shift2BreakAfterPeriod || 3, shift2BreakMinutes: schoolSettings.shift2BreakMinutes ?? 20 });
-      if (clsList.length > 0 && !selectedClassId) {
-        setSelectedClassId(clsList[0].id);
-        setRoomNumber(clsList[0].roomNumber);
-      }
-      if (subList.length > 0) setSubjectId(subList[0].id);
-      if (tchList.length > 0) setTeacherId(tchList[0].id);
-
-      if (tchList.length && !selectedTeacherId) setSelectedTeacherId(tchList[0].id);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Unable to load timetable settings and assignments.');
+    const results = await Promise.allSettled([
+      ApiClient.getClasses(),
+      ApiClient.getSubjects(school.id),
+      ApiClient.getTeachers(school.id),
+      ApiClient.getTimetable(),
+      ApiClient.getTimetableSettings()
+    ]);
+    const errors: string[] = [];
+    const [classResult, subjectResult, teacherResult, timetableResult, settingsResult] = results;
+    const clsList = classResult.status === 'fulfilled' && Array.isArray(classResult.value) ? classResult.value : [];
+    const subList = subjectResult.status === 'fulfilled' && Array.isArray(subjectResult.value) ? subjectResult.value : [];
+    const tchList = teacherResult.status === 'fulfilled' && Array.isArray(teacherResult.value) ? teacherResult.value : [];
+    const schedule = timetableResult.status === 'fulfilled' && Array.isArray(timetableResult.value) ? timetableResult.value : [];
+    const schoolSettings = settingsResult.status === 'fulfilled' ? settingsResult.value : null;
+    if (classResult.status === 'rejected') errors.push('Fasallada lama soo dejin: ' + (classResult.reason instanceof Error ? classResult.reason.message : 'API error'));
+    if (subjectResult.status === 'rejected') errors.push('Maaddooyinka lama soo dejin.');
+    if (teacherResult.status === 'rejected') errors.push('Macallimiinta lama soo dejin.');
+    if (timetableResult.status === 'rejected') errors.push('Jadwalkii hore lama soo dejin.');
+    if (settingsResult.status === 'rejected') errors.push('Dejimaha waqtiga lama soo dejin; waqtiga caadiga ah ayaa la isticmaalayaa.');
+    setClasses(clsList);
+    setDisplayClassIds(current => {
+      const valid = current.filter(id => clsList.some(item => item.id === id)).slice(0, 5);
+      return valid.length ? valid : clsList.slice(0, 5).map(item => item.id);
+    });
+    setSubjects(subList);
+    setTeachers(tchList);
+    setTimetable(schedule);
+    if (schoolSettings) setSettings({
+      firstPeriodStart: schoolSettings.firstPeriodStart || '08:00',
+      periodMinutes: schoolSettings.periodMinutes || 40,
+      breakAfterPeriod: schoolSettings.breakAfterPeriod || 3,
+      breakMinutes: schoolSettings.breakMinutes ?? 20,
+      shift2FirstPeriodStart: schoolSettings.shift2FirstPeriodStart || '13:00',
+      shift2PeriodMinutes: schoolSettings.shift2PeriodMinutes || 40,
+      shift2BreakAfterPeriod: schoolSettings.shift2BreakAfterPeriod || 3,
+      shift2BreakMinutes: schoolSettings.shift2BreakMinutes ?? 20
+    });
+    if (clsList.length > 0) {
+      const activeClassId = clsList.some(item => item.id === selectedClassId) ? selectedClassId : clsList[0].id;
+      setSelectedClassId(activeClassId);
+      setRoomNumber(clsList.find(item => item.id === activeClassId)?.roomNumber || '');
+    } else {
+      setSelectedClassId('');
+      if (classResult.status === 'fulfilled') errors.push('Dugsigan weli fasal firfircoon kuma jiro. Marka hore samee fasal.');
     }
+    if (subList.length > 0) setSubjectId(subList[0].id);
+    if (tchList.length > 0) {
+      setTeacherId(tchList[0].id);
+      if (!selectedTeacherId) setSelectedTeacherId(tchList[0].id);
+    }
+    setLoadError(errors.join(' '));
   };
 
   useEffect(() => {
@@ -119,9 +145,9 @@ export const TimetableView: React.FC = () => {
   // Clash detector
   const checkClash = (day: string, period: number, tchId: string, room: string) => {
     const selectedShift = Number(classes.find(item => item.id === selectedClassId)?.shift) === 2 ? 2 : 1;
-    const teacherClash = timetable.find(s =>
+    const teacherClash = tchId ? timetable.find(s =>
       s.dayOfWeek === day && s.periodNumber === period && s.teacherId === tchId && (Number(s.shift) === 2 ? 2 : 1) === selectedShift && !(s.classId === selectedClassId && s.dayOfWeek === day && s.periodNumber === period)
-    );
+    ) : undefined;
     if (teacherClash) {
       const tch = teachers.find(t => t.id === tchId);
       return `Teacher Clash: ${tch?.fullName || 'Teacher'} is already teaching another class during ${day} Period ${period}!`;
@@ -147,6 +173,21 @@ export const TimetableView: React.FC = () => {
       setShowAddModal(false); setClashWarning(null); setNotice('Timetable period saved.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedClassId || isReadOnly) return;
+    setNotice('Jadwalka fasalka ayaa la diyaarinayaa…');
+    try {
+      const result = await ApiClient.generateTimetable(selectedClassId);
+      setTimetable(current => [...current.filter(slot => slot.classId !== selectedClassId), ...result.slots]);
+      const unfilledCount = result.unfilled.length;
+      setNotice(unfilledCount
+        ? `Jadwalka waa la sameeyay; ${unfilledCount} cashar lama meelayn. Hubi maaddooyinka iyo macallimiinta fasalka.`
+        : `Jadwalka ${classes.find(item => item.id === selectedClassId)?.name || ''} si guul leh ayaa loo sameeyay.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Auto-generate timetable wuu fashilmay.');
+    }
   };
 
   const handleRemovePeriod = async (slot: TimetableSlot) => {
@@ -238,6 +279,7 @@ export const TimetableView: React.FC = () => {
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
           </>}
           
+          <button onClick={() => void handleGenerate()} disabled={isReadOnly || !selectedClassId} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate</button>
           <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]"><Printer className="w-3.5 h-3.5" /> Print A4 (max 5)</button>
 
           <button
@@ -352,7 +394,7 @@ export const TimetableView: React.FC = () => {
                           <td key={period} className="h-14 border-b border-r p-1 text-center align-middle">
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
-                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
                                 {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
@@ -368,7 +410,7 @@ export const TimetableView: React.FC = () => {
             </div>
           </article>
         ))}
-        {displayedClasses.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-[#CBD5E1] bg-white p-10 text-center text-sm text-[#64748B]">Dooro fasal ama macallin si jadwalkooda loo arko.</div>}
+        {displayedClasses.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-[#CBD5E1] bg-white p-10 text-center text-sm text-[#64748B]">{classes.length === 0 ? 'Fasallo lama helin. Hubi in fasallada dugsiga la sameeyay iyo in koontadu leedahay rukhsadda School Admin.' : viewMode === 'teacher' ? 'Macallinkan weli jadwal looma qorin. U beddel Class view si aad u aragto fasallada.' : 'Fasal lama dooran. Dooro ugu yaraan hal fasal qaybta kore.'}</div>}
       </section>
 
       {/* ADD / EDIT PERIOD MODAL */}
@@ -434,6 +476,7 @@ export const TimetableView: React.FC = () => {
                   onChange={e => setTeacherId(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
+                  <option value="">— Lama qoondeyn —</option>
                   {(assignedTeachersForSubject.length ? assignedTeachersForSubject : teachers.filter(item => classSubjectAssignments.some(assignment => assignment.teacher?.id === item.id))).map(t => <option key={t.id} value={t.id}>{t.fullName} ({t.department})</option>)}
                 </select>
               </div>
