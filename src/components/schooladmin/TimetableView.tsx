@@ -29,6 +29,7 @@ export const TimetableView: React.FC = () => {
   const [firstSwapSlot, setFirstSwapSlot] = useState<string | null>(null);
   const [unfilledSlots, setUnfilledSlots] = useState<Array<{ subjectId: string; teacherId: string; occurrence: number }>>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [printAllClasses, setPrintAllClasses] = useState(false);
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -170,6 +171,27 @@ export const TimetableView: React.FC = () => {
   };
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
+  const classesThroughGradeFive = classes.filter(klass => {
+    const label = String(klass.gradeLevel || klass.name || '').trim().toLowerCase();
+    if (/^(kg|kindergarten|nursery|reception)/.test(label)) return true;
+    const match = label.match(/(?:grade|class|g)?\\s*(\\d+)/);
+    return match ? Number(match[1]) <= 5 : false;
+  }).sort((a, b) => {
+    const grade = (klass: SchoolClass) => {
+      const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
+      if (/kg|kindergarten|nursery/.test(label)) return 0;
+      return Number(label.match(/\\d+/)?.[0] || 99);
+    };
+    return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
+  });
+  const handlePrintAllClasses = () => {
+    if (!classesThroughGradeFive.length) { setNotice('No KG–Grade 5 classes are available to print.'); return; }
+    setPrintAllClasses(true);
+    window.setTimeout(() => {
+      window.print();
+      setPrintAllClasses(false);
+    }, 100);
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -213,6 +235,7 @@ export const TimetableView: React.FC = () => {
           <button onClick={handleGenerate} disabled={isReadOnly || !selectedClassId} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs disabled:opacity-50">{t('timetable_generate')}</button>
           <button onClick={() => { setSwapMode(value => !value); setFirstSwapSlot(null); }} disabled={isReadOnly} className={`px-3 py-1.5 rounded-lg border text-xs ${swapMode ? 'bg-amber-100 border-amber-300' : 'border-[#CBD5E1]'}`}>{t('timetable_swap')}</button>
           <button onClick={() => window.print()} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">{t('timetable_print')}</button>
+          <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]">Print KG–Grade 5</button>
 
           <button
             onClick={() => {
@@ -265,6 +288,26 @@ export const TimetableView: React.FC = () => {
           }))}
         </div>
       </section>
+
+      <style>{`@media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 12mm; background: white; } .timetable-print-class { break-after: page; page-break-after: always; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
+      {printAllClasses && <section className="timetable-print-all hidden">
+        <h1 className="mb-2 text-2xl font-bold">{school?.name || 'School'} · Timetables</h1>
+        <p className="mb-6 text-sm">KG to Grade 5 · All classes</p>
+        {classesThroughGradeFive.map(klass => (
+          <article key={klass.id} className="timetable-print-class mb-8">
+            <h2 className="mb-3 text-lg font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
+            <table className="w-full border-collapse text-xs">
+              <thead><tr><th className="border p-2 text-left">Day</th>{periods.map(period => <th key={period} className="border p-2">Period {period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
+              <tbody>{days.map(day => <tr key={day}><th className="border p-2 text-left">{day}</th>{periods.map(period => {
+                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
+                const subject = subjects.find(item => item.id === slot?.subjectId);
+                const teacher = teachers.find(item => item.id === slot?.teacherId);
+                return <td key={period} className="border p-2 text-center">{day === 'Friday' && period === 6 ? '—' : slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{teacher?.fullName || ''}</span><span className="block">{slot.startTime}–{slot.endTime}</span></> : '—'}</td>;
+              })}</tr>)}</tbody>
+            </table>
+          </article>
+        ))}
+      </section>}
 
       {/* Grid Timetable Table */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
