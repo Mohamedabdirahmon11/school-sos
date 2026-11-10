@@ -4350,7 +4350,7 @@ apiRouter.post('/payroll', requireAuth, requireSchoolContext, requireAccountantO
   const month = typeof req.body?.month === 'string' ? req.body.month : '';
   const selections = req.body?.staff;
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Array.isArray(selections) || selections.length < 1 || selections.length > 500) { res.status(400).json({ error: 'Choose a valid payroll month and between 1 and 500 staff members.' }); return; }
-  const [teachers, staffRows, existing] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id), db.getPayrollRecords(school.id, undefined, month)]);
+  const [teachers, staffRows, existing] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id), db.getPayrollRecords(school.id)]);
   const employees = [
     ...teachers.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) })),
     ...staffRows.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) }))
@@ -4460,7 +4460,7 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
-  const [payments, expenses, students, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id), db.getPayrollRecords(school.id, undefined, month)]);
+  const [payments, expenses, students, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id), db.getPayrollRecords(school.id)]);
   const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
   const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
     id: payment.id, date: payment.date, type: 'income' as const, description: `Fee payment · ${studentById.get(payment.studentId) || payment.studentId}`,
@@ -4485,7 +4485,7 @@ apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requir
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
-  const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getPayrollRecords(school.id, undefined, month)]);
+  const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getPayrollRecords(school.id)]);
   const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
   const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
   const paidPayroll = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month)));
