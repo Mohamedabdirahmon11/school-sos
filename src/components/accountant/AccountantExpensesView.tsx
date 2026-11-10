@@ -7,7 +7,7 @@ import type { SchoolExpense } from '../../types/index.ts';
 const categories: Array<{ value: SchoolExpense['category']; label: string }> = [
   { value: 'rent', label: 'Rent' }, { value: 'utilities', label: 'Utilities' },
   { value: 'supplies', label: 'School supplies' }, { value: 'transport', label: 'Transport' },
-  { value: 'salaries', label: 'Staff and wages' }, { value: 'maintenance', label: 'Maintenance' },
+  { value: 'salaries', label: 'Other staff costs (outside payroll)' }, { value: 'maintenance', label: 'Maintenance' },
   { value: 'other', label: 'Other' }
 ];
 const methods: Array<{ value: SchoolExpense['paymentMethod']; label: string }> = [
