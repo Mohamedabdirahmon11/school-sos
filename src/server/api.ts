@@ -3481,7 +3481,7 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     if (updates.assignedSubjects !== undefined) accountUpdates.assignedSubjectIds = updates.assignedSubjects;
     if (Object.keys(accountUpdates).length) db.updateUser(String(current.userId), accountUpdates as any);
   }
-  db.logAudit({ action: 'TEACHER_PROFILE_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated teacher profile ${id}.` });
+  db.logAudit({ action: 'TEACHER_PROFILE_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated teacher profile ${id}.`, severity: 'info' });
   await db.flush();
   res.json(updated);
 });
