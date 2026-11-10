@@ -1104,7 +1104,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   required
                   value={routeName}
                   onChange={e => setRouteName(e.target.value)}
-                  placeholder="e.g. North Jigjiga pickup route"
+                  placeholder="e.g. North Campus pickup route"
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
               </div>
@@ -1115,7 +1115,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   maxLength={15000}
                   value={routeStops}
                   onChange={e => setRouteStops(e.target.value)}
-                  placeholder="Enter confirmed Jigjiga neighborhoods or pickup points, one per line"
+                  placeholder="Enter this school's verified neighborhoods or pickup points, one per line"
                   className="mt-1 w-full resize-y rounded-lg border border-[#CBD5E1] px-3 py-2"
                 />
                 <p className="mt-1 text-[10px] text-[#64748B]">Use one verified neighborhood or pickup point per line. The stops are saved with this route.</p>
