@@ -14,6 +14,7 @@ import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
+import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -130,7 +131,13 @@ const AppContent: React.FC = () => {
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
-    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard' : requestedView;
+    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard'
+      : user.role === 'accountant' && (
+        requestedView === 'sch_fees' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'acc_expenses' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'sch_payroll' && !hasStaffNavigationPermission(user.permissions, 'payroll_manage')
+        || requestedView === 'sch_reports' && !hasStaffNavigationPermission(user.permissions, 'reports_export')
+      ) ? 'acc_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
     if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
