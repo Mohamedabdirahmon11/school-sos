@@ -4525,6 +4525,53 @@ apiRouter.post('/bank-reconciliation', requireAuth, requireSchoolContext, requir
   res.status(201).json(entry);
 });
 
+apiRouter.post('/bank-reconciliation/import', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 500) {
+    res.status(400).json({ error: 'Upload between 1 and 500 valid bank statement rows.' }); return;
+  }
+  const validRows: Array<{ schoolId: string; statementDate: string; description: string; direction: 'credit' | 'debit'; amount: number; reference?: string; bankAccountLabel?: string; createdBy: string }> = [];
+  for (const row of rows) {
+    const statementDate = typeof row?.statementDate === 'string' ? row.statementDate : '';
+    const description = typeof row?.description === 'string' ? row.description.trim() : '';
+    const direction = row?.direction;
+    const amount = Number(row?.amount);
+    const parsedDate = new Date(`${statementDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(statementDate) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== statementDate
+      || description.length < 2 || description.length > 500 || !['credit', 'debit'].includes(direction)
+      || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99) {
+      res.status(400).json({ error: 'The import contains an invalid date, description, direction, or amount. No rows were saved.' }); return;
+    }
+    const optional = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+    validRows.push({
+      schoolId: school.id, statementDate, description, direction, amount,
+      reference: optional(row.reference, 160), bankAccountLabel: optional(row.bankAccountLabel, 120), createdBy: user.id
+    });
+  }
+  const key = (row: { statementDate: string; direction: string; amount: number; reference?: string; description: string }) =>
+    [row.statementDate, row.direction, Number(row.amount).toFixed(2), (row.reference || row.description).trim().toLowerCase()].join('|');
+  const existing = await db.getBankStatementEntries(school.id);
+  const seen = new Set(existing.map(key));
+  const uniqueRows = validRows.filter(row => {
+    const rowKey = key(row);
+    if (seen.has(rowKey)) return false;
+    seen.add(rowKey);
+    return true;
+  });
+  const created = uniqueRows.length ? await db.createBankStatementEntries(uniqueRows) : [];
+  if (created.length) {
+    db.logAudit({
+      action: 'BANK_STATEMENT_CSV_IMPORTED', category: 'finance', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Imported ${created.length} bank statement lines; skipped ${validRows.length - created.length} duplicates.`, severity: 'info'
+    });
+    await db.flush();
+  }
+  res.status(201).json({ createdCount: created.length, skippedDuplicates: validRows.length - created.length, entries: created });
+});
+
 apiRouter.post('/bank-reconciliation/:id/match', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
