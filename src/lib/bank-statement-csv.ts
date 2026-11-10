@@ -57,9 +57,24 @@ function parseStatementDate(value: string): string | null {
 function parseAmount(value: string): number | null {
   const raw = value.trim();
   if (!raw) return null;
-  const negative = /^\(.*\)$/.test(raw) || raw.startsWith('-');
-  const cleaned = raw.replace(/[(),\s]/g, '').replace(/[^0-9.]/g, '');
-  if (!cleaned || (cleaned.match(/\./g) || []).length > 1) return null;
+  const negative = raw.includes('-') || /^\(.*\)$/.test(raw);
+  let cleaned = raw.replace(/[^0-9,.]/g, '');
+  if (!cleaned) return null;
+  const comma = cleaned.lastIndexOf(',');
+  const dot = cleaned.lastIndexOf('.');
+  if (comma >= 0 && dot >= 0) {
+    if (comma > dot) cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    else cleaned = cleaned.replace(/,/g, '');
+  } else if (comma >= 0) {
+    const groups = cleaned.split(',');
+    if (groups.length === 2 && groups[1].length > 0 && groups[1].length <= 2) cleaned = cleaned.replace(',', '.');
+    else if (groups.length >= 2 && groups.slice(1).every(group => group.length === 3)) cleaned = groups.join('');
+    else return null;
+  } else if (dot >= 0 && cleaned.split('.').length > 2) {
+    const groups = cleaned.split('.');
+    if (groups.slice(1).every(group => group.length === 3)) cleaned = groups.join('');
+    else return null;
+  }
   const amount = Number(cleaned) * (negative ? -1 : 1);
   return Number.isFinite(amount) && amount !== 0 ? amount : null;
 }
