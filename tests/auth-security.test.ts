@@ -54,3 +54,12 @@ test('new school administrator temporary passwords are hashed and changed on fir
   assert.match(schoolsSource, /res\.temporaryPassword/);
   assert.doesNotMatch(schoolsSource, /addAdminPass/);
 });
+
+
+test('Super Admin, School Admin, and Accountant share one staff login and resolve dashboard role from the account', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(apiSource, /const sharedAdminLogin = requestedRole === 'school_admin'\s*&& \(normalizedRole === 'super_admin' \|\| normalizedRole === 'school_admin' \|\| normalizedRole === 'accountant'\)/);
+  assert.doesNotMatch(apiSource, /const sharedAdminLogin[\s\S]{0,180}identifier\.includes\('@'\)/);
+  const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
+  assert.match(loginSource, /Super Admin, School Admin, and Accountant use this same sign-in/);
+});
