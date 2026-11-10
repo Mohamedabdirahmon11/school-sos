@@ -31,6 +31,7 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['fee_receipt_sequences', { id: 's1:2026-2027', schoolId: 's1', academicYear: '2026-2027', nextValue: 1 }],
   ['inventory_items', { id: 'inv1', schoolId: 's1', name: 'Exercise books', category: 'Stationery', unit: 'pack', quantityOnHand: 12, reorderLevel: 3, unitCost: 2.5, isActive: true }],
   ['inventory_transactions', { id: 'itx1', schoolId: 's1', itemId: 'inv1', transactionType: 'stock_in', quantityDelta: 12, quantityBefore: 0, quantityAfter: 12, unitCost: 2.5 }],
+  ['school_expenses', { id: 'exp1', schoolId: 's1', category: 'supplies', description: 'Stationery purchase', vendor: 'Local supplier', amount: 250, expenseDate: '2026-11-09', paymentMethod: 'cash', reference: 'INV-1', notes: '', status: 'posted', createdBy: 'u1', createdAt: '2026-11-09T00:00:00Z' }],
   ['payroll_records', { id: 'pr1', schoolId: 's1', userId: 'u1', staffId: 't1', staffName: 'Test Staff', payrollMonth: '2026-11', baseSalary: 100, allowances: [], allowanceTotal: 0, deductions: [], deductionTotal: 0, netSalary: 100, status: 'draft', createdBy: 'u1' }]
 ];
 
@@ -53,6 +54,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
   assert.match(sql, /payment_method\s+VARCHAR\(20\)\s+NOT NULL DEFAULT 'Cash' CHECK\s*\(payment_method = 'Cash'\)/i);
   assert.match(sql, /user_id VARCHAR\(64\) NOT NULL REFERENCES users\(id\)/i);
   assert.ok(definitions.has('payroll_records'), 'payroll persistence is represented in the schema');
+  assert.ok(definitions.has('school_expenses'), 'school expense ledger persistence is represented in the schema');
   assert.ok(definitions.has('inventory_items'), 'inventory item persistence is represented in the schema');
   assert.ok(definitions.has('inventory_transactions'), 'inventory stock ledger is represented in the schema');
   assert.match(sql, /schoolos_adjust_inventory/i);
