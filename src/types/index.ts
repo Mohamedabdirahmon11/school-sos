@@ -296,7 +296,7 @@ export interface ExamConfig {
   updatedAt: string;
 }
 
-export type MarkStatus = 'draft' | 'submitted' | 'approved';
+export type MarkStatus = 'draft' | 'submitted' | 'form_teacher_submitted' | 'approved';
 
 /**
  * Marks are strictly Percentage-Based from Small Exam + Big Exam.
