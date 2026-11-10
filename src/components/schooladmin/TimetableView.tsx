@@ -323,23 +323,25 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
       </details>
-      <style>{`@page { size: A4 portrait; margin: 12mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-class { break-after: page; page-break-after: always; min-height: 250mm; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
+      <style>{`@page { size: A4 portrait; margin: 8mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; } .timetable-print-class h2 { font-size: 9pt; margin-bottom: 2mm; } .timetable-print-class table { font-size: 6pt; } .timetable-print-class th, .timetable-print-class td { padding: 1.2mm !important; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden">
-        <h1 className="mb-2 text-2xl font-bold">{school?.name || 'School'} · Timetables</h1>
-        <p className="mb-6 text-sm">Selected classes · one A4 page per class</p>
+        <h1 className="mb-1 text-lg font-bold">{school?.name || 'School'} · Timetables</h1>
+        <p className="mb-3 text-xs">Up to five selected classes · one A4 sheet</p>
+        <div className="timetable-print-grid grid grid-cols-2 gap-3">
         {displayedClasses.map(klass => (
-          <article key={klass.id} className="timetable-print-class mb-8">
-            <h2 className="mb-3 text-lg font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
-            <table className="w-full border-collapse text-xs">
-              <thead><tr><th className="border p-2 text-left">Day</th>{periods.map(period => <th key={period} className="border p-2">Period {period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
-              <tbody>{days.map(day => <tr key={day}><th className="border p-2 text-left">{day}</th>{periods.map(period => {
+          <article key={klass.id} className="timetable-print-class">
+            <h2 className="mb-2 text-sm font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
+            <table className="w-full border-collapse text-[7px]">
+              <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
+              <tbody>{days.map(day => <tr key={day}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
                 const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                 const subject = subjects.find(item => item.id === slot?.subjectId);
-                return <td key={period} className="border p-2 text-center">{day === 'Friday' && period === 6 ? '—' : slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : '—'}</td>;
+                return <td key={period} className={`border p-1 text-center ${day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
             </table>
           </article>
         ))}
+        </div>
       </section>}
 
       {viewMode !== 'teacher' && (
@@ -391,7 +393,7 @@ export const TimetableView: React.FC = () => {
                         const subject = subjects.find(item => item.id === slot?.subjectId);
                         const isClosedPeriod = day === 'Friday' && period === 6;
                         return (
-                          <td key={period} className="h-14 border-b border-r p-1 text-center align-middle">
+                          <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
@@ -437,7 +439,7 @@ export const TimetableView: React.FC = () => {
             <form onSubmit={handleAddSlot} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Day of Week</label>
+                  <label className="block font-medium text-[#334155]">Day</label>
                   <select
                     value={dayOfWeek}
                     onChange={e => { const nextDay = e.target.value as typeof dayOfWeek; setDayOfWeek(nextDay); if (nextDay === 'Friday' && periodNumber > 5) setPeriodNumber(5); }}
@@ -447,7 +449,7 @@ export const TimetableView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">Period Number ({dayOfWeek === 'Friday' ? '1-5' : '1-6'})</label>
+                  <label className="block font-medium text-[#334155]">Period</label>
                   <select
                     value={periodNumber}
                     onChange={e => setPeriodNumber(parseInt(e.target.value, 10))}
