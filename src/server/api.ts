@@ -532,10 +532,7 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
     const assignment = teacher
       ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
       : { items: [] as any[] };
-    const isFormTeacher = Boolean(teacher && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(classId))
-    ));
+    const isFormTeacher = Boolean(teacher && klass.classTeacherId === user.id);
     if (!assignment.items.length && !isFormTeacher) {
       res.status(403).json({ error: 'You may only access classes assigned to you as a subject teacher or form teacher.' });
       return false;
@@ -2463,10 +2460,9 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
 
   const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
   const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
-  const formTeacherClassIds = new Set<string>(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses : []);
-  const formTeacherClasses = allClasses.filter((klass: any) =>
-    klass.classTeacherId === user.id || formTeacherClassIds.has(klass.id)
-  );
+  // A Fomester is explicitly assigned on the class record. assignedClasses
+  // describes teaching scope and must not grant whole-class Fomester privileges.
+  const formTeacherClasses = allClasses.filter((klass: any) => klass.classTeacherId === user.id);
   const assignedPairs = new Set<string>();
   const result: any[] = [];
 
@@ -4192,10 +4188,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
       const student = await db.getStudentById(studentId as string, school.id);
       const klass = student ? await db.getClassById(student.classId, school.id) : null;
-      const isFormTeacher = Boolean(student && klass && (
-        klass.classTeacherId === user.id ||
-        (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
-      ));
+      const isFormTeacher = Boolean(student && klass && klass.classTeacherId === user.id);
       if (!isFormTeacher) {
         const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
         marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
@@ -4214,24 +4207,26 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     return;
   }
   if (user.role === 'teacher') {
-    if (!subjectId) { res.status(400).json({ error: 'subjectId is required for teacher results access.' }); return; }
-    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     const teacher = teacherPage.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
-    const isFormTeacher = Boolean(teacher && klass && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(String(classId)))
-    ));
-    const assignment = teacher
-      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id')
-      : { items: [] as any[] };
-    if (!assignment.items.length && !isFormTeacher) { res.status(403).json({ error: 'You may only access results for your assigned subject or form-teacher class.' }); return; }
+    const isFormTeacher = Boolean(teacher && klass && klass.classTeacherId === user.id);
+    if (!subjectId && !isFormTeacher) { res.status(400).json({ error: 'Subject is required unless you are the Fomester assigned to this class.' }); return; }
+    if (subjectId) {
+      const assignment = teacher
+        ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id')
+        : { items: [] as any[] };
+      if (!assignment.items.length) { res.status(403).json({ error: 'You may only access marks for your assigned subject.' }); return; }
+    }
   }
   if (user.role === 'parent' || user.role === 'student') {
     res.status(403).json({ error: 'A student ID is required for this results request.' });
     return;
   }
-  res.json(await db.getMarks(school.id, classId as string, subjectId as string, semester as any));
+  const classMarks = await db.getMarks(school.id, classId as string, subjectId as string | undefined, semester as any);
+  res.json(user.role === 'teacher'
+    ? classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted')
+    : classMarks);
 });
 
 apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
@@ -4261,10 +4256,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     }
     const teacherRecord = teacher.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
-    const isFormTeacher = Boolean(klass && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacherRecord.assignedClasses) && teacherRecord.assignedClasses.includes(String(classId)))
-    ));
+    const isFormTeacher = Boolean(klass && klass.classTeacherId === user.id);
     const assignment = await db.queryPage('class_subjects', {
       school_id: school.id,
       class_id: classId,
@@ -4272,8 +4264,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    if (!assignment.total && !isFormTeacher) {
-      res.status(403).json({ error: 'You may only enter marks for subjects assigned to you or classes where you are the form teacher.' });
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may only enter marks for a subject assigned to you. The Fomester forwards the complete class results after subject teachers submit.' });
       return;
     }
   }
@@ -4304,6 +4296,24 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     res.json({ success: true, count: saved.length, marks: saved });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid marks.' });
+  }
+});
+
+apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Only a teacher assigned as Fomester can forward class marks.' }); return; }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId : '';
+  const semester = req.body?.semester;
+  if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) { res.status(400).json({ error: 'Choose a class and valid semester.' }); return; }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
+  if (klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the Fomester assigned to this class can forward its results.' }); return; }
+  try {
+    const result = await db.forwardClassMarks(school.id, classId, semester, user.id);
+    res.json({ success: true, forwardedCount: result.count });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Class marks could not be forwarded.' });
   }
 });
 
