@@ -4448,6 +4448,26 @@ apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireA
   res.json(expense);
 });
 
+apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
+  const [payments, expenses, students] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id)]);
+  const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
+  const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
+    id: payment.id, date: payment.date, type: 'income' as const, description: `Fee payment · ${studentById.get(payment.studentId) || payment.studentId}`,
+    category: payment.feeType, amount: Number(payment.amountPaid) || 0, method: 'cash', reference: payment.receiptNumber,
+    status: payment.voidedAt ? 'void' : 'posted'
+  }));
+  const expenseEntries = expenses.filter(expense => expense.expenseDate?.startsWith(month)).map(expense => ({
+    id: expense.id, date: expense.expenseDate, type: 'expense' as const, description: expense.description,
+    category: expense.category, amount: Number(expense.amount) || 0, method: expense.paymentMethod,
+    reference: expense.reference || '', status: expense.status
+  }));
+  const entries = [...incomeEntries, ...expenseEntries].sort((left, right) => right.date.localeCompare(left.date));
+  res.json(entries);
+});
+
 apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
