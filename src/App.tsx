@@ -42,6 +42,7 @@ const SchoolSupportView = React.lazy(() => import('./components/schooladmin/Scho
 const YearEndPromotionView = React.lazy(() => import('./components/schooladmin/YearEndPromotionView.tsx').then(module => ({ default: module.YearEndPromotionView })));
 const NoticesEventsView = React.lazy(() => import('./components/schooladmin/NoticesEventsView.tsx').then(module => ({ default: module.NoticesEventsView })));
 const MessagesView = React.lazy(() => import('./components/schooladmin/MessagesView.tsx').then(module => ({ default: module.MessagesView })));
+const WhatsAppRemindersView = React.lazy(() => import('./components/schooladmin/WhatsAppRemindersView.tsx').then(module => ({ default: module.WhatsAppRemindersView })));
 const StaffAccessView = React.lazy(() => import('./components/schooladmin/StaffAccessView.tsx').then(module => ({ default: module.StaffAccessView })));
 const ReportsView = React.lazy(() => import('./components/schooladmin/ReportsView.tsx').then(module => ({ default: module.ReportsView })));
 const AccountantDashboard = React.lazy(() => import('./components/accountant/AccountantDashboard.tsx').then(module => ({ default: module.AccountantDashboard })));
@@ -272,6 +273,9 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_messages' && (
               <MessagesView />
+            )}
+            {activeView === 'sch_whatsapp' && user.role === 'school_admin' && (
+              <WhatsAppRemindersView />
             )}
             {activeView === 'sch_staff' && (
               <StaffAccessView />
