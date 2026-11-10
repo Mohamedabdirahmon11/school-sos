@@ -1188,6 +1188,51 @@ class StorageEngine {
     return data ? fromSupabaseRow(data, 'school_expenses') as SchoolExpense : null;
   }
 
+  public async getBankStatementEntries(schoolId: string): Promise<import('../types/index.ts').BankStatementEntry[]> {
+    return this.queryRows<import('../types/index.ts').BankStatementEntry>('bank_statement_entries', { school_id: schoolId });
+  }
+
+  public async createBankStatementEntry(input: Omit<import('../types/index.ts').BankStatementEntry, 'id' | 'createdAt' | 'matchedAt' | 'matchedPaymentId' | 'matchedExpenseId'>): Promise<import('../types/index.ts').BankStatementEntry> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const row = { ...input, id: `bank-${randomUUID()}`, createdAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('bank_statement_entries').insert(toSupabaseRow(row, 'bank_statement_entries')).select('*').single();
+    this.recordQuery('bank_statement_entries', 'insert', startedAt);
+    if (error || !data) throw new Error(`Unable to save bank statement entry: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
+  }
+
+  public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }, userId: string): Promise<import('../types/index.ts').BankStatementEntry | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const entry = (await this.getBankStatementEntries(schoolId)).find(row => row.id === id);
+    if (!entry || entry.matchedAt) return null;
+    if (match.paymentId) {
+      if (entry.direction !== 'credit') throw new Error('A bank debit must be matched to an expense.');
+      const payment = await this.getFeePaymentById(match.paymentId, schoolId);
+      if (!payment || payment.voidedAt || !['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) || Math.abs(Number(payment.amountPaid) - Number(entry.amount)) > 0.01) {
+        throw new Error('Choose a non-void bank/mobile fee receipt with the exact statement amount.');
+      }
+    } else if (match.expenseId) {
+      if (entry.direction !== 'debit') throw new Error('A bank credit must be matched to a fee receipt.');
+      const expense = (await this.getSchoolExpenses(schoolId)).find(row => row.id === match.expenseId);
+      if (!expense || expense.status !== 'posted' || !['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) || Math.abs(Number(expense.amount) - Number(entry.amount)) > 0.01) {
+        throw new Error('Choose a posted bank/mobile expense with the exact statement amount.');
+      }
+    } else {
+      throw new Error('Select a fee receipt or expense to match.');
+    }
+    const startedAt = performance.now();
+    let query = client.from('bank_statement_entries').update(toSupabaseRow({
+      matchedPaymentId: match.paymentId || null, matchedExpenseId: match.expenseId || null, matchedAt: new Date().toISOString()
+    }, 'bank_statement_entries')).eq('id', id).eq('school_id', schoolId).is('matched_at', null);
+    const { data, error } = await query.select('*').maybeSingle();
+    this.recordQuery('bank_statement_entries', 'match', startedAt);
+    if (error) throw new Error(`Unable to match bank statement entry: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry : null;
+  }
+
   public async getPayrollRecords(schoolId: string, userId?: string, month?: string): Promise<StaffPayrollRecord[]> {
     return this.queryRows<StaffPayrollRecord>('payroll_records', { school_id: schoolId, user_id: userId, payroll_month: month });
   }
