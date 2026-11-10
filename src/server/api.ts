@@ -4270,7 +4270,7 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccou
       (notes !== undefined && (typeof notes !== 'string' || notes.length > 1000)) ||
       (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128)) ||
       !['Cash', 'Bank Transfer', 'Mobile Money'].includes(paymentMethod)) {
-    res.status(400).json({ error: 'Provide a student, positive amount due, non-negative cash amount, valid fee category, and valid optional payment details.' });
+    res.status(400).json({ error: 'Provide a student, positive amount due, non-negative payment amount, valid fee category, and valid optional payment details.' });
     return;
   }
 
@@ -4473,7 +4473,7 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
   const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
   const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
     id: payment.id, date: payment.date, type: 'income' as const, description: `Fee payment · ${studentById.get(payment.studentId) || payment.studentId}`,
-    category: payment.feeType, amount: Number(payment.amountPaid) || 0, method: 'cash', reference: payment.receiptNumber,
+    category: payment.feeType, amount: Number(payment.amountPaid) || 0, method: payment.paymentMethod, reference: payment.receiptNumber,
     status: payment.voidedAt ? 'void' : 'posted'
   }));
   const expenseEntries = expenses.filter(expense => expense.expenseDate?.startsWith(month)).map(expense => ({
@@ -4497,8 +4497,8 @@ apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, require
   ]);
   res.json({
     entries: entries.sort((a, b) => b.statementDate.localeCompare(a.statementDate)),
-    unmatchedPayments: payments.filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod)),
-    unmatchedExpenses: expenses.filter(expense => expense.status === 'posted' && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod))
+    unmatchedPayments: payments.filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) && !entries.some(entry => entry.matchedPaymentId === payment.id)),
+    unmatchedExpenses: expenses.filter(expense => expense.status === 'posted' && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) && !entries.some(entry => entry.matchedExpenseId === expense.id))
   });
 });
 
