@@ -476,6 +476,7 @@ export const TimetableView: React.FC = () => {
                   onChange={e => setTeacherId(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
+                  <option value="">— Lama qoondeyn —</option>
                   {(assignedTeachersForSubject.length ? assignedTeachersForSubject : teachers.filter(item => classSubjectAssignments.some(assignment => assignment.teacher?.id === item.id))).map(t => <option key={t.id} value={t.id}>{t.fullName} ({t.department})</option>)}
                 </select>
               </div>
