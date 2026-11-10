@@ -12,7 +12,21 @@ export const ClassBulkImportWizard: React.FC<{ open: boolean; onClose: () => voi
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const downloadTemplate = () => {
-    const csv = 'className,gradeLevel,section,branch,roomNumber,capacity,monthlyFee\r\nKG,KG,A,,KG Room,40,0\r\nGrade 1,1,A,,Room 101,40,0\r\nGrade 1,1,B,,Room 102,40,0';
+    const csv = [
+      'className,gradeLevel,section,branch,roomNumber,capacity,monthlyFee',
+      'KG,KG,A,,KG-A,40,0',
+      'KG,KG,B,,KG-B,40,0',
+      'Grade 1,1,A,,Room 101,40,0',
+      'Grade 1,1,B,,Room 102,40,0',
+      'Grade 2,2,A,,Room 201,40,0',
+      'Grade 2,2,B,,Room 202,40,0',
+      'Grade 3,3,A,,Room 301,40,0',
+      'Grade 3,3,B,,Room 302,40,0',
+      'Grade 4,4,A,,Room 401,40,0',
+      'Grade 4,4,B,,Room 402,40,0',
+      'Grade 5,5,A,,Room 501,40,0',
+      'Grade 5,5,B,,Room 502,40,0'
+    ].join('\\r\\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'schoolos-class-import-template.csv'; anchor.click(); URL.revokeObjectURL(url);
   };
