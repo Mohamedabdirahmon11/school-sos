@@ -267,7 +267,8 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
   assert.equal((await allocate(splitLineA.id, receiptC.id, 15)).status, 201);
   assert.equal((await allocate(splitLineB.id, receiptC.id, 25)).status, 201);
 
-  const tooMuch = await allocate(splitLineB.id, receiptC.id, 0.01);
+  const extraLine = await createStatement(5, 'SPLIT-OVER-RECEIPT');
+  const tooMuch = await allocate(extraLine.id, receiptC.id, 0.01);
   assert.equal(tooMuch.status, 409, 'a receipt cannot be allocated beyond its paid amount');
   const tooMuchForLine = await allocate(splitLineA.id, receiptD.id, 0.01);
   assert.equal(tooMuchForLine.status, 409, 'a statement line cannot be allocated beyond its value');
