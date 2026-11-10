@@ -2582,10 +2582,9 @@ const TIMETABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] 
 async function nextSchoolStaffId(school: School): Promise<string> {
   const users = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   const used = new Set(users.map((user: any) => String(user.staffId || '').toUpperCase()).filter(Boolean));
-  const schoolTag = String(school.code || 'SCHOOL').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) || 'SCHOOL';
   let sequence = users.length + 1;
   let id = '';
-  do { id = `STF-${schoolTag}-${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
+  do { id = `T${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
   return id;
 }
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
@@ -3670,6 +3669,10 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     if (valid.length !== ids.length) { res.status(400).json({ error: `Every assigned ${table} must belong to this school.` }); return; }
     updates[field] = ids;
   }
+  // Direct paged reads do not hydrate the storage cache used by updateTeacher/updateUser.
+  // Load this school's teacher and teacher-account rows before applying the scoped update.
+  await db.getTeachers(school.id);
+  if (current.userId) await db.getUsers(school.id, 'teacher');
   const updated = db.updateTeacher(id, updates as any);
   if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
   if (current.userId) {
@@ -3683,6 +3686,24 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   db.logAudit({ action: 'TEACHER_PROFILE_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated teacher profile ${id}.`, severity: 'info' });
   await db.flush();
   res.json(updated);
+});
+
+apiRouter.post('/teachers/:id/reset-pin', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const teacherId = String(req.params.id || '');
+  const teachers = await db.getTeachers(school.id);
+  const teacher = teachers.find(item => item.id === teacherId && item.schoolId === school.id);
+  if (!teacher?.userId) { res.status(404).json({ error: 'Teacher login was not found in this school.' }); return; }
+  const accounts = await db.getUsers(school.id, 'teacher');
+  const account = accounts.find(item => item.id === teacher.userId && item.schoolId === school.id);
+  if (!account) { res.status(404).json({ error: 'Teacher login was not found in this school.' }); return; }
+  const newPin = String(randomInt(1000, 10000));
+  const updated = db.updateUser(account.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null } as any);
+  if (!updated) { res.status(404).json({ error: 'Teacher login could not be updated.' }); return; }
+  db.logAudit({ action: 'TEACHER_PIN_RESET', category: 'security', schoolId: school.id, schoolName: school.name, userId: actor.id, userName: actor.fullName, userRole: actor.role, details: 'Reset sign-in PIN for teacher ' + teacher.staffId + '.', severity: 'warning' });
+  await db.flush();
+  res.json({ success: true, newPin, teacher: { id: teacher.id, staffId: teacher.staffId, fullName: teacher.fullName } });
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -3702,7 +3723,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   const staffId = normalizeStaffId(body.staffId) || await nextSchoolStaffId(school);
-  if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
+  if (!validStaffId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
   const [usedStaffIds, existingTeachers] = await Promise.all([
     queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
     queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
@@ -3758,7 +3779,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
-const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
+const validStaffId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
