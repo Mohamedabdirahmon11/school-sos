@@ -2366,13 +2366,13 @@ class StorageEngine {
       this.queryRows<Student>('students', { school_id: schoolId, class_id: classId }),
       this.getMarks(schoolId, classId, undefined, semester)
     ]);
-    if (!assignments.items.length) throw new Error('This class has no active subject assignments.');
-    if (!students.items.length) throw new Error('This class has no enrolled students.');
+    if (!assignments.length) throw new Error('This class has no active subject assignments.');
+    if (!students.length) throw new Error('This class has no enrolled students.');
     const submitted = marks.filter(mark => mark.status === 'submitted');
     const missing: string[] = [];
-    for (const assignment of assignments.items) {
-      const count = students.items.filter(student => submitted.some(mark => mark.subjectId === assignment.subjectId && mark.studentId === student.id)).length;
-      if (count !== students.items.length) missing.push(`${assignment.subjectId}: ${students.items.length - count} student mark(s) missing`);
+    for (const assignment of assignments) {
+      const count = students.filter(student => submitted.some(mark => mark.subjectId === assignment.subjectId && mark.studentId === student.id)).length;
+      if (count !== students.length) missing.push(`${assignment.subjectId}: ${students.length - count} student mark(s) missing`);
     }
     if (missing.length) throw new Error(`Cannot forward results yet. Complete every student mark for all class subjects first: ${missing.join('; ')}.`);
     const client = this.testClient || supabase;
