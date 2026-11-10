@@ -4415,7 +4415,7 @@ apiRouter.post('/expenses', requireAuth, requireSchoolContext, requireAccountant
   const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : '';
   const expenseDate = typeof body.expenseDate === 'string' ? body.expenseDate : '';
   const amount = Number(body.amount);
-  if (!expenseCategories.has(category) || description.length < 2 || description.length > 500 || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(expenseDate) || Number.isNaN(Date.parse(expenseDate)) || !expensePaymentMethods.has(paymentMethod)) {
+  if (!expenseCategories.has(category) || description.length < 2 || description.length > 500 || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99 || !/^\d{4}-\d{2}-\d{2}$/.test(expenseDate) || Number.isNaN(Date.parse(expenseDate)) || !expensePaymentMethods.has(paymentMethod)) {
     res.status(400).json({ error: 'Enter a valid category, description, positive amount, expense date, and payment method.' }); return;
   }
   const optionalText = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
