@@ -4215,7 +4215,7 @@ apiRouter.get('/fees/receipts', requireAuth, requireSchoolContext, requireAccoun
   const school = (req as any).school as School;
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
-  const result = await db.queryPage<FeePayment>('fee_payments', { school_id: school.id }, page, pageSize);
+  const result = await db.queryPage<FeePayment>('fee_payments', { school_id: school.id }, page, pageSize, undefined, '*', 'created_at', false);
   res.json({ items: result.items, total: result.total, page: result.page, pageSize: result.pageSize, totalPages: Math.ceil(result.total / result.pageSize) });
 });
 
