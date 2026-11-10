@@ -2,7 +2,7 @@
 -- SchoolOS Multi-School SaaS Platform Database Schema
 -- Compatible with Supabase PostgreSQL (Postgres 15+)
 -- Features: Multi-Tenancy Isolation, Row Level Security (RLS), Role-Based Access,
---           Rate Limiting, Audit Trails, Cash-Only Fees, Small/Big Exam Grading
+--           Rate Limiting, Audit Trails, Cash/Bank/Mobile fee payments, Small/Big Exam Grading
 -- ==============================================================================
 
 -- 1. EXTENSIONS
