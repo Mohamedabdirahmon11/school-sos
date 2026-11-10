@@ -78,13 +78,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     ];
 
     return [
-      { title: 'Overview', items: [item('sch_dashboard', t('dashboard'), LayoutDashboard)] },
-      { title: 'People & admissions', items: [
+      { title: 'Dashboard', items: [item('sch_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'People', items: [
         item('sch_students', t('students'), GraduationCap), item('sch_teachers', t('teachers'), UserCheck),
         item('sch_parents', t('parents_contacts'), PhoneCall), item('sch_admissions', t('admissions'), UserPlus),
         item('sch_staff', t('staff_access'), ShieldCheck)
       ] },
-      { title: 'Academic management', items: [
+      { title: 'Academics', items: [
         item('sch_classes', t('classes'), Layers), item('sch_subjects', t('subjects'), BookOpen),
         item('sch_timetable', t('timetable'), CalendarDays), item('sch_attendance', t('attendance'), CalendarCheck),
         item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText),
@@ -95,16 +95,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_whatsapp', 'WhatsApp parent reminders', MessageCircle),
         item('sch_events', t('events_holidays'), CalendarDays)
       ] },
-      { title: 'Reports & insights', items: [
+      { title: 'Reports', items: [
         item('sch_reports', t('reports_export'), BarChart3)
       ] },
-      { title: 'School resources', items: [
+      { title: 'Resources', items: [
         item('sch_library', t('library'), Library), item('sch_transport', t('transport'), Bus),
         item('sch_inventory', t('inventory'), Boxes), item('sch_discipline', t('discipline'), AlertTriangle),
         item('sch_health', t('health_nurse'), HeartPulse)
       ] },
-      { title: 'Administration', items: [
-        item('sch_settings', t('school_settings'), Sliders), item('sch_support', t('support_audit'), LifeBuoy)
+      { title: 'Settings', items: [
+        item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help & Support', LifeBuoy)
       ] }
     ];
   })();
