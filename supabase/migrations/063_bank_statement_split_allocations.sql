@@ -131,5 +131,83 @@ $$;
 REVOKE ALL ON FUNCTION public.schoolos_allocate_bank_statement(VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_allocate_bank_statement(VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC, VARCHAR) TO service_role;
 
+-- A reconciled receipt/expense must not be voided after allocation. Lock the
+-- target row so voiding and allocation cannot race each other.
+CREATE OR REPLACE FUNCTION public.schoolos_void_fee_payment(
+  p_payment_id VARCHAR,
+  p_school_id VARCHAR,
+  p_user_id VARCHAR,
+  p_reason TEXT
+) RETURNS public.fee_payments
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  payment_row public.fee_payments%ROWTYPE;
+BEGIN
+  IF p_payment_id IS NULL OR btrim(p_payment_id) = ''
+    OR p_school_id IS NULL OR btrim(p_school_id) = ''
+    OR p_user_id IS NULL OR btrim(p_user_id) = ''
+    OR p_reason IS NULL OR length(btrim(p_reason)) < 5 OR length(p_reason) > 500 THEN
+    RAISE EXCEPTION 'A valid payment, school, user, and void reason are required.';
+  END IF;
+  SELECT * INTO payment_row
+    FROM public.fee_payments
+   WHERE id = p_payment_id AND school_id = p_school_id
+   FOR UPDATE;
+  IF NOT FOUND OR payment_row.voided_at IS NOT NULL THEN RETURN NULL; END IF;
+  IF EXISTS (SELECT 1 FROM public.bank_statement_allocations a WHERE a.school_id = p_school_id AND a.payment_id = p_payment_id)
+    OR EXISTS (SELECT 1 FROM public.bank_statement_entries e WHERE e.school_id = p_school_id AND e.matched_payment_id = p_payment_id) THEN
+    RAISE EXCEPTION 'This receipt is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.';
+  END IF;
+  UPDATE public.fee_payments
+     SET voided_at = now(), voided_by = p_user_id, void_reason = btrim(p_reason)
+   WHERE id = p_payment_id AND school_id = p_school_id
+   RETURNING * INTO payment_row;
+  RETURN payment_row;
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_void_school_expense(
+  p_expense_id VARCHAR,
+  p_school_id VARCHAR,
+  p_user_id VARCHAR,
+  p_reason VARCHAR
+) RETURNS public.school_expenses
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $
+DECLARE
+  expense_row public.school_expenses%ROWTYPE;
+BEGIN
+  IF p_expense_id IS NULL OR btrim(p_expense_id) = ''
+    OR p_school_id IS NULL OR btrim(p_school_id) = ''
+    OR p_user_id IS NULL OR btrim(p_user_id) = ''
+    OR p_reason IS NULL OR length(btrim(p_reason)) < 5 OR length(p_reason) > 500 THEN
+    RAISE EXCEPTION 'A valid expense, school, user, and void reason are required.';
+  END IF;
+  SELECT * INTO expense_row
+    FROM public.school_expenses
+   WHERE id = p_expense_id AND school_id = p_school_id AND status = 'posted'
+   FOR UPDATE;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF EXISTS (SELECT 1 FROM public.bank_statement_allocations a WHERE a.school_id = p_school_id AND a.expense_id = p_expense_id)
+    OR EXISTS (SELECT 1 FROM public.bank_statement_entries e WHERE e.school_id = p_school_id AND e.matched_expense_id = p_expense_id) THEN
+    RAISE EXCEPTION 'This expense is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.';
+  END IF;
+  UPDATE public.school_expenses
+     SET status = 'void', voided_at = now(), voided_by = p_user_id, void_reason = btrim(p_reason)
+   WHERE id = p_expense_id AND school_id = p_school_id AND status = 'posted'
+   RETURNING * INTO expense_row;
+  RETURN expense_row;
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
