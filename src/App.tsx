@@ -313,6 +313,9 @@ const AppContent: React.FC = () => {
             {activeView === 'acc_expenses' && user.role === 'accountant' && (
               <AccountantExpensesView />
             )}
+            {activeView === 'acc_bank_reconciliation' && user.role === 'accountant' && (
+              <AccountantBankReconciliationView />
+            )}
             {activeView === 'sch_payroll' && (
               user.role === 'accountant' ? <AccountantPayrollView /> : null
             )}
