@@ -337,8 +337,8 @@ export interface PromotionRecord {
   processedAt: string;
 }
 
-// Students pay in CASH ONLY
-export type PaymentMethod = 'Cash';
+// Supported fee collection channels.
+export type PaymentMethod = 'Cash' | 'Bank Transfer' | 'Mobile Money';
 export type FeePaymentStatus = 'paid' | 'partial' | 'unpaid';
 export type FeeType = 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom';
 
@@ -368,7 +368,7 @@ export interface FeePayment {
   amountDue: number;
   amountPaid: number;
   remainingAmount: number;
-  paymentMethod: 'Cash';
+  paymentMethod: PaymentMethod;
   status: FeePaymentStatus;
   date: string;
   recordedBy: string;
