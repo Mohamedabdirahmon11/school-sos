@@ -8,9 +8,11 @@ test('parses quoted CSV values and preserves comma-containing descriptions', () 
   assert.deepEqual(result.rows, [{ statementDate: '2026-11-01', description: 'Tuition, Grade 4', direction: 'credit', amount: 1250.5, reference: 'R-1' }]);
 });
 
-test('supports day-first dates, debit signs, and separate credit/debit columns', () => {
+test('supports day-first dates, signed amounts, and separate credit/debit columns', () => {
   const result = parseBankStatementCsv('date,description,amount\n02/11/2026,Power,-320\n03/11/2026,Fees,100');
   assert.deepEqual(result.rows.map(row => [row.statementDate, row.direction, row.amount]), [['2026-11-02', 'debit', 320], ['2026-11-03', 'credit', 100]]);
+  const splitColumns = parseBankStatementCsv('date,description,credit,debit\\n04/11/2026,Deposit,500,\\n05/11/2026,Transfer,,80');
+  assert.deepEqual(splitColumns.rows.map(row => [row.direction, row.amount]), [['credit', 500], ['debit', 80]]);
 });
 
 test('reports invalid rows and missing headers without creating data', () => {
