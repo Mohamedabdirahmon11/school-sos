@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig, SuperAdminSettings } from '../types/index.ts';
+import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -4393,6 +4393,53 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
 apiRouter.get('/fees/arrears', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getArrearsList(school.id));
+});
+
+// ==============================================================================
+// ACCOUNTANT EXPENSE LEDGER
+// ==============================================================================
+const expenseCategories = new Set(['rent', 'utilities', 'supplies', 'transport', 'salaries', 'maintenance', 'other']);
+const expensePaymentMethods = new Set(['cash', 'bank_transfer', 'mobile_money', 'other']);
+
+apiRouter.get('/expenses', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  res.json(await db.getSchoolExpenses(school.id));
+});
+
+apiRouter.post('/expenses', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const category = typeof body.category === 'string' ? body.category : '';
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : '';
+  const expenseDate = typeof body.expenseDate === 'string' ? body.expenseDate : '';
+  const amount = Number(body.amount);
+  if (!expenseCategories.has(category) || description.length < 2 || description.length > 500 || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(expenseDate) || Number.isNaN(Date.parse(expenseDate)) || !expensePaymentMethods.has(paymentMethod)) {
+    res.status(400).json({ error: 'Enter a valid category, description, positive amount, expense date, and payment method.' }); return;
+  }
+  const optionalText = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+  const expense = await db.createSchoolExpense({
+    schoolId: school.id, category: category as SchoolExpense['category'], description,
+    vendor: optionalText(body.vendor, 160), amount, expenseDate,
+    paymentMethod: paymentMethod as SchoolExpense['paymentMethod'],
+    reference: optionalText(body.reference, 120), notes: optionalText(body.notes, 1000), createdBy: user.id
+  });
+  db.logAudit({ action: 'SCHOOL_EXPENSE_RECORDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Recorded ${category} expense ${amount} ${school.currency || 'ETB'} on ${expenseDate}.`, severity: 'info' });
+  await db.flush();
+  res.status(201).json(expense);
+});
+
+apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
+  const expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason);
+  if (!expense) { res.status(409).json({ error: 'Expense was not found or has already been voided.' }); return; }
+  db.logAudit({ action: 'SCHOOL_EXPENSE_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided expense ${expense.id}. Reason: ${reason}`, severity: 'warning' });
+  await db.flush();
+  res.json(expense);
 });
 
 // ==============================================================================
