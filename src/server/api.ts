@@ -4252,12 +4252,13 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireSchoolConte
   res.json(payment);
 });
 
-// Record Cash Payment only!
+// Record a fee payment through cash, bank transfer, or mobile money.
 apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const { studentId, academicYear, month, feeType, feeStructureId, amountDue, amountPaid, notes, idempotencyKey } = body;
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : 'Cash';
   const resolvedFeeType = feeType || 'monthly_tuition';
   const due = Number(amountDue);
   const paid = Number(amountPaid);
@@ -4267,7 +4268,8 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccou
       (academicYear !== undefined && (typeof academicYear !== 'string' || !academicYear.trim() || academicYear.length > 20)) ||
       (month !== undefined && (typeof month !== 'string' || !month.trim() || month.length > 40)) ||
       (notes !== undefined && (typeof notes !== 'string' || notes.length > 1000)) ||
-      (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128))) {
+      (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128)) ||
+      !['Cash', 'Bank Transfer', 'Mobile Money'].includes(paymentMethod)) {
     res.status(400).json({ error: 'Provide a student, positive amount due, non-negative cash amount, valid fee category, and valid optional payment details.' });
     return;
   }
@@ -4284,7 +4286,8 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccou
       amountPaid: paid,
       recordedBy: user.id,
       notes,
-      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey.trim() : undefined
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey.trim() : undefined,
+      paymentMethod: paymentMethod as 'Cash' | 'Bank Transfer' | 'Mobile Money'
     });
     res.status(201).json(payment);
   } catch (error: any) {
