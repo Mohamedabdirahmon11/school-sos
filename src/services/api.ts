@@ -948,6 +948,11 @@ export class ApiClient {
     return this.downloadPdf(`/payroll/${encodeURIComponent(id)}/payslip.pdf`, `payslip-${id}.pdf`);
   }
 
+  public static async getMonthlyCashbook(month: string) {
+    const query = new URLSearchParams({ month });
+    return this.request<Array<{ id: string; date: string; type: 'income' | 'expense'; description: string; category: string; amount: number; method: string; reference: string; status: 'posted' | 'void' }>>(`/fees/cashbook?${query.toString()}`);
+  }
+
   public static async getMonthlyFinanceSummary(month: string) {
     const query = new URLSearchParams({ month });
     return this.request<{ month: string; totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; netCashflow: number }>(`/fees/monthly-summary?${query.toString()}`);
