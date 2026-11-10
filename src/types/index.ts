@@ -707,6 +707,25 @@ export interface StaffPayrollRecord {
   paidDate?: string;
 }
 
+export interface SchoolExpense {
+  id: string;
+  schoolId: string;
+  category: 'rent' | 'utilities' | 'supplies' | 'transport' | 'salaries' | 'maintenance' | 'other';
+  description: string;
+  vendor?: string;
+  amount: number;
+  expenseDate: string;
+  paymentMethod: 'cash' | 'bank_transfer' | 'mobile_money' | 'other';
+  reference?: string;
+  notes?: string;
+  status: 'posted' | 'void';
+  createdBy: string;
+  createdAt: string;
+  voidedAt?: string;
+  voidedBy?: string;
+  voidReason?: string;
+}
+
 export interface InventoryItem {
   id: string;
   schoolId: string;
