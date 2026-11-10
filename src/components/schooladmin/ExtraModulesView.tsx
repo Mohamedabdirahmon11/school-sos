@@ -251,7 +251,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setRoutes(routeRows);
       setStudents(studentRows);
       setBusAssignments(assignmentRows);
-      setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
+      setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current && student.status === 'active') ? current : studentRows.find((student: any) => student.status === 'active')?.id || '');
       setAssignmentRouteId(current => routeRows.some((route: any) => route.id === current) ? current : routeRows[0]?.id || '');
     }).catch((err: any) => {
       if (!cancelled) setModuleError(err.message || 'Unable to load transport records.');
@@ -679,7 +679,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   </select>
                   <select required value={loanStudentId} onChange={e => setLoanStudentId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
                     <option value="">Select student</option>
-                    {students.map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
+                    {students.filter(student => student.status === 'active').map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
                   </select>
                   <input required type="date" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)} value={loanDueDate} onChange={e => setLoanDueDate(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg" aria-label="Due date" />
                   <button type="submit" disabled={isReadOnly || librarySaving || !loanBookId || !loanStudentId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">{librarySaving ? 'Saving…' : 'Issue book'}</button>
