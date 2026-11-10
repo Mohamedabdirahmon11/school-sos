@@ -157,5 +157,6 @@ test('template contains required headers and explicitly skipped examples', async
   const text = await response.text();
   assert.equal(response.status, 200);
   assert.match(text, /"?className"?,"?section"?,"?studentName"?,"?gender"?,"?dateOfBirth"?,"?parentName"?,"?parentPhone"?,"?fatherPhone"?,"?motherName"?,"?motherPhone"?,"?studentPhone"?,"?branch"?/);
-  assert.equal((text.match(/EXAMPLE/g) || []).length, 6);
+  assert.equal((text.match(/EXAMPLE/g) || []).length, 9);
+  assert.match(text, /Grade 5/);
 });

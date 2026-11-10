@@ -659,6 +659,13 @@ export class ApiClient {
     return this.createTeacher(data, schoolId);
   }
 
+  public static async updateTeacher(id: string, updates: Partial<Teacher>) {
+    return this.request<Teacher>(`/teachers/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  }
+
   public static async getSchoolDashboard(schoolId?: string) {
     const data = await this.request<any>('/school/dashboard');
     if (data && typeof data === 'object') return data;
@@ -769,6 +776,10 @@ export class ApiClient {
   // Attendance: Taken once per day
   public static async getDailyAttendance(classId: string, date: string) {
     return this.request<AttendanceRecord[]>(`/attendance?classId=${classId}&date=${date}`);
+  }
+
+  public static async getSchoolDailyAbsences(date: string) {
+    return this.request<Array<AttendanceRecord & { student: Student; className: string }>>(`/attendance/school/absences?date=${encodeURIComponent(date)}`);
   }
 
   public static async recordDailyAttendance(classId: string, date: string, records: any[]) {

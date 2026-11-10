@@ -10,7 +10,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download } from 'lucide-react';
+import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil } from 'lucide-react';
 
 export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -25,6 +25,9 @@ export const TeachersView: React.FC = () => {
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const subjects: Subject[] = Array.isArray(subjectRows) ? subjectRows : [];
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Teacher>>({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [initialPassword, setInitialPassword] = useState('');
 
@@ -67,6 +70,39 @@ export const TeachersView: React.FC = () => {
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error: any) {
       alert(error.message || 'Teacher export failed.');
+    }
+  };
+
+  const openTeacherEditor = (teacher: Teacher) => {
+    if (isReadOnly) return;
+    setEditingTeacher(teacher);
+    setEditForm({
+      fullName: teacher.fullName || '',
+      phone: teacher.phone || '',
+      gender: teacher.gender || 'male',
+      qualification: teacher.qualification || '',
+      department: teacher.department || '',
+      monthlySalary: Number(teacher.monthlySalary || 0),
+      assignedClasses: [...(teacher.assignedClasses || [])],
+      assignedSubjects: [...(teacher.assignedSubjects || [])],
+      status: teacher.status || 'active'
+    });
+  };
+
+  const handleSaveTeacher = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingTeacher) return;
+    setIsSavingEdit(true);
+    try {
+      await ApiClient.updateTeacher(editingTeacher.id, editForm);
+      setNotice(`Teacher ${editForm.fullName || editingTeacher.fullName} updated successfully.`);
+      setEditingTeacher(null);
+      await fetchData();
+      window.setTimeout(() => setNotice(null), 3500);
+    } catch (error: any) {
+      setNotice(error?.message || 'Unable to update teacher.');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -150,6 +186,7 @@ export const TeachersView: React.FC = () => {
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Classes</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Phone</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Status</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
@@ -166,11 +203,17 @@ export const TeachersView: React.FC = () => {
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
                   </td>
+                  <td className="px-4 py-3">
+                    <button type="button" onClick={() => openTeacherEditor(t)} disabled={isReadOnly}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 font-semibold text-[#0F766E] hover:bg-[#F0FDFA] disabled:opacity-50">
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filteredTeachers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#64748B]">
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
                     {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
                   </td>
                 </tr>
@@ -180,6 +223,32 @@ export const TeachersView: React.FC = () => {
         </div>
       </div>
       <PaginationControls info={pageInfo} onPage={setPage} />
+
+      {editingTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSaveTeacher} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#132A29]">Edit teacher · {editingTeacher.staffId || editingTeacher.id}</h2>
+              <button type="button" onClick={() => setEditingTeacher(null)} aria-label="Close"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium">Full name<input required maxLength={120} value={String(editForm.fullName || '')} onChange={e => setEditForm(v => ({...v,fullName:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Phone<input value={String(editForm.phone || '')} onChange={e => setEditForm(v => ({...v,phone:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Gender<select value={editForm.gender || 'male'} onChange={e => setEditForm(v => ({...v,gender:e.target.value as 'male'|'female'}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
+              <label className="text-xs font-medium">Status<select value={String(editForm.status || 'active')} onChange={e => setEditForm(v => ({...v,status:e.target.value as any}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option><option value="on_leave">On leave</option></select></label>
+              <label className="text-xs font-medium">Qualification<input value={String(editForm.qualification || '')} onChange={e => setEditForm(v => ({...v,qualification:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Department<input value={String(editForm.department || '')} onChange={e => setEditForm(v => ({...v,department:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Monthly salary ({school?.currency || 'ETB'})<input type="number" min="0" value={Number(editForm.monthlySalary || 0)} onChange={e => setEditForm(v => ({...v,monthlySalary:Number(e.target.value)}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Assigned classes<select multiple value={editForm.assignedClasses || []} onChange={e => setEditForm(v => ({...v,assignedClasses:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple classes.</span></label>
+              <label className="text-xs font-medium">Assigned subjects<select multiple value={editForm.assignedSubjects || []} onChange={e => setEditForm(v => ({...v,assignedSubjects:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple subjects.</span></label>
+            </div>
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button type="button" onClick={() => setEditingTeacher(null)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+              <button type="submit" disabled={isSavingEdit} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSavingEdit ? 'Saving…' : 'Save changes'}</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* APPOINT TEACHER MODAL */}
       {showAddModal && (

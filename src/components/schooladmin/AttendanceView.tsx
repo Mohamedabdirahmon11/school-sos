@@ -29,7 +29,8 @@ const parentWhatsAppNumber = (student: Student) =>
   normalizeWhatsAppNumber(student.fatherPhone) || normalizeWhatsAppNumber(student.motherPhone);
 
 export const AttendanceView: React.FC = () => {
-  const { school, isReadOnly, t } = useAuth();
+  const { school, user, isReadOnly, t } = useAuth();
+  const isSchoolAdmin = user?.role === 'school_admin' || user?.role === 'super_admin';
   const adminWhatsAppNumber = normalizeWhatsAppNumber(school?.whatsappPhone);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -45,6 +46,8 @@ export const AttendanceView: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [schoolAbsences, setSchoolAbsences] = useState<Array<{ id: string; student: Student; className: string; note?: string }>>([]);
+  const [absencesLoading, setAbsencesLoading] = useState(false);
 
   const loadClasses = async () => {
     if (!school) return;
@@ -64,6 +67,24 @@ export const AttendanceView: React.FC = () => {
   useEffect(() => {
     void loadClasses();
   }, [school]);
+
+  const loadSchoolAbsences = async () => {
+    if (!school || !isSchoolAdmin) return;
+    setAbsencesLoading(true);
+    setLoadError(null);
+    try {
+      const records = await ApiClient.getSchoolDailyAbsences(date);
+      setSchoolAbsences(records);
+    } catch (error: any) {
+      setLoadError(error?.message || 'Unable to load school-wide absences.');
+    } finally {
+      setAbsencesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSchoolAdmin) void loadSchoolAbsences();
+  }, [school?.id, date, isSchoolAdmin]);
 
   const loadAttendanceSheet = async () => {
     if (!school || !selectedClassId) return;
@@ -131,7 +152,7 @@ export const AttendanceView: React.FC = () => {
       return;
     }
     const studentName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-    const className = classes.find(item => item.id === selectedClassId)?.name || '';
+    const className = classes.find(item => item.id === (student.classId || selectedClassId))?.name || '';
     const message = [
       'Asc,',
       `Waxaan ku wargelinaynaa in ardayga ${studentName} (${student.studentId}) uu maanta, ${date}, dugsiga ka maqnaa.`,
@@ -157,6 +178,50 @@ export const AttendanceView: React.FC = () => {
   const localAttendancePageInfo: PageInfo = { page, pageSize: 20, total: filteredStudents.length, totalPages: Math.ceil(filteredStudents.length / 20) };
   const attendancePageInfo = searchQuery.trim() ? localAttendancePageInfo : serverPageInfo;
   const visibleStudents = searchQuery.trim() ? filteredStudents.slice((page - 1) * 20, page * 20) : pageStudents;
+
+  if (isSchoolAdmin) {
+    return (
+      <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">School-wide daily report</p>
+            <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-[#102522]"><CalendarCheck className="h-7 w-7 text-[#0e8078]" /> Daily Absences</h1>
+            <p className="mt-1 text-sm text-[#71817d]">All classes are included automatically. Only students marked absent by their class teachers appear here.</p>
+          </div>
+          <div className="flex items-end gap-2">
+            <label className="text-xs font-semibold text-[#475569]">Attendance date
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <span className="mt-1 block text-[10px] font-normal text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</span>
+            </label>
+            <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Refresh</button>
+          </div>
+        </div>
+        {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{loadError}</div>}
+        {ethiopianCalendar.holiday && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Absent students</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Classes covered</p><p className="mt-1 text-2xl font-bold text-slate-800">{new Set(schoolAbsences.map(row => row.student.classId)).size}</p></div>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white">
+          {absencesLoading ? <p className="p-8 text-center text-sm text-slate-500">Loading absent students…</p> : schoolAbsences.length === 0 ? (
+            <div className="p-10 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-2 font-semibold text-slate-800">No absences recorded</p><p className="mt-1 text-xs text-slate-500">No students have been marked absent for this date.</p></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-xs">
+                <thead className="border-b bg-[#f6faf8] text-[11px] uppercase tracking-wide text-[#71817d]"><tr><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Parent phone</th><th className="px-4 py-3">Note</th><th className="px-4 py-3">Action</th></tr></thead>
+                <tbody className="divide-y divide-[#edf2f0]">
+                  {schoolAbsences.map(row => {
+                    const parentPhone = parentWhatsAppNumber(row.student);
+                    return <tr key={row.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-mono">{row.student.studentId}</td><td className="px-4 py-3 font-semibold">{row.student.firstName} {row.student.middleName} {row.student.lastName}</td><td className="px-4 py-3">{row.className}</td><td className="px-4 py-3">{row.student.fatherPhone || row.student.motherPhone || 'N/A'}</td><td className="px-4 py-3">{row.note || '—'}</td><td className="px-4 py-3"><button type="button" onClick={() => openAbsentStudentWhatsApp(row.student)} disabled={isReadOnly || !parentPhone || !adminWhatsAppNumber} className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-40"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp parent</button></td></tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
