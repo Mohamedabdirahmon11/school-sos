@@ -25,11 +25,13 @@ import {
 
 export const AccountantDashboard: React.FC = () => {
   const { school, user } = useAuth();
+  const now = new Date();
+  const reportingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const dashboardData = useApi(() => Promise.all([
     ApiClient.getStudents(), ApiClient.getFeePayments(), ApiClient.getFeeStructures(),
-    ApiClient.getDailyIncome(), ApiClient.getArrears()
-  ]), [school?.id], Boolean(school));
-  const [studentRows, paymentRows, structureRows, dailyIncome, arrearsRows] = dashboardData.data || [[], [], [], null, []];
+    ApiClient.getDailyIncome(), ApiClient.getArrears(), ApiClient.getMonthlyFinanceSummary(reportingMonth)
+  ]), [school?.id, reportingMonth], Boolean(school));
+  const [studentRows, paymentRows, structureRows, dailyIncome, arrearsRows, monthlySummary] = dashboardData.data || [[], [], [], null, [], null];
   const students: Student[] = Array.isArray(studentRows) ? studentRows : [];
   const payments: FeePayment[] = Array.isArray(paymentRows) ? paymentRows : [];
   const feeStructures: FeeStructureItem[] = Array.isArray(structureRows) ? structureRows : [];
@@ -113,8 +115,8 @@ export const AccountantDashboard: React.FC = () => {
   };
 
   const activePayments = payments.filter(payment => !payment.voidedAt);
-  const totalCollected = activePayments.reduce((sum, p) => sum + p.amountPaid, 0);
-  const totalArrears = activePayments.reduce((sum, payment) => sum + Math.max(0, Number(payment.remainingAmount) || 0), 0);
+  const totalCollected = Number(monthlySummary?.totalIncome) || 0;
+  const totalArrears = (Array.isArray(arrearsRows) ? arrearsRows : []).reduce((sum: number, row: any) => sum + Math.max(0, Number(row.totalRemaining) || 0), 0);
 
   const filteredPayments = payments.filter(p => {
     const student = students.find(s => s.id === p.studentId);
@@ -253,7 +255,7 @@ export const AccountantDashboard: React.FC = () => {
               <Receipt className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-blue-900">{activePayments.length}</div>
+          <div className="mt-2 text-2xl font-bold font-mono text-blue-900">{Number(monthlySummary?.incomeCount) || 0}</div>
           <p className="text-[11px] text-blue-700 font-medium mt-1">Individual stamped transactions</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
