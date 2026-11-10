@@ -22,6 +22,7 @@ const today = () => {
 export const AccountantExpensesView: React.FC = () => {
   const { school } = useAuth();
   const [rows, setRows] = useState<SchoolExpense[]>([]);
+  const [cashbookRows, setCashbookRows] = useState<Array<{ id: string; date: string; type: 'income' | 'expense'; description: string; category: string; amount: number; method: string; reference: string; status: 'posted' | 'void' }>>([]);
   const [month, setMonth] = useState(today().slice(0, 7));
   const [monthlySummary, setMonthlySummary] = useState<{ totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; netCashflow: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,8 +42,8 @@ export const AccountantExpensesView: React.FC = () => {
   const reload = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [result, summary] = await Promise.all([ApiClient.getSchoolExpenses(), ApiClient.getMonthlyFinanceSummary(month)]);
-      setRows(Array.isArray(result) ? result : []); setMonthlySummary(summary);
+      const [result, summary, cashbook] = await Promise.all([ApiClient.getSchoolExpenses(), ApiClient.getMonthlyFinanceSummary(month), ApiClient.getMonthlyCashbook(month)]);
+      setRows(Array.isArray(result) ? result : []); setMonthlySummary(summary); setCashbookRows(Array.isArray(cashbook) ? cashbook : []);
     }
     catch (reason: any) { setError(reason?.message || 'Expenses could not be loaded.'); }
     finally { setLoading(false); }
@@ -53,6 +54,15 @@ export const AccountantExpensesView: React.FC = () => {
   const total = posted.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const monthTotal = posted.filter(row => row.expenseDate.slice(0, 7) === today().slice(0, 7)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const visible = rows.filter(row => [row.description, row.vendor, row.reference, row.category].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
+  const cashbookVisible = cashbookRows.filter(row => [row.description, row.reference, row.category, row.method].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
+  const exportCashbookCsv = () => {
+    const fields = ['Date', 'Type', 'Description', 'Category', 'Amount', 'Currency', 'Method', 'Reference', 'Status'];
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const lines = [fields, ...cashbookVisible.map(row => [row.date, row.type, row.description, row.category, row.amount, school?.currency || 'ETB', row.method, row.reference, row.status])];
+    const blob = new Blob(['\uFEFF' + lines.map(line => line.map(escape).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob); const link = document.createElement('a');
+    link.href = url; link.download = `school-cashbook-${month}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
   const money = (value: number) => formatMoney(value, school?.currency);
   const exportCsv = () => {
     const fields = ['Date', 'Description', 'Category', 'Vendor', 'Amount', 'Currency', 'Payment method', 'Reference', 'Status', 'Void reason'];
@@ -126,6 +136,11 @@ export const AccountantExpensesView: React.FC = () => {
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-base font-bold text-[#132A29]">Expense history</h2><p className="mt-1 text-xs text-slate-500">School-scoped records · posted and voided</p></div><div className="flex gap-2"><input aria-label="Search expenses" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search expenses…" className="min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-xs"/><button type="button" onClick={exportCsv} disabled={!visible.length} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 disabled:opacity-40">Export CSV</button><button type="button" onClick={() => void reload()} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Refresh</button></div></div>
         {loading ? <p className="p-6 text-sm text-slate-500">Loading expenses…</p> : !visible.length ? <div className="p-8 text-center"><p className="text-sm font-semibold text-slate-700">No expenses recorded</p><p className="mt-1 text-xs text-slate-500">New entries will appear here after they are saved.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="p-3">Date / description</th><th className="p-3">Category</th><th className="p-3">Payee / method</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody className="divide-y divide-slate-100">{visible.map(row => <tr key={row.id} className="hover:bg-slate-50/80"><td className="p-3"><p className="font-semibold text-slate-800">{row.description}</p><p className="mt-1 text-[10px] text-slate-500">{row.expenseDate}{row.reference ? ` · Ref ${row.reference}` : ''}</p></td><td className="p-3 capitalize text-slate-600">{row.category.replace(/_/g, ' ')}</td><td className="p-3 text-slate-600">{row.vendor || '—'}<p className="mt-1 capitalize text-[10px] text-slate-400">{row.paymentMethod.replace(/_/g, ' ')}</p></td><td className="p-3 text-right font-bold tabular-nums text-slate-900">{money(Number(row.amount) || 0)}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${row.status === 'posted' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{row.status}</span></td><td className="p-3 text-right">{row.status === 'posted' && <button type="button" onClick={() => void voidExpense(row)} className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-50">Void</button>}</td></tr>)}</tbody></table></div>}
       </section>
+    </section>
+
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-base font-bold text-[#132A29]">Monthly cashbook</h2><p className="mt-1 text-xs text-slate-500">Income and expenses in one chronological ledger for {month}</p></div><button type="button" onClick={exportCashbookCsv} disabled={!cashbookVisible.length} className="w-fit rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 disabled:opacity-40">Export cashbook CSV</button></div>
+      {loading ? <p className="p-6 text-sm text-slate-500">Loading cashbook…</p> : !cashbookVisible.length ? <p className="p-8 text-center text-sm text-slate-500">No income or expense entries for this month.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="p-3">Date / details</th><th className="p-3">Type</th><th className="p-3">Category / method</th><th className="p-3">Reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{cashbookVisible.map(row => <tr key={row.id} className="hover:bg-slate-50/80"><td className="p-3 font-semibold text-slate-800">{row.description}<p className="mt-1 text-[10px] font-normal text-slate-500">{row.date}</p></td><td className="p-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${row.type === 'income' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{row.type}</span></td><td className="p-3 capitalize text-slate-600">{row.category.replace(/_/g, ' ')}<p className="mt-1 text-[10px] text-slate-400">{row.method.replace(/_/g, ' ')}</p></td><td className="p-3 text-slate-500">{row.reference || '—'}</td><td className={`p-3 text-right font-bold tabular-nums ${row.type === 'income' ? 'text-emerald-700' : 'text-amber-800'}`}>{row.type === 'income' ? '+' : '−'}{money(Number(row.amount) || 0)}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${row.status === 'posted' ? 'bg-slate-100 text-slate-700' : 'bg-rose-50 text-rose-700'}`}>{row.status}</span></td></tr>)}</tbody></table></div>}
     </section>
   </div>;
 };
