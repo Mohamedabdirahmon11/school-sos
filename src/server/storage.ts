@@ -1215,7 +1215,7 @@ class StorageEngine {
       .insert(rows.map(row => toSupabaseRow(row, 'bank_statement_entries'))).select('*');
     this.recordQuery('bank_statement_entries', 'bulk_insert', startedAt);
     if (error || !data) throw new Error(`Unable to import bank statement entries: ${error?.message || 'no rows returned'}`);
-    return data.map(row => fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry);
+    return data.map((row: Record<string, any>) => fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry);
   }
 
   public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
