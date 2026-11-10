@@ -93,6 +93,12 @@ BEGIN
       OR payment_row.payment_method NOT IN ('Bank Transfer', 'Mobile Money') THEN
       RAISE EXCEPTION 'Choose a valid, non-void bank/mobile fee receipt from this school.';
     END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.bank_statement_entries e
+       WHERE e.school_id = p_school_id AND e.matched_payment_id = p_payment_id
+    ) THEN
+      RAISE EXCEPTION 'This receipt is already reconciled to another bank statement line.';
+    END IF;
     SELECT COALESCE(SUM(amount), 0) INTO already_allocated
       FROM public.bank_statement_allocations
      WHERE school_id = p_school_id AND payment_id = p_payment_id;
@@ -108,6 +114,12 @@ BEGIN
     IF NOT FOUND OR expense_row.status <> 'posted' OR expense_row.voided_at IS NOT NULL
       OR expense_row.payment_method NOT IN ('bank_transfer', 'mobile_money') THEN
       RAISE EXCEPTION 'Choose a valid, posted bank/mobile expense from this school.';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.bank_statement_entries e
+       WHERE e.school_id = p_school_id AND e.matched_expense_id = p_expense_id
+    ) THEN
+      RAISE EXCEPTION 'This expense is already reconciled to another bank statement line.';
     END IF;
     SELECT COALESCE(SUM(amount), 0) INTO already_allocated
       FROM public.bank_statement_allocations
