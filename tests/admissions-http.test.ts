@@ -446,6 +446,11 @@ test('concurrent attendance submissions converge on one daily row without automa
   const subjectOnlyAttempt = await submit();
   assert.equal(subjectOnlyAttempt.status, 403, 'subject assignment alone must not grant Form Teacher attendance permission');
   await storage.db.updateClass(klass.id, { classTeacherId: teacherUser.id }, school.id);
+  // The test adapter stores raw database rows; keep the fixture's canonical DB column in sync.
+  const assignedClassRow = memory.rows('classes').find(row => row.id === klass.id);
+  assert.ok(assignedClassRow, 'class fixture must exist in the database adapter');
+  assignedClassRow.class_teacher_id = teacherUser.id;
+  assignedClassRow.classTeacherId = teacherUser.id;
   const invalidNote = await fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
@@ -487,6 +492,37 @@ test('concurrent attendance submissions converge on one daily row without automa
   ).length, 0, 're-saving an absent status must not queue automatic alerts');
 });
 
+
+test('teacher IDs are simple alphanumeric and teacher profile updates and PIN resets persist', async () => {
+  const created = await fetch(`${baseUrl}/teachers`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      fullName: 'PIN Reset Teacher', gender: 'female',
+      qualification: 'B.Ed', monthlySalary: 550
+    })
+  });
+  assert.equal(created.status, 201, await created.clone().text());
+  const teacher = await created.json();
+  assert.match(teacher.staffId, /^T[0-9]{4,}$/);
+  assert.doesNotMatch(teacher.staffId, /[^A-Z0-9]/);
+
+  const updated = await fetch(`${baseUrl}/teachers/${teacher.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ fullName: 'Updated PIN Reset Teacher', phone: '' })
+  });
+  assert.equal(updated.status, 200, await updated.clone().text());
+  assert.equal((await updated.json()).fullName, 'Updated PIN Reset Teacher');
+
+  const reset = await fetch(`${baseUrl}/teachers/${teacher.id}/reset-pin`, {
+    method: 'POST', headers, body: JSON.stringify({})
+  });
+  assert.equal(reset.status, 200, await reset.clone().text());
+  const result = await reset.json();
+  assert.match(result.newPin, /^[0-9]{4}$/);
+  const account = await storage.db.getUserById(teacher.userId, school.id);
+  const { verifyPin } = await import('../src/server/auth-security.ts');
+  assert.ok(account?.pin && verifyPin(result.newPin, account.pin));
+});
 
 test('school backup restore previews tenant-scoped rows and requires explicit matching confirmation', async () => {
   const event = {
