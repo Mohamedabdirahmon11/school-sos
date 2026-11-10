@@ -2450,6 +2450,13 @@ apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) =
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
+apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
+  const classes = await db.getClasses(school.id);
+  res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
+});
 apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
