@@ -65,9 +65,9 @@ const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, re
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-export const SchoolSettingsView: React.FC = () => {
+export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>(initialTab);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
