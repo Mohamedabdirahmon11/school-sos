@@ -11,7 +11,7 @@ Updated: 2026-11-10
 - Applied migrations 060, 061, and 062 to the intended Supabase project `school management 3` (`rhpazlnjqsmzngxatnwd`); expense and bank-statement tables have RLS and school-scoped policies.
 
 ## Accountant — in progress
-- PR #64 adds CSV statement parsing, preview, downloadable template, validation, duplicate skipping, and a tenant-scoped batch insert. Parser and HTTP regression tests are included. CI has not yet been confirmed; do not merge until all checks pass.
+- PR #64 adds CSV statement parsing, preview, downloadable template, validation, duplicate skipping, and a tenant-scoped batch insert. Parser and HTTP regression tests are included. Accountant dashboard daily/monthly summaries also use the school's timezone with boundary tests. CI has not yet been confirmed; do not merge until all checks pass.
 - Split-settlement reconciliation (one bank statement line matched to multiple receipts/expenses) is not implemented. It needs a separate reviewed migration and accounting model; do not approximate it by changing existing one-to-one links.
 - A live browser review of the redesigned Accountant screens on desktop and mobile is still required. Automated build checks are not a substitute for visual review.
 - Bank-provider connections and automatic bank-feed synchronization are not included.
