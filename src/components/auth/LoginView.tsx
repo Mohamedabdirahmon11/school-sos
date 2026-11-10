@@ -130,6 +130,12 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
+          {!parentStudentMode && (
+            <p className="mb-4 text-center text-xs text-[#64748B]">
+              Super Admin, School Admin, and Accountant use this same sign-in. Your account role opens the correct dashboard automatically.
+            </p>
+          )}
+
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             
