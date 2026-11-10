@@ -47,6 +47,7 @@ export const AccountantDashboard: React.FC = () => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState('');
   const [selectedFeeType, setSelectedFeeType] = useState<FeeType>('monthly_tuition');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Mobile Money'>('Cash');
   const [amountDue, setAmountDue] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [month, setMonth] = useState('Current Month');
@@ -87,6 +88,7 @@ export const AccountantDashboard: React.FC = () => {
         month,
         amountDue: due,
         amountPaid: paid,
+        paymentMethod,
         notes: notes || undefined,
         idempotencyKey: paymentIdempotencyKey.current
       });
@@ -160,7 +162,7 @@ export const AccountantDashboard: React.FC = () => {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Payment Channel:</span>
-                <span className="font-semibold text-slate-800 capitalize">Cash Only</span>
+                <span className="font-semibold text-slate-800">{selectedReceipt.paymentMethod}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Amount Paid:</span>
@@ -202,7 +204,7 @@ export const AccountantDashboard: React.FC = () => {
             Accountant Finance & Fee Ledger
           </h1>
           <p className="text-xs text-[#64748B]">
-            Cash desk, arrears, and instant receipts
+            Cash, bank transfer, mobile money, arrears, and instant receipts
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -246,7 +248,7 @@ export const AccountantDashboard: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-slate-900">
             {formatMoney(totalCollected, school?.currency)}
           </div>
-          <p className="text-[11px] text-teal-700 font-medium mt-1">Recorded cash collections</p>
+          <p className="text-[11px] text-teal-700 font-medium mt-1">Recorded collections</p>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
@@ -282,7 +284,7 @@ export const AccountantDashboard: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-slate-900">
             {formatMoney(Number(dailyIncome?.totalCollected) || 0, school?.currency)}
           </div>
-          <p className="text-[11px] text-indigo-700 font-medium mt-1">{Number(dailyIncome?.paymentCount) || 0} cash receipts today</p>
+          <p className="text-[11px] text-indigo-700 font-medium mt-1">{Number(dailyIncome?.paymentCount) || 0} receipts today</p>
         </div>
       </div>
 
@@ -531,6 +533,14 @@ export const AccountantDashboard: React.FC = () => {
                     onChange={e => setAmountDue(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Payment Method</label>
+                  <select required value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as typeof paymentMethod)} className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Mobile Money">Mobile Money</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Amount Paid ({school?.currency || 'ETB'})</label>
