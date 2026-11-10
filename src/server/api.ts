@@ -3743,7 +3743,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = normalizeStaffId(body.staffId) || await nextSchoolTeacherId(school);
+  const staffId = await nextSchoolTeacherId(school);
   if (!validTeacherId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
   const [usedStaffIds, existingTeachers] = await Promise.all([
     queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
