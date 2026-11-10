@@ -666,7 +666,7 @@ class StorageEngine {
     this.testClient = client;
   }
 
-  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*'): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
+  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Supabase client is not configured.');
     const safePage = Math.max(1, Math.floor(page) || 1);
@@ -677,7 +677,7 @@ class StorageEngine {
       query = Array.isArray(value) ? query.in(field, value) : query.eq(field, value);
     }
     if (orFilter && typeof query.or === 'function') query = query.or(orFilter);
-    if (typeof query.order === 'function') query = query.order(primaryKeyColumn(table), { ascending: true });
+    if (typeof query.order === 'function') query = query.order(orderBy || primaryKeyColumn(table), { ascending });
     const startedAt = performance.now();
     const { data, error, count } = await query.range((safePage - 1) * safeSize, safePage * safeSize - 1);
     this.recordQuery(table, 'select-page', startedAt);
