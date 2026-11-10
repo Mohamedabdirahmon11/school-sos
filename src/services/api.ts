@@ -461,6 +461,10 @@ export class ApiClient {
     return this.request<Subject[]>('/subjects');
   }
 
+  public static async getMyFormTeacherClasses() {
+    return this.request<SchoolClass[]>('/teacher/form-teacher-classes');
+  }
+
   public static async getTeacherSubjectAssignments() {
     return this.request<Array<{ classId: string; subjectId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; isFormTeacher?: boolean; isFormTeacherClass?: boolean; canEditMarks?: boolean }>>('/teacher/subject-assignments');
   }
