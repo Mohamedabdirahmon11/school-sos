@@ -260,6 +260,9 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
   assert.ok(storedReceiptA, 'split settlement receipt must be stored');
   assert.equal(storedReceiptA.payment_method ?? storedReceiptA.paymentMethod, 'Bank Transfer');
   const combinedLine = await createStatement(50, 'SPLIT-COMBINED');
+  const storedStatement = memory.rows('bank_statement_entries').find(row => String(row.id) === String(combinedLine.id));
+  assert.ok(storedStatement, `statement line must be stored: ${JSON.stringify({ combinedLine, stored: memory.rows('bank_statement_entries') })}`);
+  assert.equal(storedStatement.school_id ?? storedStatement.schoolId, school.id, JSON.stringify(storedStatement));
   const firstAllocation = await allocate(combinedLine.id, receiptA.id, 20);
   const firstAllocationBody = await firstAllocation.clone().json();
   assert.equal(firstAllocation.status, 201, JSON.stringify(firstAllocationBody));
