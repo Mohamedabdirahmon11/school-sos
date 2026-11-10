@@ -132,7 +132,7 @@ export const LoginView: React.FC = () => {
 
           {!parentStudentMode && (
             <p className="mb-4 text-center text-xs text-[#64748B]">
-              One sign-in for Super Admin, School Admin, Accountant, and Teacher. Enter your email, phone, or school-issued Teacher ID; SchoolOS opens the correct dashboard automatically.
+              Super Admin, School Admin, and Accountant use this same sign-in. Teachers use this same sign-in with their school-issued Teacher ID. SchoolOS opens the correct dashboard automatically.
             </p>
           )}
 
