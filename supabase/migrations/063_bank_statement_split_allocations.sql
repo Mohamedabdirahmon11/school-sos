@@ -209,5 +209,99 @@ $;
 REVOKE ALL ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) TO service_role;
 
+-- Extend the existing safe school backup restore without replacing its
+-- established validation and merge behavior for the existing tables.
+ALTER FUNCTION public.schoolos_restore_school_backup(JSONB)
+  RENAME TO schoolos_restore_school_backup_legacy;
+
+CREATE OR REPLACE FUNCTION public.schoolos_restore_school_backup(p_payload JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  restore_result JSONB;
+  school_key TEXT;
+  allocation_rows JSONB;
+  allocation_row JSONB;
+  restored_count INTEGER := 0;
+BEGIN
+  restore_result := public.schoolos_restore_school_backup_legacy(p_payload);
+  school_key := p_payload->>'school_id';
+  allocation_rows := p_payload->'backup'->'tables'->'bank_statement_allocations';
+
+  IF allocation_rows IS NULL OR allocation_rows = 'null'::JSONB THEN
+    RETURN restore_result;
+  END IF;
+  IF jsonb_typeof(allocation_rows) <> 'array' THEN
+    RAISE EXCEPTION 'Backup table bank_statement_allocations must be an array.';
+  END IF;
+
+  FOR allocation_row IN SELECT value FROM jsonb_array_elements(allocation_rows) LOOP
+    IF COALESCE(allocation_row->>'schoolId', allocation_row->>'school_id') IS DISTINCT FROM school_key THEN
+      RAISE EXCEPTION 'Bank statement allocation backup contains a row outside this school.';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.bank_statement_entries e
+       WHERE e.id = COALESCE(allocation_row->>'statementEntryId', allocation_row->>'statement_entry_id')
+         AND e.school_id = school_key
+    ) THEN
+      RAISE EXCEPTION 'Bank statement allocation references a missing statement line.';
+    END IF;
+    IF (allocation_row->>'paymentId' IS NOT NULL OR allocation_row->>'payment_id' IS NOT NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.fee_payments p
+         WHERE p.id = COALESCE(allocation_row->>'paymentId', allocation_row->>'payment_id')
+           AND p.school_id = school_key
+      ) THEN
+      RAISE EXCEPTION 'Bank statement allocation references a receipt outside this school.';
+    END IF;
+    IF (allocation_row->>'expenseId' IS NOT NULL OR allocation_row->>'expense_id' IS NOT NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.school_expenses e
+         WHERE e.id = COALESCE(allocation_row->>'expenseId', allocation_row->>'expense_id')
+           AND e.school_id = school_key
+      ) THEN
+      RAISE EXCEPTION 'Bank statement allocation references an expense outside this school.';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.bank_statement_allocations current_row
+       WHERE current_row.id = COALESCE(allocation_row->>'id', '')
+         AND current_row.school_id <> school_key
+    ) THEN
+      RAISE EXCEPTION 'Bank statement allocation ID conflicts with another school.';
+    END IF;
+  END LOOP;
+
+  INSERT INTO public.bank_statement_allocations
+    (id, school_id, statement_entry_id, payment_id, expense_id, amount, created_by, created_at)
+  SELECT
+    value->>'id',
+    school_key,
+    COALESCE(value->>'statementEntryId', value->>'statement_entry_id'),
+    COALESCE(value->>'paymentId', value->>'payment_id'),
+    COALESCE(value->>'expenseId', value->>'expense_id'),
+    (value->>'amount')::NUMERIC,
+    COALESCE(value->>'createdBy', value->>'created_by'),
+    COALESCE((value->>'createdAt')::TIMESTAMPTZ, (value->>'created_at')::TIMESTAMPTZ, NOW())
+  FROM jsonb_array_elements(allocation_rows) AS rows(value)
+  ON CONFLICT (id) DO UPDATE SET
+    statement_entry_id = EXCLUDED.statement_entry_id,
+    payment_id = EXCLUDED.payment_id,
+    expense_id = EXCLUDED.expense_id,
+    amount = EXCLUDED.amount,
+    created_by = EXCLUDED.created_by,
+    created_at = EXCLUDED.created_at
+  WHERE public.bank_statement_allocations.school_id = EXCLUDED.school_id;
+
+  GET DIAGNOSTICS restored_count = ROW_COUNT;
+  RETURN restore_result || jsonb_build_object('bank_statement_allocations', restored_count);
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.schoolos_restore_school_backup(JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_restore_school_backup(JSONB) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
