@@ -4632,12 +4632,12 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
   const feeName = payment.feeStructureId ? feeStructures.find(item => item.id === payment.feeStructureId)?.name : undefined;
   sendPdf(res, `receipt-${payment.receiptNumber}`, [[
-    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED CASH RECEIPT �?" ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL CASH RECEIPT',
+    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
     `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
     `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
     `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
-    `Cash received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
-    'Payment channel: Cash only', '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
+    `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
+    `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
     ...(school.receiptFooter ? ['', school.receiptFooter] : [])
   ]]);
 });
