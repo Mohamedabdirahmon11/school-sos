@@ -537,39 +537,47 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Campus Extension Modules
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Library, Transport, Discipline, Clinic, and Assets
-          </p>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">School operations</p>
+            <h1 className="mt-1 text-xl font-bold tracking-tight text-[#132A29]">School Resources</h1>
+            <p className="mt-1 text-xs text-[#64748B]">Manage learning resources, transport, student welfare, clinic visits and school assets in one place.</p>
+          </div>
+          <span className="text-[11px] text-slate-500">Records are scoped to the active school</span>
         </div>
-
-        {/* Module Switcher Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-[#F1F5F9] rounded-lg text-xs overflow-x-auto self-start sm:self-auto">
+        <nav aria-label="School resource modules" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {[
-            { id: 'library', label: 'Library' },
-            { id: 'transport', label: 'Transport' },
-            { id: 'discipline', label: 'Discipline' },
-            { id: 'health', label: 'Clinic/Health' },
-            { id: 'inventory', label: 'Inventory' }
+            { id: 'library', label: 'Library', detail: 'Books & lending', icon: Library },
+            { id: 'transport', label: 'Transport', detail: 'Routes & students', icon: Bus },
+            { id: 'discipline', label: 'Discipline', detail: 'Incidents & actions', icon: AlertTriangle },
+            { id: 'health', label: 'Clinic / Health', detail: 'Visits & care', icon: HeartPulse },
+            { id: 'inventory', label: 'Inventory', detail: 'Stock & assets', icon: Boxes }
           ].map(m => (
             <button
               key={m.id}
-              onClick={() => setActiveModule(m.id as any)}
-              className={`px-3 py-1 font-medium rounded transition-colors whitespace-nowrap ${
+              type="button"
+              aria-pressed={activeModule === m.id}
+              onClick={() => setActiveModule(m.id as typeof activeModule)}
+              className={`flex min-h-[76px] items-center gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
                 activeModule === m.id
-                  ? 'bg-white text-[#132A29] shadow-xs font-semibold'
-                  : 'text-[#64748B] hover:text-[#132A29]'
+                  ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-sm'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
               }`}
             >
-              {m.label}
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                activeModule === m.id ? 'bg-teal-100 text-teal-800' : 'bg-white text-slate-500'
+              }`}>
+                <m.icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-bold">{m.label}</span>
+                <span className="mt-0.5 block text-[10px] text-slate-500">{m.detail}</span>
+              </span>
             </button>
           ))}
-        </div>
-      </div>
+        </nav>
+      </section>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="block w-full sm:max-w-sm">
