@@ -44,6 +44,7 @@ const MessagesView = React.lazy(() => import('./components/schooladmin/MessagesV
 const StaffAccessView = React.lazy(() => import('./components/schooladmin/StaffAccessView.tsx').then(module => ({ default: module.StaffAccessView })));
 const ReportsView = React.lazy(() => import('./components/schooladmin/ReportsView.tsx').then(module => ({ default: module.ReportsView })));
 const AccountantDashboard = React.lazy(() => import('./components/accountant/AccountantDashboard.tsx').then(module => ({ default: module.AccountantDashboard })));
+const AccountantExpensesView = React.lazy(() => import('./components/accountant/AccountantExpensesView.tsx').then(module => ({ default: module.AccountantExpensesView })));
 const AccountantPayrollView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.AccountantPayrollView })));
 const StaffPayslipsView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.StaffPayslipsView })));
 const TeacherPortalView = React.lazy(() => import('./components/teacher/TeacherPortalView.tsx').then(module => ({ default: module.TeacherPortalView })));
@@ -299,6 +300,9 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_health' && (
               <ExtraModulesView initialSubModule="health" />
+            )}
+            {activeView === 'acc_expenses' && user.role === 'accountant' && (
+              <AccountantExpensesView />
             )}
             {activeView === 'sch_payroll' && (
               user.role === 'accountant' ? <AccountantPayrollView /> : null
