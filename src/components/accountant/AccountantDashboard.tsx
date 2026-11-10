@@ -117,7 +117,6 @@ export const AccountantDashboard: React.FC = () => {
     }
   };
 
-  const activePayments = payments.filter(payment => !payment.voidedAt);
   const totalCollected = Number(monthlySummary?.totalIncome) || 0;
   const totalArrears = (Array.isArray(arrearsRows) ? arrearsRows : []).reduce((sum: number, row: any) => sum + Math.max(0, Number(row.totalRemaining) || 0), 0);
 
