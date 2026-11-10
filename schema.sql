@@ -1349,8 +1349,9 @@ CREATE POLICY school_expenses_school_update ON school_expenses FOR UPDATE TO aut
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
 DROP POLICY IF EXISTS school_expenses_service_role_all ON school_expenses;
 CREATE POLICY school_expenses_service_role_all ON school_expenses FOR ALL TO service_role USING (true) WITH CHECK (true);
-GRANT SELECT, INSERT, UPDATE ON school_expenses TO authenticated, service_role;
-REVOKE DELETE ON school_expenses FROM authenticated, anon;
+REVOKE ALL ON TABLE school_expenses FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE ON TABLE school_expenses TO authenticated, service_role;
+REVOKE DELETE ON TABLE school_expenses FROM authenticated;
 
 -- 3. Users Table Policy
 DROP POLICY IF EXISTS users_super_admin ON users;
