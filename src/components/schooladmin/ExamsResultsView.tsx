@@ -363,15 +363,7 @@ export const ExamsResultsView: React.FC = () => {
               Maximum Scores: Small Exam ({smallExamMax} pts) + Big Exam ({bigExamMax} pts) = Total ({maxCombined} pts).
               Percentage = (Score / {maxCombined}) × 100%. Pass mark: {passMarkPercentage}%.
             </span>
-            <button
-              type="button"
-              onClick={handleApproveAll}
-              disabled={isReadOnly}
-              className="px-3 py-1.5 bg-[#0B2B2A] hover:bg-black text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-xs"
-            >
-              <Lock className="w-3.5 h-3.5 text-amber-300" />
-              Approve & Lock All
-            </button>
+
           </div>
 
           {/* Class-wide results matrix */}
