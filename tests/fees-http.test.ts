@@ -286,4 +286,9 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
   assert.equal(splitA.isFullyMatched, true);
   assert.ok(!body.unmatchedPayments.some((payment: any) => [receiptA.id, receiptB.id, receiptC.id].includes(payment.id)));
   assert.ok(memory.rows('bank_statement_allocations').every(row => row.school_id === school.id));
+  await assert.rejects(
+    storage.db.voidFeePayment(receiptA.id, school.id, admin.id, 'Receipt already reconciled'),
+    /reconciled to a bank statement/i,
+    'a reconciled fee receipt must not be voidable'
+  );
 });
