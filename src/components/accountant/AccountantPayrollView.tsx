@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { getSchoolLocalDate } from '../../lib/school-local-date.ts';
 import { StaffPayrollRecord } from '../../types/index.ts';
 
 type PayrollStaff = { id: string; staffId: string; userId: string; name: string; monthlySalary: number };
 
 export const AccountantPayrollView: React.FC = () => {
   const { school, t } = useAuth();
-  const [month, setMonth] = useState(() => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; });
+  const schoolToday = getSchoolLocalDate(new Date(), school?.timezone);
+  const [month, setMonth] = useState(schoolToday.slice(0, 7));
   const [staff, setStaff] = useState<PayrollStaff[]>([]);
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [selected, setSelected] = useState<string[]>([]);

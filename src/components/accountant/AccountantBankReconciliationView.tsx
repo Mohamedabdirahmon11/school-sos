@@ -3,6 +3,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import type { BankStatementEntry, FeePayment, SchoolExpense } from '../../types/index.ts';
+import { BANK_STATEMENT_CSV_TEMPLATE, parseBankStatementCsv, type BankStatementCsvIssue, type BankStatementImportRow } from '../../lib/bank-statement-csv.ts';
 
 type ReconciliationData = { entries: BankStatementEntry[]; unmatchedPayments: FeePayment[]; unmatchedExpenses: SchoolExpense[] };
 
@@ -20,6 +21,9 @@ export const AccountantBankReconciliationView: React.FC = () => {
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [bankAccountLabel, setBankAccountLabel] = useState('');
+  const [csvRows, setCsvRows] = useState<BankStatementImportRow[]>([]);
+  const [csvIssues, setCsvIssues] = useState<BankStatementCsvIssue[]>([]);
+  const [csvFileName, setCsvFileName] = useState('');
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,6 +59,48 @@ export const AccountantBankReconciliationView: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  const handleCsvFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setCsvRows([]); setCsvIssues([]); setCsvFileName('');
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv') || file.size > 2_000_000) {
+      setError('Choose a CSV file smaller than 2 MB.');
+      event.target.value = '';
+      return;
+    }
+    try {
+      const parsed = parseBankStatementCsv(await file.text());
+      setCsvRows(parsed.rows);
+      setCsvIssues(parsed.issues);
+      setCsvFileName(file.name);
+      setError('');
+      setNotice(parsed.rows.length ? `Preview ready: ${parsed.rows.length} valid row(s).` : 'No valid rows were found. Correct the CSV and try again.');
+    } catch (e: any) {
+      setError(e?.message || 'The CSV file could not be read.');
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const blob = new Blob(['\uFEFF' + BANK_STATEMENT_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = 'schoolos-bank-statement-template.csv'; link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importCsv = async () => {
+    if (!csvRows.length || csvIssues.length) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const result = await ApiClient.importBankStatementEntries(csvRows);
+      setNotice(`Import complete: ${result.createdCount} saved, ${result.skippedDuplicates} duplicate(s) skipped.`);
+      setCsvRows([]); setCsvIssues([]); setCsvFileName('');
+      await reload();
+    } catch (e: any) {
+      setError(e?.message || 'The bank statement CSV could not be imported.');
+    } finally { setSaving(false); }
+  };
+
   const matchLine = async (entry: BankStatementEntry) => {
     const selected = selections[entry.id];
     if (!selected) { setError('Choose the matching receipt or expense first.'); return; }
@@ -83,9 +129,23 @@ export const AccountantBankReconciliationView: React.FC = () => {
       <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold uppercase text-slate-500">Awaiting match</p><p className="mt-2 text-2xl font-bold text-amber-700">{unmatched.length}</p></article>
     </section>
 
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-bold text-slate-900">Import bank statement CSV</h2><p className="mt-1 text-xs text-slate-500">Upload up to 500 transactions. Review validation before saving; repeated rows are skipped.</p></div>
+        <button type="button" onClick={downloadCsvTemplate} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">Download CSV template</button>
+      </div>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input type="file" accept=".csv,text/csv" onChange={event => void handleCsvFile(event)} className="block min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold"/>
+        <button type="button" disabled={saving || !csvRows.length || csvIssues.length > 0} onClick={() => void importCsv()} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? 'Importing…' : `Import ${csvRows.length || ''} rows`}</button>
+      </div>
+      {csvFileName && <p className="mt-2 text-xs text-slate-500">Selected: {csvFileName}</p>}
+      {csvRows.length > 0 && <div className="mt-3 rounded-xl bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-800">{csvRows.length} valid row(s) ready to import</p><p className="mt-1 text-xs text-slate-500">First entries: {csvRows.slice(0, 3).map(row => `${row.statementDate} · ${row.description} · ${row.direction} · ${money(row.amount)}`).join('  |  ')}</p></div>}
+      {csvIssues.length > 0 && <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3"><p className="text-sm font-semibold text-rose-800">{csvIssues.length} row issue(s) — fix these before importing</p><ul className="mt-2 space-y-1 text-xs text-rose-700">{csvIssues.slice(0, 8).map(issue => <li key={issue.line}>Row {issue.line}: {issue.message}</li>)}</ul>{csvIssues.length > 8 && <p className="mt-1 text-xs text-rose-700">And {csvIssues.length - 8} more issue(s).</p>}</div>}
+    </section>
+
     <section className="grid gap-5 xl:grid-cols-[minmax(300px,.8fr)_minmax(0,1.4fr)]">
       <form onSubmit={addStatementLine} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div><h2 className="text-base font-bold text-slate-900">Add bank statement line</h2><p className="mt-1 text-xs text-slate-500">Enter a line from your bank statement. CSV upload can be added later.</p></div>
+        <div><h2 className="text-base font-bold text-slate-900">Add bank statement line</h2><p className="mt-1 text-xs text-slate-500">Enter a single transaction, or use the CSV import above for multiple statement lines.</p></div>
         <label className="block text-xs font-semibold text-slate-700">Statement date<input required type="date" value={statementDate} onChange={e => setStatementDate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"/></label>
         <label className="block text-xs font-semibold text-slate-700">Description<input required minLength={2} maxLength={500} value={description} onChange={e => setDescription(e.target.value)} placeholder="Bank transaction description" className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"/></label>
         <div className="grid grid-cols-2 gap-3">

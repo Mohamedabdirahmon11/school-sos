@@ -4,6 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { getSchoolLocalDate } from '../../lib/school-local-date.ts';
 import { Student, FeePayment, FeeType, FeeStructureItem } from '../../types/index.ts';
 import { 
   DollarSign, 
@@ -25,9 +26,8 @@ import {
 
 export const AccountantDashboard: React.FC = () => {
   const { school, user } = useAuth();
-  const now = new Date();
-  const reportingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const reportingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const reportingDate = getSchoolLocalDate(new Date(), school?.timezone);
+  const reportingMonth = reportingDate.slice(0, 7);
   const canManageFees = user?.permissions?.includes('fees_manage') ?? false;
   const [receiptPage, setReceiptPage] = useState(1);
   const dashboardData = useApi(() => Promise.all([

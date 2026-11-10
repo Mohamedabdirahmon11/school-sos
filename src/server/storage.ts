@@ -1203,6 +1203,21 @@ class StorageEngine {
     return fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
   }
 
+  public async createBankStatementEntries(inputs: Array<Omit<import('../types/index.ts').BankStatementEntry, 'id' | 'createdAt' | 'matchedAt' | 'matchedPaymentId' | 'matchedExpenseId'>>): Promise<import('../types/index.ts').BankStatementEntry[]> {
+    if (!inputs.length) return [];
+    if (inputs.length > 500) throw new Error('A bank statement import may contain at most 500 rows.');
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const now = new Date().toISOString();
+    const rows = inputs.map(input => ({ ...input, id: `bank-${randomUUID()}`, createdAt: now }));
+    const startedAt = performance.now();
+    const { data, error } = await client.from('bank_statement_entries')
+      .insert(rows.map(row => toSupabaseRow(row, 'bank_statement_entries'))).select('*');
+    this.recordQuery('bank_statement_entries', 'bulk_insert', startedAt);
+    if (error || !data) throw new Error(`Unable to import bank statement entries: ${error?.message || 'no rows returned'}`);
+    return data.map((row: Record<string, any>) => fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry);
+  }
+
   public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Bank reconciliation storage is unavailable.');

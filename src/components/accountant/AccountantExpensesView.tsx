@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { getSchoolLocalDate } from '../../lib/school-local-date.ts';
 import type { SchoolExpense } from '../../types/index.ts';
 
 const categories: Array<{ value: SchoolExpense['category']; label: string }> = [
@@ -14,16 +15,14 @@ const methods: Array<{ value: SchoolExpense['paymentMethod']; label: string }> =
   { value: 'cash', label: 'Cash' }, { value: 'bank_transfer', label: 'Bank transfer' },
   { value: 'mobile_money', label: 'Mobile money' }, { value: 'other', label: 'Other' }
 ];
-const today = () => {
-  const date = new Date();
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
-};
+const today = (timeZone?: string) => getSchoolLocalDate(new Date(), timeZone);
 
 export const AccountantExpensesView: React.FC = () => {
   const { school } = useAuth();
+  const schoolToday = today(school?.timezone);
   const [rows, setRows] = useState<SchoolExpense[]>([]);
   const [cashbookRows, setCashbookRows] = useState<Array<{ id: string; date: string; type: 'income' | 'expense'; description: string; category: string; amount: number; method: string; reference: string; status: 'posted' | 'void' }>>([]);
-  const [month, setMonth] = useState(today().slice(0, 7));
+  const [month, setMonth] = useState(schoolToday.slice(0, 7));
   const [monthlySummary, setMonthlySummary] = useState<{ totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; payrollExpenseTotal: number; payrollExpenseCount: number; payrollIncluded: boolean; netCashflow: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +32,7 @@ export const AccountantExpensesView: React.FC = () => {
   const [description, setDescription] = useState('');
   const [vendor, setVendor] = useState('');
   const [amount, setAmount] = useState('');
-  const [expenseDate, setExpenseDate] = useState(today);
+  const [expenseDate, setExpenseDate] = useState(schoolToday);
   const [paymentMethod, setPaymentMethod] = useState<SchoolExpense['paymentMethod']>('cash');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -52,7 +51,7 @@ export const AccountantExpensesView: React.FC = () => {
 
   const posted = useMemo(() => rows.filter(row => row.status === 'posted'), [rows]);
   const total = posted.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const monthTotal = posted.filter(row => row.expenseDate.slice(0, 7) === today().slice(0, 7)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const monthTotal = posted.filter(row => row.expenseDate.slice(0, 7) === schoolToday.slice(0, 7)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const visible = [...rows].sort((left, right) => right.expenseDate.localeCompare(left.expenseDate) || right.createdAt.localeCompare(left.createdAt)).filter(row => [row.description, row.vendor, row.reference, row.category].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
   const cashbookVisible = cashbookRows.filter(row => [row.description, row.reference, row.category, row.method].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
   const exportCashbookCsv = () => {
