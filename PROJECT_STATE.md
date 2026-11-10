@@ -10,13 +10,13 @@ Updated: 2026-11-09
 - Added regression coverage for supported payment methods and bank reconciliation.
 
 ## In progress
-- PR #59 remains a draft PR. New changes must pass GitHub Actions and review before merge.
+- PR #59 remains open as a draft PR; code and CI are complete for this scope, pending review/merge.
 - Migrations 060 and 061 have not been applied to production Supabase.
 - Accountant permission grants for `payroll_manage` and `reports_export` remain an explicit School Admin action; no production permission changes have been made.
 
 ## Next
-- Verify lint, TypeScript, complete tests, route parity, RLS source audit, and production build on the latest PR commit.
-- After review/merge, apply migrations 060 then 061 to the intended Supabase project and verify schema/RLS.
+- DONE: GitHub CI run 1838 passed TypeScript checks, all 196 tests, route parity audit, RLS source audit, and production build on commit `ebaa6e38cecbcbcd85478fea8cb4e6e4e7d6a34d`.
+- Next: after review/merge and explicit production approval, apply migrations 060 then 061 to the intended Supabase project and verify schema/RLS.
 - Test cash, bank transfer, mobile money, receipts, partial installments, and bank statement reconciliation with controlled test records.
 - Complete finance reports/export and grant Payroll/Reports access only after the School Admin authorizes those permissions.
 
