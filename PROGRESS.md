@@ -6,7 +6,8 @@
 - DONE: Reorganized Accountant navigation into Workspace, Daily operations, and Financial management groups. Existing permission checks remain attached to fee, expense, reconciliation, reports, and payroll destinations.
 - DONE: Replaced the Accountant mobile quick-link from Reports to Expenses & cashbook; reports and payroll remain available from the permission-filtered menu.
 - SAFETY: Presentation and navigation-label changes only. No finance records, database schema, payment logic, or tenant-scoping rules are changed.
-- NOT YET VERIFIED: GitHub Actions must pass before merge. Browser-level visual review is still required on desktop and mobile; CSS-only changes do not prove every form's business workflow.
+- VERIFIED: GitHub Actions run 1845 passed TypeScript checks, the test suite, route parity audit, RLS source audit, and production build. PR #62 was merged to `main` as `60f271133729ba3eb3007e6eb89a3dd38d62e762`.
+- REVIEW NOTE: A live browser visual review on desktop and mobile is still required. Styling was applied to existing Accountant screens; this change does not add payment-provider integrations, CSV bank import, split-settlement reconciliation, or other previously documented scope limits.
 
 ## Request write-amplification fix (2026-11-03)
 
