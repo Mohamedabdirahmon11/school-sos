@@ -67,7 +67,7 @@ export const ClassesSubjectsView: React.FC = () => {
         capacity,
         monthlyFee,
         branchId: branchId || undefined,
-        classTeacherId: formTeacherId || undefined
+        classTeacherId: formTeacherId || null
       };
       if (editingClass) await ApiClient.updateClass(editingClass.id, payload);
       else await ApiClient.addClass(payload, school?.id);
