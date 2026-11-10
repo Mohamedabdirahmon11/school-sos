@@ -132,7 +132,7 @@ export const LoginView: React.FC = () => {
 
           {!parentStudentMode && (
             <p className="mb-4 text-center text-xs text-[#64748B]">
-              Super Admin, School Admin, and Accountant use this same sign-in. Your account role opens the correct dashboard automatically.
+              One sign-in for Super Admin, School Admin, Accountant, and Teacher. Enter your email, phone, or school-issued Teacher ID; SchoolOS opens the correct dashboard automatically.
             </p>
           )}
 
@@ -177,14 +177,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Teacher ID' : t('staff_signin_identifier')}</label>
+                  <label className="block text-xs font-medium text-[#334155]">Email, phone, or Teacher ID</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={activeTab === 'teacher' ? 'STF-SCHOOL-0001' : t('staff_signin_placeholder')}
+                      placeholder="Email, phone, or STF-SCHOOL-0001"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
@@ -192,9 +192,9 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">{activeTab === 'teacher' ? 'Password / PIN' : 'Password'}</label>
+                    <label className="block text-xs font-medium text-[#334155]">Password / Teacher PIN</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      {activeTab === 'school_admin' ? t('school_admin_initial_password_hint') : activeTab === 'teacher' ? 'Use the password or PIN given to you by your School Admin.' : 'Contact your school administrator to reset your password.'}
+                      Use your account password. Teachers may also use the PIN issued by their School Admin.
                     </span>
                   </div>
                   <div className="mt-1">
