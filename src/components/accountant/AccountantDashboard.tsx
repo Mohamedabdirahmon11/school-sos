@@ -235,10 +235,49 @@ export const AccountantDashboard: React.FC = () => {
               <Receipt className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-blue-900">{payments.length}</div>
+          <div className="mt-2 text-2xl font-bold font-mono text-blue-900">{activePayments.length}</div>
           <p className="text-[11px] text-blue-700 font-medium mt-1">Individual stamped transactions</p>
         </div>
       </div>
+
+      {/* Fee structure overview */}
+      <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 md:p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-[#132A29]">Fee structures</h2>
+            <p className="text-xs text-slate-500">Configured charges for this school</p>
+          </div>
+          <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
+            {feeStructures.filter(item => item.isActive).length} active
+          </span>
+        </div>
+        {feeStructures.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+            <p className="text-sm font-semibold text-slate-700">No fee structures configured</p>
+            <p className="mt-1 text-xs text-slate-500">Ask the School Admin to configure the school's fee schedule before collecting recurring fees.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {feeStructures.map(structure => (
+              <article key={structure.id} className="rounded-xl border border-slate-200 p-4 transition-colors hover:border-teal-200 hover:bg-teal-50/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-slate-900">{structure.name}</h3>
+                    <p className="mt-1 text-[11px] capitalize text-slate-500">{structure.feeType.replace(/_/g, ' ')} · {structure.cadence.replace(/_/g, ' ')}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${structure.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {structure.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <p className="mt-4 text-xl font-bold tracking-tight text-[#0F766E]">{formatMoney(structure.amount, school?.currency)}</p>
+                {(structure.minGrade || structure.maxGrade) && (
+                  <p className="mt-1 text-[11px] text-slate-500">Grades {structure.minGrade ?? '—'}–{structure.maxGrade ?? '—'}</p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Transaction Records */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
