@@ -326,11 +326,16 @@ test('teacher creation ignores client-controlled identity and credential fields'
   assert.ok(studentTeacher);
   assert.equal('monthlySalary' in studentTeacher, false);
 
-  const duplicate = await post({
-    staffId: 'STF-SEC-001', fullName: 'Duplicate Staff ID',
+  // Client-supplied IDs are ignored; the server must issue a fresh school-scoped ID.
+  const secondTeacher = await post({
+    staffId: 'STF-SEC-001', fullName: 'Second Generated Teacher',
     gender: 'female', assignedClasses: [], assignedSubjects: []
   });
-  assert.equal(duplicate.status, 409);
+  assert.equal(secondTeacher.status, 201, await secondTeacher.clone().text());
+  const secondTeacherResult = await secondTeacher.json();
+  assert.match(secondTeacherResult.staffId, /^T[0-9]{4,}$/);
+  assert.notEqual(secondTeacherResult.staffId, result.staffId);
+  assert.notEqual(secondTeacherResult.staffId, 'STF-SEC-001');
 
   const invalidAssignments = await post({
     staffId: 'STF-SEC-002', fullName: 'Invalid Assignments',
@@ -489,11 +494,11 @@ test('concurrent attendance submissions converge on one daily row without automa
   );
   assert.equal(alerts.length, 0, 'absence alerts are sent manually from the administrator WhatsApp session, not queued as SMS');
 
-  const repeated = await submit();
-  assert.equal(repeated.status, 200, await repeated.clone().text());
+  const repeatedAfterRemoval = await submit();
+  assert.equal(repeatedAfterRemoval.status, 403, 'a teacher who is no longer the Form Teacher cannot resave attendance');
   assert.equal(memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
-  ).length, 0, 're-saving an absent status must not queue automatic alerts');
+  ).length, 0, 'attendance saves must not queue automatic alerts');
 });
 
 
