@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
-import { CalendarDays, AlertTriangle, CheckCircle2, Plus, Clock, X } from 'lucide-react';
+import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2 } from 'lucide-react';
 
 export const TimetableView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
@@ -20,15 +20,10 @@ export const TimetableView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'day'>('class');
+  const [viewMode, setViewMode] = useState<'class' | 'teacher'>('class');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
-  const [selectedDay, setSelectedDay] = useState('Monday');
   const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
-  const [unavailableSlots, setUnavailableSlots] = useState<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>([]);
-  const [swapMode, setSwapMode] = useState(false);
-  const [firstSwapSlot, setFirstSwapSlot] = useState<string | null>(null);
-  const [unfilledSlots, setUnfilledSlots] = useState<Array<{ subjectId: string; teacherId: string; occurrence: number }>>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
   const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
@@ -61,13 +56,12 @@ export const TimetableView: React.FC = () => {
     if (!school) return;
     setLoadError(null);
     try {
-      const [clsList, subList, tchList, schedule, schoolSettings, unavailable] = await Promise.all([
+      const [clsList, subList, tchList, schedule, schoolSettings] = await Promise.all([
         ApiClient.getClasses(),
         ApiClient.getSubjects(school.id),
         ApiClient.getTeachers(school.id),
         ApiClient.getTimetable(),
-        ApiClient.getTimetableSettings(),
-        ApiClient.getTeacherUnavailability()
+        ApiClient.getTimetableSettings()
       ]);
       setClasses(clsList);
       setDisplayClassIds(current => current.length ? current.filter(id => clsList.some(item => item.id === id)).slice(0, 5) : clsList.slice(0, 5).map(item => item.id));
@@ -75,7 +69,6 @@ export const TimetableView: React.FC = () => {
       setTeachers(tchList);
       setTimetable(schedule);
       setSettings({ firstPeriodStart: schoolSettings.firstPeriodStart || '08:00', periodMinutes: schoolSettings.periodMinutes || 40, breakAfterPeriod: schoolSettings.breakAfterPeriod || 3, breakMinutes: schoolSettings.breakMinutes ?? 20, shift2FirstPeriodStart: schoolSettings.shift2FirstPeriodStart || '13:00', shift2PeriodMinutes: schoolSettings.shift2PeriodMinutes || 40, shift2BreakAfterPeriod: schoolSettings.shift2BreakAfterPeriod || 3, shift2BreakMinutes: schoolSettings.shift2BreakMinutes ?? 20 });
-      setUnavailableSlots(unavailable);
       if (clsList.length > 0 && !selectedClassId) {
         setSelectedClassId(clsList[0].id);
         setRoomNumber(clsList[0].roomNumber);
@@ -156,16 +149,6 @@ export const TimetableView: React.FC = () => {
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
   };
 
-  const handleGenerate = async () => {
-    if (!selectedClassId) return;
-    try {
-      const result = await ApiClient.generateTimetable(selectedClassId);
-      setTimetable(prev => [...prev.filter(slot => slot.classId !== selectedClassId), ...result.slots]);
-      setUnfilledSlots(result.unfilled);
-      setNotice(result.unfilled.length ? `Timetable generated with ${result.unfilled.length} unfilled subject periods.` : 'Timetable generated successfully.');
-    } catch (err: any) { setNotice(err.message || 'Unable to generate timetable.'); }
-  };
-
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
       await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber);
@@ -178,28 +161,25 @@ export const TimetableView: React.FC = () => {
     catch (err: any) { setNotice(err.message || 'Unable to save timetable settings.'); }
   };
 
-  const handleSwapSlot = async (slot: TimetableSlot) => {
-    if (!swapMode) return;
-    if (!firstSwapSlot) { setFirstSwapSlot(slot.id); setNotice(t('timetable_swap_select')); return; }
+  const openClassPeriodEditor = async (klass: SchoolClass) => {
+    setSelectedClassId(klass.id);
+    setRoomNumber(klass.roomNumber || '');
+    setDayOfWeek('Monday');
+    setPeriodNumber(1);
+    setClashWarning(null);
     try {
-      await ApiClient.swapTimetableSlots(firstSwapSlot, slot.id);
-      setTimetable(await ApiClient.getTimetable());
-      setNotice(t('timetable_swapped'));
-      setFirstSwapSlot(null); setSwapMode(false);
-    } catch (err: any) { setNotice(err.message || 'Unable to swap these timetable periods.'); setFirstSwapSlot(null); }
+      const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
+      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+      setClassSubjectAssignments(assignments);
+      const first = assignments[0];
+      setSubjectId(first?.subject?.id || '');
+      setTeacherId(first?.teacher?.id || '');
+      setShowAddModal(true);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Unable to load subjects for this class.');
+    }
   };
 
-  const handleAvailability = async (day: string, period: number, unavailable: boolean) => {
-    if (!selectedTeacherId) return;
-    try {
-      await ApiClient.setTeacherUnavailability({ teacherId: selectedTeacherId, dayOfWeek: day, periodNumber: period, unavailable });
-      setUnavailableSlots(prev => unavailable
-        ? [...prev.filter(item => !(item.teacherId === selectedTeacherId && item.dayOfWeek === day && item.periodNumber === period)), { id: '', teacherId: selectedTeacherId, dayOfWeek: day, periodNumber: period }]
-        : prev.filter(item => !(item.teacherId === selectedTeacherId && item.dayOfWeek === day && item.periodNumber === period)));
-    } catch (err: any) { setNotice(err.message || 'Unable to update teacher availability.'); }
-  };
-
-  const selectedClass = classes.find(c => c.id === selectedClassId);
   const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
       const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
@@ -225,10 +205,10 @@ export const TimetableView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Timetable Matrix & Clash Detector
+            School Timetable
           </h1>
           <p className="text-xs text-[#64748B]">
-            Separate class schedules. Subjects and lesson times only; teacher names stay off the student timetable.
+            Jadwal fasal kasta gooni ayuu u yahay. Waxaa muuqda maaddada iyo waqtiga oo keliya.
           </p>
         </div>
         {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:max-w-md">
@@ -239,7 +219,6 @@ export const TimetableView: React.FC = () => {
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
-            <option value="day">{t('timetable_view_day')}</option>
           </select>
           <select
             value={selectedClassId}
@@ -258,11 +237,8 @@ export const TimetableView: React.FC = () => {
             <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
           </>}
-          {viewMode === 'day' && <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
-          <button onClick={handleGenerate} disabled={isReadOnly || !selectedClassId} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs disabled:opacity-50">{t('timetable_generate')}</button>
-          <button onClick={() => { setSwapMode(value => !value); setFirstSwapSlot(null); }} disabled={isReadOnly} className={`px-3 py-1.5 rounded-lg border text-xs ${swapMode ? 'bg-amber-100 border-amber-300' : 'border-[#CBD5E1]'}`}>{t('timetable_swap')}</button>
           
-          <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]">Print KG–Grade 5</button>
+          <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]"><Printer className="w-3.5 h-3.5" /> Print A4 (max 5)</button>
 
           <button
             onClick={() => {
@@ -284,9 +260,9 @@ export const TimetableView: React.FC = () => {
           <span>{notice}</span>
         </div>
       )}
-      {unfilledSlots.length > 0 && <section className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900"><h2 className="font-bold mb-2">{t('timetable_unfilled')}</h2><ul className="list-disc pl-5">{unfilledSlots.map((item, index) => <li key={`${item.subjectId}-${item.occurrence}-${index}`}>{subjects.find(subject => subject.id === item.subjectId)?.name || item.subjectId} · occurrence {item.occurrence}{item.teacherId ? '' : ' · no teacher assigned'}</li>)}</ul></section>}
-
-      <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3">
+      <details className="group rounded-xl border border-[#E2E8F0] bg-white p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-[#334155]"><Settings2 className="h-4 w-4 text-[#0F766E]" /> Jadwal waqtigiisa iyo dejimaha fasallada</summary>
+        <div className="mt-4 space-y-3">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable_times')}</h2>
         <h3 className="text-xs font-semibold text-[#475569]">Shift 1 · Morning</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end text-xs">
@@ -303,19 +279,8 @@ export const TimetableView: React.FC = () => {
           <label className="space-y-1"><span>Break minutes</span><input type="number" min="0" max="120" value={settings.shift2BreakMinutes} onChange={e => setSettings(prev => ({ ...prev, shift2BreakMinutes: Number(e.target.value) }))} className="w-full border rounded px-2 py-1.5" /></label>
           <button onClick={handleSaveSettings} disabled={isReadOnly} className="px-3 py-2 rounded-lg bg-slate-100 text-xs disabled:opacity-50">{t('timetable_save_times')}</button>
         </div>
-      </section>
-
-      <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3">
-        <h2 className="text-sm font-bold text-[#132A29]">{t('timetable_unavailability')}</h2>
-        <div className="flex flex-wrap gap-2 items-center text-xs">
-          <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="border border-[#DCE7E4] rounded-lg px-3 py-2 text-xs text-[#102522] bg-white focus:outline-none focus:ring-2 focus:ring-[#0E8078]/20 focus:border-[#0E8078]">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
-          {days.map(day => periods.filter(period => day !== 'Friday' || period <= 5).map(period => {
-            const unavailable = unavailableSlots.some(item => item.teacherId === selectedTeacherId && item.dayOfWeek === day && item.periodNumber === period);
-            return <label key={`${day}-${period}`} className="inline-flex items-center gap-1 rounded border px-2 py-1"><input type="checkbox" checked={unavailable} disabled={isReadOnly} onChange={e => handleAvailability(day, period, e.target.checked)} />{day.slice(0, 3)} P{period}</label>;
-          }))}
-        </div>
-      </section>
-
+      </div>
+      </details>
       <style>{`@page { size: A4 portrait; margin: 12mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-class { break-after: page; page-break-after: always; min-height: 250mm; } .timetable-print-class:last-child { break-after: auto; page-break-after: auto; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden">
         <h1 className="mb-2 text-2xl font-bold">{school?.name || 'School'} · Timetables</h1>
@@ -365,7 +330,7 @@ export const TimetableView: React.FC = () => {
                 <h2 className="text-sm font-bold text-[#132A29]">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''}</h2>
                 <p className="text-[10px] text-[#64748B]">{klass.roomNumber || 'Room not set'} · Shift {klass.shift || 1}</p>
               </div>
-              {!isReadOnly && <button type="button" onClick={() => { setSelectedClassId(klass.id); setRoomNumber(klass.roomNumber || ''); setShowAddModal(true); }} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
+              {!isReadOnly && <button type="button" onClick={() => void openClassPeriodEditor(klass)} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
             </header>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[9px]">
@@ -376,7 +341,7 @@ export const TimetableView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(viewMode === 'day' ? days.filter(day => day === selectedDay) : days).map(day => (
+                  {days.map(day => (
                     <tr key={day}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
@@ -387,7 +352,7 @@ export const TimetableView: React.FC = () => {
                           <td key={period} className="h-14 border-b border-r p-1 text-center align-middle">
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
-                                onClick={() => { if (swapMode) void handleSwapSlot(slot); else if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
                                 {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
