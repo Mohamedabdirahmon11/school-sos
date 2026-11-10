@@ -233,7 +233,7 @@ export interface SchoolClass {
   section: string; // "A", "B", etc.
   roomNumber: string;
   capacity: number;
-  classTeacherId?: string;
+  classTeacherId?: string | null;
   monthlyFee: number;
   isArchived?: boolean;
   /** Morning (1) or afternoon (2) school session. */
