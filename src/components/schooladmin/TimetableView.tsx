@@ -336,59 +336,76 @@ export const TimetableView: React.FC = () => {
         ))}
       </section>}
 
-      {/* Grid Timetable Table */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left text-xs border-collapse">
-            <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-              <tr>
-                <th className="px-3 py-3 border-r border-[#E2E8F0] w-28">Day / Period</th>
-                {periods.map(p => (
-                  <th key={p} className="px-3 py-3 border-r border-[#E2E8F0] text-center min-w-[130px]">
-                    Period {p}
-                    <span className="block text-[10px] font-mono text-[#64748B]">
-                  {periodTime(p, viewMode === 'teacher' ? selectedTeacherShift : selectedClass?.shift === 2 ? 2 : 1)}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E2E8F0]">
-              {(viewMode === 'day' ? days.filter(day => day === selectedDay) : days).map(day => (
-                <tr key={day} className="hover:bg-[#F8FAFC]/50">
-                  <td className="px-3 py-3 font-semibold text-[#132A29] border-r border-[#E2E8F0] bg-[#FAFAFA]">
-                    {day}
-                  </td>
-                  {periods.map(p => {
-                    const slot = timetable.find(s => (viewMode === 'teacher' ? s.teacherId === selectedTeacherId && (Number(s.shift) === 2 ? 2 : 1) === selectedTeacherShift : s.classId === selectedClassId) && s.dayOfWeek === day && s.periodNumber === p);
-                    if (day === 'Friday' && p === 6) return <td key={p} className="p-2 border-r border-[#E2E8F0] text-center text-[10px] text-slate-400">—</td>;
-                    const sub = subjects.find(s => s.id === slot?.subjectId);
-                    const tch = teachers.find(t => t.id === slot?.teacherId);
+      {viewMode !== 'teacher' && (
+        <section className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-[#132A29]">Fasallada shaashadda ka muuqda</h2>
+              <p className="text-xs text-[#64748B]">Dooro ugu badnaan 5 fasal. Jadwal kasta si gooni ah ayaa loo muujinayaa.</p>
+            </div>
+            <span className="text-xs font-semibold text-[#0F766E]">{displayClassIds.length}/5 selected</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {classesThroughGradeFive.map(klass => (
+              <label key={klass.id} className="inline-flex items-center gap-2 text-xs text-[#334155]">
+                <input type="checkbox" checked={displayClassIds.includes(klass.id)} disabled={!displayClassIds.includes(klass.id) && displayClassIds.length >= 5}
+                  onChange={event => setDisplayClassIds(current => event.target.checked ? [...current, klass.id].slice(0, 5) : current.filter(id => id !== klass.id))}
+                />
+                {klass.name}{klass.section ? ` · ${klass.section}` : ''}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
-                    return (
-                      <td key={p} className="p-2 border-r border-[#E2E8F0] align-top">
-                        {slot ? (
-                          <div onClick={() => swapMode ? handleSwapSlot(slot) : (setSelectedClassId(slot.classId), setDayOfWeek(day), setPeriodNumber(p), setSubjectId(slot.subjectId), setTeacherId(slot.teacherId), setRoomNumber(slot.roomNumber), setShowAddModal(true))} className={`p-2 bg-[#F0FDFA] border rounded-lg space-y-0.5 cursor-pointer ${firstSwapSlot === slot.id ? 'border-amber-500' : 'border-[#CCFBF1]'}`}>
-                            <span className="font-bold text-[#0F766E] block truncate">{sub?.name || 'Subject'}</span>
-                            <span className="text-[11px] text-[#334155] block truncate">{tch?.fullName || 'Teacher'}</span>
-                            <span className="text-[10px] font-mono text-[#64748B] block">{slot.startTime}–{slot.endTime}</span>
-                            <span className="text-[10px] font-mono text-[#64748B] block">{viewMode === 'teacher' ? classes.find(klass => klass.id === slot.classId)?.name : slot.roomNumber} · Shift {slot.shift || 1}</span>
-                            {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); handleRemovePeriod(slot); }} className="text-rose-700 underline text-[10px]">{t('timetable_remove_period')}</button>}
-                          </div>
-                        ) : (
-                          <div className="h-14 border border-dashed border-[#E2E8F0] rounded flex items-center justify-center text-[10px] text-[#94A3B8]">
-                            Free
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {displayedClasses.map(klass => (
+          <article key={klass.id} className="min-w-0 overflow-hidden rounded-xl border border-[#DCE7E4] bg-white shadow-sm">
+            <header className="flex items-center justify-between gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3">
+              <div>
+                <h2 className="text-sm font-bold text-[#132A29]">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''}</h2>
+                <p className="text-[10px] text-[#64748B]">{klass.roomNumber || 'Room not set'} · Shift {klass.shift || 1}</p>
+              </div>
+              {!isReadOnly && <button type="button" onClick={() => { setSelectedClassId(klass.id); setRoomNumber(klass.roomNumber || ''); setShowAddModal(true); }} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
+            </header>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] border-collapse text-[10px]">
+                <thead className="bg-white text-[#64748B]">
+                  <tr>
+                    <th className="w-16 border-b border-r p-2 text-left">Day</th>
+                    {periods.map(period => <th key={period} className="border-b border-r p-2 text-center">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(viewMode === 'day' ? days.filter(day => day === selectedDay) : days).map(day => (
+                    <tr key={day}>
+                      <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
+                      {periods.map(period => {
+                        const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
+                        const subject = subjects.find(item => item.id === slot?.subjectId);
+                        const isClosedPeriod = day === 'Friday' && period === 6;
+                        return (
+                          <td key={period} className="h-16 min-w-[76px] border-b border-r p-1 text-center align-middle">
+                            {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
+                              <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
+                                onClick={() => { if (swapMode) void handleSwapSlot(slot); else if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                                <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
+                                <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
+                                {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
+                              </div>
+                            ) : <span className="text-[9px] text-[#CBD5E1]">—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        ))}
+        {displayedClasses.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-[#CBD5E1] bg-white p-10 text-center text-sm text-[#64748B]">Dooro fasal ama macallin si jadwalkooda loo arko.</div>}
+      </section>
 
       {/* ADD / EDIT PERIOD MODAL */}
       {showAddModal && (
