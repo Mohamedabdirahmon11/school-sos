@@ -16,7 +16,7 @@ if (!dryRun && !url) throw new Error('SUPABASE_URL is required.');
 if (!dryRun && !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required.');
 
 const raw = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
-const schemaSource = fs.readFileSync(path.resolve('supabase/schema.sql'), 'utf8');
+const schemaSource = fs.readFileSync(path.resolve('schema.sql'), 'utf8');
 if (!Array.isArray(raw.users)) throw new Error('Source data has no users array.');
 const adminCandidates = raw.users.filter((user: any) => user.id === 'usr-super-admin-01' || user.role === 'super_admin');
 const legacyAdmin = adminCandidates[adminCandidates.length - 1];
@@ -174,7 +174,7 @@ for (const [source, table] of tableOrder) {
 
 function prepare(entry: SourceTable): any[] {
   const info = tableInfo.get(entry.table);
-  if (!info) throw new Error(`Migration target ${entry.table} is absent from supabase/schema.sql.`);
+  if (!info) throw new Error(`Migration target ${entry.table} is absent from schema.sql.`);
   const payload = entry.rows.map((row: any) => convert(row, entry.source === 'users'));
   const missing = new Set<string>();
   for (const row of payload) for (const field of Object.keys(row)) if (!info.has(field)) missing.add(field);
