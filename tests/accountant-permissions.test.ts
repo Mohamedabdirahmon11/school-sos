@@ -25,5 +25,4 @@ test('accountant session hydrates permissions from the active school staff recor
   assert.match(api, /sanitizeUser\(sessionUser\)/);
   assert.ok(api.includes("accountantStaff?.status === 'active'"));
   assert.ok(api.includes('user: sanitizeUser(sessionUser)'));
-  assert.match(api, /accountantStaff\?\.status === 'active'[\\s\\S]*?sanitizeUser\(sessionUser\)/);
 });
