@@ -2022,7 +2022,7 @@ class StorageEngine {
     const { error } = await client.rpc('schoolos_replace_class_timetable', {
       p_school_id: schoolId,
       p_class_id: classId,
-      p_slots: slots.map(slot => toSupabaseRow(slot, 'timetable_slots'))
+      p_slots: slots.map(slot => toSupabaseRow({ ...slot, teacherId: slot.teacherId || null }, 'timetable_slots'))
     });
     this.recordQuery('rpc:schoolos_replace_class_timetable', 'call', startedAt);
     if (error) throw new Error(error.message || 'Unable to replace timetable.');
