@@ -147,7 +147,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
     });
     return () => { cancelled = true; };
-  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses]);
+  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments]);
 
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
