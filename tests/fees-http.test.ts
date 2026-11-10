@@ -196,3 +196,33 @@ test('fee HTTP routes apply grade rates, bus and annual rules, status, receipts 
   assert.ok(income.payments.every((payment: any) => payment.amountPaid > 0 && !payment.voidedAt));
   assert.equal(income.totalCollected, 72);
 });
+
+test('bank statement CSV import is atomic, school-scoped, and skips exact duplicates', async () => {
+  const rows = [
+    { statementDate: today, description: 'Imported tuition deposit', direction: 'credit', amount: 125.5, reference: 'CSV-IMPORT-1', bankAccountLabel: 'Main account' },
+    { statementDate: today, description: 'Imported electricity debit', direction: 'debit', amount: 40, reference: 'CSV-IMPORT-2', bankAccountLabel: 'Main account' }
+  ];
+  const first = await fetch(`${baseUrl}/bank-reconciliation/import`, { method: 'POST', headers, body: JSON.stringify({ rows }) });
+  assert.equal(first.status, 201);
+  const firstBody = await first.json() as any;
+  assert.equal(firstBody.createdCount, 2);
+  assert.equal(firstBody.skippedDuplicates, 0);
+  assert.ok(firstBody.entries.every((entry: any) => entry.schoolId === school.id));
+  const stored = memory.rows('bank_statement_entries').filter(row => row.school_id === school.id);
+  assert.equal(stored.length, 2);
+  assert.ok(stored.every(row => row.created_by === admin.id));
+
+  const retry = await fetch(`${baseUrl}/bank-reconciliation/import`, { method: 'POST', headers, body: JSON.stringify({ rows }) });
+  assert.equal(retry.status, 201);
+  const retryBody = await retry.json() as any;
+  assert.equal(retryBody.createdCount, 0);
+  assert.equal(retryBody.skippedDuplicates, 2);
+  assert.equal(memory.rows('bank_statement_entries').filter(row => row.school_id === school.id).length, 2);
+
+  const invalid = await fetch(`${baseUrl}/bank-reconciliation/import`, {
+    method: 'POST', headers, body: JSON.stringify({ rows: [{ ...rows[0], statementDate: 'not-a-date' }] })
+  });
+  assert.equal(invalid.status, 400);
+  assert.equal(memory.rows('bank_statement_entries').filter(row => row.school_id === school.id).length, 2,
+    'invalid batches must not write partial data');
+});
