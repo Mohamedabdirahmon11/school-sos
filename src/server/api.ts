@@ -4451,7 +4451,7 @@ apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireA
 apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
-  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
   const [payments, expenses, students] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id)]);
   const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
   const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
