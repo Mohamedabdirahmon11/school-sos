@@ -5,10 +5,9 @@ Status: not executed by the agent. Run this only against a non-production Supaba
 ## Preconditions
 
 1. Keep `.env` private and out of git. It must contain `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, `SUPER_ADMIN_EMAIL`, and `SUPER_ADMIN_PASSWORD`.
-2. On a fresh project, run `supabase/schema.sql` first, then apply `supabase/migrations/001_missing_tables.sql` through `supabase/migrations/014_assignment_submission_content.sql` in order. All files are rerun-safe; stop on any SQL error.
-3. In Supabase SQL Editor, run `scripts/check-rls.sql` and confirm every public table has RLS enabled and at least one policy.
-4. Install with `npm install --legacy-peer-deps`, then run the local checks:
-   `npm run lint`, `npm run build`, `npm run test:security`, `npm run test:storage`, `npm run test:fees`, `npm run test:payroll`, `npm run test:academics`, `npm run test:pdf`, `npm run test:report-cards`, `npm run test:schema`, `npm run audit:routes`, and `npm run audit:rls`.
+2. Use only an isolated test project. The canonical bootstrap schema is the repository-root `schema.sql` (not `supabase/schema.sql`). Before applying migrations, compare the project's migration history with `supabase/MIGRATION_SOURCE_GAPS.md` and review every source-backed migration in chronological order. Never replay an already-applied migration or run the bootstrap schema against an existing production database.
+3. In Supabase SQL Editor, run `scripts/check-rls.sql`. Every public table must have RLS enabled; tables with no policies are acceptable only when anon/authenticated have no table grants (service-role-only access).
+4. Install with `npm ci`, then run the local checks: `npm run lint`, `npm test`, `npm run build`, `npm run audit:routes`, `npm run audit:rls`, and `npm run audit:translations`.
 5. Start with `npm run dev`. Use a desktop browser and a mobile-width browser, not just one viewport.
 
 ## Browser workflow
