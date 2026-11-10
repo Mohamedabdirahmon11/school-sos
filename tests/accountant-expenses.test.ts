@@ -23,6 +23,8 @@ test('expense endpoints are school-scoped and use the existing finance permissio
   assert.ok(api.includes('netCashflow: totalIncome - totalExpenses'));
   assert.ok(api.includes("record.status === 'paid'"));
   assert.ok(api.includes('payrollExpenseTotal: paidPayroll.reduce'));
+  assert.ok(api.includes('payrollIncluded: canViewPayroll'));
+  assert.ok(api.includes("staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'payroll_manage')"));
   assert.ok(api.includes("method: 'payroll'"));
 });
 
