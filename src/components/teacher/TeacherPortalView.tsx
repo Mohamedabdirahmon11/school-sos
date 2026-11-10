@@ -25,16 +25,11 @@ import {
   StudentMark
 } from '../../types/index.ts';
 import { 
-  CalendarDays, 
-  CalendarCheck, 
-  FileSpreadsheet, 
-  BellRing, 
-  CheckCircle2, 
-  Lock,
+  CalendarDays,
+  FileSpreadsheet,
+  CheckCircle2,
   Send,
   Save,
-  Check,
-  UserCheck,
   ClipboardList
 } from 'lucide-react';
 
