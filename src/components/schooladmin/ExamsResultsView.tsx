@@ -33,6 +33,7 @@ export const ExamsResultsView: React.FC = () => {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('entry_approval');
@@ -44,9 +45,8 @@ export const ExamsResultsView: React.FC = () => {
   const [bigExamMax, setBigExamMax] = useState(10);
   const [passMarkPercentage, setPassMarkPercentage] = useState(50);
 
-  // Marks Table State
+  // Marks Table State: all subjects in the selected class, all students in rows.
   const [marks, setMarks] = useState<StudentMark[]>([]);
-  const [marksInput, setMarksInput] = useState<Record<string, { small: number; big: number; remarks: string }>>({});
   const [semRankings, setSemRankings] = useState<any[]>([]);
   const [yearlyRankings, setYearlyRankings] = useState<any[]>([]);
 
@@ -118,31 +118,20 @@ export const ExamsResultsView: React.FC = () => {
     if (seatSheet) window.print();
   }, [seatSheet]);
 
-  // Load students and marks for selected class & subject
+  // Load the complete class results matrix: all class subjects and all enrolled students.
   const loadClassData = async () => {
     if (!selectedClassId) return;
     setLoadError(null);
     try {
-      const [stdList, existingMarks] = await Promise.all([
+      const [stdList, existingMarks, classDetails] = await Promise.all([
         ApiClient.getAllStudents(selectedClassId),
-        ApiClient.getMarks(selectedClassId, selectedSubjectId || undefined, selectedSemester)
+        ApiClient.getMarks(selectedClassId, undefined, selectedSemester),
+        ApiClient.getClassDetails(selectedClassId, { page: 1, pageSize: 1 })
       ]);
-
       setStudents(stdList);
       setMarks(existingMarks);
+      setClassSubjectRows(classDetails.subjects || []);
 
-      const inputMap: Record<string, { small: number; big: number; remarks: string }> = {};
-      for (const std of stdList) {
-        const m = existingMarks.find(em => em.studentId === std.id && em.subjectId === selectedSubjectId);
-        inputMap[std.id] = {
-          small: m ? m.smallExamMarks : 0,
-          big: m ? m.bigExamMarks : 0,
-          remarks: m?.teacherRemarks || ''
-        };
-      }
-      setMarksInput(inputMap);
-
-      // Load rankings
       if (activeTab === 'sem1_rankings') {
         const ranks = await ApiClient.getSemesterRankings(selectedClassId, 'Semester 1');
         setSemRankings(ranks);
@@ -152,13 +141,13 @@ export const ExamsResultsView: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setLoadError(err?.message || 'Unable to load students, marks, or class rankings.');
+      setLoadError(err?.message || 'Unable to load the complete class results.');
     }
   };
 
   useEffect(() => {
-    loadClassData();
-  }, [selectedClassId, selectedSubjectId, selectedSemester, activeTab]);
+    void loadClassData();
+  }, [selectedClassId, selectedSemester, activeTab]);
 
   // Save Exam Config
   const handleSaveConfig = async () => {
@@ -183,7 +172,7 @@ export const ExamsResultsView: React.FC = () => {
   // Admin Approve All Submitted Marks
   const handleApproveAll = async () => {
     if (isReadOnly) return;
-    const pendingIds = marks.filter(m => m.status === 'submitted').map(m => m.id);
+    const pendingIds = marks.filter(m => m.status === 'form_teacher_submitted').map(m => m.id);
     if (pendingIds.length === 0) {
       setNotice('No pending marks to approve.');
       return;
@@ -265,7 +254,7 @@ export const ExamsResultsView: React.FC = () => {
   };
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  const selectedClassSubjects = classSubjectRows.filter(row => row.subject).map(row => row.subject as Subject);
   const maxCombined = smallExamMax + bigExamMax;
 
   return (
@@ -347,53 +336,25 @@ export const ExamsResultsView: React.FC = () => {
       {activeTab === 'entry_approval' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Select Class</label>
-              <select
-                value={selectedClassId}
-                onChange={e => setSelectedClassId(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-              >
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
-                ))}
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
+            <label className="text-xs font-semibold text-[#475569]">Select Class
+              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Select Subject</label>
-              <select
-                value={selectedSubjectId}
-                onChange={e => setSelectedSubjectId(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-              >
-                {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                ))}
+            </label>
+            <label className="text-xs font-semibold text-[#475569]">Academic Semester
+              <select value={selectedSemester} onChange={event => setSelectedSemester(event.target.value as any)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                <option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option>
               </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Academic Semester</label>
-              <select
-                value={selectedSemester}
-                onChange={e => setSelectedSemester(e.target.value as any)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-              >
-                <option value="Semester 1">Semester 1</option>
-                <option value="Semester 2">Semester 2</option>
-              </select>
-            </div>
-
-            <div className="flex items-center text-xs font-medium text-[#0F766E]">
-              Teachers enter and submit marks from their Teacher Portal. This screen is for school review and approval.
-            </div>
+            </label>
+            <div className="flex items-end text-xs font-medium text-[#0F766E]">All class subjects and all students load together for review and approval.</div>
           </div>
-
-          <div className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-900">
-            <strong>Selected results:</strong> {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'No class selected'} · {selectedSubject ? `${selectedSubject.name} (${selectedSubject.code})` : 'No subject selected'} · {selectedSemester}
-            <span className="ml-2 text-teal-700">{students.length} students loaded</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-900">
+            <div>
+              <strong>Class results:</strong> {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'No class selected'} · {selectedSemester}
+              <p className="mt-1">{selectedClassSubjects.length} subjects · {students.length} students · {marks.filter(mark => mark.status === 'form_teacher_submitted').length} mark rows submitted by Fomester</p>
+            </div>
+            <button type="button" onClick={handleApproveAll} disabled={isReadOnly || !marks.some(mark => mark.status === 'form_teacher_submitted')} className="rounded-lg bg-[#0B2B2A] px-3 py-2 font-semibold text-white disabled:opacity-50"><Lock className="mr-1 inline h-3.5 w-3.5"/>Approve & Lock All</button>
           </div>
 
           {/* Mark Scheme Guidance Banner */}
@@ -402,136 +363,34 @@ export const ExamsResultsView: React.FC = () => {
               Maximum Scores: Small Exam ({smallExamMax} pts) + Big Exam ({bigExamMax} pts) = Total ({maxCombined} pts).
               Percentage = (Score / {maxCombined}) × 100%. Pass mark: {passMarkPercentage}%.
             </span>
-            <button
-              type="button"
-              onClick={handleApproveAll}
-              disabled={isReadOnly}
-              className="px-3 py-1.5 bg-[#0B2B2A] hover:bg-black text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-xs"
-            >
-              <Lock className="w-3.5 h-3.5 text-amber-300" />
-              Approve & Lock All
-            </button>
+
           </div>
 
-          {/* Marks Grading Table */}
-          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-            {students.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#71817d]">
-                No students enrolled in this class.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
-                  <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
-                    <tr>
-                      <th className="py-3 px-4">Student</th>
-                      <th className="py-3 px-4 text-center">Small Exam (Max {smallExamMax})</th>
-                      <th className="py-3 px-4 text-center">Big Exam (Max {bigExamMax})</th>
-                      <th className="py-3 px-4 text-center font-bold">Total ({maxCombined})</th>
-                      <th className="py-3 px-4 text-center font-bold">Percentage (%)</th>
-                      <th className="py-3 px-4 text-center">Status</th>
-                      <th className="py-3 px-4">Teacher Remark</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#F1F5F9]">
-                    {students.map(std => {
-                      const inp = marksInput[std.id] || { small: 0, big: 0, remarks: '' };
-                      const mRecord = marks.find(m => m.studentId === std.id && m.subjectId === selectedSubjectId);
-                      const isApproved = mRecord?.status === 'approved';
-                      const total = Number(inp.small) + Number(inp.big);
-                      const percentage = maxCombined > 0 ? Math.round(((total / maxCombined) * 100) * 100) / 100 : 0;
-                      const isPassing = percentage >= passMarkPercentage;
-
-                      return (
-                        <tr key={std.id} className="hover:bg-[#F8FAFC]">
-                          <td className="py-3 px-4">
-                            <p className="font-semibold text-[#132A29]">{std.firstName} {std.middleName} {std.lastName}</p>
-                            <p className="text-[11px] font-mono text-[#64748B]">{std.studentId}</p>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={smallExamMax}
-                              step={0.5}
-                              disabled
-                              value={inp.small}
-                              onChange={e => {
-                                const val = Math.min(smallExamMax, Math.max(0, parseFloat(e.target.value) || 0));
-                                setMarksInput(prev => ({
-                                  ...prev,
-                                  [std.id]: { ...prev[std.id], small: val }
-                                }));
-                              }}
-                              className="w-16 text-center text-xs py-1 px-2 border border-[#CBD5E1] rounded font-mono disabled:bg-slate-100 disabled:text-slate-500"
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={bigExamMax}
-                              step={0.5}
-                              disabled
-                              value={inp.big}
-                              onChange={e => {
-                                const val = Math.min(bigExamMax, Math.max(0, parseFloat(e.target.value) || 0));
-                                setMarksInput(prev => ({
-                                  ...prev,
-                                  [std.id]: { ...prev[std.id], big: val }
-                                }));
-                              }}
-                              className="w-16 text-center text-xs py-1 px-2 border border-[#CBD5E1] rounded font-mono disabled:bg-slate-100 disabled:text-slate-500"
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-[#132A29]">
-                            {total}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              isPassing ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                            }`}>
-                              {percentage}%
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {isApproved ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                <Lock className="w-3 h-3 text-emerald-600" />
-                                Locked
-                              </span>
-                            ) : mRecord?.status === 'submitted' ? (
-                              <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                                Pending Approval
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                                Draft
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <input
-                              type="text"
-                              value={inp.remarks}
-                              disabled
-                              onChange={e => {
-                                const val = e.target.value;
-                                setMarksInput(prev => ({
-                                  ...prev,
-                                  [std.id]: { ...prev[std.id], remarks: val }
-                                }));
-                              }}
-                              placeholder="Academic notes..."
-                              className="w-full text-xs py-1 px-2 border border-[#CBD5E1] rounded disabled:bg-slate-100"
-                            />
-                          </td>
-                        </tr>
-                      );
+          {/* Class-wide results matrix */}
+          <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+            {students.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No students enrolled in this class.</div> : selectedClassSubjects.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No subjects have been assigned to this class.</div> : (
+              <table className="w-full min-w-[1000px] border-collapse text-xs text-[#132A29]">
+                <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
+                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{selectedClassSubjects.map(subject => <th key={subject.id} colSpan={5} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
+                  <tr>{selectedClassSubjects.map(subject => <React.Fragment key={subject.id}><th className="border-b border-l px-2 py-2">Small</th><th className="border-b px-2 py-2">Big</th><th className="border-b px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th><th className="border-b px-2 py-2">Status</th></React.Fragment>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {students.map(student => <tr key={student.id} className="hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-3 py-2"><strong>{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-500">{student.studentId}</span></td>
+                    {selectedClassSubjects.map(subject => {
+                      const mark = marks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+                      const status = mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'submitted' ? 'Waiting Fomester' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : 'Missing';
+                      return <React.Fragment key={subject.id}>
+                        <td className="border-l px-2 py-2 text-center">{mark ? mark.smallExamMarks : '—'}</td>
+                        <td className="px-2 py-2 text-center">{mark ? mark.bigExamMarks : '—'}</td>
+                        <td className="px-2 py-2 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td>
+                        <td className="px-2 py-2 text-center">{mark ? `${mark.percentage}%` : '—'}</td>
+                        <td className="px-2 py-2 text-center"><span className={`rounded-full px-2 py-1 text-[10px] ${mark?.status === 'form_teacher_submitted' ? 'bg-teal-100 text-teal-800' : mark?.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{status}</span></td>
+                      </React.Fragment>;
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </tr>)}
+                </tbody>
+              </table>
             )}
           </div>
         </div>

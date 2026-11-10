@@ -462,7 +462,7 @@ export class ApiClient {
   }
 
   public static async getTeacherSubjectAssignments() {
-    return this.request<Array<{ classId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>('/teacher/subject-assignments');
+    return this.request<Array<{ classId: string; subjectId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; isFormTeacher?: boolean; isFormTeacherClass?: boolean; canEditMarks?: boolean }>>('/teacher/subject-assignments');
   }
 
   public static async createSubject(subData: Partial<Subject>, schoolId?: string) {
@@ -514,6 +514,10 @@ export class ApiClient {
 
   public static async generateTimetable(classId: string) {
     return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+  }
+
+  public static async generateAllTimetables() {
+    return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }> }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
   }
 
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
@@ -843,6 +847,13 @@ export class ApiClient {
     return this.request<{ success: boolean; marks: StudentMark[] }>('/exams/marks', {
       method: 'POST',
       body: JSON.stringify({ classId, subjectId, semester, marks })
+    });
+  }
+
+  public static async forwardClassMarks(classId: string, semester: string) {
+    return this.request<{ success: boolean; forwardedCount: number }>('/exams/forward-class', {
+      method: 'POST',
+      body: JSON.stringify({ classId, semester })
     });
   }
 

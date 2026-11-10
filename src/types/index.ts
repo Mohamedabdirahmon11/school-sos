@@ -233,7 +233,7 @@ export interface SchoolClass {
   section: string; // "A", "B", etc.
   roomNumber: string;
   capacity: number;
-  classTeacherId?: string;
+  classTeacherId?: string | null;
   monthlyFee: number;
   isArchived?: boolean;
   /** Morning (1) or afternoon (2) school session. */
@@ -296,7 +296,7 @@ export interface ExamConfig {
   updatedAt: string;
 }
 
-export type MarkStatus = 'draft' | 'submitted' | 'approved';
+export type MarkStatus = 'draft' | 'submitted' | 'form_teacher_submitted' | 'approved';
 
 /**
  * Marks are strictly Percentage-Based from Small Exam + Big Exam.

@@ -3,7 +3,7 @@
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
  * 2. Exam marks: Small Exam + Big Exam -> Percentage only (no letter grades or GPA)
- * 3. Save Draft & Submit for Admin Approval (locked once approved)
+ * 3. Subject teachers submit their assigned subjects to the Fomester; the Fomester forwards the complete class to Admin.
  * 4. Personal teaching schedule & notices
  */
 
@@ -21,7 +21,8 @@ import {
   AttendanceStatus,
   TimetableSlot,
   SchoolNotice,
-  AssignmentSubmission
+  AssignmentSubmission,
+  StudentMark
 } from '../../types/index.ts';
 import { 
   CalendarDays, 
@@ -56,7 +57,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
   const classes: SchoolClass[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class])).values()] as SchoolClass[];
   const subjects: Subject[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
-  const classSubjects: Subject[] = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId).map((assignment: any) => assignment.subject);
+  const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
+  const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
+  const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
+  const allClassSubjects = uniqueSubjects(classAssignments);
+  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher || assignment.canEditMarks === true));
+  const classSubjects: Subject[] = editableClassSubjects;
+  const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
@@ -82,7 +89,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
   const [marksInput, setMarksInput] = useState<Record<string, { small: number; big: number; remarks: string }>>({});
-  const [marksLocked, setMarksLocked] = useState(false);
+  const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -94,42 +101,42 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     if (!classSubjects.some(subject => subject.id === selectedSubjectId)) setSelectedSubjectId(firstAssignedSubject);
   }, [selectedClassId, teacherAssignments, classSubjects, selectedSubjectId]);
 
-  // Load class students & existing attendance/marks
+  // Load the full class mark matrix. Subject teachers see only their assigned subjects;
+  // the Fomester sees submitted marks from every subject plus their own editable subject(s).
   useEffect(() => {
     if (!selectedClassId) return;
-    ApiClient.getAllStudents(selectedClassId).then(async (stdList) => {
+    let cancelled = false;
+    Promise.all([
+      ApiClient.getAllStudents(selectedClassId),
+      ApiClient.getDailyAttendance(selectedClassId, attendanceDate),
+      ApiClient.getMarks(selectedClassId, undefined, semester)
+    ]).then(([stdList, existingAtt, existingMarks]) => {
+      if (cancelled) return;
       setStudents(stdList);
-
-      // Attendance
-      const existingAtt = await ApiClient.getDailyAttendance(selectedClassId, attendanceDate);
       const attMap: Record<string, { status: AttendanceStatus; note: string }> = {};
-      for (const s of stdList) {
-        const found = existingAtt.find(a => a.studentId === s.id);
-        attMap[s.id] = {
-          status: found ? found.status : 'present',
-          note: found?.note || ''
-        };
+      for (const student of stdList) {
+        const found = existingAtt.find(record => record.studentId === student.id);
+        attMap[student.id] = { status: found ? found.status : 'present', note: found?.note || '' };
       }
       setAttendanceMap(attMap);
-
-      // Marks
-      if (selectedSubjectId) {
-        const existingMarks = await ApiClient.getMarks(selectedClassId, selectedSubjectId, semester);
-        const mInput: Record<string, { small: number; big: number; remarks: string }> = {};
-        let allApproved = existingMarks.length > 0 && existingMarks.every(m => m.status === 'approved');
-        for (const s of stdList) {
-          const m = existingMarks.find(em => em.studentId === s.id);
-          mInput[s.id] = {
-            small: m ? m.smallExamMarks : 0,
-            big: m ? m.bigExamMarks : 0,
-            remarks: m?.teacherRemarks || ''
+      setClassMarks(existingMarks);
+      const inputMap: Record<string, { small: number; big: number; remarks: string }> = {};
+      for (const student of stdList) {
+        for (const subject of gradeSubjects) {
+          const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+          inputMap[`${student.id}:${subject.id}`] = {
+            small: mark ? mark.smallExamMarks : 0,
+            big: mark ? mark.bigExamMarks : 0,
+            remarks: mark?.teacherRemarks || ''
           };
         }
-        setMarksInput(mInput);
-        setMarksLocked(allApproved);
       }
+      setMarksInput(inputMap);
+    }).catch(error => {
+      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
     });
-  }, [selectedClassId, selectedSubjectId, attendanceDate, semester]);
+    return () => { cancelled = true; };
+  }, [selectedClassId, attendanceDate, semester, teacherAssignments]);
 
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
@@ -151,27 +158,54 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
-  // Save Marks (Draft vs Submit)
+  // Save every subject assigned to this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    if (isReadOnly || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     setIsSaving(true);
     try {
-      const formatted = students.map(s => ({
-        studentId: s.id,
-        smallExamMarks: Number(marksInput[s.id]?.small || 0),
-        bigExamMarks: Number(marksInput[s.id]?.big || 0),
-        teacherRemarks: marksInput[s.id]?.remarks || '',
-        status
+      const results = await Promise.all(editableClassSubjects.map(async subject => {
+        const existing = classMarks.filter(mark => mark.subjectId === subject.id);
+        if (existing.some(mark => ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status))) return [];
+        const formatted = students.map(student => {
+          const input = marksInput[`${student.id}:${subject.id}`] || { small: 0, big: 0, remarks: '' };
+          return {
+            studentId: student.id,
+            smallExamMarks: Number(input.small || 0),
+            bigExamMarks: Number(input.big || 0),
+            teacherRemarks: input.remarks || '',
+            status
+          };
+        });
+        const saved = await ApiClient.saveMarks(selectedClassId, subject.id, semester, formatted);
+        return saved.marks || [];
       }));
-
-      await ApiClient.saveMarks(selectedClassId, selectedSubjectId, semester, formatted);
-      setNotice(status === 'submitted' 
-        ? 'Marks submitted for Administrator Approval! Editing is locked pending verification.'
-        : 'Marks saved as draft.');
-      if (status === 'submitted') setMarksLocked(true);
-      setTimeout(() => setNotice(null), 4000);
+      const savedMarks = results.flat();
+      setClassMarks(current => [...current.filter(mark => !savedMarks.some(saved => saved.id === mark.id)), ...savedMarks]);
+      setNotice(status === 'submitted'
+        ? `You submitted ${savedMarks.length} mark records to the class Fomester for review.`
+        : `Drafts saved for ${editableClassSubjects.length} assigned subject(s).`);
+      if (status === 'submitted') {
+        const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
+        setClassMarks(refreshed);
+      }
+      setTimeout(() => setNotice(null), 4500);
     } catch (err: any) {
-      setNotice(err.message || 'Failed to save marks.');
+      setNotice(err.message || 'Failed to save class marks.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleForwardClassMarks = async () => {
+    if (isReadOnly || !isFormTeacher || !selectedClassId || isSaving) return;
+    setIsSaving(true);
+    try {
+      const result = await ApiClient.forwardClassMarks(selectedClassId, semester);
+      const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
+      setClassMarks(refreshed);
+      setNotice(`Fomester ahaan waxaad Admin u dirtay ${result.forwardedCount} natiijo oo fasalka ah.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Class results could not be forwarded.');
     } finally {
       setIsSaving(false);
     }
@@ -434,153 +468,71 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         </div>
       )}
 
-      {/* TAB 3: ENTER EXAM MARKS (SMALL + BIG EXAM -> PERCENTAGE ONLY) */}
+      {/* TAB 3: CLASS MARK MATRIX */}
       {activeTab === 'grades' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Class</label>
-              <select
-                value={selectedClassId}
-                onChange={e => setSelectedClassId(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
-              >
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
-                ))}
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
+            <label className="text-xs font-semibold text-[#475569]">Class
+              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Subject</label>
-              <select
-                value={selectedSubjectId}
-                onChange={e => setSelectedSubjectId(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
-              >
-                {classSubjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+            </label>
+            <label className="text-xs font-semibold text-[#475569]">Semester
+              <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                <option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Semester</label>
-              <select
-                value={semester}
-                onChange={e => setSemester(e.target.value as any)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
-              >
-                <option value="Semester 1">Semester 1</option>
-                <option value="Semester 2">Semester 2</option>
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleSaveMarks('draft')}
-                disabled={marksLocked || isReadOnly || isSaving}
-                className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-[#334155] text-xs font-semibold rounded-lg"
-              >
-                Save Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveMarks('submitted')}
-                disabled={marksLocked || isReadOnly || isSaving}
-                className="flex-1 py-2 px-3 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 shadow-sm disabled:opacity-50"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Submit
-              </button>
+            </label>
+            <div className="flex items-end gap-2">
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
             </div>
           </div>
 
-          <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl text-xs text-teal-900 flex items-center justify-between">
-            <span>
-              Grading Scheme: Small Exam (Max {smallMax}) + Big Exam (Max {bigMax}) = Total ({combinedMax}). Percentage is calculated automatically.
-            </span>
-            {marksLocked && (
-              <span className="font-bold flex items-center gap-1 text-emerald-800">
-                <Lock className="w-3.5 h-3.5" />
-                Locked by Administration
-              </span>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-900">
+            <div>
+              <strong>{isFormTeacher ? 'Fomester class review' : 'Your assigned subject marks'}</strong>
+              <p className="mt-1">Small Exam (max {smallMax}) + Big Exam (max {bigMax}) = {combinedMax}. All assigned subjects are shown together.</p>
+              <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
+            </div>
+            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-lg bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+            {gradeSubjects.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</p> : (
+              <table className="w-full min-w-[900px] border-collapse text-xs text-[#132A29]">
+                <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
+                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{gradeSubjects.map(subject => <th key={subject.id} colSpan={4} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
+                  <tr>{gradeSubjects.map(subject => <React.Fragment key={subject.id}><th className="border-b border-l px-2 py-2">Small</th><th className="border-b px-2 py-2">Big</th><th className="border-b px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th></React.Fragment>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {students.map(student => (
+                    <tr key={student.id} className="hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-3 py-2"><strong>{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-500">{student.studentId}</span></td>
+                      {gradeSubjects.map(subject => {
+                        const key = `${student.id}:${subject.id}`;
+                        const input = marksInput[key] || { small: 0, big: 0, remarks: '' };
+                        const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
+                        const total = Number(input.small || 0) + Number(input.big || 0);
+                        const percentage = combinedMax > 0 ? Math.round(total / combinedMax * 10000) / 100 : 0;
+                        return <React.Fragment key={subject.id}>
+                          <td className="border-l px-1 py-2 text-center">
+                            {editable ? <input type="number" min={0} max={smallMax} step={0.5} value={input.small} onChange={event => setMarksInput(prev => ({...prev,[key]:{...prev[key],small:Math.min(smallMax,Math.max(0,Number(event.target.value)||0))}}))} className="w-14 rounded border px-1 py-1 text-center"/> : <span>{mark ? mark.smallExamMarks : '—'}</span>}
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            {editable ? <input type="number" min={0} max={bigMax} step={0.5} value={input.big} onChange={event => setMarksInput(prev => ({...prev,[key]:{...prev[key],big:Math.min(bigMax,Math.max(0,Number(event.target.value)||0))}}))} className="w-14 rounded border px-1 py-1 text-center"/> : <span>{mark ? mark.bigExamMarks : '—'}</span>}
+                          </td>
+                          <td className="px-2 py-2 text-center font-semibold">{mark && !editable ? mark.totalMarks : total}</td>
+                          <td className="px-2 py-2 text-center">{mark && !editable ? mark.percentage : percentage}%<span className="block text-[9px] text-slate-400">{mark?.status === 'submitted' ? 'To Fomester' : mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : editable ? 'Enter' : 'Waiting'}</span></td>
+                        </React.Fragment>;
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
-
-          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-[#132A29]">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
-                <tr>
-                  <th className="py-3 px-4">Student</th>
-                  <th className="py-3 px-4 text-center">Small Exam (Max {smallMax})</th>
-                  <th className="py-3 px-4 text-center">Big Exam (Max {bigMax})</th>
-                  <th className="py-3 px-4 text-center font-bold">Total ({combinedMax})</th>
-                  <th className="py-3 px-4 text-center font-bold">Percentage (%)</th>
-                  <th className="py-3 px-4">Teacher Remark</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F1F5F9]">
-                {students.map(s => {
-                  const inp = marksInput[s.id] || { small: 0, big: 0, remarks: '' };
-                  const total = Number(inp.small) + Number(inp.big);
-                  const percentage = combinedMax > 0 ? Math.round(((total / combinedMax) * 100) * 100) / 100 : 0;
-
-                  return (
-                    <tr key={s.id} className="hover:bg-[#F8FAFC]">
-                      <td className="py-3 px-4">
-                        <p className="font-semibold">{s.firstName} {s.lastName}</p>
-                        <p className="text-[11px] font-mono text-[#64748B]">{s.studentId}</p>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <input
-                          type="number"
-                          min={0}
-                          max={smallMax}
-                          step={0.5}
-                          disabled={marksLocked || isReadOnly}
-                          value={inp.small}
-                          onChange={e => setMarksInput(prev => ({
-                            ...prev,
-                            [s.id]: { ...prev[s.id], small: Math.min(smallMax, Math.max(0, parseFloat(e.target.value) || 0)) }
-                          }))}
-                          className="w-16 text-center text-xs py-1 px-2 border border-[#CBD5E1] rounded font-mono disabled:bg-slate-100"
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <input
-                          type="number"
-                          min={0}
-                          max={bigMax}
-                          step={0.5}
-                          disabled={marksLocked || isReadOnly}
-                          value={inp.big}
-                          onChange={e => setMarksInput(prev => ({
-                            ...prev,
-                            [s.id]: { ...prev[s.id], big: Math.min(bigMax, Math.max(0, parseFloat(e.target.value) || 0)) }
-                          }))}
-                          className="w-16 text-center text-xs py-1 px-2 border border-[#CBD5E1] rounded font-mono disabled:bg-slate-100"
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold">{total}</td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">{percentage}%</td>
-                      <td className="py-3 px-4">
-                        <input
-                          type="text"
-                          value={inp.remarks}
-                          disabled={marksLocked || isReadOnly}
-                          onChange={e => setMarksInput(prev => ({
-                            ...prev,
-                            [s.id]: { ...prev[s.id], remarks: e.target.value }
-                          }))}
-                          placeholder="Teacher feedback..."
-                          className="w-full text-xs py-1 px-2 border border-[#CBD5E1] rounded disabled:bg-slate-100"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {isFormTeacher && <p className="text-[11px] text-slate-500">You can edit only the subjects assigned to you. Other subject columns are read-only and show marks submitted by the subject teachers. Forwarding is allowed only after every subject has marks for every student.</p>}
         </div>
       )}
 
