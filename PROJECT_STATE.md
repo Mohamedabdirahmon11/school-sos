@@ -11,8 +11,11 @@ Updated: 2026-11-10
 - Applied migration 062 with indexes for all five new Accountant foreign keys.
 - CI for PR #59 passed TypeScript, 196/196 tests, route parity, RLS source audit, and production build.
 
+## Done
+- Unified staff login: Super Admin, School Admin, and Accountant use one sign-in form; the authenticated account role determines the dashboard. Email or phone identifiers are accepted where the account has that identifier. Role-based authorization and school scoping remain server-enforced.
+
 ## In progress
-- Follow-up PR for the five FK indexes and canonical schema synchronization is being prepared.
+- Accountant foreign-key indexes and canonical schema synchronization are merged in PR #60.
 - Controlled live transaction tests (Cash, Bank Transfer, Mobile Money, partial installments, receipts, and reconciliation) remain pending; no financial test transactions were inserted.
 - Accountant payroll/report access remains a School Admin permission decision. The live Accountant record currently has `fees_manage`, not `payroll_manage` or `reports_export`.
 
