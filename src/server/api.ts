@@ -2619,7 +2619,7 @@ const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
   if (!slots.length) return slots;
   const [subjects, teachers, classes] = await Promise.all([
     queryAllRows('subjects', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.subjectId))] }, 'id,name'),
-    queryAllRows('teachers', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.teacherId))] }, 'id,full_name'),
+    queryAllRows('teachers', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.teacherId).filter(Boolean))] }, 'id,full_name'),
     queryAllRows('classes', { school_id: schoolId, id: [...new Set(slots.map(slot => slot.classId))] }, 'id,name,shift')
   ]);
   const subjectNames = new Map(subjects.map((item: any) => [item.id, item.name]));
@@ -2954,7 +2954,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       if (!placed) unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId, occurrence });
     }
   }
-  for (const assignment of assignments.items.filter((item: any) => !item.teacherId || Number(item.periodsPerWeek) <= 0)) for (let occurrence = 1; occurrence <= Math.max(1, Number(assignment.periodsPerWeek) || 1); occurrence += 1) unfilled.push({ subjectId: assignment.subjectId, teacherId: '', occurrence });
+  for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
   try { await db.replaceTimetableForClass(school.id, classId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
   res.json({ slots: generated, unfilled });
