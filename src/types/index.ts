@@ -735,6 +735,7 @@ export interface BankStatementAllocation {
   amount: number;
   createdBy: string;
   createdAt: string;
+  targetLabel?: string;
 }
 
 export interface BankStatementEntry {
