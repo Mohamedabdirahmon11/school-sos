@@ -39,5 +39,5 @@ test('expense ledger migration enforces tenant RLS, positive values, and no hard
   assert.match(view, /Expense history/);
   assert.match(view, /Voided records remain available for audit/);
   assert.ok(storage.includes("'school_expenses'"), 'school backup exports the expense ledger');
-  assert.ok(migration.includes("'payroll_records', 'school_expenses', 'notification_templates'"), 'safe restore accepts expense rows');
+  assert.ok(migration.includes("'payroll_records', 'school_expenses', 'bank_statement_entries', 'notification_templates'"), 'safe restore accepts expense rows');
 });
