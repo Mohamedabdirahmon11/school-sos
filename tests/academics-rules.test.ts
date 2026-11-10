@@ -30,11 +30,11 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     schoolId: school.id, studentId: `ACAD-${index + 1}`, firstName: `Pupil${index + 1}`, middleName: '', lastName: 'Test', gender: 'female',
     admissionDate: '2026-01-01', fatherPhone: '', classId: source.id, status: 'active'
   } as any));
-  await assert.rejects(() => db.forwardClassMarks(school.id, source.id, 'Semester 1', 'fomester-1'), /Cannot forward results yet/);
-    await db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
+  await db.updateExamConfig(school.id, { academicYear: '2026-2027', smallExamMax: 20, bigExamMax: 80, passMarkPercentage: 60 });
   await assert.rejects(() => db.updateExamConfig(school.id, { smallExamMax: 0 }), /maximum marks/);
   await assert.rejects(() => db.updateExamConfig(school.id, { passMarkPercentage: 101 }), /pass mark/);
   await db.flush();
+  await assert.rejects(() => db.forwardClassMarks(school.id, source.id, 'Semester 1', 'fomester-1'), /Cannot forward results yet/);
 
   const marks = students.map((student, index) => ({ studentId: student.id, smallExamMarks: [18, 14, 12, 8][index], bigExamMarks: [72, 56, 48, 32][index], status: 'submitted' as const }));
   const firstSemester = await db.saveStudentMarks(school.id, source.id, subject.id, 'Semester 1', marks, 'teacher-1');
