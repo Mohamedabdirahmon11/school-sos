@@ -1203,7 +1203,7 @@ class StorageEngine {
     return fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
   }
 
-  public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }, userId: string): Promise<import('../types/index.ts').BankStatementEntry | null> {
+  public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Bank reconciliation storage is unavailable.');
     const entry = (await this.getBankStatementEntries(schoolId)).find(row => row.id === id);
