@@ -960,7 +960,7 @@ export class ApiClient {
 
   public static async getMonthlyFinanceSummary(month: string) {
     const query = new URLSearchParams({ month });
-    return this.request<{ month: string; totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; payrollExpenseTotal: number; payrollExpenseCount: number; netCashflow: number }>(`/fees/monthly-summary?${query.toString()}`);
+    return this.request<{ month: string; totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; payrollExpenseTotal: number; payrollExpenseCount: number; payrollIncluded: boolean; netCashflow: number }>(`/fees/monthly-summary?${query.toString()}`);
   }
 
   public static async getSchoolExpenses() {
