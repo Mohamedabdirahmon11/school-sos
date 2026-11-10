@@ -417,6 +417,7 @@ test('concurrent attendance submissions converge on one daily row without automa
     passwordHash: '', isBlocked: false
   } as any);
   memory.rows('teachers').push({ id: 'attendance-teacher-profile', school_id: school.id, user_id: teacherUser.id });
+  await storage.db.updateClass(klass.id, { classTeacherId: teacherUser.id }, school.id);
   memory.rows('class_subjects').push({
     id: 'attendance-teacher-assignment', school_id: school.id,
     teacher_id: 'attendance-teacher-profile', class_id: klass.id,
@@ -439,9 +440,14 @@ test('concurrent attendance submissions converge on one daily row without automa
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
   });
   assert.equal(invalidNote.status, 400);
+  const classStudents = await storage.db.getStudents(school.id, klass.id);
+  const attendanceRecords = classStudents.map(classStudent => ({
+    studentId: classStudent.id,
+    status: classStudent.id === student.id ? 'absent' : 'present'
+  }));
   const submit = () => fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
-    body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent' }] })
+    body: JSON.stringify({ classId: klass.id, date, records: attendanceRecords })
   });
   const [first, retry] = await Promise.all([submit(), submit()]);
   assert.equal(first.status, 200, await first.clone().text());
