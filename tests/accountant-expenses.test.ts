@@ -26,9 +26,10 @@ test('expense endpoints are school-scoped and use the existing finance permissio
 test('expense ledger migration enforces tenant RLS, positive values, and no hard deletes', () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.school_expenses/);
   assert.match(migration, /amount NUMERIC\(12,2\) NOT NULL CHECK \(amount > 0/);
+  assert.match(migration, /REVOKE ALL ON TABLE public\.school_expenses FROM PUBLIC, anon/);
+  assert.match(migration, /REVOKE DELETE ON TABLE public\.school_expenses FROM authenticated/);
   assert.match(migration, /private\.auth_school_id\(\)/);
   assert.match(migration, /private\.auth_user_role\(\) IN \('school_admin','accountant'\)/);
-  assert.match(migration, /REVOKE DELETE ON public\.school_expenses FROM authenticated, anon/);
   assert.match(view, /Expense history/);
   assert.match(view, /Voided records remain available for audit/);
 });
