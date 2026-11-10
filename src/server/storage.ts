@@ -2619,7 +2619,7 @@ class StorageEngine {
     return payment;
   }
 
-  // Record Cash Payment only!
+  // Record a school fee payment using the selected collection channel.
   public async recordCashFeePayment(
     paymentData: {
       schoolId: string;
@@ -2771,7 +2771,7 @@ class StorageEngine {
       amountDue: paymentData.amountDue,
       amountPaid: paymentData.amountPaid,
       remainingAmount: remaining,
-      paymentMethod: paymentData.paymentMethod || 'Cash'
+      paymentMethod: paymentData.paymentMethod || 'Cash',
       status,
       date: new Date().toISOString().split('T')[0],
       recordedBy: paymentData.recordedBy,
