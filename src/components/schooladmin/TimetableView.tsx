@@ -100,7 +100,14 @@ export const TimetableView: React.FC = () => {
     let active = true;
     ApiClient.getClassDetails(selectedClassId, { page: 1, pageSize: 1 })
       .then(details => {
-        if (active) setClassSubjectAssignments(details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher })));
+        if (!active) return;
+        const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+        setClassSubjectAssignments(assignments);
+        if (assignments.length) {
+          setSubjectId(current => assignments.some(item => item.subject?.id === current) ? current : assignments[0].subject!.id);
+          const firstTeacher = assignments.find(item => item.subject?.id === subjectId)?.teacher?.id || assignments[0].teacher?.id;
+          if (firstTeacher) setTeacherId(firstTeacher);
+        }
       })
       .catch(() => { if (active) setClassSubjectAssignments([]); });
     return () => { active = false; };
