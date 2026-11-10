@@ -81,7 +81,7 @@ export const AccountantBankReconciliationView: React.FC = () => {
   };
 
   const downloadCsvTemplate = () => {
-    const blob = new Blob(['\\uFEFF' + BANK_STATEMENT_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + BANK_STATEMENT_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url; link.download = 'schoolos-bank-statement-template.csv'; link.click();
