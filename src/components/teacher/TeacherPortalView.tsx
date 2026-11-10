@@ -313,30 +313,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </p>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-[#F1F5F9] rounded-lg text-xs overflow-x-auto">
-          {[
-            { id: 'dashboard', label: 'My Schedule', icon: CalendarDays },
-            { id: 'attendance', label: 'Daily Attendance', icon: CalendarCheck },
-            { id: 'grades', label: 'Enter Exam Marks', icon: FileSpreadsheet },
-            { id: 'assignments', label: 'Homework', icon: ClipboardList },
-            { id: 'notices', label: 'Circulars', icon: BellRing }
-          ].map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 font-medium rounded transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === tab.id ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+
       </div>
 
       {notice && (
@@ -347,7 +324,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       )}
 
       {/* TAB 1: TEACHER SCHEDULE */}
-      {activeTab === 'dashboard' && (
+      {(activeTab === 'dashboard' || activeTab === 'timetable') && (
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-[#0F766E]" />
