@@ -1081,6 +1081,10 @@ apiRouter.post('/auth/login', async (req, res) => {
 
   await issueSessionCookie(res, user, req);
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
+  const accountantStaff = user.role === 'accountant' && school ? await db.getStaffMemberByUserId(user.id, school.id) : null;
+  const sessionUser = user.role === 'accountant'
+    ? { ...user, permissions: accountantStaff?.status === 'active' && Array.isArray(accountantStaff.permissions) ? accountantStaff.permissions : [] }
+    : user;
 
   db.logAudit({
     action: 'USER_LOGIN_SUCCESS',
@@ -1095,7 +1099,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 
   res.json({
-    user: sanitizeUser(user),
+    user: sanitizeUser(sessionUser),
     school,
     sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
     mustChangePassword: user.mustChangePassword || false
