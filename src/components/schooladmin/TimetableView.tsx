@@ -198,12 +198,7 @@ export const TimetableView: React.FC = () => {
   };
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
-  const classesThroughGradeFive = classes.filter(klass => {
-    const label = String(klass.gradeLevel || klass.name || '').trim().toLowerCase();
-    if (/^(kg|kindergarten|nursery|reception)/.test(label)) return true;
-    const match = label.match(/(?:grade|class|g)?\\s*(\\d+)/);
-    return match ? Number(match[1]) <= 5 : false;
-  }).sort((a, b) => {
+  const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
       const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
       if (/kg|kindergarten|nursery/.test(label)) return 0;
@@ -212,7 +207,7 @@ export const TimetableView: React.FC = () => {
     return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
   });
   const handlePrintAllClasses = () => {
-    if (!classesThroughGradeFive.length) { setNotice('No KG–Grade 5 classes are available to print.'); return; }
+    if (!orderedClasses.length) { setNotice('No KG–Grade 5 classes are available to print.'); return; }
     setPrintAllClasses(true);
     window.setTimeout(() => {
       window.print();
@@ -261,7 +256,7 @@ export const TimetableView: React.FC = () => {
           {viewMode === 'day' && <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
           <button onClick={handleGenerate} disabled={isReadOnly || !selectedClassId} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs disabled:opacity-50">{t('timetable_generate')}</button>
           <button onClick={() => { setSwapMode(value => !value); setFirstSwapSlot(null); }} disabled={isReadOnly} className={`px-3 py-1.5 rounded-lg border text-xs ${swapMode ? 'bg-amber-100 border-amber-300' : 'border-[#CBD5E1]'}`}>{t('timetable_swap')}</button>
-          <button onClick={() => window.print()} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">{t('timetable_print')}</button>
+          
           <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]">Print KG–Grade 5</button>
 
           <button
@@ -320,7 +315,7 @@ export const TimetableView: React.FC = () => {
       {printAllClasses && <section className="timetable-print-all hidden">
         <h1 className="mb-2 text-2xl font-bold">{school?.name || 'School'} · Timetables</h1>
         <p className="mb-6 text-sm">KG to Grade 5 · All classes</p>
-        {classesThroughGradeFive.map(klass => (
+        {orderedClasses.map(klass => (
           <article key={klass.id} className="timetable-print-class mb-8">
             <h2 className="mb-3 text-lg font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
             <table className="w-full border-collapse text-xs">
@@ -346,7 +341,7 @@ export const TimetableView: React.FC = () => {
             <span className="text-xs font-semibold text-[#0F766E]">{displayClassIds.length}/5 selected</span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {classesThroughGradeFive.map(klass => (
+            {orderedClasses.map(klass => (
               <label key={klass.id} className="inline-flex items-center gap-2 text-xs text-[#334155]">
                 <input type="checkbox" checked={displayClassIds.includes(klass.id)} disabled={!displayClassIds.includes(klass.id) && displayClassIds.length >= 5}
                   onChange={event => setDisplayClassIds(current => event.target.checked ? [...current, klass.id].slice(0, 5) : current.filter(id => id !== klass.id))}
