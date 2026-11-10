@@ -125,7 +125,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_statement_matched_expense
 ALTER TABLE public.bank_statement_entries ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS bank_statement_school_read ON public.bank_statement_entries;
 CREATE POLICY bank_statement_school_read ON public.bank_statement_entries FOR SELECT TO authenticated
-  USING (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id());
+  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant')));
 DROP POLICY IF EXISTS bank_statement_school_insert ON public.bank_statement_entries;
 CREATE POLICY bank_statement_school_insert ON public.bank_statement_entries FOR INSERT TO authenticated
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
