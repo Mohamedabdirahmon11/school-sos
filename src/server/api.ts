@@ -990,11 +990,15 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
   const normalizedRole = normalizeRole(storedUser.role);
-  // The staff sign-in screen is shared by Super Admin and School Admin.
-  // The submitted tab defaults to school_admin, so resolve the actual admin
-  // role from the matched account instead of rejecting a Super Admin login.
+  // One shared staff sign-in resolves the dashboard from the matched account.
+  // Teachers may use their school-issued staff ID on this same form; keep the
+  // exact staff-ID check so a teacher cannot authenticate with another identifier.
+  const sharedTeacherLogin = requestedRole === 'school_admin'
+    && normalizedRole === 'teacher'
+    && validStaffId(normalizeStaffId(identifier))
+    && normalizeStaffId(storedUser.staffId) === normalizeStaffId(identifier);
   const sharedAdminLogin = requestedRole === 'school_admin'
-    && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin' || normalizedRole === 'accountant');
+    && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin' || normalizedRole === 'accountant' || sharedTeacherLogin);
   if (!normalizedRole || (requestedRole && normalizedRole !== requestedRole && !sharedAdminLogin) || (requestedRole === 'teacher' && normalizeStaffId(storedUser.staffId) !== normalizeStaffId(identifier))) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
