@@ -53,7 +53,7 @@ export const AccountantExpensesView: React.FC = () => {
   const posted = useMemo(() => rows.filter(row => row.status === 'posted'), [rows]);
   const total = posted.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const monthTotal = posted.filter(row => row.expenseDate.slice(0, 7) === today().slice(0, 7)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const visible = rows.filter(row => [row.description, row.vendor, row.reference, row.category].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
+  const visible = [...rows].sort((left, right) => right.expenseDate.localeCompare(left.expenseDate) || right.createdAt.localeCompare(left.createdAt)).filter(row => [row.description, row.vendor, row.reference, row.category].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
   const cashbookVisible = cashbookRows.filter(row => [row.description, row.reference, row.category, row.method].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())));
   const exportCashbookCsv = () => {
     const fields = ['Date', 'Type', 'Description', 'Category', 'Amount', 'Currency', 'Method', 'Reference', 'Status'];
