@@ -462,7 +462,7 @@ export class ApiClient {
   }
 
   public static async getTeacherSubjectAssignments() {
-    return this.request<Array<{ classId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>('/teacher/subject-assignments');
+    return this.request<Array<{ classId: string; subjectId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; isFormTeacher?: boolean; isFormTeacherClass?: boolean; canEditMarks?: boolean }>>('/teacher/subject-assignments');
   }
 
   public static async createSubject(subData: Partial<Subject>, schoolId?: string) {
