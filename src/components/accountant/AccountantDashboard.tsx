@@ -43,7 +43,7 @@ export const AccountantDashboard: React.FC = () => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<FeePayment | null>(null);
 
-  // Quick Cash Payment form
+  // Quick Fee Payment form
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState('');
   const [selectedFeeType, setSelectedFeeType] = useState<FeeType>('monthly_tuition');
@@ -414,7 +414,7 @@ export const AccountantDashboard: React.FC = () => {
                       <td className="py-3 px-4">
                         <span className="font-semibold text-slate-700 capitalize flex items-center gap-1.5">
                           <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                          Cash
+                          {p.paymentMethod}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">
