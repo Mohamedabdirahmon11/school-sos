@@ -578,3 +578,12 @@ pm run dev and apply migrations 001-014.
 - NOT VERIFIED: TypeScript, lint, build, test suite, CI, live fee collection, bank reconciliation, and RLS behavior must pass after the branch update. CSV bank statement import and direct bank-provider integration are not included; this version supports manually entering statement lines and matching them to recorded transactions.
 
 - VERIFIED: GitHub Actions run 1838 passed TypeScript checks, all 196 tests, route parity audit, RLS source audit, and production build for commit `ebaa6e38cecbcbcd85478fea8cb4e6e4e7d6a34d`. A previous run exposed one outdated backup-restore assertion; the assertion was updated to include bank statement entries, then the full run passed.
+
+
+## 2026-11-10 Accountant production migration follow-up
+- DONE: PR #59 merged into main (merge commit f426a4b4e0e32957f299cdd8d2e89cd1832aa654); latest head CI was green (196/196 tests, typecheck, route parity, RLS source audit, production build).
+- DONE: Supabase project `school management 3` (rhpazlnjqsmzngxatnwd) verified ACTIVE_HEALTHY. Applied `accountant_expenses_ledger` (060), then `accountant_payment_channels_bank_reconciliation` (061). Both recorded in migration history.
+- DONE: Verified `school_expenses` and `bank_statement_entries` exist, both have RLS enabled, 8 policies exist across them, payment method constraint allows Cash/Bank Transfer/Mobile Money, and installment RPC accepts the method argument.
+- DONE: Applied `accountant_foreign_key_indexes` (062) to cover five Accountant foreign keys flagged by Supabase performance advisor. Follow-up migration file and canonical schema synchronization are being committed separately.
+- NOT DONE: No real fee, expense, or bank statement transactions were created; transaction flow requires controlled test records.
+- NOT DONE: Accountant payroll_manage and reports_export permissions remain ungranted pending School Admin approval.
