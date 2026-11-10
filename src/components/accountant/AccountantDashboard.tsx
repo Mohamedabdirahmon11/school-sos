@@ -26,9 +26,10 @@ import {
 export const AccountantDashboard: React.FC = () => {
   const { school, user } = useAuth();
   const dashboardData = useApi(() => Promise.all([
-    ApiClient.getStudents(), ApiClient.getFeePayments(), ApiClient.getFeeStructures()
+    ApiClient.getStudents(), ApiClient.getFeePayments(), ApiClient.getFeeStructures(),
+    ApiClient.getDailyIncome(), ApiClient.getArrears()
   ]), [school?.id], Boolean(school));
-  const [studentRows, paymentRows, structureRows] = dashboardData.data || [[], [], []];
+  const [studentRows, paymentRows, structureRows, dailyIncome, arrearsRows] = dashboardData.data || [[], [], [], null, []];
   const students: Student[] = Array.isArray(studentRows) ? studentRows : [];
   const payments: FeePayment[] = Array.isArray(paymentRows) ? paymentRows : [];
   const feeStructures: FeeStructureItem[] = Array.isArray(structureRows) ? structureRows : [];
@@ -201,7 +202,7 @@ export const AccountantDashboard: React.FC = () => {
       )}
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Total Collected</span>
@@ -237,6 +238,18 @@ export const AccountantDashboard: React.FC = () => {
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-blue-900">{activePayments.length}</div>
           <p className="text-[11px] text-blue-700 font-medium mt-1">Individual stamped transactions</p>
+        </div>
+        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase">Today's collection</span>
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono text-slate-900">
+            {formatMoney(Number(dailyIncome?.totalCollected) || 0, school?.currency)}
+          </div>
+          <p className="text-[11px] text-indigo-700 font-medium mt-1">{Number(dailyIncome?.paymentCount) || 0} cash receipts today</p>
         </div>
       </div>
 
@@ -275,6 +288,40 @@ export const AccountantDashboard: React.FC = () => {
                 )}
               </article>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* Student arrears */}
+      <section className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+        <div className="flex flex-col gap-1 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-[#132A29]">Students with outstanding balances</h2>
+            <p className="text-xs text-slate-500">Balances exclude voided receipts and use the stored remaining amount</p>
+          </div>
+          <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{Array.isArray(arrearsRows) ? arrearsRows.length : 0} students</span>
+        </div>
+        {!Array.isArray(arrearsRows) || arrearsRows.length === 0 ? (
+          <p className="px-4 py-7 text-center text-sm text-slate-500">No outstanding student balances.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                <tr><th className="p-3">Student</th><th className="p-3">Class</th><th className="p-3 text-right">Due</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Remaining</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {arrearsRows.slice(0, 10).map((row: any) => (
+                  <tr key={row.student?.id} className="hover:bg-slate-50">
+                    <td className="p-3 font-semibold text-slate-800">{[row.student?.firstName, row.student?.middleName, row.student?.lastName].filter(Boolean).join(' ') || row.student?.studentId || 'Student'}</td>
+                    <td className="p-3 text-slate-500">{row.className || 'Unassigned'}</td>
+                    <td className="p-3 text-right tabular-nums">{formatMoney(Number(row.totalDue) || 0, school?.currency)}</td>
+                    <td className="p-3 text-right tabular-nums">{formatMoney(Number(row.totalPaid) || 0, school?.currency)}</td>
+                    <td className="p-3 text-right font-bold tabular-nums text-amber-700">{formatMoney(Number(row.totalRemaining) || 0, school?.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {arrearsRows.length > 10 && <p className="border-t border-slate-100 px-4 py-2 text-right text-[11px] text-slate-500">Showing 10 of {arrearsRows.length} students</p>}
           </div>
         )}
       </section>
