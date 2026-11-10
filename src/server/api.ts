@@ -4510,7 +4510,7 @@ apiRouter.post('/bank-reconciliation', requireAuth, requireSchoolContext, requir
   const description = typeof body.description === 'string' ? body.description.trim() : '';
   const direction = body.direction;
   const amount = Number(body.amount);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(statementDate) || Number.isNaN(Date.parse(statementDate))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(statementDate) || Number.isNaN(Date.parse(statementDate))
     || description.length < 2 || description.length > 500
     || !['credit', 'debit'].includes(direction) || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99) {
     res.status(400).json({ error: 'Enter a valid statement date, description, direction and positive amount.' }); return;
