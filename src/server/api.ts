@@ -4531,7 +4531,7 @@ apiRouter.post('/bank-reconciliation/:id/match', requireAuth, requireSchoolConte
   const paymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId : undefined;
   const expenseId = typeof req.body?.expenseId === 'string' ? req.body.expenseId : undefined;
   if (Boolean(paymentId) === Boolean(expenseId)) { res.status(400).json({ error: 'Match one statement line to exactly one fee receipt or expense.' }); return; }
-  const entry = await db.matchBankStatementEntry(req.params.id, school.id, { paymentId, expenseId }, user.id);
+  const entry = await db.matchBankStatementEntry(req.params.id, school.id, { paymentId, expenseId });
   if (!entry) { res.status(409).json({ error: 'This statement line was already matched or no longer exists.' }); return; }
   db.logAudit({ action: 'BANK_STATEMENT_RECONCILED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Reconciled bank statement line ${entry.id}.`, severity: 'info' });
   await db.flush();
