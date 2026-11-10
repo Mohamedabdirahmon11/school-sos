@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
+import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import {
   LayoutDashboard, Building2, Receipt, Users, BarChart3, Radio, LifeBuoy,
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
@@ -17,7 +18,7 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }>; permission?: 'fees_manage' | 'payroll_manage' | 'reports_export' };
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
@@ -64,8 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [{ title: 'Finance', items: [
-      item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_fees', t('fees_payments'), CreditCard),
-      item('sch_reports', t('reports_export'), BarChart3), item('sch_payroll', t('payroll_management'), Wallet)
+      item('acc_dashboard', t('dashboard'), LayoutDashboard), { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
+      { ...item('sch_reports', t('reports_export'), BarChart3), permission: 'reports_export' }, { ...item('sch_payroll', t('payroll_management'), Wallet), permission: 'payroll_manage' }
     ] }];
 
     return [
@@ -120,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         {groups.map(group => <section key={group.title}>
           <h2 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50">{group.title}</h2>
           <div className="space-y-1">
-            {group.items.map(entry => {
+            {group.items.filter(entry => role !== 'accountant' || !entry.permission || hasStaffNavigationPermission(user?.permissions, entry.permission)).map(entry => {
               const Icon = entry.icon;
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
