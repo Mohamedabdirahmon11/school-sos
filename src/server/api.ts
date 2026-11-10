@@ -1231,7 +1231,13 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 apiRouter.get('/auth/me', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   const school = user.schoolId ? await getSchoolForRequest(req, user.schoolId) : null;
-  res.json({ user: sanitizeUser(user), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
+  // Accountant permissions live on the school-scoped staff record. Resolve them
+  // here so the client navigation matches the same record enforced by API guards.
+  const staff = user.role === 'accountant' && school ? await getStaffForRequest(req, user.id, school.id) : null;
+  const sessionUser = user.role === 'accountant'
+    ? { ...user, permissions: staff?.status === 'active' && Array.isArray(staff.permissions) ? staff.permissions : [] }
+    : user;
+  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
 });
 
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
