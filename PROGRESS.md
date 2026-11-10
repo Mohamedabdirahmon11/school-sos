@@ -1,3 +1,12 @@
+## Accountant bank statement CSV import (2026-11-10)
+
+- IN PROGRESS: PR #64 adds CSV parsing with quoted fields, ISO/day-first dates, credit/debit or separate credit/debit columns, row validation, a downloadable template, and a preview-before-import workflow.
+- IN PROGRESS: The API validates all rows, enforces the signed-in Accountant permission and school scope, skips exact duplicate transactions, and inserts accepted rows in one Supabase bulk insert. Maximum 500 rows / 2 MB.
+- ADDED: Parser regression tests and an HTTP test for school scoping, duplicate retry behavior, and rejecting invalid batches without partial writes.
+- SAFETY: No schema migration or existing financial-record update/delete is required. Existing bank statement records are not changed.
+- NOT YET VERIFIED: GitHub Actions must pass TypeScript, the full test suite, route parity, RLS source audit, and production build before merge.
+- REMAINING ACCOUNTANT LIMITS: Split-settlement reconciliation (one bank line against multiple receipts/expenses) still requires a reviewed schema migration; live desktop/mobile browser visual review still requires a real browser session. No bank-provider connection is included.
+
 
  
 ## Accountant workspace design refresh (2026-11-10)
