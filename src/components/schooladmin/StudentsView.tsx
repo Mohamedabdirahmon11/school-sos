@@ -322,12 +322,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <th className="px-5 py-4">Class</th>
                   <th className="px-5 py-4">Guardian</th>
                   <th className="px-5 py-4">Fees</th>
+                  <th className="px-5 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={6} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
@@ -358,6 +359,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           }`}>
                             {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
                           </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button type="button" disabled={isReadOnly} onClick={event => {
+                            event.stopPropagation();
+                            setSelectedStudent(s);
+                            setModalError(null);
+                            setEditForm({ firstName: s.firstName || '', middleName: s.middleName || '', lastName: s.lastName || '', gender: s.gender || 'male', studentPhone: s.studentPhone || '', fatherPhone: s.fatherPhone || '', motherPhone: s.motherPhone || '', classId: s.classId || '' });
+                            setShowEditModal(true);
+                          }} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[11px] font-semibold text-[#0F766E] hover:bg-[#F0FDFA] disabled:opacity-50">Edit</button>
                         </td>
                       </tr>
                     );
