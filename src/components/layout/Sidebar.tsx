@@ -64,10 +64,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing),
       item('st_messages', t('messages'), MessageSquare)
     ] }];
-    if (role === 'accountant') return [{ title: 'Finance', items: [
-      item('acc_dashboard', t('dashboard'), LayoutDashboard), { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' }, { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' }, { ...item('acc_bank_reconciliation', 'Bank reconciliation', Building2), permission: 'fees_manage' },
-      { ...item('sch_reports', t('reports_export'), BarChart3), permission: 'reports_export' }, { ...item('sch_payroll', t('payroll_management'), Wallet), permission: 'payroll_manage' }
-    ] }];
+    if (role === 'accountant') return [
+      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'Daily operations', items: [
+        { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
+        { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },
+        { ...item('acc_bank_reconciliation', 'Bank reconciliation', Building2), permission: 'fees_manage' }
+      ] },
+      { title: 'Financial management', items: [
+        { ...item('sch_reports', t('reports_export'), BarChart3), permission: 'reports_export' },
+        { ...item('sch_payroll', t('payroll_management'), Wallet), permission: 'payroll_manage' }
+      ] }
+    ];
 
     return [
       { title: 'Overview', items: [item('sch_dashboard', t('dashboard'), LayoutDashboard)] },

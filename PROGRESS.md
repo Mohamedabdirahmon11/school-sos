@@ -1,4 +1,13 @@
 
+ 
+## Accountant workspace design refresh (2026-11-10)
+
+- DONE: Added a dedicated Accountant-only visual theme for the app shell, sidebar, header, content canvas, tables, forms, dialogs, and mobile navigation. The theme is isolated from School Admin and Super Admin layouts.
+- DONE: Reorganized Accountant navigation into Workspace, Daily operations, and Financial management groups. Existing permission checks remain attached to fee, expense, reconciliation, reports, and payroll destinations.
+- DONE: Replaced the Accountant mobile quick-link from Reports to Expenses & cashbook; reports and payroll remain available from the permission-filtered menu.
+- SAFETY: Presentation and navigation-label changes only. No finance records, database schema, payment logic, or tenant-scoping rules are changed.
+- NOT YET VERIFIED: GitHub Actions must pass before merge. Browser-level visual review is still required on desktop and mobile; CSS-only changes do not prove every form's business workflow.
+
 ## Request write-amplification fix (2026-11-03)
 
 - DONE: Settings and plan cache hits now register the current request's persistence baseline. Default-merged settings/plans are compared using the same Supabase column mapping as writes, preventing unrelated authenticated GET requests from repeatedly upserting unchanged configuration.

@@ -990,3 +990,310 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+ 
+/* --------------------------------------------------------------------------
+   Accountant workspace — dedicated finance operations visual system.
+   Isolated from School Admin and Super Admin styling; no data or API changes.
+   -------------------------------------------------------------------------- */
+.accountant-design {
+  --acc-canvas: #f3f6fa;
+  --acc-ink: #152b40;
+  --acc-muted: #718397;
+  --acc-line: #e2eaf1;
+  --acc-sidebar: #10283e;
+  --acc-sidebar-deep: #0b2034;
+  --acc-accent: #168477;
+  --acc-accent-dark: #106b61;
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--acc-ink);
+  background: var(--acc-canvas) !important;
+  -webkit-font-smoothing: antialiased;
+}
+.accountant-design > .flex-1.flex.overflow-hidden { min-height: 0; overflow: hidden; }
+.accountant-design aside {
+  width: 264px;
+  flex: 0 0 264px;
+  height: 100%;
+  max-height: 100%;
+  border: 0;
+  border-right: 1px solid rgba(222,235,246,.1);
+  background: linear-gradient(180deg, #142f49 0%, var(--acc-sidebar) 56%, var(--acc-sidebar-deep) 100%) !important;
+  box-shadow: 10px 0 32px rgba(13,35,57,.09);
+}
+.accountant-design aside > div:first-child {
+  height: 82px;
+  min-height: 82px;
+  padding-inline: 20px;
+  border-bottom-color: rgba(223,238,249,.12);
+  background: rgba(255,255,255,.025);
+}
+.accountant-design aside > div:first-child > div:first-child {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(145deg,#38b8a6,#147d78);
+  box-shadow: 0 8px 18px rgba(2,20,34,.24);
+}
+.accountant-design aside > div:first-child > div:nth-child(2) > div:first-child {
+  color: #f4f8fc;
+  font-size: 14px;
+  letter-spacing: -.015em;
+}
+.accountant-design aside > div:first-child > div:nth-child(2) > div:last-child {
+  color: #8fb9c5;
+  font-size: 9px;
+  letter-spacing: .13em;
+}
+.accountant-design aside nav {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(149,190,205,.3) transparent;
+  padding: 22px 13px 24px;
+  gap: 25px;
+}
+.accountant-design aside nav section h2 {
+  margin-bottom: 9px;
+  padding-inline: 12px;
+  color: #7897ac;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+.accountant-design aside nav section > div { gap: 4px; }
+.accountant-design aside nav button {
+  min-height: 43px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #c0d0dc;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .005em;
+}
+.accountant-design aside nav button:hover {
+  color: #fff;
+  background: rgba(255,255,255,.075);
+  border-color: rgba(255,255,255,.045);
+}
+.accountant-design aside nav button[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(105deg,#17877e,#176d70) !important;
+  border-color: rgba(180,244,231,.18);
+  box-shadow: 0 7px 17px rgba(2,19,32,.22), inset 0 1px 0 rgba(255,255,255,.1);
+}
+.accountant-design aside nav button svg { color: #91b7c5; }
+.accountant-design aside nav button[aria-current="page"] svg { color: #fff; }
+.accountant-design aside > div:last-child {
+  min-height: 66px;
+  padding: 13px 17px;
+  border-top-color: rgba(223,238,249,.12);
+  background: rgba(2,15,27,.34);
+}
+.accountant-design aside > div:last-child p:first-child { color: #f1f6fb; font-size: 11px; }
+.accountant-design aside > div:last-child p:last-child { color: #8ca9bb; font-size: 10px; }
+.accountant-design header {
+  min-height: 68px;
+  height: 68px;
+  padding-inline: clamp(16px,2.5vw,34px);
+  border: 0;
+  border-bottom: 1px solid var(--acc-line);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 3px 18px rgba(23,47,70,.035);
+  backdrop-filter: blur(14px);
+}
+.accountant-design header > div:first-child span {
+  color: #213d55;
+  font-size: 12px;
+  font-weight: 750;
+}
+.accountant-design header button { border-radius: 10px; }
+.accountant-design header button:hover { background: #f1f6f8; }
+.accountant-design header button svg { color: #648095; }
+.accountant-design main {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(ellipse at 92% 0%, rgba(37,143,139,.055), transparent 34%),
+    var(--acc-canvas);
+  scrollbar-width: thin;
+  scrollbar-color: #c6d3df transparent;
+}
+.accountant-design main > div {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1600px;
+  min-height: 100%;
+  margin-inline: auto;
+  padding: 30px clamp(16px,2.7vw,38px) 42px;
+  color: var(--acc-ink);
+}
+.accountant-design main h1 {
+  color: #172f46;
+  font-size: clamp(22px,2vw,28px);
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -.04em;
+}
+.accountant-design main h2 {
+  color: #203c54;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.018em;
+}
+.accountant-design main h3 { color: #2b465c; font-weight: 750; }
+.accountant-design main p { line-height: 1.55; }
+.accountant-design main :is(.bg-white,[class*="bg-white/"]) {
+  background-color: #fff;
+}
+.accountant-design main :is(.rounded-xl,.rounded-2xl) { border-radius: 17px; }
+.accountant-design main :is(.border,.border-b,.border-t) { border-color: var(--acc-line); }
+.accountant-design main :is(.shadow-sm,.shadow-md) {
+  box-shadow: 0 7px 24px rgba(26,52,75,.045), 0 1px 2px rgba(26,52,75,.025);
+}
+.accountant-design main :is(.text-slate-900,.text-slate-800) { color: #1c344a; }
+.accountant-design main :is(.text-slate-600,.text-slate-500) { color: #6b7f91; }
+.accountant-design main :is(input,select,textarea) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  color: #263f54;
+  background: #fff;
+  border: 1px solid #d7e2eb;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgba(20,43,64,.025);
+  transition: border-color .16s ease,box-shadow .16s ease;
+}
+.accountant-design main textarea { min-height: 96px; line-height: 1.55; }
+.accountant-design main :is(input,select,textarea)::placeholder { color: #9aabba; }
+.accountant-design main :is(input,select,textarea):focus {
+  border-color: var(--acc-accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(22,132,119,.13);
+}
+.accountant-design main :is(input,select,textarea):disabled {
+  color: #8a9aaa;
+  background: #f2f5f8;
+  cursor: not-allowed;
+}
+.accountant-design main label {
+  display: block;
+  margin-bottom: 6px;
+  color: #526a7e;
+  font-size: 11px;
+  font-weight: 700;
+}
+.accountant-design main button {
+  min-height: 36px;
+  border-radius: 10px;
+  font-weight: 650;
+  transition: background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease;
+}
+.accountant-design main button:focus-visible,
+.accountant-design aside button:focus-visible {
+  outline: 3px solid rgba(32,169,153,.32);
+  outline-offset: 2px;
+}
+.accountant-design main button:disabled { opacity: .56; cursor: not-allowed; }
+.accountant-design main button[class*="bg-teal-700"],
+.accountant-design main button[class*="bg-[#0F766E]"] {
+  background-color: var(--acc-accent) !important;
+  box-shadow: 0 3px 9px rgba(22,132,119,.15);
+}
+.accountant-design main button[class*="bg-teal-700"]:hover,
+.accountant-design main button[class*="bg-[#0F766E]"]:hover {
+  background-color: var(--acc-accent-dark) !important;
+}
+.accountant-design main table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.accountant-design main table thead { background: #f5f8fb; }
+.accountant-design main table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 13px 14px;
+  color: #71869a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--acc-line);
+}
+.accountant-design main table tbody td {
+  padding: 13px 14px;
+  color: #52697d;
+  font-size: 11px;
+  border-bottom: 1px solid #edf1f5;
+}
+.accountant-design main table tbody tr { transition: background-color .14s ease; }
+.accountant-design main table tbody tr:hover { background: #f5faf9; }
+.accountant-design main table tbody tr:last-child td { border-bottom: 0; }
+.accountant-design main :is(.overflow-x-auto,[class*="overflow-auto"]) {
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #c4d2de transparent;
+  overscroll-behavior-x: contain;
+}
+.accountant-design main :is(.bg-emerald-50,.bg-green-50) {
+  border-color: #d5eee5;
+  color: #176c55;
+}
+.accountant-design main :is(.bg-amber-50,.bg-yellow-50) {
+  border-color: #f1e5c9;
+}
+.accountant-design main :is(.bg-rose-50,.bg-red-50) { border-color: #f2d8dc; }
+.accountant-design main :is(.fixed.inset-0 > div,.fixed.inset-0 [role="dialog"]) {
+  max-height: min(90dvh,900px);
+  overflow-y: auto;
+  border: 1px solid var(--acc-line);
+  border-radius: 20px;
+  box-shadow: 0 24px 72px rgba(13,35,57,.22);
+}
+.accountant-design main .animate-pulse { border-color: var(--acc-line); }
+.accountant-design > nav.md\:hidden {
+  min-height: 62px;
+  height: 62px;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--acc-line);
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 -8px 26px rgba(21,46,68,.08);
+  backdrop-filter: blur(16px);
+}
+.accountant-design > nav.md\:hidden button {
+  min-height: 46px;
+  border-radius: 11px;
+}
+.accountant-design > nav.md\:hidden button.text-\[\#0F766E\] { color: var(--acc-accent) !important; }
+@media (max-width: 767px) {
+  .accountant-design aside { width: min(84vw,310px); flex-basis: auto; height: 100dvh; }
+  .accountant-design header { min-height: 58px; height: 58px; padding-inline: 13px; }
+  .accountant-design main { padding-bottom: 70px; }
+  .accountant-design main > div { padding: 21px 15px 30px; }
+  .accountant-design main h1 { font-size: 21px; }
+  .accountant-design main :is(.grid-cols-2,.grid-cols-3,.grid-cols-4) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .accountant-design main table { min-width: 660px; }
+  .accountant-design main .fixed.inset-0 { align-items: flex-end; padding: 10px; }
+  .accountant-design main .fixed.inset-0 > div { width: 100%; max-width: 100%; max-height: 88dvh; border-radius: 20px 20px 14px 14px; }
+}
+@media (max-width: 420px) {
+  .accountant-design main :is(.grid-cols-2,.grid-cols-3,.grid-cols-4) { grid-template-columns: minmax(0,1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .accountant-design *, .accountant-design *::before, .accountant-design *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

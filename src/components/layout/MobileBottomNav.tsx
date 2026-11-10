@@ -63,7 +63,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
       return [
         { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
         { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
-        { id: 'sch_reports', label: 'Reports', icon: FileSpreadsheet }
+        { id: 'acc_expenses', label: 'Expenses', icon: FileText }
       ];
     }
     // School Admin default
