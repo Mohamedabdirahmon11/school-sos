@@ -296,6 +296,9 @@ export class InMemorySupabase {
         if (!payment || payment.voided_at || payment.voidedAt || !['Bank Transfer', 'Mobile Money'].includes(String(payment.payment_method ?? payment.paymentMethod))) {
           return { data: null, error: { message: 'Choose a valid, non-void bank/mobile fee receipt from this school.' } };
         }
+        const legacyMatched = this.rows('bank_statement_entries').some(row =>
+          String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_payment_id ?? row.matchedPaymentId) === paymentId);
+        if (legacyMatched) return { data: null, error: { message: 'This receipt is already reconciled to another bank statement line.' } };
         const targetAllocated = allocations.filter(row => String(row.payment_id ?? row.paymentId) === paymentId && String(row.school_id ?? row.schoolId) === schoolId)
           .reduce((sum, row) => sum + Number(row.amount), 0);
         if (targetAllocated + amount > Number(payment.amount_paid ?? payment.amountPaid) + 0.0001) {
@@ -308,6 +311,9 @@ export class InMemorySupabase {
         if (!expense || String(expense.status) !== 'posted' || expense.voided_at || expense.voidedAt || !['bank_transfer', 'mobile_money'].includes(String(expense.payment_method ?? expense.paymentMethod))) {
           return { data: null, error: { message: 'Choose a valid, posted bank/mobile expense from this school.' } };
         }
+        const legacyMatched = this.rows('bank_statement_entries').some(row =>
+          String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_expense_id ?? row.matchedExpenseId) === expenseId);
+        if (legacyMatched) return { data: null, error: { message: 'This expense is already reconciled to another bank statement line.' } };
         const targetAllocated = allocations.filter(row => String(row.expense_id ?? row.expenseId) === expenseId && String(row.school_id ?? row.schoolId) === schoolId)
           .reduce((sum, row) => sum + Number(row.amount), 0);
         if (targetAllocated + amount > Number(expense.amount) + 0.0001) {
