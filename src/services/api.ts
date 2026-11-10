@@ -659,6 +659,13 @@ export class ApiClient {
     return this.createTeacher(data, schoolId);
   }
 
+  public static async updateTeacher(id: string, updates: Partial<Teacher>) {
+    return this.request<Teacher>(`/teachers/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  }
+
   public static async getSchoolDashboard(schoolId?: string) {
     const data = await this.request<any>('/school/dashboard');
     if (data && typeof data === 'object') return data;
