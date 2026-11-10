@@ -3429,6 +3429,63 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   );
 });
 
+apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const id = String(req.params.id || '');
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const rows = await db.queryPage('teachers', { school_id: school.id, id }, 1, 1, undefined, LIST_QUERY_COLUMNS.teachers);
+  const current = rows.items[0] as any;
+  if (!current) { res.status(404).json({ error: 'Teacher was not found in this school.' }); return; }
+  const updates: Record<string, unknown> = {};
+  for (const field of ['fullName', 'phone', 'qualification', 'department'] as const) {
+    if (body[field] === undefined) continue;
+    const value = body[field];
+    if (typeof value !== 'string' || value.trim().length > (field === 'phone' ? 30 : 120)) {
+      res.status(400).json({ error: `${field} must be valid text.` }); return;
+    }
+    if (field === 'fullName' && !value.trim()) { res.status(400).json({ error: 'Teacher name is required.' }); return; }
+    if (field === 'phone' && value.trim() && !validImportPhone(value.trim())) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
+    updates[field] = value.trim();
+  }
+  if (body.gender !== undefined) {
+    if (!['male', 'female'].includes(body.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+    updates.gender = body.gender;
+  }
+  if (body.status !== undefined) {
+    if (!['active', 'inactive', 'on_leave'].includes(body.status)) { res.status(400).json({ error: 'Teacher status is invalid.' }); return; }
+    updates.status = body.status;
+  }
+  if (body.monthlySalary !== undefined) {
+    const salary = Number(body.monthlySalary);
+    if (!Number.isFinite(salary) || salary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
+    updates.monthlySalary = salary;
+  }
+  for (const [field, table] of [['assignedClasses', 'classes'], ['assignedSubjects', 'subjects']] as const) {
+    if (body[field] === undefined) continue;
+    const values = body[field];
+    if (!Array.isArray(values) || values.length > 100 || values.some((value: unknown) => typeof value !== 'string' || !value.trim())) {
+      res.status(400).json({ error: `Assigned ${table} are invalid.` }); return;
+    }
+    const ids = [...new Set((values as string[]).map(value => value.trim()))];
+    const valid = ids.length ? await queryAllRows(table, { school_id: school.id, id: ids }, 'id') : [];
+    if (valid.length !== ids.length) { res.status(400).json({ error: `Every assigned ${table} must belong to this school.` }); return; }
+    updates[field] = ids;
+  }
+  const updated = db.updateTeacher(id, updates as any);
+  if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
+  if (current.userId) {
+    const accountUpdates: Record<string, unknown> = {};
+    if (updates.fullName !== undefined) accountUpdates.fullName = updates.fullName;
+    if (updates.phone !== undefined) accountUpdates.phone = updates.phone;
+    if (updates.assignedClasses !== undefined) accountUpdates.assignedClassIds = updates.assignedClasses;
+    if (updates.assignedSubjects !== undefined) accountUpdates.assignedSubjectIds = updates.assignedSubjects;
+    if (Object.keys(accountUpdates).length) db.updateUser(String(current.userId), accountUpdates as any);
+  }
+  db.logAudit({ action: 'TEACHER_PROFILE_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated teacher profile ${id}.` });
+  await db.flush();
+  res.json(updated);
+});
+
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
