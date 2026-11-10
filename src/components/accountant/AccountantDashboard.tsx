@@ -216,6 +216,17 @@ export const AccountantDashboard: React.FC = () => {
         </div>
       </div>
 
+      {(!user?.permissions?.includes('payroll_manage') || !user?.permissions?.includes('reports_export')) && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-950">
+          <p className="font-bold">Some finance tools need additional access</p>
+          <p className="mt-1 text-amber-900/80">
+            {!user?.permissions?.includes('payroll_manage') ? 'Payroll is not assigned to this Accountant account. ' : ''}
+            {!user?.permissions?.includes('reports_export') ? 'Financial report exports are not assigned. ' : ''}
+            Ask the School Admin to enable the required permissions in Staff Access. Your current Fees and Expenses access remains available.
+          </p>
+        </section>
+      )}
+
       {message && (
         <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-[#0F766E] flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
