@@ -58,7 +58,7 @@ export const AccountantExpensesView: React.FC = () => {
     const fields = ['Date', 'Description', 'Category', 'Vendor', 'Amount', 'Currency', 'Payment method', 'Reference', 'Status', 'Void reason'];
     const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const lines = [fields, ...visible.map(row => [row.expenseDate, row.description, row.category, row.vendor, row.amount, school?.currency || 'ETB', row.paymentMethod, row.reference, row.status, row.voidReason])];
-    const blob = new Blob(['\\uFEFF' + lines.map(line => line.map(escape).join(',')).join('\\r\\n')], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + lines.map(line => line.map(escape).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob); const link = document.createElement('a');
     link.href = url; link.download = `school-expenses-${month}.csv`; link.click(); URL.revokeObjectURL(url);
   };
