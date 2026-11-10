@@ -13,6 +13,7 @@ import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeM
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
+import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -23,6 +24,7 @@ const BroadcastsView = React.lazy(() => import('./components/superadmin/Broadcas
 const SupportAuditView = React.lazy(() => import('./components/superadmin/SupportAuditView.tsx').then(module => ({ default: module.SupportAuditView })));
 const PlatformSettingsView = React.lazy(() => import('./components/superadmin/PlatformSettingsView.tsx').then(module => ({ default: module.PlatformSettingsView })));
 const SchoolDashboard = React.lazy(() => import('./components/schooladmin/SchoolDashboard.tsx').then(module => ({ default: module.SchoolDashboard })));
+const SchoolSetupWizard = React.lazy(() => import('./components/schooladmin/SchoolSetupWizard.tsx').then(module => ({ default: module.SchoolSetupWizard })));
 const StudentsView = React.lazy(() => import('./components/schooladmin/StudentsView.tsx').then(module => ({ default: module.StudentsView })));
 const TeachersView = React.lazy(() => import('./components/schooladmin/TeachersView.tsx').then(module => ({ default: module.TeachersView })));
 const ParentsView = React.lazy(() => import('./components/schooladmin/ParentsView.tsx').then(module => ({ default: module.ParentsView })));
@@ -49,7 +51,7 @@ const ParentPortalView = React.lazy(() => import('./components/parent/ParentPort
 const StudentPortalView = React.lazy(() => import('./components/student/StudentPortalView.tsx').then(module => ({ default: module.StudentPortalView })));
 
 const AppContent: React.FC = () => {
-  const { user, school, inspectedSchool, isLoading } = useAuth();
+  const { user, school, inspectedSchool, isLoading, refreshUser, t } = useAuth();
   const [apiFailure, setApiFailure] = useState<{ status: number; message: string; code?: string } | null>(null);
   const [currentView, setCurrentView] = useState<string>('default');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -123,11 +125,23 @@ const AppContent: React.FC = () => {
     return 'sch_dashboard';
   };
 
-  const requestedView = getEffectiveView();
-  const activeView = user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard' : requestedView;
+  const setupRequired = user.role === 'school_admin' && !school?.setupProgress?.completedAt;
+  const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
+  const activeView = setupRequired
+    ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
+    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
+    if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
+      setCurrentView('sch_setup');
+      return;
+    }
     setCurrentView(view);
+  };
+
+  const handleSetupComplete = async () => {
+    await refreshUser();
+    setCurrentView('sch_dashboard');
   };
 
   return (
@@ -148,23 +162,36 @@ const AppContent: React.FC = () => {
       <ReadOnlyBanner onRenewClick={() => setCurrentView(user.role === 'super_admin' ? 'sa_schools' : 'sch_support')} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar & Mobile Drawer */}
-        <Sidebar
-          currentView={activeView}
-          onNavigate={handleNavigate}
-          isOpenMobile={mobileMenuOpen}
-          onCloseMobile={() => setMobileMenuOpen(false)}
-        />
+        {/* Keep first-time School Admins in setup until the required checklist is complete. */}
+        {!setupRequired && (
+          <Sidebar
+            currentView={activeView}
+            onNavigate={handleNavigate}
+            isOpenMobile={mobileMenuOpen}
+            onCloseMobile={() => setMobileMenuOpen(false)}
+          />
+        )}
 
         {/* Main Viewport Hub */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <Header
-            currentView={activeView}
-            onNavigate={handleNavigate}
-          />
+          {!setupRequired && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
           <main className="flex-1 overflow-y-auto pb-16 md:pb-6">
+            {setupRequired && activeView !== 'sch_setup' && (
+              <div className="mx-auto w-full max-w-6xl px-4 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+                  <span>{t('setup_in_progress')}</span>
+                  <button type="button" onClick={() => setCurrentView('sch_setup')} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800">
+                    {t('setup_return')}
+                  </button>
+                </div>
+              </div>
+            )}
             <React.Suspense fallback={<div className="p-6 space-y-4" aria-label="Loading screen"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map(item => <div key={item} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />)}</div><div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>}>
+            {activeView === 'sch_setup' && (
+              <SchoolSetupWizard onNavigate={handleNavigate} onComplete={handleSetupComplete} />
+            )}
+
             {/* SUPER ADMIN ROUTING */}
             {activeView === 'sa_dashboard' && (
               <SuperAdminDashboard
@@ -248,8 +275,8 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_admissions' && (
               <AdmissionsView />
             )}
-            {activeView === 'sch_settings' && (
-              <SchoolSettingsView />
+            {(activeView === 'sch_settings' || activeView === 'sch_setup_academics') && (
+              <SchoolSettingsView key={activeView} initialTab={activeView === 'sch_setup_academics' ? 'academics' : 'identity'} />
             )}
             {activeView === 'sch_support' && (
               <SchoolSupportView />
@@ -304,11 +331,13 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Mobile Touch Bottom Navigation */}
-      <MobileBottomNav
-        currentView={activeView}
-        onNavigate={handleNavigate}
-        onOpenMenu={() => setMobileMenuOpen(true)}
-      />
+      {!setupRequired && (
+        <MobileBottomNav
+          currentView={activeView}
+          onNavigate={handleNavigate}
+          onOpenMenu={() => setMobileMenuOpen(true)}
+        />
+      )}
     </div>
   );
 };
