@@ -262,10 +262,76 @@ export class InMemorySupabase {
       const notes = args?.p_notes ? [payment.notes, String(args.p_notes).trim()].filter(Boolean).join(' · ') : payment.notes;
       Object.assign(payment, {
         amountPaid, amount_paid: amountPaid, remainingAmount: remaining, remaining_amount: remaining,
+        paymentMethod: args?.p_payment_method || 'Cash', payment_method: args?.p_payment_method || 'Cash',
         status, date: new Date().toISOString().slice(0, 10), recordedBy: args?.p_recorded_by, recorded_by: args?.p_recorded_by,
         idempotencyKeys: nextKeys, idempotency_keys: nextKeys, notes
       });
       return { data: payment, error: null };
+    }
+    if (name === 'schoolos_allocate_bank_statement') {
+      const schoolId = String(args?.p_school_id || '');
+      const entryId = String(args?.p_statement_entry_id || '');
+      const paymentId = args?.p_payment_id ? String(args.p_payment_id) : null;
+      const expenseId = args?.p_expense_id ? String(args.p_expense_id) : null;
+      const amount = Number(args?.p_amount);
+      if (!schoolId || !entryId || !args?.p_created_by || !Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== amount * 100 || Boolean(paymentId) === Boolean(expenseId)) {
+        return { data: null, error: { message: 'Invalid bank statement allocation details.' } };
+      }
+      const entry = this.rows('bank_statement_entries').find(row =>
+        String(row.id) === entryId && String(row.school_id ?? row.schoolId) === schoolId);
+      if (!entry) return { data: null, error: { message: 'Bank statement line not found for this school.' } };
+      if (entry.matched_at || entry.matchedAt || entry.matched_payment_id || entry.matched_expense_id) {
+        return { data: null, error: { message: 'This bank statement line was already reconciled.' } };
+      }
+      const allocations = this.rows('bank_statement_allocations');
+      const statementAllocated = allocations.filter(row => String(row.statement_entry_id ?? row.statementEntryId) === entryId && String(row.school_id ?? row.schoolId) === schoolId)
+        .reduce((sum, row) => sum + Number(row.amount), 0);
+      if (statementAllocated + amount > Number(entry.amount) + 0.0001) {
+        return { data: null, error: { message: 'Allocation exceeds the remaining bank statement amount.' } };
+      }
+      let targetId: string;
+      if (paymentId) {
+        if (String(entry.direction) !== 'credit') return { data: null, error: { message: 'Bank debits must be allocated to expenses.' } };
+        const payment = this.rows('fee_payments').find(row => String(row.id) === paymentId && String(row.school_id ?? row.schoolId) === schoolId);
+        if (!payment || payment.voided_at || payment.voidedAt || !['Bank Transfer', 'Mobile Money'].includes(String(payment.payment_method ?? payment.paymentMethod))) {
+          return { data: null, error: { message: 'Choose a valid, non-void bank/mobile fee receipt from this school.' } };
+        }
+        const legacyMatched = this.rows('bank_statement_entries').some(row =>
+          String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_payment_id ?? row.matchedPaymentId) === paymentId);
+        if (legacyMatched) return { data: null, error: { message: 'This receipt is already reconciled to another bank statement line.' } };
+        const targetAllocated = allocations.filter(row => String(row.payment_id ?? row.paymentId) === paymentId && String(row.school_id ?? row.schoolId) === schoolId)
+          .reduce((sum, row) => sum + Number(row.amount), 0);
+        if (targetAllocated + amount > Number(payment.amount_paid ?? payment.amountPaid) + 0.0001) {
+          return { data: null, error: { message: 'Allocation exceeds the unreconciled receipt amount.' } };
+        }
+        targetId = paymentId;
+      } else {
+        if (String(entry.direction) !== 'debit') return { data: null, error: { message: 'Bank credits must be allocated to fee receipts.' } };
+        const expense = this.rows('school_expenses').find(row => String(row.id) === expenseId && String(row.school_id ?? row.schoolId) === schoolId);
+        if (!expense || String(expense.status) !== 'posted' || expense.voided_at || expense.voidedAt || !['bank_transfer', 'mobile_money'].includes(String(expense.payment_method ?? expense.paymentMethod))) {
+          return { data: null, error: { message: 'Choose a valid, posted bank/mobile expense from this school.' } };
+        }
+        const legacyMatched = this.rows('bank_statement_entries').some(row =>
+          String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_expense_id ?? row.matchedExpenseId) === expenseId);
+        if (legacyMatched) return { data: null, error: { message: 'This expense is already reconciled to another bank statement line.' } };
+        const targetAllocated = allocations.filter(row => String(row.expense_id ?? row.expenseId) === expenseId && String(row.school_id ?? row.schoolId) === schoolId)
+          .reduce((sum, row) => sum + Number(row.amount), 0);
+        if (targetAllocated + amount > Number(expense.amount) + 0.0001) {
+          return { data: null, error: { message: 'Allocation exceeds the unreconciled expense amount.' } };
+        }
+        targetId = expenseId!;
+      }
+      const duplicate = allocations.some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId &&
+        String(row.statement_entry_id ?? row.statementEntryId) === entryId &&
+        String(paymentId ? row.payment_id ?? row.paymentId ?? '' : row.expense_id ?? row.expenseId ?? '') === targetId);
+      if (duplicate) return { data: null, error: { message: 'This receipt or expense already has an allocation on this statement line.' } };
+      const row = {
+        id: `bsa-test-${Date.now()}-${allocations.length}`, school_id: schoolId, statement_entry_id: entryId,
+        payment_id: paymentId, expense_id: expenseId, amount, created_by: args.p_created_by, created_at: new Date().toISOString()
+      };
+      allocations.push(row);
+      return { data: row, error: null };
     }
     if (name === 'schoolos_void_fee_payment') {
       const payment = this.rows('fee_payments').find(row =>
@@ -273,6 +339,13 @@ export class InMemorySupabase {
         && String(row.schoolId ?? row.school_id) === String(args?.p_school_id)
       );
       if (!payment || payment.voidedAt || payment.voided_at) return { data: null, error: null };
+      const paymentId = String(args?.p_payment_id);
+      const schoolId = String(args?.p_school_id);
+      const hasAllocation = this.rows('bank_statement_allocations').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.payment_id ?? row.paymentId) === paymentId);
+      const hasLegacyMatch = this.rows('bank_statement_entries').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_payment_id ?? row.matchedPaymentId) === paymentId);
+      if (hasAllocation || hasLegacyMatch) return { data: null, error: { message: 'This receipt is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.' } };
       const now = new Date().toISOString();
       Object.assign(payment, {
         voidedAt: now,
@@ -284,13 +357,30 @@ export class InMemorySupabase {
       });
       return { data: payment, error: null };
     }
+    if (name === 'schoolos_void_school_expense') {
+      const expenseId = String(args?.p_expense_id || '');
+      const schoolId = String(args?.p_school_id || '');
+      const expense = this.rows('school_expenses').find(row =>
+        String(row.id) === expenseId && String(row.school_id ?? row.schoolId) === schoolId && String(row.status) === 'posted');
+      if (!expense) return { data: null, error: null };
+      const hasAllocation = this.rows('bank_statement_allocations').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.expense_id ?? row.expenseId) === expenseId);
+      const hasLegacyMatch = this.rows('bank_statement_entries').some(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.matched_expense_id ?? row.matchedExpenseId) === expenseId);
+      if (hasAllocation || hasLegacyMatch) return { data: null, error: { message: 'This expense is reconciled to a bank statement and cannot be voided until the reconciliation is reversed.' } };
+      Object.assign(expense, {
+        status: 'void', voidedAt: new Date().toISOString(), voided_at: new Date().toISOString(),
+        voidedBy: args?.p_user_id, voided_by: args?.p_user_id, voidReason: args?.p_reason, void_reason: args?.p_reason
+      });
+      return { data: expense, error: null };
+    }
     if (name === 'schoolos_restore_school_backup') {
       const payload = args?.p_payload || {};
       const backup = payload.backup || {};
       if (payload.confirm !== true || backup.school?.id !== payload.school_id || !backup.tables || typeof backup.tables !== 'object') {
         return { data: null, error: { message: 'A confirmed school backup belonging to this school is required.' } };
       }
-      const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
+      const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
       const tableNames = [...allowed];
       const snapshots = new Map<string, any[]>(tableNames.concat(['audit_logs']).map(table => [table, structuredClone(this.rows(table))] as [string, any[]]));
       const restored: Record<string, number> = {};

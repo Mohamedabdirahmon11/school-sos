@@ -965,7 +965,7 @@ export class ApiClient {
   }
 
   public static async getBankReconciliation() {
-    return this.request<{ entries: import('../types/index.ts').BankStatementEntry[]; unmatchedPayments: FeePayment[]; unmatchedExpenses: SchoolExpense[] }>('/bank-reconciliation');
+    return this.request<{ entries: import('../types/index.ts').BankStatementEntry[]; unmatchedPayments: Array<FeePayment & { reconciliationRemainingAmount: number }>; unmatchedExpenses: Array<SchoolExpense & { reconciliationRemainingAmount: number }> }>('/bank-reconciliation');
   }
 
   public static async createBankStatementEntry(data: { statementDate: string; description: string; direction: 'credit' | 'debit'; amount: number; reference?: string; bankAccountLabel?: string }) {
@@ -980,6 +980,12 @@ export class ApiClient {
 
   public static async matchBankStatementEntry(id: string, match: { paymentId?: string; expenseId?: string }) {
     return this.request<import('../types/index.ts').BankStatementEntry>(`/bank-reconciliation/${encodeURIComponent(id)}/match`, { method: 'POST', body: JSON.stringify(match) });
+  }
+
+  public static async allocateBankStatementAmount(id: string, allocation: { paymentId?: string; expenseId?: string; amount: number }) {
+    return this.request<import('../types/index.ts').BankStatementAllocation>(`/bank-reconciliation/${encodeURIComponent(id)}/allocations`, {
+      method: 'POST', body: JSON.stringify(allocation)
+    });
   }
   public static async getSchoolExpenses() {
     return this.request<SchoolExpense[]>('/expenses');

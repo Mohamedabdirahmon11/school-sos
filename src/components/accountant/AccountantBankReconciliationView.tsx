@@ -5,7 +5,7 @@ import { formatMoney } from '../../lib/money.ts';
 import type { BankStatementEntry, FeePayment, SchoolExpense } from '../../types/index.ts';
 import { BANK_STATEMENT_CSV_TEMPLATE, parseBankStatementCsv, type BankStatementCsvIssue, type BankStatementImportRow } from '../../lib/bank-statement-csv.ts';
 
-type ReconciliationData = { entries: BankStatementEntry[]; unmatchedPayments: FeePayment[]; unmatchedExpenses: SchoolExpense[] };
+type ReconciliationData = { entries: BankStatementEntry[]; unmatchedPayments: Array<FeePayment & { reconciliationRemainingAmount: number }>; unmatchedExpenses: Array<SchoolExpense & { reconciliationRemainingAmount: number }> };
 
 const today = () => {
   const d = new Date();
@@ -25,6 +25,7 @@ export const AccountantBankReconciliationView: React.FC = () => {
   const [csvIssues, setCsvIssues] = useState<BankStatementCsvIssue[]>([]);
   const [csvFileName, setCsvFileName] = useState('');
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [allocationAmounts, setAllocationAmounts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export const AccountantBankReconciliationView: React.FC = () => {
 
   useEffect(() => { void reload(); }, [reload, school?.id]);
 
-  const unmatched = useMemo(() => data.entries.filter(entry => !entry.matchedAt), [data.entries]);
+  const unmatched = useMemo(() => data.entries.filter(entry => !entry.isFullyMatched && !entry.matchedAt), [data.entries]);
   const matchedCount = data.entries.length - unmatched.length;
   const money = (value: number) => formatMoney(value, school?.currency);
 
@@ -101,16 +102,24 @@ export const AccountantBankReconciliationView: React.FC = () => {
     } finally { setSaving(false); }
   };
 
-  const matchLine = async (entry: BankStatementEntry) => {
+  const allocateLine = async (entry: BankStatementEntry) => {
     const selected = selections[entry.id];
-    if (!selected) { setError('Choose the matching receipt or expense first.'); return; }
+    const allocationAmount = Number(allocationAmounts[entry.id]);
+    if (!selected || !Number.isFinite(allocationAmount) || allocationAmount <= 0) {
+      setError('Choose a receipt or expense and enter the amount to allocate.');
+      return;
+    }
     setSaving(true); setError(''); setNotice('');
     try {
-      await ApiClient.matchBankStatementEntry(entry.id, entry.direction === 'credit' ? { paymentId: selected } : { expenseId: selected });
-      setNotice('Statement line reconciled successfully.');
+      await ApiClient.allocateBankStatementAmount(entry.id, {
+        ...(entry.direction === 'credit' ? { paymentId: selected } : { expenseId: selected }),
+        amount: allocationAmount
+      });
+      setNotice('Amount allocated. Continue allocating the remaining balance, or leave it partially reconciled.');
       setSelections(current => { const next = { ...current }; delete next[entry.id]; return next; });
+      setAllocationAmounts(current => { const next = { ...current }; delete next[entry.id]; return next; });
       await reload();
-    } catch (e: any) { setError(e?.message || 'Could not reconcile this statement line.'); }
+    } catch (e: any) { setError(e?.message || 'Could not allocate this bank statement amount.'); }
     finally { setSaving(false); }
   };
 
@@ -158,16 +167,33 @@ export const AccountantBankReconciliationView: React.FC = () => {
       </form>
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 p-4"><h2 className="text-base font-bold text-slate-900">Reconciliation queue</h2><p className="mt-1 text-xs text-slate-500">Credits match fee receipts; debits match expenses. Each record can be matched once.</p></div>
+        <div className="border-b border-slate-100 p-4"><h2 className="text-base font-bold text-slate-900">Reconciliation queue</h2><p className="mt-1 text-xs text-slate-500">Allocate one bank line across multiple receipts or expenses, or reconcile one receipt over multiple bank lines. Partial matches are supported.</p></div>
         {loading ? <p className="p-6 text-sm text-slate-500">Loading statement lines…</p> : !data.entries.length ? <p className="p-8 text-center text-sm text-slate-500">No bank statement lines yet.</p> : <div className="divide-y divide-slate-100">
           {data.entries.map(entry => {
-            const candidates = entry.direction === 'credit'
-              ? data.unmatchedPayments.filter(p => Math.abs(Number(p.amountPaid) - Number(entry.amount)) <= .01)
-              : data.unmatchedExpenses.filter(e => Math.abs(Number(e.amount) - Number(entry.amount)) <= .01);
-            const matchedLabel = entry.matchedPaymentId ? 'Matched to fee receipt' : entry.matchedExpenseId ? 'Matched to expense' : '';
+            const candidates = entry.direction === 'credit' ? data.unmatchedPayments : data.unmatchedExpenses;
+            const selectedCandidate = candidates.find(candidate => candidate.id === selections[entry.id]);
+            const remaining = Number(entry.remainingStatementAmount ?? entry.amount);
+            const allocated = Number(entry.allocatedAmount || 0);
+            const isComplete = Boolean(entry.isFullyMatched || entry.matchedAt);
+            const matchedLabel = entry.matchedPaymentId ? 'Legacy receipt match' : entry.matchedExpenseId ? 'Legacy expense match' : 'Fully allocated';
             return <article key={entry.id} className="space-y-3 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-slate-900">{entry.description}</p><p className="mt-1 text-xs text-slate-500">{entry.statementDate}{entry.reference ? ` · Ref ${entry.reference}` : ''}{entry.bankAccountLabel ? ` · ${entry.bankAccountLabel}` : ''}</p></div><div className="text-right"><p className="font-bold tabular-nums text-slate-900">{entry.direction === 'credit' ? '+' : '−'}{money(Number(entry.amount))}</p><span className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${entry.matchedAt ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{entry.matchedAt ? matchedLabel : 'Unmatched'}</span></div></div>
-              {!entry.matchedAt && <div className="flex flex-col gap-2 sm:flex-row"><select aria-label={`Match transaction for ${entry.description}`} value={selections[entry.id] || ''} onChange={e => setSelections(current => ({ ...current, [entry.id]: e.target.value }))} className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"><option value="">Choose exact-amount match ({candidates.length} found)</option>{entry.direction === 'credit' ? data.unmatchedPayments.filter(p => Math.abs(Number(p.amountPaid) - Number(entry.amount)) <= .01).map(p => <option key={p.id} value={p.id}>{p.receiptNumber} · {p.paymentMethod} · {money(Number(p.amountPaid))}</option>) : data.unmatchedExpenses.filter(e => Math.abs(Number(e.amount) - Number(entry.amount)) <= .01).map(e => <option key={e.id} value={e.id}>{e.description} · {e.paymentMethod} · {money(Number(e.amount))}</option>)}</select><button type="button" disabled={saving || !selections[entry.id]} onClick={() => void matchLine(entry)} className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">Match</button></div>}
+              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-slate-900">{entry.description}</p><p className="mt-1 text-xs text-slate-500">{entry.statementDate}{entry.reference ? ` · Ref ${entry.reference}` : ''}{entry.bankAccountLabel ? ` · ${entry.bankAccountLabel}` : ''}</p></div><div className="text-right"><p className="font-bold tabular-nums text-slate-900">{entry.direction === 'credit' ? '+' : '−'}{money(Number(entry.amount))}</p><p className="mt-1 text-[11px] text-slate-500">Allocated {money(allocated)} · Remaining {money(remaining)}</p><span className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${isComplete ? 'bg-emerald-50 text-emerald-700' : allocated > 0 ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-800'}`}>{isComplete ? matchedLabel : allocated > 0 ? 'Partially matched' : 'Unmatched'}</span></div></div>
+              {entry.allocations?.length ? <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Existing allocations</p><ul className="mt-2 space-y-1">{entry.allocations.map(allocation => <li key={allocation.id} className="flex justify-between gap-3 text-xs text-slate-700"><span className="truncate">{allocation.targetLabel || (allocation.paymentId ? `Receipt ${allocation.paymentId}` : `Expense ${allocation.expenseId}`)}</span><strong>{money(Number(allocation.amount))}</strong></li>)}</ul></div> : null}
+              {!isComplete && <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px_auto]">
+                <select aria-label={`Choose allocation for ${entry.description}`} value={selections[entry.id] || ''} onChange={e => {
+                  const selected = candidates.find(candidate => candidate.id === e.target.value);
+                  const candidateRemaining = Number(selected?.reconciliationRemainingAmount || 0);
+                  setSelections(current => ({ ...current, [entry.id]: e.target.value }));
+                  setAllocationAmounts(current => ({ ...current, [entry.id]: selected ? String(Math.min(remaining, candidateRemaining).toFixed(2)) : '' }));
+                }} className="min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
+                  <option value="">Choose receipt/expense ({candidates.length} available)</option>
+                  {entry.direction === 'credit'
+                    ? data.unmatchedPayments.map(payment => <option key={payment.id} value={payment.id}>{payment.receiptNumber} · {payment.paymentMethod} · remaining {money(payment.reconciliationRemainingAmount)}</option>)
+                    : data.unmatchedExpenses.map(expense => <option key={expense.id} value={expense.id}>{expense.description} · {expense.paymentMethod} · remaining {money(expense.reconciliationRemainingAmount)}</option>)}
+                </select>
+                <input aria-label="Amount to allocate" type="number" min="0.01" max={remaining} step="0.01" value={allocationAmounts[entry.id] || ''} onChange={e => setAllocationAmounts(current => ({ ...current, [entry.id]: e.target.value }))} placeholder="Amount" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"/>
+                <button type="button" disabled={saving || !selectedCandidate || !allocationAmounts[entry.id] || Number(allocationAmounts[entry.id]) > remaining || Number(allocationAmounts[entry.id]) > Number(selectedCandidate.reconciliationRemainingAmount)} onClick={() => void allocateLine(entry)} className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">Allocate</button>
+              </div>}
             </article>;
           })}
         </div>}

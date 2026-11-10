@@ -4244,7 +4244,9 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireSchoolConte
   const school = (req as any).school as School;
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
-  const payment = await db.voidFeePayment(req.params.paymentId, school.id, user.id, reason);
+  let payment;
+  try { payment = await db.voidFeePayment(req.params.paymentId, school.id, user.id, reason); }
+  catch (error: any) { res.status(409).json({ error: error?.message || 'This receipt cannot be voided.' }); return; }
   if (!payment) { res.status(409).json({ error: 'Payment was not found or has already been voided.' }); return; }
   db.logAudit({ action: 'FEE_PAYMENT_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided receipt ${payment.receiptNumber}. Reason: ${reason}`, severity: 'warning' });
   await db.flush();
@@ -4455,7 +4457,9 @@ apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireA
   const user = (req as any).user as User;
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
-  const expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason);
+  let expense;
+  try { expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason); }
+  catch (error: any) { res.status(409).json({ error: error?.message || 'This expense cannot be voided.' }); return; }
   if (!expense) { res.status(409).json({ error: 'Expense was not found or has already been voided.' }); return; }
   db.logAudit({ action: 'SCHOOL_EXPENSE_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided expense ${expense.id}. Reason: ${reason}`, severity: 'warning' });
   await db.flush();
@@ -4491,13 +4495,42 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
 
 apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
-  const [entries, payments, expenses] = await Promise.all([
-    db.getBankStatementEntries(school.id), db.getFeePayments(school.id), db.getSchoolExpenses(school.id)
+  const [entries, payments, expenses, allocations] = await Promise.all([
+    db.getBankStatementEntries(school.id), db.getFeePayments(school.id), db.getSchoolExpenses(school.id),
+    db.getBankStatementAllocations(school.id)
   ]);
+  const byEntry = new Map<string, typeof allocations>();
+  const paymentTotals = new Map<string, number>();
+  const expenseTotals = new Map<string, number>();
+  for (const allocation of allocations) {
+    const payment = allocation.paymentId ? payments.find(item => item.id === allocation.paymentId) : undefined;
+    const expense = allocation.expenseId ? expenses.find(item => item.id === allocation.expenseId) : undefined;
+    const labeledAllocation = { ...allocation, targetLabel: payment ? payment.receiptNumber : expense?.description || 'Financial record' };
+    byEntry.set(allocation.statementEntryId, [...(byEntry.get(allocation.statementEntryId) || []), labeledAllocation]);
+    if (allocation.paymentId) paymentTotals.set(allocation.paymentId, (paymentTotals.get(allocation.paymentId) || 0) + Number(allocation.amount));
+    if (allocation.expenseId) expenseTotals.set(allocation.expenseId, (expenseTotals.get(allocation.expenseId) || 0) + Number(allocation.amount));
+  }
+  const enrichedEntries = entries.map(entry => {
+    const rowAllocations = byEntry.get(entry.id) || [];
+    const allocatedAmount = rowAllocations.reduce((sum, item) => sum + Number(item.amount), 0);
+    const remainingStatementAmount = entry.matchedAt ? 0 : Math.max(0, Number(entry.amount) - allocatedAmount);
+    return {
+      ...entry, allocations: rowAllocations, allocatedAmount, remainingStatementAmount,
+      isFullyMatched: Boolean(entry.matchedAt) || remainingStatementAmount <= 0.001
+    };
+  });
+  const legacyPayments = new Set(entries.map(entry => entry.matchedPaymentId).filter(Boolean));
+  const legacyExpenses = new Set(entries.map(entry => entry.matchedExpenseId).filter(Boolean));
   res.json({
-    entries: entries.sort((a, b) => b.statementDate.localeCompare(a.statementDate)),
-    unmatchedPayments: payments.filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) && !entries.some(entry => entry.matchedPaymentId === payment.id)),
-    unmatchedExpenses: expenses.filter(expense => expense.status === 'posted' && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) && !entries.some(entry => entry.matchedExpenseId === expense.id))
+    entries: enrichedEntries.sort((a, b) => b.statementDate.localeCompare(a.statementDate)),
+    unmatchedPayments: payments
+      .filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) && !legacyPayments.has(payment.id))
+      .map(payment => ({ ...payment, reconciliationRemainingAmount: Math.max(0, Number(payment.amountPaid) - (paymentTotals.get(payment.id) || 0)) }))
+      .filter(payment => payment.reconciliationRemainingAmount > 0.001),
+    unmatchedExpenses: expenses
+      .filter(expense => expense.status === 'posted' && !expense.voidedAt && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) && !legacyExpenses.has(expense.id))
+      .map(expense => ({ ...expense, reconciliationRemainingAmount: Math.max(0, Number(expense.amount) - (expenseTotals.get(expense.id) || 0)) }))
+      .filter(expense => expense.reconciliationRemainingAmount > 0.001)
   });
 });
 
@@ -4570,6 +4603,31 @@ apiRouter.post('/bank-reconciliation/import', requireAuth, requireSchoolContext,
     await db.flush();
   }
   res.status(201).json({ createdCount: created.length, skippedDuplicates: validRows.length - created.length, entries: created });
+});
+
+apiRouter.post('/bank-reconciliation/:id/allocations', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const paymentId = typeof req.body?.paymentId === 'string' && req.body.paymentId.trim() ? req.body.paymentId.trim() : undefined;
+  const expenseId = typeof req.body?.expenseId === 'string' && req.body.expenseId.trim() ? req.body.expenseId.trim() : undefined;
+  const amount = Number(req.body?.amount);
+  if (Boolean(paymentId) === Boolean(expenseId) || !Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== amount * 100) {
+    res.status(400).json({ error: 'Choose exactly one receipt or expense and enter a positive amount with no more than two decimal places.' }); return;
+  }
+  try {
+    const allocation = await db.allocateBankStatementAmount({
+      schoolId: school.id, statementEntryId: req.params.id, paymentId, expenseId, amount, createdBy: user.id
+    });
+    db.logAudit({
+      action: 'BANK_STATEMENT_AMOUNT_ALLOCATED', category: 'finance', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Allocated ${amount} ${school.currency || 'ETB'} from bank statement line ${req.params.id}.`, severity: 'info'
+    });
+    await db.flush();
+    res.status(201).json(allocation);
+  } catch (error: any) {
+    res.status(409).json({ error: error?.message || 'The bank statement amount could not be allocated.' });
+  }
 });
 
 apiRouter.post('/bank-reconciliation/:id/match', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
@@ -5103,7 +5161,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;

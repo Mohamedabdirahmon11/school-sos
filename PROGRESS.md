@@ -1,4 +1,4 @@
-## Accountant bank statement CSV import (2026-11-10)
+## Accountant bank statement CSV import and split settlement (2026-11-10)
 
 - DONE: PR #64 merged as `4eaea446e4ef0344ac72fc72d4351cbb5a1936e8`; added CSV parsing with quoted fields, ISO/day-first dates, credit/debit or separate credit/debit columns, locale-aware amount parsing, row validation, a downloadable template, and preview-before-import.
 - ADDED: Accountant dashboard summaries, expense date defaults/current-month totals, and payroll month defaults now use the school's configured timezone (East Africa fallback), not the accountant's browser timezone; boundary and invalid-timezone tests added.

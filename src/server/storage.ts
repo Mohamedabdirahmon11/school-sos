@@ -1182,10 +1182,13 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Expense storage is unavailable.');
     const startedAt = performance.now();
-    const { data, error } = await client.from('school_expenses').update(toSupabaseRow({ status: 'void', voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason }, 'school_expenses')).eq('id', id).eq('school_id', schoolId).eq('status', 'posted').select('*').maybeSingle();
-    this.recordQuery('school_expenses', 'update', startedAt);
+    const { data, error } = await client.rpc('schoolos_void_school_expense', {
+      p_expense_id: id, p_school_id: schoolId, p_user_id: userId, p_reason: reason
+    });
+    this.recordQuery('school_expenses', 'void_rpc', startedAt);
     if (error) throw new Error(`Unable to void school expense: ${error.message}`);
-    return data ? fromSupabaseRow(data, 'school_expenses') as SchoolExpense : null;
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? fromSupabaseRow(row, 'school_expenses') as SchoolExpense : null;
   }
 
   public async getBankStatementEntries(schoolId: string): Promise<import('../types/index.ts').BankStatementEntry[]> {
@@ -1200,7 +1203,8 @@ class StorageEngine {
     const { data, error } = await client.from('bank_statement_entries').insert(toSupabaseRow(row, 'bank_statement_entries')).select('*').single();
     this.recordQuery('bank_statement_entries', 'insert', startedAt);
     if (error || !data) throw new Error(`Unable to save bank statement entry: ${error?.message || 'no row returned'}`);
-    return fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
+    const savedRow = Array.isArray(data) ? data[0] : data;
+    return fromSupabaseRow(savedRow, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
   }
 
   public async createBankStatementEntries(inputs: Array<Omit<import('../types/index.ts').BankStatementEntry, 'id' | 'createdAt' | 'matchedAt' | 'matchedPaymentId' | 'matchedExpenseId'>>): Promise<import('../types/index.ts').BankStatementEntry[]> {
@@ -1218,11 +1222,35 @@ class StorageEngine {
     return data.map((row: Record<string, any>) => fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry);
   }
 
+  public async getBankStatementAllocations(schoolId: string): Promise<import('../types/index.ts').BankStatementAllocation[]> {
+    return this.queryRows<import('../types/index.ts').BankStatementAllocation>('bank_statement_allocations', { school_id: schoolId });
+  }
+
+  public async allocateBankStatementAmount(input: {
+    schoolId: string; statementEntryId: string; paymentId?: string; expenseId?: string; amount: number; createdBy: string;
+  }): Promise<import('../types/index.ts').BankStatementAllocation> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_allocate_bank_statement', {
+      p_school_id: input.schoolId,
+      p_statement_entry_id: input.statementEntryId,
+      p_payment_id: input.paymentId || null,
+      p_expense_id: input.expenseId || null,
+      p_amount: input.amount,
+      p_created_by: input.createdBy
+    });
+    this.recordQuery('bank_statement_allocations', 'allocate_rpc', startedAt);
+    if (error || !data) throw new Error(`Unable to allocate bank statement amount: ${error?.message || 'no allocation returned'}`);
+    const row = Array.isArray(data) ? data[0] : data;
+    return fromSupabaseRow(row, 'bank_statement_allocations') as import('../types/index.ts').BankStatementAllocation;
+  }
+
   public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Bank reconciliation storage is unavailable.');
     const entry = (await this.getBankStatementEntries(schoolId)).find(row => row.id === id);
-    if (!entry || entry.matchedAt) return null;
+    if (!entry || entry.matchedAt || (await this.getBankStatementAllocations(schoolId)).some(allocation => allocation.statementEntryId === id)) return null;
     if (match.paymentId) {
       if (entry.direction !== 'credit') throw new Error('A bank debit must be matched to an expense.');
       const payment = await this.getFeePaymentById(match.paymentId, schoolId);
@@ -3488,7 +3516,7 @@ class StorageEngine {
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
-      'notification_templates', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'promotion_history', 'promotions',
+      'notification_templates', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'bank_statement_allocations', 'promotion_history', 'promotions',
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
       'staff_members', 'student_marks', 'students', 'subjects', 'school_health_visits',
       'support_tickets', 'teacher_unavailability', 'teachers',

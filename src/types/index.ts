@@ -726,6 +726,18 @@ export interface SchoolExpense {
   voidReason?: string;
 }
 
+export interface BankStatementAllocation {
+  id: string;
+  schoolId: string;
+  statementEntryId: string;
+  paymentId?: string;
+  expenseId?: string;
+  amount: number;
+  createdBy: string;
+  createdAt: string;
+  targetLabel?: string;
+}
+
 export interface BankStatementEntry {
   id: string;
   schoolId: string;
@@ -738,6 +750,10 @@ export interface BankStatementEntry {
   matchedPaymentId?: string;
   matchedExpenseId?: string;
   matchedAt?: string;
+  allocatedAmount?: number;
+  remainingStatementAmount?: number;
+  isFullyMatched?: boolean;
+  allocations?: BankStatementAllocation[];
   createdBy: string;
   createdAt: string;
 }
