@@ -2397,6 +2397,10 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const gradeMismatch = classGradeMismatchError(req.body.name, Number(req.body.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (req.body?.classTeacherId) {
+    const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
+    if (!formTeacher.items.length) { res.status(400).json({ error: 'Fomester must be an active teacher in this school.' }); return; }
+  }
   const newClass = db.createClass({ ...req.body, shift: requestedShift, schoolId: school.id });
   res.status(201).json(newClass);
 });
@@ -2423,6 +2427,10 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  if (req.body?.classTeacherId) {
+    const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
+    if (!formTeacher.items.length) { res.status(400).json({ error: 'Fomester must be an active teacher in this school.' }); return; }
+  }
   const updated = await db.updateClass(String(req.params.id), req.body, school.id);
   res.json(updated);
 });
