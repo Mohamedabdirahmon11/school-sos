@@ -972,6 +972,12 @@ export class ApiClient {
     return this.request<import('../types/index.ts').BankStatementEntry>('/bank-reconciliation', { method: 'POST', body: JSON.stringify(data) });
   }
 
+  public static async importBankStatementEntries(rows: Array<{ statementDate: string; description: string; direction: 'credit' | 'debit'; amount: number; reference?: string; bankAccountLabel?: string }>) {
+    return this.request<{ createdCount: number; skippedDuplicates: number; entries: import('../types/index.ts').BankStatementEntry[] }>('/bank-reconciliation/import', {
+      method: 'POST', body: JSON.stringify({ rows })
+    });
+  }
+
   public static async matchBankStatementEntry(id: string, match: { paymentId?: string; expenseId?: string }) {
     return this.request<import('../types/index.ts').BankStatementEntry>(`/bank-reconciliation/${encodeURIComponent(id)}/match`, { method: 'POST', body: JSON.stringify(match) });
   }
