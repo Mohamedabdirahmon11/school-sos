@@ -4,7 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
-import { Student, FeePayment, PaymentMethod, FeeStructureItem, StaffPayrollRecord } from '../../types/index.ts';
+import { Student, FeePayment, FeeType, FeeStructureItem } from '../../types/index.ts';
 import { 
   DollarSign, 
   Receipt, 
@@ -40,6 +40,8 @@ export const AccountantDashboard: React.FC = () => {
 
   // Quick Cash Payment form
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedFeeStructureId, setSelectedFeeStructureId] = useState('');
+  const [selectedFeeType, setSelectedFeeType] = useState<FeeType>('monthly_tuition');
   const [amountDue, setAmountDue] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [month, setMonth] = useState('Current Month');
@@ -50,6 +52,16 @@ export const AccountantDashboard: React.FC = () => {
   useEffect(() => {
     if (students.length > 0 && !selectedStudentId) setSelectedStudentId(students[0].id);
   }, [students, selectedStudentId]);
+
+  useEffect(() => {
+    const firstActive = feeStructures.find(structure => structure.isActive);
+    if (firstActive && !selectedFeeStructureId) {
+      setSelectedFeeStructureId(firstActive.id);
+      setSelectedFeeType(firstActive.feeType);
+      setAmountDue(String(firstActive.amount));
+      setAmountPaid(String(firstActive.amount));
+    }
+  }, [feeStructures, selectedFeeStructureId]);
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +77,8 @@ export const AccountantDashboard: React.FC = () => {
       paymentIdempotencyKey.current ||= globalThis.crypto?.randomUUID?.() || `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const payment = await ApiClient.recordCashPayment({
         studentId: selectedStudentId,
+        feeType: selectedFeeType,
+        feeStructureId: selectedFeeStructureId || undefined,
         month,
         amountDue: due,
         amountPaid: paid,
@@ -76,6 +90,9 @@ export const AccountantDashboard: React.FC = () => {
       setShowPayModal(false);
       setSelectedReceipt(payment);
       setNotes('');
+      setAmountDue('');
+      setAmountPaid('');
+      setSelectedFeeStructureId('');
       paymentIdempotencyKey.current = null;
       dashboardData.retry();
     } catch (err: any) {
@@ -438,6 +455,44 @@ export const AccountantDashboard: React.FC = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Fee structure</label>
+                  <select
+                    value={selectedFeeStructureId}
+                    onChange={event => {
+                      const id = event.target.value;
+                      const structure = feeStructures.find(item => item.id === id);
+                      setSelectedFeeStructureId(id);
+                      if (structure) {
+                        setSelectedFeeType(structure.feeType);
+                        setAmountDue(String(structure.amount));
+                        setAmountPaid(String(structure.amount));
+                      }
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                  >
+                    <option value="">Manual amount</option>
+                    {feeStructures.filter(item => item.isActive).map(structure => (
+                      <option key={structure.id} value={structure.id}>{structure.name} · {formatMoney(structure.amount, school?.currency)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Fee category</label>
+                  <select
+                    value={selectedFeeType}
+                    onChange={event => { setSelectedFeeStructureId(''); setSelectedFeeType(event.target.value as FeeType); }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                  >
+                    <option value="monthly_tuition">Monthly tuition</option>
+                    <option value="annual_registration">Annual registration</option>
+                    <option value="bus">Transport / bus</option>
+                    <option value="custom">Custom fee</option>
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
