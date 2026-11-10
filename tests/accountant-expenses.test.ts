@@ -15,6 +15,8 @@ test('expense endpoints are school-scoped and use the existing finance permissio
   assert.match(api, /SCHOOL_EXPENSE_VOIDED/);
   assert.ok(api.includes("apiRouter.get('/fees/monthly-summary'"));
   assert.ok(api.includes("apiRouter.get('/fees/cashbook'"));
+  assert.ok(api.includes("apiRouter.get('/fees/receipts'"));
+  assert.ok(api.includes('totalPages: Math.ceil(result.total / result.pageSize)'));
   assert.ok(api.includes("payment.voidedAt ? 'void' : 'posted'"));
   assert.ok(api.includes("payment.date?.startsWith(month)"));
   assert.ok(api.includes('netCashflow: totalIncome - totalExpenses'));
