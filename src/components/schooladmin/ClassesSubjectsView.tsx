@@ -24,6 +24,7 @@ export const ClassesSubjectsView: React.FC = () => {
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const [branchId, setBranchId] = useState('');
+  const [formTeacherId, setFormTeacherId] = useState('');
   const [showClassModal, setShowClassModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [editingClass, setEditingClass] = useState<SchoolClass | null>(null);
@@ -65,7 +66,8 @@ export const ClassesSubjectsView: React.FC = () => {
         roomNumber,
         capacity,
         monthlyFee,
-        branchId: branchId || undefined
+        branchId: branchId || undefined,
+        classTeacherId: formTeacherId || undefined
       };
       if (editingClass) await ApiClient.updateClass(editingClass.id, payload);
       else await ApiClient.addClass(payload, school?.id);
@@ -146,7 +148,7 @@ export const ClassesSubjectsView: React.FC = () => {
                 <Upload className="w-3.5 h-3.5 text-[#0F766E]" /><span>{t('bulk_import')}</span>
               </button>
               <button
-                onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setShowClassModal(true); }}
+                onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
                 disabled={isReadOnly}
                 className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
               >
@@ -164,11 +166,12 @@ export const ClassesSubjectsView: React.FC = () => {
                   <p className="text-[11px] text-[#64748B]">
                     {c.roomNumber} · Shift {c.shift || 1} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
                   </p>
+                  <p className="text-[11px] text-teal-700">Fomester: {teachers.find(teacher => teacher.userId === c.classTeacherId)?.fullName || 'Not assigned'}</p>
                 </button>
                 <span className="font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded text-[11px] font-bold">
                   Section {c.section}
                 </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setClassShift(c.shift === 2 ? 2 : 1); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
+                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setClassShift(c.shift === 2 ? 2 : 1); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setFormTeacherId(c.classTeacherId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
@@ -251,6 +254,14 @@ export const ClassesSubjectsView: React.FC = () => {
                   <option value="">Unassigned</option>
                   {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block font-medium">Fomester / Class Teacher</label>
+                <select value={formTeacherId} onChange={event => setFormTeacherId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2">
+                  <option value="">Not assigned</option>
+                  {teachers.filter(teacher => teacher.status === 'active').map(teacher => <option key={teacher.userId} value={teacher.userId}>{teacher.fullName} · {teacher.staffId || teacher.id}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-500">Hal macallin ayaa fasalkan Fomester u noqonaya. Ma aha dhammaan macallimiinta maaddooyinka.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
