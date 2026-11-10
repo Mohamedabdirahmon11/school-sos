@@ -2359,12 +2359,51 @@ class StorageEngine {
     return results;
   }
 
+  public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string): Promise<{ count: number }> {
+    const [assignments, students, marks] = await Promise.all([
+      this.queryPage<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' }, 1, 100, undefined, 'id,class_id,subject_id,teacher_id'),
+      this.queryPage<Student>('students', { school_id: schoolId, class_id: classId }, 1, 2000, undefined, 'id'),
+      this.getMarks(schoolId, classId, undefined, semester)
+    ]);
+    if (!assignments.items.length) throw new Error('This class has no active subject assignments.');
+    if (!students.items.length) throw new Error('This class has no enrolled students.');
+    const submitted = marks.filter(mark => mark.status === 'submitted');
+    const missing: string[] = [];
+    for (const assignment of assignments.items) {
+      const count = students.items.filter(student => submitted.some(mark => mark.subjectId === assignment.subjectId && mark.studentId === student.id)).length;
+      if (count !== students.items.length) missing.push(`${assignment.subjectId}: ${students.items.length - count} student mark(s) missing`);
+    }
+    if (missing.length) throw new Error(`Cannot forward results yet. Complete every student mark for all class subjects first: ${missing.join('; ')}.`);
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam marks storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('student_marks')
+      .update({ status: 'form_teacher_submitted' })
+      .eq('school_id', schoolId).eq('class_id', classId).eq('semester', semester).eq('status', 'submitted')
+      .select('*');
+    this.recordQuery('student_marks', 'forward-class-marks', startedAt);
+    if (error) throw new Error(error.message || 'Unable to forward class marks.');
+    const forwarded = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    for (const row of forwarded) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+    }
+    this.logAudit({
+      action: 'CLASS_MARKS_FORWARDED_TO_ADMIN', category: 'academics', schoolId,
+      userId: forwardedBy, userName: 'Class Fomester', userRole: 'teacher',
+      details: `Forwarded ${forwarded.length} student-subject mark records for class ${classId} (${semester}) to the School Administrator.`,
+      severity: 'info'
+    });
+    await this.flush();
+    return { count: forwarded.length };
+  }
+
   public approveMarks(schoolId: string, markIds: string[], approvedBy: string): StudentMark[] {
     const now = new Date().toISOString();
     const approved: StudentMark[] = [];
 
     for (const id of markIds) {
-      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId && m.status === 'submitted');
+      const idx = this.data.marks.findIndex(m => m.id === id && m.schoolId === schoolId && m.status === 'form_teacher_submitted');
       if (idx >= 0) {
         this.data.marks[idx].status = 'approved';
         this.data.marks[idx].approvedBy = approvedBy;
