@@ -38,7 +38,8 @@ CREATE POLICY school_expenses_school_update ON public.school_expenses FOR UPDATE
 DROP POLICY IF EXISTS school_expenses_service_role_all ON public.school_expenses;
 CREATE POLICY school_expenses_service_role_all ON public.school_expenses FOR ALL TO service_role USING (true) WITH CHECK (true);
 
-GRANT SELECT, INSERT, UPDATE ON public.school_expenses TO authenticated, service_role;
-REVOKE DELETE ON public.school_expenses FROM authenticated, anon;
+REVOKE ALL ON TABLE public.school_expenses FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.school_expenses TO authenticated, service_role;
+REVOKE DELETE ON TABLE public.school_expenses FROM authenticated;
 NOTIFY pgrst, 'reload schema';
 COMMIT;
