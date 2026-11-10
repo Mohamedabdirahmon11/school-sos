@@ -460,6 +460,19 @@ test('concurrent attendance submissions converge on one daily row without automa
   assert.equal(rows.length, 1);
   assert.equal(rows[0].status, 'absent');
 
+  const examHistory = {
+    id: 'attendance-class-exam-history', school_id: school.id, class_id: klass.id,
+    student_id: student.id, subject_id: 'attendance-test-subject', semester: 'Semester 1',
+    small_exam_marks: 18, big_exam_marks: 72, percentage: 90, status: 'approved'
+  };
+  memory.rows('marks').push(examHistory);
+  await storage.db.updateClass(klass.id, { classTeacherId: null }, school.id);
+  assert.equal((await storage.db.getClassById(klass.id, school.id))?.classTeacherId, null);
+  assert.equal(memory.rows('attendance_records').filter(row => row.class_id === klass.id && row.student_id === student.id && row.date === date).length, 1, 'removing the Form Teacher must preserve attendance history');
+  assert.deepEqual(memory.rows('marks').find(row => row.id === examHistory.id), examHistory, 'changing the Form Teacher must preserve exam history');
+  const formerTeacherRetry = await submit();
+  assert.equal(formerTeacherRetry.status, 403, 'a former Form Teacher cannot submit attendance after reassignment/removal');
+
   const alerts = memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
   );
