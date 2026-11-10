@@ -39,8 +39,8 @@ export const AccountantDashboard: React.FC = () => {
 
   // Quick Cash Payment form
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [amountDue, setAmountDue] = useState('50');
-  const [amountPaid, setAmountPaid] = useState('50');
+  const [amountDue, setAmountDue] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
   const [month, setMonth] = useState('Current Month');
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -52,15 +52,21 @@ export const AccountantDashboard: React.FC = () => {
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStudentId) return;
+    const due = Number(amountDue);
+    const paid = Number(amountPaid);
+    if (!selectedStudentId) { setMessage('Select a student before recording a payment.'); return; }
+    if (!Number.isFinite(due) || due <= 0 || !Number.isFinite(paid) || paid <= 0 || paid > due) {
+      setMessage('Enter a valid amount paid greater than zero and no more than the amount due.');
+      return;
+    }
 
     try {
       paymentIdempotencyKey.current ||= globalThis.crypto?.randomUUID?.() || `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const payment = await ApiClient.recordCashPayment({
         studentId: selectedStudentId,
         month,
-        amountDue: parseFloat(amountDue) || 0,
-        amountPaid: parseFloat(amountPaid) || 0,
+        amountDue: due,
+        amountPaid: paid,
         notes: notes || undefined,
         idempotencyKey: paymentIdempotencyKey.current
       });
@@ -72,7 +78,7 @@ export const AccountantDashboard: React.FC = () => {
       paymentIdempotencyKey.current = null;
       dashboardData.retry();
     } catch (err: any) {
-      alert(err.message);
+      setMessage(err?.message || 'Payment could not be recorded. Please try again.');
     }
   };
 
@@ -90,14 +96,13 @@ export const AccountantDashboard: React.FC = () => {
 
   const activePayments = payments.filter(payment => !payment.voidedAt);
   const totalCollected = activePayments.reduce((sum, p) => sum + p.amountPaid, 0);
-  const totalDue = activePayments.reduce((sum, p) => sum + p.amountDue, 0);
-  const totalArrears = Math.max(0, totalDue - totalCollected);
+  const totalArrears = activePayments.reduce((sum, payment) => sum + Math.max(0, Number(payment.remainingAmount) || 0), 0);
 
   const filteredPayments = payments.filter(p => {
     const student = students.find(s => s.id === p.studentId);
     const stdName = student ? `${student.firstName} ${student.lastName}` : '';
     return (
-      p.receiptNumber.toLowerCase().includes(search.toLowerCase()) ||
+      String(p.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
       stdName.toLowerCase().includes(search.toLowerCase())
     );
   });
@@ -207,7 +212,7 @@ export const AccountantDashboard: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-slate-900">
             {formatMoney(totalCollected, school?.currency)}
           </div>
-          <p className="text-[11px] text-teal-700 font-medium mt-1">Verified cash and mobile money</p>
+          <p className="text-[11px] text-teal-700 font-medium mt-1">Recorded cash collections</p>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
@@ -282,7 +287,7 @@ export const AccountantDashboard: React.FC = () => {
                         {p.receiptNumber}
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-900">
-                        {student ? `${student.firstName} ${student.middleName} ${student.lastName}` : p.studentId}
+                        {student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : p.studentId}
                       </td>
                       <td className="py-3 px-4 text-slate-600">{p.month}</td>
                       <td className="py-3 px-4">
@@ -351,18 +356,24 @@ export const AccountantDashboard: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Amount Due ($)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Amount Due ({school?.currency || 'ETB'})</label>
                   <input
                     type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
                     value={amountDue}
                     onChange={e => setAmountDue(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Amount Paid ($)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Amount Paid ({school?.currency || 'ETB'})</label>
                   <input
                     type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
                     value={amountPaid}
                     onChange={e => setAmountPaid(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
@@ -374,7 +385,7 @@ export const AccountantDashboard: React.FC = () => {
                 <label className="block text-xs font-medium text-slate-700 mb-1">Payment Method</label>
                 <div className="px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-semibold text-slate-800 flex items-center gap-1.5">
                   <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Cash Payment (Mandatory Policy)</span>
+                  <span>Cash payment (currently supported)</span>
                 </div>
               </div>
 
