@@ -38,6 +38,6 @@ test('expense ledger migration enforces tenant RLS, positive values, and no hard
   assert.match(migration, /private\.auth_user_role\(\) IN \('school_admin','accountant'\)/);
   assert.match(view, /Expense history/);
   assert.match(view, /Voided records remain available for audit/);
-  assert.match(storage, /'school_expenses'[\\s\\S]*?schoolTables/);
-  assert.match(migration, /schoolos_restore_school_backup[\\s\\S]*?'school_expenses'[\\s\\S]*?notification_templates/);
+  assert.ok(storage.includes("'school_expenses'"), 'school backup exports the expense ledger');
+  assert.ok(migration.includes("'payroll_records', 'school_expenses', 'notification_templates'"), 'safe restore accepts expense rows');
 });
