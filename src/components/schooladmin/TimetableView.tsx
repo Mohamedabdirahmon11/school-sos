@@ -190,6 +190,22 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const handleGenerateAll = async () => {
+    if (isReadOnly || !classes.length) return;
+    if (!window.confirm('Dhammaan fasallada jadwalkooda ma dib ayaa loo sameeyaa? Jadwalkii hore ee fasallada leh maaddooyin loo qoondeeyay waa la beddelayaa.')) return;
+    setNotice('Jadwalka dhammaan fasallada ayaa la diyaarinayaa…');
+    try {
+      const result = await ApiClient.generateAllTimetables();
+      const generatedIds = new Set(result.generatedClassIds || []);
+      setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
+      const unfilledCount = result.unfilled.length;
+      const skippedCount = result.skipped.length;
+      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la sameeyay. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyay.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
+    }
+  };
+
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
       await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber);
@@ -279,7 +295,7 @@ export const TimetableView: React.FC = () => {
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
           </>}
           
-          <button onClick={() => void handleGenerate()} disabled={isReadOnly || !selectedClassId} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate</button>
+          <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>
           <button onClick={handlePrintAllClasses} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E]"><Printer className="w-3.5 h-3.5" /> Print A4 (max 5)</button>
 
           <button
