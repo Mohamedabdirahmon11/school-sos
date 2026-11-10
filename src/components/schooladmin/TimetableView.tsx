@@ -234,9 +234,9 @@ export const TimetableView: React.FC = () => {
   const displayedClasses = viewMode === 'teacher'
     ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
     : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
-  const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id)).slice(0, 5);
+  const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
   const runTimetablePrint = (classIds: string[]) => {
-    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id)).slice(0, 5).map(klass => klass.id);
+    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5).map(klass => klass.id);
     if (!validIds.length) { setNotice('Dooro ugu yaraan hal fasal oo jadwalkiisu diyaar yahay.'); return; }
     setPrintClassIds(validIds);
     setPrintAllClasses(true);
