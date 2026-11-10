@@ -16,6 +16,7 @@ export const TimetableView: React.FC = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
+  const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -93,6 +94,25 @@ export const TimetableView: React.FC = () => {
   useEffect(() => {
     setRoomNumber(classes.find(klass => klass.id === selectedClassId)?.roomNumber || '');
   }, [classes, selectedClassId]);
+
+  useEffect(() => {
+    if (!selectedClassId) { setClassSubjectAssignments([]); return; }
+    let active = true;
+    ApiClient.getClassDetails(selectedClassId, { page: 1, pageSize: 1 })
+      .then(details => {
+        if (active) setClassSubjectAssignments(details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher })));
+      })
+      .catch(() => { if (active) setClassSubjectAssignments([]); });
+    return () => { active = false; };
+  }, [selectedClassId]);
+
+  const assignedSubjectsForClass = classSubjectAssignments
+    .map(item => item.subject)
+    .filter((item): item is Subject => Boolean(item));
+  const selectedSubjectAssignment = classSubjectAssignments.find(item => item.subject?.id === subjectId);
+  const assignedTeachersForSubject = selectedSubjectAssignment?.teacher
+    ? teachers.filter(item => item.id === selectedSubjectAssignment.teacher?.id)
+    : [];
 
   // Clash detector
   const checkClash = (day: string, period: number, tchId: string, room: string) => {
@@ -415,7 +435,7 @@ export const TimetableView: React.FC = () => {
                   onChange={e => setSubjectId(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  {assignedSubjectsForClass.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                 </select>
               </div>
 
@@ -426,7 +446,7 @@ export const TimetableView: React.FC = () => {
                   onChange={e => setTeacherId(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.fullName} ({t.department})</option>)}
+                  {(assignedTeachersForSubject.length ? assignedTeachersForSubject : teachers.filter(item => classSubjectAssignments.some(assignment => assignment.teacher?.id === item.id))).map(t => <option key={t.id} value={t.id}>{t.fullName} ({t.department})</option>)}
                 </select>
               </div>
 
