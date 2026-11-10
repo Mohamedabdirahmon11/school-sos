@@ -154,7 +154,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_void_fee_payment(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   payment_row public.fee_payments%ROWTYPE;
 BEGIN
@@ -179,7 +179,7 @@ BEGIN
    RETURNING * INTO payment_row;
   RETURN payment_row;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_void_fee_payment(VARCHAR, VARCHAR, VARCHAR, TEXT) TO service_role;
 
@@ -192,7 +192,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_void_school_expense(
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   expense_row public.school_expenses%ROWTYPE;
 BEGIN
@@ -217,7 +217,7 @@ BEGIN
    RETURNING * INTO expense_row;
   RETURN expense_row;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_void_school_expense(VARCHAR, VARCHAR, VARCHAR, VARCHAR) TO service_role;
 
@@ -231,7 +231,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   restore_result JSONB;
   school_key TEXT;
@@ -310,7 +310,7 @@ BEGIN
   GET DIAGNOSTICS restored_count = ROW_COUNT;
   RETURN restore_result || jsonb_build_object('bank_statement_allocations', restored_count);
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.schoolos_restore_school_backup(JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_restore_school_backup(JSONB) TO service_role;
