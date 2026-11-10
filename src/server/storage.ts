@@ -1203,8 +1203,8 @@ class StorageEngine {
     const { data, error } = await client.from('bank_statement_entries').insert(toSupabaseRow(row, 'bank_statement_entries')).select('*').single();
     this.recordQuery('bank_statement_entries', 'insert', startedAt);
     if (error || !data) throw new Error(`Unable to save bank statement entry: ${error?.message || 'no row returned'}`);
-    const row = Array.isArray(data) ? data[0] : data;
-    return fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
+    const savedRow = Array.isArray(data) ? data[0] : data;
+    return fromSupabaseRow(savedRow, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
   }
 
   public async createBankStatementEntries(inputs: Array<Omit<import('../types/index.ts').BankStatementEntry, 'id' | 'createdAt' | 'matchedAt' | 'matchedPaymentId' | 'matchedExpenseId'>>): Promise<import('../types/index.ts').BankStatementEntry[]> {
