@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import {
   LayoutDashboard,
   Building2,
@@ -75,7 +76,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     ];
   };
 
-  const tabs = getQuickTabs();
+  const tabs = getQuickTabs().filter(tab => {
+    if (role !== 'accountant') return true;
+    if (tab.id === 'sch_fees' || tab.id === 'acc_expenses') {
+      return hasStaffNavigationPermission(user?.permissions, 'fees_manage');
+    }
+    return true;
+  });
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E2E8F0] h-14 flex items-center justify-around px-2 z-30 shadow-lg">
