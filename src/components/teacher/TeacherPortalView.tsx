@@ -3,7 +3,7 @@
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
  * 2. Exam marks: Small Exam + Big Exam -> Percentage only (no letter grades or GPA)
- * 3. Subject teachers submit their assigned subjects to the Fomester; the Fomester forwards the complete class to Admin.
+ * 3. Subject teachers submit their assigned subjects to the Form Teacher; the Form Teacher forwards the complete class to Admin.
  * 4. Personal teaching schedule & notices
  */
 
@@ -56,6 +56,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
   const classes: SchoolClass[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class])).values()] as SchoolClass[];
+  const formTeacherClasses = classes.filter(klass => klass.classTeacherId === user?.id);
   const subjects: Subject[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
   const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
@@ -96,13 +97,18 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => {
+    if (activeTab === 'attendance' && formTeacherClasses.length && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+      setSelectedClassId(formTeacherClasses[0].id);
+    }
+  }, [activeTab, formTeacherClasses, selectedClassId]);
+  useEffect(() => {
     if (!selectedClassId) return;
     const firstAssignedSubject = teacherAssignments.find((assignment: any) => assignment.classId === selectedClassId)?.subject.id || '';
     if (!classSubjects.some(subject => subject.id === selectedSubjectId)) setSelectedSubjectId(firstAssignedSubject);
   }, [selectedClassId, teacherAssignments, classSubjects, selectedSubjectId]);
 
   // Load the full class mark matrix. Subject teachers see only their assigned subjects;
-  // the Fomester sees submitted marks from every subject plus their own editable subject(s).
+  // the Form Teacher sees submitted marks from every subject plus their own editable subject(s).
   useEffect(() => {
     if (!selectedClassId) return;
     let cancelled = false;
@@ -182,7 +188,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       const savedMarks = results.flat();
       setClassMarks(current => [...current.filter(mark => !savedMarks.some(saved => saved.id === mark.id)), ...savedMarks]);
       setNotice(status === 'submitted'
-        ? `You submitted ${savedMarks.length} mark records to the class Fomester for review.`
+        ? `You submitted ${savedMarks.length} mark records to the class Form Teacher for review.`
         : `Drafts saved for ${editableClassSubjects.length} assigned subject(s).`);
       if (status === 'submitted') {
         const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
@@ -203,7 +209,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       const result = await ApiClient.forwardClassMarks(selectedClassId, semester);
       const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
       setClassMarks(refreshed);
-      setNotice(`Fomester ahaan waxaad Admin u dirtay ${result.forwardedCount} natiijo oo fasalka ah.`);
+      setNotice(`Form Teacher ahaan waxaad Admin u dirtay ${result.forwardedCount} natiijo oo fasalka ah.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Class results could not be forwarded.');
     } finally {
@@ -372,14 +378,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {activeTab === 'attendance' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            {formTeacherClasses.length === 0 && <p className="sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No class is assigned to you as Form Teacher. Contact School Admin to assign you to a class.</p>}
             <div>
-              <label className="block text-xs font-semibold text-[#475569] mb-1">Select Class</label>
+              <label className="block text-xs font-semibold text-[#475569] mb-1">My Form Teacher Class</label>
               <select
                 value={selectedClassId}
                 onChange={e => setSelectedClassId(e.target.value)}
                 className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
               >
-                {classes.map(c => (
+                {formTeacherClasses.map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
                 ))}
               </select>
@@ -399,7 +406,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <button
                 type="button"
                 onClick={handleSaveAttendance}
-                disabled={isSaving || isReadOnly || students.length === 0}
+                disabled={isSaving || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
                 className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
@@ -490,7 +497,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-900">
             <div>
-              <strong>{isFormTeacher ? 'Fomester class review' : 'Your assigned subject marks'}</strong>
+              <strong>{isFormTeacher ? 'Form Teacher class review' : 'Your assigned subject marks'}</strong>
               <p className="mt-1">Small Exam (max {smallMax}) + Big Exam (max {bigMax}) = {combinedMax}. All assigned subjects are shown together.</p>
               <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
             </div>
@@ -523,7 +530,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                             {editable ? <input type="number" min={0} max={bigMax} step={0.5} value={input.big} onChange={event => setMarksInput(prev => ({...prev,[key]:{...prev[key],big:Math.min(bigMax,Math.max(0,Number(event.target.value)||0))}}))} className="w-14 rounded border px-1 py-1 text-center"/> : <span>{mark ? mark.bigExamMarks : '—'}</span>}
                           </td>
                           <td className="px-2 py-2 text-center font-semibold">{mark && !editable ? mark.totalMarks : total}</td>
-                          <td className="px-2 py-2 text-center">{mark && !editable ? mark.percentage : percentage}%<span className="block text-[9px] text-slate-400">{mark?.status === 'submitted' ? 'To Fomester' : mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : editable ? 'Enter' : 'Waiting'}</span></td>
+                          <td className="px-2 py-2 text-center">{mark && !editable ? mark.percentage : percentage}%<span className="block text-[9px] text-slate-400">{mark?.status === 'submitted' ? 'To Form Teacher' : mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : editable ? 'Enter' : 'Waiting'}</span></td>
                         </React.Fragment>;
                       })}
                     </tr>
