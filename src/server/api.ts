@@ -4490,6 +4490,54 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
   res.json(entries);
 });
 
+apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const [entries, payments, expenses] = await Promise.all([
+    db.getBankStatementEntries(school.id), db.getFeePayments(school.id), db.getSchoolExpenses(school.id)
+  ]);
+  res.json({
+    entries: entries.sort((a, b) => b.statementDate.localeCompare(a.statementDate)),
+    unmatchedPayments: payments.filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod)),
+    unmatchedExpenses: expenses.filter(expense => expense.status === 'posted' && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod))
+  });
+});
+
+apiRouter.post('/bank-reconciliation', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const statementDate = typeof body.statementDate === 'string' ? body.statementDate : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const direction = body.direction;
+  const amount = Number(body.amount);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(statementDate) || Number.isNaN(Date.parse(statementDate))
+    || description.length < 2 || description.length > 500
+    || !['credit', 'debit'].includes(direction) || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99) {
+    res.status(400).json({ error: 'Enter a valid statement date, description, direction and positive amount.' }); return;
+  }
+  const optional = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+  const entry = await db.createBankStatementEntry({
+    schoolId: school.id, statementDate, description, direction, amount,
+    reference: optional(body.reference, 160), bankAccountLabel: optional(body.bankAccountLabel, 120), createdBy: user.id
+  });
+  db.logAudit({ action: 'BANK_STATEMENT_ENTRY_ADDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Added a ${direction} bank statement line for ${amount} ${school.currency || 'ETB'}.`, severity: 'info' });
+  await db.flush();
+  res.status(201).json(entry);
+});
+
+apiRouter.post('/bank-reconciliation/:id/match', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const paymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId : undefined;
+  const expenseId = typeof req.body?.expenseId === 'string' ? req.body.expenseId : undefined;
+  if (Boolean(paymentId) === Boolean(expenseId)) { res.status(400).json({ error: 'Match one statement line to exactly one fee receipt or expense.' }); return; }
+  const entry = await db.matchBankStatementEntry(req.params.id, school.id, { paymentId, expenseId }, user.id);
+  if (!entry) { res.status(409).json({ error: 'This statement line was already matched or no longer exists.' }); return; }
+  db.logAudit({ action: 'BANK_STATEMENT_RECONCILED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Reconciled bank statement line ${entry.id}.`, severity: 'info' });
+  await db.flush();
+  res.json(entry);
+});
+
 apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
