@@ -4499,7 +4499,10 @@ apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, require
   const paymentTotals = new Map<string, number>();
   const expenseTotals = new Map<string, number>();
   for (const allocation of allocations) {
-    byEntry.set(allocation.statementEntryId, [...(byEntry.get(allocation.statementEntryId) || []), allocation]);
+    const payment = allocation.paymentId ? payments.find(item => item.id === allocation.paymentId) : undefined;
+    const expense = allocation.expenseId ? expenses.find(item => item.id === allocation.expenseId) : undefined;
+    const labeledAllocation = { ...allocation, targetLabel: payment ? payment.receiptNumber : expense?.description || 'Financial record' };
+    byEntry.set(allocation.statementEntryId, [...(byEntry.get(allocation.statementEntryId) || []), labeledAllocation]);
     if (allocation.paymentId) paymentTotals.set(allocation.paymentId, (paymentTotals.get(allocation.paymentId) || 0) + Number(allocation.amount));
     if (allocation.expenseId) expenseTotals.set(allocation.expenseId, (expenseTotals.get(allocation.expenseId) || 0) + Number(allocation.amount));
   }
@@ -4509,7 +4512,7 @@ apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, require
     const remainingStatementAmount = entry.matchedAt ? 0 : Math.max(0, Number(entry.amount) - allocatedAmount);
     return {
       ...entry, allocations: rowAllocations, allocatedAmount, remainingStatementAmount,
-      isFullyMatched: Boolean(entry.matchedAt) || remainingStatementAmount <= 0.01
+      isFullyMatched: Boolean(entry.matchedAt) || remainingStatementAmount <= 0.001
     };
   });
   const legacyPayments = new Set(entries.map(entry => entry.matchedPaymentId).filter(Boolean));
@@ -4519,11 +4522,11 @@ apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, require
     unmatchedPayments: payments
       .filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) && !legacyPayments.has(payment.id))
       .map(payment => ({ ...payment, reconciliationRemainingAmount: Math.max(0, Number(payment.amountPaid) - (paymentTotals.get(payment.id) || 0)) }))
-      .filter(payment => payment.reconciliationRemainingAmount > 0.01),
+      .filter(payment => payment.reconciliationRemainingAmount > 0.001),
     unmatchedExpenses: expenses
       .filter(expense => expense.status === 'posted' && !expense.voidedAt && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) && !legacyExpenses.has(expense.id))
       .map(expense => ({ ...expense, reconciliationRemainingAmount: Math.max(0, Number(expense.amount) - (expenseTotals.get(expense.id) || 0)) }))
-      .filter(expense => expense.reconciliationRemainingAmount > 0.01)
+      .filter(expense => expense.reconciliationRemainingAmount > 0.001)
   });
 });
 
