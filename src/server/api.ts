@@ -2454,11 +2454,11 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
   const teacher = teacherPage.items[0] as any;
   if (!teacher) { res.json([]); return; }
 
-  const assignments = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects);
+  const assignments = await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
   const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
   // A Fomester is explicitly assigned on the class record. assignedClasses
   // describes teaching scope and must not grant whole-class Fomester privileges.
@@ -2469,7 +2469,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const assignedPairs = new Set<string>();
   const result: any[] = [];
 
-  for (const item of assignments.items as any[]) {
+  for (const item of assignments as any[]) {
     const klass = allClasses.find((row: any) => row.id === item.classId);
     const subject = allSubjects.find((row: any) => row.id === item.subjectId);
     if (!klass || !subject) continue;
@@ -2478,8 +2478,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
-  // A form teacher is responsible for the whole class, so they can enter marks
-  // for every active subject in that class, even when another teacher teaches it.
+  // A Fomester reviews every class subject. They may enter marks only where
+  // no subject teacher is assigned; assigned subjects remain with their teachers.
   for (const klass of formTeacherClasses) {
     const classSubjects = formTeacherClassAssignments.filter((item: any) => item.classId === klass.id);
     for (const assignment of classSubjects) {
