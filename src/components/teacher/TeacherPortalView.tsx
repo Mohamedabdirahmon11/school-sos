@@ -110,7 +110,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Load the full class mark matrix. Subject teachers see only their assigned subjects;
   // the Form Teacher sees submitted marks from every subject plus their own editable subject(s).
   useEffect(() => {
-    if (!selectedClassId) return;
+    if (!selectedClassId) { setStudents([]); return; }
+    if (activeTab === 'attendance' && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+      setStudents([]);
+      setAttendanceMap({});
+      return;
+    }
     let cancelled = false;
     Promise.all([
       ApiClient.getAllStudents(selectedClassId),
@@ -142,7 +147,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
     });
     return () => { cancelled = true; };
-  }, [selectedClassId, attendanceDate, semester, teacherAssignments]);
+  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses]);
 
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
