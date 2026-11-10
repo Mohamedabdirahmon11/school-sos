@@ -3028,7 +3028,6 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     db.getTimetableSettings(school.id),
     queryAllRows('classes', { school_id: school.id }, 'id,shift')
   ]);
-  const classById = new Map(classes.map((klass: any) => [klass.id, klass]));
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
   const targetIds = new Set(classes.map((klass: any) => klass.id));
   // Keep existing schedules for classes with no valid subject assignments.
