@@ -778,6 +778,10 @@ export class ApiClient {
     return this.request<AttendanceRecord[]>(`/attendance?classId=${classId}&date=${date}`);
   }
 
+  public static async getSchoolDailyAbsences(date: string) {
+    return this.request<Array<AttendanceRecord & { student: Student; className: string }>>(`/attendance/school/absences?date=${encodeURIComponent(date)}`);
+  }
+
   public static async recordDailyAttendance(classId: string, date: string, records: any[]) {
     return this.request<{ success: boolean; count: number; records: AttendanceRecord[] }>('/attendance', {
       method: 'POST',
