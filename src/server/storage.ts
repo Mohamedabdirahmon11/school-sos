@@ -2012,7 +2012,7 @@ class StorageEngine {
       if (deleteError) throw new Error(deleteError.message || 'Unable to replace timetable.');
       if (slots.length) {
         startedAt = performance.now();
-        const { error } = await client.from('timetable_slots').insert(slots.map(slot => toSupabaseRow(slot, 'timetable_slots')));
+        const { error } = await client.from('timetable_slots').insert(slots.map(slot => toSupabaseRow({ ...slot, teacherId: slot.teacherId || null }, 'timetable_slots')));
         this.recordQuery('timetable_slots', 'insert-class-timetable', startedAt);
         if (error) throw new Error(error.message || 'Unable to save timetable.');
       }
