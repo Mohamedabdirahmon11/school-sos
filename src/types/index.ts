@@ -726,6 +726,22 @@ export interface SchoolExpense {
   voidReason?: string;
 }
 
+export interface BankStatementEntry {
+  id: string;
+  schoolId: string;
+  statementDate: string;
+  description: string;
+  reference?: string;
+  direction: 'credit' | 'debit';
+  amount: number;
+  bankAccountLabel?: string;
+  matchedPaymentId?: string;
+  matchedExpenseId?: string;
+  matchedAt?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface InventoryItem {
   id: string;
   schoolId: string;
