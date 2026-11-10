@@ -30,6 +30,7 @@ import {
   AuditLog,
   SuperAdminSettings,
   StaffPayrollRecord,
+  SchoolExpense,
   SchoolSetupState,
   SchoolSetupProgressUpdate
 } from '../types/index.ts';
@@ -945,6 +946,18 @@ export class ApiClient {
 
   public static downloadPayslipPdf(id: string) {
     return this.downloadPdf(`/payroll/${encodeURIComponent(id)}/payslip.pdf`, `payslip-${id}.pdf`);
+  }
+
+  public static async getSchoolExpenses() {
+    return this.request<SchoolExpense[]>('/expenses');
+  }
+
+  public static async createSchoolExpense(data: Omit<SchoolExpense, 'id' | 'schoolId' | 'status' | 'createdBy' | 'createdAt'>) {
+    return this.request<SchoolExpense>('/expenses', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async voidSchoolExpense(id: string, reason: string) {
+    return this.request<SchoolExpense>(`/expenses/${encodeURIComponent(id)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
   public static async getDailyIncome(date?: string) {
