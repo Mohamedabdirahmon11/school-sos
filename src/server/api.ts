@@ -1860,7 +1860,7 @@ apiRouter.get('/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, r
     ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2018-04-22', 'EXAMPLE Father Two', '+252633333333', '', 'EXAMPLE Mother Two', '+252644444444', '+252655555555', ''],
     ['Grade 5', 'A', 'EXAMPLE Student Three', 'female', '2014-09-12', 'EXAMPLE Father Three', '+252666666666', '', 'EXAMPLE Mother Three', '+252677777777', '', '']
   ];
-  const csv = '\\uFEFF' + records.map(record => record.map(value => `"${value.replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const csv = records.map(record => record.map(value => `"${value.replace(/"/g, '""')}"`).join(',')).join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-student-import-template.csv"' }).send(csv);
 });
 
