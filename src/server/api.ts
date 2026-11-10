@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, TimetableSlot, StaffPayrollRecord, PlanConfig, SuperAdminSettings } from '../types/index.ts';
+import { User, UserRole, School, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -1081,6 +1081,10 @@ apiRouter.post('/auth/login', async (req, res) => {
 
   await issueSessionCookie(res, user, req);
   const school = user.schoolId ? await db.getSchoolById(user.schoolId) : null;
+  const accountantStaff = user.role === 'accountant' && school ? await db.getStaffMemberByUserId(user.id, school.id) : null;
+  const sessionUser = user.role === 'accountant'
+    ? { ...user, permissions: accountantStaff?.status === 'active' && Array.isArray(accountantStaff.permissions) ? accountantStaff.permissions : [] }
+    : user;
 
   db.logAudit({
     action: 'USER_LOGIN_SUCCESS',
@@ -1095,7 +1099,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 
   res.json({
-    user: sanitizeUser(user),
+    user: sanitizeUser(sessionUser),
     school,
     sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
     mustChangePassword: user.mustChangePassword || false
@@ -1231,7 +1235,13 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 apiRouter.get('/auth/me', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   const school = user.schoolId ? await getSchoolForRequest(req, user.schoolId) : null;
-  res.json({ user: sanitizeUser(user), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
+  // Accountant permissions live on the school-scoped staff record. Resolve them
+  // here so the client navigation matches the same record enforced by API guards.
+  const staff = user.role === 'accountant' && school ? await getStaffForRequest(req, user.id, school.id) : null;
+  const sessionUser = user.role === 'accountant'
+    ? { ...user, permissions: staff?.status === 'active' && Array.isArray(staff.permissions) ? staff.permissions : [] }
+    : user;
+  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
 });
 
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
@@ -4205,6 +4215,14 @@ apiRouter.delete('/fees/structures/:id', requireAuth, requireSchoolContext, requ
   res.json({ success: await db.deleteFeeStructure(req.params.id, school.id) });
 });
 
+apiRouter.get('/fees/receipts', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+  const result = await db.queryPage<FeePayment>('fee_payments', { school_id: school.id }, page, pageSize, undefined, '*', 'created_at', false);
+  res.json({ items: result.items, total: result.total, page: result.page, pageSize: result.pageSize, totalPages: Math.ceil(result.total / result.pageSize) });
+});
+
 apiRouter.get('/fees/payments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -4234,12 +4252,13 @@ apiRouter.post('/fees/payments/:paymentId/void', requireAuth, requireSchoolConte
   res.json(payment);
 });
 
-// Record Cash Payment only!
+// Record a fee payment through cash, bank transfer, or mobile money.
 apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const { studentId, academicYear, month, feeType, feeStructureId, amountDue, amountPaid, notes, idempotencyKey } = body;
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : 'Cash';
   const resolvedFeeType = feeType || 'monthly_tuition';
   const due = Number(amountDue);
   const paid = Number(amountPaid);
@@ -4249,8 +4268,9 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccou
       (academicYear !== undefined && (typeof academicYear !== 'string' || !academicYear.trim() || academicYear.length > 20)) ||
       (month !== undefined && (typeof month !== 'string' || !month.trim() || month.length > 40)) ||
       (notes !== undefined && (typeof notes !== 'string' || notes.length > 1000)) ||
-      (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128))) {
-    res.status(400).json({ error: 'Provide a student, positive amount due, non-negative cash amount, valid fee category, and valid optional payment details.' });
+      (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length < 8 || idempotencyKey.length > 128)) ||
+      !['Cash', 'Bank Transfer', 'Mobile Money'].includes(paymentMethod)) {
+    res.status(400).json({ error: 'Provide a student, positive amount due, non-negative payment amount, valid fee category, and valid optional payment details.' });
     return;
   }
 
@@ -4266,7 +4286,8 @@ apiRouter.post('/fees/pay-cash', requireAuth, requireSchoolContext, requireAccou
       amountPaid: paid,
       recordedBy: user.id,
       notes,
-      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey.trim() : undefined
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey.trim() : undefined,
+      paymentMethod: paymentMethod as 'Cash' | 'Bank Transfer' | 'Mobile Money'
     });
     res.status(201).json(payment);
   } catch (error: any) {
@@ -4336,7 +4357,7 @@ apiRouter.post('/payroll', requireAuth, requireSchoolContext, requireAccountantO
   const month = typeof req.body?.month === 'string' ? req.body.month : '';
   const selections = req.body?.staff;
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Array.isArray(selections) || selections.length < 1 || selections.length > 500) { res.status(400).json({ error: 'Choose a valid payroll month and between 1 and 500 staff members.' }); return; }
-  const [teachers, staffRows, existing] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id), db.getPayrollRecords(school.id, undefined, month)]);
+  const [teachers, staffRows, existing] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id), db.getPayrollRecords(school.id)]);
   const employees = [
     ...teachers.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) })),
     ...staffRows.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) }))
@@ -4393,6 +4414,145 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
 apiRouter.get('/fees/arrears', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getArrearsList(school.id));
+});
+
+// ==============================================================================
+// ACCOUNTANT EXPENSE LEDGER
+// ==============================================================================
+const expenseCategories = new Set(['rent', 'utilities', 'supplies', 'transport', 'salaries', 'maintenance', 'other']);
+const expensePaymentMethods = new Set(['cash', 'bank_transfer', 'mobile_money', 'other']);
+
+apiRouter.get('/expenses', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  res.json(await db.getSchoolExpenses(school.id));
+});
+
+apiRouter.post('/expenses', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const category = typeof body.category === 'string' ? body.category : '';
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : '';
+  const expenseDate = typeof body.expenseDate === 'string' ? body.expenseDate : '';
+  const amount = Number(body.amount);
+  if (!expenseCategories.has(category) || description.length < 2 || description.length > 500 || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99 || !/^\d{4}-\d{2}-\d{2}$/.test(expenseDate) || Number.isNaN(Date.parse(expenseDate)) || !expensePaymentMethods.has(paymentMethod)) {
+    res.status(400).json({ error: 'Enter a valid category, description, positive amount, expense date, and payment method.' }); return;
+  }
+  const optionalText = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+  const expense = await db.createSchoolExpense({
+    schoolId: school.id, category: category as SchoolExpense['category'], description,
+    vendor: optionalText(body.vendor, 160), amount, expenseDate,
+    paymentMethod: paymentMethod as SchoolExpense['paymentMethod'],
+    reference: optionalText(body.reference, 120), notes: optionalText(body.notes, 1000), createdBy: user.id
+  });
+  db.logAudit({ action: 'SCHOOL_EXPENSE_RECORDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Recorded ${category} expense ${amount} ${school.currency || 'ETB'} on ${expenseDate}.`, severity: 'info' });
+  await db.flush();
+  res.status(201).json(expense);
+});
+
+apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 5 || reason.length > 500) { res.status(400).json({ error: 'Enter a void reason between 5 and 500 characters.' }); return; }
+  const expense = await db.voidSchoolExpense(req.params.id, school.id, user.id, reason);
+  if (!expense) { res.status(409).json({ error: 'Expense was not found or has already been voided.' }); return; }
+  db.logAudit({ action: 'SCHOOL_EXPENSE_VOIDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Voided expense ${expense.id}. Reason: ${reason}`, severity: 'warning' });
+  await db.flush();
+  res.json(expense);
+});
+
+apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
+  const canViewPayroll = user.role === 'super_admin' || staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'payroll_manage');
+  const [payments, expenses, students, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), db.getStudents(school.id), canViewPayroll ? db.getPayrollRecords(school.id) : Promise.resolve([])]);
+  const studentById = new Map(students.map(student => [student.id, [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')]));
+  const incomeEntries = payments.filter(payment => payment.date?.startsWith(month) && Number(payment.amountPaid) > 0).map(payment => ({
+    id: payment.id, date: payment.date, type: 'income' as const, description: `Fee payment · ${studentById.get(payment.studentId) || payment.studentId}`,
+    category: payment.feeType, amount: Number(payment.amountPaid) || 0, method: payment.paymentMethod, reference: payment.receiptNumber,
+    status: payment.voidedAt ? 'void' : 'posted'
+  }));
+  const expenseEntries = expenses.filter(expense => expense.expenseDate?.startsWith(month)).map(expense => ({
+    id: expense.id, date: expense.expenseDate, type: 'expense' as const, description: expense.description,
+    category: expense.category, amount: Number(expense.amount) || 0, method: expense.paymentMethod,
+    reference: expense.reference || '', status: expense.status
+  }));
+  const payrollEntries = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))).map(record => ({
+    id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
+    description: `Payroll · ${record.staffName || record.staffId || record.userId}`, category: 'salaries',
+    amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted'
+  }));
+  const entries = [...incomeEntries, ...expenseEntries, ...payrollEntries].sort((left, right) => right.date.localeCompare(left.date));
+  res.json(entries);
+});
+
+apiRouter.get('/bank-reconciliation', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const [entries, payments, expenses] = await Promise.all([
+    db.getBankStatementEntries(school.id), db.getFeePayments(school.id), db.getSchoolExpenses(school.id)
+  ]);
+  res.json({
+    entries: entries.sort((a, b) => b.statementDate.localeCompare(a.statementDate)),
+    unmatchedPayments: payments.filter(payment => !payment.voidedAt && Number(payment.amountPaid) > 0 && ['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) && !entries.some(entry => entry.matchedPaymentId === payment.id)),
+    unmatchedExpenses: expenses.filter(expense => expense.status === 'posted' && ['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) && !entries.some(entry => entry.matchedExpenseId === expense.id))
+  });
+});
+
+apiRouter.post('/bank-reconciliation', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const statementDate = typeof body.statementDate === 'string' ? body.statementDate : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const direction = body.direction;
+  const amount = Number(body.amount);
+  const parsedStatementDate = new Date(`${statementDate}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(statementDate) || Number.isNaN(parsedStatementDate.getTime()) || parsedStatementDate.toISOString().slice(0, 10) !== statementDate
+    || description.length < 2 || description.length > 500
+    || !['credit', 'debit'].includes(direction) || !Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99) {
+    res.status(400).json({ error: 'Enter a valid statement date, description, direction and positive amount.' }); return;
+  }
+  const optional = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+  const entry = await db.createBankStatementEntry({
+    schoolId: school.id, statementDate, description, direction, amount,
+    reference: optional(body.reference, 160), bankAccountLabel: optional(body.bankAccountLabel, 120), createdBy: user.id
+  });
+  db.logAudit({ action: 'BANK_STATEMENT_ENTRY_ADDED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Added a ${direction} bank statement line for ${amount} ${school.currency || 'ETB'}.`, severity: 'info' });
+  await db.flush();
+  res.status(201).json(entry);
+});
+
+apiRouter.post('/bank-reconciliation/:id/match', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const paymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId : undefined;
+  const expenseId = typeof req.body?.expenseId === 'string' ? req.body.expenseId : undefined;
+  if (Boolean(paymentId) === Boolean(expenseId)) { res.status(400).json({ error: 'Match one statement line to exactly one fee receipt or expense.' }); return; }
+  const entry = await db.matchBankStatementEntry(req.params.id, school.id, { paymentId, expenseId });
+  if (!entry) { res.status(409).json({ error: 'This statement line was already matched or no longer exists.' }); return; }
+  db.logAudit({ action: 'BANK_STATEMENT_RECONCILED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Reconciled bank statement line ${entry.id}.`, severity: 'info' });
+  await db.flush();
+  res.json(entry);
+});
+
+apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
+  const canViewPayroll = user.role === 'super_admin' || staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'payroll_manage');
+  const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), canViewPayroll ? db.getPayrollRecords(school.id) : Promise.resolve([])]);
+  const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
+  const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
+  const paidPayroll = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month)));
+  const totalIncome = incomeRows.reduce((sum, payment) => sum + (Number(payment.amountPaid) || 0), 0);
+  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
+    + paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0);
+  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + paidPayroll.length, payrollExpenseTotal: paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0), payrollExpenseCount: paidPayroll.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
 });
 
 // ==============================================================================
@@ -4473,12 +4633,12 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
   const feeName = payment.feeStructureId ? feeStructures.find(item => item.id === payment.feeStructureId)?.name : undefined;
   sendPdf(res, `receipt-${payment.receiptNumber}`, [[
-    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED CASH RECEIPT �?" ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL CASH RECEIPT',
+    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
     `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
     `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
     `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
-    `Cash received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
-    'Payment channel: Cash only', '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
+    `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
+    `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
     ...(school.receiptFooter ? ['', school.receiptFooter] : [])
   ]]);
 });
@@ -4897,7 +5057,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;

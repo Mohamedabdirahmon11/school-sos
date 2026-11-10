@@ -337,8 +337,8 @@ export interface PromotionRecord {
   processedAt: string;
 }
 
-// Students pay in CASH ONLY
-export type PaymentMethod = 'Cash';
+// Supported fee collection channels.
+export type PaymentMethod = 'Cash' | 'Bank Transfer' | 'Mobile Money';
 export type FeePaymentStatus = 'paid' | 'partial' | 'unpaid';
 export type FeeType = 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom';
 
@@ -368,7 +368,7 @@ export interface FeePayment {
   amountDue: number;
   amountPaid: number;
   remainingAmount: number;
-  paymentMethod: 'Cash';
+  paymentMethod: PaymentMethod;
   status: FeePaymentStatus;
   date: string;
   recordedBy: string;
@@ -705,6 +705,41 @@ export interface StaffPayrollRecord {
   approvedAt?: string;
   paidAt?: string;
   paidDate?: string;
+}
+
+export interface SchoolExpense {
+  id: string;
+  schoolId: string;
+  category: 'rent' | 'utilities' | 'supplies' | 'transport' | 'salaries' | 'maintenance' | 'other';
+  description: string;
+  vendor?: string;
+  amount: number;
+  expenseDate: string;
+  paymentMethod: 'cash' | 'bank_transfer' | 'mobile_money' | 'other';
+  reference?: string;
+  notes?: string;
+  status: 'posted' | 'void';
+  createdBy: string;
+  createdAt: string;
+  voidedAt?: string;
+  voidedBy?: string;
+  voidReason?: string;
+}
+
+export interface BankStatementEntry {
+  id: string;
+  schoolId: string;
+  statementDate: string;
+  description: string;
+  reference?: string;
+  direction: 'credit' | 'debit';
+  amount: number;
+  bankAccountLabel?: string;
+  matchedPaymentId?: string;
+  matchedExpenseId?: string;
+  matchedAt?: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface InventoryItem {

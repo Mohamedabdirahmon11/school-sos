@@ -14,3 +14,8 @@ export function staffHasPermission(
     && Array.isArray(staff.permissions)
     && staff.permissions.includes(permission);
 }
+
+/** Keep staff navigation aligned with the permissions enforced by API routes. */
+export function hasStaffNavigationPermission(permissions: unknown, permission: StaffPermission): boolean {
+  return Array.isArray(permissions) && permissions.includes(permission);
+}

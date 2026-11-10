@@ -8,7 +8,7 @@ type PayrollStaff = { id: string; staffId: string; userId: string; name: string;
 
 export const AccountantPayrollView: React.FC = () => {
   const { school, t } = useAuth();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; });
   const [staff, setStaff] = useState<PayrollStaff[]>([]);
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -17,6 +17,8 @@ export const AccountantPayrollView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [transitioningId, setTransitioningId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true); setError('');
@@ -36,6 +38,7 @@ export const AccountantPayrollView: React.FC = () => {
     value[record.status].net += Number(record.netSalary) || 0;
     return value;
   }, { draft: { count: 0, net: 0 }, approved: { count: 0, net: 0 }, paid: { count: 0, net: 0 } }), [records]);
+  const visibleAvailable = useMemo(() => available.filter(employee => `${employee.name} ${employee.staffId}`.toLowerCase().includes(staffSearch.toLowerCase())), [available, staffSearch]);
   const money = (amount: number) => formatMoney(Number(amount) || 0, school?.currency);
   const statusText = (status: StaffPayrollRecord['status']) => status === 'draft' ? t('payroll_draft') : status === 'approved' ? t('payroll_approved') : t('payroll_paid');
 
@@ -51,12 +54,13 @@ export const AccountantPayrollView: React.FC = () => {
   };
 
   const transition = async (record: StaffPayrollRecord, action: 'approve' | 'pay') => {
-    setError('');
+    setError(''); setTransitioningId(record.id);
     try {
       if (action === 'approve') await ApiClient.approvePayroll(record.id);
       else await ApiClient.payPayroll(record.id);
       await reload();
     } catch (reason: any) { setError(reason?.message || t('payroll_error')); }
+    finally { setTransitioningId(null); }
   };
 
   return <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
@@ -80,16 +84,18 @@ export const AccountantPayrollView: React.FC = () => {
       <div className="grid md:grid-cols-2 gap-4">
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-[#475569] mb-2">{t('payroll_staff_member')}</legend>
-          {available.map(employee => <label key={employee.id} className="flex items-center justify-between gap-3 text-sm p-2 rounded-lg hover:bg-slate-50">
-            <span className="flex items-center gap-2"><input type="checkbox" checked={selected.includes(employee.id)} onChange={event => setSelected(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} />{employee.name} · {employee.staffId}</span>
-            <span className="text-xs text-slate-600">{money(employee.monthlySalary)}</span>
+          <input aria-label="Search payroll staff" value={staffSearch} onChange={event => setStaffSearch(event.target.value)} placeholder="Search staff name or ID…" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+          {visibleAvailable.map(employee => <label key={employee.id} className="flex items-center justify-between gap-3 text-sm p-2 rounded-lg hover:bg-slate-50">
+            <span className="flex min-w-0 items-center gap-2"><input type="checkbox" checked={selected.includes(employee.id)} onChange={event => setSelected(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><span className="truncate">{employee.name} · {employee.staffId}</span></span>
+            <span className="shrink-0 text-xs text-slate-600">{money(employee.monthlySalary)}</span>
           </label>)}
           {!available.length && <p className="text-sm text-slate-500">{t('payroll_empty')}</p>}
+          {available.length > 0 && !visibleAvailable.length && <p className="text-xs text-slate-500">No staff match that search.</p>}
         </fieldset>
         <div className="grid grid-cols-2 gap-3 content-start">
           <label className="text-xs font-semibold text-[#475569]">{t('payroll_allowance')} ({school?.currency || 'ETB'})<input type="number" min="0" step="0.01" value={allowance} onChange={event => setAllowance(Number(event.target.value))} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
           <label className="text-xs font-semibold text-[#475569]">{t('payroll_deduction')} ({school?.currency || 'ETB'})<input type="number" min="0" step="0.01" value={deduction} onChange={event => setDeduction(Number(event.target.value))} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-          <button type="button" disabled={!selected.length || saving} onClick={() => void createDraft()} className="col-span-2 px-4 py-2 bg-[#0F766E] disabled:opacity-50 text-white rounded-lg text-sm font-semibold">{saving ? t('payroll_loading') : t('payroll_create')}</button>
+          <button type="button" disabled={!selected.length || saving || loading} onClick={() => void createDraft()} className="col-span-2 px-4 py-2 bg-[#0F766E] disabled:opacity-50 text-white rounded-lg text-sm font-semibold">{saving ? t('payroll_loading') : t('payroll_create')}</button>
         </div>
       </div>
     </section>
@@ -101,7 +107,7 @@ export const AccountantPayrollView: React.FC = () => {
             <th className="p-3">{t('payroll_staff_member')}</th><th className="p-3">{t('payroll_salary')}</th><th className="p-3">{t('payroll_allowance')}</th><th className="p-3">{t('payroll_deduction')}</th><th className="p-3">{t('payroll_net')}</th><th className="p-3">{t('payroll_status')}</th><th className="p-3"></th>
           </tr></thead><tbody className="divide-y divide-slate-100">{records.map(record => <tr key={record.id}>
             <td className="p-3 font-semibold">{record.staffName}</td><td className="p-3">{money(record.baseSalary)}</td><td className="p-3">{money(record.allowanceTotal)}</td><td className="p-3">{money(record.deductionTotal)}</td><td className="p-3 font-bold">{money(record.netSalary)}</td><td className="p-3">{statusText(record.status)}</td>
-            <td className="p-3"><div className="flex justify-end gap-2">{record.status === 'draft' && <button type="button" onClick={() => void transition(record, 'approve')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_approve')}</button>}{record.status === 'approved' && <button type="button" onClick={() => void transition(record, 'pay')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_mark_paid')}</button>}<button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-2 py-1 text-slate-700 border border-slate-200 rounded">{t('payroll_payslip')}</button></div></td>
+            <td className="p-3"><div className="flex justify-end gap-2">{record.status === 'draft' && <button type="button" disabled={transitioningId !== null} onClick={() => void transition(record, 'approve')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_approve')}</button>}{record.status === 'approved' && <button type="button" disabled={transitioningId !== null} onClick={() => void transition(record, 'pay')} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_mark_paid')}</button>}<button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-2 py-1 text-slate-700 border border-slate-200 rounded">{t('payroll_payslip')}</button></div></td>
           </tr>)}</tbody>
         </table></div>}
     </section>

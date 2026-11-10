@@ -2,7 +2,7 @@
  * Multi-Tenant Persistent Storage & Rule Engine for SchoolOS
  * Handles database operations, tenant scoping, Supabase synchronization,
  * subscription state machine, lockout protection, once-per-day attendance,
- * percentage-based small/big exam grading, cash-only fees, and audit logging.
+ * percentage-based small/big exam grading, multi-channel fee collection, and audit logging.
  */
 
 import {
@@ -26,6 +26,7 @@ import {
   SupportTicket,
   StaffMember,
   StaffPayrollRecord,
+  SchoolExpense,
   AdmissionApplication,
   AuditLog,
   SuperAdminSettings,
@@ -665,7 +666,7 @@ class StorageEngine {
     this.testClient = client;
   }
 
-  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*'): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
+  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Supabase client is not configured.');
     const safePage = Math.max(1, Math.floor(page) || 1);
@@ -676,7 +677,7 @@ class StorageEngine {
       query = Array.isArray(value) ? query.in(field, value) : query.eq(field, value);
     }
     if (orFilter && typeof query.or === 'function') query = query.or(orFilter);
-    if (typeof query.order === 'function') query = query.order(primaryKeyColumn(table), { ascending: true });
+    if (typeof query.order === 'function') query = query.order(orderBy || primaryKeyColumn(table), { ascending });
     const startedAt = performance.now();
     const { data, error, count } = await query.range((safePage - 1) * safeSize, safePage * safeSize - 1);
     this.recordQuery(table, 'select-page', startedAt);
@@ -1160,6 +1161,76 @@ class StorageEngine {
     this.data.staffMembers.push(staff);
     this.save();
     return staff;
+  }
+
+  public async getSchoolExpenses(schoolId: string): Promise<SchoolExpense[]> {
+    return this.queryRows<SchoolExpense>('school_expenses', { school_id: schoolId });
+  }
+
+  public async createSchoolExpense(input: Omit<SchoolExpense, 'id' | 'status' | 'createdAt' | 'voidedAt' | 'voidedBy' | 'voidReason'>): Promise<SchoolExpense> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Expense storage is unavailable.');
+    const row = { ...input, id: `exp-${randomUUID()}`, status: 'posted' as const, createdAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_expenses').insert(toSupabaseRow(row, 'school_expenses')).select('*').single();
+    this.recordQuery('school_expenses', 'insert', startedAt);
+    if (error || !data) throw new Error(`Unable to record school expense: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(data, 'school_expenses') as SchoolExpense;
+  }
+
+  public async voidSchoolExpense(id: string, schoolId: string, userId: string, reason: string): Promise<SchoolExpense | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Expense storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_expenses').update(toSupabaseRow({ status: 'void', voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason }, 'school_expenses')).eq('id', id).eq('school_id', schoolId).eq('status', 'posted').select('*').maybeSingle();
+    this.recordQuery('school_expenses', 'update', startedAt);
+    if (error) throw new Error(`Unable to void school expense: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'school_expenses') as SchoolExpense : null;
+  }
+
+  public async getBankStatementEntries(schoolId: string): Promise<import('../types/index.ts').BankStatementEntry[]> {
+    return this.queryRows<import('../types/index.ts').BankStatementEntry>('bank_statement_entries', { school_id: schoolId });
+  }
+
+  public async createBankStatementEntry(input: Omit<import('../types/index.ts').BankStatementEntry, 'id' | 'createdAt' | 'matchedAt' | 'matchedPaymentId' | 'matchedExpenseId'>): Promise<import('../types/index.ts').BankStatementEntry> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const row = { ...input, id: `bank-${randomUUID()}`, createdAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('bank_statement_entries').insert(toSupabaseRow(row, 'bank_statement_entries')).select('*').single();
+    this.recordQuery('bank_statement_entries', 'insert', startedAt);
+    if (error || !data) throw new Error(`Unable to save bank statement entry: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry;
+  }
+
+  public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const entry = (await this.getBankStatementEntries(schoolId)).find(row => row.id === id);
+    if (!entry || entry.matchedAt) return null;
+    if (match.paymentId) {
+      if (entry.direction !== 'credit') throw new Error('A bank debit must be matched to an expense.');
+      const payment = await this.getFeePaymentById(match.paymentId, schoolId);
+      if (!payment || payment.voidedAt || !['Bank Transfer', 'Mobile Money'].includes(payment.paymentMethod) || Math.abs(Number(payment.amountPaid) - Number(entry.amount)) > 0.01) {
+        throw new Error('Choose a non-void bank/mobile fee receipt with the exact statement amount.');
+      }
+    } else if (match.expenseId) {
+      if (entry.direction !== 'debit') throw new Error('A bank credit must be matched to a fee receipt.');
+      const expense = (await this.getSchoolExpenses(schoolId)).find(row => row.id === match.expenseId);
+      if (!expense || expense.status !== 'posted' || !['bank_transfer', 'mobile_money'].includes(expense.paymentMethod) || Math.abs(Number(expense.amount) - Number(entry.amount)) > 0.01) {
+        throw new Error('Choose a posted bank/mobile expense with the exact statement amount.');
+      }
+    } else {
+      throw new Error('Select a fee receipt or expense to match.');
+    }
+    const startedAt = performance.now();
+    let query = client.from('bank_statement_entries').update(toSupabaseRow({
+      matchedPaymentId: match.paymentId || null, matchedExpenseId: match.expenseId || null, matchedAt: new Date().toISOString()
+    }, 'bank_statement_entries')).eq('id', id).eq('school_id', schoolId).is('matched_at', null);
+    const { data, error } = await query.select('*').maybeSingle();
+    this.recordQuery('bank_statement_entries', 'match', startedAt);
+    if (error) throw new Error(`Unable to match bank statement entry: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry : null;
   }
 
   public async getPayrollRecords(schoolId: string, userId?: string, month?: string): Promise<StaffPayrollRecord[]> {
@@ -2548,7 +2619,7 @@ class StorageEngine {
     return payment;
   }
 
-  // Record Cash Payment only!
+  // Record a school fee payment using the selected collection channel.
   public async recordCashFeePayment(
     paymentData: {
       schoolId: string;
@@ -2556,6 +2627,7 @@ class StorageEngine {
       academicYear: string;
       month: string;
       feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom';
+      paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money';
       amountDue: number;
       amountPaid: number;
       recordedBy: string;
@@ -2607,7 +2679,7 @@ class StorageEngine {
   private async recordCashFeePaymentInternal(paymentData: {
     schoolId: string; studentId: string; academicYear: string; month: string;
     feeType: 'monthly_tuition' | 'annual_registration' | 'bus' | 'custom'; amountDue: number; amountPaid: number;
-    recordedBy: string; notes?: string; idempotencyKey?: string; feeStructureId?: string;
+    paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money'; recordedBy: string; notes?: string; idempotencyKey?: string; feeStructureId?: string;
   }): Promise<FeePayment> {
     const student = await this.getStudentById(paymentData.studentId, paymentData.schoolId);
     if (!student || student.schoolId !== paymentData.schoolId) throw new Error('Student is not part of this school.');
@@ -2634,7 +2706,7 @@ class StorageEngine {
       paymentData.amountDue = Number(matching.amount);
     }
     if (!Number.isFinite(paymentData.amountDue) || !Number.isFinite(paymentData.amountPaid) || paymentData.amountDue < 0 || paymentData.amountPaid < 0 || paymentData.amountPaid > paymentData.amountDue) {
-      throw new Error('Payment amounts must be valid, non-negative values and cash paid cannot exceed the amount due.');
+      throw new Error('Payment amounts must be valid, non-negative values and payment amount cannot exceed the amount due.');
     }
     const installmentUsesMonth = paymentData.feeType === 'monthly_tuition'
       || paymentData.feeType === 'bus'
@@ -2658,7 +2730,8 @@ class StorageEngine {
         p_amount_paid: paymentData.amountPaid,
         p_recorded_by: paymentData.recordedBy,
         p_notes: paymentData.notes || null,
-        p_idempotency_key: paymentData.idempotencyKey || null
+        p_idempotency_key: paymentData.idempotencyKey || null,
+        p_payment_method: paymentData.paymentMethod || 'Cash'
       });
       this.recordQuery('rpc:schoolos_apply_fee_installment', 'call', startedAt);
       if (error) throw new Error(error.message || 'Unable to apply this fee installment.');
@@ -2698,7 +2771,7 @@ class StorageEngine {
       amountDue: paymentData.amountDue,
       amountPaid: paymentData.amountPaid,
       remainingAmount: remaining,
-      paymentMethod: 'Cash', // Strictly Cash only
+      paymentMethod: paymentData.paymentMethod || 'Cash',
       status,
       date: new Date().toISOString().split('T')[0],
       recordedBy: paymentData.recordedBy,
@@ -2709,13 +2782,13 @@ class StorageEngine {
     this.data.feePayments.push(payment);
 
     this.logAudit({
-      action: 'CASH_FEE_PAYMENT_RECORDED',
+      action: 'FEE_PAYMENT_RECORDED',
       category: 'finance',
       schoolId: paymentData.schoolId,
       userId: paymentData.recordedBy,
       userName: 'Cashier / Accountant',
       userRole: 'accountant',
-      details: `Recorded cash payment (Receipt #${receiptNumber}) for student ID ${paymentData.studentId}.`,
+      details: `Recorded ${payment.paymentMethod} payment (Receipt #${receiptNumber}) for student ID ${paymentData.studentId}.`,
       severity: 'info'
     });
 
@@ -3400,7 +3473,7 @@ class StorageEngine {
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
-      'notification_templates', 'payroll_records', 'promotion_history', 'promotions',
+      'notification_templates', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'promotion_history', 'promotions',
       'report_card_templates', 'school_branches', 'school_events', 'school_notices',
       'staff_members', 'student_marks', 'students', 'subjects', 'school_health_visits',
       'support_tickets', 'teacher_unavailability', 'teachers',

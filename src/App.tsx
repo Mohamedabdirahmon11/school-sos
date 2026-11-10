@@ -14,6 +14,7 @@ import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
+import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -44,6 +45,8 @@ const MessagesView = React.lazy(() => import('./components/schooladmin/MessagesV
 const StaffAccessView = React.lazy(() => import('./components/schooladmin/StaffAccessView.tsx').then(module => ({ default: module.StaffAccessView })));
 const ReportsView = React.lazy(() => import('./components/schooladmin/ReportsView.tsx').then(module => ({ default: module.ReportsView })));
 const AccountantDashboard = React.lazy(() => import('./components/accountant/AccountantDashboard.tsx').then(module => ({ default: module.AccountantDashboard })));
+const AccountantExpensesView = React.lazy(() => import('./components/accountant/AccountantExpensesView.tsx').then(module => ({ default: module.AccountantExpensesView })));
+const AccountantBankReconciliationView = React.lazy(() => import('./components/accountant/AccountantBankReconciliationView.tsx').then(module => ({ default: module.AccountantBankReconciliationView })));
 const AccountantPayrollView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.AccountantPayrollView })));
 const StaffPayslipsView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.StaffPayslipsView })));
 const TeacherPortalView = React.lazy(() => import('./components/teacher/TeacherPortalView.tsx').then(module => ({ default: module.TeacherPortalView })));
@@ -129,7 +132,14 @@ const AppContent: React.FC = () => {
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
-    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard' : requestedView;
+    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard'
+      : user.role === 'accountant' && (
+        requestedView === 'sch_fees' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'acc_expenses' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'acc_bank_reconciliation' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        || requestedView === 'sch_payroll' && !hasStaffNavigationPermission(user.permissions, 'payroll_manage')
+        || requestedView === 'sch_reports' && !hasStaffNavigationPermission(user.permissions, 'reports_export')
+      ) ? 'acc_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
     if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
@@ -299,6 +309,12 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_health' && (
               <ExtraModulesView initialSubModule="health" />
+            )}
+            {activeView === 'acc_expenses' && user.role === 'accountant' && (
+              <AccountantExpensesView />
+            )}
+            {activeView === 'acc_bank_reconciliation' && user.role === 'accountant' && (
+              <AccountantBankReconciliationView />
             )}
             {activeView === 'sch_payroll' && (
               user.role === 'accountant' ? <AccountantPayrollView /> : null

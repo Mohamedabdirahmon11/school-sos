@@ -30,6 +30,7 @@ import {
   AuditLog,
   SuperAdminSettings,
   StaffPayrollRecord,
+  SchoolExpense,
   SchoolSetupState,
   SchoolSetupProgressUpdate
 } from '../types/index.ts';
@@ -860,7 +861,7 @@ export class ApiClient {
     });
   }
 
-  // Fees: Cash Only
+  // Fees: Cash, bank transfer, or mobile money
   public static async getFeeStructures() {
     return this.request<FeeStructureItem[]>('/fees/structures');
   }
@@ -880,6 +881,11 @@ export class ApiClient {
     return this.request<{ success: boolean }>(`/fees/structures/${id}`, { method: 'DELETE' });
   }
 
+  public static async getFeeReceiptPage(page = 1, pageSize = 20) {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return this.request<{ items: FeePayment[]; total: number; page: number; pageSize: number; totalPages: number }>(`/fees/receipts?${query.toString()}`);
+  }
+
   public static async getFeePayments(studentId?: string, params?: any) {
     const query = new URLSearchParams();
     if (studentId) query.set('studentId', studentId);
@@ -893,6 +899,7 @@ export class ApiClient {
     studentId: string;
     amountDue: number;
     amountPaid: number;
+    paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money';
     feeType?: string;
     feeStructureId?: string;
     month?: string;
@@ -945,6 +952,39 @@ export class ApiClient {
 
   public static downloadPayslipPdf(id: string) {
     return this.downloadPdf(`/payroll/${encodeURIComponent(id)}/payslip.pdf`, `payslip-${id}.pdf`);
+  }
+
+  public static async getMonthlyCashbook(month: string) {
+    const query = new URLSearchParams({ month });
+    return this.request<Array<{ id: string; date: string; type: 'income' | 'expense'; description: string; category: string; amount: number; method: string; reference: string; status: 'posted' | 'void' }>>(`/fees/cashbook?${query.toString()}`);
+  }
+
+  public static async getMonthlyFinanceSummary(month: string) {
+    const query = new URLSearchParams({ month });
+    return this.request<{ month: string; totalIncome: number; incomeCount: number; totalExpenses: number; expenseCount: number; payrollExpenseTotal: number; payrollExpenseCount: number; payrollIncluded: boolean; netCashflow: number }>(`/fees/monthly-summary?${query.toString()}`);
+  }
+
+  public static async getBankReconciliation() {
+    return this.request<{ entries: import('../types/index.ts').BankStatementEntry[]; unmatchedPayments: FeePayment[]; unmatchedExpenses: SchoolExpense[] }>('/bank-reconciliation');
+  }
+
+  public static async createBankStatementEntry(data: { statementDate: string; description: string; direction: 'credit' | 'debit'; amount: number; reference?: string; bankAccountLabel?: string }) {
+    return this.request<import('../types/index.ts').BankStatementEntry>('/bank-reconciliation', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async matchBankStatementEntry(id: string, match: { paymentId?: string; expenseId?: string }) {
+    return this.request<import('../types/index.ts').BankStatementEntry>(`/bank-reconciliation/${encodeURIComponent(id)}/match`, { method: 'POST', body: JSON.stringify(match) });
+  }
+  public static async getSchoolExpenses() {
+    return this.request<SchoolExpense[]>('/expenses');
+  }
+
+  public static async createSchoolExpense(data: Omit<SchoolExpense, 'id' | 'schoolId' | 'status' | 'createdBy' | 'createdAt'>) {
+    return this.request<SchoolExpense>('/expenses', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async voidSchoolExpense(id: string, reason: string) {
+    return this.request<SchoolExpense>(`/expenses/${encodeURIComponent(id)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
   public static async getDailyIncome(date?: string) {

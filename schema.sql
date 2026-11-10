@@ -2,7 +2,7 @@
 -- SchoolOS Multi-School SaaS Platform Database Schema
 -- Compatible with Supabase PostgreSQL (Postgres 15+)
 -- Features: Multi-Tenancy Isolation, Row Level Security (RLS), Role-Based Access,
---           Rate Limiting, Audit Trails, Cash-Only Fees, Small/Big Exam Grading
+--           Rate Limiting, Audit Trails, Cash/Bank/Mobile fee payments, Small/Big Exam Grading
 -- ==============================================================================
 
 -- 1. EXTENSIONS
@@ -961,6 +961,28 @@ CREATE TABLE IF NOT EXISTS staff_members (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.school_expenses (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  category VARCHAR(32) NOT NULL CHECK (category IN ('rent','utilities','supplies','transport','salaries','maintenance','other')),
+  description VARCHAR(500) NOT NULL CHECK (length(btrim(description)) BETWEEN 2 AND 500),
+  vendor VARCHAR(160),
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0 AND amount <= 9999999999.99),
+  expense_date DATE NOT NULL,
+  payment_method VARCHAR(24) NOT NULL CHECK (payment_method IN ('cash','bank_transfer','mobile_money','other')),
+  reference VARCHAR(120),
+  notes VARCHAR(1000),
+  status VARCHAR(12) NOT NULL DEFAULT 'posted' CHECK (status IN ('posted','void')),
+  created_by VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  voided_at TIMESTAMPTZ,
+  voided_by VARCHAR(64) REFERENCES users(id) ON DELETE RESTRICT,
+  void_reason VARCHAR(500),
+  CHECK ((status = 'posted' AND voided_at IS NULL AND voided_by IS NULL) OR (status = 'void' AND voided_at IS NOT NULL AND voided_by IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_school_expenses_school_date ON public.school_expenses (school_id, expense_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_school_expenses_school_category ON public.school_expenses (school_id, category, expense_date DESC);
+
 CREATE TABLE IF NOT EXISTS payroll_records (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -1259,6 +1281,7 @@ ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fee_structures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fee_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payroll_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE school_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_card_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE direct_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE communication_settings ENABLE ROW LEVEL SECURITY;
@@ -1312,6 +1335,23 @@ BEGIN
     ', t, t, t, t, t, t, t, t);
   END LOOP;
 END $$;
+
+-- Expenses are restricted to school administrators and accountants; no hard deletes.
+DROP POLICY IF EXISTS school_expenses_school_read ON school_expenses;
+CREATE POLICY school_expenses_school_read ON school_expenses FOR SELECT TO authenticated
+  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant')));
+DROP POLICY IF EXISTS school_expenses_school_insert ON school_expenses;
+CREATE POLICY school_expenses_school_insert ON school_expenses FOR INSERT TO authenticated
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS school_expenses_school_update ON school_expenses;
+CREATE POLICY school_expenses_school_update ON school_expenses FOR UPDATE TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'))
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS school_expenses_service_role_all ON school_expenses;
+CREATE POLICY school_expenses_service_role_all ON school_expenses FOR ALL TO service_role USING (true) WITH CHECK (true);
+REVOKE ALL ON TABLE school_expenses FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE ON TABLE school_expenses TO authenticated, service_role;
+REVOKE DELETE ON TABLE school_expenses FROM authenticated;
 
 -- 3. Users Table Policy
 DROP POLICY IF EXISTS users_super_admin ON users;
@@ -1705,7 +1745,7 @@ CREATE POLICY teachers_role_scope ON teachers AS RESTRICTIVE FOR SELECT TO authe
 DROP POLICY IF EXISTS subscription_invoices_scope ON subscription_invoices;
 CREATE POLICY subscription_invoices_scope ON subscription_invoices
   FOR SELECT TO authenticated
-  USING (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id());
+  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant')));
 
 DROP POLICY IF EXISTS broadcasts_target_scope ON platform_broadcasts;
 CREATE POLICY broadcasts_target_scope ON platform_broadcasts
@@ -3576,7 +3616,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'notification_templates', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'notification_templates', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;
@@ -4136,3 +4176,149 @@ UPDATE public.schools
 SET class_levels = jsonb_build_array(0) || COALESCE(class_levels, '[]'::jsonb)
 WHERE NOT COALESCE(class_levels, '[]'::jsonb) @> '[0]'::jsonb;
 
+
+
+-- Accountant payment channels and bank reconciliation (migration 061).
+-- Accountant payment channels and bank reconciliation.
+-- Additive and tenant-scoped; existing receipts retain their Cash method.
+BEGIN;
+
+ALTER TABLE public.fee_payments
+  DROP CONSTRAINT IF EXISTS fee_payments_payment_method_check;
+ALTER TABLE public.fee_payments
+  ALTER COLUMN payment_method SET DEFAULT 'Cash';
+ALTER TABLE public.fee_payments
+  ADD CONSTRAINT fee_payments_payment_method_check
+  CHECK (payment_method IN ('Cash', 'Bank Transfer', 'Mobile Money'));
+
+-- Replace the previous six-argument overload so callers can safely pass the
+-- payment channel while older six-argument application calls keep the default.
+DROP FUNCTION IF EXISTS public.schoolos_apply_fee_installment(VARCHAR, VARCHAR, NUMERIC, VARCHAR, TEXT, VARCHAR);
+CREATE OR REPLACE FUNCTION public.schoolos_apply_fee_installment(
+  p_payment_id VARCHAR,
+  p_school_id VARCHAR,
+  p_amount_paid NUMERIC,
+  p_recorded_by VARCHAR,
+  p_notes TEXT DEFAULT NULL,
+  p_idempotency_key VARCHAR DEFAULT NULL,
+  p_payment_method VARCHAR DEFAULT 'Cash'
+)
+RETURNS public.fee_payments
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  payment_row public.fee_payments%ROWTYPE;
+  next_paid NUMERIC(10,2);
+BEGIN
+  IF p_payment_id IS NULL OR btrim(p_payment_id) = ''
+    OR p_school_id IS NULL OR btrim(p_school_id) = ''
+    OR p_recorded_by IS NULL OR btrim(p_recorded_by) = ''
+    OR p_amount_paid IS NULL OR p_amount_paid <= 0
+    OR (p_notes IS NOT NULL AND length(p_notes) > 1000)
+    OR (p_idempotency_key IS NOT NULL AND length(p_idempotency_key) > 128)
+    OR p_payment_method NOT IN ('Cash', 'Bank Transfer', 'Mobile Money') THEN
+    RAISE EXCEPTION 'Invalid fee installment details.';
+  END IF;
+
+  SELECT * INTO payment_row
+    FROM public.fee_payments
+   WHERE id = p_payment_id AND school_id = p_school_id
+   FOR UPDATE;
+
+  IF NOT FOUND OR payment_row.voided_at IS NOT NULL THEN
+    RAISE EXCEPTION 'The fee installment was not found or has been voided.';
+  END IF;
+  IF p_idempotency_key IS NOT NULL AND (
+    payment_row.idempotency_key = p_idempotency_key
+    OR COALESCE(payment_row.idempotency_keys, '[]'::JSONB) @> jsonb_build_array(p_idempotency_key)
+  ) THEN RETURN payment_row; END IF;
+  IF payment_row.status = 'paid' THEN
+    RAISE EXCEPTION 'This fee is already fully paid for the selected billing period.';
+  END IF;
+
+  next_paid := payment_row.amount_paid + p_amount_paid;
+  IF next_paid > payment_row.amount_due THEN
+    RAISE EXCEPTION 'Payment cannot exceed the remaining fee balance.';
+  END IF;
+
+  UPDATE public.fee_payments
+     SET amount_paid = next_paid,
+         remaining_amount = amount_due - next_paid,
+         status = CASE
+           WHEN amount_due - next_paid = 0 THEN 'paid'::public.fee_payment_status_enum
+           WHEN next_paid > 0 THEN 'partial'::public.fee_payment_status_enum
+           ELSE 'unpaid'::public.fee_payment_status_enum
+         END,
+         payment_method = p_payment_method,
+         date = (now() AT TIME ZONE COALESCE(
+           (SELECT timezone FROM public.schools WHERE id = p_school_id),
+           'Africa/Addis_Ababa'
+         ))::date,
+         recorded_by = p_recorded_by,
+         idempotency_keys = CASE
+           WHEN p_idempotency_key IS NULL THEN COALESCE(idempotency_keys, '[]'::JSONB)
+           ELSE COALESCE(idempotency_keys, '[]'::JSONB) || jsonb_build_array(p_idempotency_key)
+         END,
+         notes = CASE
+           WHEN p_notes IS NULL OR btrim(p_notes) = '' THEN notes
+           ELSE concat_ws(' · ', NULLIF(notes, ''), btrim(p_notes))
+         END
+   WHERE id = p_payment_id AND school_id = p_school_id
+   RETURNING * INTO payment_row;
+
+  RETURN payment_row;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.schoolos_apply_fee_installment(VARCHAR, VARCHAR, NUMERIC, VARCHAR, TEXT, VARCHAR, VARCHAR) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.schoolos_apply_fee_installment(VARCHAR, VARCHAR, NUMERIC, VARCHAR, TEXT, VARCHAR, VARCHAR) TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.bank_statement_entries (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  statement_date DATE NOT NULL,
+  description VARCHAR(500) NOT NULL CHECK (length(btrim(description)) BETWEEN 2 AND 500),
+  reference VARCHAR(160),
+  direction VARCHAR(8) NOT NULL CHECK (direction IN ('credit','debit')),
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0 AND amount <= 9999999999.99),
+  bank_account_label VARCHAR(120),
+  matched_payment_id VARCHAR(64) REFERENCES public.fee_payments(id) ON DELETE RESTRICT,
+  matched_expense_id VARCHAR(64) REFERENCES public.school_expenses(id) ON DELETE RESTRICT,
+  matched_at TIMESTAMPTZ,
+  created_by VARCHAR(64) NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (NOT (matched_payment_id IS NOT NULL AND matched_expense_id IS NOT NULL)),
+  CHECK ((matched_payment_id IS NULL AND matched_expense_id IS NULL AND matched_at IS NULL)
+      OR (matched_payment_id IS NOT NULL OR matched_expense_id IS NOT NULL) AND matched_at IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bank_statement_school_date
+  ON public.bank_statement_entries (school_id, statement_date DESC, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_statement_matched_payment
+  ON public.bank_statement_entries (school_id, matched_payment_id)
+  WHERE matched_payment_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_statement_matched_expense
+  ON public.bank_statement_entries (school_id, matched_expense_id)
+  WHERE matched_expense_id IS NOT NULL;
+
+ALTER TABLE public.bank_statement_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS bank_statement_school_read ON public.bank_statement_entries;
+CREATE POLICY bank_statement_school_read ON public.bank_statement_entries FOR SELECT TO authenticated
+  USING (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id());
+DROP POLICY IF EXISTS bank_statement_school_insert ON public.bank_statement_entries;
+CREATE POLICY bank_statement_school_insert ON public.bank_statement_entries FOR INSERT TO authenticated
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS bank_statement_school_update ON public.bank_statement_entries;
+CREATE POLICY bank_statement_school_update ON public.bank_statement_entries FOR UPDATE TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'))
+  WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS bank_statement_service_role_all ON public.bank_statement_entries;
+CREATE POLICY bank_statement_service_role_all ON public.bank_statement_entries FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON TABLE public.bank_statement_entries FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.bank_statement_entries TO authenticated, service_role;
+REVOKE DELETE ON TABLE public.bank_statement_entries FROM authenticated;
+
+NOTIFY pgrst, 'reload schema';

@@ -568,3 +568,13 @@ pm run dev and apply migrations 001-014.
 - DONE (code): Redesigned the Super Admin dashboard presentation with a premium command-centre hero, clearer platform metric cards, revenue chart panel, subscription health panel, and improved attention table. Existing API calls, tenant actions, navigation IDs, and data contracts are preserved; no database schema or production data changed.
 - DONE (CI): GitHub Actions run 1594 passed on head `2b9bc299f64adf40fc8ee1c1c49d3f9eaf14b790`: TypeScript checks, test suite, route parity audit, RLS source audit, and production build all succeeded.
 - PARTIAL (visual verification): The remote build and automated checks passed, but an interactive browser review at desktop and mobile widths remains for the owner to perform locally.
+
+
+## Accountant continuation — payment channels and bank reconciliation (2026-11-09)
+
+- DONE IN CODE: Fee collection now accepts Cash, Bank Transfer, and Mobile Money; receipt details and the monthly cashbook display the actual method. Partial fee installments persist the selected method through a replacement atomic RPC.
+- DONE IN CODE: Added school-scoped bank statement entries, credit-to-receipt and debit-to-expense matching, exact-amount validation, duplicate-match protection, RLS, audit events, and an Accountant reconciliation screen.
+- NOT DONE / NOT APPLIED: Migration `061_accountant_payment_channels_bank_reconciliation.sql` has not been applied to the live Supabase project. Migration `060_accountant_expenses_ledger.sql` also remains pending. No production rows, permissions, or schema were changed.
+- NOT VERIFIED: TypeScript, lint, build, test suite, CI, live fee collection, bank reconciliation, and RLS behavior must pass after the branch update. CSV bank statement import and direct bank-provider integration are not included; this version supports manually entering statement lines and matching them to recorded transactions.
+
+- VERIFIED: GitHub Actions run 1838 passed TypeScript checks, all 196 tests, route parity audit, RLS source audit, and production build for commit `ebaa6e38cecbcbcd85478fea8cb4e6e4e7d6a34d`. A previous run exposed one outdated backup-restore assertion; the assertion was updated to include bank statement entries, then the full run passed.
