@@ -516,6 +516,10 @@ export class ApiClient {
     return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
   }
 
+  public static async generateAllTimetables() {
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }> }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
+  }
+
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
     return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE' });
   }
