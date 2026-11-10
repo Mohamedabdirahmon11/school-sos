@@ -861,7 +861,7 @@ export class ApiClient {
     });
   }
 
-  // Fees: Cash Only
+  // Fees: Cash, bank transfer, or mobile money
   public static async getFeeStructures() {
     return this.request<FeeStructureItem[]>('/fees/structures');
   }
@@ -899,6 +899,7 @@ export class ApiClient {
     studentId: string;
     amountDue: number;
     amountPaid: number;
+    paymentMethod?: 'Cash' | 'Bank Transfer' | 'Mobile Money';
     feeType?: string;
     feeStructureId?: string;
     month?: string;
