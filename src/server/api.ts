@@ -3037,8 +3037,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     queryAllRows('classes', { school_id: school.id }, 'id,shift')
   ]);
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
-  const targetIds = new Set(classes.map((klass: any) => klass.id));
-  // Keep existing schedules for classes with no valid subject assignments.
+  const targetIds = new Set(assignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
+  // Existing timetables for classes without schedulable assignments remain in place
+  // and continue to block teacher/room conflicts in the other classes.
   let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId));
   const generatedSlots: TimetableSlot[] = [];
   const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
@@ -3118,6 +3119,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     }
     if (!generatedForClass.length) {
       skipped.push({ classId: klass.id, className: klass.name, reason: 'No timetable periods could be placed; the previous timetable was kept.' });
+      workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id));
       continue;
     }
     replacements.push({ classId: klass.id, slots: generatedForClass });
