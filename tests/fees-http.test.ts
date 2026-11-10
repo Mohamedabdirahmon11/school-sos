@@ -226,3 +226,63 @@ test('bank statement CSV import is atomic, school-scoped, and skips exact duplic
   assert.equal(memory.rows('bank_statement_entries').filter(row => row.school_id === school.id).length, 2,
     'invalid batches must not write partial data');
 });
+
+test('bank reconciliation supports split allocations and prevents over-allocation', async () => {
+  const createPayment = async (month: string, paid: number) => {
+    const response = await fetch(`${baseUrl}/fees/pay-cash`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        studentId: partialStudent.id, academicYear: '2026-2027', month, feeType: 'monthly_tuition',
+        amountDue: 120, amountPaid: paid, paymentMethod: 'Bank Transfer',
+        idempotencyKey: `split-settlement-${month.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+      })
+    });
+    assert.equal(response.status, 201);
+    return response.json() as Promise<any>;
+  };
+  const [receiptA, receiptB, receiptC] = await Promise.all([
+    createPayment('Split test A', 20), createPayment('Split test B', 30), createPayment('Split test C', 40)
+  ]);
+  const createStatement = async (amount: number, reference: string) => {
+    const response = await fetch(`${baseUrl}/bank-reconciliation`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ statementDate: today, description: `Split settlement ${reference}`, direction: 'credit', amount, reference })
+    });
+    assert.equal(response.status, 201);
+    return response.json() as Promise<any>;
+  };
+  const allocate = (entryId: string, paymentId: string, amount: number) =>
+    fetch(`${baseUrl}/bank-reconciliation/${encodeURIComponent(entryId)}/allocations`, {
+      method: 'POST', headers, body: JSON.stringify({ paymentId, amount })
+    });
+
+  const combinedLine = await createStatement(50, 'SPLIT-COMBINED');
+  const firstAllocation = await allocate(combinedLine.id, receiptA.id, 20);
+  assert.equal(firstAllocation.status, 201);
+  const secondAllocation = await allocate(combinedLine.id, receiptB.id, 30);
+  assert.equal(secondAllocation.status, 201);
+
+  const splitLineA = await createStatement(15, 'SPLIT-PART-A');
+  const splitLineB = await createStatement(25, 'SPLIT-PART-B');
+  assert.equal((await allocate(splitLineA.id, receiptC.id, 15)).status, 201);
+  assert.equal((await allocate(splitLineB.id, receiptC.id, 25)).status, 201);
+
+  const tooMuch = await allocate(splitLineB.id, receiptC.id, 0.01);
+  assert.equal(tooMuch.status, 409, 'a receipt cannot be allocated beyond its paid amount');
+  const tooMuchForLine = await allocate(splitLineA.id, receiptA.id, 0.01);
+  assert.equal(tooMuchForLine.status, 409, 'a statement line cannot be allocated beyond its value');
+
+  const reconciliation = await fetch(`${baseUrl}/bank-reconciliation`, { headers });
+  assert.equal(reconciliation.status, 200);
+  const body = await reconciliation.json() as any;
+  const combined = body.entries.find((entry: any) => entry.id === combinedLine.id);
+  assert.equal(combined.allocatedAmount, 50);
+  assert.equal(combined.remainingStatementAmount, 0);
+  assert.equal(combined.isFullyMatched, true);
+  assert.equal(combined.allocations.length, 2);
+  const splitA = body.entries.find((entry: any) => entry.id === splitLineA.id);
+  assert.equal(splitA.allocatedAmount, 15);
+  assert.equal(splitA.isFullyMatched, true);
+  assert.ok(!body.unmatchedPayments.some((payment: any) => [receiptA.id, receiptB.id, receiptC.id].includes(payment.id)));
+  assert.ok(memory.rows('bank_statement_allocations').every(row => row.school_id === school.id));
+});
