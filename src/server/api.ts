@@ -3706,6 +3706,27 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
+apiRouter.get('/attendance/school/absences', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school;
+  const date = typeof req.query.date === 'string' ? req.query.date : '';
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    res.status(400).json({ error: 'Attendance date must be a real YYYY-MM-DD date.' }); return;
+  }
+  const records = await queryAllRows('attendance_records', { school_id: school.id, date, status: 'absent' }, LIST_QUERY_COLUMNS.attendance_records);
+  const studentIds = [...new Set(records.map((record: any) => String(record.studentId || '')).filter(Boolean))];
+  const [students, classes] = await Promise.all([
+    studentIds.length ? queryAllRows('students', { school_id: school.id, id: studentIds }, LIST_QUERY_COLUMNS.students) : [],
+    db.getClasses(school.id)
+  ]);
+  const studentsById = new Map(students.map((student: any) => [String(student.id), student]));
+  const classesById = new Map(classes.map(item => [item.id, item]));
+  res.json(records.map((record: any) => {
+    const student = studentsById.get(String(record.studentId));
+    return student ? { ...record, student, className: classesById.get(String(record.classId))?.name || 'Unassigned' } : null;
+  }).filter(Boolean));
+});
+
 apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
