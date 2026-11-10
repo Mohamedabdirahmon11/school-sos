@@ -6,7 +6,8 @@
 - ADDED: Parser regression tests and an HTTP test for school scoping, duplicate retry behavior, and rejecting invalid batches without partial writes.
 - SAFETY: No schema migration or existing financial-record update/delete is required. Existing bank statement records are not changed.
 - VERIFIED: GitHub Actions run `42783208889` (#1869) passed TypeScript, the full test suite, route parity, RLS source audit, and production build before merge.
-- REMAINING ACCOUNTANT LIMITS: Split-settlement reconciliation (one bank line against multiple receipts/expenses) still requires a reviewed schema migration; live desktop/mobile browser visual review still requires a real browser session. No bank-provider connection is included.
+- DONE: Split-settlement reconciliation is merged in PR #66; migration 063 and FK-index migration 064 are applied to `school management 3`. Rollback-only DB tests passed multi-receipt, split-statement, expense, over-allocation, void-protection, and school-backup restore scenarios; all temporary rows were rolled back.
+- REMAINING ACCOUNTANT LIMITS: Live desktop/mobile browser review needs a browser session or preview URL. Automatic bank feeds need a named provider with official API documentation and authorized credentials; CSV import is available in the meantime.
 
 
  
