@@ -4277,6 +4277,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     }
     const teacherRecord = teacher.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
+    const isFormTeacher = Boolean(klass && klass.classTeacherId === user.id);
     const assignment = await db.queryPage('class_subjects', {
       school_id: school.id,
       class_id: classId,
