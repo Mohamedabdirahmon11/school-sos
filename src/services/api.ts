@@ -881,6 +881,11 @@ export class ApiClient {
     return this.request<{ success: boolean }>(`/fees/structures/${id}`, { method: 'DELETE' });
   }
 
+  public static async getFeeReceiptPage(page = 1, pageSize = 20) {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return this.request<{ items: FeePayment[]; total: number; page: number; pageSize: number; totalPages: number }>(`/fees/receipts?${query.toString()}`);
+  }
+
   public static async getFeePayments(studentId?: string, params?: any) {
     const query = new URLSearchParams();
     if (studentId) query.set('studentId', studentId);
