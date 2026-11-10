@@ -262,6 +262,7 @@ export class InMemorySupabase {
       const notes = args?.p_notes ? [payment.notes, String(args.p_notes).trim()].filter(Boolean).join(' · ') : payment.notes;
       Object.assign(payment, {
         amountPaid, amount_paid: amountPaid, remainingAmount: remaining, remaining_amount: remaining,
+        paymentMethod: args?.p_payment_method || 'Cash', payment_method: args?.p_payment_method || 'Cash',
         status, date: new Date().toISOString().slice(0, 10), recordedBy: args?.p_recorded_by, recorded_by: args?.p_recorded_by,
         idempotencyKeys: nextKeys, idempotency_keys: nextKeys, notes
       });
