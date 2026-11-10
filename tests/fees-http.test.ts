@@ -240,8 +240,8 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
     assert.equal(response.status, 201);
     return response.json() as Promise<any>;
   };
-  const [receiptA, receiptB, receiptC] = await Promise.all([
-    createPayment('Split test A', 20), createPayment('Split test B', 30), createPayment('Split test C', 40)
+  const [receiptA, receiptB, receiptC, receiptD] = await Promise.all([
+    createPayment('Split test A', 20), createPayment('Split test B', 30), createPayment('Split test C', 40), createPayment('Split test D', 5)
   ]);
   const createStatement = async (amount: number, reference: string) => {
     const response = await fetch(`${baseUrl}/bank-reconciliation`, {
@@ -269,7 +269,7 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
 
   const tooMuch = await allocate(splitLineB.id, receiptC.id, 0.01);
   assert.equal(tooMuch.status, 409, 'a receipt cannot be allocated beyond its paid amount');
-  const tooMuchForLine = await allocate(splitLineA.id, receiptA.id, 0.01);
+  const tooMuchForLine = await allocate(splitLineA.id, receiptD.id, 0.01);
   assert.equal(tooMuchForLine.status, 409, 'a statement line cannot be allocated beyond its value');
 
   const reconciliation = await fetch(`${baseUrl}/bank-reconciliation`, { headers });
