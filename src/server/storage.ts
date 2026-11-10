@@ -26,6 +26,7 @@ import {
   SupportTicket,
   StaffMember,
   StaffPayrollRecord,
+  SchoolExpense,
   AdmissionApplication,
   AuditLog,
   SuperAdminSettings,
@@ -1160,6 +1161,31 @@ class StorageEngine {
     this.data.staffMembers.push(staff);
     this.save();
     return staff;
+  }
+
+  public async getSchoolExpenses(schoolId: string): Promise<SchoolExpense[]> {
+    return this.queryRows<SchoolExpense>('school_expenses', { school_id: schoolId });
+  }
+
+  public async createSchoolExpense(input: Omit<SchoolExpense, 'id' | 'status' | 'createdAt' | 'voidedAt' | 'voidedBy' | 'voidReason'>): Promise<SchoolExpense> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Expense storage is unavailable.');
+    const row = { ...input, id: `exp-${randomUUID()}`, status: 'posted' as const, createdAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_expenses').insert(toSupabaseRow(row, 'school_expenses')).select('*').single();
+    this.recordQuery('school_expenses', 'insert', startedAt);
+    if (error || !data) throw new Error(`Unable to record school expense: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(data, 'school_expenses') as SchoolExpense;
+  }
+
+  public async voidSchoolExpense(id: string, schoolId: string, userId: string, reason: string): Promise<SchoolExpense | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Expense storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('school_expenses').update(toSupabaseRow({ status: 'void', voidedAt: new Date().toISOString(), voidedBy: userId, voidReason: reason }, 'school_expenses')).eq('id', id).eq('school_id', schoolId).eq('status', 'posted').select('*').maybeSingle();
+    this.recordQuery('school_expenses', 'update', startedAt);
+    if (error) throw new Error(`Unable to void school expense: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'school_expenses') as SchoolExpense : null;
   }
 
   public async getPayrollRecords(schoolId: string, userId?: string, month?: string): Promise<StaffPayrollRecord[]> {
