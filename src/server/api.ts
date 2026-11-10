@@ -4445,7 +4445,7 @@ apiRouter.post('/expenses/:id/void', requireAuth, requireSchoolContext, requireA
 apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
   const school = (req as any).school as School;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
-  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Choose a valid month in YYYY-MM format.' }); return; }
   const [payments, expenses] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id)]);
   const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
   const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
