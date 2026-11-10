@@ -1218,11 +1218,35 @@ class StorageEngine {
     return data.map((row: Record<string, any>) => fromSupabaseRow(row, 'bank_statement_entries') as import('../types/index.ts').BankStatementEntry);
   }
 
+  public async getBankStatementAllocations(schoolId: string): Promise<import('../types/index.ts').BankStatementAllocation[]> {
+    return this.queryRows<import('../types/index.ts').BankStatementAllocation>('bank_statement_allocations', { school_id: schoolId });
+  }
+
+  public async allocateBankStatementAmount(input: {
+    schoolId: string; statementEntryId: string; paymentId?: string; expenseId?: string; amount: number; createdBy: string;
+  }): Promise<import('../types/index.ts').BankStatementAllocation> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Bank reconciliation storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_allocate_bank_statement', {
+      p_school_id: input.schoolId,
+      p_statement_entry_id: input.statementEntryId,
+      p_payment_id: input.paymentId || null,
+      p_expense_id: input.expenseId || null,
+      p_amount: input.amount,
+      p_created_by: input.createdBy
+    });
+    this.recordQuery('bank_statement_allocations', 'allocate_rpc', startedAt);
+    if (error || !data) throw new Error(`Unable to allocate bank statement amount: ${error?.message || 'no allocation returned'}`);
+    const row = Array.isArray(data) ? data[0] : data;
+    return fromSupabaseRow(row, 'bank_statement_allocations') as import('../types/index.ts').BankStatementAllocation;
+  }
+
   public async matchBankStatementEntry(id: string, schoolId: string, match: { paymentId?: string; expenseId?: string }): Promise<import('../types/index.ts').BankStatementEntry | null> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Bank reconciliation storage is unavailable.');
     const entry = (await this.getBankStatementEntries(schoolId)).find(row => row.id === id);
-    if (!entry || entry.matchedAt) return null;
+    if (!entry || entry.matchedAt || (await this.getBankStatementAllocations(schoolId)).some(allocation => allocation.statementEntryId === id)) return null;
     if (match.paymentId) {
       if (entry.direction !== 'credit') throw new Error('A bank debit must be matched to an expense.');
       const payment = await this.getFeePaymentById(match.paymentId, schoolId);
