@@ -161,6 +161,25 @@ export const TimetableView: React.FC = () => {
     catch (err: any) { setNotice(err.message || 'Unable to save timetable settings.'); }
   };
 
+  const openClassPeriodEditor = async (klass: SchoolClass) => {
+    setSelectedClassId(klass.id);
+    setRoomNumber(klass.roomNumber || '');
+    setDayOfWeek('Monday');
+    setPeriodNumber(1);
+    setClashWarning(null);
+    try {
+      const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
+      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+      setClassSubjectAssignments(assignments);
+      const first = assignments[0];
+      setSubjectId(first?.subject?.id || '');
+      setTeacherId(first?.teacher?.id || '');
+      setShowAddModal(true);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Unable to load subjects for this class.');
+    }
+  };
+
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
@@ -171,7 +190,7 @@ export const TimetableView: React.FC = () => {
     return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
   });
   const displayedClasses = viewMode === 'teacher'
-    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift))
+    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
     : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const handlePrintAllClasses = () => {
     if (!displayedClasses.length) { setNotice('Select at least one class (maximum five) with a timetable to print.'); return; }
@@ -316,7 +335,7 @@ export const TimetableView: React.FC = () => {
                 <h2 className="text-sm font-bold text-[#132A29]">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''}</h2>
                 <p className="text-[10px] text-[#64748B]">{klass.roomNumber || 'Room not set'} · Shift {klass.shift || 1}</p>
               </div>
-              {!isReadOnly && <button type="button" onClick={() => { setSelectedClassId(klass.id); setRoomNumber(klass.roomNumber || ''); setShowAddModal(true); }} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
+              {!isReadOnly && <button type="button" onClick={() => void openClassPeriodEditor(klass)} className="rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#0F766E]">Add period</button>}
             </header>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[9px]">
