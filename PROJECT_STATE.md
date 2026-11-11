@@ -10,6 +10,7 @@ Updated: 2026-11-11
 - Live Supabase review of `school management 3` found that `private.auth_can_access_student` and `private.auth_can_access_class` currently authorize teachers through active `class_subjects` assignments but omit the `classes.class_teacher_id` Form Teacher relationship. One active Form Teacher class currently exists and has zero enrolled students.
 - PR #82 contains additive migration `20261111070000_form_teacher_rls_scope.sql` and regression coverage to include a Form Teacher's own school-scoped class and students while retaining subject-teacher and parent/student rules. The migration is NOT applied to production; no live data was modified.
 - Teacher messages and payslips remain connected through the existing role-specific sidebar routes; the payslip API filters by the signed-in user's ID. Shared parent/School Admin message presentation is unchanged.
+- Live data audit: ten teacher-related relationship checks returned zero mismatches; RLS is enabled on the inspected teacher tables. Current live data has no marks, assignments/submissions, school notices, or payroll records, so those real-data workflows still need controlled test data.
 - Remaining: run CI after the latest all-section UI updates, verify the migration under authenticated/non-assigned teacher identities, audit Somali/Amharic teacher strings, and perform real desktop/mobile teacher sign-in journeys. Do not mark this section DONE until those checks pass.
 
 ## Accountant — merged and verified
