@@ -61,3 +61,15 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.match(api, /Teacher ID and password or PIN are required/);
   assert.match(api, /Every assigned class must belong to this school|Every assigned subject must belong to this school/);
 });
+
+test('Form Teacher class and student reads are included in the private Supabase RLS helpers', () => {
+  const migration = read('../supabase/migrations/20261111070000_form_teacher_rls_scope.sql');
+  assert.match(migration, /CREATE OR REPLACE FUNCTION private\.auth_can_access_student/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION private\.auth_can_access_class/);
+  assert.match(migration, /c\.class_teacher_id = u\.id/);
+  assert.match(migration, /c\.id = s\.class_id/);
+  assert.match(migration, /c\.school_id = s\.school_id/);
+  assert.match(migration, /u\.school_id = c\.school_id AND u\.role = 'teacher'/);
+  assert.match(migration, /SECURITY DEFINER SET search_path = ''/);
+  assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\./);
+});
