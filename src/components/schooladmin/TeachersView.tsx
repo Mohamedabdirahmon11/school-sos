@@ -51,8 +51,6 @@ export const TeachersView: React.FC = () => {
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPage(1); }, [search]);
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
-  useEffect(() => { if (classes.length && selectedClassIds.length === 0) setSelectedClassIds([classes[0].id]); }, [classes, selectedClassIds.length]);
-  useEffect(() => { if (subjects.length && selectedSubjectIds.length === 0) setSelectedSubjectIds([subjects[0].id]); }, [subjects, selectedSubjectIds.length]);
 
   const handleExportTeachers = async () => {
     try {
@@ -139,6 +137,8 @@ export const TeachersView: React.FC = () => {
       setShowAddModal(false);
       setFullName('');
       setPhone('');
+      setSelectedClassIds([]);
+      setSelectedSubjectIds([]);
       setInitialPassword(`Teacher ID: ${(created as any).staffId}\nInitial PIN: ${(created as any).initialPin}`);
       setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
