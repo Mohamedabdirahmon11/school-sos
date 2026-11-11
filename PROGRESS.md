@@ -646,3 +646,11 @@ pm run dev and apply migrations 001-014.
 - ADDED: attendance save, every class-wide marks action, and Form Teacher forwarding remain disabled while selected-class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
 - ADDED: regression coverage for lazy workflow loading and stale-class data clearing.
 - VERIFIED: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading code. No production schema, account, or school data was changed.
+
+
+## Teacher homework workflow hardening (2026-11-11)
+- ADDED IN PR #82: assignment-submission review requests now use a request sequence guard; switching assignments or unmounting ignores stale responses, clears prior submissions/drafts, and avoids a previous request clearing the new request's loading state.
+- ADDED: homework creation trims title/instructions, rejects past due dates using the school's timezone, and validates integer max points from 1–1000 in the handler as well as the form.
+- ADDED: grading is serialized so only one submission grade can be saved at a time; handlers reject read-only or overlapping grade attempts.
+- ADDED: regression tests cover stale homework responses, grading draft clearing, school-local due-date validation, and point limits.
+- NOT VERIFIED YET: GitHub Actions for these latest code changes is pending.
