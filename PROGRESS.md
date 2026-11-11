@@ -645,4 +645,4 @@ pm run dev and apply migrations 001-014.
 - ADDED: attendance and marks data are fetched only when the corresponding workflow is active; timetable, notices, homework, and overview no longer trigger unnecessary attendance/marks reads.
 - ADDED: attendance save, every class-wide marks action, and Form Teacher forwarding remain disabled while selected-class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
 - ADDED: regression coverage for lazy workflow loading and stale-class data clearing.
-- NOT VERIFIED YET: CI for the latest commit is pending. No production schema, account, or school data was changed.
+- VERIFIED: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading code. No production schema, account, or school data was changed.
