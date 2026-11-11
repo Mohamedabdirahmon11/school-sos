@@ -2176,10 +2176,17 @@ class StorageEngine {
         id: `ec-${schoolId}-${yr}`,
         schoolId,
         academicYear: yr,
-        smallExamName: 'Small Exam',
-        smallExamMax: 10,
-        bigExamName: 'Big Exam',
-        bigExamMax: 10,
+        smallExamName: 'Continuous Assessment',
+        smallExamMax: 40,
+        bigExamName: 'Final Examination',
+        bigExamMax: 60,
+        assessmentComponents: [
+          { id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 },
+          { id: 'test-2', name: 'Test 2', maxMarks: 10, category: 'continuous', order: 2 },
+          { id: 'test-3', name: 'Test 3', maxMarks: 10, category: 'continuous', order: 3 },
+          { id: 'test-4', name: 'Test 4', maxMarks: 10, category: 'continuous', order: 4 },
+          { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 5 }
+        ],
         passMarkPercentage: 50,
         updatedAt: new Date().toISOString()
       };
@@ -2193,6 +2200,12 @@ class StorageEngine {
         if (persisted.length) return persisted[0];
         throw error;
       }
+    }
+    if (!Array.isArray(conf.assessmentComponents) || !conf.assessmentComponents.length) {
+      conf.assessmentComponents = [
+        { id: 'legacy-small', name: conf.smallExamName || 'Continuous Assessment', maxMarks: conf.smallExamMax || 10, category: 'continuous', order: 1 },
+        { id: 'legacy-big', name: conf.bigExamName || 'Final Examination', maxMarks: conf.bigExamMax || 10, category: 'final', order: 2 }
+      ];
     }
     return conf;
   }
@@ -2294,43 +2307,80 @@ class StorageEngine {
     classId: string,
     subjectId: string,
     semester: 'Semester 1' | 'Semester 2',
-    marks: { studentId: string; smallExamMarks: number; bigExamMarks: number; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
+    marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, number>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
     submittedBy: string
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
     const config = await this.getExamConfig(schoolId);
-    const maxTotal = (config.smallExamMax || 10) + (config.bigExamMax || 10);
-    for (const mark of marks) {
-      if (!Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) || mark.smallExamMarks < 0 || mark.bigExamMarks < 0 || mark.smallExamMarks > config.smallExamMax || mark.bigExamMarks > config.bigExamMax) {
-        throw new Error(`Marks must be between 0 and the configured maximums (${config.smallExamMax} and ${config.bigExamMax}).`);
+    const components = config.assessmentComponents || [];
+    const continuousComponents = components.filter(component => component.category === 'continuous');
+    const finalComponents = components.filter(component => component.category === 'final');
+    const maxContinuous = continuousComponents.reduce((sum, component) => sum + component.maxMarks, 0);
+    const maxFinal = finalComponents.reduce((sum, component) => sum + component.maxMarks, 0);
+    const maxTotal = maxContinuous + maxFinal;
+    const allocateLegacyTotal = (total: number, list: typeof components) => {
+      let remaining = total;
+      const allocated: Record<string, number> = {};
+      for (const component of list) {
+        const value = Math.min(component.maxMarks, Math.max(0, remaining));
+        allocated[component.id] = value;
+        remaining -= value;
       }
-    }
+      return allocated;
+    };
+    const normalized = marks.map(mark => {
+      let scores: Record<string, number>;
+      if (mark.assessmentScores && typeof mark.assessmentScores === 'object' && !Array.isArray(mark.assessmentScores)) {
+        const unknownIds = Object.keys(mark.assessmentScores).filter(id => !components.some(component => component.id === id));
+        if (unknownIds.length) throw new Error('One or more assessment components are not configured for this school.');
+        scores = {};
+        for (const component of components) {
+          const value = mark.assessmentScores[component.id] ?? 0;
+          if (!Number.isFinite(value) || value < 0 || value > component.maxMarks) {
+            throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}.`);
+          }
+          scores[component.id] = value;
+        }
+      } else {
+        const small = Number(mark.smallExamMarks ?? 0);
+        const big = Number(mark.bigExamMarks ?? 0);
+        if (!Number.isFinite(small) || !Number.isFinite(big) || small < 0 || big < 0 || small > maxContinuous || big > maxFinal) {
+          throw new Error(`Marks must be between 0 and the configured maximums (${maxContinuous} and ${maxFinal}).`);
+        }
+        scores = {
+          ...allocateLegacyTotal(small, continuousComponents),
+          ...allocateLegacyTotal(big, finalComponents)
+        };
+      }
+      const smallExamMarks = continuousComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
+      const bigExamMarks = finalComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
+      const totalMarks = smallExamMarks + bigExamMarks;
+      const percentage = maxTotal > 0 ? Math.round((totalMarks / maxTotal) * 10000) / 100 : 0;
+      return { ...mark, assessmentScores: scores, smallExamMarks, bigExamMarks, totalMarks, percentage };
+    });
     const now = new Date().toISOString();
     const results: StudentMark[] = [];
 
-    for (const m of marks) {
-      const total = (m.smallExamMarks || 0) + (m.bigExamMarks || 0);
-      const percentage = maxTotal > 0 ? Math.round(((total / maxTotal) * 100) * 100) / 100 : 0;
-
-      const existingIdx = this.data.marks.findIndex(mk => 
-        mk.schoolId === schoolId && 
-        mk.classId === classId && 
-        mk.subjectId === subjectId && 
-        mk.studentId === m.studentId && 
-        mk.semester === semester
+    for (const mark of normalized) {
+      const existingIdx = this.data.marks.findIndex(existing =>
+        existing.schoolId === schoolId &&
+        existing.classId === classId &&
+        existing.subjectId === subjectId &&
+        existing.studentId === mark.studentId &&
+        existing.semester === semester
       );
 
       if (existingIdx >= 0) {
-        // Subject teachers may edit drafts only. Submitted marks stay locked
-        // while the Fomester reviews and forwards the complete class result.
+        // Submitted rows remain immutable; teachers can keep saving drafts as
+        // the four continuous tests and final exam happen during the semester.
         if (this.data.marks[existingIdx].status !== 'draft') continue;
-
-        this.data.marks[existingIdx].smallExamMarks = m.smallExamMarks;
-        this.data.marks[existingIdx].bigExamMarks = m.bigExamMarks;
-        this.data.marks[existingIdx].totalMarks = total;
-        this.data.marks[existingIdx].percentage = percentage;
-        this.data.marks[existingIdx].status = m.status;
-        this.data.marks[existingIdx].teacherRemarks = m.teacherRemarks;
+        this.data.marks[existingIdx].assessmentScores = mark.assessmentScores;
+        this.data.marks[existingIdx].smallExamMarks = mark.smallExamMarks;
+        this.data.marks[existingIdx].bigExamMarks = mark.bigExamMarks;
+        this.data.marks[existingIdx].totalMarks = mark.totalMarks;
+        this.data.marks[existingIdx].percentage = mark.percentage;
+        this.data.marks[existingIdx].status = mark.status;
+        this.data.marks[existingIdx].teacherRemarks = mark.teacherRemarks;
         this.data.marks[existingIdx].submittedBy = submittedBy;
         this.data.marks[existingIdx].submittedAt = now;
         results.push(this.data.marks[existingIdx]);
@@ -2340,15 +2390,16 @@ class StorageEngine {
           schoolId,
           classId,
           subjectId,
-          studentId: m.studentId,
+          studentId: mark.studentId,
           academicYear: config.academicYear,
           semester,
-          smallExamMarks: m.smallExamMarks,
-          bigExamMarks: m.bigExamMarks,
-          totalMarks: total,
-          percentage,
-          status: m.status,
-          teacherRemarks: m.teacherRemarks,
+          assessmentScores: mark.assessmentScores,
+          smallExamMarks: mark.smallExamMarks,
+          bigExamMarks: mark.bigExamMarks,
+          totalMarks: mark.totalMarks,
+          percentage: mark.percentage,
+          status: mark.status,
+          teacherRemarks: mark.teacherRemarks,
           submittedBy,
           submittedAt: now
         };
