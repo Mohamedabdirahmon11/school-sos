@@ -627,3 +627,8 @@ pm run dev and apply migrations 001-014.
 - ADDED: source regression coverage in `tests/teacher-workflow.test.ts`.
 - SAFETY: migration is committed to the PR branch only and has NOT been applied to production. No live rows or existing school records were changed.
 - NOT VERIFIED: actual authenticated-role SQL behavior after migration; apply only after PR review/approval, then test Form Teacher and non-assigned teacher access in the intended project.
+
+- UPDATED: refreshed the remaining Teacher Portal panels (weekly timetable, homework creation/list/submissions, and faculty notices) to use the same responsive workspace design as the overview, attendance, and marksheet.
+- UPDATED: gave the Teacher direct-messages route a teacher-only responsive shell without changing the shared parent/School Admin presentation; redesigned the teacher's personal payslip cards and added explicit load-error/retry handling. The payslip API remains scoped to the signed-in user's `user_id`.
+- ADDED: regression assertions for the teacher messages/payslip navigation routes and the redesigned timetable/homework/notices sections.
+- VALIDATION: CI for the RLS migration passed on the earlier commit; the latest UI/navigation changes are awaiting the next GitHub Actions run.
