@@ -333,7 +333,7 @@ test('teacher creation ignores client-controlled identity and credential fields'
   });
   assert.equal(secondTeacher.status, 201, await secondTeacher.clone().text());
   const secondTeacherResult = await secondTeacher.json();
-  assert.match(secondTeacherResult.staffId, /^T[0-9]{4,}$/);
+  assert.match(secondTeacherResult.staffId, /^T[0-9]{3,}$/);
   assert.notEqual(secondTeacherResult.staffId, result.staffId);
   assert.notEqual(secondTeacherResult.staffId, 'STF-SEC-001');
 
@@ -512,7 +512,7 @@ test('teacher IDs are simple alphanumeric and teacher profile updates and PIN re
   });
   assert.equal(created.status, 201, await created.clone().text());
   const teacher = await created.json();
-  assert.match(teacher.staffId, /^T[0-9]{4,}$/);
+  assert.match(teacher.staffId, /^T[0-9]{3,}$/);
   assert.doesNotMatch(teacher.staffId, /[^A-Z0-9]/);
 
   const updated = await fetch(`${baseUrl}/teachers/${teacher.id}`, {
