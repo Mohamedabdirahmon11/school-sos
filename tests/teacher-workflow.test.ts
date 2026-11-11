@@ -35,3 +35,29 @@ test('Form Teachers see every student and can complete every subject in their ho
   assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
   assert.match(api, /canEditMarks: true/);
 });
+
+test('teacher workspace exposes every teaching task and batch class workflows', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /Teacher workspace navigation/);
+  assert.match(teacher, /id: 'dashboard'/);
+  assert.match(teacher, /id: 'timetable'/);
+  assert.match(teacher, /id: 'attendance'/);
+  assert.match(teacher, /id: 'grades'/);
+  assert.match(teacher, /id: 'assignments'/);
+  assert.match(teacher, /id: 'notices'/);
+  assert.match(teacher, /attendanceCounts/);
+  assert.match(teacher, /Submit all subjects/);
+  assert.match(teacher, /Forward complete class to Admin/);
+});
+
+test('teacher appointment supports optional multiple profile tags and one-time school credentials', () => {
+  const admin = read('../src/components/schooladmin/TeachersView.tsx');
+  const api = read('../src/server/api.ts');
+  assert.match(admin, /selectedClassIds/);
+  assert.match(admin, /selectedSubjectIds/);
+  assert.match(admin, /Teacher ID:/);
+  assert.match(admin, /Initial PIN:/);
+  assert.match(admin, /Reset PIN/);
+  assert.match(api, /Teacher ID and password or PIN are required/);
+  assert.match(api, /Every assigned classes must belong to this school|Every assigned subjects must belong to this school/);
+});
