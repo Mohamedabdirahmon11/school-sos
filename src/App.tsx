@@ -187,7 +187,7 @@ const AppContent: React.FC = () => {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {!setupRequired && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
-          <main className="flex-1 overflow-y-auto pb-16 md:pb-6">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
             {setupRequired && activeView !== 'sch_setup' && (
               <div className="mx-auto w-full max-w-6xl px-4 pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
