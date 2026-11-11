@@ -34,7 +34,10 @@ import {
   Users,
   BookOpen,
   ClipboardCheck,
-  GraduationCap
+  GraduationCap,
+  LayoutDashboard,
+  Bell,
+  Clock3
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -332,27 +335,52 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#132A29]">
-            Teacher Faculty Portal
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Welcome, {user?.fullName} · {school?.name}
-          </p>
+    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
+        <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">
+              <GraduationCap className="h-3.5 w-3.5" /> Faculty workspace
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Good day, {user?.fullName || 'Teacher'}</h1>
+            <p className="mt-1 text-sm text-teal-100/90">{school?.name || 'Your school'} · Your classes, lessons and student progress in one place.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+            <div className="rounded-xl bg-white/10 p-2.5"><CalendarDays className="h-5 w-5 text-teal-100" /></div>
+            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-teal-100">School date</p><p className="text-sm font-bold">{getSchoolLocalDate(school?.timezone)}</p></div>
+          </div>
         </div>
-
-
-      </div>
+      </header>
 
       {notice && (
-        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-xl text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+        <div role="status" className="flex items-start gap-2 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 shadow-sm">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
           <span>{notice}</span>
         </div>
       )}
+
+      <nav aria-label="Teacher workspace navigation" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {([
+          { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+          { id: 'timetable', label: 'My timetable', icon: Clock3 },
+          { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+          { id: 'grades', label: 'Exam marks', icon: FileSpreadsheet },
+          { id: 'assignments', label: 'Homework', icon: ClipboardList },
+          { id: 'notices', label: 'Notices', icon: Bell }
+        ] as const).map(tab => {
+          const Icon = tab.icon;
+          const selected = activeTab === tab.id;
+          return (
+            <button key={tab.id} type="button" role="tab" aria-selected={selected}
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${selected ? 'border-[#0f766e] bg-[#0f766e] text-white shadow-md shadow-teal-900/10' : 'border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800'}`}>
+              <Icon className="h-4 w-4" />{tab.label}
+            </button>
+          );
+        })}
+      </nav>
 
       {activeTab === 'dashboard' && (
         <section className="space-y-4">
