@@ -12,7 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { SchoolClass, Subject, Student, ExamConfig, StudentMark } from '../../types/index.ts';
+import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
   Check, 
@@ -41,8 +41,13 @@ export const ExamsResultsView: React.FC = () => {
 
   // Exam Config State
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
-  const [smallExamMax, setSmallExamMax] = useState(10);
-  const [bigExamMax, setBigExamMax] = useState(10);
+  const [assessmentComponents, setAssessmentComponents] = useState<ExamAssessmentComponent[]>([
+    { id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 },
+    { id: 'test-2', name: 'Test 2', maxMarks: 10, category: 'continuous', order: 2 },
+    { id: 'test-3', name: 'Test 3', maxMarks: 10, category: 'continuous', order: 3 },
+    { id: 'test-4', name: 'Test 4', maxMarks: 10, category: 'continuous', order: 4 },
+    { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 5 }
+  ]);
   const [passMarkPercentage, setPassMarkPercentage] = useState(50);
 
   // Marks Table State: all subjects in the selected class, all students in rows.
@@ -87,9 +92,11 @@ export const ExamsResultsView: React.FC = () => {
       if (subs.length > 0) setSelectedSubjectId(subs[0].id);
       if (conf) {
         setExamConfig(conf);
-        setSmallExamMax(conf.smallExamMax || 10);
-        setBigExamMax(conf.bigExamMax || 10);
-        setPassMarkPercentage(conf.passMarkPercentage || 50);
+        setAssessmentComponents(conf.assessmentComponents?.length ? conf.assessmentComponents : [
+          { id: 'legacy-small', name: conf.smallExamName || 'Continuous Assessment', maxMarks: conf.smallExamMax || 10, category: 'continuous', order: 1 },
+          { id: 'legacy-big', name: conf.bigExamName || 'Final Examination', maxMarks: conf.bigExamMax || 10, category: 'final', order: 2 }
+        ]);
+        setPassMarkPercentage(conf.passMarkPercentage ?? 50);
       }
     } catch (err: any) {
       setLoadError(err?.message || 'Unable to load classes, subjects, or exam configuration.');
@@ -155,8 +162,7 @@ export const ExamsResultsView: React.FC = () => {
     setIsSaving(true);
     try {
       const updated = await ApiClient.updateExamConfig({
-        smallExamMax,
-        bigExamMax,
+        assessmentComponents: assessmentComponents.map((component, index) => ({ ...component, order: index + 1 })),
         passMarkPercentage
       });
       setExamConfig(updated);
@@ -255,7 +261,9 @@ export const ExamsResultsView: React.FC = () => {
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const selectedClassSubjects = classSubjectRows.filter(row => row.subject).map(row => row.subject as Subject);
-  const maxCombined = smallExamMax + bigExamMax;
+  const continuousMax = assessmentComponents.filter(component => component.category === 'continuous').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
+  const finalMax = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
+  const maxCombined = continuousMax + finalMax;
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
@@ -360,7 +368,7 @@ export const ExamsResultsView: React.FC = () => {
           {/* Mark Scheme Guidance Banner */}
           <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center justify-between text-xs text-teal-900">
             <span className="font-medium">
-              Maximum Scores: Small Exam ({smallExamMax} pts) + Big Exam ({bigExamMax} pts) = Total ({maxCombined} pts).
+              Maximum Scores: {assessmentComponents.map(component => `${component.name} ({component.maxMarks})`).join(' + ')} = Total ({maxCombined} pts).
               Percentage = (Score / {maxCombined}) × 100%. Pass mark: {passMarkPercentage}%.
             </span>
 
@@ -371,8 +379,8 @@ export const ExamsResultsView: React.FC = () => {
             {students.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No students enrolled in this class.</div> : selectedClassSubjects.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No subjects have been assigned to this class.</div> : (
               <table className="w-full min-w-[1000px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
-                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{selectedClassSubjects.map(subject => <th key={subject.id} colSpan={5} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
-                  <tr>{selectedClassSubjects.map(subject => <React.Fragment key={subject.id}><th className="border-b border-l px-2 py-2">Small</th><th className="border-b px-2 py-2">Big</th><th className="border-b px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th><th className="border-b px-2 py-2">Status</th></React.Fragment>)}</tr>
+                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{selectedClassSubjects.map(subject => <th key={subject.id} colSpan={assessmentComponents.length + 3} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
+                  <tr>{selectedClassSubjects.map(subject => <React.Fragment key={subject.id}>{assessmentComponents.map(component => <th key={component.id} className="border-b border-l px-2 py-2">{component.name}<span className="block text-[9px] normal-case">/{component.maxMarks}</span></th>)}<th className="border-b border-l px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th><th className="border-b px-2 py-2">Status</th></React.Fragment>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {students.map(student => <tr key={student.id} className="hover:bg-slate-50">
@@ -381,9 +389,8 @@ export const ExamsResultsView: React.FC = () => {
                       const mark = marks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                       const status = mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'submitted' ? 'Waiting Fomester' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : 'Missing';
                       return <React.Fragment key={subject.id}>
-                        <td className="border-l px-2 py-2 text-center">{mark ? mark.smallExamMarks : '—'}</td>
-                        <td className="px-2 py-2 text-center">{mark ? mark.bigExamMarks : '—'}</td>
-                        <td className="px-2 py-2 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td>
+                        {assessmentComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{mark?.assessmentScores?.[component.id] ?? '—'}</td>)}
+                        <td className="border-l px-2 py-2 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td>
                         <td className="px-2 py-2 text-center">{mark ? `${mark.percentage}%` : '—'}</td>
                         <td className="px-2 py-2 text-center"><span className={`rounded-full px-2 py-1 text-[10px] ${mark?.status === 'form_teacher_submitted' ? 'bg-teal-100 text-teal-800' : mark?.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{status}</span></td>
                       </React.Fragment>;
@@ -683,58 +690,40 @@ export const ExamsResultsView: React.FC = () => {
       {activeTab === 'config' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
-            <h2 className="text-base font-bold text-[#132A29]">Exam Configuration & Maximum Marks</h2>
-            <p className="text-sm text-[#71817d] mt-0.5">
-              Set the maximum marks for Small Exam and Big Exam according to school policy.
-            </p>
+            <h2 className="text-base font-bold text-[#132A29]">School Exam Structure</h2>
+            <p className="mt-1 text-sm text-[#71817d]">Add or remove assessments, set each maximum score, and choose whether it belongs to continuous assessment or the final examination. Teachers will see these exact columns.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#334155] mb-1">Small Exam Maximum Marks</label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={smallExamMax}
-                onChange={e => setSmallExamMax(Number(e.target.value))}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E]"
-              />
-              <p className="text-[11px] text-[#64748B] mt-1">Default is 10 marks.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#334155] mb-1">Big Exam Maximum Marks</label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={bigExamMax}
-                onChange={e => setBigExamMax(Number(e.target.value))}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E]"
-              />
-              <p className="text-[11px] text-[#64748B] mt-1">Default is 10 marks.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#334155] mb-1">Minimum Pass Mark (%)</label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={passMarkPercentage}
-                onChange={e => setPassMarkPercentage(Number(e.target.value))}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg font-mono focus:ring-2 focus:ring-[#0F766E]"
-              />
-              <p className="text-[11px] text-[#64748B] mt-1">Default is 50% pass mark.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#334155] mb-1">Combined Maximum Score</label>
-              <div className="py-2 px-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-mono font-bold text-[#132A29]">
-                {smallExamMax + bigExamMax} Points = 100%
+          <div className="space-y-3">
+            {assessmentComponents.map((component, index) => (
+              <div key={component.id} className="grid grid-cols-1 gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:grid-cols-[minmax(0,1fr)_110px_160px_40px]">
+                <label className="text-xs font-semibold text-[#475569]">Assessment name
+                  <input value={component.name} maxLength={100} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, name: event.target.value } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+                </label>
+                <label className="text-xs font-semibold text-[#475569]">Maximum marks
+                  <input type="number" min={0.5} max={1000} step={0.5} value={component.maxMarks} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, maxMarks: Math.max(0.5, Number(event.target.value) || 0.5) } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono font-normal" />
+                </label>
+                <label className="text-xs font-semibold text-[#475569]">Assessment group
+                  <select value={component.category} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, category: event.target.value as 'continuous' | 'final' } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                    <option value="continuous">Continuous / small tests</option>
+                    <option value="final">Final / major exam</option>
+                  </select>
+                </label>
+                <button type="button" onClick={() => setAssessmentComponents(rows => rows.filter(row => row.id !== component.id).map((row, rowIndex) => ({ ...row, order: rowIndex + 1 })))} disabled={assessmentComponents.length <= 2} aria-label={`Remove ${component.name}`} className="mt-5 h-9 rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-40">×</button>
               </div>
-            </div>
+            ))}
+            <button type="button" onClick={() => setAssessmentComponents(rows => [...rows, { id: `assessment-${Date.now()}`, name: `Assessment ${rows.length + 1}`, maxMarks: 10, category: 'continuous', order: rows.length + 1 }])} disabled={assessmentComponents.length >= 20} className="rounded-lg border border-dashed border-[#0F766E] px-4 py-2 text-xs font-semibold text-[#0F766E] disabled:opacity-40">+ Add assessment</button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 rounded-xl bg-teal-50 p-4 text-xs sm:grid-cols-3">
+            <div><span className="text-teal-800">Continuous total</span><strong className="mt-1 block text-lg text-teal-950">{continuousMax} marks</strong></div>
+            <div><span className="text-teal-800">Final exam total</span><strong className="mt-1 block text-lg text-teal-950">{finalMax} marks</strong></div>
+            <div><span className="text-teal-800">Combined maximum</span><strong className="mt-1 block text-lg text-teal-950">{maxCombined} marks</strong></div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#334155] mb-1">Minimum Pass Mark (%)</label>
+            <input type="number" min={0} max={100} value={passMarkPercentage} onChange={event => setPassMarkPercentage(Number(event.target.value))} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-mono" />
           </div>
 
           <div className="pt-4 border-t border-[#E2E8F0] flex justify-end">

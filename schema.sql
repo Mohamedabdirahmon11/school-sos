@@ -526,22 +526,29 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_unique_day ON attendance_records(school_id, class_id, student_id, date);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance_records(school_id, class_id, date);
 
--- 16. EXAM CONFIGURATION (SMALL & BIG EXAM RULES)
+-- 16. EXAM CONFIGURATION (SCHOOL-DEFINED ASSESSMENT COMPONENTS)
 CREATE TABLE IF NOT EXISTS exam_configs (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   academic_year VARCHAR(50) NOT NULL DEFAULT '2026-2027',
-  small_exam_name VARCHAR(100) NOT NULL DEFAULT 'Small Exam',
-  small_exam_max NUMERIC(5, 2) NOT NULL DEFAULT 10.00,
-  big_exam_name VARCHAR(100) NOT NULL DEFAULT 'Big Exam',
-  big_exam_max NUMERIC(5, 2) NOT NULL DEFAULT 10.00,
+  small_exam_name VARCHAR(100) NOT NULL DEFAULT 'Continuous Assessment',
+  small_exam_max NUMERIC(5, 2) NOT NULL DEFAULT 40.00,
+  big_exam_name VARCHAR(100) NOT NULL DEFAULT 'Final Examination',
+  big_exam_max NUMERIC(5, 2) NOT NULL DEFAULT 60.00,
+  assessment_components JSONB NOT NULL DEFAULT '[
+    {"id":"test-1","name":"Test 1","maxMarks":10,"category":"continuous","order":1},
+    {"id":"test-2","name":"Test 2","maxMarks":10,"category":"continuous","order":2},
+    {"id":"test-3","name":"Test 3","maxMarks":10,"category":"continuous","order":3},
+    {"id":"test-4","name":"Test 4","maxMarks":10,"category":"continuous","order":4},
+    {"id":"final-exam","name":"Final Examination","maxMarks":60,"category":"final","order":5}
+  ]'::jsonb,
   pass_mark_percentage NUMERIC(5, 2) NOT NULL DEFAULT 50.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(school_id, academic_year)
 );
 
--- 17. STUDENT MARKS (PERCENTAGE BASED, SMALL + BIG EXAM)
+-- 17. STUDENT MARKS (COMPONENT SCORES AND PERCENTAGE TOTALS)
 CREATE TABLE IF NOT EXISTS student_marks (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
@@ -552,6 +559,7 @@ CREATE TABLE IF NOT EXISTS student_marks (
   semester VARCHAR(50) NOT NULL CHECK (semester IN ('Semester 1', 'Semester 2')),
   small_exam_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
   big_exam_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
+  assessment_scores JSONB NOT NULL DEFAULT '{}'::jsonb,
   total_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
   percentage NUMERIC(5, 2) NOT NULL DEFAULT 0,
   status mark_status_enum NOT NULL DEFAULT 'draft',

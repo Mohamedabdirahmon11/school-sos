@@ -27,3 +27,11 @@ test('teachers enter exam marks and school administrators only review and approv
   assert.match(api, /classTeacherId === user\.id/);
   assert.match(api, /form-teacher-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
+
+test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /formTeacherClassIds = classes[\s\S]*klass\.classTeacherId === userId/);
+  assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
+  assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
+  assert.match(api, /canEditMarks: true/);
+});

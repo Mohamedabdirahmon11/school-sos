@@ -166,7 +166,7 @@ export const ClassesSubjectsView: React.FC = () => {
                   <p className="text-[11px] text-[#64748B]">
                     {c.roomNumber} · Shift {c.shift || 1} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
                   </p>
-                  <p className="text-[11px] text-teal-700">Fomester: {teachers.find(teacher => teacher.userId === c.classTeacherId)?.fullName || 'Not assigned'}</p>
+                  <p className="text-[11px] text-teal-700">Form Teacher: {teachers.find(teacher => teacher.userId === c.classTeacherId)?.fullName || 'Not assigned'}</p>
                 </button>
                 <span className="font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded text-[11px] font-bold">
                   Section {c.section}
@@ -256,12 +256,12 @@ export const ClassesSubjectsView: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block font-medium">Fomester / Class Teacher</label>
+                <label className="block font-medium">Form Teacher</label>
                 <select value={formTeacherId} onChange={event => setFormTeacherId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2">
                   <option value="">Not assigned</option>
                   {teachers.filter(teacher => teacher.status === 'active').map(teacher => <option key={teacher.userId} value={teacher.userId}>{teacher.fullName} · {teacher.staffId || teacher.id}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-slate-500">Hal macallin ayaa fasalkan Fomester u noqonaya. Ma aha dhammaan macallimiinta maaddooyinka.</p>
+                <p className="mt-1 text-[11px] text-slate-500">Hal macallin ayaa fasalkan Form Teacher u noqonaya. Ma aha dhammaan macallimiinta maaddooyinka.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

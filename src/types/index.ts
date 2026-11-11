@@ -284,15 +284,25 @@ export interface AttendanceRecord {
   recordedAt: string;
 }
 
+export interface ExamAssessmentComponent {
+  id: string;
+  name: string;
+  maxMarks: number;
+  category: 'continuous' | 'final';
+  order: number;
+}
+
 export interface ExamConfig {
   id: string;
   schoolId: string;
   academicYear: string;
-  smallExamName: string; // Default "Small Exam"
-  smallExamMax: number; // Default 10
-  bigExamName: string; // Default "Big Exam"
-  bigExamMax: number; // Default 10
-  passMarkPercentage: number; // Default 50%
+  /** Compatibility totals derived from assessmentComponents. */
+  smallExamName: string;
+  smallExamMax: number;
+  bigExamName: string;
+  bigExamMax: number;
+  assessmentComponents: ExamAssessmentComponent[];
+  passMarkPercentage: number;
   updatedAt: string;
 }
 
@@ -311,6 +321,8 @@ export interface StudentMark {
   semester: 'Semester 1' | 'Semester 2';
   smallExamMarks: number;
   bigExamMarks: number;
+  /** Per-assessment raw scores keyed by ExamAssessmentComponent.id. */
+  assessmentScores?: Record<string, number>;
   totalMarks: number; // small + big
   percentage: number; // (total / (smallMax + bigMax)) * 100
   status: MarkStatus;

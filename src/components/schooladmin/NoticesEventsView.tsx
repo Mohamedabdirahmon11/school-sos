@@ -159,7 +159,7 @@ export const NoticesEventsView: React.FC = () => {
             Academic Calendar & School Announcements
           </h1>
           <p className="text-xs text-[#64748B]">
-            Manage terms, official holidays, examination intervals, and targeted school broadcasts
+            Academic Calendar is for dated events, terms, exams and holidays. Notice Board is for general announcements and circulars sent to selected school audiences.
           </p>
         </div>
         <div className="flex items-center gap-2">

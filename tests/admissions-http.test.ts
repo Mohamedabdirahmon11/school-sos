@@ -326,11 +326,16 @@ test('teacher creation ignores client-controlled identity and credential fields'
   assert.ok(studentTeacher);
   assert.equal('monthlySalary' in studentTeacher, false);
 
-  const duplicate = await post({
-    staffId: 'STF-SEC-001', fullName: 'Duplicate Staff ID',
+  // Client-supplied IDs are ignored; the server must issue a fresh school-scoped ID.
+  const secondTeacher = await post({
+    staffId: 'STF-SEC-001', fullName: 'Second Generated Teacher',
     gender: 'female', assignedClasses: [], assignedSubjects: []
   });
-  assert.equal(duplicate.status, 409);
+  assert.equal(secondTeacher.status, 201, await secondTeacher.clone().text());
+  const secondTeacherResult = await secondTeacher.json();
+  assert.match(secondTeacherResult.staffId, /^T[0-9]{3,}$/);
+  assert.notEqual(secondTeacherResult.staffId, result.staffId);
+  assert.notEqual(secondTeacherResult.staffId, 'STF-SEC-001');
 
   const invalidAssignments = await post({
     staffId: 'STF-SEC-002', fullName: 'Invalid Assignments',
@@ -434,15 +439,28 @@ test('concurrent attendance submissions converge on one daily row without automa
     lastActivityAt: new Date().toISOString()
   });
   const teacherHeaders = { Cookie: `schoolos_session=${teacherToken}`, 'Content-Type': 'application/json' };
+  const classStudents = await storage.db.getStudents(school.id, klass.id);
+  const attendanceRecords = classStudents.map(classStudent => ({
+    studentId: classStudent.id,
+    status: classStudent.id === student.id ? 'absent' : 'present'
+  }));
+  const submit = () => fetch(`${baseUrl}/attendance`, {
+    method: 'POST', headers: teacherHeaders,
+    body: JSON.stringify({ classId: klass.id, date, records: attendanceRecords })
+  });
+  const subjectOnlyAttempt = await submit();
+  assert.equal(subjectOnlyAttempt.status, 403, 'subject assignment alone must not grant Form Teacher attendance permission');
+  await storage.db.updateClass(klass.id, { classTeacherId: teacherUser.id }, school.id);
+  // The test adapter stores raw database rows; keep the fixture's canonical DB column in sync.
+  const assignedClassRow = memory.rows('classes').find(row => row.id === klass.id);
+  assert.ok(assignedClassRow, 'class fixture must exist in the database adapter');
+  assignedClassRow.class_teacher_id = teacherUser.id;
+  assignedClassRow.classTeacherId = teacherUser.id;
   const invalidNote = await fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
   });
   assert.equal(invalidNote.status, 400);
-  const submit = () => fetch(`${baseUrl}/attendance`, {
-    method: 'POST', headers: teacherHeaders,
-    body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent' }] })
-  });
   const [first, retry] = await Promise.all([submit(), submit()]);
   assert.equal(first.status, 200, await first.clone().text());
   assert.equal(retry.status, 200, await retry.clone().text());
@@ -454,18 +472,66 @@ test('concurrent attendance submissions converge on one daily row without automa
   assert.equal(rows.length, 1);
   assert.equal(rows[0].status, 'absent');
 
+  const examHistory = {
+    id: 'attendance-class-exam-history', school_id: school.id, class_id: klass.id,
+    student_id: student.id, subject_id: 'attendance-test-subject', semester: 'Semester 1',
+    small_exam_marks: 18, big_exam_marks: 72, percentage: 90, status: 'approved'
+  };
+  memory.rows('marks').push(examHistory);
+  await storage.db.updateClass(klass.id, { classTeacherId: null }, school.id);
+  const unassignedClassRow = memory.rows('classes').find(row => row.id === klass.id);
+  assert.ok(unassignedClassRow);
+  unassignedClassRow.class_teacher_id = null;
+  unassignedClassRow.classTeacherId = null;
+  assert.equal((await storage.db.getClassById(klass.id, school.id))?.classTeacherId, null);
+  assert.equal(memory.rows('attendance_records').filter(row => row.class_id === klass.id && row.student_id === student.id && row.date === date).length, 1, 'removing the Form Teacher must preserve attendance history');
+  assert.deepEqual(memory.rows('marks').find(row => row.id === examHistory.id), examHistory, 'changing the Form Teacher must preserve exam history');
+  const formerTeacherRetry = await submit();
+  assert.equal(formerTeacherRetry.status, 403, 'a former Form Teacher cannot submit attendance after reassignment/removal');
+
   const alerts = memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
   );
   assert.equal(alerts.length, 0, 'absence alerts are sent manually from the administrator WhatsApp session, not queued as SMS');
 
-  const repeated = await submit();
-  assert.equal(repeated.status, 200, await repeated.clone().text());
+  const repeatedAfterRemoval = await submit();
+  assert.equal(repeatedAfterRemoval.status, 403, 'a teacher who is no longer the Form Teacher cannot resave attendance');
   assert.equal(memory.rows('communication_queue').filter(row =>
     row.school_id === school.id && row.student_id === student.id && row.message_type === 'attendance_absent'
-  ).length, 0, 're-saving an absent status must not queue automatic alerts');
+  ).length, 0, 'attendance saves must not queue automatic alerts');
 });
 
+
+test('teacher IDs are simple alphanumeric and teacher profile updates and PIN resets persist', async () => {
+  const created = await fetch(`${baseUrl}/teachers`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      fullName: 'PIN Reset Teacher', gender: 'female',
+      qualification: 'B.Ed', monthlySalary: 550
+    })
+  });
+  assert.equal(created.status, 201, await created.clone().text());
+  const teacher = await created.json();
+  assert.match(teacher.staffId, /^T[0-9]{3,}$/);
+  assert.doesNotMatch(teacher.staffId, /[^A-Z0-9]/);
+
+  const updated = await fetch(`${baseUrl}/teachers/${teacher.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ fullName: 'Updated PIN Reset Teacher', phone: '' })
+  });
+  assert.equal(updated.status, 200, await updated.clone().text());
+  assert.equal((await updated.json()).fullName, 'Updated PIN Reset Teacher');
+
+  const reset = await fetch(`${baseUrl}/teachers/${teacher.id}/reset-pin`, {
+    method: 'POST', headers, body: JSON.stringify({})
+  });
+  assert.equal(reset.status, 200, await reset.clone().text());
+  const result = await reset.json();
+  assert.match(result.newPin, /^[0-9]{4}$/);
+  const account = await storage.db.getUserById(teacher.userId, school.id);
+  const { verifyPin } = await import('../src/server/auth-security.ts');
+  assert.ok(account?.pin && verifyPin(result.newPin, account.pin));
+});
 
 test('school backup restore previews tenant-scoped rows and requires explicit matching confirmation', async () => {
   const event = {

@@ -335,12 +335,21 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id');
+  const [teacher, classes] = await Promise.all([
+    db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id'),
+    db.getClasses(schoolId)
+  ]);
   if (!teacher.items.length) return [];
   const assignments = await queryAllRows('class_subjects', {
     school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true'
   }, 'class_id');
-  return [...new Set(assignments.map((assignment: any) => assignment.classId))];
+  // Subject teachers see the full student lists of classes they teach.
+  // Form Teachers also need their entire homeroom class, even without a subject assignment.
+  const subjectClassIds = assignments.map((assignment: any) => assignment.classId);
+  const formTeacherClassIds = classes
+    .filter((klass: any) => klass.classTeacherId === userId && !klass.isArchived)
+    .map((klass: any) => klass.id);
+  return [...new Set([...subjectClassIds, ...formTeacherClassIds])];
 }
 
 async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]> {
@@ -2396,7 +2405,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.classTeacherId) {
     const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
-    if (!formTeacher.items.length) { res.status(400).json({ error: 'Fomester must be an active teacher in this school.' }); return; }
+    if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
   }
   const newClass = db.createClass({ ...req.body, shift: requestedShift, schoolId: school.id });
   res.status(201).json(newClass);
@@ -2426,7 +2435,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.classTeacherId) {
     const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
-    if (!formTeacher.items.length) { res.status(400).json({ error: 'Fomester must be an active teacher in this school.' }); return; }
+    if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
   }
   const updated = await db.updateClass(String(req.params.id), req.body, school.id);
   res.json(updated);
@@ -2450,6 +2459,13 @@ apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) =
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
+apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
+  const classes = await db.getClasses(school.id);
+  res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
+});
 apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -2460,8 +2476,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
 
   const assignments = await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
   const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
-  // A Fomester is explicitly assigned on the class record. assignedClasses
-  // describes teaching scope and must not grant whole-class Fomester privileges.
+  // A Form Teacher is explicitly assigned on the class record. assignedClasses
+  // describes teaching scope and must not grant whole-class Form Teacher privileges.
   const formTeacherClasses = allClasses.filter((klass: any) => klass.classTeacherId === user.id);
   const formTeacherClassAssignments = formTeacherClasses.length
     ? await queryAllRows('class_subjects', { school_id: school.id, class_id: formTeacherClasses.map((klass: any) => klass.id), is_active: 'true' }, 'class_id,subject_id,teacher_id')
@@ -2478,8 +2494,9 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
-  // A Fomester reviews every class subject. They may enter marks only where
-  // no subject teacher is assigned; assigned subjects remain with their teachers.
+  // A Form Teacher is responsible for the complete class mark sheet.
+  // Subject teachers retain their own class/subject scope; the Form Teacher
+  // may complete any subject in their homeroom class before forwarding it.
   for (const klass of formTeacherClasses) {
     const classSubjects = formTeacherClassAssignments.filter((item: any) => item.classId === klass.id);
     for (const assignment of classSubjects) {
@@ -2503,7 +2520,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         bigExamEnabled: true,
         isFormTeacher: true,
         isFormTeacherClass: true,
-        canEditMarks: !assignment.teacherId
+        canEditMarks: true
       });
     }
   }
@@ -2585,9 +2602,24 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   const schoolTag = String(school.code || 'SCHOOL').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) || 'SCHOOL';
   let sequence = users.length + 1;
   let id = '';
-  do { id = `STF-${schoolTag}-${String(sequence++).padStart(4, '0')}`; } while (used.has(id));
+  do { id = 'STF-' + schoolTag + '-' + String(sequence++).padStart(4, '0'); } while (used.has(id));
   return id;
 }
+
+async function nextSchoolTeacherId(_school: School): Promise<string> {
+  // Teacher IDs are also the login identifier and users.staff_id has a
+  // global unique index, so keep the short T001 sequence globally unique.
+  const [users, teachers] = await Promise.all([
+    queryAllRows('users', {}, 'id,staff_id'),
+    queryAllRows('teachers', {}, 'id,staff_id')
+  ]);
+  const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
+  let sequence = 1;
+  let id = '';
+  do { id = 'T' + String(sequence++).padStart(3, '0'); } while (used.has(id));
+  return id;
+}
+
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
 const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
@@ -3670,6 +3702,10 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     if (valid.length !== ids.length) { res.status(400).json({ error: `Every assigned ${table} must belong to this school.` }); return; }
     updates[field] = ids;
   }
+  // Direct paged reads do not hydrate the storage cache used by updateTeacher/updateUser.
+  // Load this school's teacher and teacher-account rows before applying the scoped update.
+  await db.getTeachers(school.id);
+  if (current.userId) await db.getUsers(school.id, 'teacher');
   const updated = db.updateTeacher(id, updates as any);
   if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
   if (current.userId) {
@@ -3683,6 +3719,24 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   db.logAudit({ action: 'TEACHER_PROFILE_UPDATED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated teacher profile ${id}.`, severity: 'info' });
   await db.flush();
   res.json(updated);
+});
+
+apiRouter.post('/teachers/:id/reset-pin', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const teacherId = String(req.params.id || '');
+  const teachers = await db.getTeachers(school.id);
+  const teacher = teachers.find(item => item.id === teacherId && item.schoolId === school.id);
+  if (!teacher?.userId) { res.status(404).json({ error: 'Teacher login was not found in this school.' }); return; }
+  const accounts = await db.getUsers(school.id, 'teacher');
+  const account = accounts.find(item => item.id === teacher.userId && item.schoolId === school.id);
+  if (!account) { res.status(404).json({ error: 'Teacher login was not found in this school.' }); return; }
+  const newPin = String(randomInt(1000, 10000));
+  const updated = db.updateUser(account.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null } as any);
+  if (!updated) { res.status(404).json({ error: 'Teacher login could not be updated.' }); return; }
+  db.logAudit({ action: 'TEACHER_PIN_RESET', category: 'security', schoolId: school.id, schoolName: school.name, userId: actor.id, userName: actor.fullName, userRole: actor.role, details: 'Reset sign-in PIN for teacher ' + teacher.staffId + '.', severity: 'warning' });
+  await db.flush();
+  res.json({ success: true, newPin, teacher: { id: teacher.id, staffId: teacher.staffId, fullName: teacher.fullName } });
 });
 
 apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -3701,11 +3755,11 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = normalizeStaffId(body.staffId) || await nextSchoolStaffId(school);
-  if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
+  const staffId = await nextSchoolTeacherId(school);
+  if (!validTeacherId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
   const [usedStaffIds, existingTeachers] = await Promise.all([
-    queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
+    queryAllRows('users', {}, 'id,staff_id'),
+    queryAllRows('teachers', {}, 'id,staff_id')
   ]);
   if ([...usedStaffIds, ...existingTeachers].some((record: any) => String(record.staffId || '').toUpperCase() === staffId)) {
     res.status(409).json({ error: 'That staff ID is already used in this school.' }); return;
@@ -3759,6 +3813,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
+const validTeacherId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
@@ -3991,6 +4046,16 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   const classStudentIds = new Set(classStudents.map((student: any) => student.id));
   if (normalizedRecords.some(record => !classStudentIds.has(record.studentId))) {
     res.status(400).json({ error: 'Attendance can only be recorded for students currently enrolled in the selected class.' });
+    return;
+  }
+  if (normalizedRecords.length !== classStudentIds.size || [...classStudentIds].some(studentId => !seenStudentIds.has(studentId))) {
+    res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
+    return;
+  }
+  const attendanceClass = await db.getClassById(normalizedClassId, school.id);
+  if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
+  if (attendanceClass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
     return;
   }
 
@@ -4231,14 +4296,14 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
     const editableSubjectIds = new Set([
       ...ownSubjectIds,
-      ...classAssignments.items.filter((item: any) => !item.teacherId).map((item: any) => item.subjectId)
+      ...(isFormTeacher ? classAssignments.items.map((item: any) => item.subjectId) : [])
     ]);
     if (!isFormTeacher && ownSubjectIds.size === 0) {
-      res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Fomester.' });
+      res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Form Teacher.' });
       return;
     }
     if (subjectId && !editableSubjectIds.has(String(subjectId))) {
-      res.status(403).json({ error: 'You may only access your assigned subject or an unassigned subject in your Fomester class.' });
+      res.status(403).json({ error: 'You may only access subjects assigned to you, or subjects in your Form Teacher class.' });
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
@@ -4291,16 +4356,18 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       is_active: 'true'
     }, 1, 1, undefined, 'id');
     const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillUnassignedSubject = isFormTeacher && classSubject.items.length > 0 && !classSubject.items[0].teacherId;
-    if (!assignment.total && !mayFillUnassignedSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or an unassigned subject in your Fomester class.' });
+    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
+    if (!assignment.total && !mayFillFormTeacherSubject) {
+      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
       return;
     }
   }
   const seenStudentIds = new Set<string>();
   for (const mark of marks) {
+    const hasAssessmentScores = mark?.assessmentScores && typeof mark.assessmentScores === 'object' && !Array.isArray(mark.assessmentScores);
+    const hasLegacyScores = Number.isFinite(mark?.smallExamMarks) && Number.isFinite(mark?.bigExamMarks);
     if (!mark || typeof mark.studentId !== 'string' || !mark.studentId.trim() ||
-        !Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) ||
+        (!hasAssessmentScores && !hasLegacyScores) ||
         !['draft', 'submitted'].includes(mark.status) ||
         (typeof mark.teacherRemarks === 'string' && mark.teacherRemarks.length > 1000)) {
       res.status(400).json({ error: 'Every mark row must include a student, numeric marks, a valid status, and remarks of at most 1,000 characters.' });
@@ -4330,13 +4397,13 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
 apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Only a teacher assigned as Fomester can forward class marks.' }); return; }
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Only a teacher assigned as Form Teacher can forward class marks.' }); return; }
   const classId = typeof req.body?.classId === 'string' ? req.body.classId : '';
   const semester = req.body?.semester;
   if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) { res.status(400).json({ error: 'Choose a class and valid semester.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
-  if (klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the Fomester assigned to this class can forward its results.' }); return; }
+  if (klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the Form Teacher assigned to this class can forward its results.' }); return; }
   try {
     const result = await db.forwardClassMarks(school.id, classId, semester, user.id);
     res.json({ success: true, forwardedCount: result.count });
