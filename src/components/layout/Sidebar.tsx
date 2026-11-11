@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[276px] shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[82px] shrink-0 items-center gap-3 border-b border-white/10 px-5">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 text-lg font-black text-white shadow-lg shadow-teal-950/40">S</div>
         <div className="min-w-0 flex-1">
