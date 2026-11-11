@@ -92,3 +92,16 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(payroll, /ApiClient\.downloadPayslipPdf\(record\.id\)/);
   assert.match(payroll, /setError\(reason instanceof Error/);
 });
+
+
+test('teacher class switching clears stale student data and loads only the active workflow data', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /setStudents\(\[\]\);[\s\S]*setIsLoadingClassData\(true\)/);
+  assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
+  assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
+  assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
+  assert.match(teacher, /needsGrades\s*\? ApiClient\.getMarks/);
+  assert.match(teacher, /if \(!needsAttendance && !needsGrades\) return/);
+  assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
+  assert.match(teacher, /Loading students and attendance/);
+});
