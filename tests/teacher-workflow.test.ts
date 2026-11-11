@@ -107,3 +107,25 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
   assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
 });
+
+
+test('teacher homework submission switching ignores stale responses and clears old grading drafts', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /const submissionRequestRef = useRef\(0\)/);
+  assert.match(teacher, /const requestId = \+\+submissionRequestRef\.current/);
+  assert.match(teacher, /if \(requestId !== submissionRequestRef\.current\) return/);
+  assert.match(teacher, /if \(requestId === submissionRequestRef\.current\) setIsLoadingSubmissions\(false\)/);
+  assert.match(teacher, /setReviewSubmissions\(\[\]\);[\s\S]*setGradeDrafts\(\{\}\)/);
+  assert.match(teacher, /useEffect\(\(\) => \(\) => \{ submissionRequestRef\.current \+= 1; \}, \[\]\)/);
+});
+
+test('teacher homework creation validates trimmed content, school-local due date, and point range', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /const title = assignmentTitle\.trim\(\)/);
+  assert.match(teacher, /const description = assignmentDescription\.trim\(\)/);
+  assert.match(teacher, /const today = getSchoolLocalDate\(school\?\.timezone\)/);
+  assert.match(teacher, /assignmentDueDate < today/);
+  assert.match(teacher, /Number\.isInteger\(maxPoints\).*maxPoints < 1.*maxPoints > 1000/s);
+  assert.match(teacher, /min=\{getSchoolLocalDate\(school\?\.timezone\)\}/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| gradingSubmissionId !== null\}/);
+});
