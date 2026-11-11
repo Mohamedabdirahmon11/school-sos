@@ -737,7 +737,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Due date</label>
-                <input type="date" value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
+                <input type="date" min={getSchoolLocalDate(school?.timezone)} value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Max points</label>
@@ -813,7 +813,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                     <button
                       type="button"
                       onClick={() => handleGradeSubmission(submission)}
-                      disabled={isReadOnly || gradingSubmissionId === submission.id}
+                      disabled={isReadOnly || gradingSubmissionId !== null}
                       className="rounded-xl bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50"
                     >
                       {gradingSubmissionId === submission.id ? 'Saving...' : submission.status === 'graded' ? 'Update Grade' : 'Save Grade'}
