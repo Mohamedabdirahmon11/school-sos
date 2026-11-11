@@ -187,7 +187,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
-  // Save every subject assigned to this teacher in one operation.
+  // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
     if (isReadOnly || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     if (status === 'submitted') {
@@ -221,8 +221,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       const savedMarks = results.flat();
       setClassMarks(current => [...current.filter(mark => !savedMarks.some(saved => saved.id === mark.id)), ...savedMarks]);
       setNotice(status === 'submitted'
-        ? `You submitted ${savedMarks.length} mark records to the class Form Teacher for review.`
-        : `Drafts saved for ${editableClassSubjects.length} assigned subject(s).`);
+        ? (isFormTeacher
+          ? `You completed and submitted ${savedMarks.length} mark records. Review the class sheet, then forward it to School Admin.`
+          : `You submitted ${savedMarks.length} mark records to the class Form Teacher for review.`)
+        : `Drafts saved for ${editableClassSubjects.length} subject(s) in this class.`);
       if (status === 'submitted') {
         const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
         setClassMarks(refreshed);
