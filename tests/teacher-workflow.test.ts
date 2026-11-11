@@ -56,7 +56,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit marks/);
-  assert.match(teacher, /Forward complete class to Admin/);
+  assert.match(teacher, /Forward class to Admin/);
 });
 
 test('teacher appointment supports optional multiple profile tags and one-time school credentials', () => {
