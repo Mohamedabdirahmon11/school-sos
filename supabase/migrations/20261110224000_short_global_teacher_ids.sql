@@ -24,7 +24,10 @@ BEGIN
     ORDER BY u.created_at NULLS FIRST, u.id
   LOOP
     LOOP
-      candidate_id := 'T' || lpad(next_number::TEXT, 3, '0');
+      candidate_id := 'T' || CASE
+        WHEN next_number < 1000 THEN lpad(next_number::TEXT, 3, '0')
+        ELSE next_number::TEXT
+      END;
       next_number := next_number + 1;
       EXIT WHEN NOT EXISTS (
         SELECT 1 FROM public.users u
