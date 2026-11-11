@@ -119,7 +119,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   }, [activeTab, formTeacherClasses, selectedClassId]);
   useEffect(() => {
     if (!selectedClassId) return;
-    const firstAssignedSubject = teacherAssignments.find((assignment: any) => assignment.classId === selectedClassId)?.subject.id || '';
+    const firstAssignedSubject = classSubjects[0]?.id || '';
     if (!classSubjects.some(subject => subject.id === selectedSubjectId)) setSelectedSubjectId(firstAssignedSubject);
   }, [selectedClassId, teacherAssignments, classSubjects, selectedSubjectId]);
 
