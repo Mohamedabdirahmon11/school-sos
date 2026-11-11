@@ -44,6 +44,6 @@ Updated: 2026-11-11
 ## Teacher portal follow-up — class data safety (2026-11-11)
 - Added to PR #82: clear prior class roster and grade/attendance state before loading a newly selected class, so stale students cannot appear during class switching.
 - Attendance data and marks data are now fetched only in their respective tabs. Other Teacher Portal sections avoid those unnecessary requests.
-- Save Attendance and bulk marks actions are disabled during class-data loading; attendance shows an explicit loading row.
+- Save Attendance, all bulk marks actions, and Form Teacher forwarding are disabled during class-data loading; attendance shows an explicit loading row.
 - Added a source regression test for the loading and stale-data safeguards.
 - Verification: latest CI run pending at commit 3ff1491; do not treat this change as verified until the workflow completes. No live database or production records were modified.
