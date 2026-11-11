@@ -4362,8 +4362,10 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
   const seenStudentIds = new Set<string>();
   for (const mark of marks) {
+    const hasAssessmentScores = mark?.assessmentScores && typeof mark.assessmentScores === 'object' && !Array.isArray(mark.assessmentScores);
+    const hasLegacyScores = Number.isFinite(mark?.smallExamMarks) && Number.isFinite(mark?.bigExamMarks);
     if (!mark || typeof mark.studentId !== 'string' || !mark.studentId.trim() ||
-        !Number.isFinite(mark.smallExamMarks) || !Number.isFinite(mark.bigExamMarks) ||
+        (!hasAssessmentScores && !hasLegacyScores) ||
         !['draft', 'submitted'].includes(mark.status) ||
         (typeof mark.teacherRemarks === 'string' && mark.teacherRemarks.length > 1000)) {
       res.status(400).json({ error: 'Every mark row must include a student, numeric marks, a valid status, and remarks of at most 1,000 characters.' });
