@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupProgressUpdate, SchoolSetupState } from '../../types/index.ts';
 import { TranslationDict } from '../../lib/translations.ts';
-import { SCHOOL_SETUP_STEP_TARGETS } from '../../lib/school-setup-navigation.ts';
+import { SCHOOL_SETUP_EXTRA_MODULES, SCHOOL_SETUP_STEP_TARGETS } from '../../lib/school-setup-navigation.ts';
 
 interface Props {
   onNavigate: (view: string) => void;
@@ -17,8 +17,7 @@ interface StepDefinition {
   helpKey: keyof TranslationDict;
   target?: string;
   targetLabelKey?: keyof TranslationDict;
-  secondaryTarget?: string;
-  secondaryTargetLabelKey?: keyof TranslationDict;
+  additionalTargets?: ReadonlyArray<{ view: string; labelKey: keyof TranslationDict }>;
   optional: boolean;
 }
 
@@ -28,10 +27,10 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 3, titleKey: 'setup_step_3_title', helpKey: 'setup_step_3_help', target: 'sch_classes', optional: false },
   { id: 4, titleKey: 'setup_step_4_title', helpKey: 'setup_step_4_help', target: 'sch_classes', optional: false },
   { id: 5, titleKey: 'setup_step_5_title', helpKey: 'setup_step_5_help', target: 'sch_teachers', optional: false },
-  { id: 6, titleKey: 'setup_step_6_title', helpKey: 'setup_step_6_help', target: 'sch_students', optional: false },
+  { id: 6, titleKey: 'setup_step_6_title', helpKey: 'setup_step_6_help', target: 'sch_students', additionalTargets: [{ view: 'sch_parents', labelKey: 'parents_contacts' }], optional: false },
   { id: 7, titleKey: 'setup_step_7_title', helpKey: 'setup_step_7_help', target: 'sch_timetable', optional: true },
-  { id: 8, titleKey: 'setup_step_8_title', helpKey: 'setup_step_8_help', target: 'sch_setup_academics', optional: false },
-  { id: 9, titleKey: 'setup_step_9_title', helpKey: 'setup_step_9_help', target: SCHOOL_SETUP_STEP_TARGETS.fees, targetLabelKey: 'setup_open_fees', secondaryTarget: SCHOOL_SETUP_STEP_TARGETS.modules, secondaryTargetLabelKey: 'setup_open_modules', optional: true },
+  { id: 8, titleKey: 'setup_step_8_title', helpKey: 'setup_step_8_help', target: 'sch_setup_academics', targetLabelKey: 'school_settings', additionalTargets: [{ view: 'sch_attendance', labelKey: 'attendance' }, { view: 'sch_exams', labelKey: 'exams_results' }], optional: false },
+  { id: 9, titleKey: 'setup_step_9_title', helpKey: 'setup_step_9_help', target: SCHOOL_SETUP_STEP_TARGETS.fees, targetLabelKey: 'setup_open_fees', additionalTargets: SCHOOL_SETUP_EXTRA_MODULES, optional: true },
   { id: 10, titleKey: 'setup_step_10_title', helpKey: 'setup_step_10_help', optional: false }
 ];
 
@@ -180,11 +179,11 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
                       {t(item.targetLabelKey || 'setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  {item.secondaryTarget && (
-                    <button type="button" disabled={saving} onClick={() => void openStep(item.id, item.secondaryTarget)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      {t(item.secondaryTargetLabelKey || 'setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
+                  {item.additionalTargets?.map(({ view, labelKey }) => (
+                    <button key={view} type="button" disabled={saving} onClick={() => void openStep(item.id, view)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                      {t(labelKey)} <ArrowRight className="h-3.5 w-3.5" />
                     </button>
-                  )}
+                  ))}
                   {!isFinal && !isCompleted && !isSkipped && (
                     <button type="button" disabled={saving || !ready} onClick={() => void markComplete(item.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40">
                       {t('setup_mark_complete')}
