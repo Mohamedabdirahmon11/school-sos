@@ -104,6 +104,6 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /if \(!needsAttendance && !needsGrades\) return/);
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
-  assert.match(teacher, /isLoadingClassData \\|\\| !editableClassSubjects.length \\|\\| !students.length/);
-  assert.match(teacher, /disabled=\\{isReadOnly \\|\\| isSaving \\|\\| isLoadingClassData\\}/);
+  assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
 });
