@@ -421,11 +421,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 1: TEACHER SCHEDULE */}
       {(activeTab === 'dashboard' || activeTab === 'timetable') && (
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-[#0F766E]" />
-            <span>Weekly Teaching Schedule & Timetable</span>
-          </h2>
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
+              <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
+                <CalendarDays className="h-5 w-5 text-teal-700" />
+                Weekly timetable
+              </h2>
+            </div>
+            <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} assigned periods</span>
+          </div>
           {timetable.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#64748B]">
               No schedule slots assigned. Contact school administration to set your timetable.
@@ -436,7 +442,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 const c = classes.find(cls => cls.id === slot.classId);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
-                  <div key={slot.id} className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-1 text-xs">
+                  <div key={slot.id} className="group rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
                       <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
@@ -455,7 +461,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* TAB 2: DAILY ATTENDANCE (ONCE PER DAY) */}
       {activeTab === 'attendance' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="grid grid-cols-1 items-end gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3 sm:p-5">
             {formTeacherClasses.length === 0 && <p className="sm:col-span-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No class is assigned to you as Form Teacher. Contact School Admin to assign you to a class.</p>}
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">My Form Teacher Class</label>
@@ -647,8 +653,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 5: HOMEWORK */}
       {activeTab === 'assignments' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+        <div className="grid grid-cols-1 gap-4 text-xs lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-[#0F766E]" />
               Assign Homework
@@ -696,9 +702,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29]">Assigned Homework</h2>
-            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
+            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold text-[#132A29]">{item.title}</p>
                 <span className={`font-mono text-[10px] font-semibold ${item.dueDate < new Date().toISOString().slice(0, 10) ? 'text-rose-700' : 'text-[#0F766E]'}`}>{item.dueDate}</span>
@@ -708,7 +714,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>)}</div>}
           </div>
 
-          <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-[#0F766E]" />
               Student Submissions
@@ -721,7 +727,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               const draft = gradeDrafts[submission.id] || { grade: '', feedback: '' };
               const assignment = homework.find(item => item.id === reviewAssignmentId);
               return (
-                <div key={submission.id} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 space-y-2">
+                <div key={submission.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-bold text-[#132A29]">{submission.studentName}</p>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${submission.status === 'graded' ? 'bg-[#CCFBF1] text-[#0F766E]' : 'bg-amber-100 text-amber-800'}`}>
@@ -770,20 +776,26 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 4: CIRCULARS & NOTICES */}
       {activeTab === 'notices' && (
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3 text-xs">
-          <h2 className="text-sm font-bold text-[#132A29]">Faculty Bulletins & Announcements</h2>
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">School communication</p>
+              <h2 className="mt-1 text-base font-bold text-slate-900">Faculty notices & announcements</h2>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">{notices.length} notices</span>
+          </div>
           {notices.length === 0 ? (
             <p className="text-[#64748B]">No announcements posted yet.</p>
           ) : (
             <div className="space-y-3">
               {notices.map(n => (
-                <div key={n.id} className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
+                <article key={n.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
                     <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
                   </div>
                   <p className="text-[#334155]">{n.content}</p>
-                </div>
+                </article>
               ))}
             </div>
           )}
