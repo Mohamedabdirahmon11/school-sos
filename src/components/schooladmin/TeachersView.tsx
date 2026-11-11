@@ -175,6 +175,7 @@ export const TeachersView: React.FC = () => {
             <span>Appoint Teacher</span>
           </button>
         </div>
+        </div>
       </header>
 
       <section aria-label="Teacher directory summary" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
