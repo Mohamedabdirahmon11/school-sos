@@ -93,6 +93,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Attendance state
   const [attendanceDate, setAttendanceDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const [isLoadingClassData, setIsLoadingClassData] = useState(false);
   const ethiopianCalendar = getEthiopianCalendarInfo(attendanceDate, school?.timezone || 'Africa/Addis_Ababa');
   const attendanceCounts = (['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => ({
     status,
@@ -119,61 +120,93 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     if (!classSubjects.some(subject => subject.id === selectedSubjectId)) setSelectedSubjectId(firstAssignedSubject);
   }, [selectedClassId, teacherAssignments, classSubjects, selectedSubjectId]);
 
-  // Load the full class mark matrix. Subject teachers see only their assigned subjects;
-  // the Form Teacher sees submitted marks from every subject plus their own editable subject(s).
+  // Load only the data needed by the active teacher workflow. Clear the previous
+  // class immediately so a fast class switch can never display or submit stale students.
   useEffect(() => {
-    if (!selectedClassId) { setStudents([]); return; }
-    if (activeTab === 'attendance' && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+    if (!selectedClassId) {
       setStudents([]);
       setAttendanceMap({});
+      setClassMarks([]);
+      setMarksInput({});
+      setIsLoadingClassData(false);
       return;
     }
+    const needsAttendance = activeTab === 'attendance';
+    const needsGrades = activeTab === 'grades';
+    if (!needsAttendance && !needsGrades) return;
+    if (needsAttendance && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+      setStudents([]);
+      setAttendanceMap({});
+      setIsLoadingClassData(false);
+      return;
+    }
+
     let cancelled = false;
-    Promise.all([
-      ApiClient.getAllStudents(selectedClassId),
-      ApiClient.getDailyAttendance(selectedClassId, attendanceDate),
-      ApiClient.getMarks(selectedClassId, undefined, semester)
-    ]).then(([stdList, existingAtt, existingMarks]) => {
-      if (cancelled) return;
-      setStudents(stdList);
-      const attMap: Record<string, { status: AttendanceStatus; note: string }> = {};
-      for (const student of stdList) {
-        const found = existingAtt.find(record => record.studentId === student.id);
-        attMap[student.id] = { status: found ? found.status : 'present', note: found?.note || '' };
-      }
-      setAttendanceMap(attMap);
-      setClassMarks(existingMarks);
-      const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
-      const components = examConfig?.assessmentComponents || [];
-      const allocateLegacy = (total: number, rows: typeof components) => {
-        let remaining = Number(total) || 0;
-        const values: Record<string, number> = {};
-        for (const component of rows) {
-          values[component.id] = Math.min(component.maxMarks, Math.max(0, remaining));
-          remaining -= values[component.id];
+    setIsLoadingClassData(true);
+    setStudents([]);
+    if (needsAttendance) setAttendanceMap({});
+    if (needsGrades) {
+      setClassMarks([]);
+      setMarksInput({});
+    }
+
+    const attendanceRequest = needsAttendance
+      ? ApiClient.getDailyAttendance(selectedClassId, attendanceDate)
+      : Promise.resolve([]);
+    const marksRequest = needsGrades
+      ? ApiClient.getMarks(selectedClassId, undefined, semester)
+      : Promise.resolve([]);
+
+    Promise.all([ApiClient.getAllStudents(selectedClassId), attendanceRequest, marksRequest])
+      .then(([stdList, existingAtt, existingMarks]) => {
+        if (cancelled) return;
+        setStudents(stdList);
+        if (needsAttendance) {
+          const attMap: Record<string, { status: AttendanceStatus; note: string }> = {};
+          for (const student of stdList) {
+            const found = existingAtt.find(record => record.studentId === student.id);
+            attMap[student.id] = { status: found ? found.status : 'present', note: found?.note || '' };
+          }
+          setAttendanceMap(attMap);
         }
-        return values;
-      };
-      for (const student of stdList) {
-        for (const subject of gradeSubjects) {
-          const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
-          const legacyScores = {
-            ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
-            ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
+        if (needsGrades) {
+          setClassMarks(existingMarks);
+          const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
+          const components = examConfig?.assessmentComponents || [];
+          const allocateLegacy = (total: number, rows: typeof components) => {
+            let remaining = Number(total) || 0;
+            const values: Record<string, number> = {};
+            for (const component of rows) {
+              values[component.id] = Math.min(component.maxMarks, Math.max(0, remaining));
+              remaining -= values[component.id];
+            }
+            return values;
           };
-          inputMap[`${student.id}:${subject.id}`] = {
-            scores: mark ? (mark.assessmentScores || legacyScores) : {},
-            remarks: mark?.teacherRemarks || ''
-          };
+          for (const student of stdList) {
+            for (const subject of gradeSubjects) {
+              const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+              const legacyScores = {
+                ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
+                ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
+              };
+              inputMap[`${student.id}:${subject.id}`] = {
+                scores: mark ? (mark.assessmentScores || legacyScores) : {},
+                remarks: mark?.teacherRemarks || ''
+              };
+            }
+          }
+          setMarksInput(inputMap);
         }
-      }
-      setMarksInput(inputMap);
-    }).catch(error => {
-      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
-    });
+      })
+      .catch(error => {
+        if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class data.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingClassData(false);
+      });
+
     return () => { cancelled = true; };
   }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
-
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
     if (isReadOnly || !selectedClassId) return;
@@ -490,11 +523,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <button
                 type="button"
                 onClick={handleSaveAttendance}
-                disabled={isSaving || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
+                disabled={isSaving || isLoadingClassData || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
                 className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
-                {isSaving ? 'Saving...' : 'Save Attendance'}
+                {isLoadingClassData ? 'Loading class...' : isSaving ? 'Saving...' : 'Save Attendance'}
               </button>
             </div>
           </div>
@@ -520,7 +553,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {students.map(s => {
+                {isLoadingClassData ? <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">Loading students and attendance...</td></tr> : students.map(s => {
                   const current = attendanceMap[s.id] || { status: 'present', note: '' };
                   return (
                     <tr key={s.id} className="hover:bg-[#F8FAFC]">
@@ -586,7 +619,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
               <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
             </div>
           </div>
