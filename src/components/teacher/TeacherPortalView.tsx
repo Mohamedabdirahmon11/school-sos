@@ -620,7 +620,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </label>
             <div className="flex items-end gap-2">
               <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
             </div>
           </div>
 
@@ -630,7 +630,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="mt-1">{assessmentComponents.map(component => `${component.name} (${component.maxMarks})`).join(' + ')} = {combinedMax} marks. All subjects in your permitted class scope are shown together.</p>
               <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
             </div>
-            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
+            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
