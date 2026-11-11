@@ -1009,10 +1009,17 @@ class StorageEngine {
       id: `ec-${id}`,
       schoolId: id,
       academicYear: newSchool.academicYear,
-      smallExamName: 'Small Exam',
-      smallExamMax: 10,
-      bigExamName: 'Big Exam',
-      bigExamMax: 10,
+      smallExamName: 'Continuous Assessment',
+      smallExamMax: 40,
+      bigExamName: 'Final Examination',
+      bigExamMax: 60,
+      assessmentComponents: [
+        { id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 },
+        { id: 'test-2', name: 'Test 2', maxMarks: 10, category: 'continuous', order: 2 },
+        { id: 'test-3', name: 'Test 3', maxMarks: 10, category: 'continuous', order: 3 },
+        { id: 'test-4', name: 'Test 4', maxMarks: 10, category: 'continuous', order: 4 },
+        { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 5 }
+      ],
       passMarkPercentage: 50,
       updatedAt: now
     });
