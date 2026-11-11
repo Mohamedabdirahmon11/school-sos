@@ -55,7 +55,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /assigned periods/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
-  assert.match(teacher, /Submit all subjects/);
+  assert.match(teacher, /Submit marks/);
   assert.match(teacher, /Forward complete class to Admin/);
 });
 
@@ -107,7 +107,7 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
-  assert.match(teacher, /needsGrades\s*\? ApiClient\.getMarks/);
+  assert.match(teacher, /needsGrades \|\| needsResults\s*\? ApiClient\.getMarks/);
   assert.match(teacher, /if \(!needsAttendance && !needsGrades\) return/);
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
