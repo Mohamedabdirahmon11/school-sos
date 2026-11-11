@@ -7,7 +7,7 @@
  * 4. Personal teaching schedule & notices
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -89,6 +89,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, { grade: string; feedback: string }>>({});
+  const submissionRequestRef = useRef(0);
+
+  useEffect(() => () => { submissionRequestRef.current += 1; }, []);
 
   // Attendance state
   const [attendanceDate, setAttendanceDate] = useState(() => getSchoolLocalDate(school?.timezone));
@@ -209,7 +212,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
-    if (isReadOnly || !selectedClassId) return;
+    if (isReadOnly || isLoadingClassData || !selectedClassId || !students.length) return;
     setIsSaving(true);
     try {
       const records = students.map(s => ({
@@ -229,7 +232,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     if (status === 'submitted') {
       const incompleteSubject = editableClassSubjects.find(subject => {
         const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
@@ -293,16 +296,28 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   };
 
   const handleCreateAssignment = async () => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    const title = assignmentTitle.trim();
+    const description = assignmentDescription.trim();
+    const maxPoints = Number(assignmentMaxPoints);
+    const today = getSchoolLocalDate(school?.timezone);
+    if (isReadOnly || !selectedClassId || !selectedSubjectId || !title || !description || !assignmentDueDate) return;
+    if (assignmentDueDate < today) {
+      setNotice('Homework due date cannot be earlier than today.');
+      return;
+    }
+    if (!Number.isInteger(maxPoints) || maxPoints < 1 || maxPoints > 1000) {
+      setNotice('Maximum points must be a whole number between 1 and 1000.');
+      return;
+    }
     setIsCreatingAssignment(true);
     try {
       await ApiClient.createAssignment({
         classId: selectedClassId,
         subjectId: selectedSubjectId,
-        title: assignmentTitle,
-        description: assignmentDescription,
+        title,
+        description,
         dueDate: assignmentDueDate,
-        maxPoints: assignmentMaxPoints
+        maxPoints
       });
       setAssignmentTitle('');
       setAssignmentDescription('');
@@ -320,24 +335,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   const handleReviewAssignment = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const assignmentId = event.target.value;
+    const requestId = ++submissionRequestRef.current;
     setReviewAssignmentId(assignmentId);
     setReviewSubmissions([]);
-    if (!assignmentId) return;
+    setGradeDrafts({});
+    setNotice(null);
+    if (!assignmentId) {
+      setIsLoadingSubmissions(false);
+      return;
+    }
     setIsLoadingSubmissions(true);
     try {
       const submissions = await ApiClient.getAssignmentSubmissions(assignmentId);
+      if (requestId !== submissionRequestRef.current) return;
       setReviewSubmissions(submissions);
-      setGradeDrafts(current => {
-        const next = { ...current };
-        for (const submission of submissions) {
-          next[submission.id] = { grade: submission.grade?.toString() || '', feedback: submission.feedback || '' };
-        }
-        return next;
-      });
+      const nextDrafts: Record<string, { grade: string; feedback: string }> = {};
+      for (const submission of submissions) {
+        nextDrafts[submission.id] = { grade: submission.grade?.toString() || '', feedback: submission.feedback || '' };
+      }
+      setGradeDrafts(nextDrafts);
     } catch (err: any) {
-      setNotice(err.message || 'Failed to load submissions.');
+      if (requestId === submissionRequestRef.current) setNotice(err.message || 'Failed to load submissions.');
     } finally {
-      setIsLoadingSubmissions(false);
+      if (requestId === submissionRequestRef.current) setIsLoadingSubmissions(false);
     }
   };
 
@@ -345,7 +365,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     const assignment = homework.find(item => item.id === reviewAssignmentId);
     const draft = gradeDrafts[submission.id];
     const grade = Number(draft?.grade);
-    if (!assignment) return;
+    if (isReadOnly || gradingSubmissionId || !assignment) return;
     if (!Number.isFinite(grade) || grade < 0 || grade > assignment.maxPoints) {
       setNotice(`Enter a grade between 0 and ${assignment.maxPoints}.`);
       return;
