@@ -635,3 +635,6 @@ pm run dev and apply migrations 001-014.
 
 - LIVE DATA AUDIT: checked school/role consistency for teacher accounts and Form Teacher links, class-subject and timetable references, attendance student/class links, marks, assignments/submissions, message participants, and payroll ownership. All ten integrity checks returned zero mismatches. All inspected teacher-related tables have RLS enabled.
 - LIVE DATA LIMIT: the inspected project currently has no persisted student marks, assignments/submissions, school notices, or payroll records, so those workflows still need controlled test records or an owner-provided staging dataset before real user-journey verification.
+
+- AUTH LINKAGE BLOCKER: live read-only counts show 0 of 3 teacher users have `users.auth_user_id` set, and none of those teacher emails match an existing `auth.users` row. School Admin, Accountant, Parent, and Student users are also not linked; only 1 of 2 Super Admin users is linked. The rollback-only authenticated RLS simulation could not use legacy `usr-...` IDs because `auth.uid()` requires a UUID.
+- SAFETY: did not create Auth users, reset credentials, or rewrite password hashes. A safe staff account-linking/forced-reset decision is required before claiming authenticated RLS verification.
