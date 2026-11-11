@@ -1,6 +1,15 @@
 # SchoolOS Project State
 
-Updated: 2026-11-10
+Updated: 2026-11-11
+
+## Next
+- Complete the Teacher workspace and faculty-management review in PR #82. Work only on gaps not already completed: audit and polish all teacher workflows (overview, timetable, attendance, class-wide exam marks and Form Teacher approval, homework/submissions, notices, direct messages, and teacher payslips/navigation); verify school-scoped data and role permissions; add only necessary additive Supabase migrations; and run CI plus desktop/mobile browser journeys. Do not repeat the completed Accountant work or the Teacher UI changes already present in PR #82.
+
+## Teacher workspace — in progress
+- PR #82 (`codex/teacher-workspace-redesign`) is open as Draft and is based on current `main`. It already redesigns the Teacher Portal header/navigation, attendance summary/table, class marksheet presentation, and School Admin teacher directory; it also adds multi-class/subject profile tags and preserves the one-time Teacher ID/PIN flow.
+- Live Supabase review of `school management 3` found that `private.auth_can_access_student` and `private.auth_can_access_class` currently authorize teachers through active `class_subjects` assignments but omit the `classes.class_teacher_id` Form Teacher relationship. One active Form Teacher class currently exists and has zero enrolled students.
+- PR #82 now contains additive migration `20261111070000_form_teacher_rls_scope.sql` and a source regression test to include a Form Teacher's own school-scoped class and students while retaining subject-teacher and parent/student rules. The migration is NOT applied to production; no live data was modified.
+- Remaining: validate all teacher workflows and direct-message/payslip navigation, run the PR checks, and perform real desktop/mobile teacher sign-in journeys. Do not mark this section DONE until those checks pass.
 
 ## Accountant — merged and verified
 - PR #59 finance ledger and payment-channel support merged; fee payments, receipts, cashbook, expenses, and reconciliation are school-scoped.
