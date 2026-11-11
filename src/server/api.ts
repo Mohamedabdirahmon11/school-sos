@@ -2606,10 +2606,12 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   return id;
 }
 
-async function nextSchoolTeacherId(school: School): Promise<string> {
+async function nextSchoolTeacherId(_school: School): Promise<string> {
+  // Teacher IDs are also the login identifier and users.staff_id has a
+  // global unique index, so keep the short T001 sequence globally unique.
   const [users, teachers] = await Promise.all([
-    queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
+    queryAllRows('users', {}, 'id,staff_id'),
+    queryAllRows('teachers', {}, 'id,staff_id')
   ]);
   const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
   let sequence = 1;
@@ -3756,8 +3758,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const staffId = await nextSchoolTeacherId(school);
   if (!validTeacherId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
   const [usedStaffIds, existingTeachers] = await Promise.all([
-    queryAllRows('users', { school_id: school.id }, 'id,staff_id'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id')
+    queryAllRows('users', {}, 'id,staff_id'),
+    queryAllRows('teachers', {}, 'id,staff_id')
   ]);
   if ([...usedStaffIds, ...existingTeachers].some((record: any) => String(record.staffId || '').toUpperCase() === staffId)) {
     res.status(409).json({ error: 'That staff ID is already used in this school.' }); return;
