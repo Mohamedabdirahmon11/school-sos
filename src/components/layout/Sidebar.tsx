@@ -49,7 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     ] }];
     if (role === 'teacher') return [{ title: 'Teaching', items: [
       item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
-      item('t_attendance', t('attendance'), CalendarCheck), item('t_grades', t('exams_results'), FileSpreadsheet),
+      item('t_students', t('students'), GraduationCap), item('t_attendance', t('attendance'), CalendarCheck),
+      item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
       item('t_assignments', t('assignments'), FileCheck2), item('t_notices', noticeLabel, BellRing),
       item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
     ] }];
