@@ -85,7 +85,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
-  const [marksInput, setMarksInput] = useState<Record<string, { small: number; big: number; remarks: string }>>({});
+  const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -127,13 +127,26 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       }
       setAttendanceMap(attMap);
       setClassMarks(existingMarks);
-      const inputMap: Record<string, { small: number; big: number; remarks: string }> = {};
+      const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
+      const components = examConfig?.assessmentComponents || [];
+      const allocateLegacy = (total: number, rows: typeof components) => {
+        let remaining = Number(total) || 0;
+        const values: Record<string, number> = {};
+        for (const component of rows) {
+          values[component.id] = Math.min(component.maxMarks, Math.max(0, remaining));
+          remaining -= values[component.id];
+        }
+        return values;
+      };
       for (const student of stdList) {
         for (const subject of gradeSubjects) {
           const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+          const legacyScores = {
+            ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
+            ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
+          };
           inputMap[`${student.id}:${subject.id}`] = {
-            small: mark ? mark.smallExamMarks : 0,
-            big: mark ? mark.bigExamMarks : 0,
+            scores: mark?.assessmentScores || legacyScores,
             remarks: mark?.teacherRemarks || ''
           };
         }
@@ -143,7 +156,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
     });
     return () => { cancelled = true; };
-  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses]);
+  }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
 
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
@@ -174,11 +187,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         const existing = classMarks.filter(mark => mark.subjectId === subject.id);
         if (existing.some(mark => ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status))) return [];
         const formatted = students.map(student => {
-          const input = marksInput[`${student.id}:${subject.id}`] || { small: 0, big: 0, remarks: '' };
+          const input = marksInput[`${student.id}:${subject.id}`] || { scores: {}, remarks: '' };
           return {
             studentId: student.id,
-            smallExamMarks: Number(input.small || 0),
-            bigExamMarks: Number(input.big || 0),
+            assessmentScores: input.scores,
             teacherRemarks: input.remarks || '',
             status
           };
@@ -289,9 +301,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
-  const smallMax = examConfig?.smallExamMax || 10;
-  const bigMax = examConfig?.bigExamMax || 10;
+  const smallMax = examConfig?.smallExamMax || 40;
+  const bigMax = examConfig?.bigExamMax || 60;
   const combinedMax = smallMax + bigMax;
+  const assessmentComponents = examConfig?.assessmentComponents || [];
 
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-xl bg-white" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
@@ -476,7 +489,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-900">
             <div>
               <strong>{isFormTeacher ? 'Form Teacher class review' : 'Your assigned subject marks'}</strong>
-              <p className="mt-1">Small Exam (max {smallMax}) + Big Exam (max {bigMax}) = {combinedMax}. All assigned subjects are shown together.</p>
+              <p className="mt-1">{assessmentComponents.map(component => `${component.name} (${component.maxMarks})`).join(' + ')} = {combinedMax} marks. All subjects in your permitted class scope are shown together.</p>
               <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
             </div>
             {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-lg bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
@@ -486,8 +499,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             {gradeSubjects.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</p> : (
               <table className="w-full min-w-[900px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
-                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{gradeSubjects.map(subject => <th key={subject.id} colSpan={4} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
-                  <tr>{gradeSubjects.map(subject => <React.Fragment key={subject.id}><th className="border-b border-l px-2 py-2">Small</th><th className="border-b px-2 py-2">Big</th><th className="border-b px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th></React.Fragment>)}</tr>
+                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{gradeSubjects.map(subject => <th key={subject.id} colSpan={assessmentComponents.length + 2} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
+                  <tr>{gradeSubjects.map(subject => <React.Fragment key={subject.id}>{assessmentComponents.map(component => <th key={component.id} className="border-b border-l px-2 py-2">{component.name}<span className="block text-[9px] normal-case">/{component.maxMarks}</span></th>)}<th className="border-b border-l px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th></React.Fragment>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {students.map(student => (
@@ -495,19 +508,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                       <td className="whitespace-nowrap px-3 py-2"><strong>{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-500">{student.studentId}</span></td>
                       {gradeSubjects.map(subject => {
                         const key = `${student.id}:${subject.id}`;
-                        const input = marksInput[key] || { small: 0, big: 0, remarks: '' };
+                        const input = marksInput[key] || { scores: {}, remarks: '' };
                         const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                         const editable = editableClassSubjects.some(item => item.id === subject.id) && !['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
-                        const total = Number(input.small || 0) + Number(input.big || 0);
+                        const total = assessmentComponents.reduce((sum, component) => sum + Number(input.scores[component.id] || 0), 0);
                         const percentage = combinedMax > 0 ? Math.round(total / combinedMax * 10000) / 100 : 0;
                         return <React.Fragment key={subject.id}>
-                          <td className="border-l px-1 py-2 text-center">
-                            {editable ? <input type="number" min={0} max={smallMax} step={0.5} value={input.small} onChange={event => setMarksInput(prev => ({...prev,[key]:{...prev[key],small:Math.min(smallMax,Math.max(0,Number(event.target.value)||0))}}))} className="w-14 rounded border px-1 py-1 text-center"/> : <span>{mark ? mark.smallExamMarks : '—'}</span>}
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            {editable ? <input type="number" min={0} max={bigMax} step={0.5} value={input.big} onChange={event => setMarksInput(prev => ({...prev,[key]:{...prev[key],big:Math.min(bigMax,Math.max(0,Number(event.target.value)||0))}}))} className="w-14 rounded border px-1 py-1 text-center"/> : <span>{mark ? mark.bigExamMarks : '—'}</span>}
-                          </td>
-                          <td className="px-2 py-2 text-center font-semibold">{mark && !editable ? mark.totalMarks : total}</td>
+                          {assessmentComponents.map(component => (
+                            <td key={component.id} className="border-l px-1 py-2 text-center">
+                              {editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => {
+                                const value = event.target.value === '' ? 0 : Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0));
+                                setMarksInput(prev => ({ ...prev, [key]: { ...prev[key], scores: { ...(prev[key]?.scores || {}), [component.id]: value } } }));
+                              }} className="w-14 rounded border px-1 py-1 text-center" aria-label={`${component.name} mark for ${student.firstName} ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}
+                            </td>
+                          ))}
+                          <td className="border-l px-2 py-2 text-center font-semibold">{mark && !editable ? mark.totalMarks : total}</td>
                           <td className="px-2 py-2 text-center">{mark && !editable ? mark.percentage : percentage}%<span className="block text-[9px] text-slate-400">{mark?.status === 'submitted' ? 'To Form Teacher' : mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : editable ? 'Enter' : 'Waiting'}</span></td>
                         </React.Fragment>;
                       })}
@@ -517,7 +532,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </table>
             )}
           </div>
-          {isFormTeacher && <p className="text-[11px] text-slate-500">You can edit only the subjects assigned to you. Other subject columns are read-only and show marks submitted by the subject teachers. Forwarding is allowed only after every subject has marks for every student.</p>}
+          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you can complete any subject in your class. Subject teachers can enter marks only for their own assigned subjects. Submitted marks remain locked; forwarding is allowed after the complete class sheet is ready.</p>}
         </div>
       )}
 
