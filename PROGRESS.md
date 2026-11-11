@@ -638,3 +638,11 @@ pm run dev and apply migrations 001-014.
 
 - AUTH LINKAGE BLOCKER: live read-only counts show 0 of 3 teacher users have `users.auth_user_id` set, and none of those teacher emails match an existing `auth.users` row. School Admin, Accountant, Parent, and Student users are also not linked; only 1 of 2 Super Admin users is linked. The rollback-only authenticated RLS simulation could not use legacy `usr-...` IDs because `auth.uid()` requires a UUID.
 - SAFETY: did not create Auth users, reset credentials, or rewrite password hashes. A safe staff account-linking/forced-reset decision is required before claiming authenticated RLS verification.
+
+
+## Teacher class-data safety and request efficiency (2026-11-11)
+- ADDED IN PR #82: Teacher class switching now clears the previous class roster immediately, preventing stale student rows from remaining visible while a new class is loading.
+- ADDED: attendance and marks data are fetched only when the corresponding workflow is active; timetable, notices, homework, and overview no longer trigger unnecessary attendance/marks reads.
+- ADDED: attendance save and class-wide marks actions remain disabled while the selected class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
+- ADDED: regression coverage for lazy workflow loading and stale-class data clearing.
+- NOT VERIFIED YET: CI for the latest commit is pending. No production schema, account, or school data was changed.
