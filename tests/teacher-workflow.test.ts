@@ -38,13 +38,18 @@ test('Form Teachers see every student and can complete every subject in their ho
 
 test('teacher workspace exposes every teaching task and batch class workflows', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(teacher, /Teacher workspace navigation/);
-  assert.match(teacher, /id: 'dashboard'/);
-  assert.match(teacher, /id: 'timetable'/);
-  assert.match(teacher, /id: 'attendance'/);
-  assert.match(teacher, /id: 'grades'/);
-  assert.match(teacher, /id: 'assignments'/);
-  assert.match(teacher, /id: 'notices'/);
+  assert.match(teacher, /activeTab === 'dashboard'/);
+  assert.match(teacher, /activeTab === 'timetable'/);
+  assert.match(teacher, /activeTab === 'students'/);
+  assert.match(teacher, /activeTab === 'attendance'/);
+  assert.match(teacher, /activeTab === 'grades'/);
+  assert.match(teacher, /activeTab === 'exam_results'/);
+  assert.match(teacher, /activeTab === 'assignments'/);
+  assert.match(teacher, /activeTab === 'notices'/);
+  assert.match(teacher, /setActiveTab\(initialTab\)/);
+  assert.match(teacher, /Small Exam/);
+  assert.match(teacher, /Big Exam/);
+  assert.match(teacher, /EXAM RESULTS — READ ONLY/);
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
   assert.match(teacher, /assigned periods/);
@@ -83,6 +88,8 @@ test('teacher messages and personal payslips remain available through role navig
   const app = read('../src/App.tsx');
   const messages = read('../src/components/schooladmin/MessagesView.tsx');
   const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
+  assert.match(sidebar, /item\('t_students'/);
+  assert.match(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
   assert.match(app, /activeView === 't_messages' && <MessagesView \/>/);
@@ -128,4 +135,28 @@ test('teacher homework creation validates trimmed content, school-local due date
   assert.match(teacher, /Number\.isInteger\(maxPoints\).*maxPoints < 1.*maxPoints > 1000/s);
   assert.match(teacher, /min=\{getSchoolLocalDate\(school\?\.timezone\)\}/);
   assert.match(teacher, /disabled=\{isReadOnly \|\| gradingSubmissionId !== null\}/);
+});
+
+test('teacher has separate subject-wise Small Exam and Big Exam entry and a read-only results page', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const sidebar = read('../src/components/layout/Sidebar.tsx');
+  const app = read('../src/App.tsx');
+  assert.match(sidebar, /item\('t_students'/);
+  assert.match(sidebar, /item\('t_grades'/);
+  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.match(app, /activeView\.replace\('t_', ''\)/);
+  assert.match(teacher, /examType === 'small' \? 'continuous' : 'final'/);
+  assert.match(teacher, /gradeSubjects\.map\(subject =>/);
+  assert.match(teacher, /EXAM RESULTS — READ ONLY/);
+  assert.match(teacher, /mark\.smallExamMarks/);
+  assert.match(teacher, /mark\.bigExamMarks/);
+});
+
+test('teacher dashboard shows Form Teacher class and assigned teaching subjects without duplicate task shortcuts', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /Form Teacher responsibility/);
+  assert.match(teacher, /Your assigned class/);
+  assert.match(teacher, /Subjects you teach/);
+  assert.doesNotMatch(teacher, /Enter marks<\/button>/);
+  assert.doesNotMatch(teacher, /Class attendance<\/button>/);
 });
