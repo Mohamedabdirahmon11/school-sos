@@ -175,7 +175,7 @@ export const TeachersView: React.FC = () => {
             <span>Appoint Teacher</span>
           </button>
         </div>
-      </div>
+      </header>
 
       <section aria-label="Teacher directory summary" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {[
@@ -373,6 +373,9 @@ export const TeachersView: React.FC = () => {
                 <span className="mt-1 block text-[10px] text-slate-500">{selectedClassIds.length} class(es) selected. Use Ctrl/Command to select multiple.</span>
               </div>
 
+              <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-[11px] leading-relaxed text-sky-900">
+                These are profile assignments. To grant timetable and exam access, also assign the teacher to each class subject in Subject Assignments. Form Teacher responsibility is set on the class record.
+              </p>
               <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">
                 <button
                   type="button"
