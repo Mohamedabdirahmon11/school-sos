@@ -46,6 +46,10 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /id: 'assignments'/);
   assert.match(teacher, /id: 'notices'/);
   assert.match(teacher, /attendanceCounts/);
+  assert.match(teacher, /Teaching schedule/);
+  assert.match(teacher, /assigned periods/);
+  assert.match(teacher, /Student Submissions/);
+  assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit all subjects/);
   assert.match(teacher, /Forward complete class to Admin/);
 });
@@ -72,4 +76,19 @@ test('Form Teacher class and student reads are included in the private Supabase 
   assert.match(migration, /u\.school_id = c\.school_id AND u\.role = 'teacher'/);
   assert.match(migration, /SECURITY DEFINER SET search_path = ''/);
   assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\./);
+});
+
+test('teacher messages and personal payslips remain available through role navigation', () => {
+  const sidebar = read('../src/components/layout/Sidebar.tsx');
+  const app = read('../src/App.tsx');
+  const messages = read('../src/components/schooladmin/MessagesView.tsx');
+  const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
+  assert.match(sidebar, /item\('t_messages'/);
+  assert.match(sidebar, /item\('t_payslips'/);
+  assert.match(app, /activeView === 't_messages' && <MessagesView \/>/);
+  assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
+  assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
+  assert.match(payroll, /ApiClient\.getMyPayslips\(\)/);
+  assert.match(payroll, /ApiClient\.downloadPayslipPdf\(record\.id\)/);
+  assert.match(payroll, /setError\(reason instanceof Error/);
 });
