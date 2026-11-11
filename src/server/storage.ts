@@ -2355,11 +2355,15 @@ class StorageEngine {
         if (unknownIds.length) throw new Error('One or more assessment components are not configured for this school.');
         scores = {};
         for (const component of components) {
-          const value = mark.assessmentScores[component.id] ?? 0;
+          if (!Object.prototype.hasOwnProperty.call(mark.assessmentScores, component.id)) continue;
+          const value = mark.assessmentScores[component.id];
           if (!Number.isFinite(value) || value < 0 || value > component.maxMarks) {
             throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}.`);
           }
           scores[component.id] = value;
+        }
+        if (mark.status === 'submitted' && components.some(component => scores[component.id] === undefined)) {
+          throw new Error('Enter a mark for every configured assessment before submitting this subject.');
         }
       } else {
         const small = Number(mark.smallExamMarks ?? 0);
