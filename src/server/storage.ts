@@ -2228,11 +2228,24 @@ class StorageEngine {
     }
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
     if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
-    this.data.examConfigs[idx] = {
+    const nextConfig: ExamConfig = {
       ...this.data.examConfigs[idx],
       ...updates,
       updatedAt: new Date().toISOString()
     };
+    // Keep legacy two-number API callers working by translating their
+    // maximums into a two-component assessment plan. The new Admin UI sends
+    // assessmentComponents directly and therefore retains its full structure.
+    if (!updates.assessmentComponents && (
+      updates.smallExamName !== undefined || updates.smallExamMax !== undefined ||
+      updates.bigExamName !== undefined || updates.bigExamMax !== undefined
+    )) {
+      nextConfig.assessmentComponents = [
+        { id: 'legacy-small', name: nextConfig.smallExamName, maxMarks: nextConfig.smallExamMax, category: 'continuous', order: 1 },
+        { id: 'legacy-big', name: nextConfig.bigExamName, maxMarks: nextConfig.bigExamMax, category: 'final', order: 2 }
+      ];
+    }
+    this.data.examConfigs[idx] = nextConfig;
     this.save();
     await this.flush();
     return this.data.examConfigs[idx];
