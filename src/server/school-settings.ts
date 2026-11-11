@@ -170,14 +170,33 @@ export function sanitizeBranchInput(body: unknown, partial = false): Partial<Bra
   return updates;
 }
 
-const examConfigSchema = z.object({
-  smallExamName: z.string().trim().min(1, 'Small exam name is required.').max(100, 'Small exam name must be 100 characters or fewer.').optional(),
-  smallExamMax: z.number().min(1, 'Small exam maximum must be between 1 and 1000.').max(1000, 'Small exam maximum must be between 1 and 1000.').optional(),
-  bigExamName: z.string().trim().min(1, 'Big exam name is required.').max(100, 'Big exam name must be 100 characters or fewer.').optional(),
-  bigExamMax: z.number().min(1, 'Big exam maximum must be between 1 and 1000.').max(1000, 'Big exam maximum must be between 1 and 1000.').optional(),
-  passMarkPercentage: z.number().min(0, 'Pass mark must be between 0 and 100.').max(100, 'Pass mark must be between 0 and 100.').optional()
+const examAssessmentComponentSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(100),
+  maxMarks: z.number().positive().max(1000),
+  category: z.enum(['continuous', 'final']),
+  order: z.number().int().min(1).max(20)
 });
 
+const examConfigSchema = z.object({
+  smallExamName: z.string().trim().min(1, 'Continuous assessment name is required.').max(100).optional(),
+  smallExamMax: z.number().min(1).max(1000).optional(),
+  bigExamName: z.string().trim().min(1, 'Final examination name is required.').max(100).optional(),
+  bigExamMax: z.number().min(1).max(1000).optional(),
+  assessmentComponents: z.array(examAssessmentComponentSchema).min(1).max(20).optional(),
+  passMarkPercentage: z.number().min(0, 'Pass mark must be between 0 and 100.').max(100).optional()
+}).superRefine((value, context) => {
+  if (!value.assessmentComponents) return;
+  const ids = value.assessmentComponents.map(item => item.id);
+  const orders = value.assessmentComponents.map(item => item.order);
+  if (new Set(ids).size !== ids.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component IDs must be unique.' });
+  if (new Set(orders).size !== orders.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component order values must be unique.' });
+  const continuousTotal = value.assessmentComponents.filter(item => item.category === 'continuous').reduce((sum, item) => sum + item.maxMarks, 0);
+  const finalTotal = value.assessmentComponents.filter(item => item.category === 'final').reduce((sum, item) => sum + item.maxMarks, 0);
+  if (continuousTotal <= 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Add at least one continuous assessment component.' });
+  if (finalTotal <= 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Add at least one final examination component.' });
+  if (continuousTotal + finalTotal > 1000) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'The combined maximum mark cannot exceed 1,000.' });
+});
 export function sanitizeExamConfigSettings(body: unknown): Partial<ExamConfig> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Exam configuration payload must be an object.');
   const parsed = examConfigSchema.safeParse(body);
@@ -187,6 +206,21 @@ export function sanitizeExamConfigSettings(body: unknown): Partial<ExamConfig> {
     throw new Error(`${path}${issue.message}`);
   }
   if (!Object.keys(parsed.data).length) throw new Error('Provide at least one exam setting to update.');
+  if (parsed.data.assessmentComponents) {
+    const continuousTotal = parsed.data.assessmentComponents
+      .filter(item => item.category === 'continuous')
+      .reduce((sum, item) => sum + item.maxMarks, 0);
+    const finalTotal = parsed.data.assessmentComponents
+      .filter(item => item.category === 'final')
+      .reduce((sum, item) => sum + item.maxMarks, 0);
+    return {
+      ...parsed.data,
+      smallExamName: parsed.data.smallExamName || 'Continuous Assessment',
+      smallExamMax: continuousTotal,
+      bigExamName: parsed.data.bigExamName || 'Final Examination',
+      bigExamMax: finalTotal
+    } as Partial<ExamConfig>;
+  }
   return parsed.data as Partial<ExamConfig>;
 }
 
