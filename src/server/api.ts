@@ -335,12 +335,21 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  const teacher = await db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id');
+  const [teacher, classes] = await Promise.all([
+    db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id'),
+    db.getClasses(schoolId)
+  ]);
   if (!teacher.items.length) return [];
   const assignments = await queryAllRows('class_subjects', {
     school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true'
   }, 'class_id');
-  return [...new Set(assignments.map((assignment: any) => assignment.classId))];
+  // Subject teachers see the full student lists of classes they teach.
+  // Form Teachers also need their entire homeroom class, even without a subject assignment.
+  const subjectClassIds = assignments.map((assignment: any) => assignment.classId);
+  const formTeacherClassIds = classes
+    .filter((klass: any) => klass.classTeacherId === userId && !klass.isArchived)
+    .map((klass: any) => klass.id);
+  return [...new Set([...subjectClassIds, ...formTeacherClassIds])];
 }
 
 async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]> {
@@ -2485,8 +2494,9 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
-  // A Form Teacher reviews every class subject. They may enter marks only where
-  // no subject teacher is assigned; assigned subjects remain with their teachers.
+  // A Form Teacher is responsible for the complete class mark sheet.
+  // Subject teachers retain their own class/subject scope; the Form Teacher
+  // may complete any subject in their homeroom class before forwarding it.
   for (const klass of formTeacherClasses) {
     const classSubjects = formTeacherClassAssignments.filter((item: any) => item.classId === klass.id);
     for (const assignment of classSubjects) {
@@ -2510,7 +2520,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         bigExamEnabled: true,
         isFormTeacher: true,
         isFormTeacherClass: true,
-        canEditMarks: !assignment.teacherId
+        canEditMarks: true
       });
     }
   }
@@ -4284,14 +4294,14 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
     const editableSubjectIds = new Set([
       ...ownSubjectIds,
-      ...classAssignments.items.filter((item: any) => !item.teacherId).map((item: any) => item.subjectId)
+      ...(isFormTeacher ? classAssignments.items.map((item: any) => item.subjectId) : [])
     ]);
     if (!isFormTeacher && ownSubjectIds.size === 0) {
       res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Form Teacher.' });
       return;
     }
     if (subjectId && !editableSubjectIds.has(String(subjectId))) {
-      res.status(403).json({ error: 'You may only access your assigned subject or an unassigned subject in your Form Teacher class.' });
+      res.status(403).json({ error: 'You may only access subjects assigned to you, or subjects in your Form Teacher class.' });
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
@@ -4344,9 +4354,9 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       is_active: 'true'
     }, 1, 1, undefined, 'id');
     const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillUnassignedSubject = isFormTeacher && classSubject.items.length > 0 && !classSubject.items[0].teacherId;
-    if (!assignment.total && !mayFillUnassignedSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or an unassigned subject in your Form Teacher class.' });
+    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
+    if (!assignment.total && !mayFillFormTeacherSubject) {
+      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
       return;
     }
   }
