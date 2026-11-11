@@ -47,3 +47,10 @@ Updated: 2026-11-11
 - Save Attendance, all bulk marks actions, and Form Teacher forwarding are disabled during class-data loading; attendance shows an explicit loading row.
 - Added a source regression test for the loading and stale-data safeguards.
 - Verification: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading safeguards. No live database or production records were modified.
+
+
+## Teacher portal follow-up — homework safety (2026-11-11)
+- Assignment-submission review is race-safe: stale responses from a previous assignment cannot overwrite the newly selected assignment; switching/unmounting invalidates in-flight requests and clears old grading drafts.
+- Homework creation now trims text, validates school-local due dates (today or later), and enforces whole-number max points 1–1000 before calling the API.
+- Grade saves are serialized; read-only and concurrent grade attempts are rejected by the handler.
+- Added source regression tests for these cases. CI is pending for the latest commit; no production data or schema was changed.
