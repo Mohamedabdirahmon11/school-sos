@@ -140,7 +140,10 @@ test('teacher homework creation validates trimmed content, school-local due date
 test('teacher has separate subject-wise Small Exam and Big Exam entry and a read-only results page', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   const sidebar = read('../src/components/layout/Sidebar.tsx');
+  const mobileNav = read('../src/components/layout/MobileBottomNav.tsx');
   const app = read('../src/App.tsx');
+  assert.match(mobileNav, /id: 't_students'/);
+  assert.match(mobileNav, /id: 't_exam_results'/);
   assert.match(sidebar, /item\('t_students'/);
   assert.match(sidebar, /item\('t_grades'/);
   assert.match(sidebar, /item\('t_exam_results'/);
@@ -159,4 +162,12 @@ test('teacher dashboard shows Form Teacher class and assigned teaching subjects 
   assert.match(teacher, /Subjects you teach/);
   assert.doesNotMatch(teacher, /Enter marks<\/button>/);
   assert.doesNotMatch(teacher, /Class attendance<\/button>/);
+});
+
+test('teacher sidebar remains fixed while the central viewport owns vertical scrolling', () => {
+  const sidebar = read('../src/components/layout/Sidebar.tsx');
+  const app = read('../src/App.tsx');
+  assert.match(sidebar, /fixed inset-y-0 left-0/);
+  assert.match(sidebar, /overflow-y-auto/);
+  assert.match(app, /<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });
