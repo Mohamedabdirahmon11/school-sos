@@ -94,6 +94,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [attendanceDate, setAttendanceDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
   const ethiopianCalendar = getEthiopianCalendarInfo(attendanceDate, school?.timezone || 'Africa/Addis_Ababa');
+  const attendanceCounts = (['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => ({
+    status,
+    count: students.filter(student => (attendanceMap[student.id]?.status || 'present') === status).length
+  }));
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
@@ -361,7 +365,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         </div>
       )}
 
-      <nav aria-label="Teacher workspace navigation" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <nav aria-label="Teacher workspace navigation" role="tablist" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {([
           { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
           { id: 'timetable', label: 'My timetable', icon: Clock3 },
@@ -489,8 +493,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-[#132A29]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {attendanceCounts.map(item => (
+              <article key={item.status} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.status}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{item.count}</p>
+                <p className="text-[10px] text-slate-500">students</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>
                   <th className="py-3 px-4">Student</th>
@@ -545,6 +560,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -578,7 +594,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <div><p className="text-xs font-bold text-slate-800">Class mark sheet</p><p className="mt-0.5 text-[10px] text-slate-500">One row per student · all permitted subjects shown together</p></div>
+              <span className="rounded-full bg-teal-100 px-3 py-1 text-[10px] font-bold text-teal-800">{students.length} students · {gradeSubjects.length} subjects</span>
+            </div>
+            <div className="overflow-x-auto">
             {gradeSubjects.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</p> : (
               <table className="w-full min-w-[1200px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
@@ -618,6 +639,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </tbody>
               </table>
             )}
+            </div>
           </div>
           {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you can complete any subject in your class. Subject teachers can enter marks only for their own assigned subjects. Submitted marks remain locked; forwarding is allowed after the complete class sheet is ready.</p>}
         </div>
