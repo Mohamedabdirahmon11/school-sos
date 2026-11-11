@@ -617,3 +617,13 @@ pm run dev and apply migrations 001-014.
 - IMPORTANT: profile class/subject tags are not permission grants. Actual timetable and exam permissions continue to require Subject Assignments; Form Teacher responsibility continues to be set on the class record.
 - DONE: GitHub Actions run 42979111131 passed TypeScript checks, all 210 tests, route parity audit, RLS source audit, and production build on commit `ac15dafe3df253d58822c01b870d0705e548d0fe`.
 - NOT DONE: live browser review on desktop/mobile and end-to-end teacher login-to-attendance/marks/homework verification. Automated CI is not a substitute for those checks; keep PR #82 in draft until review is possible.
+
+
+## Teacher workspace RLS correction (2026-11-11)
+
+- CONFIRMED against the intended live Supabase project: `private.auth_can_access_student` and `private.auth_can_access_class` granted teacher access only through active `class_subjects` rows; they did not include `classes.class_teacher_id` for Form Teachers.
+- LIVE DATA CHECK: one active Form Teacher class currently exists; it has no enrolled students, so the missing predicate did not expose or alter existing student records in this check.
+- ADDED IN PR #82: additive migration `20261111070000_form_teacher_rls_scope.sql` extends both private helpers for the assigned Form Teacher's own school/class while preserving subject-teacher, parent, student, and admin rules. The functions retain `SECURITY DEFINER` with an empty search path and remain in the non-exposed `private` schema.
+- ADDED: source regression coverage in `tests/teacher-workflow.test.ts`.
+- SAFETY: migration is committed to the PR branch only and has NOT been applied to production. No live rows or existing school records were changed.
+- NOT VERIFIED: actual authenticated-role SQL behavior after migration; apply only after PR review/approval, then test Form Teacher and non-assigned teacher access in the intended project.
