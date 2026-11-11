@@ -102,6 +102,17 @@ test('school-defined four small tests and one final exam calculate a 100-mark re
     schoolId: school.id, studentId: 'ASSESS-001', firstName: 'Test', middleName: '', lastName: 'Student', gender: 'female',
     admissionDate: '2026-01-01', fatherPhone: '', classId: klass.id, status: 'active'
   } as any);
+  const partial = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+    studentId: student.id, assessmentScores: { 'test-1': 9 }, status: 'draft'
+  }], 'teacher-1');
+  assert.equal(partial[0].totalMarks, 9);
+  assert.deepEqual(partial[0].assessmentScores, { 'test-1': 9 });
+  await assert.rejects(
+    () => db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+      studentId: student.id, assessmentScores: { 'test-1': 9 }, status: 'submitted'
+    }], 'teacher-1'),
+    /every configured assessment/
+  );
   const saved = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
     studentId: student.id,
     assessmentScores: { 'test-1': 9, 'test-2': 8, 'test-3': 7, 'test-4': 6, 'final-exam': 50 },
