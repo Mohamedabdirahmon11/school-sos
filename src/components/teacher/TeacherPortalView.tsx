@@ -155,7 +155,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
           };
           inputMap[`${student.id}:${subject.id}`] = {
-            scores: mark?.assessmentScores || legacyScores,
+            scores: mark ? (mark.assessmentScores || legacyScores) : {},
             remarks: mark?.teacherRemarks || ''
           };
         }
@@ -190,12 +190,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Save every subject assigned to this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
     if (isReadOnly || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    if (status === 'submitted') {
+      const incompleteSubject = editableClassSubjects.find(subject => {
+        const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
+        return students.some(student => !lockedIds.has(student.id) && assessmentComponents.some(component => marksInput[`${student.id}:${subject.id}`]?.scores[component.id] === undefined));
+      });
+      if (incompleteSubject) {
+        setNotice(`Enter every assessment mark for all students in ${incompleteSubject.name} before submitting.`);
+        return;
+      }
+    }
     setIsSaving(true);
     try {
       const results = await Promise.all(editableClassSubjects.map(async subject => {
         const existing = classMarks.filter(mark => mark.subjectId === subject.id);
-        if (existing.some(mark => ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status))) return [];
-        const formatted = students.map(student => {
+        const lockedIds = new Set(existing.filter(mark => ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
+        const formatted = students.filter(student => !lockedIds.has(student.id)).map(student => {
           const input = marksInput[`${student.id}:${subject.id}`] || { scores: {}, remarks: '' };
           return {
             studentId: student.id,
@@ -204,6 +214,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             status
           };
         });
+        if (!formatted.length) return [];
         const saved = await ApiClient.saveMarks(selectedClassId, subject.id, semester, formatted);
         return saved.marks || [];
       }));
