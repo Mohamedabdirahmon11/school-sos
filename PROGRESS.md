@@ -643,6 +643,6 @@ pm run dev and apply migrations 001-014.
 ## Teacher class-data safety and request efficiency (2026-11-11)
 - ADDED IN PR #82: Teacher class switching now clears the previous class roster immediately, preventing stale student rows from remaining visible while a new class is loading.
 - ADDED: attendance and marks data are fetched only when the corresponding workflow is active; timetable, notices, homework, and overview no longer trigger unnecessary attendance/marks reads.
-- ADDED: attendance save and class-wide marks actions remain disabled while the selected class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
+- ADDED: attendance save, every class-wide marks action, and Form Teacher forwarding remain disabled while selected-class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
 - ADDED: regression coverage for lazy workflow loading and stale-class data clearing.
 - NOT VERIFIED YET: CI for the latest commit is pending. No production schema, account, or school data was changed.
