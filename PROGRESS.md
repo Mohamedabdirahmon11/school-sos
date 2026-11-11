@@ -653,4 +653,4 @@ pm run dev and apply migrations 001-014.
 - ADDED: homework creation trims title/instructions, rejects past due dates using the school's timezone, and validates integer max points from 1–1000 in the handler as well as the form.
 - ADDED: grading is serialized so only one submission grade can be saved at a time; handlers reject read-only or overlapping grade attempts.
 - ADDED: regression tests cover stale homework responses, grading draft clearing, school-local due-date validation, and point limits.
-- NOT VERIFIED YET: GitHub Actions for these latest code changes is pending.
+- VERIFIED: GitHub Actions run 42982394200 passed TypeScript, the full test suite, route parity audit, RLS source audit, and production build for these homework changes.
