@@ -46,4 +46,4 @@ Updated: 2026-11-11
 - Attendance data and marks data are now fetched only in their respective tabs. Other Teacher Portal sections avoid those unnecessary requests.
 - Save Attendance, all bulk marks actions, and Form Teacher forwarding are disabled during class-data loading; attendance shows an explicit loading row.
 - Added a source regression test for the loading and stale-data safeguards.
-- Verification: latest CI run pending at commit 3ff1491; do not treat this change as verified until the workflow completes. No live database or production records were modified.
+- Verification: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading safeguards. No live database or production records were modified.
