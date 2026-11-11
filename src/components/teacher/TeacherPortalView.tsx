@@ -474,7 +474,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {timetable.map(slot => {
                 const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = slot.teacherId === (teacherAssignments.find((assignment: any) => !assignment.isFormTeacher)?.teacherId || user?.id);
+                const mySlot = teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId) || String((slot as any).teacherName || '').trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase();
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
                   <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
