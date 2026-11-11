@@ -17,6 +17,7 @@ import {
 
 export const MessagesView: React.FC = () => {
   const { user, school } = useAuth();
+  const isTeacher = user?.role === 'teacher';
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
@@ -101,10 +102,10 @@ export const MessagesView: React.FC = () => {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col">
+    <div className={isTeacher ? "mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5 p-3 sm:p-5 lg:p-7" : "p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col"}>
       <div className="flex items-center justify-between">
         <div>
-          <div><h1 className="text-xl font-bold tracking-tight text-[#132A29]">Direct Messages</h1><p className="mt-1 text-xs text-[#64748B]">Private one-to-one conversations with permitted school contacts. Use the Notice Board for announcements sent to groups.</p></div>
+          <div><h1 className="text-xl font-bold tracking-tight text-[#132A29]">{isTeacher ? 'Teacher messages' : 'Direct Messages'}</h1><p className="mt-1 max-w-2xl text-xs leading-relaxed text-[#64748B]">Private one-to-one conversations with permitted school contacts. Use the Notice Board for announcements sent to groups.</p></div>
         </div>
         <button
           onClick={fetchData}
@@ -117,7 +118,7 @@ export const MessagesView: React.FC = () => {
 
       {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => void fetchData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
 
-      <div className="flex-1 bg-white rounded-xl border border-[#E2E8F0] overflow-hidden flex flex-col md:flex-row shadow-xs">
+      <div className={isTeacher ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg md:flex-row" : "flex-1 bg-white rounded-xl border border-[#E2E8F0] overflow-hidden flex flex-col md:flex-row shadow-xs"}>
         {/* Contact List */}
         <div className="w-full md:w-80 min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
           <div className="p-3 border-b border-slate-200 bg-white">
