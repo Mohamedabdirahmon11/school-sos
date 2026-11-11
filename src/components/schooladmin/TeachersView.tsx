@@ -37,8 +37,9 @@ export const TeachersView: React.FC = () => {
   const [gender, setGender] = useState<'male' | 'female'>('male');
     const [qualification, setQualification] = useState('B.Ed / B.Sc');
   const [monthlySalary, setMonthlySalary] = useState(550);
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [isCreatingTeacher, setIsCreatingTeacher] = useState(false);
 
   const filteredTeachers = teachers.filter(teacher => {
     const query = search.trim().toLowerCase();
@@ -50,8 +51,8 @@ export const TeachersView: React.FC = () => {
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPage(1); }, [search]);
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
-  useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
-  useEffect(() => { if (subjects.length && !selectedSubjectId) setSelectedSubjectId(subjects[0].id); }, [subjects, selectedSubjectId]);
+  useEffect(() => { if (classes.length && selectedClassIds.length === 0) setSelectedClassIds([classes[0].id]); }, [classes, selectedClassIds.length]);
+  useEffect(() => { if (subjects.length && selectedSubjectIds.length === 0) setSelectedSubjectIds([subjects[0].id]); }, [subjects, selectedSubjectIds.length]);
 
   const handleExportTeachers = async () => {
     try {
@@ -120,39 +121,47 @@ export const TeachersView: React.FC = () => {
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName) return;
+    const name = fullName.trim();
+    if (!name || isCreatingTeacher) return;
 
+    setIsCreatingTeacher(true);
     try {
       const created = await ApiClient.addTeacher({
-        fullName,
-        phone,
+        fullName: name,
+        phone: phone.trim(),
         gender,
-        qualification,
+        qualification: qualification.trim(),
         monthlySalary,
-        assignedClasses: selectedClassId ? [selectedClassId] : [],
-        assignedSubjects: selectedSubjectId ? [selectedSubjectId] : []
+        assignedClasses: selectedClassIds,
+        assignedSubjects: selectedSubjectIds
       }, school?.id);
 
       setShowAddModal(false);
       setFullName('');
       setPhone('');
       setInitialPassword(`Teacher ID: ${(created as any).staffId}\nInitial PIN: ${(created as any).initialPin}`);
-      setNotice(`Teacher ${fullName} appointed to faculty.`);
+      setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
-      setTimeout(() => setNotice(null), 3000);
+      window.setTimeout(() => setNotice(null), 4500);
     } catch (err: any) {
-      alert(err.message);
+      setNotice(err?.message || 'Unable to appoint this teacher.');
+    } finally {
+      setIsCreatingTeacher(false);
     }
   };
 
   if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Teachers</h1>
-        </div>
+    <div className="mx-auto max-w-[1680px] space-y-6 p-3 sm:p-5 lg:p-7">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-6 text-white shadow-lg sm:p-8">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[34px] border-white/5" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-teal-100">School administration · Faculty</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Teachers & staff directory</h1>
+            <p className="mt-2 max-w-2xl text-sm text-teal-100/90">Manage teacher profiles, class and subject assignments, and secure school-issued sign-in IDs.</p>
+          </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <button type="button" onClick={handleExportTeachers}
@@ -168,8 +177,23 @@ export const TeachersView: React.FC = () => {
         </div>
       </div>
 
+      <section aria-label="Teacher directory summary" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { label: 'Teachers on this page', value: teachers.length, note: 'Current directory page' },
+          { label: 'Active teachers', value: teachers.filter(item => String(item.status).toLowerCase() === 'active').length, note: 'Ready to sign in' },
+          { label: 'School classes', value: classes.length, note: 'Available for assignment' },
+          { label: 'School subjects', value: subjects.length, note: 'Available for teaching' }
+        ].map(item => (
+          <article key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500">{item.label}</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{item.value}</p>
+            <p className="mt-1 text-[11px] text-slate-500">{item.note}</p>
+          </article>
+        ))}
+      </section>
+
       {notice && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+        <div role="status" className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{notice}</span>
         </div>
@@ -314,8 +338,9 @@ export const TeachersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Assigned Subject</label>
-                  <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"><option value="">Select subject</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+                  <label className="block font-medium text-[#334155]">Assigned subjects (optional)</label>
+                  <select multiple size={4} value={selectedSubjectIds} onChange={e => setSelectedSubjectIds(Array.from(e.target.selectedOptions, option => option.value))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white p-2 text-sm">{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+                  <span className="mt-1 block text-[10px] text-slate-500">{selectedSubjectIds.length} subject(s) selected. Use Ctrl/Command to select multiple.</span>
                 </div>
                 <div>
                   <label className="block font-medium text-[#334155]">Monthly Salary ({school?.currency || 'ETB'})</label>
@@ -342,6 +367,12 @@ export const TeachersView: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block font-medium text-[#334155]">Assigned classes (optional)</label>
+                <select multiple size={4} value={selectedClassIds} onChange={e => setSelectedClassIds(Array.from(e.target.selectedOptions, option => option.value))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white p-2 text-sm">{classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}</select>
+                <span className="mt-1 block text-[10px] text-slate-500">{selectedClassIds.length} class(es) selected. Use Ctrl/Command to select multiple.</span>
+              </div>
+
               <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">
                 <button
                   type="button"
@@ -352,9 +383,10 @@ export const TeachersView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold shadow-sm"
+                  disabled={isCreatingTeacher || isReadOnly}
+                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Appoint Teacher
+                  {isCreatingTeacher ? 'Creating teacher…' : 'Appoint Teacher'}
                 </button>
               </div>
             </form>
