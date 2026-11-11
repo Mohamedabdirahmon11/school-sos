@@ -184,7 +184,7 @@ export const LoginView: React.FC = () => {
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Email, phone, or STF-SCHOOL-0001"
+                      placeholder="Email, phone, or T001"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
