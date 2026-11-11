@@ -570,8 +570,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                           {assessmentComponents.map(component => (
                             <td key={component.id} className="border-l px-1 py-2 text-center">
                               {editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => {
-                                const value = event.target.value === '' ? 0 : Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0));
-                                setMarksInput(prev => ({ ...prev, [key]: { ...prev[key], scores: { ...(prev[key]?.scores || {}), [component.id]: value } } }));
+                                setMarksInput(prev => {
+                                  const scores = { ...(prev[key]?.scores || {}) };
+                                  if (event.target.value === '') delete scores[component.id];
+                                  else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0));
+                                  return { ...prev, [key]: { ...prev[key], scores } };
+                                });
                               }} className="w-14 rounded border px-1 py-1 text-center" aria-label={`${component.name} mark for ${student.firstName} ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}
                             </td>
                           ))}
