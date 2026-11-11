@@ -2604,7 +2604,7 @@ async function nextSchoolTeacherId(school: School): Promise<string> {
   const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
   let sequence = 1;
   let id = '';
-  do { id = 'T' + String(sequence++).padStart(4, '0'); } while (used.has(id));
+  do { id = 'T' + String(sequence++).padStart(3, '0'); } while (used.has(id));
   return id;
 }
 
