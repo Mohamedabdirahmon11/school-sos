@@ -59,5 +59,5 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.match(admin, /Initial PIN:/);
   assert.match(admin, /Reset PIN/);
   assert.match(api, /Teacher ID and password or PIN are required/);
-  assert.match(api, /Every assigned classes must belong to this school|Every assigned subjects must belong to this school/);
+  assert.match(api, /Every assigned class must belong to this school|Every assigned subject must belong to this school/);
 });
