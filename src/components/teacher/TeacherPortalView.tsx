@@ -49,7 +49,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const initialData = useApi(async () => Promise.all([
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
-    ApiClient.getTimetable(undefined, user?.id),
+    ApiClient.getTimetable({ scope: 'school' }),
     ApiClient.getNotices(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
@@ -75,6 +75,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
+  const [formClassStudentCounts, setFormClassStudentCounts] = useState<Record<string, number>>({});
+  const [formClassStudentTotal, setFormClassStudentTotal] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    if (activeTab !== 'dashboard' || !formTeacherClasses.length) { setFormClassStudentCounts({}); setFormClassStudentTotal(0); return; }
+    Promise.all(formTeacherClasses.map(async klass => ({ id: klass.id, count: (await ApiClient.getAllStudents(klass.id)).length })))
+      .then(rows => { if (!cancelled) { setFormClassStudentCounts(Object.fromEntries(rows.map(row => [row.id, row.count]))); setFormClassStudentTotal(rows.reduce((sum, row) => sum + row.count, 0)); } })
+      .catch(() => { if (!cancelled) { setFormClassStudentCounts({}); setFormClassStudentTotal(0); } });
+    return () => { cancelled = true; };
+  }, [activeTab, formTeacherClasses, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesData) ? noticesData : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
@@ -426,13 +436,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Form Teacher responsibility</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Your assigned class</h2>
-              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}</li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
+              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">{formClassStudentCounts[klass.id] ?? '…'} arday</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
             </section>
             <section className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching assignments</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Subjects you teach</h2>
               {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).length ? <ul className="mt-3 space-y-2">{teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => <li key={`${assignment.classId}:${assignment.subject.id}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold text-slate-800">{assignment.subject.name}</span><span className="text-slate-500">{assignment.class?.name || 'Assigned class'}</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No teaching subjects have been assigned yet.</p>}
             </section>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasalkaaga</p><p className="mt-2 text-2xl font-black text-slate-900">{formClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta fasallada Form Teacher</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{formTeacherClasses.length}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Maaddooyinka aad dhigto</p><p className="mt-2 text-2xl font-black text-slate-900">{subjects.length}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jadwalka dugsiga</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Waqtiyada oo dhan</p></article>
           </div>
         </section>
       )}
@@ -445,10 +461,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
                 <CalendarDays className="h-5 w-5 text-teal-700" />
-                Weekly timetable
+                Full school timetable
               </h2>
             </div>
-            <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} assigned periods</span>
+            <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} school periods</span>
           </div>
           {timetable.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#64748B]">
@@ -458,15 +474,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {timetable.map(slot => {
                 const c = classes.find(cls => cls.id === slot.classId);
+                const mySlot = slot.teacherId === (teacherAssignments.find((assignment: any) => !assignment.isFormTeacher)?.teacherId || user?.id);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
-                  <div key={slot.id} className="group rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md space-y-2 text-xs">
+                  <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
                       <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
                     </div>
-                    <p className="font-semibold text-teal-900">{s?.name || 'Subject'}</p>
-                    <p className="text-[11px] text-[#64748B]">{c?.name || 'Class'} · Room {slot.roomNumber || 'TBA'}</p>
+                    <p className="font-semibold text-teal-900">{(slot as any).subjectName || s?.name || 'Subject'}</p>
+                    <p className="text-[11px] text-[#64748B]">{(slot as any).className || c?.name || 'Class'} · Room {slot.roomNumber || 'TBA'}</p>
+                    {mySlot && <span className="inline-flex rounded-full bg-teal-700 px-2 py-1 text-[10px] font-bold text-white">Your lesson</span>}
                     <p className="font-mono text-[10px] text-[#94A3B8]">{slot.startTime} - {slot.endTime}</p>
                   </div>
                 );
