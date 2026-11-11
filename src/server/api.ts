@@ -2686,7 +2686,8 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
   if (role === 'teacher') {
     const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     if (!own.items.length) { res.json([]); return; }
-    teacherId = String(own.items[0].id);
+    if (String(req.query.scope || '') === 'school') teacherId = '';
+    else teacherId = String(own.items[0].id);
   } else if (role === 'parent' || role === 'student') {
     let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
     if (role === 'student') {

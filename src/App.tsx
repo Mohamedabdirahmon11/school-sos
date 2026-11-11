@@ -156,7 +156,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
+    <div className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
       {/* Forced Password Change Modal for First-Time Staff Sign-in */}
       <ForcePasswordChangeModal />
 
@@ -172,7 +172,7 @@ const AppContent: React.FC = () => {
       {/* Read-Only or Grace Period Banner */}
       <ReadOnlyBanner onRenewClick={() => setCurrentView(user.role === 'super_admin' ? 'sa_schools' : 'sch_support')} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="min-h-0 flex-1 flex overflow-hidden">
         {/* Keep first-time School Admins in setup until the required checklist is complete. */}
         {!setupRequired && (
           <Sidebar
@@ -184,7 +184,7 @@ const AppContent: React.FC = () => {
         )}
 
         {/* Main Viewport Hub */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="min-h-0 flex-1 flex flex-col min-w-0 overflow-hidden">
           {!setupRequired && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
