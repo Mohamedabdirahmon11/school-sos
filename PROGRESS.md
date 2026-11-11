@@ -608,3 +608,49 @@ pm run dev and apply migrations 001-014.
 - DONE: Applied `accountant_foreign_key_indexes` (062) to cover five Accountant foreign keys flagged by Supabase performance advisor. Follow-up migration file and canonical schema synchronization are being committed separately.
 - NOT DONE: No real fee, expense, or bank statement transactions were created; transaction flow requires controlled test records.
 - NOT DONE: Accountant payroll_manage and reports_export permissions remain ungranted pending School Admin approval.
+
+
+## Teacher workspace redesign — in progress (2026-11-10)
+- PARTIAL: created isolated branch `codex/teacher-workspace-redesign` from current `main`; production database and `main` were not changed.
+- PARTIAL: redesigned the teacher portal header and task navigation; added attendance status summary cards and clearer, horizontally scrollable class-wide marksheet presentation. Existing attendance, marks, Form Teacher forwarding, timetable, homework, submissions/grading, and notices handlers were retained.
+- PARTIAL: redesigned the School Admin teacher directory header and summary; teacher appointment now accepts multiple optional profile class/subject tags, prevents duplicate submits, and retains the one-time school-issued Teacher ID/PIN display and reset flow.
+- IMPORTANT: profile class/subject tags are not permission grants. Actual timetable and exam permissions continue to require Subject Assignments; Form Teacher responsibility continues to be set on the class record.
+- DONE: GitHub Actions run 42979111131 passed TypeScript checks, all 210 tests, route parity audit, RLS source audit, and production build on commit `ac15dafe3df253d58822c01b870d0705e548d0fe`.
+- NOT DONE: live browser review on desktop/mobile and end-to-end teacher login-to-attendance/marks/homework verification. Automated CI is not a substitute for those checks; keep PR #82 in draft until review is possible.
+
+
+## Teacher workspace RLS correction (2026-11-11)
+
+- CONFIRMED against the intended live Supabase project: `private.auth_can_access_student` and `private.auth_can_access_class` granted teacher access only through active `class_subjects` rows; they did not include `classes.class_teacher_id` for Form Teachers.
+- LIVE DATA CHECK: one active Form Teacher class currently exists; it has no enrolled students, so the missing predicate did not expose or alter existing student records in this check.
+- ADDED IN PR #82: additive migration `20261111070000_form_teacher_rls_scope.sql` extends both private helpers for the assigned Form Teacher's own school/class while preserving subject-teacher, parent, student, and admin rules. The functions retain `SECURITY DEFINER` with an empty search path and remain in the non-exposed `private` schema.
+- ADDED: source regression coverage in `tests/teacher-workflow.test.ts`.
+- SAFETY: migration is committed to the PR branch only and has NOT been applied to production. No live rows or existing school records were changed.
+- NOT VERIFIED: actual authenticated-role SQL behavior after migration; apply only after PR review/approval, then test Form Teacher and non-assigned teacher access in the intended project.
+
+- UPDATED: refreshed the remaining Teacher Portal panels (weekly timetable, homework creation/list/submissions, and faculty notices) to use the same responsive workspace design as the overview, attendance, and marksheet.
+- UPDATED: gave the Teacher direct-messages route a teacher-only responsive shell without changing the shared parent/School Admin presentation; redesigned the teacher's personal payslip cards and added explicit load-error/retry handling. The payslip API remains scoped to the signed-in user's `user_id`.
+- ADDED: regression assertions for the teacher messages/payslip navigation routes and the redesigned timetable/homework/notices sections.
+- VERIFIED: GitHub Actions run 42981013278 passed TypeScript checks, the configured test suite, route parity audit, RLS source audit, and production build for all teacher UI/navigation changes. A documentation-only follow-up commit triggered run 42981079491; it was still in progress when this note was written.
+
+- LIVE DATA AUDIT: checked school/role consistency for teacher accounts and Form Teacher links, class-subject and timetable references, attendance student/class links, marks, assignments/submissions, message participants, and payroll ownership. All ten integrity checks returned zero mismatches. All inspected teacher-related tables have RLS enabled.
+- LIVE DATA LIMIT: the inspected project currently has no persisted student marks, assignments/submissions, school notices, or payroll records, so those workflows still need controlled test records or an owner-provided staging dataset before real user-journey verification.
+
+- AUTH LINKAGE BLOCKER: live read-only counts show 0 of 3 teacher users have `users.auth_user_id` set, and none of those teacher emails match an existing `auth.users` row. School Admin, Accountant, Parent, and Student users are also not linked; only 1 of 2 Super Admin users is linked. The rollback-only authenticated RLS simulation could not use legacy `usr-...` IDs because `auth.uid()` requires a UUID.
+- SAFETY: did not create Auth users, reset credentials, or rewrite password hashes. A safe staff account-linking/forced-reset decision is required before claiming authenticated RLS verification.
+
+
+## Teacher class-data safety and request efficiency (2026-11-11)
+- ADDED IN PR #82: Teacher class switching now clears the previous class roster immediately, preventing stale student rows from remaining visible while a new class is loading.
+- ADDED: attendance and marks data are fetched only when the corresponding workflow is active; timetable, notices, homework, and overview no longer trigger unnecessary attendance/marks reads.
+- ADDED: attendance save, every class-wide marks action, and Form Teacher forwarding remain disabled while selected-class data is loading; the attendance table shows a loading state instead of a misleading empty roster.
+- ADDED: regression coverage for lazy workflow loading and stale-class data clearing.
+- VERIFIED: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading code. No production schema, account, or school data was changed.
+
+
+## Teacher homework workflow hardening (2026-11-11)
+- ADDED IN PR #82: assignment-submission review requests now use a request sequence guard; switching assignments or unmounting ignores stale responses, clears prior submissions/drafts, and avoids a previous request clearing the new request's loading state.
+- ADDED: homework creation trims title/instructions, rejects past due dates using the school's timezone, and validates integer max points from 1–1000 in the handler as well as the form.
+- ADDED: grading is serialized so only one submission grade can be saved at a time; handlers reject read-only or overlapping grade attempts.
+- ADDED: regression tests cover stale homework responses, grading draft clearing, school-local due-date validation, and point limits.
+- VERIFIED: GitHub Actions run 42982394200 passed TypeScript, the full test suite, route parity audit, RLS source audit, and production build for these homework changes.

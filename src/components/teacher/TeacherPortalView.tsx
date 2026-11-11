@@ -7,7 +7,7 @@
  * 4. Personal teaching schedule & notices
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -34,7 +34,10 @@ import {
   Users,
   BookOpen,
   ClipboardCheck,
-  GraduationCap
+  GraduationCap,
+  LayoutDashboard,
+  Bell,
+  Clock3
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -86,11 +89,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, { grade: string; feedback: string }>>({});
+  const submissionRequestRef = useRef(0);
+
+  useEffect(() => () => { submissionRequestRef.current += 1; }, []);
 
   // Attendance state
   const [attendanceDate, setAttendanceDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
+  const [isLoadingClassData, setIsLoadingClassData] = useState(false);
   const ethiopianCalendar = getEthiopianCalendarInfo(attendanceDate, school?.timezone || 'Africa/Addis_Ababa');
+  const attendanceCounts = (['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => ({
+    status,
+    count: students.filter(student => (attendanceMap[student.id]?.status || 'present') === status).length
+  }));
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
@@ -112,64 +123,96 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     if (!classSubjects.some(subject => subject.id === selectedSubjectId)) setSelectedSubjectId(firstAssignedSubject);
   }, [selectedClassId, teacherAssignments, classSubjects, selectedSubjectId]);
 
-  // Load the full class mark matrix. Subject teachers see only their assigned subjects;
-  // the Form Teacher sees submitted marks from every subject plus their own editable subject(s).
+  // Load only the data needed by the active teacher workflow. Clear the previous
+  // class immediately so a fast class switch can never display or submit stale students.
   useEffect(() => {
-    if (!selectedClassId) { setStudents([]); return; }
-    if (activeTab === 'attendance' && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+    if (!selectedClassId) {
       setStudents([]);
       setAttendanceMap({});
+      setClassMarks([]);
+      setMarksInput({});
+      setIsLoadingClassData(false);
       return;
     }
+    const needsAttendance = activeTab === 'attendance';
+    const needsGrades = activeTab === 'grades';
+    if (!needsAttendance && !needsGrades) return;
+    if (needsAttendance && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+      setStudents([]);
+      setAttendanceMap({});
+      setIsLoadingClassData(false);
+      return;
+    }
+
     let cancelled = false;
-    Promise.all([
-      ApiClient.getAllStudents(selectedClassId),
-      ApiClient.getDailyAttendance(selectedClassId, attendanceDate),
-      ApiClient.getMarks(selectedClassId, undefined, semester)
-    ]).then(([stdList, existingAtt, existingMarks]) => {
-      if (cancelled) return;
-      setStudents(stdList);
-      const attMap: Record<string, { status: AttendanceStatus; note: string }> = {};
-      for (const student of stdList) {
-        const found = existingAtt.find(record => record.studentId === student.id);
-        attMap[student.id] = { status: found ? found.status : 'present', note: found?.note || '' };
-      }
-      setAttendanceMap(attMap);
-      setClassMarks(existingMarks);
-      const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
-      const components = examConfig?.assessmentComponents || [];
-      const allocateLegacy = (total: number, rows: typeof components) => {
-        let remaining = Number(total) || 0;
-        const values: Record<string, number> = {};
-        for (const component of rows) {
-          values[component.id] = Math.min(component.maxMarks, Math.max(0, remaining));
-          remaining -= values[component.id];
+    setIsLoadingClassData(true);
+    setStudents([]);
+    if (needsAttendance) setAttendanceMap({});
+    if (needsGrades) {
+      setClassMarks([]);
+      setMarksInput({});
+    }
+
+    const attendanceRequest = needsAttendance
+      ? ApiClient.getDailyAttendance(selectedClassId, attendanceDate)
+      : Promise.resolve([]);
+    const marksRequest = needsGrades
+      ? ApiClient.getMarks(selectedClassId, undefined, semester)
+      : Promise.resolve([]);
+
+    Promise.all([ApiClient.getAllStudents(selectedClassId), attendanceRequest, marksRequest])
+      .then(([stdList, existingAtt, existingMarks]) => {
+        if (cancelled) return;
+        setStudents(stdList);
+        if (needsAttendance) {
+          const attMap: Record<string, { status: AttendanceStatus; note: string }> = {};
+          for (const student of stdList) {
+            const found = existingAtt.find(record => record.studentId === student.id);
+            attMap[student.id] = { status: found ? found.status : 'present', note: found?.note || '' };
+          }
+          setAttendanceMap(attMap);
         }
-        return values;
-      };
-      for (const student of stdList) {
-        for (const subject of gradeSubjects) {
-          const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
-          const legacyScores = {
-            ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
-            ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
+        if (needsGrades) {
+          setClassMarks(existingMarks);
+          const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
+          const components = examConfig?.assessmentComponents || [];
+          const allocateLegacy = (total: number, rows: typeof components) => {
+            let remaining = Number(total) || 0;
+            const values: Record<string, number> = {};
+            for (const component of rows) {
+              values[component.id] = Math.min(component.maxMarks, Math.max(0, remaining));
+              remaining -= values[component.id];
+            }
+            return values;
           };
-          inputMap[`${student.id}:${subject.id}`] = {
-            scores: mark ? (mark.assessmentScores || legacyScores) : {},
-            remarks: mark?.teacherRemarks || ''
-          };
+          for (const student of stdList) {
+            for (const subject of gradeSubjects) {
+              const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+              const legacyScores = {
+                ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
+                ...allocateLegacy(mark?.bigExamMarks || 0, components.filter(component => component.category === 'final'))
+              };
+              inputMap[`${student.id}:${subject.id}`] = {
+                scores: mark ? (mark.assessmentScores || legacyScores) : {},
+                remarks: mark?.teacherRemarks || ''
+              };
+            }
+          }
+          setMarksInput(inputMap);
         }
-      }
-      setMarksInput(inputMap);
-    }).catch(error => {
-      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class marks.');
-    });
+      })
+      .catch(error => {
+        if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load class data.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingClassData(false);
+      });
+
     return () => { cancelled = true; };
   }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
-
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
-    if (isReadOnly || !selectedClassId) return;
+    if (isReadOnly || isLoadingClassData || !selectedClassId || !students.length) return;
     setIsSaving(true);
     try {
       const records = students.map(s => ({
@@ -189,7 +232,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     if (status === 'submitted') {
       const incompleteSubject = editableClassSubjects.find(subject => {
         const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
@@ -253,16 +296,28 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   };
 
   const handleCreateAssignment = async () => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    const title = assignmentTitle.trim();
+    const description = assignmentDescription.trim();
+    const maxPoints = Number(assignmentMaxPoints);
+    const today = getSchoolLocalDate(school?.timezone);
+    if (isReadOnly || !selectedClassId || !selectedSubjectId || !title || !description || !assignmentDueDate) return;
+    if (assignmentDueDate < today) {
+      setNotice('Homework due date cannot be earlier than today.');
+      return;
+    }
+    if (!Number.isInteger(maxPoints) || maxPoints < 1 || maxPoints > 1000) {
+      setNotice('Maximum points must be a whole number between 1 and 1000.');
+      return;
+    }
     setIsCreatingAssignment(true);
     try {
       await ApiClient.createAssignment({
         classId: selectedClassId,
         subjectId: selectedSubjectId,
-        title: assignmentTitle,
-        description: assignmentDescription,
+        title,
+        description,
         dueDate: assignmentDueDate,
-        maxPoints: assignmentMaxPoints
+        maxPoints
       });
       setAssignmentTitle('');
       setAssignmentDescription('');
@@ -280,24 +335,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   const handleReviewAssignment = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const assignmentId = event.target.value;
+    const requestId = ++submissionRequestRef.current;
     setReviewAssignmentId(assignmentId);
     setReviewSubmissions([]);
-    if (!assignmentId) return;
+    setGradeDrafts({});
+    setNotice(null);
+    if (!assignmentId) {
+      setIsLoadingSubmissions(false);
+      return;
+    }
     setIsLoadingSubmissions(true);
     try {
       const submissions = await ApiClient.getAssignmentSubmissions(assignmentId);
+      if (requestId !== submissionRequestRef.current) return;
       setReviewSubmissions(submissions);
-      setGradeDrafts(current => {
-        const next = { ...current };
-        for (const submission of submissions) {
-          next[submission.id] = { grade: submission.grade?.toString() || '', feedback: submission.feedback || '' };
-        }
-        return next;
-      });
+      const nextDrafts: Record<string, { grade: string; feedback: string }> = {};
+      for (const submission of submissions) {
+        nextDrafts[submission.id] = { grade: submission.grade?.toString() || '', feedback: submission.feedback || '' };
+      }
+      setGradeDrafts(nextDrafts);
     } catch (err: any) {
-      setNotice(err.message || 'Failed to load submissions.');
+      if (requestId === submissionRequestRef.current) setNotice(err.message || 'Failed to load submissions.');
     } finally {
-      setIsLoadingSubmissions(false);
+      if (requestId === submissionRequestRef.current) setIsLoadingSubmissions(false);
     }
   };
 
@@ -305,7 +365,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     const assignment = homework.find(item => item.id === reviewAssignmentId);
     const draft = gradeDrafts[submission.id];
     const grade = Number(draft?.grade);
-    if (!assignment) return;
+    if (isReadOnly || gradingSubmissionId || !assignment) return;
     if (!Number.isFinite(grade) || grade < 0 || grade > assignment.maxPoints) {
       setNotice(`Enter a grade between 0 and ${assignment.maxPoints}.`);
       return;
@@ -332,27 +392,52 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#132A29]">
-            Teacher Faculty Portal
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Welcome, {user?.fullName} · {school?.name}
-          </p>
+    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
+        <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">
+              <GraduationCap className="h-3.5 w-3.5" /> Faculty workspace
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Good day, {user?.fullName || 'Teacher'}</h1>
+            <p className="mt-1 text-sm text-teal-100/90">{school?.name || 'Your school'} · Your classes, lessons and student progress in one place.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+            <div className="rounded-xl bg-white/10 p-2.5"><CalendarDays className="h-5 w-5 text-teal-100" /></div>
+            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-teal-100">School date</p><p className="text-sm font-bold">{getSchoolLocalDate(school?.timezone)}</p></div>
+          </div>
         </div>
-
-
-      </div>
+      </header>
 
       {notice && (
-        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-xl text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+        <div role="status" className="flex items-start gap-2 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 shadow-sm">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
           <span>{notice}</span>
         </div>
       )}
+
+      <nav aria-label="Teacher workspace navigation" role="tablist" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {([
+          { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+          { id: 'timetable', label: 'My timetable', icon: Clock3 },
+          { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+          { id: 'grades', label: 'Exam marks', icon: FileSpreadsheet },
+          { id: 'assignments', label: 'Homework', icon: ClipboardList },
+          { id: 'notices', label: 'Notices', icon: Bell }
+        ] as const).map(tab => {
+          const Icon = tab.icon;
+          const selected = activeTab === tab.id;
+          return (
+            <button key={tab.id} type="button" role="tab" aria-selected={selected}
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${selected ? 'border-[#0f766e] bg-[#0f766e] text-white shadow-md shadow-teal-900/10' : 'border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800'}`}>
+              <Icon className="h-4 w-4" />{tab.label}
+            </button>
+          );
+        })}
+      </nav>
 
       {activeTab === 'dashboard' && (
         <section className="space-y-4">
@@ -389,11 +474,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 1: TEACHER SCHEDULE */}
       {(activeTab === 'dashboard' || activeTab === 'timetable') && (
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-[#0F766E]" />
-            <span>Weekly Teaching Schedule & Timetable</span>
-          </h2>
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
+              <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
+                <CalendarDays className="h-5 w-5 text-teal-700" />
+                Weekly timetable
+              </h2>
+            </div>
+            <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} assigned periods</span>
+          </div>
           {timetable.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#64748B]">
               No schedule slots assigned. Contact school administration to set your timetable.
@@ -404,7 +495,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 const c = classes.find(cls => cls.id === slot.classId);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
-                  <div key={slot.id} className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-1 text-xs">
+                  <div key={slot.id} className="group rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
                       <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
@@ -423,7 +514,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* TAB 2: DAILY ATTENDANCE (ONCE PER DAY) */}
       {activeTab === 'attendance' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="grid grid-cols-1 items-end gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3 sm:p-5">
             {formTeacherClasses.length === 0 && <p className="sm:col-span-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No class is assigned to you as Form Teacher. Contact School Admin to assign you to a class.</p>}
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">My Form Teacher Class</label>
@@ -452,17 +543,28 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <button
                 type="button"
                 onClick={handleSaveAttendance}
-                disabled={isSaving || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
+                disabled={isSaving || isLoadingClassData || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
                 className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
-                {isSaving ? 'Saving...' : 'Save Attendance'}
+                {isLoadingClassData ? 'Loading class...' : isSaving ? 'Saving...' : 'Save Attendance'}
               </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-[#132A29]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {attendanceCounts.map(item => (
+              <article key={item.status} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.status}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{item.count}</p>
+                <p className="text-[10px] text-slate-500">students</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>
                   <th className="py-3 px-4">Student</th>
@@ -471,7 +573,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {students.map(s => {
+                {isLoadingClassData ? <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">Loading students and attendance...</td></tr> : students.map(s => {
                   const current = attendanceMap[s.id] || { status: 'present', note: '' };
                   return (
                     <tr key={s.id} className="hover:bg-[#F8FAFC]">
@@ -517,6 +619,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -536,8 +639,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
             </div>
           </div>
 
@@ -547,10 +650,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="mt-1">{assessmentComponents.map(component => `${component.name} (${component.maxMarks})`).join(' + ')} = {combinedMax} marks. All subjects in your permitted class scope are shown together.</p>
               <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
             </div>
-            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
+            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <div><p className="text-xs font-bold text-slate-800">Class mark sheet</p><p className="mt-0.5 text-[10px] text-slate-500">One row per student · all permitted subjects shown together</p></div>
+              <span className="rounded-full bg-teal-100 px-3 py-1 text-[10px] font-bold text-teal-800">{students.length} students · {gradeSubjects.length} subjects</span>
+            </div>
+            <div className="overflow-x-auto">
             {gradeSubjects.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</p> : (
               <table className="w-full min-w-[1200px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
@@ -590,6 +698,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </tbody>
               </table>
             )}
+            </div>
           </div>
           {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you can complete any subject in your class. Subject teachers can enter marks only for their own assigned subjects. Submitted marks remain locked; forwarding is allowed after the complete class sheet is ready.</p>}
         </div>
@@ -597,8 +706,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 5: HOMEWORK */}
       {activeTab === 'assignments' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+        <div className="grid grid-cols-1 gap-4 text-xs lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-[#0F766E]" />
               Assign Homework
@@ -628,7 +737,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Due date</label>
-                <input type="date" value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
+                <input type="date" min={getSchoolLocalDate(school?.timezone)} value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Max points</label>
@@ -646,9 +755,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29]">Assigned Homework</h2>
-            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
+            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold text-[#132A29]">{item.title}</p>
                 <span className={`font-mono text-[10px] font-semibold ${item.dueDate < new Date().toISOString().slice(0, 10) ? 'text-rose-700' : 'text-[#0F766E]'}`}>{item.dueDate}</span>
@@ -658,7 +767,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>)}</div>}
           </div>
 
-          <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-[#0F766E]" />
               Student Submissions
@@ -671,7 +780,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               const draft = gradeDrafts[submission.id] || { grade: '', feedback: '' };
               const assignment = homework.find(item => item.id === reviewAssignmentId);
               return (
-                <div key={submission.id} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 space-y-2">
+                <div key={submission.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-bold text-[#132A29]">{submission.studentName}</p>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${submission.status === 'graded' ? 'bg-[#CCFBF1] text-[#0F766E]' : 'bg-amber-100 text-amber-800'}`}>
@@ -704,7 +813,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                     <button
                       type="button"
                       onClick={() => handleGradeSubmission(submission)}
-                      disabled={isReadOnly || gradingSubmissionId === submission.id}
+                      disabled={isReadOnly || gradingSubmissionId !== null}
                       className="rounded-xl bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50"
                     >
                       {gradingSubmissionId === submission.id ? 'Saving...' : submission.status === 'graded' ? 'Update Grade' : 'Save Grade'}
@@ -720,20 +829,26 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 4: CIRCULARS & NOTICES */}
       {activeTab === 'notices' && (
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3 text-xs">
-          <h2 className="text-sm font-bold text-[#132A29]">Faculty Bulletins & Announcements</h2>
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">School communication</p>
+              <h2 className="mt-1 text-base font-bold text-slate-900">Faculty notices & announcements</h2>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">{notices.length} notices</span>
+          </div>
           {notices.length === 0 ? (
             <p className="text-[#64748B]">No announcements posted yet.</p>
           ) : (
             <div className="space-y-3">
               {notices.map(n => (
-                <div key={n.id} className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
+                <article key={n.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
                     <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
                   </div>
                   <p className="text-[#334155]">{n.content}</p>
-                </div>
+                </article>
               ))}
             </div>
           )}

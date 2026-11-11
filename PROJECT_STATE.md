@@ -1,6 +1,18 @@
 # SchoolOS Project State
 
-Updated: 2026-11-10
+Updated: 2026-11-11
+
+## Next
+- Complete the Teacher workspace and faculty-management review in PR #82. Work only on gaps not already completed: audit and polish all teacher workflows (overview, timetable, attendance, class-wide exam marks and Form Teacher approval, homework/submissions, notices, direct messages, and teacher payslips/navigation); verify school-scoped data and role permissions; add only necessary additive Supabase migrations; and run CI plus desktop/mobile browser journeys. Do not repeat the completed Accountant work or the Teacher UI changes already present in PR #82.
+
+## Teacher workspace — in progress
+- PR #82 (`codex/teacher-workspace-redesign`) is open as Draft and is based on current `main`. It redesigns all six Teacher Portal areas (overview, timetable, attendance, exam marks, homework/submissions, and notices), adds a teacher-only responsive direct-messages shell, refreshes personal payslips with load-error/retry states, and redesigns the School Admin teacher directory. It also adds optional multi-class/subject profile tags and preserves the one-time Teacher ID/PIN flow.
+- Live Supabase review of `school management 3` found that `private.auth_can_access_student` and `private.auth_can_access_class` currently authorize teachers through active `class_subjects` assignments but omit the `classes.class_teacher_id` Form Teacher relationship. One active Form Teacher class currently exists and has zero enrolled students.
+- PR #82 contains additive migration `20261111070000_form_teacher_rls_scope.sql` and regression coverage to include a Form Teacher's own school-scoped class and students while retaining subject-teacher and parent/student rules. The migration is NOT applied to production; no live data was modified.
+- Teacher messages and payslips remain connected through the existing role-specific sidebar routes; the payslip API filters by the signed-in user's ID. Shared parent/School Admin message presentation is unchanged.
+- Live data audit: ten teacher-related relationship checks returned zero mismatches; RLS is enabled on the inspected teacher tables. Current live data has no marks, assignments/submissions, school notices, or payroll records, so those real-data workflows still need controlled test data.
+- Auth linkage blocker: 0/3 teacher users currently have `users.auth_user_id` set, and none match an existing `auth.users` email. School Admin, Accountant, Parent, and Student accounts are also unlinked; only 1/2 Super Admin users is linked. Do not create Auth users or reset credentials until a safe staff migration/forced-reset flow is agreed and tested.
+- Remaining: run CI after the latest all-section UI updates, verify the migration under authenticated/non-assigned teacher identities, audit Somali/Amharic teacher strings, and perform real desktop/mobile teacher sign-in journeys. Do not mark this section DONE until those checks pass.
 
 ## Accountant — merged and verified
 - PR #59 finance ledger and payment-channel support merged; fee payments, receipts, cashbook, expenses, and reconciliation are school-scoped.
@@ -27,3 +39,18 @@ Updated: 2026-11-10
 - Preserve existing school and financial data. No production finance records were deleted or modified during these changes.
 - GitHub merge does not itself deploy the hosting environment. Production deployment and live sign-in/user-journey verification remain separate checks.
 - The intended Supabase project is Frankfurt/EU Central project `rhpazlnjqsmzngxatnwd`; do not use the alternate Paris project.
+
+
+## Teacher portal follow-up — class data safety (2026-11-11)
+- Added to PR #82: clear prior class roster and grade/attendance state before loading a newly selected class, so stale students cannot appear during class switching.
+- Attendance data and marks data are now fetched only in their respective tabs. Other Teacher Portal sections avoid those unnecessary requests.
+- Save Attendance, all bulk marks actions, and Form Teacher forwarding are disabled during class-data loading; attendance shows an explicit loading row.
+- Added a source regression test for the loading and stale-data safeguards.
+- Verification: GitHub Actions run 42981856160 passed TypeScript, the test suite, route parity audit, RLS source audit, and production build for the class-loading safeguards. No live database or production records were modified.
+
+
+## Teacher portal follow-up — homework safety (2026-11-11)
+- Assignment-submission review is race-safe: stale responses from a previous assignment cannot overwrite the newly selected assignment; switching/unmounting invalidates in-flight requests and clears old grading drafts.
+- Homework creation now trims text, validates school-local due dates (today or later), and enforces whole-number max points 1–1000 before calling the API.
+- Grade saves are serialized; read-only and concurrent grade attempts are rejected by the handler.
+- Added source regression tests for these cases. GitHub Actions run 42982394200 passed TypeScript, the full test suite, route parity audit, RLS source audit, and production build. No production data or schema was changed.
