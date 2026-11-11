@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
-  initialTab?: 'dashboard' | 'timetable' | 'attendance' | 'grades' | 'assignments' | 'notices';
+  initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
 }
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
@@ -106,6 +106,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
+  const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
 
@@ -137,7 +138,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
     const needsAttendance = activeTab === 'attendance';
     const needsGrades = activeTab === 'grades';
-    if (!needsAttendance && !needsGrades) return;
+    const needsStudents = activeTab === 'students';
+    const needsResults = activeTab === 'exam_results';
+    if (!needsAttendance && !needsGrades && !needsStudents && !needsResults) return;
     if (needsAttendance && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
       setStudents([]);
       setAttendanceMap({});
@@ -149,7 +152,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     setIsLoadingClassData(true);
     setStudents([]);
     if (needsAttendance) setAttendanceMap({});
-    if (needsGrades) {
+    if (needsGrades || needsResults) {
       setClassMarks([]);
       setMarksInput({});
     }
@@ -157,7 +160,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     const attendanceRequest = needsAttendance
       ? ApiClient.getDailyAttendance(selectedClassId, attendanceDate)
       : Promise.resolve([]);
-    const marksRequest = needsGrades
+    const marksRequest = needsGrades || needsResults
       ? ApiClient.getMarks(selectedClassId, undefined, semester)
       : Promise.resolve([]);
 
@@ -173,8 +176,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           }
           setAttendanceMap(attMap);
         }
+        if (needsGrades || needsResults) setClassMarks(existingMarks);
         if (needsGrades) {
-          setClassMarks(existingMarks);
           const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
           const components = examConfig?.assessmentComponents || [];
           const allocateLegacy = (total: number, rows: typeof components) => {
