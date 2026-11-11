@@ -120,9 +120,65 @@ export const StaffPayslipsView: React.FC = () => {
   const { school, t } = useAuth();
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { ApiClient.getMyPayslips().then(rows => setRecords(Array.isArray(rows) ? rows : [])).finally(() => setLoading(false)); }, []);
-  return <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
-    <h1 className="text-xl font-bold text-[#132A29]">{t('payroll_payslip')}</h1>
-    {loading ? <p>{t('payroll_loading')}</p> : !records.length ? <p className="text-sm text-slate-500">{t('payroll_empty')}</p> : records.map(record => <div key={record.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl"><div><p className="font-semibold">{record.payrollMonth}</p><p className="text-sm text-slate-500">{formatMoney(record.netSalary, school?.currency)}</p></div><button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-3 py-2 border border-teal-200 text-teal-800 rounded-lg text-sm">{t('payroll_payslip')}</button></div>)}
-  </div>;
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    ApiClient.getMyPayslips()
+      .then(rows => { if (!cancelled) setRecords(Array.isArray(rows) ? rows : []); })
+      .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : t('payroll_error')); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [reloadKey, t]);
+
+  return (
+    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">Staff workspace · Payroll</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t('payroll_payslip')}</h1>
+            <p className="mt-1 text-sm text-teal-100/90">Your personal monthly pay statements and downloadable records.</p>
+          </div>
+          <span className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">{records.length} statement(s)</span>
+        </div>
+      </header>
+
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          <span>{error}</span>
+          <button type="button" onClick={() => setReloadKey(value => value + 1)} className="rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-semibold">Retry</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div aria-label={t('payroll_loading')} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map(item => <div key={item} className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white" />)}
+        </div>
+      ) : error ? null : records.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+          <p className="text-base font-bold text-slate-800">{t('payroll_empty')}</p>
+          <p className="mt-2 text-sm text-slate-500">When payroll is published for your account, your statement will appear here.</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {records.map(record => (
+            <article key={record.id} className="flex flex-col justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Payroll period</p>
+                <h2 className="mt-2 text-lg font-bold text-slate-900">{record.payrollMonth}</h2>
+                <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Net salary</p>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-teal-800">{formatMoney(record.netSalary, school?.currency)}</p>
+              </div>
+              <button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="inline-flex w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">{t('payroll_payslip')}</button>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
