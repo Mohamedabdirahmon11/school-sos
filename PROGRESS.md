@@ -608,3 +608,11 @@ pm run dev and apply migrations 001-014.
 - DONE: Applied `accountant_foreign_key_indexes` (062) to cover five Accountant foreign keys flagged by Supabase performance advisor. Follow-up migration file and canonical schema synchronization are being committed separately.
 - NOT DONE: No real fee, expense, or bank statement transactions were created; transaction flow requires controlled test records.
 - NOT DONE: Accountant payroll_manage and reports_export permissions remain ungranted pending School Admin approval.
+
+
+## Teacher workspace redesign — in progress (2026-11-10)
+- PARTIAL: created isolated branch `codex/teacher-workspace-redesign` from current `main`; production database and `main` were not changed.
+- PARTIAL: redesigned the teacher portal header and task navigation; added attendance status summary cards and clearer, horizontally scrollable class-wide marksheet presentation. Existing attendance, marks, Form Teacher forwarding, timetable, homework, submissions/grading, and notices handlers were retained.
+- PARTIAL: redesigned the School Admin teacher directory header and summary; teacher appointment now accepts multiple optional profile class/subject tags, prevents duplicate submits, and retains the one-time school-issued Teacher ID/PIN display and reset flow.
+- IMPORTANT: profile class/subject tags are not permission grants. Actual timetable and exam permissions continue to require Subject Assignments; Form Teacher responsibility continues to be set on the class record.
+- NOT DONE: full lint/build/test execution, browser review on desktop/mobile, and end-to-end teacher login-to-attendance/marks/homework verification. These must pass before this work is considered complete or merged.
