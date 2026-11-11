@@ -51,15 +51,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
-  const classes: SchoolClass[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class])).values()] as SchoolClass[];
   const formTeacherClasses: SchoolClass[] = Array.isArray(formTeacherClassesData) ? formTeacherClassesData : [];
-  const subjects: Subject[] = [...new Map(teacherAssignments.map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
+  const classes: SchoolClass[] = [...new Map([
+    ...teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class] as [string, SchoolClass]),
+    ...formTeacherClasses.map(klass => [klass.id, klass] as [string, SchoolClass])
+  ]).values()];
+  const subjects: Subject[] = [...new Map(teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
   const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
   const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
   const allClassSubjects = uniqueSubjects(classAssignments);
   const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher || assignment.canEditMarks === true));
-  const classSubjects: Subject[] = editableClassSubjects;
+  // Homework is limited to subjects the teacher personally teaches.
+  // Form Teacher's wider subject access applies to the class mark sheet only.
+  const classSubjects: Subject[] = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
