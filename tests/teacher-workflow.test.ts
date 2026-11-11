@@ -108,7 +108,7 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
   assert.match(teacher, /needsGrades \|\| needsResults\s*\? ApiClient\.getMarks/);
-  assert.match(teacher, /if \(!needsAttendance && !needsGrades\) return/);
+  assert.match(teacher, /if \(!needsAttendance && !needsGrades && !needsStudents && !needsResults\) return/);
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
   assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
