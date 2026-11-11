@@ -1,9 +1,9 @@
 /**
- * Teacher Faculty Portal
+ * Teacher Workspace
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
- * 2. Exam marks: Small Exam + Big Exam -> Percentage only (no letter grades or GPA)
- * 3. Subject teachers submit their assigned subjects to the Form Teacher; the Form Teacher forwards the complete class to Admin.
+ * 2. Exam marks: school-configured assessment components -> weighted total and percentage
+ * 3. Subject teachers submit assigned subjects; Form Teachers manage the full class mark sheet and forward it to Admin.
  * 4. Personal teaching schedule & notices
  */
 
@@ -315,15 +315,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const combinedMax = smallMax + bigMax;
   const assessmentComponents = examConfig?.assessmentComponents || [];
 
-  if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-xl bg-white" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div></div>;
+  if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#132A29]">
             Teacher Faculty Portal
           </h1>
           <p className="text-xs text-[#64748B]">
@@ -335,7 +335,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       </div>
 
       {notice && (
-        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
+        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-xl text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
           <span>{notice}</span>
         </div>
@@ -353,7 +353,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-slate-500">{item.label}</span>
-                  <span className="rounded-xl bg-teal-50 p-2 text-teal-700"><item.icon className="h-4 w-4" /></span>
+                  <span className="rounded-2xl bg-teal-50 p-2 text-teal-700"><item.icon className="h-4 w-4" /></span>
                 </div>
                 <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{item.value}</p>
                 <p className="mt-1 text-[11px] text-slate-500">{item.note}</p>
@@ -366,9 +366,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="mt-1 text-xs text-slate-600">Open a task directly. Your access follows the classes and subjects assigned by School Admin.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setActiveTab('grades')} className="rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800"><FileSpreadsheet className="mr-1 inline h-3.5 w-3.5"/>Enter marks</button>
-              <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><ClipboardCheck className="mr-1 inline h-3.5 w-3.5"/>Class attendance</button>
-              <button type="button" onClick={() => setActiveTab('assignments')} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><ClipboardList className="mr-1 inline h-3.5 w-3.5"/>Homework</button>
+              <button type="button" onClick={() => setActiveTab('grades')} className="rounded-2xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800"><FileSpreadsheet className="mr-1 inline h-3.5 w-3.5"/>Enter marks</button>
+              <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><ClipboardCheck className="mr-1 inline h-3.5 w-3.5"/>Class attendance</button>
+              <button type="button" onClick={() => setActiveTab('assignments')} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><ClipboardList className="mr-1 inline h-3.5 w-3.5"/>Homework</button>
             </div>
           </div>
         </section>
@@ -376,7 +376,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 1: TEACHER SCHEDULE */}
       {(activeTab === 'dashboard' || activeTab === 'timetable') && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4">
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-[#0F766E]" />
             <span>Weekly Teaching Schedule & Timetable</span>
@@ -391,7 +391,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 const c = classes.find(cls => cls.id === slot.classId);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
-                  <div key={slot.id} className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl space-y-1 text-xs">
+                  <div key={slot.id} className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
                       <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
@@ -410,14 +410,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* TAB 2: DAILY ATTENDANCE (ONCE PER DAY) */}
       {activeTab === 'attendance' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-            {formTeacherClasses.length === 0 && <p className="sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No class is assigned to you as Form Teacher. Contact School Admin to assign you to a class.</p>}
+          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            {formTeacherClasses.length === 0 && <p className="sm:col-span-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No class is assigned to you as Form Teacher. Contact School Admin to assign you to a class.</p>}
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">My Form Teacher Class</label>
               <select
                 value={selectedClassId}
                 onChange={e => setSelectedClassId(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
+                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl"
               >
                 {formTeacherClasses.map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
@@ -430,7 +430,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 type="date"
                 value={attendanceDate}
                 onChange={e => setAttendanceDate(e.target.value)}
-                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg"
+                className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl"
               />
               <p className="mt-1 text-[11px] text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</p>
               {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
@@ -440,7 +440,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 type="button"
                 onClick={handleSaveAttendance}
                 disabled={isSaving || isReadOnly || students.length === 0 || !formTeacherClasses.some(klass => klass.id === selectedClassId)}
-                className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1.5"
+                className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 {isSaving ? 'Saving...' : 'Save Attendance'}
@@ -448,7 +448,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             <table className="w-full text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>
@@ -511,35 +511,35 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* TAB 3: CLASS MARK MATRIX */}
       {activeTab === 'grades' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
             <label className="text-xs font-semibold text-[#475569]">Class
-              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-[#CBD5E1] px-3 py-2">
                 {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
               </select>
             </label>
             <label className="text-xs font-semibold text-[#475569]">Semester
-              <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+              <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-xl border border-[#CBD5E1] px-3 py-2">
                 <option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option>
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save all drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit all subjects</button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-900">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-900">
             <div>
               <strong>{isFormTeacher ? 'Form Teacher class review' : 'Your assigned subject marks'}</strong>
               <p className="mt-1">{assessmentComponents.map(component => `${component.name} (${component.maxMarks})`).join(' + ')} = {combinedMax} marks. All subjects in your permitted class scope are shown together.</p>
               <p className="mt-1">{gradeSubjects.length} subject(s) · {students.length} students · {classMarks.filter(mark => mark.status === 'submitted' || mark.status === 'form_teacher_submitted').length} submitted mark rows</p>
             </div>
-            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-lg bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
+            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving} className="rounded-xl bg-[#0B2B2A] px-4 py-2 font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward complete class to Admin</button>}
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
             {gradeSubjects.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</p> : (
-              <table className="w-full min-w-[900px] border-collapse text-xs text-[#132A29]">
+              <table className="w-full min-w-[1200px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
                   <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{gradeSubjects.map(subject => <th key={subject.id} colSpan={assessmentComponents.length + 2} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
                   <tr>{gradeSubjects.map(subject => <React.Fragment key={subject.id}>{assessmentComponents.map(component => <th key={component.id} className="border-b border-l px-2 py-2">{component.name}<span className="block text-[9px] normal-case">/{component.maxMarks}</span></th>)}<th className="border-b border-l px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th></React.Fragment>)}</tr>
@@ -581,7 +581,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* TAB 5: HOMEWORK */}
       {activeTab === 'assignments' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-[#0F766E]" />
               Assign Homework
@@ -589,49 +589,49 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Class</label>
-                <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg">
+                <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl">
                   {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.section})</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Subject</label>
-                <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg">
+                <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl">
                   {classSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">Title</label>
-              <input value={assignmentTitle} onChange={e => setAssignmentTitle(e.target.value)} maxLength={255} placeholder="Homework title" className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
+              <input value={assignmentTitle} onChange={e => setAssignmentTitle(e.target.value)} maxLength={255} placeholder="Homework title" className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#475569] mb-1">Instructions</label>
-              <textarea value={assignmentDescription} onChange={e => setAssignmentDescription(e.target.value)} rows={4} placeholder="Describe the homework and expected work." className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg resize-y" />
+              <textarea value={assignmentDescription} onChange={e => setAssignmentDescription(e.target.value)} rows={4} placeholder="Describe the homework and expected work." className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl resize-y" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Due date</label>
-                <input type="date" value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
+                <input type="date" value={assignmentDueDate} onChange={e => setAssignmentDueDate(e.target.value)} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#475569] mb-1">Max points</label>
-                <input type="number" min={1} max={1000} value={assignmentMaxPoints} onChange={e => setAssignmentMaxPoints(Math.min(1000, Math.max(1, Number(e.target.value) || 1)))} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg" />
+                <input type="number" min={1} max={1000} value={assignmentMaxPoints} onChange={e => setAssignmentMaxPoints(Math.min(1000, Math.max(1, Number(e.target.value) || 1)))} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl" />
               </div>
             </div>
             <button
               type="button"
               onClick={handleCreateAssignment}
               disabled={isReadOnly || isCreatingAssignment || !selectedClassId || !selectedSubjectId || !assignmentTitle.trim() || !assignmentDescription.trim() || !assignmentDueDate}
-              className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+              className="w-full py-2 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               {isCreatingAssignment ? 'Assigning...' : 'Assign Homework'}
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
             <h2 className="text-sm font-bold text-[#132A29]">Assigned Homework</h2>
-            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-lg bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
+            {assignmentsState.loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : homework.length === 0 ? <p className="text-[#64748B]">No homework has been assigned to your classes yet.</p> : <div className="space-y-2">{homework.map(item => <div key={item.id} className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold text-[#132A29]">{item.title}</p>
                 <span className={`font-mono text-[10px] font-semibold ${item.dueDate < new Date().toISOString().slice(0, 10) ? 'text-rose-700' : 'text-[#0F766E]'}`}>{item.dueDate}</span>
@@ -641,20 +641,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>)}</div>}
           </div>
 
-          <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+          <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-[#0F766E]" />
               Student Submissions
             </h2>
-            <select value={reviewAssignmentId} onChange={handleReviewAssignment} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg">
+            <select value={reviewAssignmentId} onChange={handleReviewAssignment} className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl">
               <option value="">Select assigned homework</option>
               {homework.map(item => <option key={item.id} value={item.id}>{item.title} - {item.dueDate}</option>)}
             </select>
-            {!reviewAssignmentId ? <p className="text-[#64748B]">Choose homework to review student submissions.</p> : isLoadingSubmissions ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : reviewSubmissions.length === 0 ? <p className="text-[#64748B]">No student has submitted this homework yet.</p> : <div className="space-y-3">{reviewSubmissions.map(submission => {
+            {!reviewAssignmentId ? <p className="text-[#64748B]">Choose homework to review student submissions.</p> : isLoadingSubmissions ? <div className="h-20 animate-pulse rounded-xl bg-slate-100" /> : reviewSubmissions.length === 0 ? <p className="text-[#64748B]">No student has submitted this homework yet.</p> : <div className="space-y-3">{reviewSubmissions.map(submission => {
               const draft = gradeDrafts[submission.id] || { grade: '', feedback: '' };
               const assignment = homework.find(item => item.id === reviewAssignmentId);
               return (
-                <div key={submission.id} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 space-y-2">
+                <div key={submission.id} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-bold text-[#132A29]">{submission.studentName}</p>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${submission.status === 'graded' ? 'bg-[#CCFBF1] text-[#0F766E]' : 'bg-amber-100 text-amber-800'}`}>
@@ -671,7 +671,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         max={assignment?.maxPoints || 0}
                         value={draft.grade}
                         onChange={event => setGradeDrafts(current => ({ ...current, [submission.id]: { ...draft, grade: event.target.value } }))}
-                        className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white"
+                        className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl bg-white"
                       />
                     </div>
                     <div>
@@ -681,14 +681,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         maxLength={2000}
                         rows={2}
                         onChange={event => setGradeDrafts(current => ({ ...current, [submission.id]: { ...draft, feedback: event.target.value } }))}
-                        className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white resize-y"
+                        className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl bg-white resize-y"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => handleGradeSubmission(submission)}
                       disabled={isReadOnly || gradingSubmissionId === submission.id}
-                      className="rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50"
+                      className="rounded-xl bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50"
                     >
                       {gradingSubmissionId === submission.id ? 'Saving...' : submission.status === 'graded' ? 'Update Grade' : 'Save Grade'}
                     </button>
@@ -703,14 +703,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* TAB 4: CIRCULARS & NOTICES */}
       {activeTab === 'notices' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 text-xs">
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-3 text-xs">
           <h2 className="text-sm font-bold text-[#132A29]">Faculty Bulletins & Announcements</h2>
           {notices.length === 0 ? (
             <p className="text-[#64748B]">No announcements posted yet.</p>
           ) : (
             <div className="space-y-3">
               {notices.map(n => (
-                <div key={n.id} className="p-3.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
+                <div key={n.id} className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
                     <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
