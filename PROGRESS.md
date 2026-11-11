@@ -632,3 +632,6 @@ pm run dev and apply migrations 001-014.
 - UPDATED: gave the Teacher direct-messages route a teacher-only responsive shell without changing the shared parent/School Admin presentation; redesigned the teacher's personal payslip cards and added explicit load-error/retry handling. The payslip API remains scoped to the signed-in user's `user_id`.
 - ADDED: regression assertions for the teacher messages/payslip navigation routes and the redesigned timetable/homework/notices sections.
 - VALIDATION: CI for the RLS migration passed on the earlier commit; the latest UI/navigation changes are awaiting the next GitHub Actions run.
+
+- LIVE DATA AUDIT: checked school/role consistency for teacher accounts and Form Teacher links, class-subject and timetable references, attendance student/class links, marks, assignments/submissions, message participants, and payroll ownership. All ten integrity checks returned zero mismatches. All inspected teacher-related tables have RLS enabled.
+- LIVE DATA LIMIT: the inspected project currently has no persisted student marks, assignments/submissions, school notices, or payroll records, so those workflows still need controlled test records or an owner-provided staging dataset before real user-journey verification.
