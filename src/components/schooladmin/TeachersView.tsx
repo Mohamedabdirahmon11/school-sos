@@ -39,6 +39,7 @@ export const TeachersView: React.FC = () => {
   const [monthlySalary, setMonthlySalary] = useState(550);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [selectedFormTeacherClassId, setSelectedFormTeacherClassId] = useState('');
   const [isCreatingTeacher, setIsCreatingTeacher] = useState(false);
 
   const filteredTeachers = teachers.filter(teacher => {
@@ -84,8 +85,9 @@ export const TeachersView: React.FC = () => {
       monthlySalary: Number(teacher.monthlySalary || 0),
       assignedClasses: [...(teacher.assignedClasses || [])],
       assignedSubjects: [...(teacher.assignedSubjects || [])],
-      status: teacher.status || 'active'
-    });
+      status: teacher.status || 'active',
+      formTeacherClassId: classes.find(klass => klass.classTeacherId === teacher.userId)?.id || ''
+    } as any);
   };
 
   const handleSaveTeacher = async (event: React.FormEvent) => {
@@ -131,14 +133,16 @@ export const TeachersView: React.FC = () => {
         qualification: qualification.trim(),
         monthlySalary,
         assignedClasses: selectedClassIds,
-        assignedSubjects: selectedSubjectIds
-      }, school?.id);
+        assignedSubjects: selectedSubjectIds,
+        formTeacherClassId: selectedFormTeacherClassId || null
+      } as any, school?.id);
 
       setShowAddModal(false);
       setFullName('');
       setPhone('');
       setSelectedClassIds([]);
       setSelectedSubjectIds([]);
+      setSelectedFormTeacherClassId('');
       setInitialPassword(`Teacher ID: ${(created as any).staffId}\nInitial PIN: ${(created as any).initialPin}`);
       setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
@@ -281,6 +285,7 @@ export const TeachersView: React.FC = () => {
               <label className="text-xs font-medium">Department<input value={String(editForm.department || '')} onChange={e => setEditForm(v => ({...v,department:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
               <label className="text-xs font-medium">Monthly salary ({school?.currency || 'ETB'})<input type="number" min="0" value={Number(editForm.monthlySalary || 0)} onChange={e => setEditForm(v => ({...v,monthlySalary:Number(e.target.value)}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
               <label className="text-xs font-medium">Assigned classes<select multiple value={editForm.assignedClasses || []} onChange={e => setEditForm(v => ({...v,assignedClasses:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple classes.</span></label>
+              <label className="text-xs font-medium">Form Teacher class<select value={String((editForm as any).formTeacherClassId || '')} onChange={e => setEditForm(v => ({...v, formTeacherClassId:e.target.value} as any))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="">Not a Form Teacher</option>{classes.filter(item => !item.classTeacherId || item.classTeacherId === editingTeacher.userId).map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}</option>)}</select><span className="text-[10px] text-slate-500">Changing the assignment does not alter attendance or exam history.</span></label>
               <label className="text-xs font-medium">Assigned subjects<select multiple value={editForm.assignedSubjects || []} onChange={e => setEditForm(v => ({...v,assignedSubjects:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple subjects.</span></label>
             </div>
             <div className="flex justify-end gap-2 border-t pt-3">
@@ -366,6 +371,15 @@ export const TeachersView: React.FC = () => {
                   placeholder="e.g. M.Sc Physics, SNU"
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
+              </div>
+
+              <div>
+                <label className="block font-medium text-[#334155]">Form Teacher class (optional)</label>
+                <select value={selectedFormTeacherClassId} onChange={e => setSelectedFormTeacherClassId(e.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white p-2 text-sm">
+                  <option value="">Not a Form Teacher</option>
+                  {classes.filter(klass => !klass.classTeacherId).map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
+                </select>
+                <span className="mt-1 block text-[10px] text-slate-500">One Form Teacher is assigned to each class. Leave blank if this teacher is not a Form Teacher.</span>
               </div>
 
               <div>
