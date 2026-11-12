@@ -292,10 +292,10 @@ export const ClassesSubjectsView: React.FC = () => {
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button type="button" disabled={isReadOnly} aria-label={`Edit ${subject.name}`}
-                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}
+                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}}
                         className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                       <button type="button" disabled={isReadOnly} aria-label={`Delete ${subject.name}`}
-                        onClick={async () => { if (!window.confirm(`Delete subject ${subject.name}?`)) return; try { await ApiClient.deleteSubject(subject.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); }}
+                        onClick={async () => { if (!window.confirm(`Delete subject ${subject.name}?`)) return; try { await ApiClient.deleteSubject(subject.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); }}}
                         className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </article>
