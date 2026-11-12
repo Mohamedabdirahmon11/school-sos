@@ -231,7 +231,10 @@ export const TeachersView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
-              {filteredTeachers.map(t => (
+              {filteredTeachers.map(t => {
+                const formTeacherClassIds = new Set(classes.filter(klass => klass.classTeacherId === t.userId && !klass.isArchived).map(klass => klass.id));
+                const displayedClassIds = Array.from(new Set([...(t.assignedClasses || []), ...formTeacherClassIds]));
+                return (
                 <tr key={t.id} className="hover:bg-[#F5FAF8]">
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[#132A29]">{t.fullName}</p>
@@ -239,7 +242,11 @@ export const TeachersView: React.FC = () => {
                     <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">ID: {t.staffId || t.id}</p>
                   </td>
                   <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
-                  <td className="px-4 py-3 text-[#334155]">{(t.assignedClasses || []).map(id => classes.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
+                  <td className="px-4 py-3 text-[#334155]">{displayedClassIds.map(id => {
+                    const klass = classes.find(item => item.id === id);
+                    const label = klass ? `${klass.name}${klass.section ? ` · ${klass.section}` : ''}` : id;
+                    return formTeacherClassIds.has(id) ? `${label} (Form Teacher)` : label;
+                  }).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
@@ -255,7 +262,8 @@ export const TeachersView: React.FC = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {filteredTeachers.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">

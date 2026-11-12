@@ -1,3 +1,13 @@
+## School Admin directory and academic setup follow-up (2026-11-12)
+
+- IN REVIEW — PR #90: simple per-school student IDs (S001, S002, ...); School Admin student list uses 50 rows per page, supports an explicit whole-class A–Z mode only in the School Admin directory, and Parents & Contacts has a class filter and 50-row pagination. Attendance and other class screens retain normal pagination. Teacher Portal student roster is restricted to the teacher's Form Teacher class. Existing student IDs are not rewritten.
+- VERIFIED — PR #90 latest GitHub Actions run 43193022141 passed TypeScript, the configured test suite, route parity, RLS source audit, and production build.
+- IN REVIEW — PR #91: Classes & Sections are grouped by grade, branch, and shift, with class search and branch filtering; Subjects are searchable cards and retain class-specific teacher, weekly-period, and exam-component assignments. Teacher directory now includes Form Teacher classes as well as profile-assigned classes.
+- VERIFIED — PR #91 GitHub Actions run 43192256652 passed TypeScript, the configured test suite, route parity, RLS source audit, and production build.
+- VERIFIED — related student-import follow-ups PR #88 (spreadsheet apostrophe phone normalization) and PR #89 (Status-free template with automatic active status) each have passing GitHub Actions runs 43181842298 and 43183001153.
+- DATA-MODEL NOTE — current Student type/schema has no role_number / roll_number field. Student list ordering therefore uses the requested A–Z fallback; the visible No. is a row index, not a stored roll number. No database column or migration was invented.
+- SAFETY — all four changes are pull requests, not merged or deployed here. No live Supabase records were modified or deleted, and no migration was applied.
+
 ## Accountant bank statement CSV import and split settlement (2026-11-10)
 
 - DONE: PR #64 merged as `4eaea446e4ef0344ac72fc72d4351cbb5a1936e8`; added CSV parsing with quoted fields, ISO/day-first dates, credit/debit or separate credit/debit columns, locale-aware amount parsing, row validation, a downloadable template, and preview-before-import.
