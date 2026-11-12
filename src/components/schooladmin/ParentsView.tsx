@@ -13,11 +13,18 @@ export const ParentsView: React.FC = () => {
   const { school } = useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [classes, setClasses] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    if (!school) return;
+    ApiClient.getClasses().then(rows => setClasses(Array.isArray(rows) ? rows : [])).catch(() => setClasses([]));
+  }, [school?.id]);
 
   useEffect(() => {
     if (!school) {
@@ -29,7 +36,7 @@ export const ParentsView: React.FC = () => {
     let active = true;
     setIsLoading(true);
     setLoadError(null);
-    ApiClient.getSchoolStudents({ schoolId: school.id, page, pageSize: 20, search })
+    ApiClient.getSchoolStudents({ schoolId: school.id, page, pageSize: 50, search, classId: classFilter })
       .then((rows: any[]) => {
         if (!active) return;
         setStudents(Array.isArray(rows) ? rows : []);
@@ -43,7 +50,7 @@ export const ParentsView: React.FC = () => {
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [school?.id, page, search, reloadCount]);
+  }, [school?.id, page, search, classFilter, reloadCount]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -80,7 +87,14 @@ export const ParentsView: React.FC = () => {
         <p className="text-xs text-[#64748B]">Parent contact details and linked enrolled children</p>
       </div>
 
-      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0]">
+      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] flex flex-wrap items-center gap-3">
+        <select aria-label="Filter by class" value={classFilter} onChange={e => { setClassFilter(e.target.value); setPage(1); }}
+          className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]">
+          <option value="">All classes</option>
+          {[...classes].sort((a, b) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0) || String(a.section || '').localeCompare(String(b.section || ''))).map(c => (
+            <option key={c.id} value={c.id}>{c.name}{c.section ? ` · ${c.section}` : ''}</option>
+          ))}
+        </select>
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input type="search" placeholder="Search student name or parent phone..." value={search}
@@ -103,6 +117,7 @@ export const ParentsView: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                   <tr>
+                    <th className="px-4 py-3 w-12">No.</th>
                     <th className="px-4 py-3">Enrolled Child (Student)</th>
                     <th className="px-4 py-3">Class</th>
                     <th className="px-4 py-3">Father Contact</th>
@@ -112,9 +127,10 @@ export const ParentsView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[#E2E8F0]">
                   {students.length === 0 ? (
-                    <tr><td colSpan={5} className="p-8 text-center text-[#64748B]">No parent records found.</td></tr>
-                  ) : students.map(student => (
+                    <tr><td colSpan={6} className="p-8 text-center text-[#64748B]">No parent records found.</td></tr>
+                  ) : students.map((student, rowIndex) => (
                     <tr key={student.id} className="hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-3 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
                       <td className="px-4 py-3">
                         <span className="font-semibold text-[#132A29] block">{student.firstName} {student.middleName} {student.lastName}</span>
                         <span className="font-mono text-[10px] text-[#64748B]">{student.studentId}</span>

@@ -81,6 +81,8 @@ test('CSV import creates one missing class, students, linked parent and one-time
   assert.equal(students.length, 2);
   assert.ok(students.every(row => row.pinHash?.startsWith('pin_scrypt:')));
   assert.ok(students.every(row => row.status === 'active'));
+  assert.ok(students.every(row => /^S\d{3,}$/.test(row.studentId)), 'new students get simple S001-style IDs');
+  assert.equal(new Set(students.map(row => row.studentId)).size, students.length);
   assert.equal(memory.rows('users').filter(row => row.schoolId === admin.schoolId && row.role === 'parent' && row.phone === '+252611234567').length, 1);
   assert.equal(memory.rows('audit_logs').filter(row => row.schoolId === admin.schoolId && row.action === 'SCHOOL_BULK_IMPORT').length, 1);
   assert.equal(JSON.stringify(students).includes(result.pinSlips[0].pin), false);
@@ -160,4 +162,22 @@ test('template contains required headers and explicitly skipped examples', async
   assert.match(text, /"?className"?,"?section"?,"?studentName"?,"?gender"?,"?dateOfBirth"?,"?parentName"?,"?parentPhone"?,"?fatherPhone"?,"?motherName"?,"?motherPhone"?,"?studentPhone"?,"?branch"?/);
   assert.equal((text.match(/EXAMPLE/g) || []).length, 9);
   assert.match(text, /Grade 5/);
+});
+
+test('a selected class returns every student at once, sorted A to Z', async () => {
+  const { body } = await preview(admin, csv(
+    ['Grade 7', 'A', 'Zeinab Ali Noor', 'female', '2013-01-02', 'Ali Noor', '+252611777001', '', ''],
+    ['Grade 7', 'A', 'Abdi Hassan Ali', 'male', '2013-02-03', 'Hassan Ali', '+252611777002', '', ''],
+    ['Grade 7', 'A', 'Mahad Omar Yusuf', 'male', '2013-03-04', 'Omar Yusuf', '+252611777003', '', '']
+  ));
+  assert.equal(body.totals.valid, 3);
+  assert.equal((await confirm(admin, body.rows.map((row: any) => row.data))).status, 200);
+  const klass = memory.rows('classes').find(row => row.schoolId === admin.schoolId && row.name === 'Grade 7');
+  assert.ok(klass, 'class was created');
+  const response = await fetch(`${baseUrl}/students?classId=${encodeURIComponent(klass.id)}&pageSize=50`, { headers: { Cookie: `schoolos_session=${tokenFor(admin)}` } });
+  assert.equal(response.status, 200);
+  const rows = await response.json() as any[];
+  assert.deepEqual(rows.map(row => row.firstName), ['Abdi', 'Mahad', 'Zeinab']);
+  assert.equal(response.headers.get('x-total-count'), '3');
+  assert.equal(response.headers.get('x-total-pages'), '1');
 });
