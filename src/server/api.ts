@@ -3668,6 +3668,12 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   const rows = await db.queryPage('teachers', { school_id: school.id, id }, 1, 1, undefined, LIST_QUERY_COLUMNS.teachers);
   const current = rows.items[0] as any;
   if (!current) { res.status(404).json({ error: 'Teacher was not found in this school.' }); return; }
+  const formTeacherClassId = body.formTeacherClassId === undefined ? undefined : (typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '');
+  if (formTeacherClassId && !current.userId) { res.status(400).json({ error: 'This teacher has no sign-in account for Form Teacher access.' }); return; }
+  if (formTeacherClassId) {
+    const schoolClasses = await db.getClasses(school.id);
+    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+  }
   const updates: Record<string, unknown> = {};
   for (const field of ['fullName', 'phone', 'qualification', 'department'] as const) {
     if (body[field] === undefined) continue;
@@ -3709,6 +3715,13 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (current.userId) await db.getUsers(school.id, 'teacher');
   const updated = db.updateTeacher(id, updates as any);
   if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
+  if (formTeacherClassId !== undefined) {
+    const schoolClasses = await db.getClasses(school.id);
+    for (const klass of schoolClasses) {
+      if (klass.classTeacherId === current.userId && klass.id !== formTeacherClassId) await db.updateClass(klass.id, { classTeacherId: null }, school.id);
+    }
+    if (formTeacherClassId) await db.updateClass(formTeacherClassId, { classTeacherId: String(current.userId) }, school.id);
+  }
   if (current.userId) {
     const accountUpdates: Record<string, unknown> = {};
     if (updates.fullName !== undefined) accountUpdates.fullName = updates.fullName;
@@ -3780,6 +3793,11 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
     assignedSubjects.length ? queryAllRows('subjects', { school_id: school.id, id: assignedSubjects }, 'id') : []
   ]);
   if (validClasses.length !== assignedClasses.length) { res.status(400).json({ error: 'Every assigned class must belong to this school.' }); return; }
+  const formTeacherClassId = typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '';
+  if (formTeacherClassId) {
+    const schoolClasses = await db.getClasses(school.id);
+    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+  }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
 
   const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
@@ -3806,6 +3824,10 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
     joinedDate: new Date().toISOString().slice(0, 10),
     monthlySalary
   });
+  if (formTeacherClassId) {
+    await db.getClasses(school.id);
+    await db.updateClass(formTeacherClassId, { classTeacherId: account.id }, school.id);
+  }
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   await db.flush();
   res.status(201).json({ ...teacher, initialPin });
