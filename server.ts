@@ -50,7 +50,7 @@ async function startServer() {
     if (broadcastCheckInFlight) return;
     broadcastCheckInFlight = true;
     try {
-      const context = await db.prepareRequestContext(false, 'broadcast-scheduler');
+      const context = await db.prepareRequestContext(false, 'broadcast-scheduler', false);
       const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
       if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
     } finally {
