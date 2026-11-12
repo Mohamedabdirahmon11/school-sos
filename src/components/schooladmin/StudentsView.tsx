@@ -1,6 +1,6 @@
 /**
  * Student Directory & 360-Degree Profile Module for School Admin
- * Strict compliance with three-part name, NO date of birth, auto-generated STD-<CODE>-XX ID,
+ * Strict compliance with three-part name, NO date of birth, auto-generated simple S001-style ID,
  * 6-tab profile (Overview, Attendance, Results, Fees, Documents, Notes), and CSV import/export
  */
 
@@ -68,7 +68,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 20 }),
+    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 50, allClass: Boolean(classFilter) }),
     ApiClient.getClasses(), ApiClient.getBranches()
   ]), [school?.id, search, classFilter, branchFilter, feeFilter, page], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
@@ -281,12 +281,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           {/* Class Filter */}
           <select
             value={classFilter}
-            onChange={e => setClassFilter(e.target.value)}
+            onChange={e => { setClassFilter(e.target.value); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
             <option value="">All Classes</option>
-            {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {[...classes].sort((a, b) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0) || String(a.section || '').localeCompare(String(b.section || ''))).map(c => (
+              <option key={c.id} value={c.id}>{c.name}{c.section ? ` · ${c.section}` : ''}</option>
             ))}
           </select>
 
@@ -317,7 +317,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
-                  <th className="px-5 py-4">Roll</th>
+                  <th className="px-5 py-4 w-14">No.</th>
+                  <th className="px-5 py-4">Student ID</th>
                   <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
                   <th className="px-5 py-4">Guardian</th>
@@ -328,12 +329,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               <tbody className="divide-y divide-[#E2E8F0]">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={7} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
                 ) : (
-                  students.map(s => {
+                  students.map((s, rowIndex) => {
                     const isSelected = selectedStudent?.id === s.id;
                     // Older/imported rows may omit this derived field; never let one row crash the screen.
                     const feeStatus = typeof s.feeStatus === 'string' ? s.feeStatus.trim() : '';
@@ -346,6 +347,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                           isSelected ? 'bg-[#eef8f5]' : 'hover:bg-[#f8fbfa]'
                         }`}
                       >
+                        <td className="px-5 py-4 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className}</td>
@@ -699,7 +701,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               </div>
 
               <div className="p-2.5 bg-[#F0FDFA] rounded border border-[#CCFBF1] text-[11px] text-[#0F766E]">
-                Student ID will be auto-generated in sequence as: <code className="font-mono font-bold">STD-{school?.code}-XX</code>
+                Student ID is created automatically in order: <code className="font-mono font-bold">S001, S002, S003…</code>
               </div>
 
               <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">

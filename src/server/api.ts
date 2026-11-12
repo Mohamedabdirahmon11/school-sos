@@ -1914,10 +1914,11 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const pinSlips: Array<{ type: 'student' | 'parent'; name: string; studentName?: string; phone?: string; studentId?: string; pin: string }> = [];
   const parentRecords = new Map<string, any>();
   const existingParentAccounts = await db.getParents(school.id);
-  for (const row of importRows) {
+  const newStudentIds = await nextSchoolStudentIds(school.id, importRows.length);
+  for (const [rowIndex, row] of importRows.entries()) {
     const names = splitStudentName(row.data.studentName);
     const id = `std-${randomUUID()}`;
-    const studentId = `STD-${school.code}-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const studentId = newStudentIds[rowIndex];
     const pin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
     const pinHash = hashPin(pin);
     const classId = classIds.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`)!;
@@ -2200,7 +2201,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   const search = String(req.query.search || '').trim().replace(/[,.()]/g, ' ').slice(0, 60);
   const orFilter = search ? `first_name.ilike.%${search}%,middle_name.ilike.%${search}%,last_name.ilike.%${search}%` : undefined;
   const [students, assignments, timetable, attendance] = await Promise.all([
-    db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students),
+    db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
     db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
     db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
@@ -2653,6 +2654,31 @@ async function queryAllRows(table: string, filters: Record<string, string | stri
   }
   return rows;
 }
+const formatSimpleStudentId = (number: number) => `S${String(number).padStart(3, '0')}`;
+
+/** Simple per-school student IDs (S001, S002, ...). Existing IDs are never reused or changed. */
+async function nextSchoolStudentIds(schoolId: string, count: number): Promise<string[]> {
+  const total = (await db.queryPage('students', { school_id: schoolId }, 1, 1, undefined, 'id')).total;
+  const picked: string[] = [];
+  let start = total + 1;
+  for (let guard = 0; guard < 50 && picked.length < count; guard += 1) {
+    const window = Array.from({ length: count - picked.length + 50 }, (_, index) => formatSimpleStudentId(start + index));
+    const existing = new Set((await queryAllRows('students', { school_id: schoolId, student_id: window }, 'student_id'))
+      .map((row: any) => String(row.studentId || '').toUpperCase()));
+    for (const candidate of window) {
+      if (picked.length >= count) break;
+      if (!existing.has(candidate.toUpperCase())) picked.push(candidate);
+    }
+    start += window.length;
+  }
+  if (picked.length < count) throw new Error('Unable to allocate student IDs.');
+  return picked;
+}
+
+const studentNameKey = (student: any) => [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ').trim();
+const compareStudentsByName = (a: any, b: any) =>
+  studentNameKey(a).localeCompare(studentNameKey(b), undefined, { sensitivity: 'base', numeric: true })
+  || String(a.studentId || '').localeCompare(String(b.studentId || ''), undefined, { numeric: true });
 const getTimetablePeriodTimes = (settings: any, period: number, shift: number = 1) => {
   const afternoon = Number(shift) === 2;
   const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart || '13:00' : settings.firstPeriodStart || '08:00';
@@ -3226,6 +3252,19 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
+  if (typeof filters.class_id === 'string' && filters.class_id && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
+    const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
+      .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
+        .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
+      .sort(compareStudentsByName);
+    res.set({ 'X-Page': '1', 'X-Page-Size': String(Math.max(classStudents.length, 1)), 'X-Total-Count': String(classStudents.length), 'X-Total-Pages': '1' });
+    if (!canViewFeeStatus) { res.json(sanitizeStudents(classStudents)); return; }
+    const classStatusMap = await getStudentFeeStatusMap(school.id, classStudents.map((student: any) => student.id), school.academicYear);
+    res.json(sanitizeStudents(classStudents.map((student: any) => ({ ...student, feeStatus: classStatusMap.get(student.id) || 'unpaid' }))));
+    return;
+  }
+
   if (feeStatus !== 'all') {
     const allStudents = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
     const statusMap = await getStudentFeeStatusMap(school.id, undefined, school.academicYear);
@@ -3234,6 +3273,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()));
       return matchesSearch && (statusMap.get(student.id) || 'unpaid') === feeStatus;
     });
+    filtered.sort(compareStudentsByName);
     const total = filtered.length;
     const items = filtered.slice((page - 1) * pageSize, page * pageSize)
       .map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }));
@@ -3242,7 +3282,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     return;
   }
 
-  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students);
+  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id');
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {
@@ -3327,7 +3367,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
 
   const studentId = typeof body.studentId === 'string' && body.studentId.trim()
     ? body.studentId.trim()
-    : `STD-${school.code}-${randomBytes(4).toString('hex').toUpperCase()}`;
+    : (await nextSchoolStudentIds(school.id, 1))[0];
   if (!/^[A-Za-z0-9._-]{2,40}$/.test(studentId)) { res.status(400).json({ error: 'Student ID must be 2–40 letters, numbers, dots, underscores or hyphens.' }); return; }
   const duplicate = await db.queryPage('students', { school_id: school.id, student_id: studentId }, 1, 1, undefined, 'id');
   if (duplicate.total) { res.status(409).json({ error: 'That Student ID is already used in this school.' }); return; }
@@ -3941,7 +3981,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolConte
   // student, student login, parent links and audit record in one transaction.
   // The initial PIN is generated and hashed here; only this response exposes it.
   const initialPin = randomInt(1000, 10000).toString();
-  const studentId = `STD-${school.code}-${application.id.slice(-8).toUpperCase()}`;
+  const studentId = (await nextSchoolStudentIds(school.id, 1))[0];
   const studentRecordId = randomUUID();
   try {
     await db.approveAdmissionAtomically({

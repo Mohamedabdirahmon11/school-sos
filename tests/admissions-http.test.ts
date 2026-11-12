@@ -54,7 +54,7 @@ test('admissions create, reject and approve flows persist; approval enrolls once
   assert.equal(memory.rows('admission_applications').length, 2);
   assert.equal(memory.rows('admission_applications').some(row => row.id === secondRow.id), true);
   assert.equal(result.application.status, 'approved');
-  assert.match(result.student.studentId, /^STD-ADMIT-/);
+  assert.match(result.student.studentId, /^S\d{3,}$/);
   assert.ok(result.student.initialPin);
   assert.equal(memory.rows('students').filter(row => row.school_id === school.id || row.schoolId === school.id).length, 1);
   assert.equal((await fetch(`${baseUrl}/school/admissions`, { headers }).then(response => response.json())).length, 2);
@@ -95,6 +95,9 @@ test('admission approval is idempotent under concurrent requests and rolls back 
   assert.equal(enrolled.length, 1);
 
   const rollbackApplication = await createApplication('Rollback');
+  const studentLoginsBefore = memory.rows('users').filter(row =>
+    String(row.id).startsWith('usr-student-') && (row.schoolId ?? row.school_id) === school.id
+  ).length;
   memory.failNextAdmissionApproval();
   const failed = await fetch(`${baseUrl}/school/admissions/${rollbackApplication.id}/approve`, {
     method: 'POST', headers
@@ -107,10 +110,8 @@ test('admission approval is idempotent under concurrent requests and rolls back 
     && (row.classId ?? row.class_id) === isolatedClass.id
   ).length, 1, 'A failed transaction must not leave a partial student row.');
   assert.equal(memory.rows('users').filter(row =>
-    String(row.id).startsWith('usr-student-')
-    && (row.schoolId ?? row.school_id) === school.id
-    && row.studentId === 'STD-ADMIT-' + rollbackApplication.id.slice(-8).toUpperCase()
-  ).length, 0, 'A failed transaction must not leave a student login.');
+    String(row.id).startsWith('usr-student-') && (row.schoolId ?? row.school_id) === school.id
+  ).length, studentLoginsBefore, 'A failed transaction must not leave a student login.');
   const capacityClass = storage.db.createClass({
     schoolId: school.id, name: 'Admissions Capacity Class', gradeLevel: 4,
     section: 'A', roomNumber: '', capacity: 1, monthlyFee: 0

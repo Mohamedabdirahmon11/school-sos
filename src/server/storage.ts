@@ -677,7 +677,9 @@ class StorageEngine {
       query = Array.isArray(value) ? query.in(field, value) : query.eq(field, value);
     }
     if (orFilter && typeof query.or === 'function') query = query.or(orFilter);
-    if (typeof query.order === 'function') query = query.order(orderBy || primaryKeyColumn(table), { ascending });
+    if (typeof query.order === 'function') {
+      for (const column of String(orderBy || primaryKeyColumn(table)).split(',').map(value => value.trim()).filter(Boolean)) query = query.order(column, { ascending });
+    }
     const startedAt = performance.now();
     const { data, error, count } = await query.range((safePage - 1) * safeSize, safePage * safeSize - 1);
     this.recordQuery(table, 'select-page', startedAt);
