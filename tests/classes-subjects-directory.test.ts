@@ -15,7 +15,7 @@ test('Classes & Sections are grouped by grade, branch and shift with searchable 
 
 test('Subjects remain editable with class-specific teacher, periods and exam assignments', () => {
   assert.match(classesSource, /Assign to classes/);
-  assert.match(classesSource, /Periods per week/);
+  assert.match(classesSource, /Periods\/week/);
   assert.match(classesSource, /Teacher<select/);
   assert.match(classesSource, /smallExamEnabled/);
   assert.match(classesSource, /bigExamEnabled/);
