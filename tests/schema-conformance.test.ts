@@ -75,11 +75,14 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
       if (spec.required && !spec.hasDefault) assert.ok(Object.hasOwn(mapped, column), `${table} insert includes required ${column}`);
     }
   }
-  for (const [label, needle] of [
-    ['student', "db.createStudent({\n    schoolId: school.id"],
-        ['teacher', "db.createTeacher({\n    schoolId: school.id"],
-    ['staff', "db.createStaffMember({ schoolId: school.id"]
-  ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
+  const httpInsertPaths: Array<[string, RegExp]> = [
+    ['student', /db\\.createStudent\\(\\s*\\{[\\s\\S]{0,500}?schoolId:\\s*school\\.id/],
+    ['teacher', /db\\.createTeacher\\(\\s*\\{[\\s\\S]{0,500}?schoolId:\\s*school\\.id/],
+    ['staff', /db\\.createStaffMember\\(\\s*\\{[\\s\\S]{0,500}?schoolId:\\s*school\\.id/]
+  ];
+  for (const [label, pattern] of httpInsertPaths) {
+    assert.match(apiSource, pattern, `${label} HTTP insert path is covered by schema mapping fixture`);
+  }
 });
 
 test('performance migration has scoped dashboard aggregates, execute grants, and idempotent filter indexes', () => {
