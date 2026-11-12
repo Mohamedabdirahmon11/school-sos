@@ -599,7 +599,7 @@ class StorageEngine {
     return data;
   }
 
-  public async prepareRequestContext(includeLockouts = false, routeLabel = ''): Promise<StorageContext> {
+  public async prepareRequestContext(includeLockouts = false, routeLabel = '', includePlans = true): Promise<StorageContext> {
     const context = await this.createRequestContext(routeLabel);
     await this.contexts.run(context, async () => {
       const settingsTask = async () => {
@@ -622,7 +622,7 @@ class StorageEngine {
         await this.queryRows<PlanConfig>('plans', {});
         this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
       };
-      await Promise.all([settingsTask(), plansTask()]);
+      await Promise.all(includePlans ? [settingsTask(), plansTask()] : [settingsTask()]);
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
         this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
@@ -3418,14 +3418,34 @@ class StorageEngine {
   }
 
   public async publishDueBroadcasts(): Promise<number> {
-    const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
-    const now = Date.now();
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase broadcast publishing is unavailable.');
+    let dueIds: string[];
+    if (this.testClient) {
+      // Preserve the deterministic in-memory adapter path used by unit tests.
+      const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
+      const now = Date.now();
+      dueIds = scheduled.filter(item => item.scheduledFor && Date.parse(item.scheduledFor) <= now).map(item => item.id);
+    } else {
+      // Use the existing (status, scheduled_for) index and fetch only IDs that
+      // are actually due, rather than loading every future scheduled broadcast.
+      const startedAt = performance.now();
+      const { data, error } = await client.from('platform_broadcasts')
+        .select('id')
+        .eq('status', 'scheduled')
+        .lte('scheduled_for', new Date().toISOString())
+        .order('scheduled_for', { ascending: true })
+        .limit(100);
+      this.recordQuery('platform_broadcasts', 'select-due', startedAt);
+      if (error) throw new Error(error.message || 'Unable to load due platform broadcasts.');
+      dueIds = (data || []).map((row: any) => String(row.id)).filter(Boolean);
+    }
+
     let published = 0;
-    for (const item of scheduled) {
-      if (!item.scheduledFor || Date.parse(item.scheduledFor) > now) continue;
-      // publishBroadcast uses an atomic status filter so multiple server instances
+    for (const id of dueIds) {
+      // The database RPC uses an atomic status filter so multiple instances
       // cannot publish or audit the same scheduled broadcast twice.
-      const broadcast = await this.publishBroadcast(item.id);
+      const broadcast = await this.publishBroadcast(id);
       if (!broadcast) continue;
       this.logAudit({
         action: 'PLATFORM_BROADCAST_AUTO_PUBLISHED',
