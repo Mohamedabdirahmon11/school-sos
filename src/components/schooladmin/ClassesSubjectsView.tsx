@@ -25,6 +25,9 @@ export const ClassesSubjectsView: React.FC = () => {
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const [branchId, setBranchId] = useState('');
   const [formTeacherId, setFormTeacherId] = useState('');
+  const [classSearch, setClassSearch] = useState('');
+  const [classBranchFilter, setClassBranchFilter] = useState('');
+  const [subjectSearch, setSubjectSearch] = useState('');
   const [showClassModal, setShowClassModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [editingClass, setEditingClass] = useState<SchoolClass | null>(null);
@@ -51,6 +54,41 @@ export const ClassesSubjectsView: React.FC = () => {
   const [subjectCode, setSubjectCode] = useState('');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
 
+  const visibleClasses = classes
+    .filter(klass => {
+      const query = classSearch.trim().toLowerCase();
+      const teacherName = teachers.find(teacher => teacher.userId === klass.classTeacherId)?.fullName || '';
+      const matchesBranch = !classBranchFilter || klass.branchId === classBranchFilter;
+      const matchesSearch = !query || [klass.name, klass.section, klass.roomNumber, teacherName]
+        .some(value => String(value || '').toLowerCase().includes(query));
+      return matchesBranch && matchesSearch;
+    })
+    .sort((a, b) => Number(a.gradeLevel || 0) - Number(b.gradeLevel || 0)
+      || String(a.branchId || '').localeCompare(String(b.branchId || ''))
+      || Number(a.shift || 1) - Number(b.shift || 1)
+      || String(a.section || '').localeCompare(String(b.section || ''), undefined, { numeric: true, sensitivity: 'base' })
+      || a.name.localeCompare(b.name));
+  const classGroups = visibleClasses.reduce<Array<{
+    key: string; title: string; branchName: string; shiftName: string; items: SchoolClass[];
+  }>>((groups, klass) => {
+    const grade = Number(klass.gradeLevel || 0);
+    const title = grade === 0 ? 'KG' : `Grade ${grade}`;
+    const branchName = branches.find(branch => branch.id === klass.branchId)?.name || (klass.branchId ? 'Other branch' : 'Unassigned branch');
+    const shiftName = Number(klass.shift) === 2 ? 'Afternoon shift' : 'Morning shift';
+    const key = `${klass.branchId || 'unassigned'}:${grade}:${klass.shift || 1}`;
+    let group = groups.find(item => item.key === key);
+    if (!group) {
+      group = { key, title, branchName, shiftName, items: [] };
+      groups.push(group);
+    }
+    group.items.push(klass);
+    return groups;
+  }, []);
+  const visibleSubjects = subjects
+    .filter(subject => !subjectSearch.trim() || [subject.name, subject.code]
+      .some(value => String(value || '').toLowerCase().includes(subjectSearch.trim().toLowerCase())))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
   const fetchData = classLoad.retry;
   useEffect(() => { if (!branchId && branches.length) setBranchId(branches[0].id); }, [branchId, branches]);
 
@@ -76,7 +114,7 @@ export const ClassesSubjectsView: React.FC = () => {
       setClassName('');
       setClassShift(1);
       setCapacity(school?.defaultClassCapacity || 40);
-      setNotice(`Class "${className}" created.`);
+      setNotice(`Class "${className}" ${editingClass ? 'updated' : 'created'}.`);
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -135,81 +173,140 @@ export const ClassesSubjectsView: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Classes Column */}
-        <div className="min-w-0 space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E2E8F0]">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#0F766E]" />
-              <span>Classes & Sections ({classes.length})</span>
-            </h2>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)] gap-6">
+        {/* Grade and section hierarchy */}
+        <section aria-label="Classes and sections" className="min-w-0 space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E8F0] pb-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]">
+                <Layers className="h-5 w-5 text-[#0F766E]" /> Classes & Sections
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">{classes.length} active class sections · grouped by grade, branch and shift</p>
+            </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setShowBulkImport(true)} disabled={isReadOnly} className="px-3 py-1.5 border border-[#CBD5E1] bg-white hover:bg-slate-50 text-[#334155] rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50">
-                <Upload className="w-3.5 h-3.5 text-[#0F766E]" /><span>{t('bulk_import')}</span>
+              <button type="button" onClick={() => setShowBulkImport(true)} disabled={isReadOnly}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
+                <Upload className="h-4 w-4 text-[#0F766E]" /> {t('bulk_import')}
               </button>
-              <button
-                onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
-                disabled={isReadOnly}
-                className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create Class</span>
+              <button type="button" onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
+                disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
+                <Plus className="h-4 w-4" /> Create class
               </button>
             </div>
+          </header>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input value={classSearch} onChange={event => setClassSearch(event.target.value)} placeholder="Search grade, section, room or form teacher"
+                aria-label="Search classes and sections" className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E]" />
+            </label>
+            <select aria-label="Filter classes by branch" value={classBranchFilter} onChange={event => setClassBranchFilter(event.target.value)}
+              className="w-full rounded-xl border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm">
+              <option value="">All branches</option>
+              {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
 
-          <div className="divide-y divide-[#E2E8F0]">
-            {classes.map(c => (
-              <div key={c.id} className="py-3 flex items-center justify-between text-xs gap-2">
-                <button type="button" onClick={() => { setSelectedClassId(c.id); setStudentPage(1); }} className="text-left min-w-0 hover:text-[#0F766E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E] rounded">
-                  <p className="font-semibold text-[#132A29]">{c.name}</p>
-                  <p className="text-[11px] text-[#64748B]">
-                    {c.roomNumber} · Shift {c.shift || 1} · Capacity: {c.capacity} students · Monthly Fee: {formatMoney(c.monthlyFee, school?.currency)}
-                  </p>
-                  <p className="text-[11px] text-teal-700">Form Teacher: {teachers.find(teacher => teacher.userId === c.classTeacherId)?.fullName || 'Not assigned'}</p>
-                </button>
-                <span className="font-mono text-[#0F766E] bg-[#F0FDFA] px-2 py-0.5 rounded text-[11px] font-bold">
-                  Section {c.section}
-                </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${c.name}`} onClick={() => { setEditingClass(c); setClassName(c.name); setGradeLevel(c.gradeLevel); setClassShift(c.shift === 2 ? 2 : 1); setSection(c.section); setRoomNumber(c.roomNumber || ''); setCapacity(c.capacity); setMonthlyFee(c.monthlyFee); setBranchId(c.branchId || ''); setFormTeacherId(c.classTeacherId || ''); setShowClassModal(true); }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
-          </div>
-        </div>
+          {classGroups.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+              <Layers className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-2 text-sm font-semibold text-slate-700">No classes found</p>
+              <p className="mt-1 text-xs text-slate-500">Change the filters or create/import a class to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {classGroups.map(group => (
+                <section key={group.key} className="overflow-hidden rounded-2xl border border-[#DCE7E4]">
+                  <header className="flex flex-wrap items-center justify-between gap-2 bg-[#F3F8F6] px-4 py-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#17332F]">{group.title}</h3>
+                      <p className="mt-0.5 text-[11px] text-slate-500">{group.branchName} · {group.shiftName}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#0F766E]">{group.items.length} section{group.items.length === 1 ? '' : 's'}</span>
+                  </header>
+                  <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
+                    {group.items.map(klass => {
+                      const formTeacher = teachers.find(teacher => teacher.userId === klass.classTeacherId);
+                      return (
+                        <article key={klass.id} className={`min-w-0 rounded-xl border p-3 transition ${selectedClassId === klass.id ? 'border-[#0F766E] bg-[#F0FDFA]' : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-[#FAFCFB]'}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <button type="button" onClick={() => { setSelectedClassId(klass.id); setStudentPage(1); }}
+                              className="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E]">
+                              <span className="inline-flex rounded-lg bg-[#E7F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">Section {klass.section || '—'}</span>
+                              <p className="mt-2 truncate text-sm font-bold text-[#132A29]">{klass.name}</p>
+                              <p className="mt-1 text-[11px] text-slate-500">{klass.roomNumber || 'Room not set'} · Capacity {klass.capacity} · {formatMoney(klass.monthlyFee, school?.currency)}</p>
+                              <p className="mt-2 text-[11px] text-slate-600">Form Teacher: <span className="font-semibold text-slate-800">{formTeacher?.fullName || 'Not assigned'}</span></p>
+                            </button>
+                            <button type="button" disabled={isReadOnly} aria-label={`Edit ${klass.name}`}
+                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
+                              className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-white hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
 
-        {/* Subjects Column */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-[#0F766E]" />
-              <span>Academic Subjects ({subjects.length})</span>
-            </h2>
-            <button
-              onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setShowSubjectModal(true); }}
-              disabled={isReadOnly}
-              className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Subject</span>
+        {/* Curriculum subjects */}
+        <section aria-label="Academic subjects" className="min-w-0 space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E8F0] pb-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]">
+                <BookOpen className="h-5 w-5 text-[#0F766E]" /> Academic Subjects
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">{subjects.length} subjects · class and teacher assignments are managed per subject</p>
+            </div>
+            <button type="button" onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setSubjectName(''); setSubjectCode(''); setShowSubjectModal(true); }}
+              disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
+              <Plus className="h-4 w-4" /> Add subject
             </button>
-          </div>
-
-          <div className="divide-y divide-[#E2E8F0]">
-            {subjects.map(s => (
-              <div key={s.id} className="py-3 flex items-center justify-between text-xs gap-2">
-                <div>
-                  <p className="font-semibold text-[#132A29]">{s.name}</p>
-                  <p className="text-[11px] text-[#64748B]">Subject code: {s.code}</p>
-                </div>
-                <span className="font-mono text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded text-[11px]">
-                  {s.code}
-                </span>
-                <button disabled={isReadOnly} aria-label={`Edit ${s.name}`} onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(s.id); setSubjectAssignments(current); setEditingSubject(s); setSubjectName(s.name); setSubjectCode(s.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); } }} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50"><Pencil className="w-3.5 h-3.5" /></button>
-                <button disabled={isReadOnly} aria-label={`Delete ${s.name}`} onClick={async () => { if (!window.confirm(`Delete subject ${s.name}?`)) return; try { await ApiClient.deleteSubject(s.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); } }} className="p-1.5 rounded hover:bg-red-50 text-red-600 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
-          </div>
-        </div>
+          </header>
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={subjectSearch} onChange={event => setSubjectSearch(event.target.value)} placeholder="Search subject name or code"
+              aria-label="Search subjects" className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E]" />
+          </label>
+          {visibleSubjects.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+              <BookOpen className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-2 text-sm font-semibold text-slate-700">No subjects found</p>
+              <p className="mt-1 text-xs text-slate-500">Add a subject or adjust your search.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              {visibleSubjects.map(subject => {
+                const assignedTeachers = (subject.assignedTeacherIds || [])
+                  .map(id => teachers.find(teacher => teacher.id === id)?.fullName)
+                  .filter(Boolean);
+                return (
+                  <article key={subject.id} className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-teal-200">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-bold text-[#132A29]">{subject.name}</h3>
+                      <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600">{subject.code}</span>
+                      <p className="mt-2 text-[11px] text-slate-500">{assignedTeachers.length ? assignedTeachers.join(', ') : 'Teachers are assigned per class in subject settings.'}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <button type="button" disabled={isReadOnly} aria-label={`Edit ${subject.name}`}
+                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}
+                        className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
+                      <button type="button" disabled={isReadOnly} aria-label={`Delete ${subject.name}`}
+                        onClick={async () => { if (!window.confirm(`Delete subject ${subject.name}?`)) return; try { await ApiClient.deleteSubject(subject.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); }}
+                        className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          <p className="rounded-xl bg-[#F3F8F6] p-3 text-[11px] leading-relaxed text-slate-600">
+            Open a subject to assign it to one or more classes, choose the subject teacher for each class, set weekly periods, and enable small or big exam components. Credit units and departments are not required.
+          </p>
+        </section>
       </div>
 
       {selectedClassId && (
