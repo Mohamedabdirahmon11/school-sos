@@ -180,30 +180,33 @@ test('teacher sidebar remains fixed while the central viewport owns vertical scr
 });
 
 
+
 test('daily attendance uses one atomic bulk upsert on the existing natural key', () => {
   const storage = read('../src/server/storage.ts');
   const start = storage.indexOf('public async recordDailyAttendance(');
   const end = storage.indexOf('// EXAMS & RESULTS', start);
   const method = storage.slice(start, end);
-  assert.match(method, /upsert\\(payload, \\{ onConflict: 'school_id,class_id,student_id,date' \\}\\)/);
-  assert.match(method, /upsert-batch/);
-  assert.doesNotMatch(method, /queryRows|this\\.save\\(|this\\.flush\\(/);
+  assert.ok(method.includes(".upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })"));
+  assert.ok(method.includes("'upsert-batch'"));
+  assert.ok(!method.includes('queryRows'));
+  assert.ok(!method.includes('this.save()'));
+  assert.ok(!method.includes('this.flush()'));
 });
 
 test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
   const start = api.indexOf("apiRouter.post('/attendance'");
   const end = api.indexOf('// 6. EXAMS & RESULTS', start);
   const route = api.slice(start, end);
-  assert.equal((route.match(/db\\.getClassById\\(/g) || []).length, 1);
-  assert.match(route, /attendanceClass\\.classTeacherId !== user\\.id/);
-  assert.doesNotMatch(route, /canAccessTeachingClass/);
+  assert.equal(route.split('db.getClassById(').length - 1, 1);
+  assert.ok(route.includes('attendanceClass.classTeacherId !== user.id'));
+  assert.ok(!route.includes('canAccessTeachingClass'));
 });
 
 test('teacher student scope queries only Form Teacher classes instead of every school class', () => {
   const start = api.indexOf('async function getTeacherAssignedClassIds(');
   const end = api.indexOf('async function getNoticeClassIds', start);
   const helper = api.slice(start, end);
-  assert.match(helper, /class_teacher_id: userId/);
-  assert.match(helper, /is_archived: 'false'/);
-  assert.doesNotMatch(helper, /db\\.getClasses\\(/);
+  assert.ok(helper.includes('class_teacher_id: userId'));
+  assert.ok(helper.includes("is_archived: 'false'"));
+  assert.ok(!helper.includes('db.getClasses('));
 });
