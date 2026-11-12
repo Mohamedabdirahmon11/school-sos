@@ -2124,49 +2124,33 @@ class StorageEngine {
     records: { studentId: string; status: 'present' | 'absent' | 'late' | 'excused'; note?: string }[],
     recordedBy: string
   ): Promise<AttendanceRecord[]> {
-    await this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId, date });
-    const results: AttendanceRecord[] = [];
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Attendance storage is unavailable.');
     const now = new Date().toISOString();
-
-    for (const rec of records) {
-      const existingIdx = this.data.attendance.findIndex(a => 
-        a.schoolId === schoolId && 
-        a.classId === classId && 
-        a.studentId === rec.studentId && 
-        a.date === date
-      );
-
-      if (existingIdx >= 0) {
-        this.data.attendance[existingIdx].status = rec.status;
-        this.data.attendance[existingIdx].note = rec.note;
-        this.data.attendance[existingIdx].recordedBy = recordedBy;
-        this.data.attendance[existingIdx].recordedAt = now;
-        results.push(this.data.attendance[existingIdx]);
-      } else {
-        // A stable ID makes simultaneous submissions converge on the same
-        // row as well as respecting the database's natural-key unique index.
-        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
-        const newRecord: AttendanceRecord = {
-          id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
-          schoolId,
-          classId,
-          studentId: rec.studentId,
-          date,
-          status: rec.status,
-          note: rec.note,
-          recordedBy,
-          recordedAt: now
-        };
-        this.data.attendance.push(newRecord);
-        results.push(newRecord);
-      }
-
-
-    }
-
-    this.save();
-    await this.flush();
-    return results;
+    const payload = records.map(rec => {
+      const attendanceKey = [schoolId, classId, rec.studentId, date].join('\\u0000');
+      return {
+        id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
+        school_id: schoolId,
+        class_id: classId,
+        student_id: rec.studentId,
+        date,
+        status: rec.status,
+        note: rec.note ?? null,
+        recorded_by: recordedBy,
+        recorded_at: now
+      };
+    });
+    // The existing unique index on (school_id, class_id, student_id, date)
+    // makes this one atomic bulk write; no read-before-write or full snapshot
+    // persistence is needed for attendance submissions.
+    const startedAt = performance.now();
+    const { data, error } = await client.from('attendance_records')
+      .upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })
+      .select('*');
+    this.recordQuery('attendance_records', 'upsert-batch', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save daily attendance.');
+    return ((data || payload) as any[]).map(row => fromSupabaseRow(row, 'attendance_records')) as AttendanceRecord[];
   }
 
   // -------------------------------------------------------------
