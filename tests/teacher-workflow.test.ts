@@ -178,3 +178,32 @@ test('teacher sidebar remains fixed while the central viewport owns vertical scr
   assert.match(sidebar, /overflow-y-auto/);
   assert.match(app, /<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });
+
+
+test('daily attendance uses one atomic bulk upsert on the existing natural key', () => {
+  const storage = read('../src/server/storage.ts');
+  const start = storage.indexOf('public async recordDailyAttendance(');
+  const end = storage.indexOf('// EXAMS & RESULTS', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /upsert\\(payload, \\{ onConflict: 'school_id,class_id,student_id,date' \\}\\)/);
+  assert.match(method, /upsert-batch/);
+  assert.doesNotMatch(method, /queryRows|this\\.save\\(|this\\.flush\\(/);
+});
+
+test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
+  const start = api.indexOf("apiRouter.post('/attendance'");
+  const end = api.indexOf('// 6. EXAMS & RESULTS', start);
+  const route = api.slice(start, end);
+  assert.equal((route.match(/db\\.getClassById\\(/g) || []).length, 1);
+  assert.match(route, /attendanceClass\\.classTeacherId !== user\\.id/);
+  assert.doesNotMatch(route, /canAccessTeachingClass/);
+});
+
+test('teacher student scope queries only Form Teacher classes instead of every school class', () => {
+  const start = api.indexOf('async function getTeacherAssignedClassIds(');
+  const end = api.indexOf('async function getNoticeClassIds', start);
+  const helper = api.slice(start, end);
+  assert.match(helper, /class_teacher_id: userId/);
+  assert.match(helper, /is_archived: 'false'/);
+  assert.doesNotMatch(helper, /db\\.getClasses\\(/);
+});
