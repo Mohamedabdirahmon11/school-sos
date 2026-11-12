@@ -80,6 +80,7 @@ test('CSV import creates one missing class, students, linked parent and one-time
   const students = memory.rows('students').filter(row => row.schoolId === admin.schoolId);
   assert.equal(students.length, 2);
   assert.ok(students.every(row => row.pinHash?.startsWith('pin_scrypt:')));
+  assert.ok(students.every(row => row.status === 'active'));
   assert.equal(memory.rows('users').filter(row => row.schoolId === admin.schoolId && row.role === 'parent' && row.phone === '+252611234567').length, 1);
   assert.equal(memory.rows('audit_logs').filter(row => row.schoolId === admin.schoolId && row.action === 'SCHOOL_BULK_IMPORT').length, 1);
   assert.equal(JSON.stringify(students).includes(result.pinSlips[0].pin), false);
