@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 test('parent directory loads every page through the school-scoped students API', () => {
   const source = readFileSync(new URL('../src/components/schooladmin/ParentsView.tsx', import.meta.url), 'utf8');
-  assert.match(source, /getSchoolStudents\(\{ schoolId: school\.id, page, pageSize: 20, search \}\)/);
+  assert.match(source, /getSchoolStudents\(\{ schoolId: school\.id, page, pageSize: 50, search, classId: classFilter \}\)/);
   assert.match(source, /PaginationControls info=\{pageInfo\}/);
   assert.match(source, /setPageInfo\(\(rows as any\)\.pagination/);
   assert.match(source, /setPage\(1\)/);
