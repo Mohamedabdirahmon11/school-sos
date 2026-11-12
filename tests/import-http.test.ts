@@ -161,3 +161,53 @@ test('template contains required headers and explicitly skipped examples', async
   assert.equal((text.match(/EXAMPLE/g) || []).length, 9);
   assert.match(text, /Grade 5/);
 });
+
+test('student import template has no Status or Reason column', async () => {
+  const response = await fetch(`${baseUrl}/import/template`, { headers: { Cookie: `schoolos_session=${tokenFor(admin)}` } });
+  assert.equal(response.status, 200);
+  const header = (await response.text()).split(/\r?\n/)[0].split(',').map(value => value.replace(/"/g, '').trim().toLowerCase());
+  assert.ok(header.includes('studentname'));
+  assert.equal(header.includes('status'), false);
+  assert.equal(header.includes('reason'), false);
+});
+
+test('CSV without a Status column imports and every new student is active', async () => {
+  const text = csv(['Grade 6', 'A', 'Hodan Ali', 'female', '2014-03-02', 'Ali Warsame', '+252611555101', '', '']);
+  assert.equal(text.split('\n')[0].toLowerCase().includes('status'), false);
+  const { response, body } = await preview(admin, text);
+  assert.equal(response.status, 200);
+  assert.equal(body.totals.valid, 1);
+  assert.equal(body.totals.errors, 0);
+  const imported = await confirm(admin, body.rows.map((row: any) => row.data));
+  assert.equal(imported.status, 200);
+  const student = memory.rows('students').find(row => row.schoolId === admin.schoolId && row.firstName === 'Hodan');
+  assert.ok(student, 'student was created');
+  assert.equal(student.status, 'active');
+});
+
+test('an unexpected Status column in the uploaded file is ignored and does not block or change the import', async () => {
+  const text = [
+    'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,studentPhone,branch,Status',
+    'Grade 6,A,Farah Ali,male,2014-05-06,Ali Warsame,+252611555102,,,inactive'
+  ].join('\n');
+  const { response, body } = await preview(admin, text);
+  assert.equal(response.status, 200);
+  assert.equal(body.totals.valid, 1);
+  const imported = await confirm(admin, body.rows.map((row: any) => row.data));
+  assert.equal(imported.status, 200);
+  const student = memory.rows('students').find(row => row.schoolId === admin.schoolId && row.firstName === 'Farah');
+  assert.ok(student, 'student was created');
+  assert.equal(student.status, 'active');
+});
+
+test('preview reports Status and Reason only as result fields, never as input data', async () => {
+  const { response, body } = await preview(admin, csv(['Grade 6', 'A', 'OnlyOneName', 'female', '2014-03-02', 'Ali Warsame', '+252611555103', '', '']));
+  assert.equal(response.status, 200);
+  assert.ok(body.rows.length > 0);
+  for (const row of body.rows) {
+    assert.ok(['valid', 'error', 'skipped'].includes(row.status));
+    assert.ok(Array.isArray(row.reasons));
+    assert.equal('status' in row.data, false);
+    assert.equal('reason' in row.data, false);
+  }
+});
