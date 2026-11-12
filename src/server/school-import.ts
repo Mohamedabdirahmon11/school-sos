@@ -99,9 +99,8 @@ export function isExampleImportRow(row: SchoolImportRow): boolean {
 }
 
 export function validImportPhone(value: string): boolean {
-  return /^\+?[1-9]\d{6,14}$/.test(value.replace(/[\s()-]/g, ''));
+  return /^\\+?[1-9]\\d{6,14}$/.test(normalizeImportPhone(value).replace(/[\\s()-]/g, ''));
 }
-
 export function splitStudentName(value: string): { firstName: string; middleName: string; lastName: string } {
   const parts = value.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) throw new Error('Student name must contain at least two names.');
