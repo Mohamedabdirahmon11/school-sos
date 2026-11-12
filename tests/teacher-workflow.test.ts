@@ -194,6 +194,7 @@ test('daily attendance uses one atomic bulk upsert on the existing natural key',
 });
 
 test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
+  const api = read('../src/server/api.ts');
   const start = api.indexOf("apiRouter.post('/attendance'");
   const end = api.indexOf('// 6. EXAMS & RESULTS', start);
   const route = api.slice(start, end);
@@ -203,6 +204,7 @@ test('Form Teacher attendance authorization loads its class once without subject
 });
 
 test('teacher class scope uses school-bound joins instead of separate teacher and full class reads', () => {
+  const api = read('../src/server/api.ts');
   const start = api.indexOf('async function getTeacherAssignedClassIds(');
   const end = api.indexOf('async function getNoticeClassIds', start);
   const helper = api.slice(start, end);
@@ -215,6 +217,7 @@ test('teacher class scope uses school-bound joins instead of separate teacher an
 });
 
 test('teaching-class authorization avoids subject queries for the assigned Form Teacher', () => {
+  const api = read('../src/server/api.ts');
   const start = api.indexOf('async function canAccessTeachingClass(');
   const end = api.indexOf('async function canAccessStudentRecord', start);
   const helper = api.slice(start, end);
