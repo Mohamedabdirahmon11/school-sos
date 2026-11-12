@@ -35,5 +35,6 @@ test('student import template columns do not include a status field', () => {
 test('international phone validation still rejects malformed numbers', () => {
   assert.equal(validImportPhone('+251911000001'), true);
   assert.equal(validImportPhone("' +251911000001"), true);
+  assert.equal(validImportPhone('’+251911000001'), true);
   assert.equal(validImportPhone('not-a-phone'), false);
 });
