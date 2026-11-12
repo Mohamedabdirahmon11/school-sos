@@ -3668,6 +3668,7 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   const rows = await db.queryPage('teachers', { school_id: school.id, id }, 1, 1, undefined, LIST_QUERY_COLUMNS.teachers);
   const current = rows.items[0] as any;
   if (!current) { res.status(404).json({ error: 'Teacher was not found in this school.' }); return; }
+  if (body.formTeacherClassId !== undefined && body.formTeacherClassId !== null && typeof body.formTeacherClassId !== 'string') { res.status(400).json({ error: 'Form Teacher class must be a valid class ID.' }); return; }
   const formTeacherClassId = body.formTeacherClassId === undefined ? undefined : (typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '');
   if (formTeacherClassId && !current.userId) { res.status(400).json({ error: 'This teacher has no sign-in account for Form Teacher access.' }); return; }
   if (formTeacherClassId) {
@@ -3717,7 +3718,7 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
   if (formTeacherClassId !== undefined) {
     const schoolClasses = await db.getClasses(school.id);
-    for (const klass of schoolClasses) {
+    if (current.userId) for (const klass of schoolClasses) {
       if (klass.classTeacherId === current.userId && klass.id !== formTeacherClassId) await db.updateClass(klass.id, { classTeacherId: null }, school.id);
     }
     if (formTeacherClassId) await db.updateClass(formTeacherClassId, { classTeacherId: String(current.userId) }, school.id);
@@ -3793,6 +3794,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
     assignedSubjects.length ? queryAllRows('subjects', { school_id: school.id, id: assignedSubjects }, 'id') : []
   ]);
   if (validClasses.length !== assignedClasses.length) { res.status(400).json({ error: 'Every assigned class must belong to this school.' }); return; }
+  if (body.formTeacherClassId !== undefined && body.formTeacherClassId !== null && typeof body.formTeacherClassId !== 'string') { res.status(400).json({ error: 'Form Teacher class must be a valid class ID.' }); return; }
   const formTeacherClassId = typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '';
   if (formTeacherClassId) {
     const schoolClasses = await db.getClasses(school.id);
