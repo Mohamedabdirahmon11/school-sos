@@ -66,6 +66,11 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   const api = read('../src/server/api.ts');
   assert.match(admin, /selectedClassIds/);
   assert.match(admin, /selectedSubjectIds/);
+  assert.match(admin, /selectedFormTeacherClassId/);
+  assert.match(admin, /formTeacherClassId/);
+  assert.match(admin, /Form Teacher class/);
+  assert.match(api, /body\.formTeacherClassId/);
+  assert.match(api, /classTeacherId: account\.id/);
   assert.match(admin, /Teacher ID:/);
   assert.match(admin, /Initial PIN:/);
   assert.match(admin, /Reset PIN/);
