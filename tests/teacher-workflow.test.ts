@@ -30,8 +30,8 @@ test('teachers enter exam marks and school administrators only review and approv
 
 test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
   const api = read('../src/server/api.ts');
-  assert.match(api, /formTeacherClassIds = formTeacherClasses\\.items\\.map/);
-  assert.match(api, /'users\\.role': 'teacher'/);
+  assert.ok(api.includes('formTeacherClassIds = formTeacherClasses.items.map'));
+  assert.ok(api.includes("'users.role': 'teacher'"));
   assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
   assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
   assert.match(api, /canEditMarks: true/);
