@@ -2128,7 +2128,7 @@ class StorageEngine {
     if (!client) throw new Error('Attendance storage is unavailable.');
     const now = new Date().toISOString();
     const payload = records.map(rec => {
-      const attendanceKey = [schoolId, classId, rec.studentId, date].join('\\u0000');
+      const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
       return {
         id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
         school_id: schoolId,
