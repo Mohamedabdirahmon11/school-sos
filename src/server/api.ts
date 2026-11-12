@@ -335,20 +335,25 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  const [teacher, classes] = await Promise.all([
-    db.queryPage('teachers', { school_id: schoolId, user_id: userId }, 1, 1, undefined, 'id'),
-    db.getClasses(schoolId)
+  // Resolve both subject-teaching and Form Teacher scopes through school-bound
+  // joins. This avoids a separate teachers lookup and avoids loading every class.
+  const [assignments, formTeacherClasses] = await Promise.all([
+    db.queryPage('class_subjects', {
+      school_id: schoolId,
+      is_active: 'true',
+      'teachers.user_id': userId,
+      'teachers.school_id': schoolId
+    }, 1, 100, undefined, 'class_id,teachers!class_subjects_teacher_id_fkey!inner(user_id)'),
+    db.queryPage('classes', {
+      school_id: schoolId,
+      class_teacher_id: userId,
+      is_archived: 'false',
+      'users.role': 'teacher',
+      'users.school_id': schoolId
+    }, 1, 100, undefined, 'id,users!classes_class_teacher_id_fkey!inner(id)')
   ]);
-  if (!teacher.items.length) return [];
-  const assignments = await queryAllRows('class_subjects', {
-    school_id: schoolId, teacher_id: teacher.items[0].id, is_active: 'true'
-  }, 'class_id');
-  // Subject teachers see the full student lists of classes they teach.
-  // Form Teachers also need their entire homeroom class, even without a subject assignment.
-  const subjectClassIds = assignments.map((assignment: any) => assignment.classId);
-  const formTeacherClassIds = classes
-    .filter((klass: any) => klass.classTeacherId === userId && !klass.isArchived)
-    .map((klass: any) => klass.id);
+  const subjectClassIds = assignments.items.map((assignment: any) => assignment.classId);
+  const formTeacherClassIds = formTeacherClasses.items.map((klass: any) => klass.id);
   return [...new Set([...subjectClassIds, ...formTeacherClassIds])];
 }
 
@@ -530,19 +535,21 @@ function requireSchoolStaff(req: Request, res: Response, next: () => void) {
 async function canAccessTeachingClass(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
-  const klass = await db.getClassById(classId, school.id);
+  const classPage = await db.queryPage('classes', { id: classId, school_id: school.id }, 1, 1, undefined, 'id,class_teacher_id');
+  const klass = classPage.items[0] as any;
   if (!klass) {
     res.status(404).json({ error: 'Class not found in this school.' });
     return false;
   }
-  if (normalizeRole(user.role) === 'teacher') {
-    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
-    const teacher = teacherPage.items[0] as any;
-    const assignment = teacher
-      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: classId, is_active: 'true' }, 1, 1, undefined, 'id')
-      : { items: [] as any[] };
-    const isFormTeacher = Boolean(teacher && klass.classTeacherId === user.id);
-    if (!assignment.items.length && !isFormTeacher) {
+  if (normalizeRole(user.role) === 'teacher' && klass.classTeacherId !== user.id) {
+    const assignment = await db.queryPage('class_subjects', {
+      school_id: school.id,
+      class_id: classId,
+      is_active: 'true',
+      'teachers.user_id': user.id,
+      'teachers.school_id': school.id
+    }, 1, 1, undefined, 'id,teachers!class_subjects_teacher_id_fkey!inner(user_id)');
+    if (!assignment.items.length) {
       res.status(403).json({ error: 'You may only access classes assigned to you as a subject teacher or form teacher.' });
       return false;
     }
@@ -4080,7 +4087,12 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
-  if (!await canAccessTeachingClass(req, res, normalizedClassId)) return;
+  const attendanceClass = await db.getClassById(normalizedClassId, school.id);
+  if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
+  if (attendanceClass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
+    return;
+  }
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
   for (const record of records) {
@@ -4117,13 +4129,6 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
     return;
   }
-  const attendanceClass = await db.getClassById(normalizedClassId, school.id);
-  if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
-  if (attendanceClass.classTeacherId !== user.id) {
-    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
-    return;
-  }
-
   const saved = await db.recordDailyAttendance(school.id, normalizedClassId, date, normalizedRecords, user.id);
   res.json({ success: true, count: saved.length, records: saved });
 });

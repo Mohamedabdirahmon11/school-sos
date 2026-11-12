@@ -293,12 +293,16 @@ test('school backups include newer tenant modules but exclude credentials and ac
 });
 
 
-test('daily attendance waits for database persistence before returning success', () => {
+test('daily attendance uses one atomic batch upsert before returning success', () => {
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   const start = storage.indexOf('public async recordDailyAttendance');
   const end = storage.indexOf('// EXAMS & RESULTS', start);
   const method = storage.slice(start, end);
-  assert.match(method, /this\.save\(\);\s*await this\.flush\(\);\s*return results;/);
+  assert.ok(method.includes(".upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })"));
+  assert.ok(method.includes(".select('*')"));
+  assert.ok(!method.includes('this.save()'));
+  assert.ok(!method.includes('this.flush()'));
+  assert.ok(!method.includes('queryRows'));
 });
 
 

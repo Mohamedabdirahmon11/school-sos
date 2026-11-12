@@ -30,7 +30,8 @@ test('teachers enter exam marks and school administrators only review and approv
 
 test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
   const api = read('../src/server/api.ts');
-  assert.match(api, /formTeacherClassIds = classes[\s\S]*klass\.classTeacherId === userId/);
+  assert.ok(api.includes('formTeacherClassIds = formTeacherClasses.items.map'));
+  assert.ok(api.includes("'users.role': 'teacher'"));
   assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
   assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
   assert.match(api, /canEditMarks: true/);
@@ -177,4 +178,52 @@ test('teacher sidebar remains fixed while the central viewport owns vertical scr
   assert.match(sidebar, /fixed inset-y-0 left-0/);
   assert.match(sidebar, /overflow-y-auto/);
   assert.match(app, /<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
+});
+
+
+
+test('daily attendance uses one atomic bulk upsert on the existing natural key', () => {
+  const storage = read('../src/server/storage.ts');
+  const start = storage.indexOf('public async recordDailyAttendance(');
+  const end = storage.indexOf('// EXAMS & RESULTS', start);
+  const method = storage.slice(start, end);
+  assert.ok(method.includes(".upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })"));
+  assert.ok(method.includes("'upsert-batch'"));
+  assert.ok(!method.includes('queryRows'));
+  assert.ok(!method.includes('this.save()'));
+  assert.ok(!method.includes('this.flush()'));
+});
+
+test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.post('/attendance'");
+  const end = api.indexOf('// 6. EXAMS & RESULTS', start);
+  const route = api.slice(start, end);
+  assert.equal(route.split('db.getClassById(').length - 1, 1);
+  assert.ok(route.includes('attendanceClass.classTeacherId !== user.id'));
+  assert.ok(!route.includes('canAccessTeachingClass'));
+});
+
+test('teacher class scope uses school-bound joins instead of separate teacher and full class reads', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf('async function getTeacherAssignedClassIds(');
+  const end = api.indexOf('async function getNoticeClassIds', start);
+  const helper = api.slice(start, end);
+  assert.ok(helper.includes("'teachers.user_id': userId"));
+  assert.ok(helper.includes("'teachers.school_id': schoolId"));
+  assert.ok(helper.includes("'users.role': 'teacher'"));
+  assert.ok(helper.includes("'users.school_id': schoolId"));
+  assert.ok(!helper.includes("queryPage('teachers'"));
+  assert.ok(!helper.includes('db.getClasses('));
+});
+
+test('teaching-class authorization avoids subject queries for the assigned Form Teacher', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf('async function canAccessTeachingClass(');
+  const end = api.indexOf('async function canAccessStudentRecord', start);
+  const helper = api.slice(start, end);
+  assert.ok(helper.includes("queryPage('classes'"));
+  assert.ok(helper.includes("classPage.items[0]"));
+  assert.ok(helper.includes("'teachers.user_id': user.id"));
+  assert.ok(!helper.includes("queryPage('teachers'"));
 });

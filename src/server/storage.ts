@@ -599,7 +599,7 @@ class StorageEngine {
     return data;
   }
 
-  public async prepareRequestContext(includeLockouts = false, routeLabel = ''): Promise<StorageContext> {
+  public async prepareRequestContext(includeLockouts = false, routeLabel = '', includePlans = true): Promise<StorageContext> {
     const context = await this.createRequestContext(routeLabel);
     await this.contexts.run(context, async () => {
       const settingsTask = async () => {
@@ -622,7 +622,7 @@ class StorageEngine {
         await this.queryRows<PlanConfig>('plans', {});
         this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
       };
-      await Promise.all([settingsTask(), plansTask()]);
+      await Promise.all(includePlans ? [settingsTask(), plansTask()] : [settingsTask()]);
       if (includeLockouts) {
         const lockouts = await this.queryRows<any>('lockout_counters', {});
         this.data.lockoutCounters = Object.fromEntries(lockouts.map(row => [row.id, {
@@ -2124,49 +2124,33 @@ class StorageEngine {
     records: { studentId: string; status: 'present' | 'absent' | 'late' | 'excused'; note?: string }[],
     recordedBy: string
   ): Promise<AttendanceRecord[]> {
-    await this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId, date });
-    const results: AttendanceRecord[] = [];
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Attendance storage is unavailable.');
     const now = new Date().toISOString();
-
-    for (const rec of records) {
-      const existingIdx = this.data.attendance.findIndex(a => 
-        a.schoolId === schoolId && 
-        a.classId === classId && 
-        a.studentId === rec.studentId && 
-        a.date === date
-      );
-
-      if (existingIdx >= 0) {
-        this.data.attendance[existingIdx].status = rec.status;
-        this.data.attendance[existingIdx].note = rec.note;
-        this.data.attendance[existingIdx].recordedBy = recordedBy;
-        this.data.attendance[existingIdx].recordedAt = now;
-        results.push(this.data.attendance[existingIdx]);
-      } else {
-        // A stable ID makes simultaneous submissions converge on the same
-        // row as well as respecting the database's natural-key unique index.
-        const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
-        const newRecord: AttendanceRecord = {
-          id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
-          schoolId,
-          classId,
-          studentId: rec.studentId,
-          date,
-          status: rec.status,
-          note: rec.note,
-          recordedBy,
-          recordedAt: now
-        };
-        this.data.attendance.push(newRecord);
-        results.push(newRecord);
-      }
-
-
-    }
-
-    this.save();
-    await this.flush();
-    return results;
+    const payload = records.map(rec => {
+      const attendanceKey = [schoolId, classId, rec.studentId, date].join('\u0000');
+      return {
+        id: `att-${createHash('sha256').update(attendanceKey).digest('hex').slice(0, 32)}`,
+        school_id: schoolId,
+        class_id: classId,
+        student_id: rec.studentId,
+        date,
+        status: rec.status,
+        note: rec.note ?? null,
+        recorded_by: recordedBy,
+        recorded_at: now
+      };
+    });
+    // The existing unique index on (school_id, class_id, student_id, date)
+    // makes this one atomic bulk write; no read-before-write or full snapshot
+    // persistence is needed for attendance submissions.
+    const startedAt = performance.now();
+    const { data, error } = await client.from('attendance_records')
+      .upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })
+      .select('*');
+    this.recordQuery('attendance_records', 'upsert-batch', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save daily attendance.');
+    return ((data || payload) as any[]).map(row => fromSupabaseRow(row, 'attendance_records')) as AttendanceRecord[];
   }
 
   // -------------------------------------------------------------
@@ -3434,14 +3418,34 @@ class StorageEngine {
   }
 
   public async publishDueBroadcasts(): Promise<number> {
-    const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
-    const now = Date.now();
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase broadcast publishing is unavailable.');
+    let dueIds: string[];
+    if (this.testClient) {
+      // Preserve the deterministic in-memory adapter path used by unit tests.
+      const scheduled = await this.queryRows<PlatformBroadcast>('platform_broadcasts', { status: 'scheduled' });
+      const now = Date.now();
+      dueIds = scheduled.filter(item => item.scheduledFor && Date.parse(item.scheduledFor) <= now).map(item => item.id);
+    } else {
+      // Use the existing (status, scheduled_for) index and fetch only IDs that
+      // are actually due, rather than loading every future scheduled broadcast.
+      const startedAt = performance.now();
+      const { data, error } = await client.from('platform_broadcasts')
+        .select('id')
+        .eq('status', 'scheduled')
+        .lte('scheduled_for', new Date().toISOString())
+        .order('scheduled_for', { ascending: true })
+        .limit(100);
+      this.recordQuery('platform_broadcasts', 'select-due', startedAt);
+      if (error) throw new Error(error.message || 'Unable to load due platform broadcasts.');
+      dueIds = (data || []).map((row: any) => String(row.id)).filter(Boolean);
+    }
+
     let published = 0;
-    for (const item of scheduled) {
-      if (!item.scheduledFor || Date.parse(item.scheduledFor) > now) continue;
-      // publishBroadcast uses an atomic status filter so multiple server instances
+    for (const id of dueIds) {
+      // The database RPC uses an atomic status filter so multiple instances
       // cannot publish or audit the same scheduled broadcast twice.
-      const broadcast = await this.publishBroadcast(item.id);
+      const broadcast = await this.publishBroadcast(id);
       if (!broadcast) continue;
       this.logAudit({
         action: 'PLATFORM_BROADCAST_AUTO_PUBLISHED',
