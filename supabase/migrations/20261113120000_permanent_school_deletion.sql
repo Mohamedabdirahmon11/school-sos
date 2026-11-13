@@ -20,7 +20,7 @@ begin
     from information_schema.columns c
     where c.table_schema = 'public'
       and c.column_name in ('school_id', 'target_school_id')
-      and c.table_name <> 'schools'
+      and c.table_name not in ('schools','users')
     order by c.table_name, c.column_name
   loop
     execute format('select count(*) from public.%I where %I = $1', r.table_name, r.column_name)
