@@ -5756,7 +5756,7 @@ apiRouter.get('/users', requireAuth, requireSchoolAdminOrSuperAdmin, (req, res) 
     role: requestedRole === 'all' ? supportedRoles : requestedRole
   };
   const rawSearch = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-  const search = rawSearch.replace(/[%(),\\"]/g, '').slice(0, 80);
+  const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
   const orFilter = search
     ? `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,staff_id.ilike.%${search}%`
     : undefined;
