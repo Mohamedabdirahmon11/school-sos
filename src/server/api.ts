@@ -46,6 +46,7 @@ import { staffHasPermission, type StaffPermission } from '../lib/staff-permissio
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, validateSchoolSetupStep } from './school-setup-data.ts';
+import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 
 export const apiRouter = Router();
 
@@ -6853,6 +6854,39 @@ async function getSchoolSetupState(school: School) {
   return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
 }
 
+
+apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext,
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '1572864' }),
+  async (req, res) => {
+    const school = (req as any).school as School;
+    const bytes = Buffer.isBuffer(req.body) ? req.body : null;
+    const detected = bytes ? detectSchoolLogoImage(bytes, String(req.headers['content-type'] || '')) : null;
+    if (!bytes || !detected) {
+      res.status(400).json({ error: 'Upload a valid PNG, JPEG or WebP logo smaller than 1.5 MB.' });
+      return;
+    }
+    if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
+      res.status(503).json({ error: 'School logo storage is not configured. Please contact support.' });
+      return;
+    }
+    const storageClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const objectPath = `${school.id}/logo/${randomUUID()}.${detected.extension}`;
+    const { error } = await storageClient.storage.from(SCHOOL_LOGO_BUCKET).upload(objectPath, bytes, {
+      contentType: detected.contentType,
+      cacheControl: '31536000',
+      upsert: false
+    });
+    if (error) {
+      console.error('[school-logo] Supabase Storage upload failed:', error.message);
+      res.status(502).json({ error: 'The school logo could not be uploaded. Please retry.' });
+      return;
+    }
+    const { data } = storageClient.storage.from(SCHOOL_LOGO_BUCKET).getPublicUrl(objectPath);
+    res.status(201).json({ logoUrl: data.publicUrl });
+  }
+);
 
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
