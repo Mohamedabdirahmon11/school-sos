@@ -2692,6 +2692,7 @@ apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuper
     'classCode,academicYear,className,gradeLevel,section,branch,roomNumber,capacity,shift,monthlyFee',
     `KG1-${school.academicYear.slice(0, 4)},${school.academicYear},KG 1,KG,,,KG Room,40,1,0`,
     `KG2-${school.academicYear.slice(0, 4)},${school.academicYear},KG 2,KG,,,KG Room 2,40,1,0`,
+    `KG3-${school.academicYear.slice(0, 4)},${school.academicYear},KG 3,KG,,,KG Room 3,40,1,0`,
     `G1-A-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,A,,Room 101,40,1,0`,
     `G1-B-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,B,,Room 102,40,1,0`
   ].join('\r\n');
