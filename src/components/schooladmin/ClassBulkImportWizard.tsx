@@ -22,7 +22,7 @@ export const ClassBulkImportWizard: React.FC<{ open: boolean; onClose: () => voi
       `G1-A-${yearCode},${year},Grade 1,1,A,,Room 101,40,1,0`,
       `G1-B-${yearCode},${year},Grade 1,1,B,,Room 102,40,1,0`,
       `G2-A-${yearCode},${year},Grade 2,2,A,,Room 201,40,1,0`
-    ].join('\\r\\n');
+    ].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'schoolos-class-import-template.csv'; anchor.click(); URL.revokeObjectURL(url);
   };
