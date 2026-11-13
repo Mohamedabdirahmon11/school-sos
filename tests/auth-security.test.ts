@@ -131,3 +131,12 @@ test('password changes and Super Admin resets synchronize linked Supabase Auth c
   assert.match(profileRoute, /email: cleanEmail/);
   assert.match(profileRoute, /await db\.flush\(\)/);
 });
+
+
+test('profile password input enforces the same eight-character minimum as the backend', () => {
+  const profileSource = readFileSync(new URL('../src/components/common/ProfileModal.tsx', import.meta.url), 'utf8');
+  const securitySource = readFileSync(new URL('../src/server/auth-security.ts', import.meta.url), 'utf8');
+  assert.match(profileSource, /minLength=\{8\}/);
+  assert.match(profileSource, /New password \(min 8 characters\)/);
+  assert.match(securitySource, /password\.length < 8/);
+});
