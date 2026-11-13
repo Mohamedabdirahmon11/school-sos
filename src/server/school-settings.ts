@@ -262,7 +262,8 @@ export function calculateShiftEndMinutes(settings: {
 }, periodsPerDay: number): number {
   const start = settings.shift2FirstPeriodStart || '13:00';
   const [hours, minutes] = start.split(':').map(Number);
-  const periods = Number.isInteger(periodsPerDay) && periodsPerDay > 0 ? periodsPerDay : 6;
+  // The timetable API currently permits at most six periods per day (Friday five).
+  const periods = Number.isInteger(periodsPerDay) && periodsPerDay > 0 ? Math.min(6, periodsPerDay) : 6;
   const periodMinutes = Number(settings.shift2PeriodMinutes || 40);
   const breakAfter = Number(settings.shift2BreakAfterPeriod || 3);
   const breakMinutes = Number(settings.shift2BreakMinutes ?? 20);
