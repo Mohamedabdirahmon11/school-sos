@@ -66,6 +66,10 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [addName, setAddName] = useState('');
   const [addCode, setAddCode] = useState('');
   const [addEmail, setAddEmail] = useState('');
+  const [addAddress, setAddAddress] = useState('');
+  const [addCity, setAddCity] = useState('');
+  const [addPhone, setAddPhone] = useState('');
+  const [addWhatsappPhone, setAddWhatsappPhone] = useState('');
   const [addPlan, setAddPlan] = useState<PlanTier>('standard');
   const [addCadence, setAddCadence] = useState<SubscriptionCadence>('monthly');
   const [addAdminName, setAddAdminName] = useState('');
@@ -125,6 +129,10 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         name: addName,
         code: addCode,
         email: addEmail,
+        address: addAddress,
+        city: addCity,
+        phone: addPhone,
+        whatsappPhone: addWhatsappPhone,
         plan: addPlan,
         cadence: addCadence,
         adminName: addAdminName,
@@ -140,6 +148,10 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setAddName('');
       setAddCode('');
       setAddEmail('');
+      setAddAddress('');
+      setAddCity('');
+      setAddPhone('');
+      setAddWhatsappPhone('');
       setAddAdminName('');
       setAddAdminEmail('');
       setAddAdminPhone('');
@@ -390,6 +402,12 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                   {selectedSchool.school.name}
                 </h2>
                 <p className="text-xs text-[#64748B]">{selectedSchool.school.email}</p>
+                <p className="text-[11px] text-[#64748B] mt-1">
+                  {[selectedSchool.school.address, selectedSchool.school.city].filter(Boolean).join(', ') || 'Address not recorded'}
+                </p>
+                <p className="text-[11px] text-[#64748B]">
+                  Phone: {selectedSchool.school.phone || '—'} · WhatsApp: {selectedSchool.school.whatsappPhone || '—'}
+                </p>
               </div>
               <button
                 onClick={() => setSelectedSchool(null)}
@@ -468,7 +486,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
             {/* Administrator Account */}
             <div className="text-xs space-y-2">
               <h3 className="font-semibold text-[#132A29]">School Administrator</h3>
-              {selectedSchool.admins.map((adm: any) => (
+              {(Array.isArray(selectedSchool.admins) ? selectedSchool.admins : selectedSchool.admin ? [selectedSchool.admin] : []).map((adm: any) => (
                 <div key={adm.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-[#132A29]">{adm.fullName}</p>
@@ -564,6 +582,25 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               <div>
                 <label className="block font-medium text-[#334155]">School Email *</label>
                 <input type="email" required value={addEmail} onChange={e => setAddEmail(e.target.value)} placeholder="office@school.so" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-[#334155]">City *</label>
+                  <input type="text" required value={addCity} onChange={e => setAddCity(e.target.value)} placeholder="e.g. Jijiga" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">School Address *</label>
+                  <input type="text" required value={addAddress} onChange={e => setAddAddress(e.target.value)} placeholder="Street / area / location" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">School Phone *</label>
+                  <input type="tel" required value={addPhone} onChange={e => setAddPhone(e.target.value)} placeholder="+251..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">School / Admin WhatsApp *</label>
+                  <input type="tel" required value={addWhatsappPhone} onChange={e => setAddWhatsappPhone(e.target.value)} placeholder="+251..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
