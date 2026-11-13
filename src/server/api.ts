@@ -3017,7 +3017,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
     schoolId: school.id, name, classCode, academicYear, gradeLevel, section,
     roomNumber: String(req.body?.roomNumber || '').trim(), capacity,
     classTeacherId: req.body?.classTeacherId || null,
-    monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift
+    monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
   });
   res.status(201).json(newClass);
 });
