@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeTimetableSettings } from '../src/server/school-settings.ts';
+import { isShiftWithinSchoolClosingTime, sanitizeTimetableSettings } from '../src/server/school-settings.ts';
 
 test('accepts separate morning and afternoon timetable settings', () => {
   const result = sanitizeTimetableSettings({
@@ -80,4 +80,27 @@ test('shift count accepts only one or two', () => {
     breakMinutes: 20,
     shiftCount: 3
   }));
+});
+
+test('second shift must finish by the configured school closing time including its break', () => {
+  const settings = {
+    shift2FirstPeriodStart: '13:00',
+    shift2PeriodMinutes: 40,
+    shift2BreakAfterPeriod: 3,
+    shift2BreakMinutes: 20
+  };
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '17:20'), true);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '17:19'), false);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '18:00'), true);
+});
+
+test('second-shift closing validation includes periods but omits a break after the final period', () => {
+  const settings = {
+    shift2FirstPeriodStart: '14:00',
+    shift2PeriodMinutes: 30,
+    shift2BreakAfterPeriod: 6,
+    shift2BreakMinutes: 30
+  };
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '17:00'), true);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '16:59'), false);
 });
