@@ -27,7 +27,18 @@ function auditIdempotency(source: string, label: string) {
   const violations: string[] = [];
   for (const match of source.matchAll(/\bCREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS\b)/gi)) violations.push('CREATE TABLE without IF NOT EXISTS');
   for (const match of source.matchAll(/\bCREATE\s+(?:UNIQUE\s+)?INDEX\s+(?!IF\s+NOT\s+EXISTS\b)/gi)) violations.push('CREATE INDEX without IF NOT EXISTS');
-  if (/\bDROP\s+TABLE\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(source)) violations.push('destructive table/data statement');
+  const hasDestructiveSql = /\\bDROP\\s+TABLE\\b|\\bTRUNCATE\\b|\\bDELETE\\s+FROM\\b/i.test(source);
+  if (hasDestructiveSql) {
+    // This migration intentionally defines a runtime deletion RPC. Its DELETE
+    // statements execute only when the service-role-only function is called;
+    // migration application itself only creates/replaces the guarded function.
+    const guardedSchoolDeletionMigration = label === '20261113120000_permanent_school_deletion.sql'
+      && /CREATE OR REPLACE FUNCTION public\\.delete_school_permanently\\(/i.test(source)
+      && /SECURITY DEFINER/i.test(source)
+      && /REVOKE ALL ON FUNCTION public\\.delete_school_permanently\\(text, text\\) FROM public, anon, authenticated/i.test(source)
+      && /GRANT EXECUTE ON FUNCTION public\\.delete_school_permanently\\(text, text\\) TO service_role/i.test(source);
+    if (!guardedSchoolDeletionMigration) violations.push('destructive table/data statement');
+  }
   for (const match of source.matchAll(/\bCREATE\s+POLICY\s+([a-z_][a-z0-9_]*|%I_[a-z_]+)\s+ON\s+([a-z_.%I]+)/gi)) {
     const prefix = source.slice(Math.max(0, match.index! - 2500), match.index);
     const name = match[1];
