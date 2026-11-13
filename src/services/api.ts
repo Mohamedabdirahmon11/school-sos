@@ -70,12 +70,13 @@ export class ApiClient {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
-  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string }) {
-    if (!params?.page && !params?.pageSize && !params?.search?.trim()) return '';
+  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
+    if (!params?.page && !params?.pageSize && !params?.search?.trim() && !params?.status) return '';
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.search?.trim()) query.set('search', params.search.trim());
+    if (params.status) query.set('status', params.status);
     return `?${query.toString()}`;
   }
   private static getHeaders(): HeadersInit {
@@ -1143,7 +1144,7 @@ export class ApiClient {
   }
 
   // Support Tickets
-  public static async getTickets(params?: any) {
+  public static async getTickets(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
     return this.request<SupportTicket[]>(`/support/tickets${this.pageQuery(params)}`);
   }
 
