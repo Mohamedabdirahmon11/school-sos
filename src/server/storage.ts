@@ -3363,15 +3363,16 @@ class StorageEngine {
     return [...new Map([...sent, ...received].map(message => [message.id, message])).values()];
   }
 
-  public sendMessage(msgData: Omit<DirectMessage, 'id' | 'timestamp' | 'isRead'>): DirectMessage {
+  public async sendMessage(msgData: Omit<DirectMessage, 'id' | 'timestamp' | 'isRead'>): Promise<DirectMessage> {
     const message: DirectMessage = {
       ...msgData,
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `msg-${Date.now()}-${randomUUID()}`,
       timestamp: new Date().toISOString(),
       isRead: false
     };
     this.data.messages.push(message);
     this.save();
+    await this.flush();
     return message;
   }
 
@@ -3382,7 +3383,10 @@ class StorageEngine {
       if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) { changed = true; return { ...message, isRead: true }; }
       return message;
     });
-    if (changed) this.save();
+    if (changed) {
+      this.save();
+      await this.flush();
+    }
   }
 
   public async getBroadcasts(): Promise<PlatformBroadcast[]> {
