@@ -6385,9 +6385,9 @@ async function getSchoolSetupState(school: School) {
   ] = await Promise.all([
     queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id,user_id'),
-    db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
-    db.queryPage('students', { school_id: school.id }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
+    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
     db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
