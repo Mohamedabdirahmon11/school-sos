@@ -19,7 +19,9 @@ export const SupportAuditView: React.FC = () => {
   const [auditPage, setAuditPage] = useState(1);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [replyText, setReplyText] = useState('');
-  const [replyStatus, setReplyStatus] = useState<any>('resolved');
+  const [replyStatus, setReplyStatus] = useState<'resolved' | 'in_progress' | 'closed'>('resolved');
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [auditSearch, setAuditSearch] = useState('');
   const [auditCategory, setAuditCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -50,18 +52,21 @@ export const SupportAuditView: React.FC = () => {
 
   const handleReplyTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTicket || !replyText.trim()) return;
-
+    if (!selectedTicket || !replyText.trim() || isReplying) return;
+    setIsReplying(true);
+    setReplyError(null);
     try {
       const updated = await ApiClient.replyTicket(selectedTicket.id, {
-        content: replyText,
+        content: replyText.trim(),
         status: replyStatus
       });
       setReplyText('');
       setSelectedTicket(updated);
       await fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setReplyError(err.message || 'The support reply could not be saved.');
+    } finally {
+      setIsReplying(false);
     }
   };
 
@@ -218,12 +223,14 @@ export const SupportAuditView: React.FC = () => {
 
               {/* Reply Form */}
               <form onSubmit={handleReplyTicket} className="space-y-3 pt-3 border-t border-[#E2E8F0] text-xs">
+                {replyError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-800">{replyError}</p>}
                 <div>
                   <label className="block font-medium text-[#334155]">Super Admin Reply</label>
                   <textarea
                     rows={3}
                     required
                     value={replyText}
+                    disabled={isReplying}
                     onChange={e => setReplyText(e.target.value)}
                     placeholder="Type official response..."
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
@@ -233,7 +240,8 @@ export const SupportAuditView: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <select
                     value={replyStatus}
-                    onChange={e => setReplyStatus(e.target.value)}
+                    disabled={isReplying}
+                    onChange={e => setReplyStatus(e.target.value as 'resolved' | 'in_progress' | 'closed')}
                     className="w-1/2 px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs"
                   >
                     <option value="resolved">Mark Resolved</option>
@@ -243,10 +251,11 @@ export const SupportAuditView: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-1/2 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                    disabled={isReplying || !replyText.trim()}
+                    className="w-1/2 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Send Reply</span>
+                    <span>{isReplying ? 'Sending…' : 'Send Reply'}</span>
                   </button>
                 </div>
               </form>
