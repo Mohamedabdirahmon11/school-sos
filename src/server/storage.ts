@@ -966,7 +966,7 @@ class StorageEngine {
   }
 
   public createSchool(schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>): School {
-    const id = `sch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const id = `sch-${randomUUID()}`;
     const now = new Date().toISOString();
     const newSchool: School = {
       ...schoolData,
@@ -1085,19 +1085,44 @@ class StorageEngine {
       // Cascade delete school data
       this.data.branches = this.data.branches.filter(b => b.schoolId !== id);
       this.data.users = this.data.users.filter(u => u.schoolId !== id);
+      this.data.sessions = this.data.sessions.filter(session => session.schoolId !== id);
       this.data.students = this.data.students.filter(s => s.schoolId !== id);
       this.data.teachers = this.data.teachers.filter(t => t.schoolId !== id);
       this.data.classes = this.data.classes.filter(c => c.schoolId !== id);
       this.data.subjects = this.data.subjects.filter(s => s.schoolId !== id);
       this.data.timetable = this.data.timetable.filter(t => t.schoolId !== id);
+      this.data.timetableSettings = this.data.timetableSettings.filter(row => row.schoolId !== id);
+      this.data.teacherUnavailability = this.data.teacherUnavailability.filter(row => row.schoolId !== id);
       this.data.attendance = this.data.attendance.filter(a => a.schoolId !== id);
+      this.data.examConfigs = this.data.examConfigs.filter(row => row.schoolId !== id);
       this.data.marks = this.data.marks.filter(m => m.schoolId !== id);
+      this.data.promotions = this.data.promotions.filter(row => row.schoolId !== id);
+      this.data.promotionHistory = this.data.promotionHistory.filter(row => row.schoolId !== id);
       this.data.feePayments = this.data.feePayments.filter(f => f.schoolId !== id);
       this.data.feeStructures = this.data.feeStructures.filter(f => f.schoolId !== id);
+      this.data.reportCardDesigns = this.data.reportCardDesigns.filter(row => row.schoolId !== id);
+      this.data.communicationSettings = this.data.communicationSettings.filter(row => row.schoolId !== id);
+      this.data.communicationQueue = this.data.communicationQueue.filter(q => q.schoolId !== id);
       this.data.notices = this.data.notices.filter(n => n.schoolId !== id);
       this.data.events = this.data.events.filter(e => e.schoolId !== id);
       this.data.messages = this.data.messages.filter(m => m.schoolId !== id);
-      this.data.communicationQueue = this.data.communicationQueue.filter(q => q.schoolId !== id);
+      this.data.assignments = this.data.assignments.filter(row => row.schoolId !== id);
+      this.data.assignmentSubmissions = this.data.assignmentSubmissions.filter(row => row.schoolId !== id);
+      this.data.staffMembers = this.data.staffMembers.filter(row => row.schoolId !== id);
+      this.data.payrollRecords = this.data.payrollRecords.filter(row => row.schoolId !== id);
+      this.data.admissionApplications = this.data.admissionApplications.filter(row => row.schoolId !== id);
+      this.data.invoices = this.data.invoices.filter(row => row.schoolId !== id);
+      this.data.feeRanges = this.data.feeRanges.filter(row => row.schoolId !== id);
+      this.data.busAssignments = this.data.busAssignments.filter(row => row.schoolId !== id);
+      this.data.notificationTemplates = this.data.notificationTemplates.filter(row => row.schoolId !== id);
+      this.data.libraryBooks = this.data.libraryBooks.filter(row => row.schoolId !== id);
+      this.data.libraryLoans = this.data.libraryLoans.filter(row => row.schoolId !== id);
+      this.data.transportRoutes = this.data.transportRoutes.filter(row => row.schoolId !== id);
+      this.data.inventoryItems = this.data.inventoryItems.filter(row => row.schoolId !== id);
+      this.data.inventoryTransactions = this.data.inventoryTransactions.filter(row => row.schoolId !== id);
+      this.data.disciplineIncidents = this.data.disciplineIncidents.filter(row => row.schoolId !== id);
+      this.data.restoreTestRecords = this.data.restoreTestRecords.filter(row => row.schoolId !== id);
+      this.data.lockoutCounterRows = this.data.lockoutCounterRows.filter(row => row.schoolId !== id);
       this.save();
       return true;
     }
