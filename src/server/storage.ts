@@ -245,7 +245,7 @@ function primaryKeyColumn(table: string): string {
 // Keep database naming decisions at the storage boundary. Most columns follow
 // camelCase -> snake_case, while these fields have schema-specific names.
 const TABLE_FIELD_MAP: Record<string, Record<string, string>> = {
-  users: { pin: 'pin_hash', pinHash: 'pin_hash', staffId: 'staff_id', mustSetup2FA: 'must_setup_2fa', requireSuperAdmin2FA: 'require_super_admin_2fa' },
+  users: { authUserId: 'auth_user_id', pin: 'pin_hash', pinHash: 'pin_hash', staffId: 'staff_id', mustSetup2FA: 'must_setup_2fa', requireSuperAdmin2FA: 'require_super_admin_2fa' },
   students: { pinHash: 'pin_hash', studentId: 'student_id' },
   teachers: { userId: 'user_id', staffId: 'staff_id', assignedClasses: 'assigned_classes', assignedSubjects: 'assigned_subjects' },
   staff_members: { userId: 'user_id', roleTitle: 'role_title', monthlySalary: 'monthly_salary', joinedDate: 'joined_date', staffId: 'staff_id' },
