@@ -1957,7 +1957,10 @@ class StorageEngine {
 
   public createClass(classData: Omit<SchoolClass, 'id'>): SchoolClass {
     const id = `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const newClass: SchoolClass = { ...classData, id };
+    const school = this.data.schools.find(item => item.id === classData.schoolId);
+    const academicYear = classData.academicYear || school?.academicYear || this.data.settings.academicYearName || '2026-2027';
+    const classCode = classData.classCode || `CLS-${Number(classData.gradeLevel) === 0 ? 'KG' : `G${classData.gradeLevel}`}-${String(classData.section || 'MAIN').toUpperCase()}-${id.slice(-6).toUpperCase()}`;
+    const newClass: SchoolClass = { ...classData, classCode, academicYear, section: classData.section || '', id };
     this.data.classes.push(newClass);
     this.save();
     return newClass;
