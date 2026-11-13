@@ -136,3 +136,13 @@ test('successful scheduled S3 backups update platform status and create an audit
   assert.match(workflowSource, /github-actions-backup-/);
   assert.match(settingsSource, /Last recorded platform backup/);
 });
+
+
+test('Super Admin dashboard quick renew action cannot be submitted twice', () => {
+  const dashboardSource = read('../src/components/superadmin/SuperAdminDashboard.tsx');
+  assert.match(dashboardSource, /if \(activatingSchoolId\) return/);
+  assert.match(dashboardSource, /setActivatingSchoolId\(schoolId\)/);
+  assert.match(dashboardSource, /disabled=\{Boolean\(activatingSchoolId\)\}/);
+  assert.match(dashboardSource, /Activating…/);
+  assert.match(dashboardSource, /finally \{\s*setActivatingSchoolId\(null\)/);
+});
