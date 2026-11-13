@@ -66,7 +66,7 @@ test('school onboarding remains Super Admin-only and tenant rows are scoped by s
 test('school admin ID can be used in the shared staff login form', () => {
   const login = read('../src/components/auth/LoginView.tsx');
   assert.match(login, /School Admin ID/);
-  assert.ok(login.includes('type="text"') && login.includes('Email, phone, Admin ID, or T001'));
+  assert.ok(login.includes('type="text"') && login.includes('Super Admin email or School / Admin / Teacher ID'));
 });
 
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {
