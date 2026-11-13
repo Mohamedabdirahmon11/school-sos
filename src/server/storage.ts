@@ -3503,6 +3503,7 @@ class StorageEngine {
     };
     this.data.tickets.push(ticket);
     this.save();
+    await this.flush();
     return ticket;
   }
 
@@ -3521,6 +3522,7 @@ class StorageEngine {
       ticket.status = 'in_progress';
     }
     this.save();
+    await this.flush();
     return ticket;
   }
 
