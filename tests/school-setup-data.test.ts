@@ -14,8 +14,8 @@ test('academic year requires consecutive years and valid Gregorian dates', () =>
 
 test('academic year cannot be changed to exclude already saved terms', () => {
   const existingData = { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }] };
-  assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', startDate: '2026-09-01', endDate: '2027-06-30' } }, existingData), null);
-  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', startDate: '2026-10-01', endDate: '2027-06-30' } }, existingData) || '', /would exclude saved terms/);
+  assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' } }, existingData), null);
+  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-10-01', endDate: '2027-06-30' } }, existingData) || '', /would exclude saved terms/);
 });
 
 test('terms allow one to three non-overlapping periods only', () => {
