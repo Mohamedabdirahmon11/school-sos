@@ -750,6 +750,38 @@ async function refreshSessionCookie(res: Response, user: User, previous: ReturnT
 // Link a legacy staff account only after the user has successfully proved
 // its existing SchoolOS password. Never overwrite or guess an existing Auth
 // identity; duplicate emails require an explicit account reconciliation.
+async function syncLinkedSupabaseAuthCredentials(
+  user: User,
+  updates: { email?: string; password?: string }
+): Promise<boolean> {
+  const authUserId = String(user.authUserId || '').trim();
+  if (!authUserId) return true;
+  if (!isSupabaseConfigured || !user.email || !supabaseUrl || !supabaseKey) return false;
+
+  const attributes: { email?: string; email_confirm?: boolean; password?: string } = {};
+  if (updates.email && updates.email !== user.email) {
+    attributes.email = updates.email;
+    attributes.email_confirm = true;
+  }
+  if (updates.password) attributes.password = updates.password;
+  if (Object.keys(attributes).length === 0) return true;
+
+  try {
+    const adminClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const { error } = await adminClient.auth.admin.updateUserById(authUserId, attributes);
+    if (error) {
+      console.error('[auth] Linked Supabase Auth credential update failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch {
+    console.error('[auth] Linked Supabase Auth credential update failed.');
+    return false;
+  }
+}
+
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
   if (!isSupabaseConfigured || !user.email || user.authUserId || !['super_admin', 'school_admin', 'accountant'].includes(user.role)) return;
 
@@ -832,38 +864,6 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // ==============================================================================
 // 1. AUTHENTICATION & LOGIN (PASSWORD, STAFF FIRST-LOGIN, STUDENT/PARENT PIN)
 // ==============================================================================
-
-async function syncLinkedSupabaseAuthCredentials(
-  user: User,
-  updates: { email?: string; password?: string }
-): Promise<boolean> {
-  const authUserId = String(user.authUserId || '').trim();
-  if (!authUserId) return true;
-  if (!isSupabaseConfigured || !user.email || !supabaseUrl || !supabaseKey) return false;
-
-  const attributes: { email?: string; email_confirm?: boolean; password?: string } = {};
-  if (updates.email && updates.email !== user.email) {
-    attributes.email = updates.email;
-    attributes.email_confirm = true;
-  }
-  if (updates.password) attributes.password = updates.password;
-  if (Object.keys(attributes).length === 0) return true;
-
-  try {
-    const adminClient = createClient(supabaseUrl, supabaseKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { error } = await adminClient.auth.admin.updateUserById(authUserId, attributes);
-    if (error) {
-      console.error('[auth] Linked Supabase Auth credential update failed:', error.message);
-      return false;
-    }
-    return true;
-  } catch {
-    console.error('[auth] Linked Supabase Auth credential update failed.');
-    return false;
-  }
-}
 
 apiRouter.post('/auth/login', async (req, res) => {
   const { email, phone, schoolCode, pin, password } = req.body;
