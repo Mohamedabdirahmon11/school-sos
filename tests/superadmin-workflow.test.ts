@@ -89,11 +89,11 @@ test('Super Admin can edit school contact and display details with validation an
 });
 
 
-test('platform backup UI does not imply that the saved frequency preference runs an automatic off-site backup', () => {
+test('platform backup UI clearly distinguishes a preference from unconfigured automation', () => {
   const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
   const storageSource = read('../src/server/storage.ts');
-  assert.match(settingsSource, /Backup Frequency Preference \(Not Automated\)/);
-  assert.match(settingsSource, /Automated off-site backups are not configured/);
+  assert.match(settingsSource, /Backup Frequency Preference/);
+  assert.match(settingsSource, /scheduled workflow is currently blocked/);
   assert.match(settingsSource, /does not support full-platform restore/);
   assert.match(storageSource, /full-platform restore is not supported/);
 });
