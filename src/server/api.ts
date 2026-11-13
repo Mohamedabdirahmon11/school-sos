@@ -4847,9 +4847,9 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   const user = (req as any).user as User;
   let allowedClassIds: Set<string> | null = null;
 
-  if (['school_admin', 'super_admin', 'accountant'].includes(user.role)) {
+  if (user.role === 'school_admin' || user.role === 'super_admin' || user.role === 'accountant') {
     allowedClassIds = null;
-  } else if (['student', 'parent', 'teacher'].includes(user.role)) {
+  } else if (user.role === 'student' || user.role === 'parent' || user.role === 'teacher') {
     allowedClassIds = new Set(await getNoticeClassIds(school.id, user));
   } else {
     allowedClassIds = new Set();
