@@ -31,6 +31,7 @@ test('batch billing uses validated recurring pricing and reports its actual coun
   assert.ok(!client.includes(".catch(() => ({ success: true, count: 0 }))"));
   assert.match(ui, /res\.generatedCount/);
   assert.match(ui, /loadError/);
+  assert.match(ui, /inv\.status === 'paid' && \([\s\S]*?setSelectedInvoice\(inv\)/);
 });
 
 test('plan edits validate prices and limits without allowing plan ID changes', () => {
