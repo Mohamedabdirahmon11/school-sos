@@ -87,9 +87,44 @@ jobs:
           tar -czf schoolos-supabase-backup.tar.gz -C backup .
 
       - name: Upload encrypted backup to private S3 bucket
+        id: upload
         if: steps.policy.outputs.run_backup == 'true'
         shell: bash
         run: |
           object_key="${BACKUP_S3_PREFIX%/}/schoolos-db-backup-$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_RUN_ID}.tar.gz"
           aws s3 cp schoolos-supabase-backup.tar.gz "s3://${BACKUP_S3_BUCKET}/${object_key}" --sse AES256 --no-progress
+          echo "object_key=${object_key}" >> "$GITHUB_OUTPUT"
           echo "Backup uploaded to private S3 key: ${object_key}"
+
+      - name: Record successful off-site backup in platform settings and audit
+        if: steps.policy.outputs.run_backup == 'true'
+        shell: bash
+        env:
+          BACKUP_OBJECT_KEY: ${{ steps.upload.outputs.object_key }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -v run_id="$GITHUB_RUN_ID" \
+            -v run_attempt="$GITHUB_RUN_ATTEMPT" \
+            -v object_key="$BACKUP_OBJECT_KEY" <<'SQL'
+          UPDATE public.super_admin_settings
+          SET last_backup_date = NOW(), last_backup_status = 'success'
+          WHERE id = 'default';
+
+          INSERT INTO public.audit_logs
+            (id, timestamp, action, category, user_id, user_name, user_role, details, severity)
+          VALUES (
+            'github-actions-backup-' || :'run_id' || '-' || :'run_attempt',
+            NOW(),
+            'PLATFORM_OFFSITE_BACKUP_COMPLETED',
+            'security',
+            'system',
+            'GitHub Actions',
+            'super_admin',
+            'Encrypted database backup uploaded to private S3 object: ' || :'object_key',
+            'info'
+          )
+          ON CONFLICT (id) DO UPDATE
+            SET timestamp = EXCLUDED.timestamp,
+                details = EXCLUDED.details,
+                severity = EXCLUDED.severity;
+          SQL
