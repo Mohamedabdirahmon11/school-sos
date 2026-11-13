@@ -44,16 +44,17 @@ test('password policy requires 8 characters, mixed case, and a number', () => {
 });
 
 
-test('new school administrator temporary passwords are hashed and changed on first sign-in', () => {
+test('new school administrator temporary PINs are hashed and changed on first sign-in', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const schoolsSource = readFileSync(new URL('../src/components/superadmin/SchoolsView.tsx', import.meta.url), 'utf8');
-  assert.match(apiSource, /const temporaryPassword = adminPassword \? undefined : randomBytes\(12\)\.toString\('base64url'\)/);
-  assert.match(apiSource, /passwordHash: hashPassword\(String\(adminPassword \|\| temporaryPassword\)\)/);
+  assert.match(apiSource, /const temporaryPin = String\(adminPin \|\| randomInt\(100000, 1_000_000\)\)/);
+  assert.match(apiSource, /passwordHash: hashPassword\(temporaryPin\)/);
   assert.match(apiSource, /adminUsername: adminUser\.staffId/);
   assert.match(apiSource, /mustChangePassword: Boolean\(adminUser\.mustChangePassword\)/);
   assert.doesNotMatch(apiSource, /passwordHash: adminPassword/);
-  assert.match(schoolsSource, /res\.temporaryPassword/);
-  assert.match(schoolsSource, /addAdminPassword/);
+  assert.match(schoolsSource, /res\.temporaryPin/);
+  assert.match(schoolsSource, /addAdminPin/);
+  assert.match(apiSource, /use a 4–6 digit PIN/);
 });
 
 
