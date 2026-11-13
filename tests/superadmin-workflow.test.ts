@@ -67,3 +67,45 @@ test('platform backup is checksum-verified in the browser before download', () =
   assert.match(settings, /actualChecksum !== res\.checksum\.value\.toLowerCase\(\)/);
   assert.match(settings, /Backup checksum verified/);
 });
+
+
+test('Super Admin can edit school contact and display details with validation and audit persistence', () => {
+  const apiSource = read('../src/server/api.ts');
+  const clientSource = read('../src/services/api.ts');
+  const schoolsSource = read('../src/components/superadmin/SchoolsView.tsx');
+  const routeStart = apiSource.indexOf("apiRouter.patch('/superadmin/schools/:id'");
+  const routeEnd = apiSource.indexOf("apiRouter.patch('/superadmin/schools/:id/subscription'", routeStart);
+  const route = apiSource.slice(routeStart, routeEnd);
+  assert.match(route, /requireAuth, requireSuperAdmin/);
+  assert.match(route, /updateSchoolDetailsSchema\.safeParse/);
+  assert.match(route, /duplicateEmail/);
+  assert.match(route, /db\.updateSchool\(school\.id, updates\)/);
+  assert.match(route, /action: 'SCHOOL_DETAILS_UPDATED'/);
+  assert.match(route, /await db\.flush\(\)/);
+  assert.match(clientSource, /updateSchoolDetails\(id: string/);
+  assert.match(schoolsSource, /Edit School Details/);
+  assert.match(schoolsSource, /Save School Details/);
+  assert.match(schoolsSource, /School code cannot be changed/);
+});
+
+
+test('platform backup UI does not imply that the saved frequency preference runs an automatic off-site backup', () => {
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  const storageSource = read('../src/server/storage.ts');
+  assert.match(settingsSource, /Backup Frequency Preference \(Not Automated\)/);
+  assert.match(settingsSource, /Automated off-site backups are not configured/);
+  assert.match(settingsSource, /does not support full-platform restore/);
+  assert.match(storageSource, /full-platform restore is not supported/);
+});
+
+
+test('subscription updates cannot be double-submitted and form limits match server validation', () => {
+  const schoolsSource = read('../src/components/superadmin/SchoolsView.tsx');
+  const apiSource = read('../src/server/api.ts');
+  assert.match(schoolsSource, /if \(!selectedSchool \|\| isUpdatingSubscription\) return/);
+  assert.match(schoolsSource, /disabled=\{isUpdatingSubscription\}/);
+  assert.match(schoolsSource, /min="1"\s+max="120"/);
+  assert.match(schoolsSource, /min="0"\s+max="60"/);
+  assert.match(apiSource, /monthsToAdd must be a whole number from 1 to 120/);
+  assert.match(apiSource, /graceDays must be a whole number from 0 to 60/);
+});
