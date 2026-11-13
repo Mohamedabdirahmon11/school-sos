@@ -1,3 +1,5 @@
+import type { School } from '../types/index.ts';
+
 export const SCHOOL_SETUP_DEFAULTS = {
   schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' as const },
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
@@ -54,4 +56,42 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (!(w.openingTime <= w.classStartTime && w.classStartTime < w.closingTime && w.breakStartTime < w.breakEndTime && w.breakStartTime >= w.classStartTime && w.breakEndTime < w.closingTime)) return 'School hours and break times are not in the correct order.';
   }
   return null;
+}
+
+export function buildSchoolSetupSchoolUpdates(
+  step: number,
+  nextData: any,
+  school: School,
+  progress: School['setupProgress']
+): Partial<School> {
+  const updates: Partial<School> = { setupData: nextData, setupProgress: progress };
+  if (step === 1) {
+    const info = nextData.schoolInformation;
+    Object.assign(updates, {
+      name: info.name.trim(),
+      address: info.address.trim(),
+      phone: info.phone.trim(),
+      email: info.email.trim(),
+      schoolType: info.schoolType,
+      logoUrl: info.logoUrl || undefined
+    });
+  }
+  if (step === 2 && nextData.academicYear.isCurrent === true) {
+    updates.academicYear = nextData.academicYear.name.replace('/', '-');
+  }
+  if (step === 3) {
+    const terms = nextData.terms;
+    if (terms.length >= 2) {
+      const lastTerm = terms[terms.length - 1];
+      updates.terms = {
+        semester1Start: terms[0].startDate,
+        semester1End: terms[0].endDate,
+        semester2Start: lastTerm.startDate,
+        semester2End: lastTerm.endDate
+      };
+    } else {
+      updates.terms = school.terms;
+    }
+  }
+  return updates;
 }
