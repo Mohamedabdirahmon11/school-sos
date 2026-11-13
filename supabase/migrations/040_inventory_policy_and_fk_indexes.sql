@@ -15,6 +15,7 @@ DROP POLICY IF EXISTS inventory_items_school_insert ON public.inventory_items;
 DROP POLICY IF EXISTS inventory_items_school_update ON public.inventory_items;
 DROP POLICY IF EXISTS inventory_items_school_delete ON public.inventory_items;
 
+DROP POLICY IF EXISTS inventory_items_school_insert ON public.inventory_items;
 CREATE POLICY inventory_items_school_insert ON public.inventory_items
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -22,6 +23,7 @@ CREATE POLICY inventory_items_school_insert ON public.inventory_items
     AND private.auth_user_role() = 'school_admin'
   );
 
+DROP POLICY IF EXISTS inventory_items_school_update ON public.inventory_items;
 CREATE POLICY inventory_items_school_update ON public.inventory_items
   FOR UPDATE TO authenticated
   USING (
@@ -33,6 +35,7 @@ CREATE POLICY inventory_items_school_update ON public.inventory_items
     AND private.auth_user_role() = 'school_admin'
   );
 
+DROP POLICY IF EXISTS inventory_items_school_delete ON public.inventory_items;
 CREATE POLICY inventory_items_school_delete ON public.inventory_items
   FOR DELETE TO authenticated
   USING (
