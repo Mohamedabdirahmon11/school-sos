@@ -7018,7 +7018,13 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (step === 1) Object.assign(updates, { name: info.name.trim(), address: info.address.trim(), phone: info.phone.trim(), email: info.email.trim(), schoolType: info.schoolType, logoUrl: info.logoUrl || undefined });
   if (step === 2) Object.assign(updates, { academicYear: academic.name.replace('/', '-') });
   if (step === 3) Object.assign(updates, { terms: legacyTerms });
-  const updated = db.updateSchool(school.id, updates);
+  let updated: School | null;
+  try {
+    updated = await db.updateSchoolFromDatabase(school.id, updates);
+  } catch {
+    res.status(503).json({ error: 'School setup could not be saved to the database. Please retry.' });
+    return;
+  }
   if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
   try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
   res.json({ data: nextData, progress, completed: allDone });
