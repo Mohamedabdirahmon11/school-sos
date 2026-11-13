@@ -2729,9 +2729,17 @@ async function nextSchoolStudentIds(schoolId: string, count: number): Promise<st
 }
 
 const studentNameKey = (student: any) => [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ').trim();
-const compareStudentsByName = (a: any, b: any) =>
-  studentNameKey(a).localeCompare(studentNameKey(b), undefined, { sensitivity: 'base', numeric: true })
-  || String(a.studentId || '').localeCompare(String(b.studentId || ''), undefined, { numeric: true });
+const compareStudentsByName = (a: any, b: any) => {
+  const aStudentId = String(a.studentId || '').trim();
+  const bStudentId = String(b.studentId || '').trim();
+  if (aStudentId && bStudentId) {
+    return aStudentId.localeCompare(bStudentId, undefined, { sensitivity: 'base', numeric: true })
+      || studentNameKey(a).localeCompare(studentNameKey(b), undefined, { sensitivity: 'base', numeric: true });
+  }
+  if (aStudentId) return -1;
+  if (bStudentId) return 1;
+  return studentNameKey(a).localeCompare(studentNameKey(b), undefined, { sensitivity: 'base', numeric: true });
+};
 const getTimetablePeriodTimes = (settings: any, period: number, shift: number = 1) => {
   const afternoon = Number(shift) === 2;
   const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart || '13:00' : settings.firstPeriodStart || '08:00';
@@ -3335,7 +3343,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     return;
   }
 
-  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id');
+  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id');
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {
