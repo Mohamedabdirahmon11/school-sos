@@ -78,3 +78,5 @@ END;
 $$;
 REVOKE ALL ON FUNCTION schoolos_bulk_import(JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION schoolos_bulk_import(JSONB) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
