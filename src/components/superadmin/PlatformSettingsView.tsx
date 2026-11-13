@@ -405,17 +405,20 @@ export const PlatformSettingsView: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block font-medium text-[#334155]">Preferred Backup Frequency</label>
+              <label className="block font-medium text-[#334155]">Backup Frequency Preference (Not Automated)</label>
               <select
                 value={settings.backupSchedule}
                 onChange={e => setSettings({ ...settings, backupSchedule: e.target.value as SuperAdminSettings['backupSchedule'] })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
               >
-                <option value="daily">Daily (off-site backup)</option>
-                <option value="weekly">Weekly (off-site backup)</option>
+                <option value="daily">Daily target (manual export required)</option>
+                <option value="weekly">Weekly target (manual export required)</option>
                 <option value="manual">Manual only</option>
               </select>
             </div>
+            <p className="text-[11px] leading-relaxed text-amber-800 sm:col-span-2">
+              This setting records a preferred cadence only. Automated off-site backups are not configured; generate an export and store it in a secure external location. The platform export does not support full-platform restore.
+            </p>
             <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
               <p className="font-medium text-[#334155]">Last verified platform backup</p>
               <p className="mt-1 text-[11px] text-[#64748B]">
