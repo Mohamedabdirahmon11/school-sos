@@ -264,13 +264,15 @@ export const PlansBillingView: React.FC = () => {
                             {payingInvoiceId === inv.id ? 'Recording…' : 'Record Received'}
                           </button>
                         )}
-                        <button
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="px-2.5 py-1 text-xs font-medium text-[#334155] bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded transition-colors flex items-center gap-1"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          <span>Receipt</span>
-                        </button>
+                        {inv.status === 'paid' && (
+                          <button
+                            onClick={() => setSelectedInvoice(inv)}
+                            className="px-2.5 py-1 text-xs font-medium text-[#334155] bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded transition-colors flex items-center gap-1"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span>Receipt</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
