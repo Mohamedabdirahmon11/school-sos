@@ -16,6 +16,8 @@ export const SupportAuditView: React.FC = () => {
   const [ticketPageInfo, setTicketPageInfo] = useState<PageInfo | null>(null);
   const [auditPageInfo, setAuditPageInfo] = useState<PageInfo | null>(null);
   const [ticketPage, setTicketPage] = useState(1);
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketStatus, setTicketStatus] = useState('all');
   const [auditPage, setAuditPage] = useState(1);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -32,7 +34,7 @@ export const SupportAuditView: React.FC = () => {
     setLoadError(null);
     try {
       const [tData, lData] = await Promise.all([
-        ApiClient.getTickets({ page: ticketPage, pageSize: 20 }),
+        ApiClient.getTickets({ page: ticketPage, pageSize: 20, search: ticketSearch, status: ticketStatus }),
         ApiClient.getAuditLogs({ search: auditSearch, category: auditCategory, page: auditPage, pageSize: 20 })
       ]);
       setTickets(tData);
@@ -48,7 +50,7 @@ export const SupportAuditView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [auditSearch, auditCategory, ticketPage, auditPage]);
+  }, [auditSearch, auditCategory, ticketPage, auditPage, ticketSearch, ticketStatus]);
 
   const handleReplyTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +142,31 @@ export const SupportAuditView: React.FC = () => {
             <div className="px-5 py-4 border-b border-[#E2E8F0]">
               <h2 className="text-sm font-bold text-[#132A29]">Tenant Support Inquiries</h2>
               <p className="text-[11px] text-[#64748B]">Tickets opened directly by school administrators</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 border-b border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:grid-cols-[1fr_180px]">
+              <label className="sr-only" htmlFor="support-ticket-search">Search support tickets</label>
+              <input
+                id="support-ticket-search"
+                type="search"
+                value={ticketSearch}
+                onChange={e => { setTicketSearch(e.target.value); setTicketPage(1); }}
+                placeholder="Search ticket number, subject, school, or description…"
+                className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+              />
+              <label className="sr-only" htmlFor="support-ticket-status">Filter support ticket status</label>
+              <select
+                id="support-ticket-status"
+                value={ticketStatus}
+                onChange={e => { setTicketStatus(e.target.value); setTicketPage(1); }}
+                className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
+              >
+                <option value="all">All statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
             </div>
 
             <div className="divide-y divide-[#E2E8F0]">
