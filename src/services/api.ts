@@ -260,6 +260,23 @@ export class ApiClient {
     });
   }
 
+  public static async previewBulkAcademicYear(academicYear: string) {
+    return this.request<{ academicYear: string; schools: Array<{
+      id: string; name: string; code: string; currentAcademicYear: string | null;
+      status: 'change' | 'unchanged' | 'warning'; warning: string;
+    }> }>('/superadmin/academic-year/preview', {
+      method: 'POST',
+      body: JSON.stringify({ academicYear })
+    });
+  }
+
+  public static async applyBulkAcademicYear(academicYear: string, confirm: string, includeWarned: boolean) {
+    return this.request<{ academicYear: string; applied: number; skipped: Array<{ id: string; name: string; reason: string }> }>('/superadmin/academic-year/apply', {
+      method: 'POST',
+      body: JSON.stringify({ academicYear, confirm, includeWarned })
+    });
+  }
+
   public static async getPlans() {
     return this.request<PlanConfig[]>('/superadmin/plans');
   }
