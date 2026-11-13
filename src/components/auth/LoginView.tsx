@@ -2,7 +2,8 @@
  * Production Multi-Role Authentication Screen
  * Supports:
  * - Super Admin: Email + Password
- * - School Admin, Accountant: Email or Phone + Password
+ * - School Admin: School ID or Admin ID + PIN
+ * - Accountant: Email or Phone + Password
  * - Teacher: School-issued Teacher ID + Password or PIN
  * - Student & Parent: School Code + Phone Number + PIN (with children switcher and lockout protection)
  */
@@ -210,14 +211,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / School Admin ID, or Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / Admin ID, Teacher ID, or Accountant email / phone</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Super Admin email or School / Admin / Teacher ID"
+                      placeholder="Super Admin email, School / Admin / Teacher ID, or Accountant email / phone"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
