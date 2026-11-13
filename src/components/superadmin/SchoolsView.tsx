@@ -570,7 +570,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 <div key={adm.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-[#132A29]">{adm.fullName}</p>
-                    <p className="text-[11px] text-[#64748B]">{adm.email || adm.phone}</p>
+                    <p className="text-[11px] text-[#64748B]">Login ID: {adm.staffId || '—'} · {adm.email || adm.phone || 'No email/phone'}</p>
                   </div>
                   <button
                     onClick={() => handleResetAdminPassword(adm.id)}
