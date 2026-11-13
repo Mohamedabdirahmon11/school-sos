@@ -348,6 +348,13 @@ export class ApiClient {
     return this.request<any[]>(`/users?${query.toString()}`);
   }
 
+  public static async createSuperAdmin(fullName: string, email: string) {
+    return this.request<{ user: User; temporaryPassword: string; mustChangePassword: boolean }>('/superadmin/admins', {
+      method: 'POST',
+      body: JSON.stringify({ fullName, email })
+    });
+  }
+
   public static async toggleUserBlock(userId: string, blockedOrSchoolId?: boolean | string) {
     return this.request<{ success: boolean; isBlocked: boolean }>(`/users/${encodeURIComponent(userId)}/toggle-block`, {
       method: 'POST',
