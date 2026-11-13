@@ -10,7 +10,7 @@ const attendanceViewSource = readFileSync(new URL('../src/components/schooladmin
 test('whole-class response is opt-in for the School Admin student directory only', () => {
   assert.match(apiSource, /req\.query\.allClass === 'true'/);
   assert.match(clientSource, /if \(allClass\) params\.append\('allClass', 'true'\)/);
-  assert.match(studentsViewSource, /allClass: Boolean\(classFilter\)/);
+  assert.match(studentsViewSource, /allClass: showAllClass/);
   assert.doesNotMatch(attendanceViewSource, /allClass/);
 });
 
