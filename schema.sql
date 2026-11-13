@@ -260,7 +260,7 @@ ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(9);
 ALTER TABLE classes ALTER COLUMN section SET DEFAULT '';
 UPDATE classes c SET academic_year = s.academic_year FROM schools s WHERE c.school_id = s.id AND c.academic_year IS NULL;
 UPDATE classes SET academic_year = '2026-2027' WHERE academic_year IS NULL;
-UPDATE classes SET class_code = 'CLS-' || upper(regexp_replace(coalesce(name, 'CLASS'), '[^A-Za-z0-9]+', '-', 'g')) || '-' || upper(right(regexp_replace(id, '[^A-Za-z0-9]', '', 'g'), 6)) WHERE class_code IS NULL OR class_code = '';
+UPDATE classes SET class_code = 'CLS-' || CASE WHEN grade_level = 0 THEN 'KG' ELSE 'G' || grade_level::text END || '-' || upper(substr(md5(id), 1, 8)) WHERE class_code IS NULL OR class_code = '';
 ALTER TABLE classes ALTER COLUMN class_code SET NOT NULL;
 ALTER TABLE classes ALTER COLUMN academic_year SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_classes_school_year_code ON classes(school_id, academic_year, lower(class_code));
