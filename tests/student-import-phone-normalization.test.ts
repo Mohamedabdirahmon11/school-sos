@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import * as XLSX from 'xlsx';
 import { IMPORT_COLUMNS, parseSchoolImport, validImportPhone } from '../src/server/school-import.ts';
 
 test('CSV import removes spreadsheet apostrophe markers from guardian phone fields', () => {
@@ -28,11 +29,12 @@ test('CSV import removes spreadsheet apostrophe markers from guardian phone fiel
 });
 
 test('XLSX import normalizes apostrophe-prefixed phone cells as well', () => {
-  const csv = [
-    IMPORT_COLUMNS.join(','),
-    IMPORT_COLUMNS.map(column => JSON.stringify(column === 'studentPhone' ? "'+251911000003" : '')).join(',')
-  ].join('\n');
-  const [row] = parseSchoolImport(Buffer.from(csv, 'utf8'), 'csv');
+  const values = Object.fromEntries(IMPORT_COLUMNS.map(column => [column, column === 'studentPhone' ? "'+251911000003" : '']));
+  const sheet = XLSX.utils.json_to_sheet([values]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Students');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  const [row] = parseSchoolImport(buffer, 'xlsx');
   assert.equal(row.studentPhone, '+251911000003');
 });
 
