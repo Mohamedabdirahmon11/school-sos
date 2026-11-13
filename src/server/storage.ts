@@ -965,8 +965,8 @@ class StorageEngine {
     };
   }
 
-  public createSchool(schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>): School {
-    const id = `sch-${randomUUID()}`;
+  public createSchool(schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): School {
+    const id = String(schoolData.id || `sch-${randomUUID()}`).trim();
     const now = new Date().toISOString();
     const newSchool: School = {
       ...schoolData,

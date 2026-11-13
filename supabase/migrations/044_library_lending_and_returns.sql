@@ -31,19 +31,24 @@ CREATE INDEX IF NOT EXISTS idx_library_loans_student ON public.library_loans(stu
 ALTER TABLE public.library_loans ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS library_loans_tenant_scope ON public.library_loans;
+DROP POLICY IF EXISTS library_loans_tenant_scope ON public.library_loans;
 CREATE POLICY library_loans_tenant_scope ON public.library_loans FOR ALL TO authenticated
   USING (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id())
   WITH CHECK (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id());
 DROP POLICY IF EXISTS library_loans_admin_select ON public.library_loans;
+DROP POLICY IF EXISTS library_loans_admin_select ON public.library_loans;
 CREATE POLICY library_loans_admin_select ON public.library_loans AS RESTRICTIVE FOR SELECT TO authenticated
   USING (private.auth_user_role() IN ('school_admin', 'super_admin'));
+DROP POLICY IF EXISTS library_loans_admin_insert ON public.library_loans;
 DROP POLICY IF EXISTS library_loans_admin_insert ON public.library_loans;
 CREATE POLICY library_loans_admin_insert ON public.library_loans AS RESTRICTIVE FOR INSERT TO authenticated
   WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin') AND issued_by = private.auth_user_id());
 DROP POLICY IF EXISTS library_loans_admin_update ON public.library_loans;
+DROP POLICY IF EXISTS library_loans_admin_update ON public.library_loans;
 CREATE POLICY library_loans_admin_update ON public.library_loans AS RESTRICTIVE FOR UPDATE TO authenticated
   USING (private.auth_user_role() IN ('school_admin', 'super_admin'))
   WITH CHECK (private.auth_user_role() IN ('school_admin', 'super_admin') AND returned_by = private.auth_user_id());
+DROP POLICY IF EXISTS library_loans_no_delete ON public.library_loans;
 DROP POLICY IF EXISTS library_loans_no_delete ON public.library_loans;
 CREATE POLICY library_loans_no_delete ON public.library_loans AS RESTRICTIVE FOR DELETE TO authenticated
   USING (false);

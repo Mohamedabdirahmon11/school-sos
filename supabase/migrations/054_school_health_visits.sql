@@ -23,10 +23,12 @@ CREATE INDEX IF NOT EXISTS idx_school_health_visits_student
 
 ALTER TABLE public.school_health_visits ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS school_health_visits_read ON public.school_health_visits;
+DROP POLICY IF EXISTS school_health_visits_read ON public.school_health_visits;
 CREATE POLICY school_health_visits_read ON public.school_health_visits
   FOR SELECT TO authenticated
   USING (private.auth_user_role() = 'super_admin'
     OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
+DROP POLICY IF EXISTS school_health_visits_insert ON public.school_health_visits;
 DROP POLICY IF EXISTS school_health_visits_insert ON public.school_health_visits;
 CREATE POLICY school_health_visits_insert ON public.school_health_visits
   FOR INSERT TO authenticated
@@ -34,11 +36,13 @@ CREATE POLICY school_health_visits_insert ON public.school_health_visits
     AND private.auth_user_role() = 'school_admin'
     AND recorded_by = private.auth_user_id());
 DROP POLICY IF EXISTS school_health_visits_update ON public.school_health_visits;
+DROP POLICY IF EXISTS school_health_visits_update ON public.school_health_visits;
 CREATE POLICY school_health_visits_update ON public.school_health_visits
   FOR UPDATE TO authenticated
   USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'
     AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS school_health_visits_delete ON public.school_health_visits;
 DROP POLICY IF EXISTS school_health_visits_delete ON public.school_health_visits;
 CREATE POLICY school_health_visits_delete ON public.school_health_visits
   FOR DELETE TO authenticated

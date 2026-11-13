@@ -47,7 +47,12 @@ test('password policy requires 8 characters, mixed case, and a number', () => {
 test('new school administrator temporary PINs are hashed and changed on first sign-in', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const schoolsSource = readFileSync(new URL('../src/components/superadmin/SchoolsView.tsx', import.meta.url), 'utf8');
-  assert.match(apiSource, /const temporaryPin = String\(adminPin \|\| randomInt\(100000, 1_000_000\)\)/);
+  assert.match(apiSource, /const temporaryPin = String\(adminPin\)/);
+  assert.match(apiSource, /adminPin \(required: use a 4–6 digit PIN\)/);
+  assert.match(apiSource, /const cleanSchoolId = String\(schoolId\)\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(schoolsSource, /School ID \*/);
+  assert.match(schoolsSource, /School Admin PIN \*/);
+  assert.match(schoolsSource, /type="text" required inputMode="numeric"/);
   assert.match(apiSource, /passwordHash: hashPassword\(temporaryPin\)/);
   assert.match(apiSource, /adminUsername: adminUser\.staffId/);
   assert.match(apiSource, /mustChangePassword: Boolean\(adminUser\.mustChangePassword\)/);
@@ -55,6 +60,13 @@ test('new school administrator temporary PINs are hashed and changed on first si
   assert.match(schoolsSource, /res\.temporaryPin/);
   assert.match(schoolsSource, /addAdminPin/);
   assert.match(apiSource, /use a 4–6 digit PIN/);
+  const resetStart = apiSource.indexOf("apiRouter.post('/users/:id/reset-password'");
+  const resetEnd = apiSource.indexOf('const createSuperAdminSchema', resetStart);
+  const resetRoute = apiSource.slice(resetStart, resetEnd);
+  assert.match(resetRoute, /targetUser\.role === 'school_admin'/);
+  assert.match(resetRoute, /Only Super Admin can reset a School Admin PIN/);
+  assert.match(resetRoute, /temporaryPin/);
+  assert.match(schoolsSource, /ApiClient\.resetUserPassword\(adminId, temporaryPin\.trim\(\)\)/);
 });
 
 
