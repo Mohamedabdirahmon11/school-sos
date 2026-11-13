@@ -7046,11 +7046,12 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   const info = nextData.schoolInformation;
   const academic = nextData.academicYear;
   const termRows = nextData.terms;
-  const legacyTerms = termRows.length >= 2 ? { semester1Start: termRows[0].startDate, semester1End: termRows[0].endDate, semester2Start: termRows[1].startDate, semester2End: termRows[1].endDate } : school.terms;
+  const legacySecondTerm = termRows.length >= 3 ? termRows[termRows.length - 1] : termRows[1];
+  const legacyTerms = termRows.length >= 2 ? { semester1Start: termRows[0].startDate, semester1End: termRows[0].endDate, semester2Start: legacySecondTerm.startDate, semester2End: legacySecondTerm.endDate } : school.terms;
   const progress = { currentStep: allDone ? 5 : Math.min(5, step + 1), completedSteps: allDone ? [1, 2, 3, 4, 5, 10] : nextData.completedSteps, skippedSteps: [], completedAt: allDone ? new Date().toISOString() : null };
   const updates: Partial<School> = { setupData: nextData, setupProgress: progress };
   if (step === 1) Object.assign(updates, { name: info.name.trim(), address: info.address.trim(), phone: info.phone.trim(), email: info.email.trim(), schoolType: info.schoolType, logoUrl: info.logoUrl || undefined });
-  if (step === 2) Object.assign(updates, { academicYear: academic.name.replace('/', '-') });
+  if (step === 2 && academic.isCurrent) Object.assign(updates, { academicYear: academic.name.replace('/', '-') });
   if (step === 3) Object.assign(updates, { terms: legacyTerms });
   let updated: School | null;
   try {
