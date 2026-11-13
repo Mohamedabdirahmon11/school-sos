@@ -1822,7 +1822,7 @@ apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (req,
   const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
   const allowedStatuses = new Set(['active', 'trial', 'grace', 'read_only', 'suspended']);
   const schools = (await db.getSchools()).filter(school => {
-    const matchesSearch = !search || [school.name, school.code, school.city, school.email]
+    const matchesSearch = !search || [school.name, school.code, school.country, school.region, school.city, school.email]
       .some(value => String(value || '').toLowerCase().includes(search));
     const matchesStatus = requestedStatus === 'all' || !allowedStatuses.has(requestedStatus)
       || school.subscription?.status === requestedStatus;
