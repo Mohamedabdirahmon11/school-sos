@@ -358,8 +358,11 @@ export class ApiClient {
     return this.updateSchoolSubscription(schoolId, { studentAccessEnabled: enabled });
   }
 
-  public static async resetUserPassword(userId: string): Promise<{ success: boolean; temporaryPassword: string; mustChangePassword: boolean }> {
-    return this.request(`/users/${userId}/reset-password`, { method: 'POST' });
+  public static async resetUserPassword(userId: string, temporaryPin?: string): Promise<{ success: boolean; temporaryPassword: string; mustChangePassword: boolean }> {
+    return this.request(`/users/${encodeURIComponent(userId)}/reset-password`, {
+      method: 'POST',
+      body: temporaryPin ? JSON.stringify({ temporaryPin }) : undefined
+    });
   }
 
   public static async runBackup() {
