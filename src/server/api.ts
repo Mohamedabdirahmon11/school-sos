@@ -1788,6 +1788,7 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (
   if (immediate) {
     const user = (req as any).user as User;
     db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+    await db.flush();
   }
   res.status(201).json(broadcast);
 });
@@ -1801,6 +1802,7 @@ apiRouter.post('/superadmin/broadcasts/:id/send', requireAuth, requireSuperAdmin
   const broadcast = await db.publishBroadcast(req.params.id);
   if (!broadcast) { res.status(404).json({ error: 'Only draft or scheduled broadcasts can be sent.' }); return; }
   db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+  await db.flush();
   res.json(broadcast);
 });
 
@@ -5628,6 +5630,11 @@ apiRouter.get('/school/backup', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const user = (req as any).user as User;
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Disposition', 'attachment; filename="school-backup.json"');
+  const backup = await db.generateSchoolBackup(school.id);
+  if (!backup) {
+    res.status(404).json({ error: 'School backup could not be generated because the school was not found.' });
+    return;
+  }
   db.logAudit({
     action: 'SCHOOL_BACKUP_DOWNLOADED',
     category: 'security',
@@ -5639,7 +5646,8 @@ apiRouter.get('/school/backup', requireAuth, requireSchoolAdminOrSuperAdmin, req
     details: `Downloaded a data backup for ${school.name}.`,
     severity: 'warning'
   });
-  res.json(await db.generateSchoolBackup(school.id));
+  await db.flush();
+  res.json(backup);
 });
 apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
