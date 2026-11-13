@@ -28,3 +28,13 @@ test('shared login sends email passwords and ID-based PINs to the correct creden
   assert.ok(loginView.includes('Set your School Admin PIN'));
   assert.ok(loginView.includes('handleBootstrapPinChange'));
 });
+
+
+test('School Admin first login securely replaces the temporary PIN before dashboard access', () => {
+  assert.ok(api.includes("['super_admin', 'school_admin'].includes(user.role)"));
+  assert.ok(api.includes('user.mustChangePassword === true'));
+  assert.ok(api.includes('requirePinChange: true'));
+  assert.ok(api.includes("apiRouter.post('/auth/change-pin'"));
+  assert.ok(api.includes('pin: hashPin(newPin)'));
+  assert.ok(api.includes('mustChangePassword: false'));
+});
