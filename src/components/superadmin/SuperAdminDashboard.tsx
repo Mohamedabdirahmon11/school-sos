@@ -33,8 +33,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
   const data = dashboard.data;
   const isLoading = dashboard.loading;
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [activatingSchoolId, setActivatingSchoolId] = useState<string | null>(null);
 
   const handleQuickActivate = async (schoolId: string) => {
+    if (activatingSchoolId) return;
+    setActivatingSchoolId(schoolId);
     try {
       await ApiClient.updateSubscription(schoolId, { monthsToAdd: 1, status: 'active' });
       dashboard.retry();
@@ -42,6 +45,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setActivatingSchoolId(null);
     }
   };
 
@@ -294,9 +299,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleQuickActivate(s.id)}
-                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#0F766E] hover:bg-[#0D655E] rounded transition-colors"
+                          disabled={Boolean(activatingSchoolId)}
+                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#0F766E] hover:bg-[#0D655E] rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Activate / Renew (+1mo)
+                          {activatingSchoolId === s.id ? 'Activating…' : 'Activate / Renew (+1mo)'}
                         </button>
                         <button
                           onClick={() => onNavigate('sa_schools', s.id)}
