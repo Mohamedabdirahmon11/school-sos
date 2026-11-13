@@ -105,10 +105,7 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
   if (typeof body.code === 'string' && body.code.trim() && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
   if (typeof body.schoolType === 'string' && !['primary', 'secondary', 'combined'].includes(body.schoolType)) missing.push('schoolType (choose primary, secondary or combined)');
   if (typeof body.adminUsername === 'string' && body.adminUsername.trim() && !/^[a-z0-9_-]{3,32}$/i.test(body.adminUsername.trim())) missing.push('adminUsername (use 3–32 letters, numbers, hyphens or underscores)');
-  if (typeof body.adminPassword === 'string' && body.adminPassword) {
-    const passwordError = passwordPolicyError(body.adminPassword);
-    if (passwordError) missing.push(`adminPassword (${passwordError})`);
-  }
+  if (typeof body.adminPin === 'string' && body.adminPin && !/^\d{4,6}$/.test(body.adminPin)) missing.push('adminPin (use a 4–6 digit PIN)');
   if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
   return [...new Set(missing)];
 }
@@ -1845,7 +1842,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}.`, fields: missing });
     return;
   }
-  const { name, code, country, region, schoolType, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminUsername, adminPassword, logoDataUrl } = body;
+  const { name, code, country, region, schoolType, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminUsername, adminPin, logoDataUrl } = body;
   const cleanCode = String(code).trim().toUpperCase();
   const cleanAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim().toLowerCase() : '';
   const requestedAdminUsername = typeof adminUsername === 'string' ? adminUsername.trim().toUpperCase() : '';
@@ -1896,7 +1893,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   // Upload a public school-branding logo through the server-side service-role client.
   let uploadedLogoPath: string | null = null;
   let adminUser: User;
-  const temporaryPassword = adminPassword ? undefined : randomBytes(12).toString('base64url');
+  const temporaryPin = String(adminPin || randomInt(100000, 1_000_000));
   try {
     if (typeof logoDataUrl === 'string' && logoDataUrl) {
       if (!isSupabaseConfigured) throw new Error('School logo storage is not configured.');
@@ -1917,12 +1914,12 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     adminUser = db.createUser({
       schoolId: school.id,
       role: 'school_admin',
-      staffId: requestedAdminUsername || await nextSchoolStaffId(school),
+      staffId: requestedAdminUsername || await nextSchoolAdminId(),
       fullName: String(adminName).trim(),
       email: cleanAdminEmail || undefined,
       phone: String(adminPhone || phone).trim(),
-      passwordHash: hashPassword(String(adminPassword || temporaryPassword)),
-      mustChangePassword: !adminPassword,
+      passwordHash: hashPassword(temporaryPin),
+      mustChangePassword: true,
       isBlocked: false,
       failedLoginAttempts: 0
     });
@@ -1942,7 +1939,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     userId: (req as any).user.id,
     userName: (req as any).user.fullName,
     userRole: 'super_admin',
-    details: `Created new school ${school.name} (${school.code}) with admin ${adminUser.email}.`,
+    details: `Created new school ${school.name} (${school.code}) with administrator ID ${adminUser.staffId}.`,
     severity: 'info'
   });
 
@@ -1963,7 +1960,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     school,
     admin: sanitizeUser(adminUser),
     adminUsername: adminUser.staffId,
-    ...(temporaryPassword ? { temporaryPassword } : {}),
+    temporaryPin,
     mustChangePassword: Boolean(adminUser.mustChangePassword)
   });
 });
@@ -3017,6 +3014,15 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
 });
 
 const TIMETABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+async function nextSchoolAdminId(): Promise<string> {
+  const users = await queryAllRows('users', {}, 'id,staff_id');
+  const used = new Set(users.map((user: any) => String(user.staffId || '').toUpperCase()).filter(Boolean));
+  let sequence = 1;
+  let id = '';
+  do { id = `ADM${String(sequence++).padStart(3, '0')}`; } while (used.has(id));
+  return id;
+}
+
 async function nextSchoolStaffId(school: School): Promise<string> {
   const users = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   const used = new Set(users.map((user: any) => String(user.staffId || '').toUpperCase()).filter(Boolean));

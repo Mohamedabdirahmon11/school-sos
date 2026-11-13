@@ -192,9 +192,9 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">Password / Teacher PIN</label>
+                    <label className="block text-xs font-medium text-[#334155]">Password / Admin PIN / Teacher PIN</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      Use your account password. Teachers may also use the PIN issued by their School Admin.
+                      Use your account password or the temporary PIN issued by your Super Admin or School Admin.
                     </span>
                   </div>
                   <div className="mt-1">

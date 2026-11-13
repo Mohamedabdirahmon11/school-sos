@@ -86,7 +86,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [addCadence, setAddCadence] = useState<SubscriptionCadence>('monthly');
   const [addAdminName, setAddAdminName] = useState('');
   const [addAdminUsername, setAddAdminUsername] = useState('');
-  const [addAdminPassword, setAddAdminPassword] = useState('');
+  const [addAdminPin, setAddAdminPin] = useState('');
   const [addAdminEmail, setAddAdminEmail] = useState('');
   const [addAdminPhone, setAddAdminPhone] = useState('');
   const [addStudentAccess, setAddStudentAccess] = useState(false);
@@ -155,7 +155,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         cadence: addCadence,
         adminName: addAdminName,
         adminUsername: addAdminUsername,
-        adminPassword: addAdminPassword,
+        adminPin: addAdminPin,
         adminEmail: addAdminEmail,
         adminPhone: addAdminPhone,
         studentAccessEnabled: addStudentAccess
@@ -163,7 +163,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
 
       setShowAddModal(false);
       setActionNotice(`School "${res.school.name}" onboarded successfully.`);
-      window.alert(`School Administrator created.\n\nLogin ID: ${res.adminUsername || res.admin?.staffId || 'See school details'}${res.temporaryPassword ? `\nTemporary password: ${res.temporaryPassword}\nChange it at first sign-in.` : '\nUse the password you entered in the registration form.'}`);
+      window.alert(`School Administrator created.\n\nLogin ID: ${res.adminUsername || res.admin?.staffId || 'See school details'}\nTemporary PIN: ${res.temporaryPin}\nChange it at first sign-in.`);
       // Reset form
       setAddName('');
       setAddCode('');
@@ -178,7 +178,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setAddWhatsappPhone('');
       setAddAdminName('');
       setAddAdminUsername('');
-      setAddAdminPassword('');
+      setAddAdminPin('');
       setAddAdminEmail('');
       setAddAdminPhone('');
       setAddStudentAccess(false);
@@ -421,7 +421,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                           isSelected ? 'bg-[#F0FDFA]' : 'hover:bg-[#F8FAFC]'
                         }`}
                       >
-                        <td className="px-4 py-3 font-semibold text-[#132A29]">{s.name}</td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-2.5 min-w-40"><div className="h-9 w-9 shrink-0 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-center overflow-hidden">{s.logoUrl ? <img src={s.logoUrl} alt={`${s.name} logo`} className="h-full w-full object-contain" /> : <Building2 className="h-4 w-4 text-[#94A3B8]" />}</div><span className="font-semibold text-[#132A29]">{s.name}</span></div></td>
                         <td className="px-4 py-3 font-mono text-[#64748B]">{s.code}</td>
                         <td className="px-4 py-3 capitalize text-[#334155]">{s.subscription.plan}</td>
                         <td className="px-4 py-3">
@@ -769,8 +769,8 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                     <input type="text" maxLength={32} value={addAdminUsername} onChange={e => setAddAdminUsername(e.target.value.toUpperCase())} placeholder="Auto-generate if blank" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
                   </div>
                   <div>
-                    <label className="block font-medium text-[#334155]">Initial Password (Optional)</label>
-                    <input type="password" minLength={8} maxLength={128} autoComplete="new-password" value={addAdminPassword} onChange={e => setAddAdminPassword(e.target.value)} placeholder="At least 8 characters" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
+                    <label className="block font-medium text-[#334155]">Initial PIN (Optional)</label>
+                    <input type="password" inputMode="numeric" pattern="[0-9]{4,6}" minLength={4} maxLength={6} autoComplete="new-password" value={addAdminPin} onChange={e => setAddAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
                   </div>
                   <div>
                     <label className="block font-medium text-[#334155]">Email Address (Optional)</label>
@@ -795,7 +795,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                   </div>
                 </div>
                 <div className="col-span-2 rounded-lg border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">
-                  A unique school Admin ID is generated if you leave it blank. If you leave the password blank, a secure temporary password is generated and must be changed at first sign-in. Admin ID can be used to sign in without Gmail.
+                  A short unique Admin ID (for example ADM001) is generated if you leave it blank. If you leave the PIN blank, a six-digit temporary PIN is generated. The administrator must change it at first sign-in. Admin ID works without Gmail.
                 </div>
               </div>
 
