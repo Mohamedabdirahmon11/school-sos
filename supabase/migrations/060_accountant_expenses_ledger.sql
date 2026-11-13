@@ -26,15 +26,19 @@ CREATE INDEX IF NOT EXISTS idx_school_expenses_school_category ON public.school_
 
 ALTER TABLE public.school_expenses ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS school_expenses_school_read ON public.school_expenses;
+DROP POLICY IF EXISTS school_expenses_school_read ON public.school_expenses;
 CREATE POLICY school_expenses_school_read ON public.school_expenses FOR SELECT TO authenticated
   USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant')));
+DROP POLICY IF EXISTS school_expenses_school_insert ON public.school_expenses;
 DROP POLICY IF EXISTS school_expenses_school_insert ON public.school_expenses;
 CREATE POLICY school_expenses_school_insert ON public.school_expenses FOR INSERT TO authenticated
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
 DROP POLICY IF EXISTS school_expenses_school_update ON public.school_expenses;
+DROP POLICY IF EXISTS school_expenses_school_update ON public.school_expenses;
 CREATE POLICY school_expenses_school_update ON public.school_expenses FOR UPDATE TO authenticated
   USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'))
   WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','accountant'));
+DROP POLICY IF EXISTS school_expenses_service_role_all ON public.school_expenses;
 DROP POLICY IF EXISTS school_expenses_service_role_all ON public.school_expenses;
 CREATE POLICY school_expenses_service_role_all ON public.school_expenses FOR ALL TO service_role USING (true) WITH CHECK (true);
 
