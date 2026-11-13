@@ -10,6 +10,7 @@ const users = read('../src/components/superadmin/GlobalUsersView.tsx');
 const sessions = read('../src/components/superadmin/SessionsModal.tsx');
 const billing = read('../src/components/superadmin/PlansBillingView.tsx');
 const settings = read('../src/components/superadmin/PlatformSettingsView.tsx');
+const storage = read('../src/server/storage.ts');
 
 test('school onboarding requires complete school and first administrator contact details', () => {
   for (const field of ['name', 'code', 'address', 'city', 'phone', 'whatsappPhone', 'email', 'adminName', 'adminEmail', 'adminPhone']) {
@@ -58,7 +59,7 @@ test('billing actions guard duplicate plan saves and confirm manual payment reco
   assert.match(billing, /if \(!editingPlan \|\| isSavingPlan\) return/);
   assert.match(billing, /disabled=\{isSavingPlan\}/);
   assert.match(billing, /Confirm that the school has already paid this invoice outside SchoolOS/);
-  assert.match(api, /schoolos_mark_subscription_invoice_paid/);
+  assert.match(storage, /schoolos_mark_subscription_invoice_paid/);
 });
 
 test('platform backup is checksum-verified in the browser before download', () => {
