@@ -28,7 +28,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user.role === 'school_admin' && newPin && !/^\\d{4,6}$/.test(newPin)) {
+    if (user.role === 'school_admin' && newPin && !/^\d{4,6}$/.test(newPin)) {
       setError('PIN must contain 4 to 6 digits.');
       return;
     }
@@ -152,9 +152,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <>
                 <label className="block text-xs font-bold text-slate-800 mb-2">Change School Admin PIN (Optional)</label>
                 <div className="space-y-2">
-                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Current PIN" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
-                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="New 4–6 digit PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
-                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Current PIN" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="New 4–6 digit PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                   <p className="text-[11px] text-slate-500">Use this PIN with your School ID or Admin ID to sign in.</p>
                 </div>
               </>
