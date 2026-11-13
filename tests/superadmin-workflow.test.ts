@@ -13,7 +13,7 @@ const settings = read('../src/components/superadmin/PlatformSettingsView.tsx');
 const storage = read('../src/server/storage.ts');
 
 test('school onboarding validates country, region, type and required contacts while keeping WhatsApp/admin email optional', () => {
-  for (const field of ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone']) {
+  for (const field of ['schoolId', 'name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminUsername', 'adminPin', 'adminPhone']) {
     assert.match(api, new RegExp(`'${field}'`), `missing onboarding validation for ${field}`);
   }
   assert.match(api, /schoolType.*primary.*secondary.*combined/);
@@ -22,18 +22,22 @@ test('school onboarding validates country, region, type and required contacts wh
   assert.match(schools, /region: addRegion/);
   assert.match(schools, /schoolType: addSchoolType/);
   assert.match(schools, /logoDataUrl: addLogoDataUrl/);
-  assert.match(schools, /Admin Login ID/);
-  assert.match(schools, /Initial PIN/);
+  assert.match(schools, /School ID \*/);
+  assert.match(schools, /Admin Login ID \*/);
+  assert.match(schools, /School Admin PIN \*/);
+  assert.match(schools, /Enter the School ID, Admin Login ID, and a 4–6 digit PIN yourself/);
   assert.match(schools, /Email Address \(Optional\)/);
-  assert.match(api, /requestedAdminUsername \|\| await nextSchoolAdminId\(\)/);
+  assert.match(api, /staffId: requestedAdminUsername,/);
+  assert.match(api, /const temporaryPin = String\(adminPin\)/);
+  assert.match(api, /id: cleanSchoolId/);
   assert.match(api, /mustChangePassword: true/);
   assert.match(api, /const temporaryPin = String\(adminPin \|\| randomInt\(100000, 1_000_000\)\)/);
   assert.match(api, /school-logos/);
   assert.match(api, /School logo must be smaller than 2 MB/);
 });
 
-test('school onboarding uses unique school UUIDs and compensates failed persistence with full tenant cleanup', () => {
-  assert.match(storage, /const id = `sch-\$\{randomUUID\(\)\}`/);
+test('school onboarding accepts a Super Admin-assigned unique school ID and compensates failed persistence with full tenant cleanup', () => {
+  assert.match(storage, /const id = String\(schoolData\.id \|\| `sch-\$\{randomUUID\(\)\}`\)\.trim\(\)/);
   assert.match(storage, /this\.data\.examConfigs = this\.data\.examConfigs\.filter\(row => row\.schoolId !== id\)/);
   assert.match(storage, /this\.data\.reportCardDesigns = this\.data\.reportCardDesigns\.filter\(row => row\.schoolId !== id\)/);
   assert.match(api, /School onboarding persistence failed; attempting rollback/);
