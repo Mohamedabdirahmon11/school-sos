@@ -94,11 +94,11 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
   const required = ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone'];
   const missing = required.filter(key => typeof body[key] !== 'string' || !(body[key] as string).trim());
   for (const field of ['email', 'adminEmail']) {
-    if (typeof body[field] === 'string' && body[field].trim() && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(body[field].trim())) missing.push(`${field} (invalid email)`);
+    if (typeof body[field] === 'string' && body[field].trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body[field].trim())) missing.push(`${field} (invalid email)`);
   }
   for (const field of ['phone', 'whatsappPhone', 'adminPhone']) {
     if (typeof body[field] === 'string' && body[field].trim()) {
-      const digits = body[field].replace(/\\D/g, '');
+      const digits = body[field].replace(/\D/g, '');
       if (digits.length < 7 || digits.length > 15) missing.push(`${field} (invalid phone)`);
     }
   }
@@ -106,7 +106,7 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
   if (typeof body.schoolType === 'string' && !['primary', 'secondary', 'combined'].includes(body.schoolType)) missing.push('schoolType (choose primary, secondary or combined)');
   if (typeof body.adminUsername === 'string' && body.adminUsername.trim() && !/^[a-z0-9_-]{3,32}$/i.test(body.adminUsername.trim())) missing.push('adminUsername (use 3–32 letters, numbers, hyphens or underscores)');
   if (typeof body.adminPassword === 'string' && body.adminPassword && (body.adminPassword.length < 8 || body.adminPassword.length > 128)) missing.push('adminPassword (must be 8–128 characters)');
-  if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
+  if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
   return [...new Set(missing)];
 }
 
@@ -1897,7 +1897,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   try {
     if (typeof logoDataUrl === 'string' && logoDataUrl) {
       if (!isSupabaseConfigured) throw new Error('School logo storage is not configured.');
-      const match = logoDataUrl.match(/^data:(image\\/(?:png|jpeg|webp));base64,([a-z0-9+/=]+)$/i);
+      const match = logoDataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([a-z0-9+/=]+)$/i);
       if (!match) throw new Error('Upload a PNG, JPEG or WebP school logo.');
       const mimeType = match[1].toLowerCase();
       const imageBytes = Buffer.from(match[2], 'base64');
@@ -1908,6 +1908,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
       const { error: uploadError } = await storageClient.storage.from('school-logos').upload(uploadedLogoPath, imageBytes, { contentType: mimeType, upsert: true });
       if (uploadError) throw new Error(`Unable to save school logo: ${uploadError.message}`);
       const { data: publicLogo } = storageClient.storage.from('school-logos').getPublicUrl(uploadedLogoPath);
+      school.logoUrl = publicLogo.publicUrl;
       db.updateSchool(school.id, { logoUrl: publicLogo.publicUrl });
     }
     adminUser = db.createUser({
@@ -1969,6 +1970,9 @@ const updateSchoolDetailsSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid school email.').max(254),
   address: z.string().trim().min(2, 'School address is required.').max(240),
   city: z.string().trim().min(2, 'School city is required.').max(100),
+  country: z.string().trim().min(2).max(80),
+  region: z.string().trim().min(2).max(100),
+  schoolType: z.enum(['primary', 'secondary', 'combined']),
   phone: z.string().trim().min(7, 'Enter a valid school phone number.').max(30),
   whatsappPhone: z.string().trim().min(7, 'Enter a valid WhatsApp number.').max(30),
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Choose a valid brand color.'),
