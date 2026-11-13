@@ -3657,7 +3657,6 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const targetShift = Number(klass.shift) === 2 ? 2 : 1;
   const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
   const closingTime = school.setupData?.workingHours?.closingTime;
   if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
