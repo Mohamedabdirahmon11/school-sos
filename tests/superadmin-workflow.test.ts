@@ -94,7 +94,7 @@ test('platform backup UI clearly distinguishes a preference from unconfigured au
   const storageSource = read('../src/server/storage.ts');
   assert.match(settingsSource, /Backup Frequency Preference/);
   assert.match(settingsSource, /scheduled workflow is currently blocked/);
-  assert.match(settingsSource, /Full-platform restore is not supported/);
+  assert.match(settingsSource, /manual JSON export is not a full-platform restore image/);
   assert.match(storageSource, /full-platform restore is not supported/);
 });
 
@@ -120,7 +120,7 @@ test('platform backup settings accurately disclose missing GitHub Actions and S3
   assert.match(settingsSource, /BACKUP_S3_SECRET_ACCESS_KEY/);
   assert.match(settingsSource, /BACKUP_S3_REGION/);
   assert.match(settingsSource, /BACKUP_S3_BUCKET/);
-  assert.match(settingsSource, /Last manual platform export generated/);
+  assert.match(settingsSource, /Last recorded platform backup/);
   assert.match(workflowSource, /Upload encrypted backup to private S3 bucket/);
   assert.match(workflowSource, /--sse AES256/);
 });
