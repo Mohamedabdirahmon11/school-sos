@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
+import { getSchoolPeriodsPerDay, getSchoolWorkingDays } from '../../lib/school-calendar.ts';
 import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2, WandSparkles } from 'lucide-react';
 
 export const TimetableView: React.FC = () => {
@@ -38,9 +39,15 @@ export const TimetableView: React.FC = () => {
   const [teacherId, setTeacherId] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
 
-  const days: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday')[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  const periods = [1, 2, 3, 4, 5, 6];
-  const periodsForDay = (day: string) => periods.filter(period => day !== 'Friday' || period <= 5);
+  const hasConfiguredWorkingDays = Boolean(school?.setupData?.calendar?.workingDays?.length);
+  const days = getSchoolWorkingDays(school?.setupData?.calendar);
+  const periods = Array.from({ length: getSchoolPeriodsPerDay(school?.setupData?.workingHours) }, (_value, index) => index + 1);
+  const periodsForDay = (day: string) => periods.filter(period => hasConfiguredWorkingDays || day !== 'Friday' || period <= 5);
+
+  useEffect(() => {
+    setDayOfWeek(current => days.includes(current) ? current : (days[0] || 'Monday'));
+    setPeriodNumber(current => Math.min(current, periods.length));
+  }, [school?.id, school?.setupData?.calendar?.workingDays?.join('|'), school?.setupData?.workingHours?.periodsPerDay]);
   const periodTime = (period: number, shift: number = 1) => {
     const afternoon = shift === 2;
     const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart : settings.firstPeriodStart;
@@ -207,7 +214,7 @@ export const TimetableView: React.FC = () => {
   const openClassPeriodEditor = async (klass: SchoolClass) => {
     setSelectedClassId(klass.id);
     setRoomNumber(klass.roomNumber || '');
-    setDayOfWeek('Monday');
+    setDayOfWeek(days[0] || 'Monday');
     setPeriodNumber(1);
     setClashWarning(null);
     try {
@@ -343,7 +350,7 @@ export const TimetableView: React.FC = () => {
               <tbody>{days.map(day => <tr key={day}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
                 const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                 const subject = subjects.find(item => item.id === slot?.subjectId);
-                return <td key={period} className={`border p-1 text-center ${day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : day === 'Friday' && period === 6 ? '' : '—'}</td>;
+                return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
             </table>
           </article>
@@ -398,9 +405,9 @@ export const TimetableView: React.FC = () => {
                       {periods.map(period => {
                         const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                         const subject = subjects.find(item => item.id === slot?.subjectId);
-                        const isClosedPeriod = day === 'Friday' && period === 6;
+                        const isClosedPeriod = !hasConfiguredWorkingDays && day === 'Friday' && period === 6;
                         return (
-                          <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
+                          <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
@@ -449,7 +456,7 @@ export const TimetableView: React.FC = () => {
                   <label className="block font-medium text-[#334155]">Day</label>
                   <select
                     value={dayOfWeek}
-                    onChange={e => { const nextDay = e.target.value as typeof dayOfWeek; setDayOfWeek(nextDay); if (nextDay === 'Friday' && periodNumber > 5) setPeriodNumber(5); }}
+                    onChange={e => { const nextDay = e.target.value as typeof dayOfWeek; setDayOfWeek(nextDay); const allowed = periodsForDay(nextDay); if (!allowed.includes(periodNumber)) setPeriodNumber(allowed[allowed.length - 1] || 1); }}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   >
                     {days.map(d => <option key={d} value={d}>{d}</option>)}
