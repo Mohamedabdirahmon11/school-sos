@@ -24,7 +24,7 @@ export const TimetableView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'class' | 'teacher'>('class');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
-  const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
+  const [settings, setSettings] = useState({ shiftCount: 1 as 1 | 2, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
   const [printMode, setPrintMode] = useState<'single' | 'multiple'>('multiple');
@@ -92,6 +92,7 @@ export const TimetableView: React.FC = () => {
     setTeachers(tchList);
     setTimetable(schedule);
     if (schoolSettings) setSettings({
+      shiftCount: schoolSettings.shiftCount === 2 ? 2 : 1,
       firstPeriodStart: schoolSettings.firstPeriodStart || '08:00',
       periodMinutes: schoolSettings.periodMinutes || 40,
       breakAfterPeriod: schoolSettings.breakAfterPeriod || 3,
@@ -312,7 +313,7 @@ export const TimetableView: React.FC = () => {
           </select>
           {viewMode === 'teacher' && <>
             <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
-            <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option><option value={2}>Shift 2 · Afternoon</option></select>
+            <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option>{(settings.shiftCount === 2 || classes.some(klass => Number(klass.shift) === 2)) && <option value={2}>Shift 2 · Afternoon</option>}</select>
           </>}
           
           <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>

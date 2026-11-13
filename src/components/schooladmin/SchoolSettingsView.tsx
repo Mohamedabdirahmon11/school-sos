@@ -50,7 +50,7 @@ type BranchForm = {
   isMain: boolean;
 };
 
-type TimetableSettings = { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number };
+type TimetableSettings = { shiftCount: 1 | 2; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number };
 
 const emptyBranchForm: BranchForm = { name: '', address: '', phone: '', email: '', isMain: false };
 const defaultGradingScale: GradingBand[] = [
@@ -65,9 +65,9 @@ const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, re
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
+export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'documents' | 'branches' | 'designer' | 'backup'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup'>(initialTab);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -97,7 +97,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
-  const [timetableSettings, setTimetableSettings] = useState<TimetableSettings>({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 });
+  const [timetableSettings, setTimetableSettings] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
 
   // Documents & Notifications State
   const [reportCardHeader, setReportCardHeader] = useState(school?.reportCardHeader || '');
@@ -125,11 +125,16 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     ApiClient.getReportCardDesign().then(setDesign);
     ApiClient.getExamConfig().then(setExamConfig).catch(() => setExamConfig(null));
     ApiClient.getTimetableSettings().then(settings => setTimetableSettings({
+      shiftCount: settings.shiftCount === 2 ? 2 : 1,
       firstPeriodStart: settings.firstPeriodStart,
       periodMinutes: settings.periodMinutes,
       breakAfterPeriod: settings.breakAfterPeriod,
-      breakMinutes: settings.breakMinutes
-    }));
+      breakMinutes: settings.breakMinutes,
+      shift2FirstPeriodStart: settings.shift2FirstPeriodStart || '13:00',
+      shift2PeriodMinutes: settings.shift2PeriodMinutes || 40,
+      shift2BreakAfterPeriod: settings.shift2BreakAfterPeriod || 3,
+      shift2BreakMinutes: settings.shift2BreakMinutes ?? 20
+    })).catch((err: any) => setError(err.message || 'School shift settings could not be loaded.'));
   }, [school]);
 
   // Save Identity
@@ -244,17 +249,41 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     e.preventDefault();
     if (isReadOnly) return;
     setError(null);
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timetableSettings.firstPeriodStart)) { setError('Timetable start must use HH:MM.'); return; }
-    if (!Number.isInteger(timetableSettings.periodMinutes) || timetableSettings.periodMinutes < 20 || timetableSettings.periodMinutes > 120) { setError('Period length must be a whole number between 20 and 120 minutes.'); return; }
-    if (!Number.isInteger(timetableSettings.breakMinutes) || timetableSettings.breakMinutes < 0 || timetableSettings.breakMinutes > 120) { setError('Break length must be a whole number between 0 and 120 minutes.'); return; }
+    const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+    const minutesOf = (value: string) => {
+      const [hour, minute] = value.split(':').map(Number);
+      return hour * 60 + minute;
+    };
+    if (!validTime(timetableSettings.firstPeriodStart)) { setError('First shift start must use HH:MM.'); return; }
+    if (!Number.isInteger(timetableSettings.periodMinutes) || timetableSettings.periodMinutes < 20 || timetableSettings.periodMinutes > 120) { setError('First shift period length must be between 20 and 120 minutes.'); return; }
+    if (!Number.isInteger(timetableSettings.breakAfterPeriod) || timetableSettings.breakAfterPeriod < 1 || timetableSettings.breakAfterPeriod > 5) { setError('First shift break position must be between periods 1 and 5.'); return; }
+    if (!Number.isInteger(timetableSettings.breakMinutes) || timetableSettings.breakMinutes < 0 || timetableSettings.breakMinutes > 120) { setError('First shift break length must be between 0 and 120 minutes.'); return; }
+    if (timetableSettings.shiftCount === 2) {
+      if (!validTime(timetableSettings.shift2FirstPeriodStart)) { setError('Second shift start must use HH:MM.'); return; }
+      if (!Number.isInteger(timetableSettings.shift2PeriodMinutes) || timetableSettings.shift2PeriodMinutes < 20 || timetableSettings.shift2PeriodMinutes > 120) { setError('Second shift period length must be between 20 and 120 minutes.'); return; }
+      if (!Number.isInteger(timetableSettings.shift2BreakAfterPeriod) || timetableSettings.shift2BreakAfterPeriod < 1 || timetableSettings.shift2BreakAfterPeriod > 5) { setError('Second shift break position must be between periods 1 and 5.'); return; }
+      if (!Number.isInteger(timetableSettings.shift2BreakMinutes) || timetableSettings.shift2BreakMinutes < 0 || timetableSettings.shift2BreakMinutes > 120) { setError('Second shift break length must be between 0 and 120 minutes.'); return; }
+      const periodsPerShift = Math.max(1, Number(school?.setupData?.workingHours?.periodsPerDay || 6));
+      const firstShiftEnd = minutesOf(timetableSettings.firstPeriodStart)
+        + periodsPerShift * timetableSettings.periodMinutes
+        + (periodsPerShift > timetableSettings.breakAfterPeriod ? timetableSettings.breakMinutes : 0);
+      const secondShiftEnd = minutesOf(timetableSettings.shift2FirstPeriodStart)
+        + periodsPerShift * timetableSettings.shift2PeriodMinutes
+        + (periodsPerShift > timetableSettings.shift2BreakAfterPeriod ? timetableSettings.shift2BreakMinutes : 0);
+      if (minutesOf(timetableSettings.shift2FirstPeriodStart) < firstShiftEnd) { setError('Second shift must start after the first shift has finished. Adjust the shift times or period lengths.'); return; }
+      if (secondShiftEnd > 1440) { setError('Second shift timetable cannot run past midnight.'); return; }
+      const schoolClosing = school?.setupData?.workingHours?.closingTime;
+      if (schoolClosing && validTime(schoolClosing) && secondShiftEnd > minutesOf(schoolClosing)) { setError('Second shift must finish before the school closing time configured in School Setup.'); return; }
+    }
     setSavingSection('timetable');
     try {
       const updated = await ApiClient.saveTimetableSettings(timetableSettings) as TimetableSettings;
-      setTimetableSettings(updated);
-      setNotice('Timetable period and break settings saved successfully!');
+      setTimetableSettings({ ...timetableSettings, ...updated, shiftCount: updated.shiftCount === 2 ? 2 : 1 });
+      await refreshUser();
+      setNotice(timetableSettings.shiftCount === 2 ? 'Both school shifts and timetable times saved successfully!' : 'Single-shift timetable settings saved successfully!');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save timetable settings.');
+      setError(err.message || 'Failed to save school shift settings.');
     } finally {
       setSavingSection(null);
     }
@@ -405,12 +434,12 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             School Settings
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Manage your school profile, academic calendar, branches, documents, report cards, and backups in one place.
+            Manage your school profile, academic calendar, school shifts, branches, documents, report cards, and backups in one place.
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#DCE7E4] bg-[#F5F8F7] p-2 text-xs shadow-sm sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#DCE7E4] bg-[#F5F8F7] p-2 text-xs shadow-sm sm:grid-cols-3 lg:grid-cols-4">
           <button
             type="button"
             onClick={() => setActiveTab('identity')}
@@ -430,6 +459,16 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           >
             <CalendarDays className="w-3.5 h-3.5" />
             {t('settings_academics')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('shifts')}
+            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
+              activeTab === 'shifts' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            School Shifts
           </button>
           <button
             type="button"
@@ -813,25 +852,61 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               </form>
             )}
 
-            <form onSubmit={handleSaveTimetable} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4 text-xs">
-              <div>
-                <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2"><Clock className="w-4 h-4 text-[#0F766E]" /> {t('settings_timetable')}</h2>
-                <p className="text-xs text-[#64748B] mt-0.5">Monday to Friday, six periods per day, and five periods on Friday. These times drive the timetable generator.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="space-y-1"><span className="font-semibold text-[#334155]">First Period Start</span><input type="time" required value={timetableSettings.firstPeriodStart} onChange={e => setTimetableSettings(prev => ({ ...prev, firstPeriodStart: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                <label className="space-y-1"><span className="font-semibold text-[#334155]">Period Length (minutes)</span><input type="number" min={20} max={120} required value={timetableSettings.periodMinutes} onChange={e => setTimetableSettings(prev => ({ ...prev, periodMinutes: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                <label className="space-y-1"><span className="font-semibold text-[#334155]">Break After Period</span><select value={timetableSettings.breakAfterPeriod} onChange={e => setTimetableSettings(prev => ({ ...prev, breakAfterPeriod: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">{[1, 2, 3, 4, 5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
-                <label className="space-y-1"><span className="font-semibold text-[#334155]">Break Length (minutes)</span><input type="number" min={0} max={120} required value={timetableSettings.breakMinutes} onChange={e => setTimetableSettings(prev => ({ ...prev, breakMinutes: Number(e.target.value) }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" disabled={isReadOnly || savingSection === 'timetable'} className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                  <Save className="w-3.5 h-3.5" /> {savingSection === 'timetable' ? '...' : t('settings_save_timetable')}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
+      )}
+
+      {/* SCHOOL SHIFTS */}
+      {activeTab === 'shifts' && (
+        <form onSubmit={handleSaveTimetable} className="mx-auto w-full max-w-4xl space-y-5 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm md:p-6 text-xs">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E2E8F0] pb-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]"><Clock className="h-5 w-5 text-[#0F766E]" /> School Shifts</h2>
+              <p className="mt-1 text-xs text-[#64748B]">Choose whether the school runs one or two shifts. These settings control class timetable generation and shift-specific lesson times.</p>
+            </div>
+            <span className="rounded-full bg-[#E7F4F0] px-3 py-1 text-[11px] font-semibold text-[#0F766E]">{timetableSettings.shiftCount === 2 ? 'Two shifts enabled' : 'One shift enabled'}</span>
+          </div>
+          <div className="max-w-sm space-y-1">
+            <label className="font-semibold text-[#334155]">Number of school shifts</label>
+            <select value={timetableSettings.shiftCount} onChange={e => setTimetableSettings(prev => ({ ...prev, shiftCount: Number(e.target.value) as 1 | 2 }))} disabled={isReadOnly} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-medium">
+              <option value={1}>One shift</option>
+              <option value={2}>Two shifts (Morning and Afternoon)</option>
+            </select>
+            <p className="text-[11px] text-[#64748B]">Classes are assigned to a shift in Classes & Subjects. Shift 2 cannot be disabled while classes are still assigned to it.</p>
+          </div>
+          <section className="space-y-3 rounded-xl border border-[#E2E8F0] p-4">
+            <div>
+              <h3 className="font-bold text-sm text-[#132A29]">Shift 1 · Morning</h3>
+              <p className="mt-0.5 text-[11px] text-[#64748B]">Set the first lesson time, lesson duration, and break for morning classes.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">First period starts</span><input type="time" required value={timetableSettings.firstPeriodStart} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, firstPeriodStart: e.target.value }))} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Period length (minutes)</span><input type="number" min={20} max={120} required value={timetableSettings.periodMinutes} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, periodMinutes: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" /></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Break after period</span><select value={timetableSettings.breakAfterPeriod} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, breakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2">{[1, 2, 3, 4, 5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+              <label className="space-y-1"><span className="font-semibold text-[#334155]">Break length (minutes)</span><input type="number" min={0} max={120} required value={timetableSettings.breakMinutes} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, breakMinutes: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" /></label>
+            </div>
+          </section>
+          {timetableSettings.shiftCount === 2 && (
+            <section className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-4">
+              <div>
+                <h3 className="font-bold text-sm text-[#132A29]">Shift 2 · Afternoon</h3>
+                <p className="mt-0.5 text-[11px] text-[#64748B]">Set separate lesson and break times for afternoon classes.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="space-y-1"><span className="font-semibold text-[#334155]">First period starts</span><input type="time" required value={timetableSettings.shift2FirstPeriodStart} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, shift2FirstPeriodStart: e.target.value }))} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono" /></label>
+                <label className="space-y-1"><span className="font-semibold text-[#334155]">Period length (minutes)</span><input type="number" min={20} max={120} required value={timetableSettings.shift2PeriodMinutes} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, shift2PeriodMinutes: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono" /></label>
+                <label className="space-y-1"><span className="font-semibold text-[#334155]">Break after period</span><select value={timetableSettings.shift2BreakAfterPeriod} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, shift2BreakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2">{[1, 2, 3, 4, 5].map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+                <label className="space-y-1"><span className="font-semibold text-[#334155]">Break length (minutes)</span><input type="number" min={0} max={120} required value={timetableSettings.shift2BreakMinutes} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, shift2BreakMinutes: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono" /></label>
+              </div>
+            </section>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
+            <p className="max-w-xl text-[11px] text-[#64748B]">Changes are school-specific. Existing timetable entries are not deleted when you update shift settings.</p>
+            <button type="submit" disabled={isReadOnly || savingSection === 'timetable'} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
+              <Save className="h-4 w-4" /> {savingSection === 'timetable' ? 'Saving…' : 'Save School Shifts'}
+            </button>
+          </div>
+        </form>
       )}
 
       {/* TAB 3: DOCUMENTS & ALERTS */}
