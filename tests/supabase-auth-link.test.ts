@@ -16,51 +16,51 @@ test('legacy account migration requires a verified password and never uses the t
   const migration = route.indexOf('linkLegacyLoginToSupabaseAuth(user, password)');
   const session = route.indexOf('await issueSessionCookie(res, user, req)');
   assert.ok(failedPassword >= 0 && migration > failedPassword && session > migration);
-  assert.match(route, /verifiedLegacyPassword = verifyPassword\(password, user\.passwordHash\)/);
-  assert.match(route, /if \(!authUserId && verifiedLegacyPassword\)/);
-  assert.match(route, /user\.role === 'teacher' && verifyPin/);
-  assert.doesNotMatch(route.slice(migration - 100, migration + 150), /verifyPin/);
+  assert.ok(route.includes('verifiedLegacyPassword = verifyPassword(password, user.passwordHash)'));
+  assert.ok(route.includes('if (!authUserId && verifiedLegacyPassword)'));
+  assert.ok(route.includes("user.role === 'teacher' && verifyPin"));
+  assert.equal(route.slice(migration - 100, migration + 150).includes('verifyPin'), false);
 });
 
-test('migration creates only a new Auth identity and never changes an existing identity password', () => {
+test('migration creates only a new Auth identity and keeps the existing SchoolOS account linked safely', () => {
   const start = api.indexOf('async function linkLegacyLoginToSupabaseAuth');
-  const end = api.indexOf('// ==============================================================================\n// 1. AUTHENTICATION', start);
+  const end = api.indexOf('// 1. AUTHENTICATION', start);
   const helper = api.slice(start, end);
-  assert.match(helper, /if \(!isSupabaseConfigured \|\| !user\.email \|\| user\.authUserId\) return/);
-  assert.match(helper, /auth\.admin\.createUser/);
-  assert.match(helper, /email_confirm: true/);
-  assert.match(helper, /\.is\('auth_user_id', null\)/);
-  assert.match(helper, /auth\.admin\.deleteUser\(authUserId\)/);
-  assert.match(helper, /db\.updateUser\(user\.id, \{ authUserId \}\)/);
-  assert.match(helper, /if \(!linkedToSchoolOSUser\)/);
-  assert.match(helper, /try \{ await db\.flush\(\); \} catch/);
-  assert.doesNotMatch(helper, /auth\.admin\.updateUserById/);
-  assert.doesNotMatch(helper, /console\.(log|error).*password/i);
+  assert.ok(helper.includes('if (!isSupabaseConfigured || !user.email || user.authUserId) return;'));
+  assert.ok(helper.includes('auth.admin.createUser'));
+  assert.ok(helper.includes('email_confirm: true'));
+  assert.ok(helper.includes(".is('auth_user_id', null)"));
+  assert.ok(helper.includes('auth.admin.deleteUser(authUserId)'));
+  assert.ok(helper.includes('db.updateUser(user.id, { authUserId })'));
+  assert.ok(helper.includes('if (!linkedToSchoolOSUser)'));
+  assert.ok(helper.includes('try { await db.flush(); } catch'));
+  assert.equal(helper.includes('auth.admin.updateUserById'), false);
+  assert.equal(/console\.(log|error).*password/i.test(helper), false);
 });
 
 test('accounts without email retain their legacy PIN or staff-ID sign-in path', () => {
   const start = api.indexOf('async function linkLegacyLoginToSupabaseAuth');
-  const end = api.indexOf('// ==============================================================================\n// 1. AUTHENTICATION', start);
+  const end = api.indexOf('// 1. AUTHENTICATION', start);
   const helper = api.slice(start, end);
-  assert.match(helper, /!user\.email/);
+  assert.ok(helper.includes('!user.email'));
   const loginStart = api.indexOf("apiRouter.post('/auth/login'");
   const staffStart = api.indexOf('// B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT', loginStart);
   const studentLogin = api.slice(loginStart, staffStart);
-  assert.match(studentLogin, /STUDENT & PARENT LOGIN/);
-  assert.match(studentLogin, /verifyPin\(/);
-  assert.doesNotMatch(studentLogin, /linkLegacyLoginToSupabaseAuth/);
+  assert.ok(studentLogin.includes('STUDENT & PARENT LOGIN'));
+  assert.ok(studentLogin.includes('verifyPin('));
+  assert.equal(studentLogin.includes('linkLegacyLoginToSupabaseAuth'), false);
 });
 
-test('Supabase Auth identity is selected into session context and mapped at the storage boundary', () => {
-  assert.match(storage, /users: \{ authUserId: 'auth_user_id'/);
-  assert.match(storage, /const userColumns = 'id,auth_user_id,/);
-  assert.match(types, /authUserId\?: string/);
-  assert.match(authSecurity, /delete copy\.authUserId/);
+test('Supabase Auth identity is selected into session context and never exposed to clients', () => {
+  assert.ok(storage.includes("users: { authUserId: 'auth_user_id'"));
+  assert.ok(storage.includes("const userColumns = 'id,auth_user_id,"));
+  assert.ok(types.includes('authUserId?: string'));
+  assert.ok(authSecurity.includes('delete copy.authUserId'));
 });
 
 test('Auth migration preserves the stable SchoolOS user ID and only backfills exact UUID matches', () => {
   const migration = read('../supabase/migrations/20261108072315_link_schoolos_users_to_supabase_auth.sql');
-  assert.match(migration, /REFERENCES auth\.users\(id\)/);
-  assert.match(migration, /WHERE u\.id = a\.id::text/);
-  assert.doesNotMatch(migration, /UPDATE public\.users[\s\S]{0,250}SET id =/);
+  assert.ok(migration.includes('REFERENCES auth.users(id)'));
+  assert.ok(migration.includes('WHERE u.id = a.id::text'));
+  assert.equal(/UPDATE public\.users[\s\S]{0,250}SET id =/.test(migration), false);
 });
