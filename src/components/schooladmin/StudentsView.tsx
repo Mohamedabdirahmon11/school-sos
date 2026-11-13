@@ -294,7 +294,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           {/* Fee Payment Status Filter */}
           <select
             value={feeFilter}
-            onChange={e => { setFeeFilter(e.target.value); setPage(1); }}
+            onChange={e => { setFeeFilter(e.target.value); setShowAllClass(false); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
             <option value="all">All Fee Statuses</option>
@@ -302,7 +302,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <option value="partial">Partial Payment</option>
             <option value="unpaid">Unpaid Fees</option>
           </select>
-          {classFilter && (
+          {classFilter && feeFilter === 'all' && (
             <label className="inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-medium text-[#334155]">
               <input type="checkbox" checked={showAllClass} onChange={event => { setShowAllClass(event.target.checked); setPage(1); }} className="h-3.5 w-3.5 accent-[#0F766E]" />
               Show all students in this class
