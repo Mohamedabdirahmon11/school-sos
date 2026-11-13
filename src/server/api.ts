@@ -3268,6 +3268,92 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
 // 4. STUDENTS & TEACHERS
 // ==============================================================================
 
+apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
+  const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
+    : '';
+
+  const [classes, students] = await Promise.all([
+    db.getClasses(school.id),
+    queryAllRows('students', {
+      school_id: school.id,
+      status: 'active',
+      ...(classId ? { class_id: classId } : {})
+    }, LIST_QUERY_COLUMNS.students)
+  ]);
+  const classById = new Map(classes.map(klass => [klass.id, klass]));
+  if (classId && !classById.has(classId)) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+
+  const contacts = new Map<string, {
+    id: string;
+    phone: string;
+    normalizedPhone: string;
+    relationships: Set<string>;
+    students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
+  }>();
+  for (const student of students) {
+    const child = {
+      id: student.id,
+      studentId: student.studentId,
+      fullName: studentNameKey(student),
+      className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
+    };
+    const guardians: Array<{ phone: string; relationship: string }> = [
+      { phone: String(student.fatherPhone || ''), relationship: 'Father' },
+      { phone: String(student.motherPhone || ''), relationship: 'Mother' }
+    ];
+    for (const guardian of guardians) {
+      const phone = guardian.phone.trim();
+      const normalizedPhone = phone.replace(/\D/g, '');
+      if (!normalizedPhone) continue;
+      let contact = contacts.get(normalizedPhone);
+      if (!contact) {
+        contact = {
+          id: `${school.id}:${normalizedPhone}`,
+          phone,
+          normalizedPhone,
+          relationships: new Set<string>(),
+          students: []
+        };
+        contacts.set(normalizedPhone, contact);
+      }
+      contact.relationships.add(guardian.relationship);
+      if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
+    }
+  }
+
+  const query = search.toLowerCase();
+  const filtered = [...contacts.values()]
+    .filter(contact => !query || contact.phone.toLowerCase().includes(query)
+      || contact.normalizedPhone.includes(query.replace(/\D/g, ''))
+      || contact.students.some(child => `${child.fullName} ${child.studentId} ${child.className}`.toLowerCase().includes(query)))
+    .map(contact => ({
+      id: contact.id,
+      phone: contact.phone,
+      relationships: [...contact.relationships].sort(),
+      students: contact.students.sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }))
+    }))
+    .sort((a, b) => a.phone.localeCompare(b.phone, undefined, { numeric: true }));
+
+  const total = filtered.length;
+  const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  res.set({
+    'Cache-Control': 'private, no-store',
+    'X-Page': String(page),
+    'X-Page-Size': String(pageSize),
+    'X-Total-Count': String(total),
+    'X-Total-Pages': String(Math.ceil(total / pageSize))
+  });
+  res.json(items);
+});
+
 apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
