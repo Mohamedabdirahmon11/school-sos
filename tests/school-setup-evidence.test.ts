@@ -12,3 +12,12 @@ test('school setup readiness counts only active teachers and students', () => {
   assert.ok(setup.includes("db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id')"));
   assert.ok(setup.includes("db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id')"));
 });
+
+test('school settings are flushed before the onboarding form receives success', () => {
+  const start = api.indexOf("apiRouter.put('/school/settings'");
+  const end = api.indexOf("apiRouter.post('/school/transport'", start);
+  const route = api.slice(start, end);
+  assert.ok(route.includes('async (req, res)'));
+  assert.ok(route.indexOf('db.logAudit(') < route.indexOf('await db.flush()'));
+  assert.ok(route.indexOf('await db.flush()') < route.indexOf('res.json(updated)'));
+});
