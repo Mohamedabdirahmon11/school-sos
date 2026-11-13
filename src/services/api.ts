@@ -294,16 +294,12 @@ export class ApiClient {
   }
 
   public static async getSchoolDetails(id: string) {
-    const schools = await this.getSchools();
-    const school = schools.find(s => s.id === id);
-    const users = await this.request<User[]>(`/users?schoolId=${id}`).catch(() => []);
-    const admin = users.find(u => u.role === 'school_admin') || users[0];
-    return {
-      school,
-      admin,
-      studentCount: Number((school as any)?.studentCount) || 0,
-      teacherCount: Number((school as any)?.teacherCount) || 0
-    };
+    return this.request<{
+      school: School;
+      admins: User[];
+      studentCount: number;
+      teacherCount: number;
+    }>(`/superadmin/schools/${encodeURIComponent(id)}`);
   }
 
   public static async updateSubscription(schoolId: string, updates: any) {
@@ -343,15 +339,20 @@ export class ApiClient {
     return { ...response, revenueTrend: revenueTrend.map((item: any) => ({ ...item, month: /^\d{4}-\d{2}$/.test(String(item?.month || '')) ? new Date(`${item.month}-01T00:00:00Z`).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : item?.month })) };
   }
 
-  public static async getGlobalUsers(params?: any) {
-    return this.request<any[]>('/users');
+  public static async getGlobalUsers(params?: { page?: number; pageSize?: number; search?: string; role?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    if (params?.role) query.set('role', params.role);
+    return this.request<any[]>(`/users?${query.toString()}`);
   }
 
   public static async toggleUserBlock(userId: string, blockedOrSchoolId?: boolean | string) {
-    return this.request<any>(`/users/${userId}/toggle-block`, { 
+    return this.request<{ success: boolean; isBlocked: boolean }>(`/users/${encodeURIComponent(userId)}/toggle-block`, {
       method: 'POST',
       body: typeof blockedOrSchoolId === 'boolean' ? JSON.stringify({ isBlocked: blockedOrSchoolId }) : undefined
-    }).catch(() => ({ success: true }));
+    });
   }
 
   public static async generateBatchInvoices() {

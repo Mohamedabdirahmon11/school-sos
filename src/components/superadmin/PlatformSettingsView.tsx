@@ -64,19 +64,42 @@ export const PlatformSettingsView: React.FC = () => {
 
   const handleDownloadPlatformBackup = async () => {
     setIsBackingUp(true);
+    setSaveError(null);
     try {
       const res = await ApiClient.getPlatformBackup();
+      if (res?.checksum?.algorithm !== 'sha256' || typeof res.checksum.value !== 'string'
+        || !res.backupDate || !res.version || !res.manifest || !res.data) {
+        throw new Error('The backup response is incomplete or has no integrity checksum. No file was downloaded.');
+      }
+      const checksumPayload = JSON.stringify({
+        backupDate: res.backupDate,
+        version: res.version,
+        manifest: res.manifest,
+        data: res.data
+      });
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(checksumPayload));
+      const actualChecksum = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      if (actualChecksum !== res.checksum.value.toLowerCase()) {
+        throw new Error('Backup integrity verification failed. The file was not downloaded.');
+      }
+
       const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `schoolos_platform_backup_${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      setNotice('Verified platform backup generated and downloaded successfully.');
-      setSettings(await ApiClient.getSettings());
-      setTimeout(() => setNotice(null), 4000);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `schoolos_platform_backup_${new Date().toISOString().split('T')[0]}.json`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Backup checksum verified and the platform export was downloaded.');
+      setTimeout(() => setNotice(null), 5000);
+
+      try {
+        setSettings(await ApiClient.getSettings());
+      } catch {
+        setSaveError('Backup downloaded and verified, but the backup status could not be refreshed.');
+      }
     } catch (err: any) {
-      setSaveError(err.message || 'Failed to generate platform backup.');
+      setSaveError(err.message || 'Failed to generate or verify platform backup.');
     } finally {
       setIsBackingUp(false);
     }
