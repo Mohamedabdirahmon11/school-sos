@@ -45,13 +45,15 @@ export const BulkAcademicYearPanel: React.FC = () => {
     setMessage(null);
     try {
       const result = await ApiClient.applyBulkAcademicYear(year.trim(), confirm, includeWarned);
-      setMessage({
-        type: 'success',
-        text: `Academic year ${result.academicYear} applied to ${result.applied} school(s). Skipped: ${result.skipped.length}.`
-      });
-      const refreshed = await ApiClient.previewBulkAcademicYear(year.trim());
-      setRows(refreshed.schools);
+      const successText = `Academic year ${result.academicYear} applied to ${result.applied} school(s). Skipped: ${result.skipped.length}.`;
+      setMessage({ type: 'success', text: successText });
       setConfirm('');
+      try {
+        const refreshed = await ApiClient.previewBulkAcademicYear(year.trim());
+        setRows(refreshed.schools);
+      } catch {
+        setMessage({ type: 'success', text: `${successText} Preview could not refresh; select Preview schools to verify the final state.` });
+      }
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Unable to apply the academic year.' });
     } finally {
