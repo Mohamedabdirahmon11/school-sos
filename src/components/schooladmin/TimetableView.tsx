@@ -99,7 +99,25 @@ export const TimetableView: React.FC = () => {
       shift2PeriodMinutes: schoolSettings.shift2PeriodMinutes || 40,
       shift2BreakAfterPeriod: schoolSettings.shift2BreakAfterPeriod || 3,
       shift2BreakMinutes: schoolSettings.shift2BreakMinutes ?? 20
-    });
+    }); else if (school?.setupData?.workingHours) {
+      const hours = school.setupData.workingHours;
+      const minutes = (value: string) => {
+        const [hour, minute] = value.split(':').map(Number);
+        return hour * 60 + minute;
+      };
+      const breakMinutes = Math.max(0, minutes(hours.breakEndTime) - minutes(hours.breakStartTime));
+      const availableTeachingMinutes = Math.max(1, minutes(hours.closingTime) - minutes(hours.classStartTime) - breakMinutes);
+      const configuredPeriods = getSchoolPeriodsPerDay(hours);
+      const periodMinutes = Math.max(1, Math.floor(availableTeachingMinutes / configuredPeriods));
+      const breakAfterPeriod = Math.max(1, Math.min(configuredPeriods - 1, Math.floor((minutes(hours.breakStartTime) - minutes(hours.classStartTime)) / periodMinutes)));
+      setSettings(current => ({
+        ...current,
+        firstPeriodStart: hours.classStartTime,
+        periodMinutes,
+        breakAfterPeriod,
+        breakMinutes
+      }));
+    }
     if (clsList.length > 0) {
       const activeClassId = clsList.some(item => item.id === selectedClassId) ? selectedClassId : clsList[0].id;
       setSelectedClassId(activeClassId);
