@@ -6146,6 +6146,19 @@ apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async 
     return;
   }
   const newStatus = typeof req.body?.isBlocked === 'boolean' ? req.body.isBlocked : !targetUser.isBlocked;
+  if (newStatus && targetUser.role === 'super_admin') {
+    const actor = (req as any).user as User;
+    if (targetUser.id === actor.id) {
+      res.status(400).json({ error: 'You cannot block your own Super Admin account.' });
+      return;
+    }
+    const superAdmins = await db.getUsers(undefined, 'super_admin');
+    const otherActiveSuperAdmins = superAdmins.filter(admin => admin.id !== targetUser.id && !admin.isBlocked);
+    if (otherActiveSuperAdmins.length === 0) {
+      res.status(400).json({ error: 'At least one active Super Admin must remain.' });
+      return;
+    }
+  }
   const updatedUser = db.updateUser(targetUser.id, { isBlocked: newStatus });
   if (!updatedUser) { res.status(404).json({ error: 'User not found.' }); return; }
   invalidateAuthenticatedSnapshot(targetUser.id);
