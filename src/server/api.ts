@@ -1116,15 +1116,6 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   let storedUser = await db.findUserForLogin(identifier);
-  // School ID is also accepted as the School Admin sign-in identifier. Only
-  // resolve it when exactly one active School Admin account belongs to it.
-  if (!storedUser && /^[A-Z0-9_-]{3,64}$/i.test(identifier)) {
-    const school = await db.getSchoolById(identifier.trim().toUpperCase());
-    if (school) {
-      const schoolAdmins = (await db.getUsers(school.id)).filter(account => normalizeRole(account.role) === 'school_admin' && !account.isBlocked);
-      if (schoolAdmins.length === 1) storedUser = schoolAdmins[0];
-    }
-  }
   if (!storedUser) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
