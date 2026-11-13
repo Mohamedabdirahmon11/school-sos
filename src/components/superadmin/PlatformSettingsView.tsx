@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { BulkAcademicYearPanel } from './BulkAcademicYearPanel.tsx';
 import { SuperAdminSettings } from '../../types/index.ts';
 import { 
   Settings, 
@@ -144,6 +145,8 @@ export const PlatformSettingsView: React.FC = () => {
           <span>{notice}</span>
         </div>
       )}
+
+      <BulkAcademicYearPanel />
 
       <form onSubmit={handleSave} className="space-y-6 text-xs">
         {/* Academic Calendar (Same for all schools) */}
