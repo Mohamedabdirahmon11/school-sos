@@ -45,7 +45,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [isSavingSchoolDetails, setIsSavingSchoolDetails] = useState(false);
   const [editSchoolError, setEditSchoolError] = useState<string | null>(null);
   const [editSchoolForm, setEditSchoolForm] = useState({
-    name: '', email: '', address: '', city: '', phone: '', whatsappPhone: '',
+    name: '', email: '', address: '', city: '', country: '', region: '', schoolType: 'combined' as 'primary' | 'secondary' | 'combined', phone: '', whatsappPhone: '',
     brandColor: '#0F766E', currency: 'ETB' as SchoolCurrency, language: 'en' as SchoolLanguage
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -199,6 +199,9 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       email: school.email || '',
       address: school.address || '',
       city: school.city || '',
+      country: school.country || '',
+      region: school.region || '',
+      schoolType: school.schoolType || 'combined',
       phone: school.phone || '',
       whatsappPhone: school.whatsappPhone || '',
       brandColor: school.brandColor || '#0F766E',
@@ -859,6 +862,20 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               <label className="space-y-1">
                 <span className="block font-medium text-[#334155]">City</span>
                 <input required minLength={2} maxLength={100} value={editSchoolForm.city} onChange={e => setEditSchoolForm({ ...editSchoolForm, city: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Country</span>
+                <input required minLength={2} maxLength={80} value={editSchoolForm.country} onChange={e => setEditSchoolForm({ ...editSchoolForm, country: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Region</span>
+                <input required minLength={2} maxLength={100} value={editSchoolForm.region} onChange={e => setEditSchoolForm({ ...editSchoolForm, region: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">School type</span>
+                <select value={editSchoolForm.schoolType} onChange={e => setEditSchoolForm({ ...editSchoolForm, schoolType: e.target.value as 'primary' | 'secondary' | 'combined' })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  <option value="primary">Primary</option><option value="secondary">Secondary</option><option value="combined">Combined</option>
+                </select>
               </label>
               <label className="space-y-1">
                 <span className="block font-medium text-[#334155]">Phone</span>
