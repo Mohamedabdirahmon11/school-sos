@@ -89,7 +89,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ isOpen, onClose })
         <div className="flex-1 overflow-y-auto space-y-2">
           {loading ? (
             <div className="p-8 text-center text-xs text-slate-500">Loading active sessions...</div>
-          ) : sessions.length === 0 ? (
+          ) : loadError ? null : sessions.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500">No active external sessions found.</div>
           ) : (
             sessions.map(s => (
