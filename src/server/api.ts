@@ -1958,7 +1958,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   // Upload a public school-branding logo through the server-side service-role client.
   let uploadedLogoPath: string | null = null;
   let adminUser: User;
-  const temporaryPin = String(adminPin || randomInt(100000, 1_000_000));
+  const temporaryPin = String(adminPin);
   try {
     if (typeof logoDataUrl === 'string' && logoDataUrl) {
       if (!isSupabaseConfigured) throw new Error('School logo storage is not configured.');
@@ -1979,7 +1979,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     adminUser = db.createUser({
       schoolId: school.id,
       role: 'school_admin',
-      staffId: requestedAdminUsername || await nextSchoolAdminId(),
+      staffId: requestedAdminUsername,
       fullName: String(adminName).trim(),
       email: cleanAdminEmail || undefined,
       phone: String(adminPhone || phone).trim(),
