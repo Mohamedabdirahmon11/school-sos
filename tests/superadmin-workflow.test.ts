@@ -174,3 +174,15 @@ test('bulk academic year preview flags malformed existing years for explicit rev
   assert.match(apiSource, /Current academic year is not in YYYY-YYYY format; review before replacing it/);
   assert.match(apiSource, /row\.status === 'warning' && !parsed\.data\.includeWarned/);
 });
+
+
+test('bulk academic year preview warns about draft or published exams tied to another year', () => {
+  const apiSource = read('../src/server/api.ts');
+  const panelSource = read('../src/components/superadmin/BulkAcademicYearPanel.tsx');
+  assert.match(apiSource, /queryAllRows\('exam_schedules', \{\}, 'school_id,academic_year,status'\)/);
+  assert.match(apiSource, /\['draft', 'published'\]\.includes\(status\)/);
+  assert.match(apiSource, /scheduleYear !== targetYear/);
+  assert.match(apiSource, /draft\/published exam schedule\(s\) use a different academic year/);
+  assert.match(panelSource, /draft\/published exams tied to another year/);
+  assert.match(panelSource, /Include all warning rows/);
+});
