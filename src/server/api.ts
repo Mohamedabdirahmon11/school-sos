@@ -5707,7 +5707,7 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
     const student = (await db.getStudents(school.id)).find(item => item.studentId === user.studentId || item.id === user.id.replace(/^usr-student-/, 'std-'));
     if (!student || !(recipient.linkedStudentIds?.includes(student.id) || [recipient.phone, recipient.parentPhone].includes(student.fatherPhone || '') || [recipient.phone, recipient.parentPhone].includes(student.motherPhone || ''))) return res.status(403).json({ error: 'Students may message only their linked parent.' });
   }
-  const msg = db.sendMessage({
+  const msg = await db.sendMessage({
     recipientId: recipient.id,
     recipientName: recipient.fullName,
     recipientRole: recipient.role,
