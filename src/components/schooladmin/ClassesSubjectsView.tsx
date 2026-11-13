@@ -42,10 +42,12 @@ export const ClassesSubjectsView: React.FC = () => {
 
   // New Class Form State
   const [className, setClassName] = useState('');
+  const [classCode, setClassCode] = useState('');
+  const [classAcademicYear, setClassAcademicYear] = useState(school?.academicYear || '2026-2027');
   const [gradeLevel, setGradeLevel] = useState(10);
   const [classShift, setClassShift] = useState<1 | 2>(1);
   const [availableShiftCount, setAvailableShiftCount] = useState<1 | 2>(1);
-  const [section, setSection] = useState('A');
+  const [section, setSection] = useState('');
   const [roomNumber, setRoomNumber] = useState('Room 101');
   const [capacity, setCapacity] = useState(school?.defaultClassCapacity || 40);
   const [monthlyFee, setMonthlyFee] = useState(50);
@@ -53,6 +55,7 @@ export const ClassesSubjectsView: React.FC = () => {
   // New Subject Form State
   const [subjectName, setSubjectName] = useState('');
   const [subjectCode, setSubjectCode] = useState('');
+  const [subjectDescription, setSubjectDescription] = useState('');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
 
   const visibleClasses = classes
@@ -102,13 +105,15 @@ export const ClassesSubjectsView: React.FC = () => {
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!className) return;
+    if (!className.trim() || !classCode.trim()) return;
     try {
       const payload = {
-        name: className,
+        name: className.trim(),
+        classCode: classCode.trim().toUpperCase(),
+        academicYear: classAcademicYear,
         gradeLevel,
         shift: classShift,
-        section,
+        section: section.trim(),
         roomNumber,
         capacity,
         monthlyFee,
@@ -120,6 +125,9 @@ export const ClassesSubjectsView: React.FC = () => {
       setShowClassModal(false);
       setEditingClass(null);
       setClassName('');
+      setClassCode('');
+      setClassAcademicYear(school?.academicYear || '2026-2027');
+      setSection('');
       setClassShift(1);
       setCapacity(school?.defaultClassCapacity || 40);
       setNotice(`Class "${className}" ${editingClass ? 'updated' : 'created'}.`);
@@ -132,13 +140,12 @@ export const ClassesSubjectsView: React.FC = () => {
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subjectName || !subjectCode) return;
+    if (!subjectName.trim() || !subjectCode.trim()) return;
     try {
       const payload = {
-        name: subjectName,
-        code: subjectCode,
-        creditUnits: 0,
-        department: 'General'
+        name: subjectName.trim(),
+        code: subjectCode.trim().toUpperCase(),
+        description: subjectDescription.trim()
       };
       const savedSubject = editingSubject ? await ApiClient.updateSubject(editingSubject.id, payload) : await ApiClient.addSubject(payload, school?.id);
       await ApiClient.saveSubjectAssignments(savedSubject.id, subjectAssignments);
@@ -146,6 +153,8 @@ export const ClassesSubjectsView: React.FC = () => {
       setEditingSubject(null);
       setSubjectName('');
       setSubjectCode('');
+      setSubjectDescription('');
+      setSubjectAssignments([]);
       setNotice(`Subject "${subjectName}" added to curriculum.`);
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
@@ -189,14 +198,14 @@ export const ClassesSubjectsView: React.FC = () => {
               <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]">
                 <Layers className="h-5 w-5 text-[#0F766E]" /> Classes & Sections
               </h2>
-              <p className="mt-1 text-xs text-slate-500">{classes.length} active class sections · grouped by grade, branch and shift</p>
+              <p className="mt-1 text-xs text-slate-500">{classes.length} active classes · KG and Grades 1–12 · sections are optional</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setShowBulkImport(true)} disabled={isReadOnly}
                 className="inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
                 <Upload className="h-4 w-4 text-[#0F766E]" /> {t('bulk_import')}
               </button>
-              <button type="button" onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
+              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(10); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
                 disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
                 <Plus className="h-4 w-4" /> Create class
               </button>
@@ -247,7 +256,7 @@ export const ClassesSubjectsView: React.FC = () => {
                               <p className="mt-2 text-[11px] text-slate-600">Form Teacher: <span className="font-semibold text-slate-800">{formTeacher?.fullName || 'Not assigned'}</span></p>
                             </button>
                             <button type="button" disabled={isReadOnly} aria-label={`Edit ${klass.name}`}
-                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
+                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setClassCode(klass.classCode || ''); setClassAcademicYear(klass.academicYear || school?.academicYear || '2026-2027'); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section || ''); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
                               className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-white hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                           </div>
                         </article>
@@ -269,7 +278,7 @@ export const ClassesSubjectsView: React.FC = () => {
               </h2>
               <p className="mt-1 text-xs text-slate-500">{subjects.length} subjects · class and teacher assignments are managed per subject</p>
             </div>
-            <button type="button" onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setSubjectName(''); setSubjectCode(''); setShowSubjectModal(true); }}
+            <button type="button" onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setSubjectName(''); setSubjectCode(''); setSubjectDescription(''); setShowSubjectModal(true); }}
               disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
               <Plus className="h-4 w-4" /> Add subject
             </button>
@@ -296,11 +305,12 @@ export const ClassesSubjectsView: React.FC = () => {
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-bold text-[#132A29]">{subject.name}</h3>
                       <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600">{subject.code}</span>
+                      {subject.description && <p className="mt-2 text-[11px] text-slate-600">{subject.description}</p>}
                       <p className="mt-2 text-[11px] text-slate-500">{assignedTeachers.length ? assignedTeachers.join(', ') : 'Teachers are assigned per class in subject settings.'}</p>
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button type="button" disabled={isReadOnly} aria-label={`Edit ${subject.name}`}
-                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}}
+                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setSubjectDescription(subject.description || ''); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}}
                         className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                       <button type="button" disabled={isReadOnly} aria-label={`Delete ${subject.name}`}
                         onClick={async () => { if (!window.confirm(`Delete subject ${subject.name}?`)) return; try { await ApiClient.deleteSubject(subject.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); }}}
@@ -354,6 +364,14 @@ export const ClassesSubjectsView: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block font-medium">Class Code *</label>
+                <input type="text" required maxLength={40} value={classCode} onChange={e => setClassCode(e.target.value.toUpperCase().replace(/\s+/g, '-'))} placeholder="e.g. KG1-2026 or G1-A-2026" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono uppercase" />
+              </div>
+              <div>
+                <label className="block font-medium">Academic Year *</label>
+                <input type="text" required pattern="\d{4}-\d{4}" value={classAcademicYear} onChange={e => setClassAcademicYear(e.target.value)} placeholder="2026-2027" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
+              </div>
+              <div>
                 <label className="block font-medium">Branch</label>
                 <select value={branchId} onChange={e => setBranchId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white">
                   <option value="">Unassigned</option>
@@ -389,12 +407,12 @@ export const ClassesSubjectsView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium">Section</label>
+                  <label className="block font-medium">Section (optional)</label>
                   <input
                     type="text"
                     value={section}
                     onChange={e => setSection(e.target.value.toUpperCase())}
-                    placeholder="A, B, C..."
+                    placeholder="Leave blank if the class has no sections"
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
                 </div>
@@ -411,7 +429,7 @@ export const ClassesSubjectsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium">Class Capacity</label>
+                  <label className="block font-medium">Class Capacity (optional)</label>
                   <input
                     type="number"
                     min="1"
@@ -475,8 +493,12 @@ export const ClassesSubjectsView: React.FC = () => {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block font-medium">Description (optional)</label>
+                <textarea value={subjectDescription} onChange={e => setSubjectDescription(e.target.value)} rows={3} maxLength={1000} placeholder="Brief description of this subject" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </div>
               <fieldset className="border rounded-lg p-3 space-y-3">
-                <legend className="px-1 font-semibold">Assign to classes</legend>
+                <legend className="px-1 font-semibold">Class Subject Assignment</legend>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-slate-500">{subjectAssignments.length} / {classes.length} classes selected</span>
                   <button type="button" onClick={() => setSubjectAssignments(current => current.length === classes.length ? [] : classes.map(klass => current.find(item => item.classId === klass.id) || { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }))} className="rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50">{subjectAssignments.length === classes.length ? 'Clear all' : 'Select all'}</button>
