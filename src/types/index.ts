@@ -75,6 +75,16 @@ export interface NotificationPreferences {
   examResults: boolean;
 }
 
+export interface SchoolSetupData {
+  schoolInformation: { name: string; logoUrl: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined' };
+  academicYear: { name: string; startDate: string; endDate: string; isCurrent: boolean };
+  terms: Array<{ name: string; startDate: string; endDate: string }>;
+  calendar: { workingDays: string[]; weeklyHolidays: string[]; nationalHolidays: Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>; schoolHolidays: Array<{ name: string; startDate: string; endDate: string }>; calendarType: 'ethiopian' | 'gregorian' | 'both' };
+  workingHours: { openingTime: string; classStartTime: string; closingTime: string; breakStartTime: string; breakEndTime: string; periodsPerDay: number };
+  completedSteps: number[];
+  updatedAt?: string;
+}
+
 export interface SchoolSetupProgress {
   currentStep: number;
   completedSteps: number[];
@@ -131,6 +141,7 @@ export interface School {
   receiptFooter?: string;
   notificationPreferences?: NotificationPreferences;
   setupProgress?: SchoolSetupProgress;
+  setupData?: SchoolSetupData;
   defaultClassCapacity: number;
   studentAccessEnabled: boolean; // School Admin and Super Admin can toggle
   subscription: SchoolSubscription;
