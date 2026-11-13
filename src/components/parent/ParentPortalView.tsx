@@ -41,6 +41,8 @@ export const ParentPortalView: React.FC = () => {
     Boolean(currentChild)
   );
   const timetable = Array.isArray(timetableState.data) ? timetableState.data : [];
+  const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules(currentChild.classId) : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
+  const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const childData = childState.data;
 
   const handleSelectChild = (idx: number) => {
@@ -119,6 +121,16 @@ export const ParentPortalView: React.FC = () => {
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable')} · {currentChild.firstName}</h2>
         {timetableState.loading ? <div className="h-24 animate-pulse rounded-lg bg-slate-100" /> : timetableState.error ? <ErrorState error={timetableState.error} onRetry={timetableState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1]"><p className="font-bold text-[#132A29]">{slot.dayOfWeek} · Period {slot.periodNumber}</p><p className="text-[#334155]">{slot.subjectName || slot.subjectId}</p><p className="text-[#64748B]">{slot.startTime}–{slot.endTime} · {slot.roomNumber}{slot.teacherName ? ` · ${slot.teacherName}` : ''}</p></div>)}</div>}
+      </section>
+
+      <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
+        <h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2>
+        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-[#64748B]">No exam timetable has been published for this child's class yet.</p> : publishedExamSchedules.map((exam: any) => (
+          <div key={exam.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="font-bold text-[#132A29]">{exam.examName} · {exam.subjectName}</p>
+            <p className="mt-1 text-[#475569]">{exam.examDate} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)} · Room {exam.roomName}</p>
+          </div>
+        ))}
       </section>
 
       {/* Academic Results & Fee Invoices */}

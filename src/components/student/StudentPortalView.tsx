@@ -32,6 +32,8 @@ export const StudentPortalView: React.FC = () => {
     ? studentsState.data.find(student => student.studentId === user?.studentId)
     : undefined;
   const scheduleState = useApi(() => ApiClient.getTimetable(), [school?.id, user?.id], Boolean(school && user));
+  const examSchedulesState = useApi(() => studentRecord?.classId ? ApiClient.getPublishedExamSchedules(studentRecord.classId) : Promise.resolve([]), [studentRecord?.classId, school?.id], Boolean(studentRecord));
+  const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const marksState = useApi(() => studentRecord ? ApiClient.getStudentMarks(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const attendanceState = useApi(() => studentRecord ? ApiClient.getStudentAttendance(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
@@ -140,6 +142,15 @@ export const StudentPortalView: React.FC = () => {
           </h2>
 
           {scheduleState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : scheduleState.error ? <ErrorState error={scheduleState.error} onRetry={scheduleState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="space-y-2">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1] flex items-center justify-between"><div><span className="font-bold text-[#132A29] block">{slot.dayOfWeek} • {slot.startTime} - {slot.endTime}: {slot.subjectName || slot.subjectId}</span><span className="text-[#64748B]">{slot.roomNumber}{slot.teacherName ? ` • ${slot.teacherName}` : ''}</span></div><span className="font-mono text-xs font-bold text-[#0F766E]">Period {slot.periodNumber}</span></div>)}</div>}
+          <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+            <h3 className="text-sm font-bold text-[#132A29]">Published Exam Schedule</h3>
+            {examSchedulesState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-[#64748B]">No exam timetable has been published for your class yet.</p> : publishedExamSchedules.map((exam: any) => (
+              <div key={exam.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="font-bold text-[#132A29]">{exam.examName} · {exam.subjectName}</p>
+                <p className="mt-1 text-[#475569]">{exam.examDate} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)} · Room {exam.roomName}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

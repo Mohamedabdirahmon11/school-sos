@@ -54,6 +54,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
   const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || [[], null, [], [], []];
+  const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
+  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
@@ -518,6 +520,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </div>
             )}
           </div>
+        <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
+          <h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2>
+          {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-xs text-[#64748B]">No published exam schedules for your assigned classes.</p> : publishedExamSchedules.map((exam: any) => (
+            <div key={exam.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+              <p className="font-bold text-[#132A29]">{exam.examName} · {exam.className} · {exam.subjectName}</p>
+              <p className="mt-1 text-[#475569]">{exam.examDate} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)} · Room {exam.roomName}</p>
+            </div>
+          ))}
+        </section>
+
         </section>
       )}
 
