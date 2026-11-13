@@ -4615,7 +4615,7 @@ apiRouter.get('/attendance/school/absences', requireAuth, requireSchoolContext, 
   const school = (req as any).school;
   const date = typeof req.query.date === 'string' ? req.query.date : '';
   const parsed = new Date(`${date}T00:00:00.000Z`);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
     res.status(400).json({ error: 'Attendance date must be a real YYYY-MM-DD date.' }); return;
   }
   const records = await queryAllRows('attendance_records', { school_id: school.id, date, status: 'absent' }, LIST_QUERY_COLUMNS.attendance_records);
@@ -6477,7 +6477,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
   if (targetUser.role === 'school_admin') {
     if (user.role !== 'super_admin') { res.status(403).json({ error: 'Only Super Admin can reset a School Admin PIN.' }); return; }
     const requestedPin = typeof req.body?.temporaryPin === 'string' ? req.body.temporaryPin.trim() : '';
-    if (!/^\\d{4,6}$/.test(requestedPin)) { res.status(400).json({ error: 'Enter a new 4–6 digit School Admin PIN.' }); return; }
+    if (!/^\d{4,6}$/.test(requestedPin)) { res.status(400).json({ error: 'Enter a new 4–6 digit School Admin PIN.' }); return; }
     temporaryPassword = requestedPin;
   } else {
     temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
@@ -6687,7 +6687,7 @@ apiRouter.post('/school/library/loans', requireAuth, requireSchoolContext, requi
   try {
     today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   } catch { /* Fall back to UTC when a legacy school timezone is invalid. */ }
-  if (!bookId || !studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) ||
+  if (!bookId || !studentId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
       Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate || dueDate < today) {
     res.status(400).json({ error: 'Select a book, student and a valid due date that is today or later.' });
     return;
@@ -6743,7 +6743,7 @@ apiRouter.post('/school/health-visits', requireAuth, requireSchoolContext, requi
   const treatment = typeof body.treatment === 'string' ? body.treatment.trim() : '';
   const nurseName = typeof body.nurseName === 'string' ? body.nurseName.trim() : '';
   const parsedDate = new Date(`${visitDate}T00:00:00.000Z`);
-  if (!studentId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate) ||
+  if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(visitDate) ||
       Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== visitDate ||
       !symptoms || symptoms.length > 2000 || treatment.length > 2000 || nurseName.length > 160) {
     res.status(400).json({ error: 'Clinic visit details are invalid. Provide a student, valid date, and symptoms.' });
