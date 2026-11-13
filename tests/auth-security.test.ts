@@ -63,3 +63,39 @@ test('Super Admin, School Admin, and Accountant share one staff login and resolv
   const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
   assert.match(loginSource, /Super Admin, School Admin, and Accountant use this same sign-in/);
 });
+
+
+test('Super Admin cannot block their own account or the last active Super Admin', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const routeStart = apiSource.indexOf("apiRouter.post('/users/:id/toggle-block'");
+  const routeEnd = apiSource.indexOf('// Batch Invoices Generation (Super Admin)', routeStart);
+  const route = apiSource.slice(routeStart, routeEnd);
+  assert.match(route, /if \(newStatus && targetUser\.role === 'super_admin'\)/);
+  assert.match(route, /targetUser\.id === actor\.id/);
+  assert.match(route, /You cannot block your own Super Admin account\./);
+  assert.match(route, /db\.getUsers\(undefined, 'super_admin'\)/);
+  assert.match(route, /otherActiveSuperAdmins\.length === 0/);
+  assert.match(route, /At least one active Super Admin must remain\./);
+});
+
+
+test('backup Super Admin creation is protected, audited, persisted, and requires a password change', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const uiSource = readFileSync(new URL('../src/components/superadmin/GlobalUsersView.tsx', import.meta.url), 'utf8');
+  const panelSource = readFileSync(new URL('../src/components/superadmin/CreateSuperAdminPanel.tsx', import.meta.url), 'utf8');
+  const routeStart = apiSource.indexOf("apiRouter.post('/superadmin/admins'");
+  const routeEnd = apiSource.indexOf("apiRouter.post('/users/:id/toggle-block'", routeStart);
+  const route = apiSource.slice(routeStart, routeEnd);
+  assert.match(route, /requireAuth, requireSuperAdmin/);
+  assert.match(route, /db\.findUserForLogin\(email\)/);
+  assert.match(route, /randomBytes\(12\)/);
+  assert.match(route, /passwordHash: temporaryPassword/);
+  assert.match(route, /mustChangePassword: true/);
+  assert.match(route, /action: 'SUPER_ADMIN_CREATED'/);
+  assert.match(route, /await db\.flush\(\)/);
+  assert.match(storageSource, /if \(passwordHash && !passwordHash\.startsWith\('scrypt:'\)\)\s*\{\s*passwordHash = hashPassword\(passwordHash\)/);
+  assert.match(uiSource, /<CreateSuperAdminPanel \/>/);
+  assert.match(panelSource, /result\.temporaryPassword/);
+  assert.match(panelSource, /Hide temporary password/);
+});

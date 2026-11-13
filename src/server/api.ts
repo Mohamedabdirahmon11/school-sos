@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -6139,6 +6140,55 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
   res.json({ success: true, temporaryPassword, mustChangePassword: true });
 });
 
+const createSuperAdminSchema = z.object({
+  fullName: z.string().trim().min(2, 'Full name is required.').max(120),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(254)
+});
+
+apiRouter.post('/superadmin/admins', requireAuth, requireSuperAdmin, async (req, res) => {
+  const parsed = createSuperAdminSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid Super Admin details.' });
+    return;
+  }
+  const { fullName, email } = parsed.data;
+  if (await db.findUserForLogin(email)) {
+    res.status(409).json({ error: 'An account with this email already exists.' });
+    return;
+  }
+
+  // Prefix/suffix guarantee mixed-case letters and a digit; createUser hashes this one-time password.
+  const temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
+  const created = db.createUser({
+    role: 'super_admin',
+    fullName,
+    email,
+    phone: '',
+    passwordHash: temporaryPassword,
+    mustChangePassword: true,
+    isBlocked: false,
+    failedLoginAttempts: 0
+  } as any);
+  const actor = (req as any).user as User;
+  db.logAudit({
+    action: 'SUPER_ADMIN_CREATED',
+    category: 'security',
+    userId: actor.id,
+    userName: actor.fullName,
+    userRole: 'super_admin',
+    details: `Created backup Super Admin account for ${email}; password change is required at first sign-in.`,
+    severity: 'critical'
+  });
+  try {
+    await db.flush();
+  } catch (error) {
+    console.error('[superadmin] Backup administrator persistence failed:', error);
+    res.status(503).json({ error: 'The account could not be confirmed as saved. Check Global Users before retrying to avoid a duplicate.' });
+    return;
+  }
+  res.status(201).json({ user: sanitizeUser(created), temporaryPassword, mustChangePassword: true });
+});
+
 apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async (req, res) => {
   const targetUser = await db.getUserById(req.params.id, (req as any).user.role === 'super_admin' ? undefined : (req as any).user.schoolId);
   if (!targetUser) {
@@ -6146,6 +6196,19 @@ apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async 
     return;
   }
   const newStatus = typeof req.body?.isBlocked === 'boolean' ? req.body.isBlocked : !targetUser.isBlocked;
+  if (newStatus && targetUser.role === 'super_admin') {
+    const actor = (req as any).user as User;
+    if (targetUser.id === actor.id) {
+      res.status(400).json({ error: 'You cannot block your own Super Admin account.' });
+      return;
+    }
+    const superAdmins = await db.getUsers(undefined, 'super_admin');
+    const otherActiveSuperAdmins = superAdmins.filter(admin => admin.id !== targetUser.id && !admin.isBlocked);
+    if (otherActiveSuperAdmins.length === 0) {
+      res.status(400).json({ error: 'At least one active Super Admin must remain.' });
+      return;
+    }
+  }
   const updatedUser = db.updateUser(targetUser.id, { isBlocked: newStatus });
   if (!updatedUser) { res.status(404).json({ error: 'User not found.' }); return; }
   invalidateAuthenticatedSnapshot(targetUser.id);
