@@ -56,7 +56,7 @@ test('school onboarding remains Super Admin-only and tenant rows are scoped by s
   assert.match(route, /schoolId: school.id/);
   const tenantPolicies = read('../supabase/migrations/022_consolidate_tenant_rls_policies.sql');
   assert.ok(tenantPolicies.includes('school_id::text = public.auth_school_id()::text'));
-  assert.ok(tenantPolicies.includes('CREATE POLICY tenant_scope_v2 ON public.schools'));
+  assert.ok(tenantPolicies.includes('CREATE POLICY tenant_scope_v2 ON public.classes'));
 });
 
 test('school admin ID can be used in the shared staff login form', () => {
