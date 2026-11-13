@@ -50,3 +50,22 @@ test('school backup audit is written only after a backup is available and flushe
   assert.ok(route.indexOf('const backup = await db.generateSchoolBackup') < route.indexOf('db.logAudit('));
   assert.match(route, /await db\.flush\(\);\s*res\.json\(backup\)/);
 });
+
+
+test('support ticket desk supports server-side search and status filtering without widening tenant scope', () => {
+  const routeStart = api.indexOf("apiRouter.get('/support/tickets'");
+  const routeEnd = api.indexOf("apiRouter.post('/support/tickets'", routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  assert.match(route, /filters\.school_id = user\.schoolId/);
+  assert.match(route, /filters\.created_by_user_id = user\.id/);
+  assert.match(route, /allowedStatuses = \['open', 'in_progress', 'resolved', 'closed'\]/);
+  assert.match(route, /filters\.status = requestedStatus/);
+  assert.match(route, /ticket_number\.ilike/);
+  assert.match(route, /subject\.ilike/);
+  assert.match(route, /school_name\.ilike/);
+  assert.match(route, /sendDatabasePage\(req, res, 'support_tickets', filters, orFilter\)/);
+  assert.match(support, /ticketSearch/);
+  assert.match(support, /ticketStatus/);
+  assert.match(support, /Search ticket number, subject, school, or description/);
+  assert.match(support, /In progress/);
+});
