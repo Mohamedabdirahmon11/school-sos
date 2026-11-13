@@ -143,6 +143,7 @@ export interface User {
   role: UserRole;
   fullName: string;
   email?: string;
+  authUserId?: string; // Optional Supabase Auth identity; public.users.id remains the stable SchoolOS ID.
   phone?: string;
   staffId?: string;
   studentId?: string; // e.g., "STD-MOG01-01"
