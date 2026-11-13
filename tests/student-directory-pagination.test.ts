@@ -18,7 +18,7 @@ test('student directory defaults to 50 rows per page and does not force every cl
 });
 
 test('School Admin can explicitly show all students in the selected class', () => {
-  assert.match(view, /Show all students in this class/);
+  assert.match(view, /classFilter && feeFilter === 'all'/);\n  assert.match(view, /Show all students in this class/);
   assert.match(view, /checked=\{showAllClass\}/);
   assert.match(view, /!showAllClass && <PaginationControls info=\{pageInfo\} onPage=\{setPage\} \/>/);
 });
@@ -27,5 +27,5 @@ test('changing search and filters resets student pagination', () => {
   assert.match(view, /setSearch\(e\.target\.value\); setPage\(1\)/);
   assert.match(view, /setBranchFilter\(e\.target\.value\); setPage\(1\)/);
   assert.match(view, /setClassFilter\(e\.target\.value\); setShowAllClass\(false\); setPage\(1\)/);
-  assert.match(view, /setFeeFilter\(e\.target\.value\); setPage\(1\)/);
+  assert.match(view, /setFeeFilter\(e\.target\.value\); setShowAllClass\(false\); setPage\(1\)/);
 });
