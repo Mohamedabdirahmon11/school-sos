@@ -44,6 +44,7 @@ export const ClassesSubjectsView: React.FC = () => {
   const [className, setClassName] = useState('');
   const [gradeLevel, setGradeLevel] = useState(10);
   const [classShift, setClassShift] = useState<1 | 2>(1);
+  const [availableShiftCount, setAvailableShiftCount] = useState<1 | 2>(1);
   const [section, setSection] = useState('A');
   const [roomNumber, setRoomNumber] = useState('Room 101');
   const [capacity, setCapacity] = useState(school?.defaultClassCapacity || 40);
@@ -90,6 +91,13 @@ export const ClassesSubjectsView: React.FC = () => {
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   const fetchData = classLoad.retry;
+  useEffect(() => {
+    let active = true;
+    ApiClient.getTimetableSettings()
+      .then(settings => { if (active) setAvailableShiftCount(settings.shiftCount === 2 ? 2 : 1); })
+      .catch(() => { if (active) setAvailableShiftCount(1); });
+    return () => { active = false; };
+  }, [school?.id]);
   useEffect(() => { if (!branchId && branches.length) setBranchId(branches[0].id); }, [branchId, branches]);
 
   const handleCreateClass = async (e: React.FormEvent) => {
@@ -377,7 +385,7 @@ export const ClassesSubjectsView: React.FC = () => {
                   <label className="block font-medium">Shift</label>
                   <select value={classShift} onChange={e => setClassShift(Number(e.target.value) as 1 | 2)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
                     <option value={1}>Shift 1 · Morning</option>
-                    <option value={2}>Shift 2 · Afternoon</option>
+                    {(availableShiftCount === 2 || classShift === 2) && <option value={2}>Shift 2 · Afternoon</option>}
                   </select>
                 </div>
                 <div>
