@@ -67,3 +67,23 @@ test('platform backup is checksum-verified in the browser before download', () =
   assert.match(settings, /actualChecksum !== res\.checksum\.value\.toLowerCase\(\)/);
   assert.match(settings, /Backup checksum verified/);
 });
+
+
+test('Super Admin can edit school contact and display details with validation and audit persistence', () => {
+  const apiSource = read('../src/server/api.ts');
+  const clientSource = read('../src/services/api.ts');
+  const schoolsSource = read('../src/components/superadmin/SchoolsView.tsx');
+  const routeStart = apiSource.indexOf("apiRouter.patch('/superadmin/schools/:id'");
+  const routeEnd = apiSource.indexOf("apiRouter.patch('/superadmin/schools/:id/subscription'", routeStart);
+  const route = apiSource.slice(routeStart, routeEnd);
+  assert.match(route, /requireAuth, requireSuperAdmin/);
+  assert.match(route, /updateSchoolDetailsSchema\.safeParse/);
+  assert.match(route, /duplicateEmail/);
+  assert.match(route, /db\.updateSchool\(school\.id, updates\)/);
+  assert.match(route, /action: 'SCHOOL_DETAILS_UPDATED'/);
+  assert.match(route, /await db\.flush\(\)/);
+  assert.match(clientSource, /updateSchoolDetails\(id: string/);
+  assert.match(schoolsSource, /Edit School Details/);
+  assert.match(schoolsSource, /Save School Details/);
+  assert.match(schoolsSource, /School code cannot be changed/);
+});
