@@ -274,7 +274,7 @@ export function isShiftWithinSchoolClosingTime(
   periodsPerDay: number,
   closingTime?: string | null
 ): boolean {
-  if (!closingTime || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(closingTime)) return true;
+  if (!closingTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(closingTime)) return true;
   const [hours, minutes] = closingTime.split(':').map(Number);
   return calculateShiftEndMinutes(settings, periodsPerDay) <= hours * 60 + minutes;
 }
