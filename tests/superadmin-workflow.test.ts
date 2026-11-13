@@ -87,3 +87,13 @@ test('Super Admin can edit school contact and display details with validation an
   assert.match(schoolsSource, /Save School Details/);
   assert.match(schoolsSource, /School code cannot be changed/);
 });
+
+
+test('platform backup UI does not imply that the saved frequency preference runs an automatic off-site backup', () => {
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  const storageSource = read('../src/server/storage.ts');
+  assert.match(settingsSource, /Backup Frequency Preference \(Not Automated\)/);
+  assert.match(settingsSource, /Automated off-site backups are not configured/);
+  assert.match(settingsSource, /does not support full-platform restore/);
+  assert.match(storageSource, /full-platform restore is not supported/);
+});
