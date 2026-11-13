@@ -4855,12 +4855,18 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
     allowedClassIds = new Set();
   }
 
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  if (requestedClassId && allowedClassIds !== null && !allowedClassIds.has(requestedClassId)) {
+    res.json([]);
+    return;
+  }
   const [allSchedules, classes, subjects] = await Promise.all([
     db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
   ]);
-  const schedules = allowedClassIds === null
-    ? allSchedules
-    : allSchedules.filter(schedule => allowedClassIds!.has(schedule.classId));
+  const schedules = allSchedules.filter(schedule =>
+    (!requestedClassId || schedule.classId === requestedClassId) &&
+    (allowedClassIds === null || allowedClassIds.has(schedule.classId))
+  );
   const classNames = new Map(classes.map(item => [item.id, item.name]));
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
   res.json(schedules.map(schedule => ({
