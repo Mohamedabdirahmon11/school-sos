@@ -90,12 +90,26 @@ function invalidateListCache(table?: string) {
 }
 
 function onboardingFieldErrors(body: Record<string, unknown>): string[] {
-  const fields: Array<[string, string]> = [
-    ['name', 'name'], ['code', 'code'], ['email', 'email'], ['adminEmail', 'adminEmail']
+  const required = [
+    'name', 'code', 'address', 'city', 'phone', 'whatsappPhone',
+    'email', 'adminName', 'adminEmail', 'adminPhone'
   ];
-  const missing = fields.filter(([key]) => typeof body[key] !== 'string' || !(body[key] as string).trim()).map(([, label]) => label);
-  if (body.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.adminEmail).trim())) missing.push('adminEmail (invalid email)');
-  return missing;
+  const missing = required.filter(key => typeof body[key] !== 'string' || !(body[key] as string).trim());
+  for (const field of ['email', 'adminEmail']) {
+    if (typeof body[field] === 'string' && body[field].trim()
+      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body[field].trim())) {
+      missing.push(`${field} (invalid email)`);
+    }
+  }
+  for (const field of ['phone', 'whatsappPhone', 'adminPhone']) {
+    if (typeof body[field] === 'string' && body[field].trim()) {
+      const digits = body[field].replace(/\D/g, '');
+      if (digits.length < 7 || digits.length > 15) missing.push(`${field} (invalid phone)`);
+    }
+  }
+  if (typeof body.code === 'string' && body.code.trim()
+    && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
+  return [...new Set(missing)];
 }
 
 function sendPdf(res: Response, filename: string, pages: PdfPageInput[]) {
@@ -1296,6 +1310,7 @@ apiRouter.post('/superadmin/sessions/revoke', requireAuth, requireSuperAdmin, as
   invalidateAuthenticatedSnapshot(undefined, req.body.sessionId);
   const user = (req as any).user as User;
   db.logAudit({ action: 'SESSION_REVOKED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: 'A user session was revoked by the Super Administrator.', severity: 'warning' });
+  await db.flush();
   res.json({ success: true });
 });
 
@@ -1519,6 +1534,26 @@ apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, async (re
   res.json(updated);
 });
 
+apiRouter.get('/superadmin/schools/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const school = await db.getSchoolById(req.params.id);
+  if (!school) {
+    res.status(404).json({ error: 'School not found.' });
+    return;
+  }
+  const [students, teachers, admins] = await Promise.all([
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+    db.queryPage('teachers', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+    db.queryPage('users', { school_id: school.id, role: 'school_admin' }, 1, 100, undefined, LIST_QUERY_COLUMNS.users)
+  ]);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    school,
+    admins: sanitizeUsers(admins.items),
+    studentCount: students.total,
+    teacherCount: teachers.total
+  });
+});
+
 apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
   const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
@@ -1547,7 +1582,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}.`, fields: missing });
     return;
   }
-  const { name, code, address, city, phone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone } = body;
+  const { name, code, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone } = body;
   const cleanCode = String(code).trim().toUpperCase();
   const cleanAdminEmail = String(adminEmail).trim().toLowerCase();
 
@@ -1567,8 +1602,9 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     code: cleanCode,
     address: address || '',
     city: city || '',
-    phone: phone || '',
-    email: String(email).trim(),
+    phone: String(phone).trim(),
+    whatsappPhone: String(whatsappPhone).trim(),
+    email: String(email).trim().toLowerCase(),
     brandColor: brandColor || '#0F766E',
     currency: ['ETB', 'USD', 'SOS'].includes(String(body.currency)) ? body.currency : 'ETB',
     language: 'en',
@@ -1616,6 +1652,14 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     details: `Created new school ${school.name} (${school.code}) with admin ${adminUser.email}.`,
     severity: 'info'
   });
+
+  try {
+    await db.flush();
+  } catch (error) {
+    console.error('[superadmin] School onboarding persistence failed:', error);
+    res.status(503).json({ error: 'The school and administrator could not be confirmed as saved. Check the directory before retrying to avoid creating a duplicate.' });
+    return;
+  }
 
   res.status(201).json({ school, admin: sanitizeUser(adminUser), temporaryPassword, mustChangePassword: true });
 });
@@ -5700,11 +5744,23 @@ apiRouter.post('/school/backup/restore', requireAuth, requireSchoolAdminOrSuperA
 
 apiRouter.get('/users', requireAuth, requireSchoolAdminOrSuperAdmin, (req, res) => {
   const user = (req as any).user as User;
-  let schoolId = req.query.schoolId as string;
-  if (user.role !== 'super_admin') {
-    schoolId = user.schoolId!;
+  const schoolId = user.role === 'super_admin' ? req.query.schoolId as string : user.schoolId!;
+  const supportedRoles = ['super_admin', 'school_admin', 'accountant', 'teacher', 'parent'];
+  const requestedRole = typeof req.query.role === 'string' ? req.query.role : 'all';
+  if (requestedRole !== 'all' && !supportedRoles.includes(requestedRole)) {
+    res.status(400).json({ error: 'Unsupported global user role filter.' });
+    return;
   }
-  void sendDatabasePage(req, res, 'users', { school_id: schoolId }, undefined, sanitizeUsers);
+  const filters: Record<string, string | string[] | undefined> = {
+    school_id: schoolId,
+    role: requestedRole === 'all' ? supportedRoles : requestedRole
+  };
+  const rawSearch = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const search = rawSearch.replace(/[%(),\\"]/g, '').slice(0, 80);
+  const orFilter = search
+    ? `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,staff_id.ilike.%${search}%`
+    : undefined;
+  void sendDatabasePage(req, res, 'users', filters, orFilter, sanitizeUsers);
 });
 
 apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -5744,6 +5800,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}).`,
     severity: 'warning'
   });
+  await db.flush();
   res.json({ success: true, temporaryPassword, mustChangePassword: true });
 });
 
@@ -5766,6 +5823,7 @@ apiRouter.post('/users/:id/toggle-block', requireAuth, requireSuperAdmin, async 
     details: `User ${targetUser.fullName} was ${newStatus ? 'blocked' : 'unblocked'} by Super Admin.`,
     severity: 'warning'
   });
+  await db.flush();
   res.json({ success: true, isBlocked: newStatus });
 });
 
