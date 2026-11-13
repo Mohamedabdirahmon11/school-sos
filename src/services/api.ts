@@ -32,7 +32,8 @@ import {
   StaffPayrollRecord,
   SchoolExpense,
   SchoolSetupState,
-  SchoolSetupProgressUpdate
+  SchoolSetupProgressUpdate,
+  SchoolSetupData
 } from '../types/index.ts';
 
 const LANG_KEY = 'schoolos_lang';
@@ -235,6 +236,17 @@ export class ApiClient {
 
   public static async getMe() {
     return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
+  }
+
+  public static async getSchoolSetupData() {
+    return this.request<{ data: SchoolSetupData; school: { name: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
+  }
+
+  public static async saveSchoolSetupStep(step: number, data: Partial<SchoolSetupData>) {
+    return this.request<{ data: SchoolSetupData; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null }; completed: boolean }>('/school/setup-data', {
+      method: 'PUT',
+      body: JSON.stringify({ step, data })
+    });
   }
 
   public static async getSchoolSetupProgress() {
