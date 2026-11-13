@@ -164,7 +164,7 @@ test('template contains required headers and explicitly skipped examples', async
   assert.match(text, /Grade 5/);
 });
 
-test('a selected class returns every student at once, sorted A to Z', async () => {
+test('a selected class returns every student at once, sorted by Student ID', async () => {
   const { body } = await preview(admin, csv(
     ['Grade 7', 'A', 'Zeinab Ali Noor', 'female', '2013-01-02', 'Ali Noor', '+252611777001', '', ''],
     ['Grade 7', 'A', 'Abdi Hassan Ali', 'male', '2013-02-03', 'Hassan Ali', '+252611777002', '', ''],
@@ -177,7 +177,10 @@ test('a selected class returns every student at once, sorted A to Z', async () =
   const response = await fetch(`${baseUrl}/students?classId=${encodeURIComponent(klass.id)}&pageSize=50`, { headers: { Cookie: `schoolos_session=${tokenFor(admin)}` } });
   assert.equal(response.status, 200);
   const rows = await response.json() as any[];
-  assert.deepEqual(rows.map(row => row.firstName), ['Abdi', 'Mahad', 'Zeinab']);
+  const expectedByStudentId = [...rows]
+    .sort((left, right) => String(left.studentId).localeCompare(String(right.studentId), undefined, { numeric: true, sensitivity: 'base' }))
+    .map(row => row.firstName);
+  assert.deepEqual(rows.map(row => row.firstName), expectedByStudentId);
   assert.equal(response.headers.get('x-total-count'), '3');
   assert.equal(response.headers.get('x-total-pages'), '1');
 });
