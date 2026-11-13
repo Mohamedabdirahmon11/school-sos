@@ -198,7 +198,7 @@ export const ClassesSubjectsView: React.FC = () => {
               <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]">
                 <Layers className="h-5 w-5 text-[#0F766E]" /> Classes & Sections
               </h2>
-              <p className="mt-1 text-xs text-slate-500">{classes.length} active classes · KG and Grades 1–12 · sections are optional</p>
+              <p className="mt-1 text-xs text-slate-500">{classes.length} active classes · KG 1–3 and Grades 1–12 · sections are optional</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setShowBulkImport(true)} disabled={isReadOnly}
@@ -252,6 +252,7 @@ export const ClassesSubjectsView: React.FC = () => {
                               className="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E]">
                               <span className="inline-flex rounded-lg bg-[#E7F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">Section {klass.section || '—'}</span>
                               <p className="mt-2 truncate text-sm font-bold text-[#132A29]">{klass.name}</p>
+                              <p className="mt-1 truncate text-[10px] font-mono text-slate-500">{klass.classCode || 'No class code'} · {klass.academicYear || school?.academicYear}</p>
                               <p className="mt-1 text-[11px] text-slate-500">{klass.roomNumber || 'Room not set'} · Capacity {klass.capacity} · {formatMoney(klass.monthlyFee, school?.currency)}</p>
                               <p className="mt-2 text-[11px] text-slate-600">Form Teacher: <span className="font-semibold text-slate-800">{formTeacher?.fullName || 'Not assigned'}</span></p>
                             </button>
