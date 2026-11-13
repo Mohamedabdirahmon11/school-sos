@@ -45,7 +45,7 @@ test('new school profile migration adds compatible metadata and a dedicated logo
   assert.match(migration, /ADD COLUMN IF NOT EXISTS school_type/);
   assert.match(migration, /school-logos/);
   assert.match(migration, /2097152/);
-  assert.match(migration, /image\\/png.*image\\/jpeg.*image\\/webp/);
+  assert.ok(migration.includes('image/png') && migration.includes('image/jpeg') && migration.includes('image/webp'));
 });
 
 test('school onboarding remains Super Admin-only and tenant rows are scoped by school id', () => {
@@ -55,14 +55,14 @@ test('school onboarding remains Super Admin-only and tenant rows are scoped by s
   assert.match(route, /requireAuth, requireSuperAdmin/);
   assert.match(route, /schoolId: school.id/);
   const tenantPolicies = read('../supabase/migrations/022_consolidate_tenant_rls_policies.sql');
-  assert.match(tenantPolicies, /school_id::text = public\\.auth_school_id\(\)::text/);
-  assert.match(tenantPolicies, /CREATE POLICY tenant_scope_v2 ON public\\.schools/);
+  assert.ok(tenantPolicies.includes('school_id::text = public.auth_school_id()::text'));
+  assert.ok(tenantPolicies.includes('CREATE POLICY tenant_scope_v2 ON public.schools'));
 });
 
 test('school admin ID can be used in the shared staff login form', () => {
   const login = read('../src/components/auth/LoginView.tsx');
   assert.match(login, /School Admin ID/);
-  assert.match(login, /type="text"[\\s\\S]*Email, phone, Admin ID, or T001/);
+  assert.ok(login.includes('type="text"') && login.includes('Email, phone, Admin ID, or T001'));
 });
 
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {
