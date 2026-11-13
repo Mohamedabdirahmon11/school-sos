@@ -5942,19 +5942,32 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, 
 
 apiRouter.get('/support/tickets', requireAuth, (req, res) => {
   const user = (req as any).user as User;
-  if (user.role === 'super_admin') {
-    void sendDatabasePage(req, res, 'support_tickets', {});
+  const filters: Record<string, string | string[] | undefined> = {};
+  if (user.role !== 'super_admin') {
+    if (!user.schoolId) {
+      res.status(403).json({ error: 'A school account is required to view support tickets.' });
+      return;
+    }
+    filters.school_id = user.schoolId;
+    // Only school administrators can inspect every ticket in their tenant.
+    // Other roles see only tickets they personally created.
+    if (user.role !== 'school_admin') filters.created_by_user_id = user.id;
+  }
+
+  const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
+  const allowedStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+  if (requestedStatus !== 'all' && !allowedStatuses.includes(requestedStatus)) {
+    res.status(400).json({ error: 'Unsupported support ticket status filter.' });
     return;
   }
-  if (!user.schoolId) {
-    res.status(403).json({ error: 'A school account is required to view support tickets.' });
-    return;
-  }
-  const filters: Record<string, string | string[] | undefined> = { school_id: user.schoolId };
-  // Only school administrators can inspect every ticket in their tenant.
-  // Other roles see only tickets they personally created.
-  if (user.role !== 'school_admin') filters.created_by_user_id = user.id;
-  void sendDatabasePage(req, res, 'support_tickets', filters);
+  if (requestedStatus !== 'all') filters.status = requestedStatus;
+
+  const rawSearch = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
+  const orFilter = search
+    ? `ticket_number.ilike.%${search}%,subject.ilike.%${search}%,school_name.ilike.%${search}%,description.ilike.%${search}%`
+    : undefined;
+  void sendDatabasePage(req, res, 'support_tickets', filters, orFilter);
 });
 
 apiRouter.post('/support/tickets', requireAuth, requireSchoolContextForSupportWrite, async (req, res) => {
