@@ -5611,11 +5611,18 @@ apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextFo
     res.status(400).json({ error: 'A support reply of 1–5000 characters is required.' });
     return;
   }
+  const requestedStatus = req.body?.status;
+  const allowedTicketStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+  if (user.role === 'super_admin' && requestedStatus !== undefined && !allowedTicketStatuses.includes(String(requestedStatus))) {
+    res.status(400).json({ error: 'Choose a valid support ticket status.' });
+    return;
+  }
   const ticket = await db.replyTicket(req.params.id, {
     senderId: user.id,
     senderName: user.fullName,
     senderRole: user.role,
-    content
+    content,
+    ...(user.role === 'super_admin' && requestedStatus ? { status: requestedStatus } : {})
   }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
   if (!ticket) {
     res.status(404).json({ error: 'Ticket not found' });
