@@ -13,7 +13,8 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
   const route = api.slice(routeStart, routeEnd);
   assert.ok(route.includes("const submittedPin = typeof pin === 'string' ? pin.trim() : ''"));
   assert.ok(route.includes('verifyPin(submittedPin'));
-  assert.ok(route.includes("user.role === 'school_admin' && verifyPassword(submittedPin, user.passwordHash)"));
+  assert.ok(route.includes("!user.pin && verifyPassword(submittedPin, user.passwordHash)"));
+  assert.ok(route.includes("db.updateUser(user.id, { pin: hashPin(submittedPin) })"));
   assert.ok(storage.includes('const school = await this.getSchoolById(normalizedStaffId)'));
   assert.ok(storage.includes('schoolAdmins.length === 1'));
   assert.ok(api.includes('pin: hashPin(temporaryPin)'));
