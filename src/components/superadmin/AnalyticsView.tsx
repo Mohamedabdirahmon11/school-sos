@@ -159,11 +159,13 @@ export const AnalyticsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
-              {(schools as any[]).map((s: any) => (
+              {(schools as any[]).map((s: any) => {
+                const subscription = s.subscription || {};
+                return (
                 <tr key={s.id} className="hover:bg-[#F8FAFC]">
                   <td className="px-4 py-3 font-semibold text-[#132A29]">{s.name}</td>
                   <td className="px-4 py-3 font-mono text-[#64748B]">{s.code}</td>
-                  <td className="px-4 py-3 capitalize">{s.subscription.plan}</td>
+                  <td className="px-4 py-3 capitalize">{subscription.plan || 'Unassigned'}</td>
                   <td className="px-4 py-3 font-mono">{s.studentCount || 0}</td>
                   <td className="px-4 py-3 font-mono">{s.teacherCount || 0}</td>
                   <td className="px-4 py-3">
@@ -172,10 +174,11 @@ export const AnalyticsView: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-4 py-3 uppercase font-semibold text-[11px] text-[#0F766E]">
-                    {s.subscription.status}
+                    {subscription.status || 'No subscription'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
