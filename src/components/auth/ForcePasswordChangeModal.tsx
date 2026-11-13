@@ -22,7 +22,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (user?.role === 'school_admin') {
-      if (!/^\\d{4,6}$/.test(pin)) { setError('PIN must contain 4 to 6 digits.'); return; }
+      if (!/^\d{4,6}$/.test(pin)) { setError('PIN must contain 4 to 6 digits.'); return; }
       if (pin !== confirmPin) { setError('PINs do not match.'); return; }
     } else {
       if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
@@ -66,12 +66,12 @@ export const ForcePasswordChangeModal: React.FC = () => {
             <>
               <div>
                 <label className="block text-xs font-medium text-[#334155]">New School Admin PIN</label>
-                <input type="password" inputMode="numeric" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" autoComplete="new-password" className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                <input type="password" inputMode="numeric" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" autoComplete="new-password" className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 <p className="mt-1 text-[11px] text-[#64748B]">Use this PIN with your School ID or Admin ID whenever you sign in.</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#334155]">Confirm New PIN</label>
-                <input type="password" inputMode="numeric" maxLength={6} required value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Confirm PIN" autoComplete="new-password" className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                <input type="password" inputMode="numeric" maxLength={6} required value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm PIN" autoComplete="new-password" className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
               </div>
             </>
           ) : (
