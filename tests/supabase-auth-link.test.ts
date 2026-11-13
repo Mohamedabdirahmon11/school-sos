@@ -37,9 +37,12 @@ test('accounts without email retain their legacy PIN or staff-ID sign-in path', 
   const end = api.indexOf('// ==============================================================================\n// 1. AUTHENTICATION', start);
   const helper = api.slice(start, end);
   assert.match(helper, /!user\.email/);
-  const studentLogin = api.slice(api.indexOf("apiRouter.post('/auth/login'"), start);
+  const loginStart = api.indexOf("apiRouter.post('/auth/login'");
+  const staffStart = api.indexOf('// B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT', loginStart);
+  const studentLogin = api.slice(loginStart, staffStart);
   assert.match(studentLogin, /STUDENT & PARENT LOGIN/);
   assert.match(studentLogin, /verifyPin\(/);
+  assert.doesNotMatch(studentLogin, /linkLegacyLoginToSupabaseAuth/);
 });
 
 test('Supabase Auth identity is selected into session context and mapped at the storage boundary', () => {
