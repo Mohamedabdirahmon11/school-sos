@@ -124,3 +124,15 @@ test('platform backup settings accurately disclose missing GitHub Actions and S3
   assert.match(workflowSource, /Upload encrypted backup to private S3 bucket/);
   assert.match(workflowSource, /--sse AES256/);
 });
+
+
+test('successful scheduled S3 backups update platform status and create an audit record', () => {
+  const workflowSource = read('../.github/workflows/supabase-backup.yml');
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  assert.match(workflowSource, /Record successful off-site backup in platform settings and audit/);
+  assert.match(workflowSource, /UPDATE public\.super_admin_settings/);
+  assert.match(workflowSource, /last_backup_status = 'success'/);
+  assert.match(workflowSource, /PLATFORM_OFFSITE_BACKUP_COMPLETED/);
+  assert.match(workflowSource, /github-actions-backup-/);
+  assert.match(settingsSource, /Last recorded platform backup/);
+});
