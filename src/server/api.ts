@@ -3285,7 +3285,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
       ...(classId ? { class_id: classId } : {})
     }, LIST_QUERY_COLUMNS.students)
   ]);
-  const classById = new Map(classes.map(klass => [klass.id, klass]));
+  const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
   if (classId && !classById.has(classId)) {
     res.status(404).json({ error: 'The selected class was not found in this school.' });
     return;
