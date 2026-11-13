@@ -1,17 +1,24 @@
 /**
  * Parents & Contacts Directory for School Admin
- * Shows every enrolled family page-by-page and provides real call, SMS and WhatsApp links.
+ * One row per unique guardian phone number, with school-scoped linked children.
  */
 
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
-import { Search, ExternalLink, Phone, MessageSquare } from 'lucide-react';
+import { Search, ExternalLink, Phone, MessageSquare, Users } from 'lucide-react';
+
+type ParentContact = {
+  id: string;
+  phone: string;
+  relationships: string[];
+  students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
+};
 
 export const ParentsView: React.FC = () => {
   const { school } = useAuth();
-  const [students, setStudents] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<ParentContact[]>([]);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
@@ -22,13 +29,20 @@ export const ParentsView: React.FC = () => {
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    if (!school) return;
-    ApiClient.getClasses().then(rows => setClasses(Array.isArray(rows) ? rows : [])).catch(() => setClasses([]));
+    if (!school) {
+      setClasses([]);
+      return;
+    }
+    let active = true;
+    ApiClient.getClasses()
+      .then(rows => { if (active) setClasses(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (active) setClasses([]); });
+    return () => { active = false; };
   }, [school?.id]);
 
   useEffect(() => {
     if (!school) {
-      setStudents([]);
+      setContacts([]);
       setPageInfo(null);
       setIsLoading(false);
       return;
@@ -36,16 +50,16 @@ export const ParentsView: React.FC = () => {
     let active = true;
     setIsLoading(true);
     setLoadError(null);
-    ApiClient.getSchoolStudents({ schoolId: school.id, page, pageSize: 50, search, classId: classFilter })
-      .then((rows: any[]) => {
+    ApiClient.getParentContacts({ page, pageSize: 50, search, classId: classFilter })
+      .then((rows: ParentContact[]) => {
         if (!active) return;
-        setStudents(Array.isArray(rows) ? rows : []);
+        setContacts(Array.isArray(rows) ? rows : []);
         setPageInfo((rows as any).pagination || null);
       })
       .catch((error: any) => {
         if (!active) return;
         setLoadError(error?.message || 'Could not load parent contacts.');
-        setStudents([]);
+        setContacts([]);
         setPageInfo(null);
       })
       .finally(() => { if (active) setIsLoading(false); });
@@ -57,9 +71,8 @@ export const ParentsView: React.FC = () => {
     setPage(1);
   };
 
-  const contactActions = (phone?: string) => {
-    const value = typeof phone === 'string' ? phone.trim() : '';
-    if (!value) return <span className="text-slate-400">No phone</span>;
+  const contactActions = (phone: string) => {
+    const value = phone.trim();
     const digits = value.replace(/\D/g, '');
     return (
       <div className="flex flex-wrap gap-1.5 mt-1">
@@ -84,7 +97,7 @@ export const ParentsView: React.FC = () => {
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Parents & Guardian Directory</h1>
-        <p className="text-xs text-[#64748B]">Parent contact details and linked enrolled children</p>
+        <p className="text-xs text-[#64748B]">One contact per unique guardian phone number, with linked enrolled children</p>
       </div>
 
       <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] flex flex-wrap items-center gap-3">
@@ -97,10 +110,11 @@ export const ParentsView: React.FC = () => {
         </select>
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
-          <input type="search" placeholder="Search student name or parent phone..." value={search}
+          <input type="search" placeholder="Search parent phone or linked student..." value={search}
             onChange={e => handleSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
         </div>
+        <span className="ml-auto text-xs text-slate-500">{pageInfo?.total ?? contacts.length} unique contacts</span>
       </div>
 
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
@@ -118,33 +132,37 @@ export const ParentsView: React.FC = () => {
                 <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                   <tr>
                     <th className="px-4 py-3 w-12">No.</th>
-                    <th className="px-4 py-3">Enrolled Child (Student)</th>
-                    <th className="px-4 py-3">Class</th>
-                    <th className="px-4 py-3">Father Contact</th>
-                    <th className="px-4 py-3">Mother Contact</th>
-                    <th className="px-4 py-3">Fee Status</th>
+                    <th className="px-4 py-3">Parent Contact</th>
+                    <th className="px-4 py-3">Relationship</th>
+                    <th className="px-4 py-3">Linked Children</th>
+                    <th className="px-4 py-3">Children</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E2E8F0]">
-                  {students.length === 0 ? (
-                    <tr><td colSpan={6} className="p-8 text-center text-[#64748B]">No parent records found.</td></tr>
-                  ) : students.map((student, rowIndex) => (
-                    <tr key={student.id} className="hover:bg-[#F8FAFC]">
-                      <td className="px-4 py-3 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
+                  {contacts.length === 0 ? (
+                    <tr><td colSpan={5} className="p-8 text-center text-[#64748B]">No parent contacts found for this school and class.</td></tr>
+                  ) : contacts.map((contact, rowIndex) => (
+                    <tr key={contact.id} className="align-top hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-3 text-slate-400">{((pageInfo?.page || page) - 1) * (pageInfo?.pageSize || 50) + rowIndex + 1}</td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-[#132A29] block">{student.firstName} {student.middleName} {student.lastName}</span>
-                        <span className="font-mono text-[10px] text-[#64748B]">{student.studentId}</span>
+                        <span className="font-mono font-semibold text-[#132A29]">{contact.phone}</span>
+                        {contactActions(contact.phone)}
                       </td>
-                      <td className="px-4 py-3 text-[#334155]">{student.className || '—'}</td>
-                      <td className="px-4 py-3 font-mono text-[#132A29] font-medium">
-                        {student.fatherPhone || '—'}{contactActions(student.fatherPhone)}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-[#132A29] font-medium">
-                        {student.motherPhone || '—'}{contactActions(student.motherPhone)}
+                      <td className="px-4 py-3 text-[#334155]">{contact.relationships.join(' / ')}</td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-1.5">
+                          {contact.students.map(student => (
+                            <div key={student.id}>
+                              <span className="font-semibold text-[#132A29]">{student.fullName}</span>
+                              <span className="ml-2 font-mono text-[10px] text-[#64748B]">{student.studentId}</span>
+                              <p className="text-[10px] text-slate-500">{student.className}</p>
+                            </div>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-[11px] font-bold uppercase ${student.feeStatus === 'paid' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {student.feeStatus || 'unknown'}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700">
+                          <Users className="h-3 w-3" /> {contact.students.length}
                         </span>
                       </td>
                     </tr>
