@@ -41,6 +41,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showEditSchoolModal, setShowEditSchoolModal] = useState(false);
+  const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
   const [isSavingSchoolDetails, setIsSavingSchoolDetails] = useState(false);
   const [editSchoolError, setEditSchoolError] = useState<string | null>(null);
   const [editSchoolForm, setEditSchoolForm] = useState({
@@ -210,9 +211,11 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   };
 
   const handleUpdateSubscription = async () => {
-    if (!selectedSchool) return;
+    if (!selectedSchool || isUpdatingSubscription) return;
+    setIsUpdatingSubscription(true);
     try {
-      const updated = await ApiClient.updateSubscription(selectedSchool.school.id, {
+      const schoolId = selectedSchool.school.id;
+      await ApiClient.updateSubscription(schoolId, {
         plan: subPlan,
         monthsToAdd: subMonthsToAdd,
         graceDays: subGraceDays,
@@ -221,9 +224,11 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setShowSubModal(false);
       setActionNotice('Subscription updated successfully.');
       await fetchSchools();
-      loadSchoolDetail(selectedSchool.school.id);
+      await loadSchoolDetail(schoolId);
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsUpdatingSubscription(false);
     }
   };
 
@@ -881,8 +886,8 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 <label className="block font-medium text-[#334155]">Add Validity (Months)</label>
                 <input
                   type="number"
-                  min="0"
-                  max="36"
+                  min="1"
+                  max="120"
                   value={subMonthsToAdd}
                   onChange={e => setSubMonthsToAdd(parseInt(e.target.value, 10) || 0)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
@@ -894,7 +899,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 <input
                   type="number"
                   min="0"
-                  max="30"
+                  max="60"
                   value={subGraceDays}
                   onChange={e => setSubGraceDays(parseInt(e.target.value, 10) || 7)}
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
@@ -918,9 +923,10 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 </button>
                 <button
                   onClick={handleUpdateSubscription}
-                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold"
+                  disabled={isUpdatingSubscription}
+                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Save & Apply Live
+                  {isUpdatingSubscription ? 'Saving…' : 'Save & Apply Live'}
                 </button>
               </div>
             </div>
