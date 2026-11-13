@@ -923,8 +923,8 @@ export class ApiClient {
   }
 
   public static async getPublishedExamSchedules(classId?: string) {
-    const query = classId ? `?classId=${encodeURIComponent(classId)}` : '';
-    return this.request<any[]>(`/exams/schedules/published${query}`);
+    const path = '/exams/schedules/published' + (classId ? '?classId=' + encodeURIComponent(classId) : '');
+    return this.request<any[]>(path);
   }
 
   public static async createExamSchedule(schedule: {
