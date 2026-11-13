@@ -3497,6 +3497,13 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
     res.status(400).json({ error: error instanceof Error ? error.message : 'Timetable settings are invalid.' });
     return;
   }
+  if (settings.shiftCount === 1) {
+    const shiftTwoClasses = await db.queryPage('classes', { school_id: school.id, shift: '2' }, 1, 1, undefined, 'id');
+    if (shiftTwoClasses.total > 0) {
+      res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });
+      return;
+    }
+  }
   const saved = await db.saveTimetableSettings(school.id, settings);
   db.logAudit({
     action: 'TIMETABLE_SETTINGS_UPDATED',
@@ -3506,7 +3513,7 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: 'Updated timetable start time, period length, and break configuration.',
+    details: `Updated the school's ${settings.shiftCount}-shift timetable configuration and period/break times.`,
     severity: 'info'
   });
   res.json(saved);
