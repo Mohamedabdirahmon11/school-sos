@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const api = read('../src/server/api.ts');
 const storage = read('../src/server/storage.ts');
 const types = read('../src/types/index.ts');
+const authSecurity = read('../src/server/auth-security.ts');
 
 test('legacy account migration is attempted only after successful staff password verification', () => {
   const routeStart = api.indexOf("apiRouter.post('/auth/login'");
