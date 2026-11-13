@@ -149,9 +149,9 @@ export class ApiClient {
       (err as any).status = response.status;
       (err as any).code = data.code;
       (err as any).data = data;
-      if (typeof window !== 'undefined' && data.code === 'MUST_CHANGE_PASSWORD') {
+      if (typeof window !== 'undefined' && ['MUST_CHANGE_PASSWORD', 'MUST_CHANGE_PIN'].includes(data.code)) {
         window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
-      } else if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login' && endpoint !== '/auth/change-password' && [401, 403, 500].includes(response.status)) {
+      } else if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login' && endpoint !== '/auth/change-password' && endpoint !== '/auth/change-pin' && [401, 403, 500].includes(response.status)) {
         window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: response.status, message: errorMsg, code: data.code } }));
       }
       throw err;
@@ -231,6 +231,14 @@ export class ApiClient {
       method: 'POST',
       headers: challengeToken ? { Authorization: `Bearer ${challengeToken}` } : undefined,
       body: JSON.stringify({ newPassword })
+    });
+  }
+  
+  public static async changePin(newPin: string, challengeToken?: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/change-pin', {
+      method: 'POST',
+      headers: challengeToken ? { Authorization: `Bearer ${challengeToken}` } : undefined,
+      body: JSON.stringify({ newPin })
     });
   }
 
@@ -384,7 +392,7 @@ export class ApiClient {
     return this.updateSchoolSubscription(schoolId, { studentAccessEnabled: enabled });
   }
 
-  public static async resetUserPassword(userId: string, temporaryPin?: string): Promise<{ success: boolean; temporaryPassword: string; mustChangePassword: boolean }> {
+  public static async resetUserPassword(userId: string, temporaryPin?: string): Promise<{ success: boolean; temporaryPassword: string; temporaryPin?: string; mustChangePassword: boolean }> {
     return this.request(`/users/${encodeURIComponent(userId)}/reset-password`, {
       method: 'POST',
       body: temporaryPin ? JSON.stringify({ temporaryPin }) : undefined

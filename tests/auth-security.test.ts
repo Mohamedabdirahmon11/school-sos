@@ -135,7 +135,9 @@ test('password changes and Super Admin resets synchronize linked Supabase Auth c
   const resetEnd = apiSource.indexOf('const createSuperAdminSchema', resetStart);
   const resetRoute = apiSource.slice(resetStart, resetEnd);
   assert.match(resetRoute, /randomBytes\(12\)/);
-  assert.match(resetRoute, /syncLinkedSupabaseAuthCredentials\(targetUser, \{ password: temporaryPassword \}\)/);
+  assert.match(resetRoute, /targetUser\.role !== 'school_admin' && !\(await syncLinkedSupabaseAuthCredentials\(targetUser, \{ password: temporaryCredential \}\)\)/);
+  assert.match(resetRoute, /targetUser\.role === 'school_admin' \? \{ pin: hashPin\(temporaryCredential\) \}/);
+  assert.match(resetRoute, /temporaryPin: temporaryCredential/);
   assert.match(resetRoute, /mustChangePassword: true/);
 
   const profileStart = apiSource.indexOf("apiRouter.put('/auth/profile'");

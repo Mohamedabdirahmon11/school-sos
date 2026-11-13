@@ -23,6 +23,32 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
 
 test('shared login sends email passwords and ID-based PINs to the correct credential fields', () => {
   assert.ok(loginView.includes("pin: email.trim().includes('@') ? pin : (password || pin)"));
-  assert.ok(loginView.includes('Super Admin email, School ID / School Admin ID, or Teacher ID'));
-  assert.ok(loginView.includes('Password (Super Admin) or PIN (School Admin / Teacher)'));
+  assert.ok(loginView.includes('Super Admin email, School ID / Admin ID, Teacher ID, or Accountant email / phone'));
+  assert.ok(loginView.includes('PIN (School Admin / Teacher) or password (Super Admin / Accountant)'));
+  assert.ok(loginView.includes('Set your School Admin PIN'));
+  assert.ok(loginView.includes('handleBootstrapPinChange'));
+});
+
+
+test('School Admin first login securely replaces the temporary PIN before dashboard access', () => {
+  assert.ok(api.includes("['super_admin', 'school_admin'].includes(user.role)"));
+  assert.ok(api.includes('user.mustChangePassword === true'));
+  assert.ok(api.includes('requirePinChange: true'));
+  assert.ok(api.includes("apiRouter.post('/auth/change-pin'"));
+  assert.ok(api.includes('pin: hashPin(newPin)'));
+  assert.ok(api.includes('mustChangePassword: false'));
+});
+
+
+test('School Admin profile and forced credential screens use PINs instead of passwords', () => {
+  const apiSource = read('../src/server/api.ts');
+  const profileSource = read('../src/components/common/ProfileModal.tsx');
+  const forcedSource = read('../src/components/auth/ForcePasswordChangeModal.tsx');
+  assert.ok(apiSource.includes("user.role === 'school_admin' && newPassword"));
+  assert.ok(apiSource.includes('verifyPin(currentPin.trim()'));
+  assert.ok(apiSource.includes('pin: hashPin(newPin)'));
+  assert.ok(profileSource.includes('Change School Admin PIN'));
+  assert.ok(profileSource.includes('currentPin: user.role'));
+  assert.ok(forcedSource.includes('New School Admin PIN'));
+  assert.ok(forcedSource.includes('ApiClient.changePin(pin)'));
 });

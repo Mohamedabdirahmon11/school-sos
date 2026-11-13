@@ -65,8 +65,8 @@ test('school onboarding remains Super Admin-only and tenant rows are scoped by s
 
 test('school admin ID can be used in the shared staff login form', () => {
   const login = read('../src/components/auth/LoginView.tsx');
-  assert.match(login, /School Admin ID/);
-  assert.ok(login.includes('type="text"') && login.includes('Super Admin email or School / Admin / Teacher ID'));
+  assert.match(login, /School Admin: School ID or Admin ID \+ PIN/);
+  assert.ok(login.includes('type="text"') && login.includes('Super Admin email, School / Admin / Teacher ID, or Accountant email / phone'));
 });
 
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {
@@ -95,7 +95,7 @@ test('global user management is server-paginated and includes accountant role fi
 });
 
 test('user block, password reset and session revocation persist before success responses', () => {
-  assert.match(api, /await db\.flush\(\);\s*res\.json\(\{ success: true, temporaryPassword/);
+  assert.match(api, /await db\.flush\(\);\s*res\.json\(targetUser\.role === 'school_admin'[\s\S]*temporaryPassword/);
   assert.match(api, /await db\.flush\(\);\s*res\.json\(\{ success: true, isBlocked: newStatus \}/);
   assert.match(api, /await db\.flush\(\);\s*res\.json\(\{ success: true \}\)/);
   assert.doesNotMatch(client, /toggleUserBlock[\s\S]{0,400}\.catch\(\(\) => \(\{ success: true \}\)\)/);

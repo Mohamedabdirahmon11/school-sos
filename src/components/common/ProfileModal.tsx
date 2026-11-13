@@ -17,6 +17,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword && newPassword !== confirmPassword) {
+    if (user.role === 'school_admin' && newPin && !/^\d{4,6}$/.test(newPin)) {
+      setError('PIN must contain 4 to 6 digits.');
+      return;
+    }
+    if (user.role === 'school_admin' && newPin && !currentPin) {
+      setError('Enter your current PIN before choosing a new one.');
+      return;
+    }
+    if (user.role === 'school_admin' && newPin !== confirmPin) {
+      setError('PINs do not match.');
+      return;
+    }
+    if (user.role !== 'school_admin' && newPassword && newPassword !== confirmPassword) {
       setError('New passwords do not match.');
       return;
     }
@@ -41,8 +56,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           fullName,
           email,
           phone,
-          currentPassword: currentPassword || undefined,
-          newPassword: newPassword || undefined
+          currentPassword: user.role === 'school_admin' ? undefined : currentPassword || undefined,
+          newPassword: user.role === 'school_admin' ? undefined : newPassword || undefined,
+          currentPin: user.role === 'school_admin' ? currentPin || undefined : undefined,
+          newPin: user.role === 'school_admin' ? newPin || undefined : undefined
         })
       });
       await refreshUser();
@@ -51,6 +68,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
       setTimeout(() => {
         onClose();
         setMessage(null);
@@ -128,32 +148,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </div>
 
           <div className="pt-2 border-t border-slate-100">
-            <label className="block text-xs font-bold text-slate-800 mb-2">Change Password (Optional)</label>
-            <div className="space-y-2">
-              <PasswordInput
-                label="current password"
-                value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
-              <PasswordInput
-                label="new password"
-                minLength={8}
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                placeholder="New password (min 8 characters)"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
-              <PasswordInput
-                label="confirm new password"
-                minLength={8}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
-              />
-            </div>
+            {user.role === 'school_admin' ? (
+              <>
+                <label className="block text-xs font-bold text-slate-800 mb-2">Change School Admin PIN (Optional)</label>
+                <div className="space-y-2">
+                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Current PIN" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="New 4–6 digit PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <p className="text-[11px] text-slate-500">Use this PIN with your School ID or Admin ID to sign in.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <label className="block text-xs font-bold text-slate-800 mb-2">Change Password (Optional)</label>
+                <div className="space-y-2">
+                  <PasswordInput label="current password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Current password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <PasswordInput label="new password" minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (min 8 characters)" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <PasswordInput label="confirm new password" minLength={8} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

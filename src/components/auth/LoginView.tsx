@@ -2,7 +2,8 @@
  * Production Multi-Role Authentication Screen
  * Supports:
  * - Super Admin: Email + Password
- * - School Admin, Accountant: Email or Phone + Password
+ * - School Admin: School ID or Admin ID + PIN
+ * - Accountant: Email or Phone + Password
  * - Teacher: School-issued Teacher ID + Password or PIN
  * - Student & Parent: School Code + Phone Number + PIN (with children switcher and lockout protection)
  */
@@ -40,8 +41,11 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [bootstrapToken, setBootstrapToken] = useState<string | null>(null);
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
+  const [pinChangeRequired, setPinChangeRequired] = useState(false);
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [confirmAdminPin, setConfirmAdminPin] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,6 +93,27 @@ export const LoginView: React.FC = () => {
     }
   };
 
+  const handleBootstrapPinChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{4,6}$/.test(newAdminPin)) { setError('PIN must contain 4 to 6 digits.'); return; }
+    if (newAdminPin !== confirmAdminPin) { setError('PINs do not match.'); return; }
+    if (!bootstrapToken) { setError('This setup session expired. Sign in again.'); return; }
+    setIsLoading(true);
+    setError(null);
+    try {
+      await ApiClient.changePin(newAdminPin, bootstrapToken);
+      setNewAdminPin('');
+      setConfirmAdminPin('');
+      setPinChangeRequired(false);
+      setBootstrapToken(null);
+      await refreshUser();
+    } catch (err: any) {
+      setError(err.message || 'Could not set the School Admin PIN.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F3F6F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Brand Header */}
@@ -108,7 +133,16 @@ export const LoginView: React.FC = () => {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-6 px-4 shadow-sm border border-[#E2E8F0] sm:rounded-xl sm:px-8">
           
-          {passwordChangeRequired ? (
+          {pinChangeRequired ? (
+            <form className="space-y-4" onSubmit={handleBootstrapPinChange}>
+              <h3 className="text-base font-semibold text-[#132A29]">Set your School Admin PIN</h3>
+              <p className="text-xs text-[#64748B]">Create a new 4–6 digit PIN. Use this PIN with your School ID or Admin ID whenever you sign in.</p>
+              <PasswordInput label="new PIN" required minLength={4} autoComplete="new-password" value={newAdminPin} onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <PasswordInput label="confirm new PIN" required minLength={4} autoComplete="new-password" value={confirmAdminPin} onChange={e => setConfirmAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm PIN" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
+              <button disabled={isLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white">{isLoading ? 'Saving…' : 'Set PIN and continue'}</button>
+            </form>
+          ) : passwordChangeRequired ? (
             <form className="space-y-4" onSubmit={handleBootstrapPasswordChange}>
               <h3 className="text-base font-semibold text-[#132A29]">Change the Super Admin password</h3>
               <p className="text-xs text-[#64748B]">Set a new password to continue to the dashboard.</p>
@@ -177,14 +211,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / School Admin ID, or Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / Admin ID, Teacher ID, or Accountant email / phone</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Super Admin email or School / Admin / Teacher ID"
+                      placeholder="Super Admin email, School / Admin / Teacher ID, or Accountant email / phone"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
@@ -192,7 +226,7 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">Password (Super Admin) or PIN (School Admin / Teacher)</label>
+                    <label className="block text-xs font-medium text-[#334155]">PIN (School Admin / Teacher) or password (Super Admin / Accountant)</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
                       Use your account password or the temporary PIN issued by your Super Admin or School Admin.
                     </span>
@@ -203,7 +237,7 @@ export const LoginView: React.FC = () => {
                       required
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="Enter your PIN or password"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
