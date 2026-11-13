@@ -32,7 +32,7 @@ export const StudentPortalView: React.FC = () => {
     ? studentsState.data.find(student => student.studentId === user?.studentId)
     : undefined;
   const scheduleState = useApi(() => ApiClient.getTimetable(), [school?.id, user?.id], Boolean(school && user));
-  const examSchedulesState = useApi(() => studentRecord?.classId ? ApiClient.getPublishedExamSchedules() : Promise.resolve([]), [studentRecord?.classId, school?.id], Boolean(studentRecord));
+  const examSchedulesState = useApi(() => studentRecord?.classId ? ApiClient.getPublishedExamSchedules(studentRecord.classId) : Promise.resolve([]), [studentRecord?.classId, school?.id], Boolean(studentRecord));
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const marksState = useApi(() => studentRecord ? ApiClient.getStudentMarks(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
