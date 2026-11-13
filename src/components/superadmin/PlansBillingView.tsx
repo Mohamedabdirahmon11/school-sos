@@ -19,6 +19,8 @@ export const PlansBillingView: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [planSaveError, setPlanSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -61,6 +63,7 @@ export const PlansBillingView: React.FC = () => {
 
   const handlePayInvoice = async (id: string) => {
     if (payingInvoiceId) return;
+    if (!window.confirm('Confirm that the school has already paid this invoice outside SchoolOS? This records a manual payment and does not charge the school.')) return;
     setPayingInvoiceId(id);
     try {
       await ApiClient.payInvoice(id);
@@ -76,15 +79,26 @@ export const PlansBillingView: React.FC = () => {
 
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPlan) return;
+    if (!editingPlan || isSavingPlan) return;
+    const prices = [editingPlan.monthlyPrice, editingPlan.yearlyPrice, editingPlan.lifetimePrice];
+    const limits = [editingPlan.maxStudents, editingPlan.maxTeachers];
+    if (prices.some(value => !Number.isFinite(value) || value < 0)
+      || limits.some(value => !Number.isInteger(value) || value < 1)) {
+      setPlanSaveError('Enter valid non-negative prices and positive whole-number limits.');
+      return;
+    }
+    setIsSavingPlan(true);
+    setPlanSaveError(null);
     try {
       await ApiClient.updatePlan(editingPlan.id, editingPlan);
-      setEditingPlan(null);
       setNotice(`Tier ${editingPlan.name} updated successfully.`);
+      setEditingPlan(null);
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message);
+      setPlanSaveError(err.message || 'Unable to save subscription plan changes.');
+    } finally {
+      setIsSavingPlan(false);
     }
   };
 
@@ -281,6 +295,7 @@ export const PlansBillingView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSavePlan} className="space-y-4 text-xs">
+              {planSaveError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{planSaveError}</div>}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-[#334155]">Monthly Price ({platformCurrency})</label>
@@ -346,16 +361,18 @@ export const PlansBillingView: React.FC = () => {
               <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingPlan(null)}
-                  className="px-4 py-2 border border-[#CBD5E1] rounded-lg text-[#334155] hover:bg-[#F8FAFC]"
+                  onClick={() => { if (!isSavingPlan) { setPlanSaveError(null); setEditingPlan(null); } }}
+                  disabled={isSavingPlan}
+                  className="px-4 py-2 border border-[#CBD5E1] rounded-lg text-[#334155] hover:bg-[#F8FAFC] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold"
+                  disabled={isSavingPlan}
+                  className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg font-semibold disabled:opacity-60"
                 >
-                  Save Tier
+                  {isSavingPlan ? 'Saving…' : 'Save Tier'}
                 </button>
               </div>
             </form>
