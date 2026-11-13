@@ -348,7 +348,7 @@ export const ExamsResultsView: React.FC = () => {
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
             <label className="text-xs font-semibold text-[#475569]">Select Class
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
-                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''} · {klass.classCode || 'No code'}</option>)}
+                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''} · {klass.classCode || 'No code'} · {klass.academicYear || school?.academicYear}</option>)}
               </select>
             </label>
             <label className="text-xs font-semibold text-[#475569]">Academic Semester
