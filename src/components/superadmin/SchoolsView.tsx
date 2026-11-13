@@ -24,7 +24,8 @@ import {
   ExternalLink,
   ChevronRight,
   X,
-  CreditCard
+  CreditCard,
+  Trash2
 } from 'lucide-react';
 
 interface SchoolsViewProps {
@@ -55,6 +56,13 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [planOptions, setPlanOptions] = useState<PlanConfig[]>([]);
   const [platformCurrency, setPlatformCurrency] = useState('ETB');
   const [plansError, setPlansError] = useState<string | null>(null);
+  const [showDeleteSchoolModal, setShowDeleteSchoolModal] = useState(false);
+  const [deletionPreview, setDeletionPreview] = useState<any | null>(null);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
+  const [isLoadingDeletionPreview, setIsLoadingDeletionPreview] = useState(false);
+  const [isDeletingSchool, setIsDeletingSchool] = useState(false);
+  const [deleteSchoolError, setDeleteSchoolError] = useState<string | null>(null);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +138,46 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       }
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const openPermanentDeleteDialog = async () => {
+    if (!selectedSchool?.school?.id) return;
+    setShowDeleteSchoolModal(true);
+    setDeleteSchoolError(null);
+    setDeleteConfirmationName('');
+    setDeletionPreview(null);
+    setIsLoadingDeletionPreview(true);
+    try {
+      const preview = await ApiClient.previewSchoolDeletion(selectedSchool.school.id);
+      setDeletionPreview(preview);
+    } catch (error: any) {
+      setDeleteSchoolError(error.message || 'Unable to load the deletion preview.');
+    } finally {
+      setIsLoadingDeletionPreview(false);
+    }
+  };
+
+  const handlePermanentSchoolDeletion = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedSchool?.school || deleteConfirmationName !== selectedSchool.school.name || !deletionPreview) return;
+    setIsDeletingSchool(true);
+    setDeleteSchoolError(null);
+    try {
+      const result = await ApiClient.deleteSchoolPermanently(selectedSchool.school.id, deleteConfirmationName);
+      setShowDeleteSchoolModal(false);
+      setSelectedSchool(null);
+      setDeleteConfirmationName('');
+      await fetchSchools();
+      if (result.cleanupWarnings?.length) {
+        window.alert(`Database records for ${result.schoolName} were deleted. Some external cleanup needs attention:\\n\\n${result.cleanupWarnings.join('\\n')}`);
+      } else {
+        setActionNotice(`School "${result.schoolName}" and its school-scoped database records were permanently deleted.`);
+      }
+    } catch (error: any) {
+      setDeleteSchoolError(error.message || 'Permanent school deletion failed.');
+    } finally {
+      setIsDeletingSchool(false);
     }
   };
 
@@ -594,6 +642,15 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               </button>
 
               <button
+                type="button"
+                onClick={openPermanentDeleteDialog}
+                className="w-full py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 bg-red-700 hover:bg-red-800 text-white"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete School Permanently</span>
+              </button>
+
+              <button
                 onClick={handleToggleSuspension}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 ${
                   selectedSchool.school.subscription.status === 'suspended'
@@ -612,6 +669,64 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
           </div>
         )}
       </div>
+
+      {/* PERMANENT SCHOOL DELETION CONFIRMATION */}
+      {showDeleteSchoolModal && selectedSchool?.school && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6 border border-red-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-red-50 text-red-700 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-red-800">Delete School Permanently</h2>
+                <p className="text-xs text-slate-600 mt-1">This action cannot be undone. It removes this school's database records and School Admin accounts. It does not delete the platform Super Admin.</p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 mb-4 text-xs text-red-900">
+              <p className="font-bold">{selectedSchool.school.name} ({selectedSchool.school.code})</p>
+              <p className="mt-1">Do not continue unless you have an independent backup and authority to erase this school's records.</p>
+            </div>
+            {isLoadingDeletionPreview ? (
+              <p className="text-xs text-slate-600 py-4">Loading exact deletion preview…</p>
+            ) : deletionPreview ? (
+              <div className="rounded-lg border border-slate-200 p-3 mb-4">
+                <div className="flex items-center justify-between text-xs font-semibold mb-2">
+                  <span>Records included in deletion</span>
+                  <span>{Number(deletionPreview.total_rows || 0).toLocaleString()} rows</span>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {Object.entries(deletionPreview.counts || {}).map(([table, count]) => (
+                    <div key={table} className="flex justify-between gap-4 text-[11px] text-slate-600">
+                      <span>{table.replace(/_/g, ' ')}</span>
+                      <span className="font-mono font-semibold">{Number(count).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {deleteSchoolError && <div className="rounded-lg bg-red-50 border border-red-200 p-3 mb-3 text-xs text-red-700">{deleteSchoolError}</div>}
+            <form onSubmit={handlePermanentSchoolDeletion} className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">
+                Type the exact school name to unlock deletion
+                <input
+                  value={deleteConfirmationName}
+                  onChange={event => setDeleteConfirmationName(event.target.value)}
+                  placeholder={selectedSchool.school.name}
+                  autoComplete="off"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </label>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
+                <button type="button" disabled={isDeletingSchool} onClick={() => setShowDeleteSchoolModal(false)} className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700">Cancel</button>
+                <button type="submit" disabled={isDeletingSchool || isLoadingDeletionPreview || !deletionPreview || deleteConfirmationName !== selectedSchool.school.name} className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 disabled:opacity-40 text-white text-xs font-bold">
+                  {isDeletingSchool ? 'Deleting school…' : 'Permanently Delete All School Data'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ADD SCHOOL MODAL */}
       {showAddModal && (

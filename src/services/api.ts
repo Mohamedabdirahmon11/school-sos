@@ -311,6 +311,21 @@ export class ApiClient {
     return this.createSchool(schoolData);
   }
 
+  public static async previewSchoolDeletion(id: string) {
+    return this.request<{
+      school_id: string; school_name: string; counts: Record<string, number>; total_rows: number;
+    }>(`/superadmin/schools/${encodeURIComponent(id)}/deletion-preview`, { method: 'POST' });
+  }
+
+  public static async deleteSchoolPermanently(id: string, confirmName: string) {
+    return this.request<{
+      success: boolean; schoolName: string; databaseDeleted: boolean;
+      authAccountsFound: number; cleanupWarnings: string[];
+    }>(`/superadmin/schools/${encodeURIComponent(id)}/permanent`, {
+      method: 'DELETE', body: JSON.stringify({ confirmName })
+    });
+  }
+
   public static async getSchoolDetails(id: string) {
     return this.request<{
       school: School;

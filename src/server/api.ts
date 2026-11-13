@@ -1794,6 +1794,63 @@ apiRouter.put('/superadmin/plans/:id', requireAuth, requireSuperAdmin, async (re
   res.json(updated);
 });
 
+apiRouter.post('/superadmin/schools/:id/deletion-preview', requireAuth, requireSuperAdmin, async (req, res) => {
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Supabase service-role connection is not configured.' }); return; }
+  const school = await db.getSchoolById(req.params.id);
+  if (!school) { res.status(404).json({ error: 'School not found.' }); return; }
+  const serviceClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await serviceClient.rpc('school_deletion_preview', { p_school_id: school.id });
+  if (error) { res.status(503).json({ error: 'Unable to prepare a complete deletion preview.', detail: error.message }); return; }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(data);
+});
+
+apiRouter.delete('/superadmin/schools/:id/permanent', requireAuth, requireSuperAdmin, async (req, res) => {
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Supabase service-role connection is not configured.' }); return; }
+  const school = await db.getSchoolById(req.params.id);
+  if (!school) { res.status(404).json({ error: 'School not found.' }); return; }
+  const confirmName = typeof req.body?.confirmName === 'string' ? req.body.confirmName : '';
+  if (confirmName !== school.name) { res.status(400).json({ error: 'Type the exact school name to confirm permanent deletion.' }); return; }
+
+  const serviceClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await serviceClient.rpc('delete_school_permanently', {
+    p_school_id: school.id, p_confirm_name: confirmName
+  });
+  if (error) { res.status(409).json({ error: 'Database deletion was rolled back. No school records were removed.', detail: error.message }); return; }
+
+  const cleanupWarnings: string[] = [];
+  // Database removal is transactional. Auth and Storage are separate Supabase services,
+  // so report their cleanup status rather than claiming cross-service atomicity.
+  const authIds: string[] = Array.isArray(data?.auth_user_ids) ? data.auth_user_ids : [];
+  for (const authId of authIds) {
+    const { error: authError } = await serviceClient.auth.admin.deleteUser(authId);
+    if (authError && !/not found|does not exist/i.test(authError.message)) cleanupWarnings.push(`Auth account ${authId}: ${authError.message}`);
+  }
+  const { data: logoFiles, error: listError } = await serviceClient.storage.from('school-logos').list(school.id, { limit: 1000 });
+  if (listError) cleanupWarnings.push(`School logo storage: ${listError.message}`);
+  else if (logoFiles?.length) {
+    const paths = logoFiles.filter(file => file.name && file.id).map(file => `${school.id}/${file.name}`);
+    if (paths.length) {
+      const { error: removeError } = await serviceClient.storage.from('school-logos').remove(paths);
+      if (removeError) cleanupWarnings.push(`School logo storage: ${removeError.message}`);
+    }
+  }
+  db.deleteSchool(school.id);
+  try { await db.flush(); } catch (flushError) {
+    cleanupWarnings.push(`Application cache synchronization: ${flushError instanceof Error ? flushError.message : 'failed'}`);
+  }
+  const actor = (req as any).user as User;
+  console.warn('[superadmin] Permanent school deletion completed', {
+    schoolId: school.id, schoolName: school.name, actorId: actor.id,
+    authAccounts: authIds.length, cleanupWarnings
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(cleanupWarnings.length ? 207 : 200).json({
+    success: true, schoolName: school.name, databaseDeleted: true,
+    authAccountsFound: authIds.length, cleanupWarnings
+  });
+});
+
 apiRouter.get('/superadmin/schools/:id', requireAuth, requireSuperAdmin, async (req, res) => {
   const school = await db.getSchoolById(req.params.id);
   if (!school) {
