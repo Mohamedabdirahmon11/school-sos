@@ -1143,7 +1143,7 @@ export class ApiClient {
   }
 
   // Support Tickets
-  public static async getTickets(params?: any) {
+  public static async getTickets(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
     return this.request<SupportTicket[]>(`/support/tickets${this.pageQuery(params)}`);
   }
 
