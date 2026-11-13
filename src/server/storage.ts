@@ -1957,7 +1957,10 @@ class StorageEngine {
 
   public createClass(classData: Omit<SchoolClass, 'id'>): SchoolClass {
     const id = `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const newClass: SchoolClass = { ...classData, id };
+    const school = this.data.schools.find(item => item.id === classData.schoolId);
+    const academicYear = classData.academicYear || school?.academicYear || '2026-2027';
+    const classCode = classData.classCode || `CLS-${Number(classData.gradeLevel) === 0 ? 'KG' : `G${classData.gradeLevel}`}-${String(classData.section || 'MAIN').toUpperCase()}-${id.slice(-6).toUpperCase()}`;
+    const newClass: SchoolClass = { ...classData, classCode, academicYear, section: classData.section || '', id };
     this.data.classes.push(newClass);
     this.save();
     return newClass;
@@ -2006,7 +2009,7 @@ class StorageEngine {
 
   public createSubject(subjectData: Omit<Subject, 'id'>): Subject {
     const id = `sbj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const newSubject: Subject = { ...subjectData, id };
+    const newSubject: Subject = { ...subjectData, creditUnits: subjectData.creditUnits ?? 0, department: subjectData.department ?? '', id };
     this.data.subjects.push(newSubject);
     this.save();
     return newSubject;

@@ -1,7 +1,7 @@
 /**
  * Exams & Marks Management: Small Exam + Big Exam Grading
  * Rules Enforced:
- * 1. Percentage-based only (No letter grades or GPA anywhere)
+ * 1. Percentage-based marks with each school's configurable letter-grade bands
  * 2. Small Exam + Big Exam max marks configuration (default 10 and 10, pass mark %)
  * 3. Total marks = small + big, percentage = (total / max) * 100
  * 4. Teachers submit marks -> Admin approves -> permanently locked
@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { getGradeLabel } from '../../lib/grading.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -347,7 +348,7 @@ export const ExamsResultsView: React.FC = () => {
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-3">
             <label className="text-xs font-semibold text-[#475569]">Select Class
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
-                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} ({klass.section})</option>)}
+                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''} · {klass.classCode || 'No code'} · {klass.academicYear || school?.academicYear}</option>)}
               </select>
             </label>
             <label className="text-xs font-semibold text-[#475569]">Academic Semester
@@ -379,8 +380,8 @@ export const ExamsResultsView: React.FC = () => {
             {students.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No students enrolled in this class.</div> : selectedClassSubjects.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No subjects have been assigned to this class.</div> : (
               <table className="w-full min-w-[1000px] border-collapse text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] text-[11px] uppercase text-[#64748B]">
-                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{selectedClassSubjects.map(subject => <th key={subject.id} colSpan={assessmentComponents.length + 3} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
-                  <tr>{selectedClassSubjects.map(subject => <React.Fragment key={subject.id}>{assessmentComponents.map(component => <th key={component.id} className="border-b border-l px-2 py-2">{component.name}<span className="block text-[9px] normal-case">/{component.maxMarks}</span></th>)}<th className="border-b border-l px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th><th className="border-b px-2 py-2">Status</th></React.Fragment>)}</tr>
+                  <tr><th rowSpan={2} className="border-b px-3 py-3 text-left">Student</th>{selectedClassSubjects.map(subject => <th key={subject.id} colSpan={assessmentComponents.length + 4} className="border-b border-l px-2 py-2 text-center">{subject.name}</th>)}</tr>
+                  <tr>{selectedClassSubjects.map(subject => <React.Fragment key={subject.id}>{assessmentComponents.map(component => <th key={component.id} className="border-b border-l px-2 py-2">{component.name}<span className="block text-[9px] normal-case">/{component.maxMarks}</span></th>)}<th className="border-b border-l px-2 py-2">Total</th><th className="border-b px-2 py-2">%</th><th className="border-b px-2 py-2">Grade</th><th className="border-b px-2 py-2">Status</th></React.Fragment>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {students.map(student => <tr key={student.id} className="hover:bg-slate-50">
@@ -392,6 +393,7 @@ export const ExamsResultsView: React.FC = () => {
                         {assessmentComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{mark?.assessmentScores?.[component.id] ?? '—'}</td>)}
                         <td className="border-l px-2 py-2 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td>
                         <td className="px-2 py-2 text-center">{mark ? `${mark.percentage}%` : '—'}</td>
+                        <td className="px-2 py-2 text-center font-semibold">{mark ? getGradeLabel(mark.percentage, school?.gradingScale) : '—'}</td>
                         <td className="px-2 py-2 text-center"><span className={`rounded-full px-2 py-1 text-[10px] ${mark?.status === 'form_teacher_submitted' ? 'bg-teal-100 text-teal-800' : mark?.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{status}</span></td>
                       </React.Fragment>;
                     })}
@@ -480,6 +482,7 @@ export const ExamsResultsView: React.FC = () => {
                     <th className="py-3 px-4">Student Name</th>
                     <th className="py-3 px-4 text-center">Subjects Graded</th>
                     <th className="py-3 px-4 text-center font-bold">Semester 1 Average (%)</th>
+                    <th className="py-3 px-4 text-center">Grade</th>
                     <th className="py-3 px-4 text-center">Status</th>
                   </tr>
                 </thead>
@@ -497,6 +500,7 @@ export const ExamsResultsView: React.FC = () => {
                       <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">
                         {r.averagePercentage}%
                       </td>
+                      <td className="py-3 px-4 text-center font-semibold">{getGradeLabel(r.averagePercentage, school?.gradingScale)}</td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
                           r.averagePercentage >= (examConfig?.passMarkPercentage || 50)
@@ -558,6 +562,7 @@ export const ExamsResultsView: React.FC = () => {
                     <th className="py-3 px-4">Student ID</th>
                     <th className="py-3 px-4">Student Name</th>
                     <th className="py-3 px-4 text-center font-bold">Yearly Total (%)</th>
+                    <th className="py-3 px-4 text-center">Grade</th>
                     <th className="py-3 px-4 text-center">Academic Decision</th>
                   </tr>
                 </thead>
@@ -574,6 +579,7 @@ export const ExamsResultsView: React.FC = () => {
                       <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">
                         {yr.yearlyPercentage}%
                       </td>
+                      <td className="py-3 px-4 text-center font-semibold">{getGradeLabel(yr.yearlyPercentage, school?.gradingScale)}</td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
                           yr.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'

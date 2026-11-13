@@ -7,7 +7,7 @@ export function classGradeMismatchError(name: string, gradeLevel: number): strin
     return `Class name "${cleanName}" conflicts with selected Grade ${gradeLevel}.`;
   }
 
-  const namesKindergarten = /\b(?:KG|KINDERGARTEN|NURSERY)\b/i.test(cleanName);
+  const namesKindergarten = /\b(?:KG|KINDERGARTEN|NURSERY)(?:[\s-]*\d+)?\b/i.test(cleanName);
   if (namesKindergarten && gradeLevel !== 0) {
     return `Class name "${cleanName}" must use KG grade level (0).`;
   }

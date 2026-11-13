@@ -43,8 +43,11 @@ test('Form Teacher saves editable subjects for the class in one submission actio
 });
 
 test('Class bulk import template includes KG and backend accepts KG grade zero', () => {
-  assert.match(classImport, /'KG,KG,A/);
-  assert.match(classImport, /'KG,KG,B/);
+  assert.match(classImport, /KG 1,KG/);
+  assert.match(classImport, /KG 2,KG/);
+  assert.match(classImport, /KG 3,KG/);
+  assert.match(classImport, /classCode,academicYear,className/);
+  assert.match(classImport, /section may be blank|section is optional/i);
   const start = api.indexOf("apiRouter.post('/classes/bulk-import'");
   const end = api.indexOf("apiRouter.get('/classes'", start);
   const route = api.slice(start, end);

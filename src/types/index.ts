@@ -243,9 +243,11 @@ export interface SchoolClass {
   id: string;
   schoolId: string;
   branchId?: string;
-  name: string; // e.g., "Grade 10 - A"
-  gradeLevel: number; // 1 to 12
-  section: string; // "A", "B", etc.
+  name: string; // e.g., "Grade 10"
+  classCode?: string;
+  academicYear?: string;
+  gradeLevel: number; // 0 = KG, 1 to 12
+  section: string; // Optional: "A", "B", etc.
   roomNumber: string;
   capacity: number;
   classTeacherId?: string | null;
@@ -260,8 +262,9 @@ export interface Subject {
   schoolId: string;
   name: string; // e.g. "Mathematics", "Biology"
   code: string; // e.g. "MATH-10"
-  creditUnits: number;
-  department: string;
+  description?: string;
+  creditUnits?: number;
+  department?: string;
   assignedTeacherIds: string[];
 }
 

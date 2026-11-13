@@ -52,8 +52,8 @@ export const apiRouter = Router();
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,grade_level,section,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
-  subjects: 'id,school_id,name,code,credit_units,department,assigned_teacher_ids,created_at',
+  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,class_id,section,status',
   teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
@@ -2686,12 +2686,15 @@ apiRouter.delete('/branches/:id', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json({ success: true });
 });
 
-apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (_req, res) => {
+apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
+  const school = (req as any).school as School;
   const csv = [
-    'className,gradeLevel,section,branch,roomNumber,capacity,monthlyFee',
-    'KG,KG,A,,KG Room,40,0',
-    'Grade 1,1,A,,Room 101,40,0',
-    'Grade 1,1,B,,Room 102,40,0'
+    'classCode,academicYear,className,gradeLevel,section,branch,roomNumber,capacity,shift,monthlyFee',
+    `KG1-${school.academicYear.slice(0, 4)},${school.academicYear},KG 1,KG,,,KG Room,40,1,0`,
+    `KG2-${school.academicYear.slice(0, 4)},${school.academicYear},KG 2,KG,,,KG Room 2,40,1,0`,
+    `KG3-${school.academicYear.slice(0, 4)},${school.academicYear},KG 3,KG,,,KG Room 3,40,1,0`,
+    `G1-A-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,A,,Room 101,40,1,0`,
+    `G1-B-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,B,,Room 102,40,1,0`
   ].join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-class-import-template.csv"' }).send(csv);
 });
@@ -2703,35 +2706,42 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
   if (!Array.isArray(input) || input.length < 1 || input.length > 500) {
     res.status(400).json({ error: 'Upload between 1 and 500 class rows.' }); return;
   }
-  const [existing, branches] = await Promise.all([db.getClasses(school.id), db.getBranches(school.id)]);
+  const [existing, branches, timetableSettings] = await Promise.all([db.getClasses(school.id), db.getBranches(school.id), db.getTimetableSettings(school.id)]);
   const allowedLevels = new Set([0, ...((school.classLevels?.length ? school.classLevels : [1,2,3,4,5,6,7,8,9,10,11,12]).filter(level => level !== 0))]);
   const branchByName = new Map(branches.map(branch => [branch.name.trim().toLowerCase(), branch]));
-  const seen = new Set(existing.map(item => `${item.name.trim().toLowerCase()}\\u0000${item.section.trim().toLowerCase()}`));
+  const seen = new Set(existing.map(item => `${item.academicYear || school.academicYear}\\u0000${String(item.classCode || '').trim().toLowerCase()}`));
   const records: any[] = [];
   const errors: string[] = [];
   input.forEach((row: any, index: number) => {
     const name = typeof row?.className === 'string' ? row.className.trim() : '';
-    const section = typeof row?.section === 'string' ? row.section.trim() : '';
+    const section = typeof row?.section === 'string' ? row.section.trim().toUpperCase() : '';
     const gradeText = String(row?.gradeLevel ?? '').trim();
     const grade = /^(KG|KINDERGARTEN|NURSERY)$/i.test(gradeText) ? 0 : Number(gradeText);
-    const capacity = Number(row?.capacity || 40);
+    const academicYear = String(row?.academicYear || school.academicYear).trim();
+    const [yearStart, yearEnd] = academicYear.split('-').map(Number);
+    const classCode = String(row?.classCode || `${grade === 0 ? 'KG' : `G${grade}`}-${section || 'MAIN'}-${academicYear.slice(0, 4)}-${index + 1}`).trim().toUpperCase();
+    const capacity = Number(row?.capacity || school.defaultClassCapacity || 40);
     const monthlyFee = Number(row?.monthlyFee || 0);
+    const shift = Number(row?.shift || 1);
     const branchName = typeof row?.branch === 'string' ? row.branch.trim() : '';
     const branch = branchName ? branchByName.get(branchName.toLowerCase()) : undefined;
-    const key = `${name.toLowerCase()}\\u0000${section.toLowerCase()}`;
-    if (!name || !section) errors.push(`Row ${index + 2}: className and section are required.`);
-    else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class ${name} / ${section}.`);
+    const key = `${academicYear}\\u0000${classCode.toLowerCase()}`;
+    if (!name || !classCode) errors.push(`Row ${index + 2}: className and classCode are required.`);
+    else if (!/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1) errors.push(`Row ${index + 2}: academicYear must use consecutive years such as 2026-2027.`);
+    else if (classCode.length > 40) errors.push(`Row ${index + 2}: classCode must be 40 characters or fewer.`);
+    else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class code ${classCode} for ${academicYear}.`);
     else if (!Number.isInteger(grade) || !allowedLevels.has(grade)) errors.push(`Row ${index + 2}: gradeLevel must be KG or an offered grade from 1 to 12.`);
     else if (classGradeMismatchError(name, grade)) errors.push(`Row ${index + 2}: ${classGradeMismatchError(name, grade)}.`);
     else if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) errors.push(`Row ${index + 2}: capacity must be between 1 and 500.`);
     else if (!Number.isFinite(monthlyFee) || monthlyFee < 0) errors.push(`Row ${index + 2}: monthlyFee must be zero or greater.`);
+    else if (![1, 2].includes(shift) || (shift === 2 && timetableSettings.shiftCount !== 2)) errors.push(`Row ${index + 2}: selected shift is not enabled in School Settings.`);
     else if (branchName && !branch) errors.push(`Row ${index + 2}: unknown branch "${branchName}".`);
     else {
       seen.add(key);
       records.push({
         id: `cls-${randomUUID()}`, schoolId: school.id, branchId: branch?.id,
-        name, gradeLevel: grade, section, roomNumber: String(row?.roomNumber || '').trim(),
-        capacity, monthlyFee
+        name, classCode, academicYear, gradeLevel: grade, section, shift,
+        roomNumber: String(row?.roomNumber || '').trim(), capacity, monthlyFee
       });
     }
   });
@@ -2741,7 +2751,8 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
     await db.bulkImportStudents({
       classes: records.map(item => ({
         id: item.id, school_id: school.id, branch_id: item.branchId, name: item.name,
-        grade_level: item.gradeLevel, section: item.section, room_number: item.roomNumber,
+        class_code: item.classCode, academic_year: item.academicYear, grade_level: item.gradeLevel,
+        section: item.section, shift: item.shift, room_number: item.roomNumber,
         capacity: item.capacity, monthly_fee: item.monthlyFee
       })),
       audit_logs: [{
@@ -2975,50 +2986,118 @@ apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContex
 });
 
 apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
-  if (typeof req.body?.name !== 'string' || !req.body.name.trim() || !Number.isInteger(Number(req.body.gradeLevel)) || Number(req.body.gradeLevel) < 0 || Number(req.body.gradeLevel) > 12 || !Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < 1 || typeof req.body.section !== 'string' || !req.body.section.trim()) { res.status(400).json({ error: 'Class name, grade level (KG-12), section, and positive capacity are required.' }); return; }
-  const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
-  if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+  const school = (req as any).school as School;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const gradeLevel = Number(req.body?.gradeLevel);
+  const section = typeof req.body?.section === 'string' ? req.body.section.trim().toUpperCase() : '';
+  const academicYear = String(req.body?.academicYear || school.academicYear).trim();
+  const [yearStart, yearEnd] = academicYear.split('-').map(Number);
+  const classCode = String(req.body?.classCode || `${gradeLevel === 0 ? 'KG' : `G${gradeLevel}`}-${section || 'MAIN'}-${academicYear.slice(0, 4)}`).trim().toUpperCase();
+  const capacity = req.body?.capacity === undefined || req.body.capacity === '' ? school.defaultClassCapacity : Number(req.body.capacity);
+  if (!name || !Number.isInteger(gradeLevel) || gradeLevel < 0 || gradeLevel > 12 || !/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500 || (req.body?.section !== undefined && typeof req.body.section !== 'string')) {
+    res.status(400).json({ error: 'Enter a class name, unique class code, valid academic year, KG–12 level, and valid optional capacity/section.' }); return;
+  }
+  const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
+  if (!allowedLevels.includes(gradeLevel)) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   const requestedShift = Number(req.body?.shift ?? 1);
-  if (![1, 2].includes(requestedShift)) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
-  const gradeMismatch = classGradeMismatchError(req.body.name, Number(req.body.gradeLevel));
+  const timetableSettings = await db.getTimetableSettings(school.id);
+  if (![1, 2].includes(requestedShift) || (requestedShift === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
+  const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
+  const existingClasses = await db.getClasses(school.id);
+  if (existingClasses.some(item => String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
+    res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
+  }
   if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (req.body?.classTeacherId) {
     const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
     if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
   }
-  const newClass = db.createClass({ ...req.body, shift: requestedShift, schoolId: school.id });
+  const newClass = db.createClass({
+    schoolId: school.id, name, classCode, academicYear, gradeLevel, section,
+    roomNumber: String(req.body?.roomNumber || '').trim(), capacity,
+    classTeacherId: req.body?.classTeacherId || null,
+    monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
+  });
   res.status(201).json(newClass);
 });
 
 apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const role = normalizeRole((req as any).user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
   const existing = await db.getClassById(String(req.params.id), school.id);
   if (!existing) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  if (req.body?.capacity !== undefined) {
-    const enrolled = await db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id');
-    if (!Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < enrolled.total) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
+  const academicYear = String(req.body?.academicYear ?? existing.academicYear ?? school.academicYear).trim();
+  const [yearStart, yearEnd] = academicYear.split('-').map(Number);
+  const classCode = String(req.body?.classCode ?? existing.classCode ?? '').trim().toUpperCase();
+  if (!/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40) {
+    res.status(400).json({ error: 'Class code and a valid consecutive academic year are required.' }); return;
+  }
+  const allClasses = await db.getClasses(school.id);
+  if (allClasses.some(item => item.id !== existing.id && String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
+    res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
+  }
+  if (academicYear !== (existing.academicYear || school.academicYear)) {
+    const [enrolled, scheduled] = await Promise.all([
+      db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id'),
+      db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id')
+    ]);
+    if (enrolled.total || scheduled.total) { res.status(409).json({ error: 'Academic year cannot be changed while students or timetable periods are attached to this class.' }); return; }
+  }
+  const updates: any = { classCode, academicYear };
+  if (req.body?.name !== undefined) {
+    if (typeof req.body.name !== 'string' || !req.body.name.trim()) { res.status(400).json({ error: 'Class name cannot be empty.' }); return; }
+    updates.name = req.body.name.trim();
   }
   if (req.body?.gradeLevel !== undefined) {
-    const allowedLevels: number[] = [0, ...((school as School).classLevels?.length ? (school as School).classLevels! : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)];
-    if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+    const gradeLevel = Number(req.body.gradeLevel);
+    const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
+    if (!Number.isInteger(gradeLevel) || !allowedLevels.includes(gradeLevel)) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+    updates.gradeLevel = gradeLevel;
   }
-  if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
-  if (req.body?.shift !== undefined && Number(req.body.shift) !== Number(existing.shift || 1)) {
-    const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
-    if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
+  if (req.body?.section !== undefined) {
+    if (typeof req.body.section !== 'string') { res.status(400).json({ error: 'Section must be text or blank.' }); return; }
+    updates.section = req.body.section.trim().toUpperCase();
   }
-  const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
+  if (req.body?.branchId !== undefined && req.body.branchId) {
+    if (!(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+    updates.branchId = req.body.branchId;
+  }
+  if (req.body?.classTeacherId !== undefined) {
+    if (req.body.classTeacherId) {
+      const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
+      if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+    }
+    updates.classTeacherId = req.body.classTeacherId || null;
+  }
+  if (req.body?.capacity !== undefined && req.body.capacity !== '') {
+    const capacity = Number(req.body.capacity);
+    const enrolled = await db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id');
+    if (!Number.isInteger(capacity) || capacity < enrolled.total || capacity > 500) { res.status(409).json({ error: `Capacity must be 1–500 and cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
+    updates.capacity = capacity;
+  }
+  if (req.body?.roomNumber !== undefined) updates.roomNumber = String(req.body.roomNumber || '').trim();
+  if (req.body?.monthlyFee !== undefined) {
+    const monthlyFee = Number(req.body.monthlyFee);
+    if (!Number.isFinite(monthlyFee) || monthlyFee < 0) { res.status(400).json({ error: 'Monthly fee must be zero or greater.' }); return; }
+    updates.monthlyFee = monthlyFee;
+  }
+  if (req.body?.shift !== undefined) {
+    const shift = Number(req.body.shift);
+    const timetableSettings = await db.getTimetableSettings(school.id);
+    if (![1, 2].includes(shift) || (shift === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
+    if (shift !== Number(existing.shift || 1)) {
+      const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
+      if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
+    }
+    updates.shift = shift;
+  }
+  const gradeLevel = Number(updates.gradeLevel ?? existing.gradeLevel);
+  const name = String(updates.name ?? existing.name);
+  const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
-  if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  if (req.body?.classTeacherId) {
-    const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
-    if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
-  }
-  const updated = await db.updateClass(String(req.params.id), req.body, school.id);
+  const updated = await db.updateClass(existing.id, updates, school.id);
   res.json(updated);
 });
 
@@ -3108,12 +3187,17 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   res.json(result);
 });
 
-apiRouter.post('/subjects', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.post('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
-  if (typeof req.body?.name !== 'string' || !req.body.name.trim() || typeof req.body?.code !== 'string' || !req.body.code.trim()) { res.status(400).json({ error: 'Subject name and code are required.' }); return; }
-  const subject = db.createSubject({ ...req.body, schoolId: school.id });
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
+  const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+  if (!name || !code || code.length > 50 || description.length > 1000) { res.status(400).json({ error: 'Subject name, code (up to 50 characters), and optional description (up to 1,000 characters) are required.' }); return; }
+  const existing = await db.getSubjects(school.id);
+  if (existing.some(item => item.code.toLowerCase() === code.toLowerCase())) { res.status(409).json({ error: `Subject code ${code} already exists in this school.` }); return; }
+  const subject = db.createSubject({ schoolId: school.id, name, code, description, creditUnits: 0, department: '', assignedTeacherIds: [] });
   res.status(201).json(subject);
 });
 
@@ -3124,7 +3208,12 @@ apiRouter.put('/subjects/:id', requireAuth, requireSchoolContext, async (req, re
   const subject = (await db.getSubjects(school.id)).find(item => item.id === String(req.params.id));
   if (!subject) { res.status(404).json({ error: 'Subject was not found.' }); return; }
   if ((req.body?.name !== undefined && !String(req.body.name).trim()) || (req.body?.code !== undefined && !String(req.body.code).trim())) { res.status(400).json({ error: 'Subject name and code cannot be empty.' }); return; }
-  const updated = db.updateSubject(subject.id, { ...req.body, id: subject.id, schoolId: school.id });
+  const code = String(req.body?.code ?? subject.code).trim().toUpperCase();
+  const description = String(req.body?.description ?? subject.description ?? '').trim();
+  if (code.length > 50 || description.length > 1000) { res.status(400).json({ error: 'Subject code must be 50 characters or fewer and description 1,000 characters or fewer.' }); return; }
+  const duplicates = (await db.getSubjects(school.id)).some(item => item.id !== subject.id && item.code.toLowerCase() === code.toLowerCase());
+  if (duplicates) { res.status(409).json({ error: `Subject code ${code} already exists in this school.` }); return; }
+  const updated = db.updateSubject(subject.id, { name: String(req.body?.name ?? subject.name).trim(), code, description, creditUnits: 0, department: '', id: subject.id, schoolId: school.id });
   res.json(updated);
 });
 

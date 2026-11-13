@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
+import { GradingBand, SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { Layers, BookOpen, Plus, X, CheckCircle2, Upload, Search, Archive, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { ClassBulkImportWizard } from './ClassBulkImportWizard.tsx';
 import { useApi } from '../../hooks/useApi.ts';
@@ -14,7 +14,7 @@ import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 
 export const ClassesSubjectsView: React.FC = () => {
-  const { school, isReadOnly, t } = useAuth();
+  const { school, isReadOnly, t, refreshUser } = useAuth();
   const classLoad = useApi(() => Promise.all([
     ApiClient.getClasses(), ApiClient.getSubjects(school?.id), ApiClient.getBranches(), ApiClient.getTeachers()
   ]), [school?.id], Boolean(school));
@@ -42,10 +42,12 @@ export const ClassesSubjectsView: React.FC = () => {
 
   // New Class Form State
   const [className, setClassName] = useState('');
+  const [classCode, setClassCode] = useState('');
+  const [classAcademicYear, setClassAcademicYear] = useState(school?.academicYear || '2026-2027');
   const [gradeLevel, setGradeLevel] = useState(10);
   const [classShift, setClassShift] = useState<1 | 2>(1);
   const [availableShiftCount, setAvailableShiftCount] = useState<1 | 2>(1);
-  const [section, setSection] = useState('A');
+  const [section, setSection] = useState('');
   const [roomNumber, setRoomNumber] = useState('Room 101');
   const [capacity, setCapacity] = useState(school?.defaultClassCapacity || 40);
   const [monthlyFee, setMonthlyFee] = useState(50);
@@ -53,7 +55,17 @@ export const ClassesSubjectsView: React.FC = () => {
   // New Subject Form State
   const [subjectName, setSubjectName] = useState('');
   const [subjectCode, setSubjectCode] = useState('');
+  const [subjectDescription, setSubjectDescription] = useState('');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
+  const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : [
+    { minPercentage: 90, label: 'A', remark: 'Excellent' },
+    { minPercentage: 80, label: 'B', remark: 'Very good' },
+    { minPercentage: 70, label: 'C', remark: 'Good' },
+    { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
+    { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
+  ]);
+  const [gradingSaving, setGradingSaving] = useState(false);
+  const [gradingError, setGradingError] = useState('');
 
   const visibleClasses = classes
     .filter(klass => {
@@ -73,10 +85,11 @@ export const ClassesSubjectsView: React.FC = () => {
     key: string; title: string; branchName: string; shiftName: string; items: SchoolClass[];
   }>>((groups, klass) => {
     const grade = Number(klass.gradeLevel || 0);
-    const title = grade === 0 ? 'KG' : `Grade ${grade}`;
+    const academicYear = klass.academicYear || school?.academicYear || 'Academic year not set';
+    const title = `${grade === 0 ? 'KG' : `Grade ${grade}`} · ${academicYear}`;
     const branchName = branches.find(branch => branch.id === klass.branchId)?.name || (klass.branchId ? 'Other branch' : 'Unassigned branch');
     const shiftName = Number(klass.shift) === 2 ? 'Afternoon shift' : 'Morning shift';
-    const key = `${klass.branchId || 'unassigned'}:${grade}:${klass.shift || 1}`;
+    const key = `${klass.branchId || 'unassigned'}:${academicYear}:${grade}:${klass.shift || 1}`;
     let group = groups.find(item => item.key === key);
     if (!group) {
       group = { key, title, branchName, shiftName, items: [] };
@@ -90,6 +103,16 @@ export const ClassesSubjectsView: React.FC = () => {
       .some(value => String(value || '').toLowerCase().includes(subjectSearch.trim().toLowerCase())))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
+  useEffect(() => {
+    setGradingScale(school?.gradingScale?.length ? school.gradingScale : [
+      { minPercentage: 90, label: 'A', remark: 'Excellent' },
+      { minPercentage: 80, label: 'B', remark: 'Very good' },
+      { minPercentage: 70, label: 'C', remark: 'Good' },
+      { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
+      { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
+    ]);
+  }, [school?.id, school?.gradingScale]);
+
   const fetchData = classLoad.retry;
   useEffect(() => {
     let active = true;
@@ -102,13 +125,15 @@ export const ClassesSubjectsView: React.FC = () => {
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!className) return;
+    if (!className.trim() || !classCode.trim()) return;
     try {
       const payload = {
-        name: className,
+        name: className.trim(),
+        classCode: classCode.trim().toUpperCase(),
+        academicYear: classAcademicYear,
         gradeLevel,
         shift: classShift,
-        section,
+        section: section.trim(),
         roomNumber,
         capacity,
         monthlyFee,
@@ -120,6 +145,9 @@ export const ClassesSubjectsView: React.FC = () => {
       setShowClassModal(false);
       setEditingClass(null);
       setClassName('');
+      setClassCode('');
+      setClassAcademicYear(school?.academicYear || '2026-2027');
+      setSection('');
       setClassShift(1);
       setCapacity(school?.defaultClassCapacity || 40);
       setNotice(`Class "${className}" ${editingClass ? 'updated' : 'created'}.`);
@@ -132,13 +160,12 @@ export const ClassesSubjectsView: React.FC = () => {
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subjectName || !subjectCode) return;
+    if (!subjectName.trim() || !subjectCode.trim()) return;
     try {
       const payload = {
-        name: subjectName,
-        code: subjectCode,
-        creditUnits: 0,
-        department: 'General'
+        name: subjectName.trim(),
+        code: subjectCode.trim().toUpperCase(),
+        description: subjectDescription.trim()
       };
       const savedSubject = editingSubject ? await ApiClient.updateSubject(editingSubject.id, payload) : await ApiClient.addSubject(payload, school?.id);
       await ApiClient.saveSubjectAssignments(savedSubject.id, subjectAssignments);
@@ -146,11 +173,42 @@ export const ClassesSubjectsView: React.FC = () => {
       setEditingSubject(null);
       setSubjectName('');
       setSubjectCode('');
+      setSubjectDescription('');
+      setSubjectAssignments([]);
       setNotice(`Subject "${subjectName}" added to curriculum.`);
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleSaveGradingScale = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isReadOnly) return;
+    setGradingError('');
+    const bands = [...gradingScale].sort((a, b) => b.minPercentage - a.minPercentage);
+    if (!bands.length || bands.length > 20) { setGradingError('Add between 1 and 20 grade bands.'); return; }
+    if (bands.some(band => !band.label.trim() || !Number.isFinite(band.minPercentage) || band.minPercentage < 0 || band.minPercentage > 100)) {
+      setGradingError('Every grade needs a label and a minimum percentage between 0 and 100.'); return;
+    }
+    if (bands[bands.length - 1].minPercentage !== 0) { setGradingError('The lowest grade band must start at 0%.'); return; }
+    if (bands.some((band, index) => index > 0 && band.minPercentage >= bands[index - 1].minPercentage)) {
+      setGradingError('Grade minimum percentages must descend without duplicate thresholds.'); return;
+    }
+    const labels = bands.map(band => band.label.trim().toLowerCase());
+    if (new Set(labels).size !== labels.length) { setGradingError('Grade labels must be unique.'); return; }
+    setGradingSaving(true);
+    try {
+      await ApiClient.request('/school/settings', { method: 'PUT', body: JSON.stringify({ gradingScale: bands.map(band => ({ ...band, label: band.label.trim(), remark: band.remark?.trim() || '' })) }) });
+      await refreshUser();
+      setGradingScale(bands);
+      setNotice('School grading system saved and applied to exam results.');
+      setTimeout(() => setNotice(null), 3500);
+    } catch (error) {
+      setGradingError(error instanceof Error ? error.message : 'Unable to save the grading system.');
+    } finally {
+      setGradingSaving(false);
     }
   };
 
@@ -189,14 +247,14 @@ export const ClassesSubjectsView: React.FC = () => {
               <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]">
                 <Layers className="h-5 w-5 text-[#0F766E]" /> Classes & Sections
               </h2>
-              <p className="mt-1 text-xs text-slate-500">{classes.length} active class sections · grouped by grade, branch and shift</p>
+              <p className="mt-1 text-xs text-slate-500">{classes.length} active classes · KG 1–3 and Grades 1–12 · sections are optional</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setShowBulkImport(true)} disabled={isReadOnly}
                 className="inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
                 <Upload className="h-4 w-4 text-[#0F766E]" /> {t('bulk_import')}
               </button>
-              <button type="button" onClick={() => { setEditingClass(null); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
+              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(10); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
                 disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
                 <Plus className="h-4 w-4" /> Create class
               </button>
@@ -243,11 +301,12 @@ export const ClassesSubjectsView: React.FC = () => {
                               className="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F766E]">
                               <span className="inline-flex rounded-lg bg-[#E7F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">Section {klass.section || '—'}</span>
                               <p className="mt-2 truncate text-sm font-bold text-[#132A29]">{klass.name}</p>
+                              <p className="mt-1 truncate text-[10px] font-mono text-slate-500">{klass.classCode || 'No class code'} · {klass.academicYear || school?.academicYear}</p>
                               <p className="mt-1 text-[11px] text-slate-500">{klass.roomNumber || 'Room not set'} · Capacity {klass.capacity} · {formatMoney(klass.monthlyFee, school?.currency)}</p>
                               <p className="mt-2 text-[11px] text-slate-600">Form Teacher: <span className="font-semibold text-slate-800">{formTeacher?.fullName || 'Not assigned'}</span></p>
                             </button>
                             <button type="button" disabled={isReadOnly} aria-label={`Edit ${klass.name}`}
-                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
+                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setClassCode(klass.classCode || ''); setClassAcademicYear(klass.academicYear || school?.academicYear || '2026-2027'); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section || ''); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
                               className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-white hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                           </div>
                         </article>
@@ -269,7 +328,7 @@ export const ClassesSubjectsView: React.FC = () => {
               </h2>
               <p className="mt-1 text-xs text-slate-500">{subjects.length} subjects · class and teacher assignments are managed per subject</p>
             </div>
-            <button type="button" onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setSubjectName(''); setSubjectCode(''); setShowSubjectModal(true); }}
+            <button type="button" onClick={() => { setEditingSubject(null); setSubjectAssignments([]); setSubjectName(''); setSubjectCode(''); setSubjectDescription(''); setShowSubjectModal(true); }}
               disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
               <Plus className="h-4 w-4" /> Add subject
             </button>
@@ -296,11 +355,12 @@ export const ClassesSubjectsView: React.FC = () => {
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-bold text-[#132A29]">{subject.name}</h3>
                       <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600">{subject.code}</span>
+                      {subject.description && <p className="mt-2 text-[11px] text-slate-600">{subject.description}</p>}
                       <p className="mt-2 text-[11px] text-slate-500">{assignedTeachers.length ? assignedTeachers.join(', ') : 'Teachers are assigned per class in subject settings.'}</p>
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button type="button" disabled={isReadOnly} aria-label={`Edit ${subject.name}`}
-                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}}
+                        onClick={async () => { try { const current = await ApiClient.getSubjectAssignments(subject.id); setSubjectAssignments(current); setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setSubjectDescription(subject.description || ''); setShowSubjectModal(true); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to load subject assignments.'); }}}
                         className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                       <button type="button" disabled={isReadOnly} aria-label={`Delete ${subject.name}`}
                         onClick={async () => { if (!window.confirm(`Delete subject ${subject.name}?`)) return; try { await ApiClient.deleteSubject(subject.id); await fetchData(); } catch (error) { setDetailError(error instanceof Error ? error.message : 'Unable to delete subject.'); }}}
@@ -316,6 +376,40 @@ export const ClassesSubjectsView: React.FC = () => {
           </p>
         </section>
       </div>
+
+      <section className="mt-6 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm space-y-4">
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]"><Layers className="h-5 w-5 text-[#0F766E]" /> Grading System</h2>
+            <p className="mt-1 text-xs text-slate-500">Set the school's letter grades and minimum percentages. These grades appear on Exam Results and class rankings.</p>
+          </div>
+          <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700">{gradingScale.length} grade bands</span>
+        </header>
+        {gradingError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{gradingError}</p>}
+        <form onSubmit={handleSaveGradingScale} className="space-y-3">
+          <div className="grid grid-cols-[minmax(70px,0.6fr)_minmax(100px,1fr)_minmax(130px,2fr)_auto] gap-2 text-[11px] font-semibold uppercase text-slate-500">
+            <span>Grade</span><span>Minimum %</span><span>Remark</span><span> </span>
+          </div>
+          {gradingScale.map((band, index) => (
+            <div key={index} className="grid grid-cols-[minmax(70px,0.6fr)_minmax(100px,1fr)_minmax(130px,2fr)_auto] items-center gap-2">
+              <input aria-label={`Grade label ${index + 1}`} value={band.label} maxLength={20} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold" />
+              <input aria-label={`Minimum percentage for ${band.label}`} type="number" min={0} max={100} step="0.01" value={band.minPercentage} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, minPercentage: Number(event.target.value) } : item))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+              <input aria-label={`Remark for ${band.label}`} value={band.remark || ''} maxLength={120} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, remark: event.target.value } : item))} placeholder="Optional description" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <button type="button" aria-label={`Remove grade ${band.label}`} disabled={isReadOnly || gradingScale.length <= 1} onClick={() => setGradingScale(rows => rows.filter((_item, i) => i !== index))} className="rounded-lg border border-slate-200 px-3 py-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"><X className="h-4 w-4" /></button>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            <button type="button" disabled={isReadOnly || gradingScale.length >= 20} onClick={() => {
+              const used = new Set(gradingScale.map(band => band.minPercentage));
+              let minimum = 85;
+              while (used.has(minimum) && minimum > 1) minimum -= 1;
+              if (used.has(minimum)) minimum = 1;
+              setGradingScale(rows => [...rows, { minPercentage: minimum, label: `Grade ${rows.length + 1}`, remark: '' }].sort((a, b) => b.minPercentage - a.minPercentage));
+            }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-40"><Plus className="mr-1 inline h-3.5 w-3.5" /> Add grade band</button>
+            <button type="submit" disabled={isReadOnly || gradingSaving} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">{gradingSaving ? 'Saving…' : 'Save Grading System'}</button>
+          </div>
+        </form>
+      </section>
 
       {selectedClassId && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4" role="dialog" aria-modal="true" aria-label="Class details">
@@ -354,6 +448,14 @@ export const ClassesSubjectsView: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block font-medium">Class Code *</label>
+                <input type="text" required maxLength={40} value={classCode} onChange={e => setClassCode(e.target.value.toUpperCase().replace(/\s+/g, '-'))} placeholder="e.g. KG1-2026 or G1-A-2026" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono uppercase" />
+              </div>
+              <div>
+                <label className="block font-medium">Academic Year *</label>
+                <input type="text" required pattern="\d{4}-\d{4}" value={classAcademicYear} onChange={e => setClassAcademicYear(e.target.value)} placeholder="2026-2027" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
+              </div>
+              <div>
                 <label className="block font-medium">Branch</label>
                 <select value={branchId} onChange={e => setBranchId(e.target.value)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white">
                   <option value="">Unassigned</option>
@@ -389,14 +491,15 @@ export const ClassesSubjectsView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium">Section</label>
+                  <label className="block font-medium">Section (optional)</label>
                   <input
                     type="text"
                     value={section}
                     onChange={e => setSection(e.target.value.toUpperCase())}
-                    placeholder="A, B, C..."
+                    placeholder="Leave blank if the class has no sections"
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">If the school uses sections, create separate rows for A, B or C. Leave blank when it has no sections.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -411,7 +514,7 @@ export const ClassesSubjectsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium">Class Capacity</label>
+                  <label className="block font-medium">Class Capacity (optional)</label>
                   <input
                     type="number"
                     min="1"
@@ -475,13 +578,17 @@ export const ClassesSubjectsView: React.FC = () => {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block font-medium">Description (optional)</label>
+                <textarea value={subjectDescription} onChange={e => setSubjectDescription(e.target.value)} rows={3} maxLength={1000} placeholder="Brief description of this subject" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </div>
               <fieldset className="border rounded-lg p-3 space-y-3">
-                <legend className="px-1 font-semibold">Assign to classes</legend>
+                <legend className="px-1 font-semibold">Class Subject Assignment</legend>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-slate-500">{subjectAssignments.length} / {classes.length} classes selected</span>
                   <button type="button" onClick={() => setSubjectAssignments(current => current.length === classes.length ? [] : classes.map(klass => current.find(item => item.classId === klass.id) || { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }))} className="rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50">{subjectAssignments.length === classes.length ? 'Clear all' : 'Select all'}</button>
                 </div>
-                <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">{classes.map(klass => <label key={klass.id} className="flex gap-2 items-center"><input type="checkbox" checked={subjectAssignments.some(item => item.classId === klass.id)} onChange={event => setSubjectAssignments(current => event.target.checked ? [...current, { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }] : current.filter(item => item.classId !== klass.id))} />{klass.name} · {klass.section}</label>)}</div>
+                <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">{classes.map(klass => <label key={klass.id} className="flex gap-2 items-center"><input type="checkbox" checked={subjectAssignments.some(item => item.classId === klass.id)} onChange={event => setSubjectAssignments(current => event.target.checked ? [...current, { classId: klass.id, periodsPerWeek: 3, smallExamEnabled: true, bigExamEnabled: true }] : current.filter(item => item.classId !== klass.id))} />{klass.name}{klass.section ? ` · ${klass.section}` : ''} · {klass.academicYear || school?.academicYear}</label>)}</div>
                 {subjectAssignments.map(assignment => { const klass = classes.find(item => item.id === assignment.classId); return <div key={assignment.classId} className="grid grid-cols-1 sm:grid-cols-4 gap-2 border-t pt-2 items-center"><strong>{klass?.name} {klass?.section}</strong><label>Periods/week<input aria-label={`Periods per week for ${klass?.name}`} type="number" min="1" max="30" value={assignment.periodsPerWeek} onChange={event => setSubjectAssignments(items => items.map(item => item.classId === assignment.classId ? { ...item, periodsPerWeek: Number(event.target.value) } : item))} className="mt-1 w-full border rounded p-1" /></label><label>Teacher<select value={assignment.teacherId || ''} onChange={event => setSubjectAssignments(items => items.map(item => item.classId === assignment.classId ? { ...item, teacherId: event.target.value || undefined } : item))} className="mt-1 w-full border rounded p-1"><option value="">Unassigned</option>{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select></label><div className="flex flex-wrap gap-2"><label className="flex items-center gap-1"><input type="checkbox" checked={assignment.smallExamEnabled} onChange={event => setSubjectAssignments(items => items.map(item => item.classId === assignment.classId ? { ...item, smallExamEnabled: event.target.checked } : item))} />Small</label><label className="flex items-center gap-1"><input type="checkbox" checked={assignment.bigExamEnabled} onChange={event => setSubjectAssignments(items => items.map(item => item.classId === assignment.classId ? { ...item, bigExamEnabled: event.target.checked } : item))} />Big</label></div></div>; })}
               </fieldset>
               <div className="flex justify-end gap-2 pt-2">

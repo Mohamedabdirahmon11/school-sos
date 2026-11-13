@@ -240,8 +240,10 @@ CREATE TABLE IF NOT EXISTS classes (
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   branch_id VARCHAR(64) REFERENCES school_branches(id) ON DELETE SET NULL,
   name VARCHAR(100) NOT NULL,
+  class_code VARCHAR(40) NOT NULL,
+  academic_year VARCHAR(9) NOT NULL,
   grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 0 AND 12),
-  section VARCHAR(20) NOT NULL DEFAULT 'A',
+  section VARCHAR(20) NOT NULL DEFAULT '',
   room_number VARCHAR(50),
   capacity INTEGER NOT NULL DEFAULT 40,
   class_teacher_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
@@ -253,6 +255,15 @@ CREATE TABLE IF NOT EXISTS classes (
 
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_code VARCHAR(40);
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(9);
+ALTER TABLE classes ALTER COLUMN section SET DEFAULT '';
+UPDATE classes c SET academic_year = s.academic_year FROM schools s WHERE c.school_id = s.id AND c.academic_year IS NULL;
+UPDATE classes SET academic_year = '2026-2027' WHERE academic_year IS NULL;
+UPDATE classes SET class_code = 'CLS-' || CASE WHEN grade_level = 0 THEN 'KG' ELSE 'G' || grade_level::text END || '-' || upper(substr(md5(id), 1, 8)) WHERE class_code IS NULL OR class_code = '';
+ALTER TABLE classes ALTER COLUMN class_code SET NOT NULL;
+ALTER TABLE classes ALTER COLUMN academic_year SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_classes_school_year_code ON classes(school_id, academic_year, lower(class_code));
 DO $shift_constraint$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.classes'::regclass AND conname = 'classes_shift_check') THEN
@@ -271,13 +282,17 @@ CREATE TABLE IF NOT EXISTS subjects (
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   name VARCHAR(150) NOT NULL,
   code VARCHAR(50) NOT NULL,
-  credit_units INTEGER NOT NULL DEFAULT 3,
+  description TEXT,
+  credit_units INTEGER NOT NULL DEFAULT 0,
   department VARCHAR(100),
   assigned_teacher_ids TEXT[] DEFAULT ARRAY[]::TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE subjects ALTER COLUMN credit_units SET DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_subjects_school ON subjects(school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_code ON subjects(school_id, lower(code));
 
 -- 12. STUDENTS
 CREATE TABLE IF NOT EXISTS students (
@@ -841,11 +856,12 @@ CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
 CREATE OR REPLACE FUNCTION schoolos_bulk_import(p_payload JSONB) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  INSERT INTO classes (id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee)
-  SELECT id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee
+  INSERT INTO classes (id, school_id, branch_id, name, class_code, academic_year, grade_level, section, shift, room_number, capacity, monthly_fee)
+  SELECT id, school_id, branch_id, name, class_code, academic_year, grade_level, section, COALESCE(shift, 1), room_number, capacity, monthly_fee
   FROM jsonb_to_recordset(COALESCE(p_payload->'classes', '[]'::jsonb)) AS x(
-    id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, grade_level INTEGER,
-    section VARCHAR, room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
+    id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, class_code VARCHAR,
+    academic_year VARCHAR, grade_level INTEGER, section VARCHAR, shift SMALLINT,
+    room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
   );
 
   INSERT INTO students (id, school_id, branch_id, student_id, first_name, middle_name, last_name, gender,
@@ -4344,3 +4360,5 @@ CREATE INDEX IF NOT EXISTS idx_bank_statement_created_by ON public.bank_statemen
 CREATE INDEX IF NOT EXISTS idx_bank_statement_matched_payment ON public.bank_statement_entries (matched_payment_id) WHERE matched_payment_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bank_statement_matched_expense ON public.bank_statement_entries (matched_expense_id) WHERE matched_expense_id IS NOT NULL;
 COMMIT;
+
+NOTIFY pgrst, 'reload schema';
