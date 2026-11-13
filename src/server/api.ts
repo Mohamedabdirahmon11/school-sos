@@ -2695,7 +2695,7 @@ apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuper
     `G1-A-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,A,,Room 101,40,1,0`,
     `G1-B-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,B,,Room 102,40,1,0`
   ].join('\\r\\n');
-  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': { 'attachment': `schoolos-class-import-template.csv` } }).send(csv);
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-class-import-template.csv"' }).send(csv);
 });
 
 apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
