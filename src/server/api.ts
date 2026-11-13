@@ -40,7 +40,7 @@ import { classGradeMismatchError } from './class-grade-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
-import { calculateShiftEndMinutes, isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
+import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
