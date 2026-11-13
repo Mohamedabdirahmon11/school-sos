@@ -1,27 +1,46 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
+import test from 'node:test';
 
-test('parent directory loads every page through the school-scoped students API', () => {
-  const source = readFileSync(new URL('../src/components/schooladmin/ParentsView.tsx', import.meta.url), 'utf8');
-  assert.match(source, /getSchoolStudents\(\{ schoolId: school\.id, page, pageSize: 50, search, classId: classFilter \}\)/);
-  assert.match(source, /PaginationControls info=\{pageInfo\}/);
-  assert.match(source, /setPageInfo\(\(rows as any\)\.pagination/);
-  assert.match(source, /setPage\(1\)/);
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const api = read('../src/server/api.ts');
+const client = read('../src/services/api.ts');
+const view = read('../src/components/schooladmin/ParentsView.tsx');
+
+test('parent contacts are derived from active students scoped to the current school and optional class', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
+  assert.match(route, /school_id: school\.id/);
+  assert.match(route, /status: 'active'/);
+  assert.match(route, /class_id: classId/);
 });
 
-test('parent directory provides real call, SMS and WhatsApp links for both guardians', () => {
-  const source = readFileSync(new URL('../src/components/schooladmin/ParentsView.tsx', import.meta.url), 'utf8');
-  assert.match(source, /href=\{\x60tel:\$\{value\}\x60\}/);
-  assert.match(source, /href=\{\x60sms:\$\{value\}\x60\}/);
-  assert.match(source, /https:\/\/wa\.me\//);
-  assert.match(source, /contactActions\(student\.fatherPhone\)/);
-  assert.match(source, /contactActions\(student\.motherPhone\)/);
-  assert.doesNotMatch(source, /alert\(/);
+test('guardian phone numbers are normalized and deduplicated across father and mother records', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /phone\.replace\(\/\\D\/g, ''\)/);
+  assert.match(route, /contacts\.get\(normalizedPhone\)/);
+  assert.match(route, /contacts\.set\(normalizedPhone, contact\)/);
+  assert.match(route, /contact\.students\.some\(item => item\.id === child\.id\)/);
 });
 
-test('parent directory reports loading failures and offers a real retry', () => {
-  const source = readFileSync(new URL('../src/components/schooladmin/ParentsView.tsx', import.meta.url), 'utf8');
-  assert.match(source, /setLoadError\(error\?\.message/);
-  assert.match(source, /setReloadCount\(count => count \+ 1\)/);
+test('unique contacts are searched, sorted, and paginated after deduplication', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /\.filter\(contact => !query/);
+  assert.match(route, /\.sort\(\(a, b\) => a\.phone\.localeCompare/);
+  assert.match(route, /const total = filtered\.length/);
+  assert.match(route, /filtered\.slice\(\(page - 1\) \* pageSize, page \* pageSize\)/);
+});
+
+test('Parents directory uses the unique contacts endpoint and exposes class All filter', () => {
+  assert.match(client, /getParentContacts\(/);
+  assert.match(client, /\/parents\/contacts\?/);
+  assert.match(view, /ApiClient\.getParentContacts\(\{ page, pageSize: 50, search, classId: classFilter \}\)/);
+  assert.match(view, /<option value="">All classes<\/option>/);
+  assert.match(view, /contact\.students\.map/);
 });
