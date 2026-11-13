@@ -123,6 +123,35 @@ jobs:
             'Encrypted database backup uploaded to private S3 object: ' || :'object_key',
             'info'
           )
+
+          ON CONFLICT (id) DO UPDATE
+            SET timestamp = EXCLUDED.timestamp,
+                details = EXCLUDED.details,
+                severity = EXCLUDED.severity;
+          SQL
+
+      - name: Record failed off-site backup in platform settings and audit
+        if: ${{ failure() && env.SUPABASE_DB_URL != '' }}
+        shell: bash
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v run_id="$GITHUB_RUN_ID" -v run_attempt="$GITHUB_RUN_ATTEMPT" <<'SQL'
+          UPDATE public.super_admin_settings
+          SET last_backup_status = 'failed'
+          WHERE id = 'default';
+
+          INSERT INTO public.audit_logs
+            (id, timestamp, action, category, user_id, user_name, user_role, details, severity)
+          VALUES (
+            'github-actions-backup-failed-' || :'run_id' || '-' || :'run_attempt',
+            NOW(),
+            'PLATFORM_OFFSITE_BACKUP_FAILED',
+            'security',
+            'system',
+            'GitHub Actions',
+            'super_admin',
+            'Scheduled encrypted database backup workflow failed. Review the associated GitHub Actions run.',
+            'warning'
+          )
           ON CONFLICT (id) DO UPDATE
             SET timestamp = EXCLUDED.timestamp,
                 details = EXCLUDED.details,
