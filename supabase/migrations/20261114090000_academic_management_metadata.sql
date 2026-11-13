@@ -31,3 +31,6 @@ ALTER TABLE public.subjects
 
 ALTER TABLE public.subjects
   ALTER COLUMN credit_units SET DEFAULT 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_code
+  ON public.subjects (school_id, lower(code));
