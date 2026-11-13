@@ -2009,7 +2009,7 @@ class StorageEngine {
 
   public createSubject(subjectData: Omit<Subject, 'id'>): Subject {
     const id = `sbj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const newSubject: Subject = { ...subjectData, id };
+    const newSubject: Subject = { creditUnits: 0, department: '', assignedTeacherIds: [], ...subjectData, id };
     this.data.subjects.push(newSubject);
     this.save();
     return newSubject;
