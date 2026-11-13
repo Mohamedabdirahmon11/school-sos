@@ -342,7 +342,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
     }
   };
 
-  const handleResetAdminPassword = async (adminId: string) => {
+  const handleSetSchoolAdminPin = async (adminId: string) => {
     const temporaryPin = window.prompt('Enter a new School Admin PIN (4–6 digits). The administrator must change it at next sign-in.');
     if (temporaryPin === null) return;
     if (!/^\d{4,6}$/.test(temporaryPin.trim())) {
@@ -631,9 +631,9 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                     <p className="text-[11px] text-[#64748B]">Login ID: {adm.staffId || '—'} · {adm.email || adm.phone || 'No email/phone'}</p>
                   </div>
                   <button
-                    onClick={() => handleResetAdminPassword(adm.id)}
+                    onClick={() => handleSetSchoolAdminPin(adm.id)}
                     className="p-1.5 text-[#0F766E] hover:bg-[#E2E8F0] rounded"
-                    title="Reset Admin Password"
+                    title="Set School Admin PIN" aria-label="Set School Admin PIN"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
                   </button>
