@@ -45,6 +45,7 @@ import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
+import { SCHOOL_SETUP_DEFAULTS, validateSchoolSetupStep } from './school-setup-data.ts';
 
 export const apiRouter = Router();
 
@@ -6851,6 +6852,38 @@ async function getSchoolSetupState(school: School) {
   const progress = normalizeSchoolSetupProgress(school.setupProgress);
   return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
 }
+
+
+apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
+  res.json({ data: current, school: { name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: school.setupProgress || { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } });
+});
+
+apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const step = Number(req.body?.step);
+  if (!Number.isInteger(step) || step < 1 || step > 5) { res.status(400).json({ error: 'Setup step must be between 1 and 5.' }); return; }
+  const validationError = validateSchoolSetupStep(step, req.body?.data);
+  if (validationError) { res.status(400).json({ error: validationError }); return; }
+  const existing = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}) } as any;
+  const submitted = req.body.data;
+  const nextData: any = { ...existing, ...submitted, completedSteps: [...new Set([...(existing.completedSteps || []), step])].sort((a: number, b: number) => a - b), updatedAt: new Date().toISOString() };
+  const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
+  const info = nextData.schoolInformation;
+  const academic = nextData.academicYear;
+  const termRows = nextData.terms;
+  const legacyTerms = termRows.length >= 2 ? { semester1Start: termRows[0].startDate, semester1End: termRows[0].endDate, semester2Start: termRows[1].startDate, semester2End: termRows[1].endDate } : school.terms;
+  const progress = { currentStep: allDone ? 5 : Math.min(5, step + 1), completedSteps: allDone ? [1, 2, 3, 4, 5, 10] : nextData.completedSteps, skippedSteps: [], completedAt: allDone ? new Date().toISOString() : null };
+  const updates: Partial<School> = { setupData: nextData, setupProgress: progress };
+  if (step === 1) Object.assign(updates, { name: info.name.trim(), address: info.address.trim(), phone: info.phone.trim(), email: info.email.trim(), schoolType: info.schoolType, logoUrl: info.logoUrl || undefined });
+  if (step === 2) Object.assign(updates, { academicYear: academic.name.replace('/', '-') });
+  if (step === 3) Object.assign(updates, { terms: legacyTerms });
+  const updated = db.updateSchool(school.id, updates);
+  if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
+  try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
+  res.json({ data: nextData, progress, completed: allDone });
+});
 
 apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
