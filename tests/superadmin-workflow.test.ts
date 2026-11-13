@@ -109,3 +109,18 @@ test('subscription updates cannot be double-submitted and form limits match serv
   assert.match(apiSource, /monthsToAdd must be a whole number from 1 to 120/);
   assert.match(apiSource, /graceDays must be a whole number from 0 to 60/);
 });
+
+
+test('platform backup settings accurately disclose missing GitHub Actions and S3 backup configuration', () => {
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  const workflowSource = read('../.github/workflows/supabase-backup.yml');
+  assert.match(settingsSource, /scheduled workflow is currently blocked/);
+  assert.match(settingsSource, /SUPABASE_DB_URL/);
+  assert.match(settingsSource, /BACKUP_S3_ACCESS_KEY_ID/);
+  assert.match(settingsSource, /BACKUP_S3_SECRET_ACCESS_KEY/);
+  assert.match(settingsSource, /BACKUP_S3_REGION/);
+  assert.match(settingsSource, /BACKUP_S3_BUCKET/);
+  assert.match(settingsSource, /Last manual platform export generated/);
+  assert.match(workflowSource, /Upload encrypted backup to private S3 bucket/);
+  assert.match(workflowSource, /--sse AES256/);
+});
