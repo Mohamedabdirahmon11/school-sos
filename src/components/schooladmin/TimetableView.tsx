@@ -45,7 +45,7 @@ export const TimetableView: React.FC = () => {
   const periodsForDay = (day: string) => periods.filter(period => hasConfiguredWorkingDays || day !== 'Friday' || period <= 5);
 
   useEffect(() => {
-    setDayOfWeek(current => days.includes(current) ? current : (days[0] || 'Monday'));
+    setDayOfWeek((current: string) => days.includes(current) ? current : (days[0] || 'Monday'));
     setPeriodNumber(current => Math.min(current, periods.length));
   }, [school?.id, school?.setupData?.calendar?.workingDays?.join('|'), school?.setupData?.workingHours?.periodsPerDay]);
   const periodTime = (period: number, shift: number = 1) => {
