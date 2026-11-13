@@ -76,10 +76,11 @@ export const ClassesSubjectsView: React.FC = () => {
     key: string; title: string; branchName: string; shiftName: string; items: SchoolClass[];
   }>>((groups, klass) => {
     const grade = Number(klass.gradeLevel || 0);
-    const title = grade === 0 ? 'KG' : `Grade ${grade}`;
+    const academicYear = klass.academicYear || school?.academicYear || 'Academic year not set';
+    const title = `${grade === 0 ? 'KG' : `Grade ${grade}`} · ${academicYear}`;
     const branchName = branches.find(branch => branch.id === klass.branchId)?.name || (klass.branchId ? 'Other branch' : 'Unassigned branch');
     const shiftName = Number(klass.shift) === 2 ? 'Afternoon shift' : 'Morning shift';
-    const key = `${klass.branchId || 'unassigned'}:${grade}:${klass.shift || 1}`;
+    const key = `${klass.branchId || 'unassigned'}:${academicYear}:${grade}:${klass.shift || 1}`;
     let group = groups.find(item => item.key === key);
     if (!group) {
       group = { key, title, branchName, shiftName, items: [] };
@@ -416,6 +417,7 @@ export const ClassesSubjectsView: React.FC = () => {
                     placeholder="Leave blank if the class has no sections"
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">If the school uses sections, create separate rows for A, B or C. Leave blank when it has no sections.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
