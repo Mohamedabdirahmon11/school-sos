@@ -30,7 +30,10 @@ test('migration creates only a new Auth identity and never changes an existing i
   assert.match(helper, /auth\.admin\.createUser/);
   assert.match(helper, /email_confirm: true/);
   assert.match(helper, /\.is\('auth_user_id', null\)/);
-  assert.match(helper, /auth\.admin\.deleteUser\(authUserId\)/);\n  assert.match(helper, /db\.updateUser\(user\.id, \{ authUserId \}\)/);\n  assert.match(helper, /if \(!linkedToSchoolOSUser\)/);\n  assert.match(helper, /try \{ await db\.flush\(\); \} catch/);
+  assert.match(helper, /auth\.admin\.deleteUser\(authUserId\)/);
+  assert.match(helper, /db\.updateUser\(user\.id, \{ authUserId \}\)/);
+  assert.match(helper, /if \(!linkedToSchoolOSUser\)/);
+  assert.match(helper, /try \{ await db\.flush\(\); \} catch/);
   assert.doesNotMatch(helper, /auth\.admin\.updateUserById/);
   assert.doesNotMatch(helper, /console\.(log|error).*password/i);
 });
@@ -51,7 +54,8 @@ test('accounts without email retain their legacy PIN or staff-ID sign-in path', 
 test('Supabase Auth identity is selected into session context and mapped at the storage boundary', () => {
   assert.match(storage, /users: \{ authUserId: 'auth_user_id'/);
   assert.match(storage, /const userColumns = 'id,auth_user_id,/);
-  assert.match(types, /authUserId\?: string/);\n  assert.match(authSecurity, /delete copy\.authUserId/);
+  assert.match(types, /authUserId\?: string/);
+  assert.match(authSecurity, /delete copy\.authUserId/);
 });
 
 test('Auth migration preserves the stable SchoolOS user ID and only backfills exact UUID matches', () => {
