@@ -38,6 +38,18 @@ test('migration creates only a new Auth identity and never changes an existing i
   assert.doesNotMatch(helper, /console\.(log|error).*password/i);
 });
 
+test('teacher accounts always retain school-issued Teacher ID and PIN authentication', () => {
+  const start = api.indexOf('async function linkLegacyLoginToSupabaseAuth');
+  const end = api.indexOf('// 1. AUTHENTICATION', start);
+  const helper = api.slice(start, end);
+  assert.ok(helper.includes("!['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
+  const loginStart = api.indexOf("apiRouter.post('/auth/login'");
+  const loginEnd = api.indexOf("apiRouter.post('/auth/logout'", loginStart);
+  const route = api.slice(loginStart, loginEnd);
+  assert.ok(route.includes("['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
+  assert.ok(route.includes("user.role === 'teacher' && verifyPin"));
+});
+
 test('accounts without email retain their legacy PIN or staff-ID sign-in path', () => {
   const start = api.indexOf('async function linkLegacyLoginToSupabaseAuth');
   const end = api.indexOf('// ==============================================================================\n// 1. AUTHENTICATION', start);
