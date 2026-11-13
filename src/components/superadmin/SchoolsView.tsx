@@ -450,6 +450,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
                 <tr>
                   <th className="px-4 py-3">School</th>
+                  <th className="px-4 py-3">School ID</th>
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3">Plan</th>
                   <th className="px-4 py-3">Status</th>
@@ -462,7 +463,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
               <tbody className="divide-y divide-[#E2E8F0]">
                 {schools.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={9} className="p-8 text-center text-[#64748B]">
                       No schools found matching the criteria. Click "Onboard New School" to create one.
                     </td>
                   </tr>
@@ -478,6 +479,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                         }`}
                       >
                         <td className="px-4 py-3"><div className="flex items-center gap-2.5 min-w-40"><div className="h-9 w-9 shrink-0 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-center overflow-hidden">{s.logoUrl ? <img src={s.logoUrl} alt={`${s.name} logo`} className="h-full w-full object-contain" /> : <Building2 className="h-4 w-4 text-[#94A3B8]" />}</div><span className="font-semibold text-[#132A29]">{s.name}</span></div></td>
+                        <td className="px-4 py-3 font-mono text-[#64748B]">{s.id}</td>
                         <td className="px-4 py-3 font-mono text-[#64748B]">{s.code}</td>
                         <td className="px-4 py-3 capitalize text-[#334155]">{s.subscription.plan}</td>
                         <td className="px-4 py-3">
