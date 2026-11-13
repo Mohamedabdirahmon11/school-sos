@@ -13,6 +13,9 @@ export const GlobalUsersView: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -22,8 +25,11 @@ export const GlobalUsersView: React.FC = () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await ApiClient.getGlobalUsers();
+      const data = await ApiClient.getGlobalUsers({ page, pageSize: 50, search, role: roleFilter });
       setUsers(Array.isArray(data) ? data : []);
+      const pagination = (data as any).pagination;
+      setTotalPages(Math.max(1, Number(pagination?.totalPages) || 1));
+      setTotalUsers(Math.max(0, Number(pagination?.total) || data.length));
     } catch (err: any) {
       setLoadError(err.message || 'Unable to load global users.');
     } finally {
@@ -32,8 +38,8 @@ export const GlobalUsersView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    void fetchUsers();
+  }, [page, roleFilter, search]);
 
   const handleToggleBlock = async (user: User) => {
     const isBlocked = user.isBlocked;
@@ -69,12 +75,11 @@ export const GlobalUsersView: React.FC = () => {
     // Student identities belong in each school's student directory, not the platform staff directory.
     if (u.role === 'student') return false;
     const matchSearch = 
-      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      String(u.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
       (u.phone && u.phone.includes(search)) ||
-      (u.studentId && u.studentId.includes(search.toUpperCase()));
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchSearch && matchRole;
+      (u.staffId && u.staffId.toLowerCase().includes(search.toLowerCase()));
+    return matchSearch;
   });
 
   if (isLoading) return <div role="status" aria-busy="true" className="p-6 text-sm text-[#64748B]">Loading user directory…</div>;
@@ -126,7 +131,7 @@ export const GlobalUsersView: React.FC = () => {
             type="text"
             placeholder="Search by name, email, phone, or staff ID..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
           />
         </div>
@@ -137,11 +142,12 @@ export const GlobalUsersView: React.FC = () => {
             { id: 'super_admin', label: 'Super Admin' },
             { id: 'school_admin', label: 'School Admin' },
             { id: 'teacher', label: 'Teacher' },
+            { id: 'accountant', label: 'Accountant' },
             { id: 'parent', label: 'Parent' },
           ].map(r => (
             <button
               key={r.id}
-              onClick={() => setRoleFilter(r.id)}
+              onClick={() => { setRoleFilter(r.id); setPage(1); }}
               className={`px-3 py-1 font-medium rounded transition-colors whitespace-nowrap ${
                 roleFilter === r.id
                   ? 'bg-white text-[#132A29] shadow-xs font-semibold'
@@ -232,6 +238,31 @@ export const GlobalUsersView: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#64748B]">
+        <span>
+          {totalUsers === 0 ? 'No users found' : `Showing ${(page - 1) * 50 + 1}–${Math.min(page * 50, totalUsers)} of ${totalUsers} users`}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage(current => Math.max(1, current - 1))}
+            disabled={page <= 1 || isLoading}
+            className="px-3 py-1.5 rounded-lg border border-[#CBD5E1] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+          >
+            Previous
+          </button>
+          <span className="font-mono">Page {page} of {totalPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage(current => Math.min(totalPages, current + 1))}
+            disabled={page >= totalPages || isLoading}
+            className="px-3 py-1.5 rounded-lg border border-[#CBD5E1] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+          >
+            Next
+          </button>
         </div>
       </div>
     </div>
