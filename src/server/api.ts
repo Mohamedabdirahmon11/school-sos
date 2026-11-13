@@ -452,14 +452,20 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
-  const firstLoginAllowedRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
+  const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
+  const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
+  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : superAdminCredentialRoutes;
   if (isBootstrap) {
-    if (user.role !== 'super_admin' || !user.mustChangePassword || !firstLoginAllowedRoutes.includes(req.path)) {
-      res.status(403).json({ error: 'Complete the required password change before continuing.' }); return;
+    if (!user.mustChangePassword || !allowedCredentialRoutes.includes(req.path)
+      || !['super_admin', 'school_admin'].includes(user.role)) {
+      res.status(403).json({ error: 'Complete the required credential setup before continuing.' }); return;
     }
   }
-  if (user.mustChangePassword && !firstLoginAllowedRoutes.includes(req.path)) {
-    res.status(403).json({ error: 'Password change is required before using SchoolOS.', code: 'MUST_CHANGE_PASSWORD' });
+  if (user.mustChangePassword && !allowedCredentialRoutes.includes(req.path)) {
+    res.status(403).json({
+      error: user.role === 'school_admin' ? 'PIN setup is required before using SchoolOS.' : 'Password change is required before using SchoolOS.',
+      code: user.role === 'school_admin' ? 'MUST_CHANGE_PIN' : 'MUST_CHANGE_PASSWORD'
+    });
     return;
   }
   if (payload && !isBootstrap) await refreshSessionCookie(res, user, payload);
@@ -1231,8 +1237,8 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  // Super Admin first-login password change
-  if (user.role === 'super_admin' && user.mustChangePassword) {
+  // First login: Super Admin must choose a password; School Admin must choose a PIN.
+  if (user.mustChangePassword && ['super_admin', 'school_admin'].includes(user.role)) {
     const challengeToken = createSignedSessionToken({
       sessionId: `bootstrap-${randomUUID()}`,
       userId: user.id,
@@ -1240,7 +1246,9 @@ apiRouter.post('/auth/login', async (req, res) => {
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
-    res.json({ requirePasswordChange: true, challengeToken });
+    res.json(user.role === 'school_admin'
+      ? { requirePinChange: true, challengeToken }
+      : { requirePasswordChange: true, challengeToken });
     return;
   }
 
@@ -1412,6 +1420,48 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'Password updated successfully.' });
+});
+
+// School Admin first-login PIN setup. This route is available only in the short-lived bootstrap session.
+apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
+  const user = (req as any).user as User;
+  if (user.role !== 'school_admin' || !user.mustChangePassword) {
+    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });
+    return;
+  }
+  const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
+  if (!/^\\d{4,6}$/.test(newPin)) {
+    res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' });
+    return;
+  }
+  if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
+    res.status(400).json({ error: 'Choose a new PIN that is different from your temporary PIN.' });
+    return;
+  }
+  const updated = db.updateUser(user.id, {
+    pin: hashPin(newPin),
+    passwordHash: hashPassword(newPin),
+    mustChangePassword: false
+  });
+  if (!updated) {
+    res.status(404).json({ error: 'School Admin account not found; PIN was not changed.' });
+    return;
+  }
+  invalidateAuthenticatedSnapshot(user.id);
+  await db.flush();
+  db.logAudit({
+    action: 'PIN_CHANGED',
+    category: 'auth',
+    schoolId: user.schoolId,
+    userId: user.id,
+    userName: user.fullName,
+    userRole: 'school_admin',
+    details: 'School Admin completed first-login PIN setup.',
+    severity: 'info'
+  });
+  await db.flush();
+  await issueSessionCookie(res, updated, req);
+  res.json({ success: true, message: 'PIN set successfully.' });
 });
 
 // Current User Profile (Sanitized)
