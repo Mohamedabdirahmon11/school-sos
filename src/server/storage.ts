@@ -2123,10 +2123,10 @@ class StorageEngine {
 
   public async getTimetableSettings(schoolId: string) {
     const rows = await this.queryRows<any>('timetable_settings', { school_id: schoolId });
-    return rows[0] || { schoolId, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20 };
+    return rows[0] || { schoolId, shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 };
   }
 
-  public async saveTimetableSettings(schoolId: string, values: { firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart?: string; shift2PeriodMinutes?: number; shift2BreakAfterPeriod?: number; shift2BreakMinutes?: number }) {
+  public async saveTimetableSettings(schoolId: string, values: { shiftCount: 1 | 2; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart?: string; shift2PeriodMinutes?: number; shift2BreakAfterPeriod?: number; shift2BreakMinutes?: number }) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable settings storage is unavailable.');
     const row = toSupabaseRow({ schoolId, ...values, updatedAt: new Date().toISOString() }, 'timetable_settings');
