@@ -50,8 +50,8 @@ export const ForcePasswordChangeModal: React.FC = () => {
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#132A29]">First-Time Sign In</h3>
-            <p className="text-xs text-[#64748B]">{t('first_time_password_hint')}</p>
+            <h3 className="text-base font-bold text-[#132A29]">{user.role === 'school_admin' ? 'First-Time Sign In – Set PIN' : 'First-Time Sign In'}</h3>
+            <p className="text-xs text-[#64748B]">{user.role === 'school_admin' ? 'Set a secure 4–6 digit PIN to continue.' : t('first_time_password_hint')}</p>
           </div>
         </div>
 
