@@ -150,6 +150,7 @@ export function sanitizeUser(user: any): Partial<User> {
   if (!user) return user;
   const copy = { ...user };
   delete copy.passwordHash;
+  delete copy.authUserId;
   delete copy.pin;
   delete copy.twoFactorSecret;
   delete copy.recoveryCodes;
