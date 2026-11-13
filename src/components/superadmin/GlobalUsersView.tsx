@@ -8,6 +8,7 @@ import { ApiClient } from '../../services/api.ts';
 import { User, UserRole } from '../../types/index.ts';
 import { Users, Search, ShieldCheck, KeyRound, Ban, CheckCircle, ShieldAlert, Monitor } from 'lucide-react';
 import { SessionsModal } from './SessionsModal.tsx';
+import { CreateSuperAdminPanel } from './CreateSuperAdminPanel.tsx';
 
 export const GlobalUsersView: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -110,6 +111,8 @@ export const GlobalUsersView: React.FC = () => {
           <span>Active Sessions</span>
         </button>
       </div>
+
+      <CreateSuperAdminPanel />
 
       <SessionsModal
         isOpen={sessionsModalOpen}
