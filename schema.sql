@@ -4360,3 +4360,5 @@ CREATE INDEX IF NOT EXISTS idx_bank_statement_created_by ON public.bank_statemen
 CREATE INDEX IF NOT EXISTS idx_bank_statement_matched_payment ON public.bank_statement_entries (matched_payment_id) WHERE matched_payment_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bank_statement_matched_expense ON public.bank_statement_entries (matched_expense_id) WHERE matched_expense_id IS NOT NULL;
 COMMIT;
+
+NOTIFY pgrst, 'reload schema';
