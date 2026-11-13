@@ -79,6 +79,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   }, []);
 
   // Add School Form State
+  const [addSchoolId, setAddSchoolId] = useState('');
   const [addName, setAddName] = useState('');
   const [addCode, setAddCode] = useState('');
   const [addEmail, setAddEmail] = useState('');
@@ -188,6 +189,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
 
     try {
       const res = await ApiClient.addSchool({
+        schoolId: addSchoolId,
         name: addName,
         code: addCode,
         email: addEmail,
@@ -213,6 +215,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setActionNotice(`School "${res.school.name}" onboarded successfully.`);
       window.alert(`School Administrator created.\n\nLogin ID: ${res.adminUsername || res.admin?.staffId || 'See school details'}\nTemporary PIN: ${res.temporaryPin}\nChange it at first sign-in.`);
       // Reset form
+      setAddSchoolId('');
       setAddName('');
       setAddCode('');
       setAddEmail('');
@@ -340,10 +343,15 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   };
 
   const handleResetAdminPassword = async (adminId: string) => {
-    if (!confirm('Generate a temporary password for this school administrator? They must change it at next sign-in.')) return;
+    const temporaryPin = window.prompt('Enter a new School Admin PIN (4–6 digits). The administrator must change it at next sign-in.');
+    if (temporaryPin === null) return;
+    if (!/^\\d{4,6}$/.test(temporaryPin.trim())) {
+      window.alert('PIN must contain 4–6 digits only.');
+      return;
+    }
     try {
-      const result = await ApiClient.resetUserPassword(adminId);
-      window.alert(`Temporary password (shown once):\n\n${result.temporaryPassword}\n\nThe administrator must change it at next sign-in.`);
+      const result = await ApiClient.resetUserPassword(adminId, temporaryPin.trim());
+      window.alert(`Temporary School Admin PIN (shown once):\\n\\n${result.temporaryPassword}\\n\\nThe administrator must change it at next sign-in.`);
     } catch (err: any) {
       alert(err.message);
     }
@@ -751,6 +759,10 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
             <form onSubmit={handleCreateSchool} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-medium text-[#334155]">School ID *</label>
+                  <input type="text" required minLength={3} maxLength={64} pattern="[A-Za-z0-9_-]{3,64}" value={addSchoolId} onChange={e => setAddSchoolId(e.target.value.toUpperCase())} placeholder="SCH001" className="mt-1 w-full px-3 py-2 font-mono uppercase border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                </div>
+                <div>
                   <label className="block font-medium text-[#334155]">School Name *</label>
                   <input
                     type="text"
@@ -880,12 +892,12 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-[#334155]">Admin Login ID (Optional)</label>
-                    <input type="text" maxLength={32} value={addAdminUsername} onChange={e => setAddAdminUsername(e.target.value.toUpperCase())} placeholder="Auto-generate if blank" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
+                    <label className="block font-medium text-[#334155]">Admin Login ID *</label>
+                    <input type="text" required minLength={3} maxLength={32} pattern="[A-Za-z0-9_-]{3,32}" value={addAdminUsername} onChange={e => setAddAdminUsername(e.target.value.toUpperCase())} placeholder="ADM001" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
                   </div>
                   <div>
-                    <label className="block font-medium text-[#334155]">Initial PIN (Optional)</label>
-                    <input type="password" inputMode="numeric" pattern="[0-9]{4,6}" minLength={4} maxLength={6} autoComplete="new-password" value={addAdminPin} onChange={e => setAddAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
+                    <label className="block font-medium text-[#334155]">School Admin PIN *</label>
+                    <input type="text" required inputMode="numeric" pattern="[0-9]{4,6}" minLength={4} maxLength={6} autoComplete="new-password" value={addAdminPin} onChange={e => setAddAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 4–6 digit PIN" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
                   </div>
                   <div>
                     <label className="block font-medium text-[#334155]">Email Address (Optional)</label>
@@ -910,7 +922,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                   </div>
                 </div>
                 <div className="col-span-2 rounded-lg border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">
-                  A short unique Admin ID (for example ADM001) is generated if you leave it blank. If you leave the PIN blank, a six-digit temporary PIN is generated. The administrator must change it at first sign-in. Admin ID works without Gmail.
+                  Enter the School ID, Admin Login ID, and a 4–6 digit PIN yourself. The PIN is stored securely and the administrator must change it at first sign-in. Admin ID works without Gmail.
                 </div>
               </div>
 
