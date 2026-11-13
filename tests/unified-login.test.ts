@@ -38,3 +38,17 @@ test('School Admin first login securely replaces the temporary PIN before dashbo
   assert.ok(api.includes('pin: hashPin(newPin)'));
   assert.ok(api.includes('mustChangePassword: false'));
 });
+
+
+test('School Admin profile and forced credential screens use PINs instead of passwords', () => {
+  const apiSource = read('../src/server/api.ts');
+  const profileSource = read('../src/components/common/ProfileModal.tsx');
+  const forcedSource = read('../src/components/auth/ForcePasswordChangeModal.tsx');
+  assert.ok(apiSource.includes("user.role === 'school_admin' && newPassword"));
+  assert.ok(apiSource.includes('verifyPin(currentPin.trim()'));
+  assert.ok(apiSource.includes('pin: hashPin(newPin)'));
+  assert.ok(profileSource.includes('Change School Admin PIN'));
+  assert.ok(profileSource.includes('currentPin: user.role'));
+  assert.ok(forcedSource.includes('New School Admin PIN'));
+  assert.ok(forcedSource.includes('ApiClient.changePin(pin)'));
+});
