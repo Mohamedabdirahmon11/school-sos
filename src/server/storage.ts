@@ -1061,6 +1061,45 @@ class StorageEngine {
     return newSchool;
   }
 
+  public async updateSchoolFromDatabase(id: string, updates: Partial<School>): Promise<School | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+
+    // The production request context starts empty. Resolve the tenant row in
+    // this request before writing, then persist the update directly so this
+    // path never depends on an incidental in-memory schools snapshot.
+    const current = await this.getSchoolById(id);
+    if (!current) return null;
+
+    const updated: School = {
+      ...current,
+      ...updates,
+      id: current.id,
+      updatedAt: new Date().toISOString()
+    };
+    const { subscription: _subscription, branches: _branches, ...schoolRow } = updated;
+    const payload = toSupabaseRow(schoolRow as Record<string, any>, 'schools');
+    const startedAt = performance.now();
+    const { data, error } = await client
+      .from('schools')
+      .update(payload)
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    this.recordQuery('schools', 'update', startedAt);
+    if (error) throw new Error('Unable to save school settings: ' + error.message);
+    if (!data) return null;
+
+    const saved = fromSupabaseRow(data, 'schools') as School;
+    this.cacheQueryRows('schools', [saved]);
+    schoolContextCache.set(id, {
+      school: { ...saved, subscription: current.subscription, branches: [] },
+      expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS
+    });
+    this.invalidateAuthContextsForSchool(id);
+    return { ...saved, subscription: current.subscription, branches: [] };
+  }
+
   public updateSchool(id: string, updates: Partial<School>): School | null {
     const idx = this.data.schools.findIndex(s => s.id === id);
     if (idx === -1) return null;
