@@ -38,6 +38,33 @@ test('school onboarding uses unique school UUIDs and compensates failed persiste
   assert.match(api, /School onboarding persistence failed; attempting rollback/);
 });
 
+test('new school profile migration adds compatible metadata and a dedicated logo bucket', () => {
+  const migration = read('../supabase/migrations/20261112120000_school_registration_profile.sql');
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS country/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS region/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS school_type/);
+  assert.match(migration, /school-logos/);
+  assert.match(migration, /2097152/);
+  assert.match(migration, /image\\/png.*image\\/jpeg.*image\\/webp/);
+});
+
+test('school onboarding remains Super Admin-only and tenant rows are scoped by school id', () => {
+  const routeStart = api.indexOf("apiRouter.post('/superadmin/schools'");
+  const routeEnd = api.indexOf("const updateSchoolDetailsSchema", routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  assert.match(route, /requireAuth, requireSuperAdmin/);
+  assert.match(route, /schoolId: school.id/);
+  const tenantPolicies = read('../supabase/migrations/022_consolidate_tenant_rls_policies.sql');
+  assert.match(tenantPolicies, /school_id::text = public\\.auth_school_id\(\)::text/);
+  assert.match(tenantPolicies, /CREATE POLICY tenant_scope_v2 ON public\\.schools/);
+});
+
+test('school admin ID can be used in the shared staff login form', () => {
+  const login = read('../src/components/auth/LoginView.tsx');
+  assert.match(login, /School Admin ID/);
+  assert.match(login, /type="text"[\\s\\S]*Email, phone, Admin ID, or T001/);
+});
+
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {
   assert.match(api, /apiRouter\.get\('\/superadmin\/schools\/:id'/);
   assert.match(api, /role: 'school_admin'/);
