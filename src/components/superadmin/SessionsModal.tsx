@@ -12,14 +12,17 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ isOpen, onClose })
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await ApiClient.request<UserSession[]>('/superadmin/sessions');
-      setSessions(data);
-    } catch (err) {
-      console.error(err);
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setLoadError(err.message || 'Unable to load active sessions.');
     } finally {
       setLoading(false);
     }
@@ -32,15 +35,17 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ isOpen, onClose })
   }, [isOpen]);
 
   const handleRevoke = async (sessionId: string) => {
+    if (!window.confirm('Revoke this session? The user will need to sign in again.')) return;
     setRevokingId(sessionId);
+    setActionError(null);
     try {
       await ApiClient.request('/superadmin/sessions/revoke', {
         method: 'POST',
         body: JSON.stringify({ sessionId })
       });
       setSessions(prev => prev.filter(s => s.id !== sessionId));
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(err.message || 'The session could not be revoked.');
     } finally {
       setRevokingId(null);
     }
@@ -74,6 +79,12 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ isOpen, onClose })
             </button>
           </div>
         </div>
+
+        {(loadError || actionError) && (
+          <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+            {loadError || actionError}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto space-y-2">
           {loading ? (
