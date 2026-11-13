@@ -26,6 +26,7 @@ export const MessagesView: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [searchContact, setSearchContact] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -74,8 +75,10 @@ export const MessagesView: React.FC = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !selectedContact) return;
+    if (!inputText.trim() || !selectedContact || isSending) return;
 
+    setIsSending(true);
+    setError(null);
     try {
       const newMsg = await ApiClient.sendMessage(
         selectedContact.id,
@@ -91,6 +94,8 @@ export const MessagesView: React.FC = () => {
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Unable to send this message.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -233,15 +238,16 @@ export const MessagesView: React.FC = () => {
                   type="text"
                   placeholder={`Write message to ${selectedContact.fullName}...`}
                   value={inputText}
+                  disabled={isSending}
                   onChange={e => setInputText(e.target.value)}
                   className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                 />
                 <button
                   type="submit"
-                  disabled={!inputText.trim()}
+                  disabled={!inputText.trim() || isSending}
                   className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] disabled:bg-slate-300 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 >
-                  <span>Send</span>
+                  <span>{isSending ? 'Sending…' : 'Send'}</span>
                   <Send className="w-3.5 h-3.5" />
                 </button>
               </form>
