@@ -91,7 +91,7 @@ function invalidateListCache(table?: string) {
 }
 
 function onboardingFieldErrors(body: Record<string, unknown>): string[] {
-  const required = ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone'];
+  const required = ['schoolId', 'name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminUsername', 'adminPin', 'adminPhone'];
   const missing = required.filter(key => typeof body[key] !== 'string' || !(body[key] as string).trim());
   for (const field of ['email', 'adminEmail']) {
     if (typeof body[field] === 'string' && body[field].trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body[field].trim())) missing.push(`${field} (invalid email)`);
@@ -102,10 +102,11 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
       if (digits.length < 7 || digits.length > 15) missing.push(`${field} (invalid phone)`);
     }
   }
+  if (typeof body.schoolId === 'string' && body.schoolId.trim() && !/^[a-z0-9_-]{3,64}$/i.test(body.schoolId.trim())) missing.push('schoolId (use 3–64 letters, numbers, hyphens or underscores)');
   if (typeof body.code === 'string' && body.code.trim() && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
   if (typeof body.schoolType === 'string' && !['primary', 'secondary', 'combined'].includes(body.schoolType)) missing.push('schoolType (choose primary, secondary or combined)');
   if (typeof body.adminUsername === 'string' && body.adminUsername.trim() && !/^[a-z0-9_-]{3,32}$/i.test(body.adminUsername.trim())) missing.push('adminUsername (use 3–32 letters, numbers, hyphens or underscores)');
-  if (typeof body.adminPin === 'string' && body.adminPin && !/^\d{4,6}$/.test(body.adminPin)) missing.push('adminPin (use a 4–6 digit PIN)');
+  if (typeof body.adminPin !== 'string' || !/^\d{4,6}$/.test(body.adminPin)) missing.push('adminPin (required: use a 4–6 digit PIN)');
   if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
   return [...new Set(missing)];
 }
@@ -1899,11 +1900,17 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}.`, fields: missing });
     return;
   }
-  const { name, code, country, region, schoolType, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminUsername, adminPin, logoDataUrl } = body;
+  const { schoolId, name, code, country, region, schoolType, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminUsername, adminPin, logoDataUrl } = body;
+  const cleanSchoolId = String(schoolId).trim().toUpperCase();
   const cleanCode = String(code).trim().toUpperCase();
   const cleanAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim().toLowerCase() : '';
   const requestedAdminUsername = typeof adminUsername === 'string' ? adminUsername.trim().toUpperCase() : '';
 
+  // School IDs and school codes are both administrator-assigned and unique.
+  if (await db.getSchoolById(cleanSchoolId)) {
+    res.status(409).json({ error: 'School ID is already in use.', fields: ['schoolId'] });
+    return;
+  }
   // Check unique code
   if (await db.getSchoolByCode(cleanCode)) {
     res.status(400).json({ error: `School code "${cleanCode}" is already in use.`, fields: ['code'] });
@@ -1917,6 +1924,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   const validUntil = new Date(now.getTime() + (settings.trialDays || 7) * 24 * 60 * 60 * 1000);
 
   const school = db.createSchool({
+    id: cleanSchoolId,
     name: String(name).trim(),
     code: cleanCode,
     country: String(country).trim(),
@@ -6465,7 +6473,15 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(403).json({ error: 'Only staff account passwords can be reset here.' });
     return;
   }
-  const temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
+  let temporaryPassword: string;
+  if (targetUser.role === 'school_admin') {
+    if (user.role !== 'super_admin') { res.status(403).json({ error: 'Only Super Admin can reset a School Admin PIN.' }); return; }
+    const requestedPin = typeof req.body?.temporaryPin === 'string' ? req.body.temporaryPin.trim() : '';
+    if (!/^\\d{4,6}$/.test(requestedPin)) { res.status(400).json({ error: 'Enter a new 4–6 digit School Admin PIN.' }); return; }
+    temporaryPassword = requestedPin;
+  } else {
+    temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
+  }
   if (!(await syncLinkedSupabaseAuthCredentials(targetUser, { password: temporaryPassword }))) {
     res.status(503).json({ error: 'The linked authentication password could not be reset. The existing password remains unchanged.' });
     return;
