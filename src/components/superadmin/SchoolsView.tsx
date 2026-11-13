@@ -76,11 +76,17 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [addEmail, setAddEmail] = useState('');
   const [addAddress, setAddAddress] = useState('');
   const [addCity, setAddCity] = useState('');
+  const [addCountry, setAddCountry] = useState('Ethiopia');
+  const [addRegion, setAddRegion] = useState('');
+  const [addSchoolType, setAddSchoolType] = useState<'primary' | 'secondary' | 'combined'>('combined');
+  const [addLogoDataUrl, setAddLogoDataUrl] = useState('');
   const [addPhone, setAddPhone] = useState('');
   const [addWhatsappPhone, setAddWhatsappPhone] = useState('');
   const [addPlan, setAddPlan] = useState<PlanTier>('standard');
   const [addCadence, setAddCadence] = useState<SubscriptionCadence>('monthly');
   const [addAdminName, setAddAdminName] = useState('');
+  const [addAdminUsername, setAddAdminUsername] = useState('');
+  const [addAdminPassword, setAddAdminPassword] = useState('');
   const [addAdminEmail, setAddAdminEmail] = useState('');
   const [addAdminPhone, setAddAdminPhone] = useState('');
   const [addStudentAccess, setAddStudentAccess] = useState(false);
@@ -139,11 +145,17 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
         email: addEmail,
         address: addAddress,
         city: addCity,
+        country: addCountry,
+        region: addRegion,
+        schoolType: addSchoolType,
+        logoDataUrl: addLogoDataUrl,
         phone: addPhone,
         whatsappPhone: addWhatsappPhone,
         plan: addPlan,
         cadence: addCadence,
         adminName: addAdminName,
+        adminUsername: addAdminUsername,
+        adminPassword: addAdminPassword,
         adminEmail: addAdminEmail,
         adminPhone: addAdminPhone,
         studentAccessEnabled: addStudentAccess
@@ -151,16 +163,22 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
 
       setShowAddModal(false);
       setActionNotice(`School "${res.school.name}" onboarded successfully.`);
-      if (res.temporaryPassword) window.alert(`School administrator temporary password:\n\n${res.temporaryPassword}\n\nShare it securely with the administrator. They must set a new password at first sign-in.`);
+      window.alert(`School Administrator created.\n\nLogin ID: ${res.adminUsername || res.admin?.staffId || 'See school details'}${res.temporaryPassword ? `\nTemporary password: ${res.temporaryPassword}\nChange it at first sign-in.` : '\nUse the password you entered in the registration form.'}`);
       // Reset form
       setAddName('');
       setAddCode('');
       setAddEmail('');
       setAddAddress('');
       setAddCity('');
+      setAddCountry('Ethiopia');
+      setAddRegion('');
+      setAddSchoolType('combined');
+      setAddLogoDataUrl('');
       setAddPhone('');
       setAddWhatsappPhone('');
       setAddAdminName('');
+      setAddAdminUsername('');
+      setAddAdminPassword('');
       setAddAdminEmail('');
       setAddAdminPhone('');
       setAddStudentAccess(false);
@@ -636,6 +654,36 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-[#334155]">Country *</label>
+                  <input required maxLength={80} value={addCountry} onChange={e => setAddCountry(e.target.value)} placeholder="Ethiopia" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">Region *</label>
+                  <input required maxLength={100} value={addRegion} onChange={e => setAddRegion(e.target.value)} placeholder="Somali Region" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">School Type *</label>
+                  <select required value={addSchoolType} onChange={e => setAddSchoolType(e.target.value as 'primary' | 'secondary' | 'combined')} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                    <option value="primary">Primary</option><option value="secondary">Secondary</option><option value="combined">Combined</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">School Logo (PNG/JPEG/WebP, max 2 MB)</label>
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) { setAddLogoDataUrl(''); return; }
+                    if (file.size > 2 * 1024 * 1024) { setModalError('School logo must be smaller than 2 MB.'); e.target.value = ''; return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setAddLogoDataUrl(typeof reader.result === 'string' ? reader.result : '');
+                    reader.onerror = () => setModalError('Unable to read the selected school logo.');
+                    reader.readAsDataURL(file);
+                  }} className="mt-1 w-full text-[11px]" />
+                  {addLogoDataUrl && <span className="text-[10px] text-emerald-700">Logo ready to upload</span>}
+                </div>
+              </div>
+
               <div>
                 <label className="block font-medium text-[#334155]">School Email *</label>
                 <input type="email" required value={addEmail} onChange={e => setAddEmail(e.target.value)} placeholder="office@school.so" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
@@ -655,8 +703,8 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                   <input type="tel" required value={addPhone} onChange={e => setAddPhone(e.target.value)} placeholder="+251..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
                 </div>
                 <div>
-                  <label className="block font-medium text-[#334155]">School / Admin WhatsApp *</label>
-                  <input type="tel" required value={addWhatsappPhone} onChange={e => setAddWhatsappPhone(e.target.value)} placeholder="+251..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
+                  <label className="block font-medium text-[#334155]">School / Admin WhatsApp (Optional)</label>
+                  <input type="tel" value={addWhatsappPhone} onChange={e => setAddWhatsappPhone(e.target.value)} placeholder="+251..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" />
                 </div>
               </div>
 
@@ -712,10 +760,17 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-[#334155]">Email Address *</label>
+                    <label className="block font-medium text-[#334155]">Admin Login ID (Optional)</label>
+                    <input type="text" maxLength={32} value={addAdminUsername} onChange={e => setAddAdminUsername(e.target.value.toUpperCase())} placeholder="Auto-generate if blank" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-[#334155]">Initial Password (Optional)</label>
+                    <input type="password" minLength={8} maxLength={128} autoComplete="new-password" value={addAdminPassword} onChange={e => setAddAdminPassword(e.target.value)} placeholder="At least 8 characters" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white" />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-[#334155]">Email Address (Optional)</label>
                     <input
                       type="email"
-                      required
                       value={addAdminEmail}
                       onChange={e => setAddAdminEmail(e.target.value)}
                       placeholder="admin@school.so"
@@ -735,7 +790,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                   </div>
                 </div>
                 <div className="col-span-2 rounded-lg border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">
-                  A temporary six-digit password is generated automatically. The school administrator sets a personal password at first sign-in.
+                  A unique school Admin ID is generated if you leave it blank. If you leave the password blank, a secure temporary password is generated and must be changed at first sign-in. Admin ID can be used to sign in without Gmail.
                 </div>
               </div>
 
