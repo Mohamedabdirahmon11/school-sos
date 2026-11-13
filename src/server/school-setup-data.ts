@@ -13,7 +13,7 @@ function validIsoDate(value: unknown): value is string {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-export function validateSchoolSetupStep(step: number, data: any): string | null {
+export function validateSchoolSetupStep(step: number, data: any, existingData?: any): string | null {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Setup data must be an object.';
   if (step === 1) {
     const s = data.schoolInformation;
@@ -32,6 +32,10 @@ export function validateSchoolSetupStep(step: number, data: any): string | null 
     if (!Array.isArray(terms) || terms.length < 1 || terms.length > 3 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Add 1–3 terms with valid names and start/end dates.';
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
+    const academicYear = existingData?.academicYear;
+    if (academicYear && validIsoDate(academicYear.startDate) && validIsoDate(academicYear.endDate)) {
+      if (terms.some((term: any) => term.startDate < academicYear.startDate || term.endDate > academicYear.endDate)) return 'Each term must fall within the selected academic year.';
+    }
   }
   if (step === 4) {
     const c = data.calendar;
