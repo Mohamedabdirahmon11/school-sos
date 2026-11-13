@@ -301,7 +301,7 @@ export class ApiClient {
   }
 
   public static async createSchool(schoolData: any) {
-    return this.request<{ school: School; admin: User; temporaryPassword: string; mustChangePassword: true }>('/superadmin/schools', {
+    return this.request<{ school: School; admin: User; adminUsername: string; temporaryPassword?: string; mustChangePassword: boolean }>('/superadmin/schools', {
       method: 'POST',
       body: JSON.stringify(schoolData)
     });
