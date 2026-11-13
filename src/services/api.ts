@@ -597,6 +597,21 @@ export class ApiClient {
     return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass));
   }
 
+  public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string }) {
+    const query = new URLSearchParams({
+      page: String(params?.page || 1),
+      pageSize: String(params?.pageSize || 50)
+    });
+    if (params?.classId) query.set('classId', params.classId);
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+    return this.request<Array<{
+      id: string;
+      phone: string;
+      relationships: string[];
+      students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
+    }>>(`/parents/contacts?${query.toString()}`);
+  }
+
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
     const payments = includeFinance ? await this.getFeePayments(id, { page: 1, pageSize: 100 }) : [];
