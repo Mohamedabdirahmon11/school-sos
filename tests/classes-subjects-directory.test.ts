@@ -7,7 +7,7 @@ const teachersSource = readFileSync(new URL('../src/components/schooladmin/Teach
 
 test('Classes & Sections are grouped by academic year, grade, branch and shift with searchable section cards', () => {
   assert.match(classesSource, /const classGroups = visibleClasses\.reduce/);
-  assert.match(classesSource, /const key = `\\$\\{klass\\.branchId \\|\\| 'unassigned'\\}:\\$\\{academicYear\\}:\\$\\{grade\\}:\\$\\{klass\\.shift \\|\\| 1\\}`/);
+  assert.match(classesSource, /const key = \`\$\{klass\.branchId \|\| 'unassigned'\}:\$\{academicYear\}:\$\{grade\}:\$\{klass\.shift \|\| 1\}\`/);
   assert.match(classesSource, /aria-label="Search classes and sections"/);
   assert.match(classesSource, /aria-label="Filter classes by branch"/);
   assert.match(classesSource, /Section \{klass\.section \|\| '—'\}/);
