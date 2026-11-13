@@ -45,7 +45,7 @@ import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
-import { SCHOOL_SETUP_DEFAULTS, validateSchoolSetupStep } from './school-setup-data.ts';
+import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 
 export const apiRouter = Router();
@@ -7043,15 +7043,8 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   const submitted = req.body.data;
   const nextData: any = { ...existing, ...submitted, completedSteps: [...new Set([...(existing.completedSteps || []), step])].sort((a: number, b: number) => a - b), updatedAt: new Date().toISOString() };
   const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
-  const info = nextData.schoolInformation;
-  const academic = nextData.academicYear;
-  const termRows = nextData.terms;
-  const legacyTerms = termRows.length >= 2 ? { semester1Start: termRows[0].startDate, semester1End: termRows[0].endDate, semester2Start: termRows[1].startDate, semester2End: termRows[1].endDate } : school.terms;
   const progress = { currentStep: allDone ? 5 : Math.min(5, step + 1), completedSteps: allDone ? [1, 2, 3, 4, 5, 10] : nextData.completedSteps, skippedSteps: [], completedAt: allDone ? new Date().toISOString() : null };
-  const updates: Partial<School> = { setupData: nextData, setupProgress: progress };
-  if (step === 1) Object.assign(updates, { name: info.name.trim(), address: info.address.trim(), phone: info.phone.trim(), email: info.email.trim(), schoolType: info.schoolType, logoUrl: info.logoUrl || undefined });
-  if (step === 2) Object.assign(updates, { academicYear: academic.name.replace('/', '-') });
-  if (step === 3) Object.assign(updates, { terms: legacyTerms });
+  const updates = buildSchoolSetupSchoolUpdates(step, nextData, school, progress);
   let updated: School | null;
   try {
     updated = await db.updateSchoolFromDatabase(school.id, updates);
