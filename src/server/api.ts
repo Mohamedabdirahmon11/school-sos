@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
+import { User, UserRole, School, SchoolClass, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
