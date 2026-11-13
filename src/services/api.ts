@@ -238,6 +238,20 @@ export class ApiClient {
     return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
   }
 
+  public static async uploadSchoolLogo(file: File): Promise<{ logoUrl: string }> {
+    const response = await fetch('/api/school/logo', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': file.type },
+      body: file
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || typeof body.logoUrl !== 'string' || !body.logoUrl) {
+      throw new Error(body.error || 'School logo upload failed.');
+    }
+    return { logoUrl: body.logoUrl };
+  }
+
   public static async getSchoolSetupData() {
     return this.request<{ data: SchoolSetupData; school: { name: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
   }
