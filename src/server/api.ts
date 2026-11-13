@@ -1629,7 +1629,7 @@ apiRouter.put('/superadmin/settings', requireAuth, requireSuperAdmin, async (req
 
 const bulkAcademicYearSchema = z.object({
   academicYear: z.string().trim()
-    .regex(/^\\d{4}-\\d{4}$/, 'Academic year must use YYYY-YYYY.')
+    .regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.')
     .refine(value => {
       const [start, end] = value.split('-').map(Number);
       return end === start + 1;
@@ -1643,7 +1643,7 @@ async function buildBulkAcademicYearPreview(targetYear: string) {
   const targetStart = Number(targetYear.slice(0, 4));
   return schools.map(school => {
     const current = String(school.academicYear || '');
-    const currentStart = /^\\d{4}-\\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
+    const currentStart = /^\d{4}-\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
     let status: 'change' | 'unchanged' | 'warning' = 'change';
     let warning = '';
     if (current === targetYear) status = 'unchanged';
