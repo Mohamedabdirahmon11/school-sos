@@ -52,8 +52,8 @@ export const apiRouter = Router();
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,grade_level,section,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
-  subjects: 'id,school_id,name,code,credit_units,department,assigned_teacher_ids,created_at',
+  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,class_id,section,status',
   teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
@@ -3044,7 +3044,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     ]);
     if (enrolled.total || scheduled.total) { res.status(409).json({ error: 'Academic year cannot be changed while students or timetable periods are attached to this class.' }); return; }
   }
-  const updates: Record<string, unknown> = { classCode, academicYear };
+  const updates: any = { classCode, academicYear };
   if (req.body?.name !== undefined) {
     if (typeof req.body.name !== 'string' || !req.body.name.trim()) { res.status(400).json({ error: 'Class name cannot be empty.' }); return; }
     updates.name = req.body.name.trim();
