@@ -139,15 +139,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               />
               <PasswordInput
                 label="new password"
-                minLength={6}
+                minLength={8}
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
-                placeholder="New password (min 6 characters)"
+                placeholder="New password (min 8 characters)"
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
               />
               <PasswordInput
                 label="confirm new password"
-                minLength={6}
+                minLength={8}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
