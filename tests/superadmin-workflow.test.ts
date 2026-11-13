@@ -31,7 +31,6 @@ test('school onboarding validates country, region, type and required contacts wh
   assert.match(api, /const temporaryPin = String\(adminPin\)/);
   assert.match(api, /id: cleanSchoolId/);
   assert.match(api, /mustChangePassword: true/);
-  assert.match(api, /const temporaryPin = String\(adminPin \|\| randomInt\(100000, 1_000_000\)\)/);
   assert.match(api, /school-logos/);
   assert.match(api, /School logo must be smaller than 2 MB/);
 });
