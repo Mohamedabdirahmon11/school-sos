@@ -3,6 +3,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save } from 
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupData } from '../../types/index.ts';
+import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
 
@@ -72,7 +73,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
   };
 
   const field = (label: string, value: string, onChange: (value: string) => void, type = 'text', placeholder = '') => (
-    <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100" /></label>
+    <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100" />{type === 'date' && value && <span className="block text-xs text-teal-700">Ethiopian date: {getEthiopianCalendarInfo(value).dateLabel} · Gregorian date: {value}</span>}</label>
   );
   const select = (label: string, value: string, options: Array<[string, string]>, onChange: (value: string) => void) => (
     <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none focus:border-teal-600">{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>

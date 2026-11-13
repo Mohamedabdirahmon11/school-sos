@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
+import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
@@ -36,6 +37,11 @@ export const AttendanceView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [date, setDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const ethiopianCalendar = getEthiopianCalendarInfo(date, school?.timezone || 'Africa/Addis_Ababa');
+  const calendarStatus = getSchoolCalendarStatus(date, school?.setupData?.calendar, school?.timezone || 'Africa/Addis_Ababa');
+  const calendarType = school?.setupData?.calendar?.calendarType || 'both';
+  const calendarDateLabel = calendarType === 'gregorian' ? 'Gregorian date: ' + date
+    : calendarType === 'ethiopian' ? 'Ethiopian date: ' + ethiopianCalendar.dateLabel
+    : 'Ethiopian date: ' + ethiopianCalendar.dateLabel + ' · Gregorian date: ' + date;
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
@@ -191,13 +197,13 @@ export const AttendanceView: React.FC = () => {
           <div className="flex items-end gap-2">
             <label className="text-xs font-semibold text-[#475569]">Attendance date
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
-              <span className="mt-1 block text-[10px] font-normal text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</span>
+              <span className="mt-1 block text-[10px] font-normal text-[#64748B]">{calendarDateLabel}</span>
             </label>
             <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Refresh</button>
           </div>
         </div>
         {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{loadError}</div>}
-        {ethiopianCalendar.holiday && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
+        {(calendarStatus.isWeeklyHoliday || calendarStatus.holidayName) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{calendarStatus.isWeeklyHoliday ? 'This date is configured as a weekly school holiday.' : 'School holiday: ' + calendarStatus.holidayName}</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Absent students</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
           <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Classes covered</p><p className="mt-1 text-2xl font-bold text-slate-800">{new Set(schoolAbsences.map(row => row.student.classId)).size}</p></div>
