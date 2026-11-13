@@ -6864,9 +6864,9 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   const school = (req as any).school as School;
   const step = Number(req.body?.step);
   if (!Number.isInteger(step) || step < 1 || step > 5) { res.status(400).json({ error: 'Setup step must be between 1 and 5.' }); return; }
-  const validationError = validateSchoolSetupStep(step, req.body?.data);
-  if (validationError) { res.status(400).json({ error: validationError }); return; }
   const existing = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}) } as any;
+  const validationError = validateSchoolSetupStep(step, req.body?.data, existing);
+  if (validationError) { res.status(400).json({ error: validationError }); return; }
   const submitted = req.body.data;
   const nextData: any = { ...existing, ...submitted, completedSteps: [...new Set([...(existing.completedSteps || []), step])].sort((a: number, b: number) => a - b), updatedAt: new Date().toISOString() };
   const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
