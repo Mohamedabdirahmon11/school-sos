@@ -52,9 +52,8 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     && terms.semester2Start <= terms.semester2End
     && terms.semester1End < terms.semester2Start;
   const yearReady = /^\d{4}-\d{4}$/.test(String(school.academicYear || ''));
-  const normalizedNames = evidence.classNames.map(name => name.trim());
-  const hasKg1 = normalizedNames.some(name => /(?:kg|kindergarten)[\s_-]*1(?:\b|$)/i.test(name));
-  const hasKg2 = normalizedNames.some(name => /(?:kg|kindergarten)[\s_-]*2(?:\b|$)/i.test(name));
+  const normalizedNames = evidence.classNames.map(name => name.trim()).filter(Boolean);
+  const hasActiveClass = normalizedNames.length > 0;
   const profileReady = Boolean(
     school.name?.trim() && school.address?.trim() && school.city?.trim()
     && school.email?.trim() && school.phone?.trim() && normalizeWhatsAppNumber(school.whatsappPhone)
@@ -65,7 +64,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
   return {
     1: step(yearReady && datesReady, false, 'Set a valid academic year and complete start/end dates for both semesters.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
-    3: step(hasKg1 && hasKg2, false, 'Create active classes named KG 1 and KG 2 before continuing.'),
+    3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
     4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
