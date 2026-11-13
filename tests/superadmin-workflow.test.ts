@@ -12,13 +12,30 @@ const billing = read('../src/components/superadmin/PlansBillingView.tsx');
 const settings = read('../src/components/superadmin/PlatformSettingsView.tsx');
 const storage = read('../src/server/storage.ts');
 
-test('school onboarding requires complete school and first administrator contact details', () => {
-  for (const field of ['name', 'code', 'address', 'city', 'phone', 'whatsappPhone', 'email', 'adminName', 'adminEmail', 'adminPhone']) {
+test('school onboarding validates country, region, type and required contacts while keeping WhatsApp/admin email optional', () => {
+  for (const field of ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone']) {
     assert.match(api, new RegExp(`'${field}'`), `missing onboarding validation for ${field}`);
   }
-  assert.match(schools, /whatsappPhone: addWhatsappPhone/);
-  assert.match(schools, /address: addAddress/);
-  assert.match(api, /whatsappPhone: String\(whatsappPhone\)\.trim\(\)/);
+  assert.match(api, /schoolType.*primary.*secondary.*combined/);
+  assert.match(api, /adminEmail.*invalid email/);
+  assert.match(schools, /country: addCountry/);
+  assert.match(schools, /region: addRegion/);
+  assert.match(schools, /schoolType: addSchoolType/);
+  assert.match(schools, /logoDataUrl: addLogoDataUrl/);
+  assert.match(schools, /Admin Login ID/);
+  assert.match(schools, /Initial Password/);
+  assert.match(schools, /Email Address \(Optional\)/);
+  assert.match(api, /requestedAdminUsername \|\| await nextSchoolStaffId\(school\)/);
+  assert.match(api, /mustChangePassword: !adminPassword/);
+  assert.match(api, /school-logos/);
+  assert.match(api, /School logo must be smaller than 2 MB/);
+});
+
+test('school onboarding uses unique school UUIDs and compensates failed persistence with full tenant cleanup', () => {
+  assert.match(storage, /const id = `sch-\$\{randomUUID\(\)\}`/);
+  assert.match(storage, /this\.data\.examConfigs = this\.data\.examConfigs\.filter\(row => row\.schoolId !== id\)/);
+  assert.match(storage, /this\.data\.reportCardDesigns = this\.data\.reportCardDesigns\.filter\(row => row\.schoolId !== id\)/);
+  assert.match(api, /School onboarding persistence failed; attempting rollback/);
 });
 
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {
