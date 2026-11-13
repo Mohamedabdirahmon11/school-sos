@@ -33,6 +33,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number[]>([]);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -59,11 +60,19 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
   const saveStep = async (advance: boolean) => {
     setSaving(true); setError(null);
     try {
-      const section = step === 1 ? { schoolInformation: data.schoolInformation }
+      const section: Partial<SchoolSetupData> = step === 1 ? { schoolInformation: data.schoolInformation }
         : step === 2 ? { academicYear: data.academicYear }
         : step === 3 ? { terms: data.terms }
         : step === 4 ? { calendar: data.calendar }
         : { workingHours: data.workingHours };
+      // Convert logos saved by the older Base64 flow into Storage on the next Step 1 save.
+      if (step === 1 && typeof data.schoolInformation.logoUrl === 'string' && data.schoolInformation.logoUrl.startsWith('data:image/')) {
+        const legacyBlob = await fetch(data.schoolInformation.logoUrl).then(response => response.blob());
+        const legacyFile = new File([legacyBlob], 'school-logo', { type: legacyBlob.type });
+        const uploaded = await ApiClient.uploadSchoolLogo(legacyFile);
+        section.schoolInformation = { ...data.schoolInformation, logoUrl: uploaded.logoUrl };
+        setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: uploaded.logoUrl } }));
+      }
       const result = await ApiClient.saveSchoolSetupStep(step, section);
       setData(result.data); setSaved(result.data.completedSteps || []);
       if (result.completed) await onComplete();
@@ -95,7 +104,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
 
       {step === 1 && <div className="grid gap-4 sm:grid-cols-2">
         {field('School name', data.schoolInformation.name, v => patch('schoolInformation', { ...data.schoolInformation, name: v }))}
-        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School logo (PNG, JPEG or WebP · max 1.5 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 1_572_864 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setError('Choose a PNG, JPEG or WebP logo smaller than 1.5 MB.'); e.currentTarget.value = ''; return; } const reader = new FileReader(); reader.onload = () => patch('schoolInformation', { ...data.schoolInformation, logoUrl: String(reader.result || '') }); reader.onerror = () => setError('The school logo could not be read.'); reader.readAsDataURL(file); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />{data.schoolInformation.logoUrl && <span className="text-xs text-teal-700">Logo selected and ready to save.</span>}</label>
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School logo (PNG, JPEG or WebP · max 1.5 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={logoUploading} onChange={e => { const input = e.currentTarget; const file = input.files?.[0]; if (!file) return; if (file.size > 1_572_864 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setError('Choose a PNG, JPEG or WebP logo smaller than 1.5 MB.'); input.value = ''; return; } setLogoUploading(true); setError(null); void ApiClient.uploadSchoolLogo(file).then(result => setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: result.logoUrl } }))).catch(err => setError(err instanceof Error ? err.message : 'The school logo could not be uploaded.')).finally(() => { setLogoUploading(false); input.value = ''; }); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50" />{logoUploading && <span className="text-xs text-teal-700">Uploading logo securely to Supabase Storage…</span>}{!logoUploading && data.schoolInformation.logoUrl && <div className="flex items-center gap-3 text-xs text-teal-700"><img src={data.schoolInformation.logoUrl} alt="School logo preview" className="h-12 w-12 rounded-lg border border-slate-200 object-contain" />Logo uploaded and ready to save.</div>}</label>
         {field('School address', data.schoolInformation.address, v => patch('schoolInformation', { ...data.schoolInformation, address: v }))}
         {field('Phone number', data.schoolInformation.phone, v => patch('schoolInformation', { ...data.schoolInformation, phone: v }), 'tel')}
         {field('Email address', data.schoolInformation.email, v => patch('schoolInformation', { ...data.schoolInformation, email: v }), 'email')}
@@ -137,7 +146,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
         <button type="button" disabled={step === 1 || saving} onClick={() => setStep(step - 1)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40"><ArrowLeft size={16} /> Back</button>
-        <div className="flex flex-wrap gap-2"><button type="button" disabled={saving} onClick={() => void saveStep(false)} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={16} /> Save and exit later</button><button type="button" disabled={saving} onClick={() => void saveStep(true)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : step === 5 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}{step === 5 ? 'Complete setup' : 'Save and continue'}</button></div>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={saving || logoUploading} onClick={() => void saveStep(false)} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={16} /> Save and exit later</button><button type="button" disabled={saving || logoUploading} onClick={() => void saveStep(true)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : step === 5 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}{step === 5 ? 'Complete setup' : 'Save and continue'}</button></div>
       </footer>
     </section>
   </main>;
