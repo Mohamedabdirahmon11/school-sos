@@ -94,6 +94,17 @@ test('second shift must finish by the configured school closing time including i
   assert.equal(isShiftWithinSchoolClosingTime(settings, 6, '18:00'), true);
 });
 
+test('second-shift closing validation follows the timetable API six-period limit', () => {
+  const settings = {
+    shift2FirstPeriodStart: '13:00',
+    shift2PeriodMinutes: 40,
+    shift2BreakAfterPeriod: 3,
+    shift2BreakMinutes: 20
+  };
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '17:20'), true);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '17:19'), false);
+});
+
 test('second-shift closing validation includes periods but omits a break after the final period', () => {
   const settings = {
     shift2FirstPeriodStart: '14:00',
