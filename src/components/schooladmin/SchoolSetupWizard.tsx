@@ -1,211 +1,143 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight, CheckCircle2, Circle, Loader2, SkipForward } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolSetupProgressUpdate, SchoolSetupState } from '../../types/index.ts';
-import { TranslationDict } from '../../lib/translations.ts';
-import { SCHOOL_SETUP_EXTRA_MODULES, SCHOOL_SETUP_STEP_TARGETS } from '../../lib/school-setup-navigation.ts';
+import { SchoolSetupData } from '../../types/index.ts';
 
-interface Props {
-  onNavigate: (view: string) => void;
-  onComplete: () => Promise<void>;
-}
+interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
 
-interface StepDefinition {
-  id: number;
-  titleKey: keyof TranslationDict;
-  helpKey: keyof TranslationDict;
-  target?: string;
-  targetLabelKey?: keyof TranslationDict;
-  additionalTargets?: ReadonlyArray<{ view: string; labelKey: keyof TranslationDict }>;
-  optional: boolean;
-}
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DEFAULT_DATA: SchoolSetupData = {
+  schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' },
+  academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
+  terms: [{ name: 'Term 1', startDate: '', endDate: '' }, { name: 'Term 2', startDate: '', endDate: '' }],
+  calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' },
+  workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 },
+  completedSteps: []
+};
 
-const STEP_DEFINITIONS: StepDefinition[] = [
-  { id: 1, titleKey: 'setup_step_1_title', helpKey: 'setup_step_1_help', target: 'sch_setup_academics', optional: false },
-  { id: 2, titleKey: 'setup_step_2_title', helpKey: 'setup_step_2_help', target: 'sch_settings', optional: false },
-  { id: 3, titleKey: 'setup_step_3_title', helpKey: 'setup_step_3_help', target: 'sch_classes', optional: false },
-  { id: 4, titleKey: 'setup_step_4_title', helpKey: 'setup_step_4_help', target: 'sch_classes', optional: false },
-  { id: 5, titleKey: 'setup_step_5_title', helpKey: 'setup_step_5_help', target: 'sch_teachers', optional: false },
-  { id: 6, titleKey: 'setup_step_6_title', helpKey: 'setup_step_6_help', target: 'sch_students', additionalTargets: [{ view: 'sch_parents', labelKey: 'parents_contacts' }], optional: false },
-  { id: 7, titleKey: 'setup_step_7_title', helpKey: 'setup_step_7_help', target: 'sch_timetable', optional: true },
-  { id: 8, titleKey: 'setup_step_8_title', helpKey: 'setup_step_8_help', target: 'sch_setup_academics', targetLabelKey: 'school_settings', additionalTargets: [{ view: 'sch_attendance', labelKey: 'attendance' }, { view: 'sch_exams', labelKey: 'exams_results' }], optional: false },
-  { id: 9, titleKey: 'setup_step_9_title', helpKey: 'setup_step_9_help', target: SCHOOL_SETUP_STEP_TARGETS.fees, targetLabelKey: 'setup_open_fees', additionalTargets: SCHOOL_SETUP_EXTRA_MODULES, optional: true },
-  { id: 10, titleKey: 'setup_step_10_title', helpKey: 'setup_step_10_help', optional: false }
+const STEPS = [
+  { title: 'School Information', description: 'Confirm the official details and contact information for this school.' },
+  { title: 'Academic Year', description: 'Set the academic year and its official start and end dates.' },
+  { title: 'Terms / Semesters', description: 'Create one, two, or three terms for the academic year.' },
+  { title: 'Academic Calendar', description: 'Choose working days, holidays, and the calendar display used by your school.' },
+  { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
 
-export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
-  const { school, t } = useAuth();
-  const [state, setState] = useState<SchoolSetupState | null>(null);
+export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
+  const { school } = useAuth();
+  const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const steps = useMemo(() => STEP_DEFINITIONS.map(item => ({
-    ...item,
-    title: t(item.titleKey),
-    help: t(item.helpKey)
-  })), [t]);
+  const [saved, setSaved] = useState<number[]>([]);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    let active = true;
+    ApiClient.getSchoolSetupData().then(result => {
+      if (!active) return;
+      const incoming = result.data || {};
+      setData({
+        ...DEFAULT_DATA, ...incoming,
+        schoolInformation: { ...DEFAULT_DATA.schoolInformation, ...result.school, ...(incoming.schoolInformation || {}) },
+        academicYear: { ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}) },
+        terms: incoming.terms?.length ? incoming.terms : DEFAULT_DATA.terms,
+        calendar: { ...DEFAULT_DATA.calendar, ...(incoming.calendar || {}) },
+        workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}) },
+        completedSteps: incoming.completedSteps || []
+      });
+      setSaved(incoming.completedSteps || []);
+      setStep(Math.min(5, Math.max(1, result.progress?.currentStep || 1)));
+    }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load school setup.'))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [school?.id]);
+
+  const patch = <K extends keyof SchoolSetupData>(key: K, value: SchoolSetupData[K]) => setData(current => ({ ...current, [key]: value }));
+  const saveStep = async (advance: boolean) => {
+    setSaving(true); setError(null);
     try {
-      setState(await ApiClient.getSchoolSetupProgress());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('setup_needs_attention'));
-    } finally {
-      setLoading(false);
-    }
+      const section = step === 1 ? { schoolInformation: data.schoolInformation }
+        : step === 2 ? { academicYear: data.academicYear }
+        : step === 3 ? { terms: data.terms }
+        : step === 4 ? { calendar: data.calendar }
+        : { workingHours: data.workingHours };
+      const result = await ApiClient.saveSchoolSetupStep(step, section);
+      setData(result.data); setSaved(result.data.completedSteps || []);
+      if (result.completed) await onComplete();
+      else if (advance && step < 5) setStep(step + 1);
+    } catch (err) { setError(err instanceof Error ? err.message : 'This setup step could not be saved.'); }
+    finally { setSaving(false); }
   };
 
-  useEffect(() => { void load(); }, [school?.id]);
-
-  const persist = async (update: SchoolSetupProgressUpdate): Promise<SchoolSetupState | null> => {
-    if (!state) return null;
-    setSaving(true);
-    setError(null);
-    try {
-      const next = await ApiClient.updateSchoolSetupProgress(update);
-      setState(next);
-      return next;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('setup_needs_attention'));
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const openStep = async (id: number, target?: string) => {
-    if (!state || !target) return;
-    const skippedSteps = state.progress.skippedSteps.filter(step => step !== id);
-    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready));
-    const saved = await persist({ currentStep: id, completedSteps, skippedSteps });
-    if (saved) onNavigate(target);
-  };
-
-  const markComplete = async (id: number) => {
-    if (!state) return;
-    const validCompleted = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready));
-    const completedSteps = [...new Set([...validCompleted.filter(step => step !== id), id])].sort((a, b) => a - b);
-    const skippedSteps = state.progress.skippedSteps.filter(step => step !== id);
-    await persist({ currentStep: Math.min(10, id + 1), completedSteps, skippedSteps });
-  };
-
-  const skipStep = async (id: number) => {
-    if (!state) return;
-    const completedSteps = state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready) && step !== id);
-    const skippedSteps = [...new Set([...state.progress.skippedSteps.filter(step => step !== id), id])].sort((a, b) => a - b);
-    await persist({ currentStep: Math.min(10, id + 1), completedSteps, skippedSteps });
-  };
-
-  const finish = async () => {
-    if (!state) return;
-    const saved = await persist({
-      currentStep: 10,
-      completedSteps: state.progress.completedSteps.filter(step => step !== 10 && Boolean(state.checklist[step]?.ready)),
-      skippedSteps: state.progress.skippedSteps,
-      complete: true
-    });
-    if (saved?.progress.completedAt) await onComplete();
-  };
-
-  if (loading) {
-    return <div className="mx-auto max-w-5xl p-6 text-sm text-slate-500">{t('setup_loading')}</div>;
-  }
-  if (!state) {
-    return (
-      <div className="mx-auto max-w-3xl p-6">
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error || t('setup_needs_attention')}</div>
-        <button type="button" onClick={() => void load()} className="mt-4 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{t('setup_retry')}</button>
-      </div>
-    );
-  }
-
-  const completedCount = state.progress.completedSteps.filter(id => id !== 10 && Boolean(state.checklist[id]?.ready)).length + state.progress.skippedSteps.length;
-  const percent = Math.round((completedCount / 9) * 100);
-
-  return (
-    <section className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-      <header className="rounded-2xl bg-[#0B2B2A] p-6 text-white shadow-sm sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">SchoolOS</p>
-        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{t('setup_title')}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">{t('setup_subtitle')}</p>
-        <p className="mt-4 text-sm font-semibold">{school?.name || t('school_admin')}</p>
-        <div className="mt-5 flex items-center justify-between text-xs text-teal-100">
-          <span>{t('setup_progress')} · {t('setup_current_step')} {state.progress.currentStep}/10</span>
-          <span>{completedCount}/9</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
-          <div className="h-full rounded-full bg-teal-300 transition-all" style={{ width: percent + '%' }} />
-        </div>
-        <p className="mt-3 text-xs text-teal-100">{t('setup_saved')}</p>
-      </header>
-
-      {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
-
-      <div className="grid gap-3">
-        {steps.map(item => {
-          const isFinal = item.id === 10;
-          const isCompleted = state.progress.completedSteps.includes(item.id) && (isFinal ? Boolean(state.progress.completedAt) : Boolean(state.checklist[item.id]?.ready));
-          const isSkipped = state.progress.skippedSteps.includes(item.id);
-          const ready = isFinal ? state.canFinish : Boolean(state.checklist[item.id]?.ready);
-          const status = isCompleted ? t('setup_completed') : isSkipped ? t('setup_skipped') : ready ? t('setup_pending') : t('setup_needs_attention');
-          return (
-            <article key={item.id} aria-current={item.id === state.progress.currentStep ? 'step' : undefined} className={'rounded-xl border p-4 shadow-sm sm:p-5 ' + (item.id === state.progress.currentStep ? 'border-teal-300 bg-teal-50/40' : 'border-slate-200 bg-white')}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <div className="flex min-w-0 flex-1 gap-3">
-                  <div className="mt-0.5 shrink-0 text-teal-700">
-                    {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : isSkipped ? <SkipForward className="h-5 w-5" /> : <Circle className="h-5 w-5 text-slate-300" />}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold text-[#132A29]">{item.id}. {item.title}</h2>
-                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-semibold ' + (item.optional ? 'bg-slate-100 text-slate-600' : 'bg-teal-50 text-teal-700')}>
-                        {item.optional ? t('setup_optional') : t('setup_required')}
-                      </span>
-                      <span className="text-[11px] font-medium text-slate-500">{status}</span>
-                    </div>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">{item.help}</p>
-                    {!ready && !isFinal && (
-                      <p className="mt-2 text-xs text-amber-700">{state.checklist[item.id]?.reason || t('setup_needs_attention')}</p>
-                    )}
-                    {isFinal && <p className="mt-2 text-xs text-slate-500">{t('setup_finish_help')}</p>}
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                  {item.target && (
-                    <button type="button" disabled={saving} onClick={() => void openStep(item.id, item.target)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      {t(item.targetLabelKey || 'setup_open_step')} <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  {item.additionalTargets?.map(({ view, labelKey }) => (
-                    <button key={view} type="button" disabled={saving} onClick={() => void openStep(item.id, view)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      {t(labelKey)} <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  ))}
-                  {!isFinal && !isCompleted && !isSkipped && (
-                    <button type="button" disabled={saving || !ready} onClick={() => void markComplete(item.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40">
-                      {t('setup_mark_complete')}
-                    </button>
-                  )}
-                  {item.optional && !isSkipped && !isCompleted && (
-                    <button type="button" disabled={saving} onClick={() => void skipStep(item.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                      {t('setup_skip_for_now')}
-                    </button>
-                  )}
-                  {isFinal && (
-                    <button type="button" disabled={saving || !state.canFinish} onClick={() => void finish()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40">
-                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {t('setup_finish')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
+  const field = (label: string, value: string, onChange: (value: string) => void, type = 'text', placeholder = '') => (
+    <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100" /></label>
   );
+  const select = (label: string, value: string, options: Array<[string, string]>, onChange: (value: string) => void) => (
+    <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none focus:border-teal-600">{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+  );
+
+  if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
+
+  return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · SCHOOL ADMIN</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">School Setup Wizard</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Complete these five essential steps. Each step is saved immediately, so you can leave and continue later.</p></div><div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-right"><div className="text-2xl font-bold">{saved.length}/5</div><div className="text-xs text-teal-100">Steps saved</div></div></div>
+      <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-teal-300 transition-all" style={{ width: (saved.length / 5 * 100) + '%' }} /></div>
+      <div className="mt-5 grid grid-cols-5 gap-2">{STEPS.map((s, i) => <button key={s.title} type="button" onClick={() => { if (i + 1 <= step || saved.includes(i + 1)) setStep(i + 1); }} className={'rounded-xl px-2 py-2 text-left text-xs transition ' + (step === i + 1 ? 'bg-white text-teal-900' : saved.includes(i + 1) ? 'bg-teal-300/20 text-white' : 'bg-white/10 text-teal-100')}><span className="flex items-center gap-1.5 font-bold">{saved.includes(i + 1) ? <CheckCircle2 size={14} /> : <span>{i + 1}</span>}<span className="hidden sm:inline">STEP {i + 1}</span></span><span className="mt-1 hidden sm:block">{s.title}</span></button>)}</div>
+    </header>
+
+    {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertCircle size={18} className="mt-0.5 shrink-0" />{error}</div>}
+
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+      <div className="mb-6"><p className="text-xs font-bold uppercase tracking-widest text-teal-700">STEP {step} OF 5</p><h2 className="mt-1 text-xl font-bold text-slate-900">{STEPS[step - 1].title}</h2><p className="mt-1 text-sm text-slate-500">{STEPS[step - 1].description}</p></div>
+
+      {step === 1 && <div className="grid gap-4 sm:grid-cols-2">
+        {field('School name', data.schoolInformation.name, v => patch('schoolInformation', { ...data.schoolInformation, name: v }))}
+        {field('Logo URL (optional)', data.schoolInformation.logoUrl, v => patch('schoolInformation', { ...data.schoolInformation, logoUrl: v }), 'url', 'https://…')}
+        {field('School address', data.schoolInformation.address, v => patch('schoolInformation', { ...data.schoolInformation, address: v }))}
+        {field('Phone number', data.schoolInformation.phone, v => patch('schoolInformation', { ...data.schoolInformation, phone: v }), 'tel')}
+        {field('Email address', data.schoolInformation.email, v => patch('schoolInformation', { ...data.schoolInformation, email: v }), 'email')}
+        {select('School type', data.schoolInformation.schoolType, [['primary', 'Primary'], ['secondary', 'Secondary'], ['combined', 'Combined']], v => patch('schoolInformation', { ...data.schoolInformation, schoolType: v as any }))}
+      </div>}
+
+      {step === 2 && <div className="grid gap-4 sm:grid-cols-2">
+        {field('Academic year (e.g. 2026/2027)', data.academicYear.name, v => patch('academicYear', { ...data.academicYear, name: v }), 'text', '2026/2027')}
+        {field('Start date', data.academicYear.startDate, v => patch('academicYear', { ...data.academicYear, startDate: v }), 'date')}
+        {field('End date', data.academicYear.endDate, v => patch('academicYear', { ...data.academicYear, endDate: v }), 'date')}
+        <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-medium text-slate-700"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={e => patch('academicYear', { ...data.academicYear, isCurrent: e.target.checked })} className="h-4 w-4 accent-teal-700" /> Set as the current academic year</label>
+      </div>}
+
+      {step === 3 && <div className="space-y-4">
+        {data.terms.map((term, index) => <div key={index} className="grid gap-3 rounded-2xl border border-slate-200 p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+          {field('Term name', term.name, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, name: v } : t)))}
+          {field('Start date', term.startDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, startDate: v } : t)), 'date')}
+          {field('End date', term.endDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, endDate: v } : t)), 'date')}
+          <button type="button" disabled={data.terms.length <= 1} onClick={() => patch('terms', data.terms.filter((_, i) => i !== index))} className="rounded-lg border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 disabled:opacity-30">Remove</button>
+        </div>)}
+        <button type="button" disabled={data.terms.length >= 3} onClick={() => patch('terms', [...data.terms, { name: 'Term ' + (data.terms.length + 1), startDate: '', endDate: '' }])} className="rounded-xl border border-dashed border-teal-400 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-40">+ Add term (maximum 3)</button>
+      </div>}
+
+      {step === 4 && <div className="space-y-6">
+        <div><h3 className="mb-3 text-sm font-bold text-slate-800">Working days</h3><div className="flex flex-wrap gap-2">{DAYS.map(day => <label key={day} className={'cursor-pointer rounded-full border px-4 py-2 text-sm ' + (data.calendar.workingDays.includes(day) ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600')}><input className="sr-only" type="checkbox" checked={data.calendar.workingDays.includes(day)} onChange={e => { const workingDays = e.target.checked ? [...data.calendar.workingDays, day] : data.calendar.workingDays.filter(d => d !== day); patch('calendar', { ...data.calendar, workingDays, weeklyHolidays: DAYS.filter(d => !workingDays.includes(d)) }); }} />{day}</label>)}</div><p className="mt-2 text-xs text-slate-500">Weekly holidays are automatically set to the days not selected as working days.</p></div>
+        {select('Calendar display', data.calendar.calendarType, [['both', 'Ethiopian + Gregorian'], ['ethiopian', 'Ethiopian calendar'], ['gregorian', 'Gregorian calendar']], v => patch('calendar', { ...data.calendar, calendarType: v as any }))}
+        <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><h3 className="text-sm font-bold text-slate-800">National holidays</h3>{data.calendar.nationalHolidays.map((h, i) => <div key={i} className="flex gap-2"><input aria-label="Holiday name" value={h.name} onChange={e => patch('calendar', { ...data.calendar, nationalHolidays: data.calendar.nationalHolidays.map((x, n) => n === i ? { ...x, name: e.target.value } : x) })} placeholder="Holiday name" className="min-w-0 flex-1 rounded-lg border border-slate-200 p-2 text-sm" /><input aria-label="Holiday date" type="date" value={h.date} onChange={e => patch('calendar', { ...data.calendar, nationalHolidays: data.calendar.nationalHolidays.map((x, n) => n === i ? { ...x, date: e.target.value } : x) })} className="w-36 rounded-lg border border-slate-200 p-2 text-sm" /><button type="button" onClick={() => patch('calendar', { ...data.calendar, nationalHolidays: data.calendar.nationalHolidays.filter((_, n) => n !== i) })} className="px-2 text-rose-600">×</button></div>)}<button type="button" onClick={() => patch('calendar', { ...data.calendar, nationalHolidays: [...data.calendar.nationalHolidays, { name: '', date: '', calendar: 'ethiopian' }] })} className="text-sm font-semibold text-teal-700">+ Add national holiday</button></div>
+        <div className="space-y-2"><h3 className="text-sm font-bold text-slate-800">School holidays</h3>{data.calendar.schoolHolidays.map((h, i) => <div key={i} className="space-y-2 rounded-xl border border-slate-200 p-3"><input aria-label="School holiday name" value={h.name} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, name: e.target.value } : x) })} placeholder="Holiday name" className="w-full rounded-lg border border-slate-200 p-2 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label="Holiday start date" type="date" value={h.startDate} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, startDate: e.target.value } : x) })} className="min-w-0 rounded-lg border border-slate-200 p-2 text-sm" /><input aria-label="Holiday end date" type="date" value={h.endDate} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, endDate: e.target.value } : x) })} className="min-w-0 rounded-lg border border-slate-200 p-2 text-sm" /></div><button type="button" onClick={() => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.filter((_, n) => n !== i) })} className="text-xs font-semibold text-rose-600">Remove holiday</button></div>)}<button type="button" onClick={() => patch('calendar', { ...data.calendar, schoolHolidays: [...data.calendar.schoolHolidays, { name: '', startDate: '', endDate: '' }] })} className="text-sm font-semibold text-teal-700">+ Add school holiday</button></div></div>
+      </div>}
+
+      {step === 5 && <div className="grid gap-4 sm:grid-cols-2">
+        {field('School opening time', data.workingHours.openingTime, v => patch('workingHours', { ...data.workingHours, openingTime: v }), 'time')}
+        {field('Class start time', data.workingHours.classStartTime, v => patch('workingHours', { ...data.workingHours, classStartTime: v }), 'time')}
+        {field('School closing time', data.workingHours.closingTime, v => patch('workingHours', { ...data.workingHours, closingTime: v }), 'time')}
+        {field('Break start time', data.workingHours.breakStartTime, v => patch('workingHours', { ...data.workingHours, breakStartTime: v }), 'time')}
+        {field('Break end time', data.workingHours.breakEndTime, v => patch('workingHours', { ...data.workingHours, breakEndTime: v }), 'time')}
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per day</span><input type="number" min="1" max="16" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Number(e.target.value) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+      </div>}
+
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+        <button type="button" disabled={step === 1 || saving} onClick={() => setStep(step - 1)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40"><ArrowLeft size={16} /> Back</button>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={saving} onClick={() => void saveStep(false)} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={16} /> Save and exit later</button><button type="button" disabled={saving} onClick={() => void saveStep(true)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : step === 5 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}{step === 5 ? 'Complete setup' : 'Save and continue'}</button></div>
+      </footer>
+    </section>
+  </main>;
 };
