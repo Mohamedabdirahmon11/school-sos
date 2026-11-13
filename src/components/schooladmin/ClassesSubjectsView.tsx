@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
+import { GradingBand, SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { Layers, BookOpen, Plus, X, CheckCircle2, Upload, Search, Archive, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { ClassBulkImportWizard } from './ClassBulkImportWizard.tsx';
 import { useApi } from '../../hooks/useApi.ts';
@@ -14,7 +14,7 @@ import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 
 export const ClassesSubjectsView: React.FC = () => {
-  const { school, isReadOnly, t } = useAuth();
+  const { school, isReadOnly, t, refreshUser } = useAuth();
   const classLoad = useApi(() => Promise.all([
     ApiClient.getClasses(), ApiClient.getSubjects(school?.id), ApiClient.getBranches(), ApiClient.getTeachers()
   ]), [school?.id], Boolean(school));
@@ -57,6 +57,15 @@ export const ClassesSubjectsView: React.FC = () => {
   const [subjectCode, setSubjectCode] = useState('');
   const [subjectDescription, setSubjectDescription] = useState('');
   const [subjectAssignments, setSubjectAssignments] = useState<Array<{ classId: string; teacherId?: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean }>>([]);
+  const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : [
+    { minPercentage: 90, label: 'A', remark: 'Excellent' },
+    { minPercentage: 80, label: 'B', remark: 'Very good' },
+    { minPercentage: 70, label: 'C', remark: 'Good' },
+    { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
+    { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
+  ]);
+  const [gradingSaving, setGradingSaving] = useState(false);
+  const [gradingError, setGradingError] = useState('');
 
   const visibleClasses = classes
     .filter(klass => {
@@ -93,6 +102,16 @@ export const ClassesSubjectsView: React.FC = () => {
     .filter(subject => !subjectSearch.trim() || [subject.name, subject.code]
       .some(value => String(value || '').toLowerCase().includes(subjectSearch.trim().toLowerCase())))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  useEffect(() => {
+    setGradingScale(school?.gradingScale?.length ? school.gradingScale : [
+      { minPercentage: 90, label: 'A', remark: 'Excellent' },
+      { minPercentage: 80, label: 'B', remark: 'Very good' },
+      { minPercentage: 70, label: 'C', remark: 'Good' },
+      { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
+      { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
+    ]);
+  }, [school?.id, school?.gradingScale]);
 
   const fetchData = classLoad.retry;
   useEffect(() => {
@@ -161,6 +180,35 @@ export const ClassesSubjectsView: React.FC = () => {
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleSaveGradingScale = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isReadOnly) return;
+    setGradingError('');
+    const bands = [...gradingScale].sort((a, b) => b.minPercentage - a.minPercentage);
+    if (!bands.length || bands.length > 20) { setGradingError('Add between 1 and 20 grade bands.'); return; }
+    if (bands.some(band => !band.label.trim() || !Number.isFinite(band.minPercentage) || band.minPercentage < 0 || band.minPercentage > 100)) {
+      setGradingError('Every grade needs a label and a minimum percentage between 0 and 100.'); return;
+    }
+    if (bands[bands.length - 1].minPercentage !== 0) { setGradingError('The lowest grade band must start at 0%.'); return; }
+    if (bands.some((band, index) => index > 0 && band.minPercentage >= bands[index - 1].minPercentage)) {
+      setGradingError('Grade minimum percentages must descend without duplicate thresholds.'); return;
+    }
+    const labels = bands.map(band => band.label.trim().toLowerCase());
+    if (new Set(labels).size !== labels.length) { setGradingError('Grade labels must be unique.'); return; }
+    setGradingSaving(true);
+    try {
+      await ApiClient.request('/school/settings', { method: 'PUT', body: JSON.stringify({ gradingScale: bands.map(band => ({ ...band, label: band.label.trim(), remark: band.remark?.trim() || '' })) }) });
+      await refreshUser();
+      setGradingScale(bands);
+      setNotice('School grading system saved and applied to exam results.');
+      setTimeout(() => setNotice(null), 3500);
+    } catch (error) {
+      setGradingError(error instanceof Error ? error.message : 'Unable to save the grading system.');
+    } finally {
+      setGradingSaving(false);
     }
   };
 
@@ -328,6 +376,40 @@ export const ClassesSubjectsView: React.FC = () => {
           </p>
         </section>
       </div>
+
+      <section className="mt-6 rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm space-y-4">
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29]"><Layers className="h-5 w-5 text-[#0F766E]" /> Grading System</h2>
+            <p className="mt-1 text-xs text-slate-500">Set the school's letter grades and minimum percentages. These grades appear on Exam Results and class rankings.</p>
+          </div>
+          <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700">{gradingScale.length} grade bands</span>
+        </header>
+        {gradingError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{gradingError}</p>}
+        <form onSubmit={handleSaveGradingScale} className="space-y-3">
+          <div className="grid grid-cols-[minmax(70px,0.6fr)_minmax(100px,1fr)_minmax(130px,2fr)_auto] gap-2 text-[11px] font-semibold uppercase text-slate-500">
+            <span>Grade</span><span>Minimum %</span><span>Remark</span><span> </span>
+          </div>
+          {gradingScale.map((band, index) => (
+            <div key={index} className="grid grid-cols-[minmax(70px,0.6fr)_minmax(100px,1fr)_minmax(130px,2fr)_auto] items-center gap-2">
+              <input aria-label={`Grade label ${index + 1}`} value={band.label} maxLength={20} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold" />
+              <input aria-label={`Minimum percentage for ${band.label}`} type="number" min={0} max={100} step="0.01" value={band.minPercentage} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, minPercentage: Number(event.target.value) } : item))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+              <input aria-label={`Remark for ${band.label}`} value={band.remark || ''} maxLength={120} onChange={event => setGradingScale(rows => rows.map((item, i) => i === index ? { ...item, remark: event.target.value } : item))} placeholder="Optional description" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <button type="button" aria-label={`Remove grade ${band.label}`} disabled={isReadOnly || gradingScale.length <= 1} onClick={() => setGradingScale(rows => rows.filter((_item, i) => i !== index))} className="rounded-lg border border-slate-200 px-3 py-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"><X className="h-4 w-4" /></button>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            <button type="button" disabled={isReadOnly || gradingScale.length >= 20} onClick={() => {
+              const used = new Set(gradingScale.map(band => band.minPercentage));
+              let minimum = 85;
+              while (used.has(minimum) && minimum > 1) minimum -= 1;
+              if (used.has(minimum)) minimum = 1;
+              setGradingScale(rows => [...rows, { minPercentage: minimum, label: `Grade ${rows.length + 1}`, remark: '' }].sort((a, b) => b.minPercentage - a.minPercentage));
+            }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-40"><Plus className="mr-1 inline h-3.5 w-3.5" /> Add grade band</button>
+            <button type="submit" disabled={isReadOnly || gradingSaving} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">{gradingSaving ? 'Saving…' : 'Save Grading System'}</button>
+          </div>
+        </form>
+      </section>
 
       {selectedClassId && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4" role="dialog" aria-modal="true" aria-label="Class details">
