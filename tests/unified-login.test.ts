@@ -15,6 +15,7 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
   assert.ok(route.includes('verifyPin(submittedPin'));
   assert.ok(route.includes("!user.pin && verifyPassword(submittedPin, user.passwordHash)"));
   assert.ok(route.includes("db.updateUser(user.id, { pin: hashPin(submittedPin) })"));
+  assert.ok(route.includes('await db.flush()'));
   assert.ok(storage.includes('const school = await this.getSchoolById(normalizedStaffId)'));
   assert.ok(storage.includes('schoolAdmins.length === 1'));
   assert.ok(api.includes('pin: hashPin(temporaryPin)'));
