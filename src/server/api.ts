@@ -6863,16 +6863,16 @@ const SCHOOL_SETUP_DEFAULTS = {
 
 function validateSchoolSetupStep(step: number, data: any): string | null {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Setup data must be an object.';
-  const date = (v: unknown) => { if (typeof v !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(v)) return false; const parsed = new Date(v + 'T00:00:00.000Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === v; };
+  const date = (v: unknown) => { if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false; const parsed = new Date(v + 'T00:00:00.000Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === v; };
   if (step === 1) {
     const s = data.schoolInformation;
-    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.phone || '').trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(s.email || ''))) return 'School name, address, phone and a valid email are required.';
+    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.phone || '').trim() || !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(String(s.email || ''))) return 'School name, address, phone and a valid email are required.';
     if (!['primary', 'secondary', 'combined'].includes(s.schoolType)) return 'Choose a valid school type.';
     if (s.logoUrl && String(s.logoUrl).length > 2_000_000) return 'School logo is too large.';
   }
   if (step === 2) {
     const y = data.academicYear;
-    if (!y || !/^\\d{4}\\/\\d{4}$/.test(String(y.name || '')) || !date(y.startDate) || !date(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
+    if (!y || !/^\d{4}\\/\d{4}$/.test(String(y.name || '')) || !date(y.startDate) || !date(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
   }
   if (step === 3) {
     const terms = data.terms;
@@ -6889,7 +6889,7 @@ function validateSchoolSetupStep(step: number, data: any): string | null {
   }
   if (step === 5) {
     const w = data.workingHours;
-    if (!w || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(w.openingTime)) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(w.classStartTime)) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(w.closingTime)) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(w.breakStartTime)) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(w.breakEndTime)) || !Number.isInteger(w.periodsPerDay) || w.periodsPerDay < 1 || w.periodsPerDay > 16) return 'Enter valid school times and 1–16 daily periods.';
+    if (!w || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(w.openingTime)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(w.classStartTime)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(w.closingTime)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(w.breakStartTime)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(w.breakEndTime)) || !Number.isInteger(w.periodsPerDay) || w.periodsPerDay < 1 || w.periodsPerDay > 16) return 'Enter valid school times and 1–16 daily periods.';
     if (!(w.openingTime <= w.classStartTime && w.classStartTime < w.closingTime && w.breakStartTime < w.breakEndTime && w.breakStartTime >= w.classStartTime && w.breakEndTime < w.closingTime)) return 'School hours and break times are not in the correct order.';
   }
   return null;
