@@ -392,7 +392,7 @@ export class ApiClient {
     return this.updateSchoolSubscription(schoolId, { studentAccessEnabled: enabled });
   }
 
-  public static async resetUserPassword(userId: string, temporaryPin?: string): Promise<{ success: boolean; temporaryPassword: string; mustChangePassword: boolean }> {
+  public static async resetUserPassword(userId: string, temporaryPin?: string): Promise<{ success: boolean; temporaryPassword: string; temporaryPin?: string; mustChangePassword: boolean }> {
     return this.request(`/users/${encodeURIComponent(userId)}/reset-password`, {
       method: 'POST',
       body: temporaryPin ? JSON.stringify({ temporaryPin }) : undefined
