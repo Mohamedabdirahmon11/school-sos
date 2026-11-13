@@ -234,6 +234,9 @@ export const TimetableView: React.FC = () => {
     setRoomNumber(klass.roomNumber || '');
     setDayOfWeek(days[0] || 'Monday');
     setPeriodNumber(1);
+    const defaultTimes = periodTime(1, Number(klass.shift) === 2 ? 2 : 1).split(' - ');
+    setStartTime(defaultTimes[0] || '08:00');
+    setEndTime(defaultTimes[1] || '08:45');
     setClashWarning(null);
     try {
       const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
@@ -428,7 +431,7 @@ export const TimetableView: React.FC = () => {
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
-                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
                                 {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
@@ -484,7 +487,7 @@ export const TimetableView: React.FC = () => {
                   <label className="block font-medium text-[#334155]">Period</label>
                   <select
                     value={periodNumber}
-                    onChange={e => setPeriodNumber(parseInt(e.target.value, 10))}
+                    onChange={e => { const nextPeriod = parseInt(e.target.value, 10); setPeriodNumber(nextPeriod); const shift = Number(classes.find(item => item.id === selectedClassId)?.shift) === 2 ? 2 : 1; const times = periodTime(nextPeriod, shift).split(' - '); setStartTime(times[0] || startTime); setEndTime(times[1] || endTime); }}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   >
                     {periodsForDay(dayOfWeek).map(p => <option key={p} value={p}>Period {p}</option>)}
