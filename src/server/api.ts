@@ -1173,7 +1173,13 @@ apiRouter.post('/auth/login', async (req, res) => {
       // Upgrade existing School Admin accounts in place so their PIN continues
       // working even after the first-login password-change flow updates passwordHash.
       db.updateUser(user.id, { pin: hashPin(submittedPin) });
-      isPasswordValid = true;
+      try {
+        await db.flush();
+        isPasswordValid = true;
+      } catch {
+        res.status(503).json({ error: 'Your PIN was verified, but its secure sign-in record could not be saved. Please retry.' });
+        return;
+      }
     } else {
       isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''));
     }
