@@ -6863,7 +6863,7 @@ const SCHOOL_SETUP_DEFAULTS = {
 
 function validateSchoolSetupStep(step: number, data: any): string | null {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Setup data must be an object.';
-  const date = (v: unknown) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+  const date = (v: unknown) => { if (typeof v !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(v)) return false; const parsed = new Date(v + 'T00:00:00.000Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === v; };
   if (step === 1) {
     const s = data.schoolInformation;
     if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.phone || '').trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(s.email || ''))) return 'School name, address, phone and a valid email are required.';
@@ -6897,7 +6897,7 @@ function validateSchoolSetupStep(step: number, data: any): string | null {
 
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  const current = school.setupData || SCHOOL_SETUP_DEFAULTS;
+  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
   res.json({ data: current, school: { name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: school.setupProgress || { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } });
 });
 
@@ -6907,7 +6907,7 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (!Number.isInteger(step) || step < 1 || step > 5) { res.status(400).json({ error: 'Setup step must be between 1 and 5.' }); return; }
   const validationError = validateSchoolSetupStep(step, req.body?.data);
   if (validationError) { res.status(400).json({ error: validationError }); return; }
-  const existing = school.setupData || SCHOOL_SETUP_DEFAULTS;
+  const existing = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}) } as any;
   const submitted = req.body.data;
   const nextData: any = { ...existing, ...submitted, completedSteps: [...new Set([...(existing.completedSteps || []), step])].sort((a: number, b: number) => a - b), updatedAt: new Date().toISOString() };
   const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
