@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { School, PlanTier, SubscriptionCadence, SubscriptionStatus, PlanConfig } from '../../types/index.ts';
+import { School, PlanTier, SubscriptionCadence, SubscriptionStatus, PlanConfig, SchoolCurrency, SchoolLanguage } from '../../types/index.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { PasswordInput } from '../common/PasswordInput.tsx';
 import { 
@@ -40,6 +40,13 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
+  const [showEditSchoolModal, setShowEditSchoolModal] = useState(false);
+  const [isSavingSchoolDetails, setIsSavingSchoolDetails] = useState(false);
+  const [editSchoolError, setEditSchoolError] = useState<string | null>(null);
+  const [editSchoolForm, setEditSchoolForm] = useState({
+    name: '', email: '', address: '', city: '', phone: '', whatsappPhone: '',
+    brandColor: '#0F766E', currency: 'ETB' as SchoolCurrency, language: 'en' as SchoolLanguage
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -162,6 +169,43 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setModalError(err.message || 'Failed to onboard school');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openEditSchool = () => {
+    if (!selectedSchool?.school) return;
+    const school = selectedSchool.school;
+    setEditSchoolForm({
+      name: school.name || '',
+      email: school.email || '',
+      address: school.address || '',
+      city: school.city || '',
+      phone: school.phone || '',
+      whatsappPhone: school.whatsappPhone || '',
+      brandColor: school.brandColor || '#0F766E',
+      currency: school.currency || 'ETB',
+      language: school.language || 'en'
+    });
+    setEditSchoolError(null);
+    setShowEditSchoolModal(true);
+  };
+
+  const handleSaveSchoolDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSchool || isSavingSchoolDetails) return;
+    setIsSavingSchoolDetails(true);
+    setEditSchoolError(null);
+    try {
+      const schoolId = selectedSchool.school.id;
+      await ApiClient.updateSchoolDetails(schoolId, editSchoolForm);
+      setShowEditSchoolModal(false);
+      setActionNotice('School details saved successfully.');
+      await fetchSchools();
+      await loadSchoolDetail(schoolId);
+    } catch (error: any) {
+      setEditSchoolError(error.message || 'Unable to save school details.');
+    } finally {
+      setIsSavingSchoolDetails(false);
     }
   };
 
@@ -416,6 +460,14 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={openEditSchool}
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC]"
+            >
+              Edit School Details
+            </button>
 
             {/* Subscription & Cadence Card */}
             <div className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-2 text-xs">
@@ -718,6 +770,72 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       )}
 
       {/* SUBSCRIPTION MODIFIER DIALOG */}
+      {showEditSchoolModal && selectedSchool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+              <div>
+                <h2 className="text-base font-bold text-[#132A29]">Edit School Details</h2>
+                <p className="mt-1 text-[11px] text-[#64748B]">School code cannot be changed after registration.</p>
+              </div>
+              <button type="button" onClick={() => setShowEditSchoolModal(false)} className="text-[#64748B] hover:text-[#132A29]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {editSchoolError && <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{editSchoolError}</div>}
+            <form onSubmit={handleSaveSchoolDetails} className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">School name</span>
+                <input required minLength={2} maxLength={120} value={editSchoolForm.name} onChange={e => setEditSchoolForm({ ...editSchoolForm, name: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">School email</span>
+                <input required type="email" maxLength={254} value={editSchoolForm.email} onChange={e => setEditSchoolForm({ ...editSchoolForm, email: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Address</span>
+                <input required minLength={2} maxLength={240} value={editSchoolForm.address} onChange={e => setEditSchoolForm({ ...editSchoolForm, address: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">City</span>
+                <input required minLength={2} maxLength={100} value={editSchoolForm.city} onChange={e => setEditSchoolForm({ ...editSchoolForm, city: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Phone</span>
+                <input required minLength={7} maxLength={30} value={editSchoolForm.phone} onChange={e => setEditSchoolForm({ ...editSchoolForm, phone: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">WhatsApp phone</span>
+                <input required minLength={7} maxLength={30} value={editSchoolForm.whatsappPhone} onChange={e => setEditSchoolForm({ ...editSchoolForm, whatsappPhone: e.target.value })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Currency</span>
+                <select value={editSchoolForm.currency} onChange={e => setEditSchoolForm({ ...editSchoolForm, currency: e.target.value as SchoolCurrency })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  <option value="ETB">ETB</option><option value="USD">USD</option><option value="SOS">SOS</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block font-medium text-[#334155]">Language</span>
+                <select value={editSchoolForm.language} onChange={e => setEditSchoolForm({ ...editSchoolForm, language: e.target.value as SchoolLanguage })} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2">
+                  <option value="en">English</option><option value="so">Somali</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-3 sm:col-span-2">
+                <span className="font-medium text-[#334155]">Brand color</span>
+                <input type="color" value={editSchoolForm.brandColor} onChange={e => setEditSchoolForm({ ...editSchoolForm, brandColor: e.target.value })} className="h-9 w-14 rounded border border-[#CBD5E1] bg-white p-1" />
+                <span className="font-mono text-[#64748B]">{editSchoolForm.brandColor}</span>
+              </label>
+              <div className="flex justify-end gap-2 border-t border-[#E2E8F0] pt-4 sm:col-span-2">
+                <button type="button" onClick={() => setShowEditSchoolModal(false)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-[#334155]">Cancel</button>
+                <button type="submit" disabled={isSavingSchoolDetails} className="rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                  {isSavingSchoolDetails ? 'Saving…' : 'Save School Details'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showSubModal && selectedSchool && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
