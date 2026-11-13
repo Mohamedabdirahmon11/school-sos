@@ -1756,6 +1756,66 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   res.status(201).json({ school, admin: sanitizeUser(adminUser), temporaryPassword, mustChangePassword: true });
 });
 
+const updateSchoolDetailsSchema = z.object({
+  name: z.string().trim().min(2, 'School name must contain at least two characters.').max(120),
+  email: z.string().trim().toLowerCase().email('Enter a valid school email.').max(254),
+  address: z.string().trim().min(2, 'School address is required.').max(240),
+  city: z.string().trim().min(2, 'School city is required.').max(100),
+  phone: z.string().trim().min(7, 'Enter a valid school phone number.').max(30),
+  whatsappPhone: z.string().trim().min(7, 'Enter a valid WhatsApp number.').max(30),
+  brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Choose a valid brand color.'),
+  currency: z.enum(['ETB', 'USD', 'SOS']),
+  language: z.enum(['en', 'so'])
+});
+
+apiRouter.patch('/superadmin/schools/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const parsed = updateSchoolDetailsSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid school details.' });
+    return;
+  }
+  const school = await db.getSchoolById(req.params.id);
+  if (!school) {
+    res.status(404).json({ error: 'School not found.' });
+    return;
+  }
+  const updates = parsed.data;
+  const duplicateEmail = (await db.getSchools()).some(existing =>
+    existing.id !== school.id && String(existing.email || '').trim().toLowerCase() === updates.email
+  );
+  if (duplicateEmail) {
+    res.status(409).json({ error: 'Another school already uses this email address.' });
+    return;
+  }
+
+  const updated = db.updateSchool(school.id, updates);
+  if (!updated) {
+    res.status(404).json({ error: 'School not found.' });
+    return;
+  }
+  const actor = (req as any).user as User;
+  db.logAudit({
+    action: 'SCHOOL_DETAILS_UPDATED',
+    category: 'school',
+    schoolId: school.id,
+    schoolName: updated.name,
+    userId: actor.id,
+    userName: actor.fullName,
+    userRole: 'super_admin',
+    details: `Updated platform-managed contact and display details for ${updated.name}.`,
+    severity: 'info'
+  });
+  try {
+    await db.flush();
+  } catch (error) {
+    console.error('[superadmin] School detail persistence failed:', error);
+    res.status(503).json({ error: 'School details could not be confirmed as saved. Refresh the school directory before retrying.' });
+    return;
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(updated);
+});
+
 apiRouter.patch('/superadmin/schools/:id/subscription', requireAuth, requireSuperAdmin, async (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const { status, plan, cadence, validUntil, studentAccessEnabled, monthsToAdd, graceDays } = body;
