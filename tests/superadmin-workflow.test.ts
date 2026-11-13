@@ -166,7 +166,7 @@ test('bulk academic year update is previewed, protected, and requires explicit t
   assert.match(settingsSource, /<BulkAcademicYearPanel \/>/);
   assert.match(panelSource, /Type CONFIRM/);
   assert.match(panelSource, /Preview schools/);
-  assert.match(panelSource, /Include schools whose current academic year is later than the target year/);
+  assert.match(panelSource, /Include all warning rows/);
 });
 
 test('bulk academic year preview flags malformed existing years for explicit review', () => {
