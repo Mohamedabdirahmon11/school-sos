@@ -66,7 +66,7 @@ export const BulkAcademicYearPanel: React.FC = () => {
       <div>
         <h2 className="text-sm font-bold text-[#132A29]">Apply academic year to schools</h2>
         <p className="mt-1 text-[11px] leading-relaxed text-[#64748B]">
-          The platform academic year above is the default for new schools. Existing schools keep their own year until you preview and confirm a bulk update here. Schools moving backwards are skipped unless you explicitly include them.
+          The platform academic year above is the default for new schools. Existing schools keep their own year until you preview and confirm a bulk update here. Schools with backward years or draft/published exams tied to another year are warned and skipped unless you explicitly include them.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export const BulkAcademicYearPanel: React.FC = () => {
           {rows.some(row => row.status === 'warning') && (
             <label className="flex items-start gap-2 text-[11px] text-amber-800">
               <input type="checkbox" checked={includeWarned} onChange={event => { setIncludeWarned(event.target.checked); setConfirm(''); }} className="mt-0.5" />
-              <span>Include schools whose current academic year is later than the target year. Review these rows carefully before applying.</span>
+              <span>Include all warning rows, including backward/malformed academic years and draft/published exam schedules tied to another year. Review these rows carefully before applying.</span>
             </label>
           )}
 

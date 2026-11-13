@@ -1639,28 +1639,45 @@ const bulkAcademicYearSchema = z.object({
 });
 
 async function buildBulkAcademicYearPreview(targetYear: string) {
-  const schools = await db.getSchools();
+  const [schools, examSchedules] = await Promise.all([
+    db.getSchools(),
+    queryAllRows('exam_schedules', {}, 'school_id,academic_year,status')
+  ]);
   const targetStart = Number(targetYear.slice(0, 4));
+  const examWarningsBySchool = new Map<string, number>();
+  for (const schedule of examSchedules) {
+    const status = String(schedule.status || '').toLowerCase();
+    const scheduleYear = String(schedule.academicYear || '');
+    if (['draft', 'published'].includes(status) && scheduleYear !== targetYear) {
+      const schoolId = String(schedule.schoolId || '');
+      if (schoolId) examWarningsBySchool.set(schoolId, (examWarningsBySchool.get(schoolId) || 0) + 1);
+    }
+  }
+
   return schools.map(school => {
     const current = String(school.academicYear || '');
     const currentStart = /^\d{4}-\d{4}$/.test(current) ? Number(current.slice(0, 4)) : null;
-    let status: 'change' | 'unchanged' | 'warning' = 'change';
-    let warning = '';
-    if (current === targetYear) status = 'unchanged';
-    else if (current && currentStart === null) {
-      status = 'warning';
-      warning = 'Current academic year is not in YYYY-YYYY format; review before replacing it.';
+    const warnings: string[] = [];
+    if (current && currentStart === null) {
+      warnings.push('Current academic year is not in YYYY-YYYY format; review before replacing it.');
     } else if (currentStart !== null && targetStart < currentStart) {
-      status = 'warning';
-      warning = 'Target year is earlier than the current year of this school.';
+      warnings.push('Target year is earlier than the current year of this school.');
     }
+    const mismatchedSchedules = examWarningsBySchool.get(school.id) || 0;
+    if (mismatchedSchedules > 0) {
+      warnings.push(`${mismatchedSchedules} draft/published exam schedule(s) use a different academic year.`);
+    }
+
+    const status: 'change' | 'unchanged' | 'warning' = warnings.length
+      ? 'warning'
+      : current === targetYear ? 'unchanged' : 'change';
     return {
       id: school.id,
       name: school.name,
       code: school.code || '',
       currentAcademicYear: current || null,
       status,
-      warning
+      warning: warnings.join(' ')
     };
   });
 }
