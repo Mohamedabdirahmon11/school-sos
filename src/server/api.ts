@@ -750,7 +750,7 @@ async function refreshSessionCookie(res: Response, user: User, previous: ReturnT
 // its existing SchoolOS password. Never overwrite or guess an existing Auth
 // identity; duplicate emails require an explicit account reconciliation.
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
-  if (!isSupabaseConfigured || !user.email || (user as any).authUserId) return;
+  if (!isSupabaseConfigured || !user.email || user.authUserId) return;
 
   const adminClient = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false }
@@ -771,9 +771,8 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
   if (error || !data.user?.id) return;
 
   const authUserId = data.user.id;
+  let linkedToSchoolOSUser = false;
   try {
-    // The unique partial index on users.auth_user_id prevents one Auth
-    // identity from being attached to multiple SchoolOS accounts.
     const { data: linkedRows, error: linkError } = await adminClient
       .from('users')
       .update({ auth_user_id: authUserId })
@@ -782,18 +781,33 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
       .select('id');
 
     if (linkError || !linkedRows?.some((row: { id: string }) => row.id === user.id)) {
-      const { data: current } = await adminClient
+      const { data: current, error: currentError } = await adminClient
         .from('users')
         .select('auth_user_id')
         .eq('id', user.id)
         .maybeSingle();
-      if (current?.auth_user_id !== authUserId) {
-        await adminClient.auth.admin.deleteUser(authUserId);
+      if (currentError || current?.auth_user_id !== authUserId) {
+        await adminClient.auth.admin.deleteUser(authUserId).catch(() => undefined);
         return;
       }
     }
 
-    (user as any).authUserId = authUserId;
+    // Keep the in-memory snapshot in sync with the direct conditional DB update.
+    // A later db.flush() must not overwrite this link with a stale null value.
+    const updatedUser = db.updateUser(user.id, { authUserId });
+    if (!updatedUser) {
+      const { error: unlinkError } = await adminClient.from('users').update({ auth_user_id: null })
+        .eq('id', user.id).eq('auth_user_id', authUserId);
+      if (!unlinkError) await adminClient.auth.admin.deleteUser(authUserId).catch(() => undefined);
+      else {
+        user.authUserId = authUserId;
+        linkedToSchoolOSUser = true;
+      }
+      return;
+    }
+    user.authUserId = authUserId;
+    linkedToSchoolOSUser = true;
+
     db.logAudit({
       action: 'LEGACY_AUTH_ACCOUNT_LINKED',
       category: 'auth',
@@ -801,15 +815,16 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
       userId: user.id,
       userName: user.fullName,
       userRole: user.role,
-      details: 'A successfully authenticated legacy staff account was linked to Supabase Auth without changing its SchoolOS ID.',
+      details: 'A successfully authenticated legacy staff password account was linked to Supabase Auth without changing its SchoolOS ID.',
       severity: 'info'
     });
-    await db.flush();
+    // The auth_user_id update is already committed. If audit/snapshot flush fails,
+    // preserve the valid Auth identity and its in-memory link.
+    try { await db.flush(); } catch { /* Keep the committed Auth link intact. */ }
   } catch {
-    // Keep the legacy login usable if the optional migration step fails.
-    // Remove only the Auth user created by this exact attempt.
-    try { await adminClient.auth.admin.deleteUser(authUserId); } catch { /* best-effort cleanup */ }
-    delete (user as any).authUserId;
+    if (!linkedToSchoolOSUser) {
+      await adminClient.auth.admin.deleteUser(authUserId).catch(() => undefined);
+    }
   }
 }
 
@@ -1112,6 +1127,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Supabase Auth is the source of truth for accounts linked through auth_user_id.
   // Keep legacy scrypt/PIN verification only for accounts that have not been migrated.
   let isPasswordValid = false;
+  let verifiedLegacyPassword = false;
   const authUserId = String((user as any).authUserId || '').trim();
   if (authUserId) {
     if (isSupabaseConfigured && user.email) {
@@ -1131,7 +1147,8 @@ apiRouter.post('/auth/login', async (req, res) => {
       }
     }
   } else {
-    isPasswordValid = verifyPassword(password, user.passwordHash)
+    verifiedLegacyPassword = verifyPassword(password, user.passwordHash);
+    isPasswordValid = verifiedLegacyPassword
       || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
   }
   if (!isPasswordValid) {
@@ -1173,10 +1190,10 @@ apiRouter.post('/auth/login', async (req, res) => {
 
   // Login is password-only; stored TOTP settings do not affect sign-in.
 
-  // A successful legacy password check is the only point at which an
-  // email-backed staff account may be migrated. Accounts without email
-  // (Teacher ID/PIN and student/parent PIN) retain their existing flow.
-  if (!(user as any).authUserId) {
+  // Only a verified legacy password (never a teacher PIN) can create a
+  // Supabase Auth identity. Teacher ID/PIN and student/parent PIN logins retain
+  // their existing sign-in flow.
+  if (!authUserId && verifiedLegacyPassword) {
     await linkLegacyLoginToSupabaseAuth(user, password);
   }
 
