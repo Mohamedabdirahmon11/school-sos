@@ -1167,8 +1167,16 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Legacy School Admin onboarding PINs are checked against their password hash
   // until the account receives a dedicated PIN hash or rotates credentials.
   if (submittedPin && ['school_admin', 'teacher'].includes(user.role)) {
-    isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''))
-      || (!authUserId && user.role === 'school_admin' && verifyPassword(submittedPin, user.passwordHash));
+    const legacySchoolAdminPinValid = !authUserId && user.role === 'school_admin'
+      && !user.pin && verifyPassword(submittedPin, user.passwordHash);
+    if (legacySchoolAdminPinValid) {
+      // Upgrade existing School Admin accounts in place so their PIN continues
+      // working even after the first-login password-change flow updates passwordHash.
+      db.updateUser(user.id, { pin: hashPin(submittedPin) });
+      isPasswordValid = true;
+    } else {
+      isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''));
+    }
   }
   if (!isPasswordValid && authUserId) {
     if (isSupabaseConfigured && user.email) {
