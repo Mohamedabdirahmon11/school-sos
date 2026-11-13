@@ -419,7 +419,10 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   const normalizedRole = normalizeRole(storedUser.role);
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
-  const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-') && user.role === 'super_admin';
+  const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-')
+    && ['super_admin', 'school_admin'].includes(user.role)
+    && user.mustChangePassword === true
+    && payload.role === user.role;
   if (!session && !isBootstrap) return null;
   if (session && !isSessionExpiryValid(session.expiresAt)) return null;
   // Non-super-admin sessions must remain bound to the user's current tenant.
