@@ -60,7 +60,7 @@ const completeEvidence = {
   feeStructureCount: 1
 };
 
-test('school setup checklist validates academic dates, WhatsApp, KG 1/KG 2, teacher login, and school records', () => {
+test('school setup checklist validates academic dates, WhatsApp, class setup, teacher login, and school records', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9]) assert.equal(checklist[id].ready, true, 'step ' + id);
 });
@@ -72,9 +72,13 @@ test('school setup requires the dedicated administration WhatsApp number, not on
   assert.equal(checklist[2].ready, false);
 });
 
-test('KG 1 and KG 2 are both required; KG classes are not inferred from one generic KG class', () => {
-  const checklist = buildSchoolSetupChecklist(school, { ...completeEvidence, classNames: ['KG - A', 'Grade 1 - A'] });
-  assert.equal(checklist[3].ready, false);
+test('a school without kindergarten can finish class setup while KG classes remain supported', () => {
+  const noKindergarten = buildSchoolSetupChecklist(school, { ...completeEvidence, classNames: ['Grade 1 - A'] });
+  const noClasses = buildSchoolSetupChecklist(school, { ...completeEvidence, classNames: [] });
+  const kindergarten = buildSchoolSetupChecklist(school, { ...completeEvidence, classNames: ['KG 1 - A', 'KG 2 - A'] });
+  assert.equal(noKindergarten[3].ready, true);
+  assert.equal(noClasses[3].ready, false);
+  assert.equal(kindergarten[3].ready, true);
 });
 
 test('teacher setup requires a school-specific staff ID and linked login credential hash', () => {
