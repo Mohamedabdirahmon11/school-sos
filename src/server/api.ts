@@ -3330,9 +3330,10 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
   }
 
   const query = search.toLowerCase();
+  const queryDigits = query.replace(/\D/g, '');
   const filtered = [...contacts.values()]
     .filter(contact => !query || contact.phone.toLowerCase().includes(query)
-      || contact.normalizedPhone.includes(query.replace(/\D/g, ''))
+      || (queryDigits.length > 0 && contact.normalizedPhone.includes(queryDigits))
       || contact.students.some(child => `${child.fullName} ${child.studentId} ${child.className}`.toLowerCase().includes(query)))
     .map(contact => ({
       id: contact.id,
