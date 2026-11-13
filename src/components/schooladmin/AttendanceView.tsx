@@ -38,6 +38,10 @@ export const AttendanceView: React.FC = () => {
   const [date, setDate] = useState(() => getSchoolLocalDate(school?.timezone));
   const ethiopianCalendar = getEthiopianCalendarInfo(date, school?.timezone || 'Africa/Addis_Ababa');
   const calendarStatus = getSchoolCalendarStatus(date, school?.setupData?.calendar, school?.timezone || 'Africa/Addis_Ababa');
+  const calendarType = school?.setupData?.calendar?.calendarType || 'both';
+  const calendarDateLabel = calendarType === 'gregorian' ? 'Gregorian date: ' + date
+    : calendarType === 'ethiopian' ? 'Ethiopian date: ' + ethiopianCalendar.dateLabel
+    : 'Ethiopian date: ' + ethiopianCalendar.dateLabel + ' · Gregorian date: ' + date;
   const [students, setStudents] = useState<Student[]>([]);
   const [pageStudents, setPageStudents] = useState<Student[]>([]);
   const [serverPageInfo, setServerPageInfo] = useState<PageInfo | null>(null);
@@ -193,7 +197,7 @@ export const AttendanceView: React.FC = () => {
           <div className="flex items-end gap-2">
             <label className="text-xs font-semibold text-[#475569]">Attendance date
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
-              <span className="mt-1 block text-[10px] font-normal text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</span>
+              <span className="mt-1 block text-[10px] font-normal text-[#64748B]">{calendarDateLabel}</span>
             </label>
             <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Refresh</button>
           </div>
