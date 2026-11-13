@@ -142,9 +142,6 @@ export const StudentPortalView: React.FC = () => {
           </h2>
 
           {scheduleState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : scheduleState.error ? <ErrorState error={scheduleState.error} onRetry={scheduleState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="space-y-2">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1] flex items-center justify-between"><div><span className="font-bold text-[#132A29] block">{slot.dayOfWeek} • {slot.startTime} - {slot.endTime}: {slot.subjectName || slot.subjectId}</span><span className="text-[#64748B]">{slot.roomNumber}{slot.teacherName ? ` • ${slot.teacherName}` : ''}</span></div><span className="font-mono text-xs font-bold text-[#0F766E]">Period {slot.periodNumber}</span></div>)}</div>}
-        </div>
-      )}
-
           <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <h3 className="text-sm font-bold text-[#132A29]">Published Exam Schedule</h3>
             {examSchedulesState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-[#64748B]">No exam timetable has been published for your class yet.</p> : publishedExamSchedules.map((exam: any) => (
