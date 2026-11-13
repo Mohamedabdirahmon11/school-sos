@@ -41,7 +41,7 @@ export const ParentPortalView: React.FC = () => {
     Boolean(currentChild)
   );
   const timetable = Array.isArray(timetableState.data) ? timetableState.data : [];
-  const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules() : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
+  const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules(currentChild.classId) : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const childData = childState.data;
 
