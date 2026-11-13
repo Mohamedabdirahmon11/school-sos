@@ -321,7 +321,8 @@ export class ApiClient {
   }
 
   public static async updateSchoolDetails(id: string, details: {
-    name: string; email: string; address: string; city: string; phone: string;
+    name: string; email: string; address: string; city: string; country: string; region: string;
+    schoolType: 'primary' | 'secondary' | 'combined'; phone: string;
     whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so';
   }) {
     return this.request<School>(`/superadmin/schools/${encodeURIComponent(id)}`, {
