@@ -1414,10 +1414,6 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     const passwordError = passwordPolicyError(newPassword);
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
     if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
-    if (!(await syncLinkedSupabaseAuthPassword(user, newPassword))) {
-      res.status(503).json({ error: 'The password could not be updated in the linked authentication account. No local password changes were saved.' });
-      return;
-    }
   }
   if (user.authUserId && !cleanEmail) {
     res.status(400).json({ error: 'A linked authentication account must keep a valid email address.' });
