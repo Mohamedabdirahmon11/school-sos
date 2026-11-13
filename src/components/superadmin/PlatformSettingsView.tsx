@@ -417,7 +417,7 @@ export const PlatformSettingsView: React.FC = () => {
               </select>
             </div>
             <p className="text-[11px] leading-relaxed text-amber-800 sm:col-span-2">
-              The scheduled workflow is currently blocked because its required GitHub Actions secrets are missing. Configure SUPABASE_DB_URL, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, BACKUP_S3_REGION, and BACKUP_S3_BUCKET to enable encrypted off-site backups. Once uploaded, the workflow records the successful backup time and an audit event here. Until then, only the manual JSON export is available. Full-platform restore is not supported.
+              The scheduled workflow is currently blocked because its required GitHub Actions secrets are missing. Configure SUPABASE_DB_URL, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, BACKUP_S3_REGION, and BACKUP_S3_BUCKET to enable encrypted off-site backups. Once uploaded, the workflow records the successful backup time and an audit event here. Until then, only the manual JSON export is available. The manual JSON export is not a full-platform restore image; the encrypted S3 database dump is intended for recovery.
             </p>
             <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
               <p className="font-medium text-[#334155]">Last recorded platform backup</p>
