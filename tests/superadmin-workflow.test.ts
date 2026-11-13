@@ -158,3 +158,10 @@ test('bulk academic year update is previewed, protected, and requires explicit t
   assert.match(panelSource, /Preview schools/);
   assert.match(panelSource, /Include schools whose current academic year is later than the target year/);
 });
+
+
+test('bulk academic year preview flags malformed existing years for explicit review', () => {
+  const apiSource = read('../src/server/api.ts');
+  assert.match(apiSource, /Current academic year is not in YYYY-YYYY format; review before replacing it/);
+  assert.match(apiSource, /row\.status === 'warning' && !parsed\.data\.includeWarned/);
+});
