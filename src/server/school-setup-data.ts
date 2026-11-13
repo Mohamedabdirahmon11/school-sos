@@ -26,6 +26,8 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (!y || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
+    const existingTerms = existingData?.terms;
+    if (Array.isArray(existingTerms) && existingTerms.some((term: any) => validIsoDate(term.startDate) && validIsoDate(term.endDate) && (term.startDate < y.startDate || term.endDate > y.endDate))) return 'The new academic year would exclude saved terms. Update the term dates first.';
   }
   if (step === 3) {
     const terms = data.terms;
