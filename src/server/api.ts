@@ -3030,38 +3030,73 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   const academicYear = String(req.body?.academicYear ?? existing.academicYear ?? school.academicYear).trim();
   const [yearStart, yearEnd] = academicYear.split('-').map(Number);
   const classCode = String(req.body?.classCode ?? existing.classCode ?? '').trim().toUpperCase();
-  if (!/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40) {
+  if (!/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40) {
     res.status(400).json({ error: 'Class code and a valid consecutive academic year are required.' }); return;
   }
-  const duplicate = (await db.getClasses(school.id)).some(item => item.id !== existing.id && String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase());
-  if (duplicate) { res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return; }
-  if (req.body?.capacity !== undefined && req.body.capacity !== '') {
-    const enrolled = await db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id');
-    if (!Number.isInteger(Number(req.body.capacity)) || Number(req.body.capacity) < enrolled.total || Number(req.body.capacity) > 500) { res.status(409).json({ error: `Capacity cannot be lower than the ${enrolled.total} enrolled students and must not exceed 500.` }); return; }
+  const allClasses = await db.getClasses(school.id);
+  if (allClasses.some(item => item.id !== existing.id && String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
+    res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
+  }
+  if (academicYear !== (existing.academicYear || school.academicYear)) {
+    const [enrolled, scheduled] = await Promise.all([
+      db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id'),
+      db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id')
+    ]);
+    if (enrolled.total || scheduled.total) { res.status(409).json({ error: 'Academic year cannot be changed while students or timetable periods are attached to this class.' }); return; }
+  }
+  const updates: Record<string, unknown> = { classCode, academicYear };
+  if (req.body?.name !== undefined) {
+    if (typeof req.body.name !== 'string' || !req.body.name.trim()) { res.status(400).json({ error: 'Class name cannot be empty.' }); return; }
+    updates.name = req.body.name.trim();
   }
   if (req.body?.gradeLevel !== undefined) {
+    const gradeLevel = Number(req.body.gradeLevel);
     const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
-    if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+    if (!Number.isInteger(gradeLevel) || !allowedLevels.includes(gradeLevel)) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
+    updates.gradeLevel = gradeLevel;
+  }
+  if (req.body?.section !== undefined) {
+    if (typeof req.body.section !== 'string') { res.status(400).json({ error: 'Section must be text or blank.' }); return; }
+    updates.section = req.body.section.trim().toUpperCase();
+  }
+  if (req.body?.branchId !== undefined && req.body.branchId) {
+    if (!(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+    updates.branchId = req.body.branchId;
+  }
+  if (req.body?.classTeacherId !== undefined) {
+    if (req.body.classTeacherId) {
+      const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
+      if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+    }
+    updates.classTeacherId = req.body.classTeacherId || null;
+  }
+  if (req.body?.capacity !== undefined && req.body.capacity !== '') {
+    const capacity = Number(req.body.capacity);
+    const enrolled = await db.queryPage('students', { school_id: school.id, class_id: existing.id }, 1, 1, undefined, 'id');
+    if (!Number.isInteger(capacity) || capacity < enrolled.total || capacity > 500) { res.status(409).json({ error: `Capacity must be 1–500 and cannot be lower than the ${enrolled.total} enrolled students.` }); return; }
+    updates.capacity = capacity;
+  }
+  if (req.body?.roomNumber !== undefined) updates.roomNumber = String(req.body.roomNumber || '').trim();
+  if (req.body?.monthlyFee !== undefined) {
+    const monthlyFee = Number(req.body.monthlyFee);
+    if (!Number.isFinite(monthlyFee) || monthlyFee < 0) { res.status(400).json({ error: 'Monthly fee must be zero or greater.' }); return; }
+    updates.monthlyFee = monthlyFee;
   }
   if (req.body?.shift !== undefined) {
+    const shift = Number(req.body.shift);
     const timetableSettings = await db.getTimetableSettings(school.id);
-    if (![1, 2].includes(Number(req.body.shift)) || (Number(req.body.shift) === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
+    if (![1, 2].includes(shift) || (shift === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
+    if (shift !== Number(existing.shift || 1)) {
+      const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
+      if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
+    }
+    updates.shift = shift;
   }
-  if (req.body?.shift !== undefined && Number(req.body.shift) !== Number(existing.shift || 1)) {
-    const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
-    if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
-  }
-  const gradeMismatch = classGradeMismatchError(typeof req.body?.name === 'string' ? req.body.name : existing.name, req.body?.gradeLevel !== undefined ? Number(req.body.gradeLevel) : Number(existing.gradeLevel));
+  const gradeLevel = Number(updates.gradeLevel ?? existing.gradeLevel);
+  const name = String(updates.name ?? existing.name);
+  const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
-  if (req.body?.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === req.body.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
-  if (req.body?.classTeacherId) {
-    const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
-    if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
-  }
-  const updates = { ...req.body, classCode, academicYear };
-  if (updates.capacity === '') delete updates.capacity;
-  if (updates.section === '') updates.section = '';
-  const updated = await db.updateClass(String(req.params.id), updates, school.id);
+  const updated = await db.updateClass(existing.id, updates, school.id);
   res.json(updated);
 });
 
