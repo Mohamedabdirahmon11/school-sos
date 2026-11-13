@@ -2694,7 +2694,7 @@ apiRouter.get('/classes/import/template', requireAuth, requireSchoolAdminOrSuper
     `KG2-${school.academicYear.slice(0, 4)},${school.academicYear},KG 2,KG,,,KG Room 2,40,1,0`,
     `G1-A-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,A,,Room 101,40,1,0`,
     `G1-B-${school.academicYear.slice(0, 4)},${school.academicYear},Grade 1,1,B,,Room 102,40,1,0`
-  ].join('\\r\\n');
+  ].join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-class-import-template.csv"' }).send(csv);
 });
 
@@ -2705,7 +2705,7 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
   if (!Array.isArray(input) || input.length < 1 || input.length > 500) {
     res.status(400).json({ error: 'Upload between 1 and 500 class rows.' }); return;
   }
-  const [existing, branches] = await Promise.all([db.getClasses(school.id), db.getBranches(school.id)]);
+  const [existing, branches, timetableSettings] = await Promise.all([db.getClasses(school.id), db.getBranches(school.id), db.getTimetableSettings(school.id)]);
   const allowedLevels = new Set([0, ...((school.classLevels?.length ? school.classLevels : [1,2,3,4,5,6,7,8,9,10,11,12]).filter(level => level !== 0))]);
   const branchByName = new Map(branches.map(branch => [branch.name.trim().toLowerCase(), branch]));
   const seen = new Set(existing.map(item => `${item.academicYear || school.academicYear}\\u0000${String(item.classCode || '').trim().toLowerCase()}`));
@@ -2733,7 +2733,7 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
     else if (classGradeMismatchError(name, grade)) errors.push(`Row ${index + 2}: ${classGradeMismatchError(name, grade)}.`);
     else if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) errors.push(`Row ${index + 2}: capacity must be between 1 and 500.`);
     else if (!Number.isFinite(monthlyFee) || monthlyFee < 0) errors.push(`Row ${index + 2}: monthlyFee must be zero or greater.`);
-    else if (![1, 2].includes(shift)) errors.push(`Row ${index + 2}: shift must be 1 or 2.`);
+    else if (![1, 2].includes(shift) || (shift === 2 && timetableSettings.shiftCount !== 2)) errors.push(`Row ${index + 2}: selected shift is not enabled in School Settings.`);
     else if (branchName && !branch) errors.push(`Row ${index + 2}: unknown branch "${branchName}".`);
     else {
       seen.add(key);
@@ -2999,7 +2999,8 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
   if (!allowedLevels.includes(gradeLevel)) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   const requestedShift = Number(req.body?.shift ?? 1);
-  if (![1, 2].includes(requestedShift)) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
+  const timetableSettings = await db.getTimetableSettings(school.id);
+  if (![1, 2].includes(requestedShift) || (requestedShift === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
   const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   const existingClasses = await db.getClasses(school.id);
@@ -3042,7 +3043,10 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
     if (!allowedLevels.includes(Number(req.body.gradeLevel))) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
   }
-  if (req.body?.shift !== undefined && ![1, 2].includes(Number(req.body.shift))) { res.status(400).json({ error: 'Class shift must be 1 (morning) or 2 (afternoon).' }); return; }
+  if (req.body?.shift !== undefined) {
+    const timetableSettings = await db.getTimetableSettings(school.id);
+    if (![1, 2].includes(Number(req.body.shift)) || (Number(req.body.shift) === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
+  }
   if (req.body?.shift !== undefined && Number(req.body.shift) !== Number(existing.shift || 1)) {
     const scheduled = await db.queryPage('timetable_slots', { school_id: school.id, class_id: existing.id, is_active: 'true' }, 1, 1, undefined, 'id');
     if (scheduled.total) { res.status(409).json({ error: 'Remove or regenerate this class timetable before changing its shift.' }); return; }
