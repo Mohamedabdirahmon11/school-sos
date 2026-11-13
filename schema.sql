@@ -397,6 +397,7 @@ CREATE INDEX IF NOT EXISTS idx_timetable_active ON timetable_slots(school_id, cl
 
 CREATE TABLE IF NOT EXISTS timetable_settings (
   school_id VARCHAR(64) PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+  shift_count SMALLINT NOT NULL DEFAULT 1 CHECK (shift_count IN (1, 2)),
   first_period_start VARCHAR(5) NOT NULL DEFAULT '08:00',
   period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (period_minutes BETWEEN 20 AND 120),
   break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 5),
@@ -408,6 +409,7 @@ CREATE TABLE IF NOT EXISTS timetable_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift_count SMALLINT NOT NULL DEFAULT 1 CHECK (shift_count IN (1, 2));
 ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00';
 ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_period_minutes INTEGER NOT NULL DEFAULT 40;
 ALTER TABLE timetable_settings ADD COLUMN IF NOT EXISTS shift2_break_after_period INTEGER NOT NULL DEFAULT 3;
