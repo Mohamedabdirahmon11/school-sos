@@ -89,12 +89,12 @@ test('Super Admin can edit school contact and display details with validation an
 });
 
 
-test('platform backup UI does not imply that the saved frequency preference runs an automatic off-site backup', () => {
+test('platform backup UI clearly distinguishes a preference from unconfigured automation', () => {
   const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
   const storageSource = read('../src/server/storage.ts');
-  assert.match(settingsSource, /Backup Frequency Preference \(Not Automated\)/);
-  assert.match(settingsSource, /Automated off-site backups are not configured/);
-  assert.match(settingsSource, /does not support full-platform restore/);
+  assert.match(settingsSource, /Backup Frequency Preference/);
+  assert.match(settingsSource, /scheduled workflow is currently blocked/);
+  assert.match(settingsSource, /manual JSON export is not a full-platform restore image/);
   assert.match(storageSource, /full-platform restore is not supported/);
 });
 
@@ -108,4 +108,31 @@ test('subscription updates cannot be double-submitted and form limits match serv
   assert.match(schoolsSource, /min="0"\s+max="60"/);
   assert.match(apiSource, /monthsToAdd must be a whole number from 1 to 120/);
   assert.match(apiSource, /graceDays must be a whole number from 0 to 60/);
+});
+
+
+test('platform backup settings accurately disclose missing GitHub Actions and S3 backup configuration', () => {
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  const workflowSource = read('../.github/workflows/supabase-backup.yml');
+  assert.match(settingsSource, /scheduled workflow is currently blocked/);
+  assert.match(settingsSource, /SUPABASE_DB_URL/);
+  assert.match(settingsSource, /BACKUP_S3_ACCESS_KEY_ID/);
+  assert.match(settingsSource, /BACKUP_S3_SECRET_ACCESS_KEY/);
+  assert.match(settingsSource, /BACKUP_S3_REGION/);
+  assert.match(settingsSource, /BACKUP_S3_BUCKET/);
+  assert.match(settingsSource, /Last recorded platform backup/);
+  assert.match(workflowSource, /Upload encrypted backup to private S3 bucket/);
+  assert.match(workflowSource, /--sse AES256/);
+});
+
+
+test('successful scheduled S3 backups update platform status and create an audit record', () => {
+  const workflowSource = read('../.github/workflows/supabase-backup.yml');
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  assert.match(workflowSource, /Record successful off-site backup in platform settings and audit/);
+  assert.match(workflowSource, /UPDATE public\.super_admin_settings/);
+  assert.match(workflowSource, /last_backup_status = 'success'/);
+  assert.match(workflowSource, /PLATFORM_OFFSITE_BACKUP_COMPLETED/);
+  assert.match(workflowSource, /github-actions-backup-/);
+  assert.match(settingsSource, /Last recorded platform backup/);
 });

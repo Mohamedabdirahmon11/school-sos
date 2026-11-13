@@ -391,7 +391,7 @@ export const PlatformSettingsView: React.FC = () => {
                 <Database className="w-4 h-4 text-[#0F766E]" />
                 <span>Database Backups & Disaster Recovery</span>
               </h2>
-              <p className="mt-1 text-[11px] text-[#64748B]">Manual JSON export is available. Daily/weekly off-site database backups run through GitHub Actions after the private SUPABASE_DB_URL secret is configured. The JSON export excludes credentials and is not a full-platform restore image.</p>
+              <p className="mt-1 text-[11px] text-[#64748B]">A GitHub Actions workflow can create encrypted off-site backups when all required private Supabase and S3 secrets are configured. The manual JSON export is separate, excludes credentials, and is not a full-platform restore image.</p>
             </div>
             <button
               type="button"
@@ -405,22 +405,22 @@ export const PlatformSettingsView: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block font-medium text-[#334155]">Backup Frequency Preference (Not Automated)</label>
+              <label className="block font-medium text-[#334155]">Backup Frequency Preference</label>
               <select
                 value={settings.backupSchedule}
                 onChange={e => setSettings({ ...settings, backupSchedule: e.target.value as SuperAdminSettings['backupSchedule'] })}
                 className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
               >
-                <option value="daily">Daily target (manual export required)</option>
-                <option value="weekly">Weekly target (manual export required)</option>
+                <option value="daily">Daily (GitHub Actions)</option>
+                <option value="weekly">Weekly (GitHub Actions)</option>
                 <option value="manual">Manual only</option>
               </select>
             </div>
             <p className="text-[11px] leading-relaxed text-amber-800 sm:col-span-2">
-              This setting records a preferred cadence only. Automated off-site backups are not configured; generate an export and store it in a secure external location. The platform export does not support full-platform restore.
+              The scheduled workflow is currently blocked because its required GitHub Actions secrets are missing. Configure SUPABASE_DB_URL, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, BACKUP_S3_REGION, and BACKUP_S3_BUCKET to enable encrypted off-site backups. Once uploaded, the workflow records the successful backup time and an audit event here. Until then, only the manual JSON export is available. The manual JSON export is not a full-platform restore image; the encrypted S3 database dump is intended for recovery.
             </p>
             <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-              <p className="font-medium text-[#334155]">Last verified platform backup</p>
+              <p className="font-medium text-[#334155]">Last recorded platform backup</p>
               <p className="mt-1 text-[11px] text-[#64748B]">
                 {settings.lastBackupDate && settings.lastBackupStatus === 'success'
                   ? new Date(settings.lastBackupDate).toLocaleString()
