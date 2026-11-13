@@ -33,10 +33,10 @@ function auditIdempotency(source: string, label: string) {
     // statements execute only when the service-role-only function is called;
     // migration application itself only creates/replaces the guarded function.
     const guardedSchoolDeletionMigration = label === '20261113120000_permanent_school_deletion.sql'
-      && /CREATE OR REPLACE FUNCTION public\.delete_school_permanently\\(/i.test(source)
+      && /CREATE OR REPLACE FUNCTION public\.delete_school_permanently\(/i.test(source)
       && /SECURITY DEFINER/i.test(source)
-      && /REVOKE ALL ON FUNCTION public\.delete_school_permanently\\(text, text\\) FROM public, anon, authenticated/i.test(source)
-      && /GRANT EXECUTE ON FUNCTION public\.delete_school_permanently\\(text, text\\) TO service_role/i.test(source);
+      && /REVOKE ALL ON FUNCTION public\.delete_school_permanently\(text, text\) FROM public, anon, authenticated/i.test(source)
+      && /GRANT EXECUTE ON FUNCTION public\.delete_school_permanently\(text, text\) TO service_role/i.test(source);
     if (!guardedSchoolDeletionMigration) violations.push('destructive table/data statement');
   }
   for (const match of source.matchAll(/\bCREATE\s+POLICY\s+([a-z_][a-z0-9_]*|%I_[a-z_]+)\s+ON\s+([a-z_.%I]+)/gi)) {
