@@ -12,13 +12,57 @@ const billing = read('../src/components/superadmin/PlansBillingView.tsx');
 const settings = read('../src/components/superadmin/PlatformSettingsView.tsx');
 const storage = read('../src/server/storage.ts');
 
-test('school onboarding requires complete school and first administrator contact details', () => {
-  for (const field of ['name', 'code', 'address', 'city', 'phone', 'whatsappPhone', 'email', 'adminName', 'adminEmail', 'adminPhone']) {
+test('school onboarding validates country, region, type and required contacts while keeping WhatsApp/admin email optional', () => {
+  for (const field of ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone']) {
     assert.match(api, new RegExp(`'${field}'`), `missing onboarding validation for ${field}`);
   }
-  assert.match(schools, /whatsappPhone: addWhatsappPhone/);
-  assert.match(schools, /address: addAddress/);
-  assert.match(api, /whatsappPhone: String\(whatsappPhone\)\.trim\(\)/);
+  assert.match(api, /schoolType.*primary.*secondary.*combined/);
+  assert.ok(api.includes("'adminEmail'") && api.includes("invalid email"));
+  assert.match(schools, /country: addCountry/);
+  assert.match(schools, /region: addRegion/);
+  assert.match(schools, /schoolType: addSchoolType/);
+  assert.match(schools, /logoDataUrl: addLogoDataUrl/);
+  assert.match(schools, /Admin Login ID/);
+  assert.match(schools, /Initial Password/);
+  assert.match(schools, /Email Address \(Optional\)/);
+  assert.match(api, /requestedAdminUsername \|\| await nextSchoolStaffId\(school\)/);
+  assert.match(api, /mustChangePassword: !adminPassword/);
+  assert.match(api, /school-logos/);
+  assert.match(api, /School logo must be smaller than 2 MB/);
+});
+
+test('school onboarding uses unique school UUIDs and compensates failed persistence with full tenant cleanup', () => {
+  assert.match(storage, /const id = `sch-\$\{randomUUID\(\)\}`/);
+  assert.match(storage, /this\.data\.examConfigs = this\.data\.examConfigs\.filter\(row => row\.schoolId !== id\)/);
+  assert.match(storage, /this\.data\.reportCardDesigns = this\.data\.reportCardDesigns\.filter\(row => row\.schoolId !== id\)/);
+  assert.match(api, /School onboarding persistence failed; attempting rollback/);
+});
+
+test('new school profile migration adds compatible metadata and a dedicated logo bucket', () => {
+  const migration = read('../supabase/migrations/20261112120000_school_registration_profile.sql');
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS country/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS region/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS school_type/);
+  assert.match(migration, /school-logos/);
+  assert.match(migration, /2097152/);
+  assert.ok(migration.includes('image/png') && migration.includes('image/jpeg') && migration.includes('image/webp'));
+});
+
+test('school onboarding remains Super Admin-only and tenant rows are scoped by school id', () => {
+  const routeStart = api.indexOf("apiRouter.post('/superadmin/schools'");
+  const routeEnd = api.indexOf("const updateSchoolDetailsSchema", routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  assert.match(route, /requireAuth, requireSuperAdmin/);
+  assert.match(route, /schoolId: school.id/);
+  const tenantPolicies = read('../supabase/migrations/022_consolidate_tenant_rls_policies.sql');
+  assert.ok(tenantPolicies.includes('school_id::text = public.auth_school_id()::text'));
+  assert.ok(tenantPolicies.includes('CREATE POLICY tenant_scope_v2 ON public.classes'));
+});
+
+test('school admin ID can be used in the shared staff login form', () => {
+  const login = read('../src/components/auth/LoginView.tsx');
+  assert.match(login, /School Admin ID/);
+  assert.ok(login.includes('type="text"') && login.includes('Email, phone, Admin ID, or T001'));
 });
 
 test('school details use a dedicated school-scoped admin query and a consistent admins array', () => {

@@ -91,16 +91,10 @@ function invalidateListCache(table?: string) {
 }
 
 function onboardingFieldErrors(body: Record<string, unknown>): string[] {
-  const required = [
-    'name', 'code', 'address', 'city', 'phone', 'whatsappPhone',
-    'email', 'adminName', 'adminEmail', 'adminPhone'
-  ];
+  const required = ['name', 'code', 'country', 'region', 'schoolType', 'address', 'city', 'phone', 'email', 'adminName', 'adminPhone'];
   const missing = required.filter(key => typeof body[key] !== 'string' || !(body[key] as string).trim());
   for (const field of ['email', 'adminEmail']) {
-    if (typeof body[field] === 'string' && body[field].trim()
-      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body[field].trim())) {
-      missing.push(`${field} (invalid email)`);
-    }
+    if (typeof body[field] === 'string' && body[field].trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body[field].trim())) missing.push(`${field} (invalid email)`);
   }
   for (const field of ['phone', 'whatsappPhone', 'adminPhone']) {
     if (typeof body[field] === 'string' && body[field].trim()) {
@@ -108,8 +102,14 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
       if (digits.length < 7 || digits.length > 15) missing.push(`${field} (invalid phone)`);
     }
   }
-  if (typeof body.code === 'string' && body.code.trim()
-    && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
+  if (typeof body.code === 'string' && body.code.trim() && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
+  if (typeof body.schoolType === 'string' && !['primary', 'secondary', 'combined'].includes(body.schoolType)) missing.push('schoolType (choose primary, secondary or combined)');
+  if (typeof body.adminUsername === 'string' && body.adminUsername.trim() && !/^[a-z0-9_-]{3,32}$/i.test(body.adminUsername.trim())) missing.push('adminUsername (use 3–32 letters, numbers, hyphens or underscores)');
+  if (typeof body.adminPassword === 'string' && body.adminPassword) {
+    const passwordError = passwordPolicyError(body.adminPassword);
+    if (passwordError) missing.push(`adminPassword (${passwordError})`);
+  }
+  if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
   return [...new Set(missing)];
 }
 
@@ -1822,7 +1822,7 @@ apiRouter.get('/superadmin/schools', requireAuth, requireSuperAdmin, async (req,
   const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
   const allowedStatuses = new Set(['active', 'trial', 'grace', 'read_only', 'suspended']);
   const schools = (await db.getSchools()).filter(school => {
-    const matchesSearch = !search || [school.name, school.code, school.city, school.email]
+    const matchesSearch = !search || [school.name, school.code, school.country, school.region, school.city, school.email]
       .some(value => String(value || '').toLowerCase().includes(search));
     const matchesStatus = requestedStatus === 'all' || !allowedStatuses.has(requestedStatus)
       || school.subscription?.status === requestedStatus;
@@ -1845,16 +1845,18 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}.`, fields: missing });
     return;
   }
-  const { name, code, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone } = body;
+  const { name, code, country, region, schoolType, address, city, phone, whatsappPhone, email, brandColor, plan, cadence, adminName, adminEmail, adminPhone, adminUsername, adminPassword, logoDataUrl } = body;
   const cleanCode = String(code).trim().toUpperCase();
-  const cleanAdminEmail = String(adminEmail).trim().toLowerCase();
+  const cleanAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim().toLowerCase() : '';
+  const requestedAdminUsername = typeof adminUsername === 'string' ? adminUsername.trim().toUpperCase() : '';
 
   // Check unique code
   if (await db.getSchoolByCode(cleanCode)) {
     res.status(400).json({ error: `School code "${cleanCode}" is already in use.`, fields: ['code'] });
     return;
   }
-  if (await db.findUserForLogin(cleanAdminEmail)) { res.status(409).json({ error: 'A user already uses this email address.', fields: ['adminEmail'] }); return; }
+  if (cleanAdminEmail && await db.findUserForLogin(cleanAdminEmail)) { res.status(409).json({ error: 'A user already uses this email address.', fields: ['adminEmail'] }); return; }
+  if (requestedAdminUsername && await db.findUserForLogin(requestedAdminUsername)) { res.status(409).json({ error: 'This administrator ID is already in use.', fields: ['adminUsername'] }); return; }
 
   const settings = db.getSettings();
   const now = new Date();
@@ -1863,10 +1865,13 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   const school = db.createSchool({
     name: String(name).trim(),
     code: cleanCode,
-    address: address || '',
-    city: city || '',
+    country: String(country).trim(),
+    region: String(region).trim(),
+    schoolType: schoolType as School['schoolType'],
+    address: String(address).trim(),
+    city: String(city).trim(),
     phone: String(phone).trim(),
-    whatsappPhone: String(whatsappPhone).trim(),
+    whatsappPhone: typeof whatsappPhone === 'string' && whatsappPhone.trim() ? whatsappPhone.trim() : undefined,
     email: String(email).trim().toLowerCase(),
     brandColor: brandColor || '#0F766E',
     currency: ['ETB', 'USD', 'SOS'].includes(String(body.currency)) ? body.currency : 'ETB',
@@ -1888,21 +1893,46 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     }
   });
 
-  // Create First School Administrator with a one-time, easy-to-type temporary password.
-  const temporaryPassword = String(randomInt(100000, 1_000_000));
+  // Upload a public school-branding logo through the server-side service-role client.
+  let uploadedLogoPath: string | null = null;
   let adminUser: User;
-  try { adminUser = db.createUser({
-    schoolId: school.id,
-    role: 'school_admin',
-    staffId: await nextSchoolStaffId(school),
-    fullName: adminName || `${name} Administrator`,
-    email: cleanAdminEmail,
-    phone: adminPhone || phone,
-    passwordHash: hashPassword(temporaryPassword),
-    mustChangePassword: true,
-    isBlocked: false,
-    failedLoginAttempts: 0
-  }); } catch (error) { db.deleteSchool(school.id); throw error; }
+  const temporaryPassword = adminPassword ? undefined : randomBytes(12).toString('base64url');
+  try {
+    if (typeof logoDataUrl === 'string' && logoDataUrl) {
+      if (!isSupabaseConfigured) throw new Error('School logo storage is not configured.');
+      const match = logoDataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([a-z0-9+/=]+)$/i);
+      if (!match) throw new Error('Upload a PNG, JPEG or WebP school logo.');
+      const mimeType = match[1].toLowerCase();
+      const imageBytes = Buffer.from(match[2], 'base64');
+      if (!imageBytes.length || imageBytes.length > 2 * 1024 * 1024) throw new Error('School logo must be smaller than 2 MB.');
+      const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
+      uploadedLogoPath = `${school.id}/logo.${extension}`;
+      const storageClient = createClient(supabaseUrl, supabaseKey);
+      const { error: uploadError } = await storageClient.storage.from('school-logos').upload(uploadedLogoPath, imageBytes, { contentType: mimeType, upsert: true });
+      if (uploadError) throw new Error(`Unable to save school logo: ${uploadError.message}`);
+      const { data: publicLogo } = storageClient.storage.from('school-logos').getPublicUrl(uploadedLogoPath);
+      school.logoUrl = publicLogo.publicUrl;
+      db.updateSchool(school.id, { logoUrl: publicLogo.publicUrl });
+    }
+    adminUser = db.createUser({
+      schoolId: school.id,
+      role: 'school_admin',
+      staffId: requestedAdminUsername || await nextSchoolStaffId(school),
+      fullName: String(adminName).trim(),
+      email: cleanAdminEmail || undefined,
+      phone: String(adminPhone || phone).trim(),
+      passwordHash: hashPassword(String(adminPassword || temporaryPassword)),
+      mustChangePassword: !adminPassword,
+      isBlocked: false,
+      failedLoginAttempts: 0
+    });
+  } catch (error) {
+    db.deleteSchool(school.id);
+    if (uploadedLogoPath && isSupabaseConfigured) {
+      try { await createClient(supabaseUrl, supabaseKey).storage.from('school-logos').remove([uploadedLogoPath]); } catch { /* best-effort cleanup */ }
+    }
+    throw error;
+  }
 
   db.logAudit({
     action: 'SCHOOL_CREATED',
@@ -1919,12 +1949,23 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
   try {
     await db.flush();
   } catch (error) {
-    console.error('[superadmin] School onboarding persistence failed:', error);
-    res.status(503).json({ error: 'The school and administrator could not be confirmed as saved. Check the directory before retrying to avoid creating a duplicate.' });
+    console.error('[superadmin] School onboarding persistence failed; attempting rollback:', error);
+    db.deleteSchool(school.id);
+    try { await db.flush(); } catch (rollbackError) { console.error('[superadmin] School onboarding rollback could not be confirmed:', rollbackError); }
+    if (uploadedLogoPath && isSupabaseConfigured) {
+      try { await createClient(supabaseUrl, supabaseKey).storage.from('school-logos').remove([uploadedLogoPath]); } catch { /* best-effort cleanup */ }
+    }
+    res.status(503).json({ error: 'School registration could not be saved. The system attempted to roll back the new school; refresh School Directory before retrying.' });
     return;
   }
 
-  res.status(201).json({ school, admin: sanitizeUser(adminUser), temporaryPassword, mustChangePassword: true });
+  res.status(201).json({
+    school,
+    admin: sanitizeUser(adminUser),
+    adminUsername: adminUser.staffId,
+    ...(temporaryPassword ? { temporaryPassword } : {}),
+    mustChangePassword: Boolean(adminUser.mustChangePassword)
+  });
 });
 
 const updateSchoolDetailsSchema = z.object({
@@ -1932,8 +1973,11 @@ const updateSchoolDetailsSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid school email.').max(254),
   address: z.string().trim().min(2, 'School address is required.').max(240),
   city: z.string().trim().min(2, 'School city is required.').max(100),
+  country: z.string().trim().max(80),
+  region: z.string().trim().max(100),
+  schoolType: z.enum(['primary', 'secondary', 'combined']),
   phone: z.string().trim().min(7, 'Enter a valid school phone number.').max(30),
-  whatsappPhone: z.string().trim().min(7, 'Enter a valid WhatsApp number.').max(30),
+  whatsappPhone: z.string().trim().max(30).optional().or(z.literal('')),
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Choose a valid brand color.'),
   currency: z.enum(['ETB', 'USD', 'SOS']),
   language: z.enum(['en', 'so'])

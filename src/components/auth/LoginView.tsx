@@ -177,14 +177,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Email, phone, or Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">Email, phone, School Admin ID, or Teacher ID</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Email, phone, or T001"
+                      placeholder="Email, phone, Admin ID, or T001"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
