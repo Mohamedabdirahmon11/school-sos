@@ -63,6 +63,16 @@ test('inventory screen uses persistent item API and stock movement ledger', () =
   assert.match(inventoryUi, /Reactivate/);
 });
 
+test('inventory create, update, and stock movements flush audit events before success', () => {
+  const start = api.indexOf("apiRouter.get('/inventory'");
+  const end = api.indexOf('// Paid provider settings', start);
+  const routes = api.slice(start, end);
+  assert.equal((routes.match(/await db\.flush\(\)/g) || []).length, 3);
+  assert.match(routes, /Created inventory item[\s\S]*?await db\.flush\(\)[\s\S]*?res\.status\(201\)\.json\(item\)/);
+  assert.match(routes, /Updated inventory item[\s\S]*?await db\.flush\(\)[\s\S]*?res\.json\(item\)/);
+  assert.match(routes, /Recorded [\s\S]*?movement[\s\S]*?await db\.flush\(\)[\s\S]*?res\.status\(201\)\.json\(movement\)/);
+});
+
 test('reports exclude voided payments, preserve zero attendance, and describe configured pass marks', () => {
   const migration = readFileSync(new URL('../supabase/migrations/037_reports_exclude_voided_and_inactive_records.sql', import.meta.url), 'utf8');
   assert.ok(migration.includes("status IN ('present', 'late')"));
