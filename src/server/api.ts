@@ -833,23 +833,34 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // 1. AUTHENTICATION & LOGIN (PASSWORD, STAFF FIRST-LOGIN, STUDENT/PARENT PIN)
 // ==============================================================================
 
-async function syncLinkedSupabaseAuthPassword(user: User, password: string): Promise<boolean> {
+async function syncLinkedSupabaseAuthCredentials(
+  user: User,
+  updates: { email?: string; password?: string }
+): Promise<boolean> {
   const authUserId = String(user.authUserId || '').trim();
   if (!authUserId) return true;
   if (!isSupabaseConfigured || !user.email || !supabaseUrl || !supabaseKey) return false;
+
+  const attributes: { email?: string; email_confirm?: boolean; password?: string } = {};
+  if (updates.email && updates.email !== user.email) {
+    attributes.email = updates.email;
+    attributes.email_confirm = true;
+  }
+  if (updates.password) attributes.password = updates.password;
+  if (Object.keys(attributes).length === 0) return true;
 
   try {
     const adminClient = createClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false }
     });
-    const { error } = await adminClient.auth.admin.updateUserById(authUserId, { password });
+    const { error } = await adminClient.auth.admin.updateUserById(authUserId, attributes);
     if (error) {
-      console.error('[auth] Linked Supabase Auth password update failed:', error.message);
+      console.error('[auth] Linked Supabase Auth credential update failed:', error.message);
       return false;
     }
     return true;
-  } catch (error) {
-    console.error('[auth] Linked Supabase Auth password update failed.');
+  } catch {
+    console.error('[auth] Linked Supabase Auth credential update failed.');
     return false;
   }
 }
@@ -1351,7 +1362,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     return;
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
-  if (!(await syncLinkedSupabaseAuthPassword(user, newPassword))) {
+  if (!(await syncLinkedSupabaseAuthCredentials(user, { password: newPassword }))) {
     res.status(503).json({ error: 'The password could not be updated in the linked authentication account. No local password changes were saved.' });
     return;
   }
@@ -1408,9 +1419,20 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
       return;
     }
   }
+  if (user.authUserId && !cleanEmail) {
+    res.status(400).json({ error: 'A linked authentication account must keep a valid email address.' });
+    return;
+  }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
     if (existing && existing.id !== user.id) { res.status(409).json({ error: 'That email address is already in use.' }); return; }
+  }
+  if (!(await syncLinkedSupabaseAuthCredentials(user, {
+    email: cleanEmail && cleanEmail !== (user.email || '').toLowerCase() ? cleanEmail : undefined,
+    password: newPassword || undefined
+  }))) {
+    res.status(503).json({ error: 'The linked authentication account could not be updated. No local profile changes were saved.' });
+    return;
   }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
@@ -6219,7 +6241,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     return;
   }
   const temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
-  if (!(await syncLinkedSupabaseAuthPassword(targetUser, temporaryPassword))) {
+  if (!(await syncLinkedSupabaseAuthCredentials(targetUser, { password: temporaryPassword }))) {
     res.status(503).json({ error: 'The linked authentication password could not be reset. The existing password remains unchanged.' });
     return;
   }
