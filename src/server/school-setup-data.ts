@@ -23,7 +23,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   }
   if (step === 2) {
     const y = data.academicYear;
-    if (!y || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
+    if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
     const existingTerms = existingData?.terms;
@@ -42,7 +42,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   if (step === 4) {
     const c = data.calendar;
     const allowedDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    if (!c || !Array.isArray(c.workingDays) || !c.workingDays.length || !Array.isArray(c.weeklyHolidays) || c.workingDays.some((d: string) => !allowedDays.includes(d) || c.weeklyHolidays.includes(d)) || c.weeklyHolidays.some((d: string) => !allowedDays.includes(d))) return 'Choose working days and weekly holidays without overlap.';
+    if (!c || !Array.isArray(c.workingDays) || !c.workingDays.length || !Array.isArray(c.weeklyHolidays) || c.workingDays.some((d: string) => !allowedDays.includes(d) || c.weeklyHolidays.includes(d)) || c.weeklyHolidays.some((d: string) => !allowedDays.includes(d)) || new Set([...c.workingDays, ...c.weeklyHolidays]).size !== allowedDays.length || allowedDays.some(day => !c.workingDays.includes(day) && !c.weeklyHolidays.includes(day))) return 'Assign all seven days as either working days or weekly holidays, without overlap.';
     if (!['ethiopian', 'gregorian', 'both'].includes(c.calendarType)) return 'Choose a supported calendar display.';
     if (!Array.isArray(c.nationalHolidays) || !Array.isArray(c.schoolHolidays)) return 'Holiday lists are invalid.';
     if (c.nationalHolidays.some((h: any) => !String(h.name || '').trim() || !validIsoDate(h.date) || !['ethiopian', 'gregorian'].includes(h.calendar || 'ethiopian')) || c.schoolHolidays.some((h: any) => !String(h.name || '').trim() || !validIsoDate(h.startDate) || !validIsoDate(h.endDate) || h.startDate > h.endDate)) return 'Holiday names and dates must be valid.';
