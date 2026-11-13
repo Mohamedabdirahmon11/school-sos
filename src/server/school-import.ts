@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 
 export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'fatherPhone', 'motherName', 'motherPhone', 'studentPhone', 'branch'] as const;
+const PHONE_IMPORT_COLUMNS = new Set(['parentPhone', 'fatherPhone', 'motherPhone', 'studentPhone']);
+
+export function normalizeImportPhone(value: unknown): string {
+  // Spreadsheet applications use a leading apostrophe to force phone numbers to text.
+  // It is a cell-format marker, not part of the international phone number.
+  return String(value ?? '').trim().replace(/^['’]\s*/, '').trim();
+}
 export const MAX_IMPORT_ROWS = 2000;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
@@ -56,7 +63,10 @@ export function parseSchoolImport(file: Buffer, extension: 'csv' | 'xlsx'): Scho
     if (!records.length) return [];
     const headers = records.shift()!.map(value => value.trim());
     if (records.length > MAX_IMPORT_ROWS) throw new Error('File exceeds the 2,000 row limit.');
-    return records.map(values => Object.fromEntries(IMPORT_COLUMNS.map(column => [column, String(values[headers.indexOf(column)] ?? '').trim()])) as unknown as SchoolImportRow);
+    return records.map(values => Object.fromEntries(IMPORT_COLUMNS.map(column => {
+      const value = String(values[headers.indexOf(column)] ?? '').trim();
+      return [column, PHONE_IMPORT_COLUMNS.has(column) ? normalizeImportPhone(value) : value];
+    })) as unknown as SchoolImportRow);
   }
   let workbook: XLSX.WorkBook;
   try {
@@ -76,7 +86,10 @@ export function parseSchoolImport(file: Buffer, extension: 'csv' | 'xlsx'): Scho
       }
       return [key.trim(), String(field ?? '').trim()];
     }));
-    return Object.fromEntries(IMPORT_COLUMNS.map(column => [column, normalized[column] || ''])) as unknown as SchoolImportRow;
+    return Object.fromEntries(IMPORT_COLUMNS.map(column => {
+      const value = normalized[column] || '';
+      return [column, PHONE_IMPORT_COLUMNS.has(column) ? normalizeImportPhone(value) : value];
+    })) as unknown as SchoolImportRow;
   });
 }
 
@@ -85,7 +98,7 @@ export function isExampleImportRow(row: SchoolImportRow): boolean {
 }
 
 export function validImportPhone(value: string): boolean {
-  return /^\+?[1-9]\d{6,14}$/.test(value.replace(/[\s()-]/g, ''));
+  return /^\+?[1-9]\d{6,14}$/.test(normalizeImportPhone(value).replace(/[\s()-]/g, ''));
 }
 
 export function splitStudentName(value: string): { firstName: string; middleName: string; lastName: string } {
