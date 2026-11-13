@@ -922,8 +922,9 @@ export class ApiClient {
     return this.request<any[]>('/exams/schedules');
   }
 
-  public static async getPublishedExamSchedules() {
-    return this.request<any[]>('/exams/schedules/published');
+  public static async getPublishedExamSchedules(classId?: string) {
+    const query = classId ? `?classId=${encodeURIComponent(classId)}` : '';
+    return this.request<any[]>(`/exams/schedules/published${query}`);
   }
 
   public static async createExamSchedule(schedule: {
