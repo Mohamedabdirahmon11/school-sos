@@ -922,6 +922,10 @@ export class ApiClient {
     return this.request<any[]>('/exams/schedules');
   }
 
+  public static async getPublishedExamSchedules() {
+    return this.request<any[]>('/exams/schedules/published');
+  }
+
   public static async createExamSchedule(schedule: {
     examName: string; classId: string; subjectId: string; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
