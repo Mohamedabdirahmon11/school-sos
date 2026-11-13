@@ -302,6 +302,16 @@ export class ApiClient {
     }>(`/superadmin/schools/${encodeURIComponent(id)}`);
   }
 
+  public static async updateSchoolDetails(id: string, details: {
+    name: string; email: string; address: string; city: string; phone: string;
+    whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so';
+  }) {
+    return this.request<School>(`/superadmin/schools/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(details)
+    });
+  }
+
   public static async updateSubscription(schoolId: string, updates: any) {
     return this.updateSchoolSubscription(schoolId, updates);
   }
