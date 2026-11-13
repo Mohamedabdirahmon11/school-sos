@@ -23,10 +23,11 @@ test('school onboarding validates country, region, type and required contacts wh
   assert.match(schools, /schoolType: addSchoolType/);
   assert.match(schools, /logoDataUrl: addLogoDataUrl/);
   assert.match(schools, /Admin Login ID/);
-  assert.match(schools, /Initial Password/);
+  assert.match(schools, /Initial PIN/);
   assert.match(schools, /Email Address \(Optional\)/);
-  assert.match(api, /requestedAdminUsername \|\| await nextSchoolStaffId\(school\)/);
-  assert.match(api, /mustChangePassword: !adminPassword/);
+  assert.match(api, /requestedAdminUsername \|\| await nextSchoolAdminId\(\)/);
+  assert.match(api, /mustChangePassword: true/);
+  assert.match(api, /const temporaryPin = String\(adminPin \|\| randomInt\(100000, 1_000_000\)\)/);
   assert.match(api, /school-logos/);
   assert.match(api, /School logo must be smaller than 2 MB/);
 });
