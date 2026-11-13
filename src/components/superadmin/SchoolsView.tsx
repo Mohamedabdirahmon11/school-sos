@@ -171,7 +171,7 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
       setDeleteConfirmationName('');
       await fetchSchools();
       if (result.cleanupWarnings?.length) {
-        window.alert(`Database records for ${result.schoolName} were deleted. Some external cleanup needs attention:\\n\\n${result.cleanupWarnings.join('\\n')}`);
+        window.alert(`Database records for ${result.schoolName} were deleted. Some external cleanup needs attention:\n\n${result.cleanupWarnings.join('\n')}`);
       } else {
         setActionNotice(`School "${result.schoolName}" and its school-scoped database records were permanently deleted.`);
       }
@@ -345,13 +345,13 @@ export const SchoolsView: React.FC<SchoolsViewProps> = ({ initialSchoolId, onVie
   const handleResetAdminPassword = async (adminId: string) => {
     const temporaryPin = window.prompt('Enter a new School Admin PIN (4–6 digits). The administrator must change it at next sign-in.');
     if (temporaryPin === null) return;
-    if (!/^\\d{4,6}$/.test(temporaryPin.trim())) {
+    if (!/^\d{4,6}$/.test(temporaryPin.trim())) {
       window.alert('PIN must contain 4–6 digits only.');
       return;
     }
     try {
       const result = await ApiClient.resetUserPassword(adminId, temporaryPin.trim());
-      window.alert(`Temporary School Admin PIN (shown once):\\n\\n${result.temporaryPassword}\\n\\nThe administrator must change it at next sign-in.`);
+      window.alert(`Temporary School Admin PIN (shown once):\n\n${result.temporaryPassword}\n\nThe administrator must change it at next sign-in.`);
     } catch (err: any) {
       alert(err.message);
     }
