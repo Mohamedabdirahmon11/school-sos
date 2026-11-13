@@ -146,3 +146,31 @@ test('Super Admin dashboard quick renew action cannot be submitted twice', () =>
   assert.match(dashboardSource, /Activating…/);
   assert.match(dashboardSource, /finally \{\s*setActivatingSchoolId\(null\)/);
 });
+
+
+test('bulk academic year update is previewed, protected, and requires explicit typed confirmation', () => {
+  const apiSource = read('../src/server/api.ts');
+  const clientSource = read('../src/services/api.ts');
+  const settingsSource = read('../src/components/superadmin/PlatformSettingsView.tsx');
+  const panelSource = read('../src/components/superadmin/BulkAcademicYearPanel.tsx');
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/preview', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /apiRouter\.post\('\/superadmin\/academic-year\/apply', requireAuth, requireSuperAdmin/);
+  assert.match(apiSource, /Academic year must cover two consecutive years/);
+  assert.match(apiSource, /parsed\.data\.confirm !== 'CONFIRM'/);
+  assert.match(apiSource, /row\.status === 'warning' && !parsed\.data\.includeWarned/);
+  assert.match(apiSource, /db\.updateSchool\(row\.id, \{ academicYear: targetYear \}\)/);
+  assert.match(apiSource, /SCHOOL_ACADEMIC_YEAR_BULK_UPDATED/);
+  assert.match(apiSource, /await db\.flush\(\)/);
+  assert.match(clientSource, /previewBulkAcademicYear/);
+  assert.match(clientSource, /applyBulkAcademicYear/);
+  assert.match(settingsSource, /<BulkAcademicYearPanel \/>/);
+  assert.match(panelSource, /Type CONFIRM/);
+  assert.match(panelSource, /Preview schools/);
+  assert.match(panelSource, /Include schools whose current academic year is later than the target year/);
+});
+
+test('bulk academic year preview flags malformed existing years for explicit review', () => {
+  const apiSource = read('../src/server/api.ts');
+  assert.match(apiSource, /Current academic year is not in YYYY-YYYY format; review before replacing it/);
+  assert.match(apiSource, /row\.status === 'warning' && !parsed\.data\.includeWarned/);
+});
