@@ -105,7 +105,10 @@ function onboardingFieldErrors(body: Record<string, unknown>): string[] {
   if (typeof body.code === 'string' && body.code.trim() && !/^[a-z0-9_-]{2,20}$/i.test(body.code.trim())) missing.push('code (use 2–20 letters, numbers, hyphens or underscores)');
   if (typeof body.schoolType === 'string' && !['primary', 'secondary', 'combined'].includes(body.schoolType)) missing.push('schoolType (choose primary, secondary or combined)');
   if (typeof body.adminUsername === 'string' && body.adminUsername.trim() && !/^[a-z0-9_-]{3,32}$/i.test(body.adminUsername.trim())) missing.push('adminUsername (use 3–32 letters, numbers, hyphens or underscores)');
-  if (typeof body.adminPassword === 'string' && body.adminPassword && (body.adminPassword.length < 8 || body.adminPassword.length > 128)) missing.push('adminPassword (must be 8–128 characters)');
+  if (typeof body.adminPassword === 'string' && body.adminPassword) {
+    const passwordError = passwordPolicyError(body.adminPassword);
+    if (passwordError) missing.push(`adminPassword (${passwordError})`);
+  }
   if (typeof body.logoDataUrl === 'string' && body.logoDataUrl && !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(body.logoDataUrl)) missing.push('logoDataUrl (use PNG, JPEG or WebP)');
   return [...new Set(missing)];
 }
@@ -1974,7 +1977,7 @@ const updateSchoolDetailsSchema = z.object({
   region: z.string().trim().max(100),
   schoolType: z.enum(['primary', 'secondary', 'combined']),
   phone: z.string().trim().min(7, 'Enter a valid school phone number.').max(30),
-  whatsappPhone: z.string().trim().min(7, 'Enter a valid WhatsApp number.').max(30),
+  whatsappPhone: z.string().trim().max(30).optional().or(z.literal('')),
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Choose a valid brand color.'),
   currency: z.enum(['ETB', 'USD', 'SOS']),
   language: z.enum(['en', 'so'])
