@@ -94,7 +94,7 @@ test('platform backup UI clearly distinguishes a preference from unconfigured au
   const storageSource = read('../src/server/storage.ts');
   assert.match(settingsSource, /Backup Frequency Preference/);
   assert.match(settingsSource, /scheduled workflow is currently blocked/);
-  assert.match(settingsSource, /does not support full-platform restore/);
+  assert.match(settingsSource, /Full-platform restore is not supported/);
   assert.match(storageSource, /full-platform restore is not supported/);
 });
 
