@@ -97,3 +97,15 @@ test('platform backup UI does not imply that the saved frequency preference runs
   assert.match(settingsSource, /does not support full-platform restore/);
   assert.match(storageSource, /full-platform restore is not supported/);
 });
+
+
+test('subscription updates cannot be double-submitted and form limits match server validation', () => {
+  const schoolsSource = read('../src/components/superadmin/SchoolsView.tsx');
+  const apiSource = read('../src/server/api.ts');
+  assert.match(schoolsSource, /if \(!selectedSchool \|\| isUpdatingSubscription\) return/);
+  assert.match(schoolsSource, /disabled=\{isUpdatingSubscription\}/);
+  assert.match(schoolsSource, /min="1"\s+max="120"/);
+  assert.match(schoolsSource, /min="0"\s+max="60"/);
+  assert.match(apiSource, /monthsToAdd must be a whole number from 1 to 120/);
+  assert.match(apiSource, /graceDays must be a whole number from 0 to 60/);
+});
