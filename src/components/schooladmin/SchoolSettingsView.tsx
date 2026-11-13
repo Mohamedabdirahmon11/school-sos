@@ -472,7 +472,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('documents')
+            onClick={() => setActiveTab('documents')}
             className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'documents' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
             }`}
