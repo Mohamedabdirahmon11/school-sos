@@ -750,7 +750,7 @@ async function refreshSessionCookie(res: Response, user: User, previous: ReturnT
 // its existing SchoolOS password. Never overwrite or guess an existing Auth
 // identity; duplicate emails require an explicit account reconciliation.
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
-  if (!isSupabaseConfigured || !user.email || user.authUserId) return;
+  if (!isSupabaseConfigured || !user.email || user.authUserId || !['super_admin', 'school_admin', 'accountant'].includes(user.role)) return;
 
   const adminClient = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false }
@@ -1193,7 +1193,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Only a verified legacy password (never a teacher PIN) can create a
   // Supabase Auth identity. Teacher ID/PIN and student/parent PIN logins retain
   // their existing sign-in flow.
-  if (!authUserId && verifiedLegacyPassword) {
+  if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role)) {
     await linkLegacyLoginToSupabaseAuth(user, password);
   }
 
