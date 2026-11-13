@@ -1390,6 +1390,16 @@ class StorageEngine {
       }
       return account;
     }
+    // Accept a School ID when it resolves to exactly one active School Admin.
+    // Ambiguous schools must use the individual School Admin ID instead.
+    if (!schoolId) {
+      const school = await this.getSchoolById(normalizedStaffId);
+      if (school) {
+        const schoolAdmins = (await this.queryRows<User>('users', { school_id: school.id, role: 'school_admin' }))
+          .filter(account => !account.isBlocked);
+        if (schoolAdmins.length === 1) return schoolAdmins[0];
+      }
+    }
     const matches = (await this.queryRows<StaffMember>('staff_members', { school_id: schoolId, staff_id: normalizedStaffId }))
       .filter(record => record.staffId?.toUpperCase() === normalizedStaffId && record.status === 'active' && record.userId);
     if (matches.length !== 1) return null;

@@ -1095,8 +1095,8 @@ apiRouter.post('/auth/login', async (req, res) => {
   // B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT
   // Teachers use their school-issued staff ID and either password or PIN.
   const identifier = typeof email === 'string' ? email.trim() : '';
-  if (!identifier || !password) {
-    res.status(400).json({ error: requestedRole === 'teacher' ? 'Teacher ID and password or PIN are required.' : 'Email or phone and password are required.' });
+  if (!identifier || (!password && !pin)) {
+    res.status(400).json({ error: requestedRole === 'teacher' ? 'Teacher ID and PIN are required.' : 'Email, School ID, or staff ID and password/PIN are required.' });
     return;
   }
   if (requestedRole === 'teacher' && !validStaffId(normalizeStaffId(identifier))) {
@@ -1115,7 +1115,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     return;
   }
 
-  const storedUser = await db.findUserForLogin(identifier);
+  let storedUser = await db.findUserForLogin(identifier);
   if (!storedUser) {
     db.recordLoginFailure(staffLockKey, threshold, durationMins);
     db.recordLoginFailure(ipKey, ipThreshold, durationMins);
@@ -1162,7 +1162,29 @@ apiRouter.post('/auth/login', async (req, res) => {
   let isPasswordValid = false;
   let verifiedLegacyPassword = false;
   const authUserId = String((user as any).authUserId || '').trim();
-  if (authUserId) {
+  const submittedPin = typeof pin === 'string' ? pin.trim() : '';
+  // School Admin and Teacher accounts may authenticate with their issued PIN.
+  // Legacy School Admin onboarding PINs are checked against their password hash
+  // until the account receives a dedicated PIN hash or rotates credentials.
+  if (submittedPin && ['school_admin', 'teacher'].includes(user.role)) {
+    const legacySchoolAdminPinValid = !authUserId && user.role === 'school_admin'
+      && !user.pin && verifyPassword(submittedPin, user.passwordHash);
+    if (legacySchoolAdminPinValid) {
+      // Upgrade existing School Admin accounts in place so their PIN continues
+      // working even after the first-login password-change flow updates passwordHash.
+      db.updateUser(user.id, { pin: hashPin(submittedPin) });
+      try {
+        await db.flush();
+        isPasswordValid = true;
+      } catch {
+        res.status(503).json({ error: 'Your PIN was verified, but its secure sign-in record could not be saved. Please retry.' });
+        return;
+      }
+    } else {
+      isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''));
+    }
+  }
+  if (!isPasswordValid && authUserId) {
     if (isSupabaseConfigured && user.email) {
       try {
         // Use an isolated server-side client so password sign-in cannot mutate the
@@ -1179,10 +1201,11 @@ apiRouter.post('/auth/login', async (req, res) => {
         isPasswordValid = false;
       }
     }
-  } else {
-    verifiedLegacyPassword = verifyPassword(password, user.passwordHash);
+  } else if (!isPasswordValid) {
+    const legacyCredential = password || submittedPin;
+    verifiedLegacyPassword = verifyPassword(legacyCredential, user.passwordHash);
     isPasswordValid = verifiedLegacyPassword
-      || (user.role === 'teacher' && verifyPin(password, String(user.pin || (user as any).pinHash || '')));
+      || (['school_admin', 'teacher'].includes(user.role) && verifyPin(legacyCredential, String(user.pin || (user as any).pinHash || '')));
   }
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
@@ -1986,6 +2009,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
       email: cleanAdminEmail || undefined,
       phone: String(adminPhone || phone).trim(),
       passwordHash: hashPassword(temporaryPin),
+      pin: hashPin(temporaryPin),
       mustChangePassword: true,
       isBlocked: false,
       failedLoginAttempts: 0

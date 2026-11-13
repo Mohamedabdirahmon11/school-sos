@@ -54,7 +54,7 @@ export const LoginView: React.FC = () => {
         email,
         phone,
         schoolCode,
-        pin,
+        pin: email.trim().includes('@') ? pin : (password || pin),
         password
       });
       if (result.requirePasswordChange && result.challengeToken) {
@@ -177,14 +177,14 @@ export const LoginView: React.FC = () => {
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Email, phone, School Admin ID, or Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / School Admin ID, or Teacher ID</label>
                   <div className="mt-1">
                     <input
                       type="text"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="Email, phone, Admin ID, or T001"
+                      placeholder="Super Admin email or School / Admin / Teacher ID"
                       className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                     />
                   </div>
@@ -192,7 +192,7 @@ export const LoginView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">Password / Admin PIN / Teacher PIN</label>
+                    <label className="block text-xs font-medium text-[#334155]">Password (Super Admin) or PIN (School Admin / Teacher)</label>
                     <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
                       Use your account password or the temporary PIN issued by your Super Admin or School Admin.
                     </span>

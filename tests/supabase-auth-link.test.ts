@@ -22,9 +22,9 @@ test('legacy account migration requires a verified stored password', () => {
   const migration = staffRoute.indexOf('linkLegacyLoginToSupabaseAuth(user, password)');
   const session = staffRoute.indexOf('await issueSessionCookie(res, user, req)');
   assert.ok(failedPassword >= 0 && migration > failedPassword && session > migration);
-  assert.ok(staffRoute.includes('verifiedLegacyPassword = verifyPassword(password, user.passwordHash)'));
+  assert.ok(staffRoute.includes('verifiedLegacyPassword = verifyPassword(legacyCredential, user.passwordHash)'));
   assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role))"));
-  assert.ok(staffRoute.includes("user.role === 'teacher' && verifyPin"));
+  assert.ok(staffRoute.includes("['school_admin', 'teacher'].includes(user.role) && verifyPin"));
   assert.equal(staffRoute.slice(migration - 100, migration + 160).includes('verifyPin'), false);
 });
 
@@ -46,7 +46,7 @@ test('teachers always keep school-issued Teacher ID and PIN authentication', () 
   const routeEnd = api.indexOf("apiRouter.post('/auth/logout'", routeStart);
   const route = api.slice(routeStart, routeEnd);
   assert.ok(route.includes("['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
-  assert.ok(route.includes("user.role === 'teacher' && verifyPin"));
+  assert.ok(route.includes("['school_admin', 'teacher'].includes(user.role) && verifyPin"));
 });
 
 test('student and parent PIN login remains separate from Supabase Auth migration', () => {
