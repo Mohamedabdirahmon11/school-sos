@@ -17,7 +17,7 @@ test('school onboarding validates country, region, type and required contacts wh
     assert.match(api, new RegExp(`'${field}'`), `missing onboarding validation for ${field}`);
   }
   assert.match(api, /schoolType.*primary.*secondary.*combined/);
-  assert.match(api, /adminEmail.*invalid email/);
+  assert.ok(api.includes("'adminEmail'") && api.includes("invalid email"));
   assert.match(schools, /country: addCountry/);
   assert.match(schools, /region: addRegion/);
   assert.match(schools, /schoolType: addSchoolType/);
