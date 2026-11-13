@@ -149,7 +149,7 @@ export class ApiClient {
       (err as any).status = response.status;
       (err as any).code = data.code;
       (err as any).data = data;
-      if (typeof window !== 'undefined' && data.code === 'MUST_CHANGE_PASSWORD') {
+      if (typeof window !== 'undefined' && ['MUST_CHANGE_PASSWORD', 'MUST_CHANGE_PIN'].includes(data.code)) {
         window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
       } else if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login' && endpoint !== '/auth/change-password' && endpoint !== '/auth/change-pin' && [401, 403, 500].includes(response.status)) {
         window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: response.status, message: errorMsg, code: data.code } }));
