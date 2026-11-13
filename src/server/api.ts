@@ -1647,7 +1647,10 @@ async function buildBulkAcademicYearPreview(targetYear: string) {
     let status: 'change' | 'unchanged' | 'warning' = 'change';
     let warning = '';
     if (current === targetYear) status = 'unchanged';
-    else if (currentStart !== null && targetStart < currentStart) {
+    else if (current && currentStart === null) {
+      status = 'warning';
+      warning = 'Current academic year is not in YYYY-YYYY format; review before replacing it.';
+    } else if (currentStart !== null && targetStart < currentStart) {
       status = 'warning';
       warning = 'Target year is earlier than the current year of this school.';
     }
