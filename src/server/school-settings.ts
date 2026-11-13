@@ -117,7 +117,7 @@ const schoolSettingsSchema = z.object({
     requireExcusedReason: z.boolean(),
     allowParentExcuses: z.boolean()
   }).optional(),
-  classLevels: z.array(z.number().int().min(1, 'Class levels must be between 1 and 12.').max(12, 'Class levels must be between 1 and 12.')).min(1, 'Select at least one class level.').max(12, 'Use 12 class levels or fewer.').refine(levels => new Set(levels).size === levels.length, 'Class levels must be unique.').optional(),
+  classLevels: z.array(z.number().int().min(0, 'Class levels must be between KG (0) and 12.').max(12, 'Class levels must be between KG (0) and 12.')).min(1, 'Select at least one class level.').max(12, 'Use 12 class levels or fewer.').refine(levels => new Set(levels).size === levels.length, 'Class levels must be unique.').optional(),
   reportCardHeader: headerText('Report card header', 300).optional(),
   reportCardFooter: headerText('Report card footer', 300).optional(),
   receiptHeader: headerText('Receipt header', 300).optional(),
