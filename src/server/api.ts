@@ -6576,7 +6576,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
   }
   invalidateAuthenticatedSnapshot(targetUser.id);
   db.logAudit({
-    action: 'ADMIN_PASSWORD_RESET',
+    action: targetUser.role === 'school_admin' ? 'ADMIN_PIN_RESET' : 'ADMIN_PASSWORD_RESET',
     category: 'auth',
     schoolId: targetUser.schoolId,
     userId: user.id,
@@ -6587,7 +6587,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
   });
   await db.flush();
   res.json(targetUser.role === 'school_admin'
-    ? { success: true, temporaryPin: temporaryCredential, mustChangePassword: true }
+    ? { success: true, temporaryPin: temporaryCredential, temporaryPassword: temporaryCredential, mustChangePassword: true }
     : { success: true, temporaryPassword: temporaryCredential, mustChangePassword: true });
 });
 
