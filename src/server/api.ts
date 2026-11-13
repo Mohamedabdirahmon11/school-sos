@@ -40,7 +40,7 @@ import { classGradeMismatchError } from './class-grade-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
-import { sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
+import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
@@ -3593,6 +3593,14 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
       return;
     }
   }
+  if (settings.shiftCount === 2) {
+    const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
+    const closingTime = school.setupData?.workingHours?.closingTime;
+    if (!isShiftWithinSchoolClosingTime(settings, periodsPerDay, closingTime)) {
+      res.status(400).json({ error: 'Second shift must finish before the school closing time configured in School Setup.' });
+      return;
+    }
+  }
   const saved = await db.saveTimetableSettings(school.id, settings);
   db.logAudit({
     action: 'TIMETABLE_SETTINGS_UPDATED',
@@ -3649,7 +3657,12 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...getTimetablePeriodTimes(settings, period, Number(klass.shift) === 2 ? 2 : 1), subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
+  const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
+  const closingTime = school.setupData?.workingHours?.closingTime;
+  if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
+    res.status(400).json({ error: 'This second-shift period would finish after the school closing time configured in School Setup.' }); return;
+  }
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
   try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
@@ -3718,9 +3731,12 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     const j = Math.floor(Math.random() * (i + 1));
     [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
   }
+  const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
+  const closingTime = school.setupData?.workingHours?.closingTime;
   const candidates = TIMETABLE_DAYS.flatMap(day =>
-    Array.from({ length: 6 }, (_, index) => ({ day, period: index + 1 }))
+    Array.from({ length: Math.min(6, periodsPerDay) }, (_, index) => ({ day, period: index + 1 }))
       .filter(item => !(item.day === 'Friday' && item.period === 6))
+      .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
   );
   for (const assignment of lessonQueue) {
     const available = candidates.filter(({ day, period }) => {
@@ -3821,9 +3837,12 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       const j = Math.floor(Math.random() * (i + 1));
       [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
     }
+    const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
+    const closingTime = school.setupData?.workingHours?.closingTime;
     const candidates = TIMETABLE_DAYS.flatMap(day =>
-      Array.from({ length: 6 }, (_, index) => ({ day, period: index + 1 }))
+      Array.from({ length: Math.min(6, periodsPerDay) }, (_, index) => ({ day, period: index + 1 }))
         .filter(item => !(item.day === 'Friday' && item.period === 6))
+        .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
     );
     for (const assignment of lessonQueue) {
       const available = candidates.filter(({ day, period }) => {

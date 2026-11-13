@@ -252,3 +252,30 @@ export function sanitizeTimetableSettings(body: unknown) {
   }
   return parsed.data;
 }
+
+
+export function calculateShiftEndMinutes(settings: {
+  shift2FirstPeriodStart?: string;
+  shift2PeriodMinutes?: number;
+  shift2BreakAfterPeriod?: number;
+  shift2BreakMinutes?: number;
+}, periodsPerDay: number): number {
+  const start = settings.shift2FirstPeriodStart || '13:00';
+  const [hours, minutes] = start.split(':').map(Number);
+  // The timetable API currently permits at most six periods per day (Friday five).
+  const periods = Number.isInteger(periodsPerDay) && periodsPerDay > 0 ? Math.min(6, periodsPerDay) : 6;
+  const periodMinutes = Number(settings.shift2PeriodMinutes || 40);
+  const breakAfter = Number(settings.shift2BreakAfterPeriod || 3);
+  const breakMinutes = Number(settings.shift2BreakMinutes ?? 20);
+  return hours * 60 + minutes + periods * periodMinutes + (periods > breakAfter ? breakMinutes : 0);
+}
+
+export function isShiftWithinSchoolClosingTime(
+  settings: Parameters<typeof calculateShiftEndMinutes>[0],
+  periodsPerDay: number,
+  closingTime?: string | null
+): boolean {
+  if (!closingTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(closingTime)) return true;
+  const [hours, minutes] = closingTime.split(':').map(Number);
+  return calculateShiftEndMinutes(settings, periodsPerDay) <= hours * 60 + minutes;
+}
