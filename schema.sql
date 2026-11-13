@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS subjects (
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE subjects ALTER COLUMN credit_units SET DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_subjects_school ON subjects(school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_code ON subjects(school_id, lower(code));
 
 -- 12. STUDENTS
 CREATE TABLE IF NOT EXISTS students (
@@ -855,11 +856,12 @@ CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
 CREATE OR REPLACE FUNCTION schoolos_bulk_import(p_payload JSONB) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  INSERT INTO classes (id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee)
-  SELECT id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee
+  INSERT INTO classes (id, school_id, branch_id, name, class_code, academic_year, grade_level, section, shift, room_number, capacity, monthly_fee)
+  SELECT id, school_id, branch_id, name, class_code, academic_year, grade_level, section, COALESCE(shift, 1), room_number, capacity, monthly_fee
   FROM jsonb_to_recordset(COALESCE(p_payload->'classes', '[]'::jsonb)) AS x(
-    id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, grade_level INTEGER,
-    section VARCHAR, room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
+    id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, class_code VARCHAR,
+    academic_year VARCHAR, grade_level INTEGER, section VARCHAR, shift SMALLINT,
+    room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
   );
 
   INSERT INTO students (id, school_id, branch_id, student_id, first_name, middle_name, last_name, gender,
