@@ -15,8 +15,7 @@ SET academic_year = '2026-2027'
 WHERE academic_year IS NULL;
 
 UPDATE public.classes
-SET class_code = 'CLS-' || upper(regexp_replace(coalesce(name, 'CLASS'), '[^A-Za-z0-9]+', '-', 'g')) || '-' ||
-  upper(right(regexp_replace(id, '[^A-Za-z0-9]', '', 'g'), 6))
+SET class_code = 'CLS-' || CASE WHEN grade_level = 0 THEN 'KG' ELSE 'G' || grade_level::text END || '-' || upper(substr(md5(id), 1, 8))
 WHERE class_code IS NULL OR btrim(class_code) = '';
 
 ALTER TABLE public.classes
