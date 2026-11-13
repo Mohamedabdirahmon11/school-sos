@@ -1482,10 +1482,27 @@ apiRouter.get('/auth/me', requireAuth, async (req, res) => {
 
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
-  const { fullName, email, phone, currentPassword, newPassword } = req.body || {};
+  const { fullName, email, phone, currentPassword, newPassword, currentPin, newPin } = req.body || {};
   if (typeof fullName !== 'string' || fullName.trim().length < 2) { res.status(400).json({ error: 'Full name must contain at least two characters.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
+  if (user.role === 'school_admin' && newPassword) {
+    res.status(400).json({ error: 'School Admin credentials use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
+  }
+  if (user.role !== 'school_admin' && newPin) {
+    res.status(400).json({ error: 'PIN changes are only available for School Admin accounts.' }); return;
+  }
+  if (newPin !== undefined && newPin !== '') {
+    if (typeof newPin !== 'string' || !/^\d{4,6}$/.test(newPin)) {
+      res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' }); return;
+    }
+    const currentPinValid = typeof currentPin === 'string'
+      && (verifyPin(currentPin.trim(), String(user.pin || '')) || (!user.pin && verifyPassword(currentPin.trim(), user.passwordHash)));
+    if (!currentPinValid) { res.status(400).json({ error: 'Current PIN is incorrect.' }); return; }
+    if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
+      res.status(400).json({ error: 'Choose a new PIN that is different from your current PIN.' }); return;
+    }
+  }
   if (newPassword !== undefined && newPassword !== '') {
     const passwordError = passwordPolicyError(newPassword);
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
@@ -1508,10 +1525,12 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
+  if (newPin) { updates.pin = hashPin(newPin); updates.passwordHash = hashPassword(newPin); updates.mustChangePassword = false; }
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
   if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings and synchronized linked authentication.', severity: 'info' });
+  if (newPin) db.logAudit({ action: 'PIN_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'School Admin changed their PIN from profile settings.', severity: 'info' });
   await db.flush();
   res.json(sanitizeUser(updated));
 });
