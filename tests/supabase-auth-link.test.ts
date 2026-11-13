@@ -46,7 +46,7 @@ test('teachers always keep school-issued Teacher ID and PIN authentication', () 
   const routeEnd = api.indexOf("apiRouter.post('/auth/logout'", routeStart);
   const route = api.slice(routeStart, routeEnd);
   assert.ok(route.includes("['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
-  assert.ok(route.includes("user.role === 'teacher' && verifyPin"));
+  assert.ok(route.includes("['school_admin', 'teacher'].includes(user.role) && verifyPin"));
 });
 
 test('student and parent PIN login remains separate from Supabase Auth migration', () => {
