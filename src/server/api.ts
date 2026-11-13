@@ -750,6 +750,38 @@ async function refreshSessionCookie(res: Response, user: User, previous: ReturnT
 // Link a legacy staff account only after the user has successfully proved
 // its existing SchoolOS password. Never overwrite or guess an existing Auth
 // identity; duplicate emails require an explicit account reconciliation.
+async function syncLinkedSupabaseAuthCredentials(
+  user: User,
+  updates: { email?: string; password?: string }
+): Promise<boolean> {
+  const authUserId = String(user.authUserId || '').trim();
+  if (!authUserId) return true;
+  if (!isSupabaseConfigured || !user.email || !supabaseUrl || !supabaseKey) return false;
+
+  const attributes: { email?: string; email_confirm?: boolean; password?: string } = {};
+  if (updates.email && updates.email !== user.email) {
+    attributes.email = updates.email;
+    attributes.email_confirm = true;
+  }
+  if (updates.password) attributes.password = updates.password;
+  if (Object.keys(attributes).length === 0) return true;
+
+  try {
+    const adminClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const { error } = await adminClient.auth.admin.updateUserById(authUserId, attributes);
+    if (error) {
+      console.error('[auth] Linked Supabase Auth credential update failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch {
+    console.error('[auth] Linked Supabase Auth credential update failed.');
+    return false;
+  }
+}
+
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
   if (!isSupabaseConfigured || !user.email || user.authUserId || !['super_admin', 'school_admin', 'accountant'].includes(user.role)) return;
 
@@ -1330,6 +1362,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     return;
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
+  if (!(await syncLinkedSupabaseAuthCredentials(user, { password: newPassword }))) {
+    res.status(503).json({ error: 'The password could not be updated in the linked authentication account. No local password changes were saved.' });
+    return;
+  }
 
   const updated = db.updateUser(user.id, {
     passwordHash: hashPassword(newPassword),
@@ -1346,9 +1382,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: 'User password was updated successfully with scrypt hashing.',
+    details: 'User password was updated successfully and synchronized with linked authentication.',
     severity: 'info'
   });
+  await db.flush();
 
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'Password updated successfully.' });
@@ -1378,16 +1415,28 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
     if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
   }
+  if (user.authUserId && !cleanEmail) {
+    res.status(400).json({ error: 'A linked authentication account must keep a valid email address.' });
+    return;
+  }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
     if (existing && existing.id !== user.id) { res.status(409).json({ error: 'That email address is already in use.' }); return; }
+  }
+  if (!(await syncLinkedSupabaseAuthCredentials(user, {
+    email: cleanEmail && cleanEmail !== (user.email || '').toLowerCase() ? cleanEmail : undefined,
+    password: newPassword || undefined
+  }))) {
+    res.status(503).json({ error: 'The linked authentication account could not be updated. No local profile changes were saved.' });
+    return;
   }
   const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
-  if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings.', severity: 'info' });
+  if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings and synchronized linked authentication.', severity: 'info' });
+  await db.flush();
   res.json(sanitizeUser(updated));
 });
 
@@ -6187,7 +6236,11 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(403).json({ error: 'Only staff account passwords can be reset here.' });
     return;
   }
-  const temporaryPassword = String(randomInt(100000, 1_000_000));
+  const temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
+  if (!(await syncLinkedSupabaseAuthCredentials(targetUser, { password: temporaryPassword }))) {
+    res.status(503).json({ error: 'The linked authentication password could not be reset. The existing password remains unchanged.' });
+    return;
+  }
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -6206,7 +6259,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}).`,
+    details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}); linked authentication was synchronized.`,
     severity: 'warning'
   });
   await db.flush();

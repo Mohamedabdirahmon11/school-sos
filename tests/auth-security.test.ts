@@ -99,3 +99,35 @@ test('backup Super Admin creation is protected, audited, persisted, and requires
   assert.match(panelSource, /result\.temporaryPassword/);
   assert.match(panelSource, /Hide temporary password/);
 });
+
+
+test('password changes and Super Admin resets synchronize linked Supabase Auth credentials', () => {
+  const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const helperStart = apiSource.indexOf('async function syncLinkedSupabaseAuthCredentials');
+  const helperEnd = apiSource.indexOf("apiRouter.post('/auth/login'", helperStart);
+  const helper = apiSource.slice(helperStart, helperEnd);
+  assert.match(helper, /user\.authUserId/);
+  assert.match(helper, /auth\.admin\.updateUserById\(authUserId, attributes\)/);
+  assert.match(helper, /attributes\.email = updates\.email/);
+  assert.match(helper, /attributes\.email_confirm = true/);
+
+  const changeStart = apiSource.indexOf("apiRouter.post('/auth/change-password'");
+  const changeEnd = apiSource.indexOf('// Current User Profile', changeStart);
+  const changeRoute = apiSource.slice(changeStart, changeEnd);
+  assert.match(changeRoute, /syncLinkedSupabaseAuthCredentials\(user, \{ password: newPassword \}\)/);
+  assert.match(changeRoute, /mustChangePassword: false/);
+
+  const resetStart = apiSource.indexOf("apiRouter.post('/users/:id/reset-password'");
+  const resetEnd = apiSource.indexOf('const createSuperAdminSchema', resetStart);
+  const resetRoute = apiSource.slice(resetStart, resetEnd);
+  assert.match(resetRoute, /randomBytes\(12\)/);
+  assert.match(resetRoute, /syncLinkedSupabaseAuthCredentials\(targetUser, \{ password: temporaryPassword \}\)/);
+  assert.match(resetRoute, /mustChangePassword: true/);
+
+  const profileStart = apiSource.indexOf("apiRouter.put('/auth/profile'");
+  const profileEnd = apiSource.indexOf("apiRouter.get('/superadmin/sessions'", profileStart);
+  const profileRoute = apiSource.slice(profileStart, profileEnd);
+  assert.match(profileRoute, /syncLinkedSupabaseAuthCredentials\(user, \{/);
+  assert.match(profileRoute, /email: cleanEmail/);
+  assert.match(profileRoute, /await db\.flush\(\)/);
+});
