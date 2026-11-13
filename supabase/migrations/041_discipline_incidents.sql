@@ -20,15 +20,19 @@ CREATE INDEX IF NOT EXISTS idx_discipline_school_date ON public.discipline_incid
 CREATE INDEX IF NOT EXISTS idx_discipline_student ON public.discipline_incidents(student_id, school_id);
 ALTER TABLE public.discipline_incidents ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS discipline_incidents_read ON public.discipline_incidents;
+DROP POLICY IF EXISTS discipline_incidents_read ON public.discipline_incidents;
 CREATE POLICY discipline_incidents_read ON public.discipline_incidents FOR SELECT TO authenticated
 USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
+DROP POLICY IF EXISTS discipline_incidents_insert ON public.discipline_incidents;
 DROP POLICY IF EXISTS discipline_incidents_insert ON public.discipline_incidents;
 CREATE POLICY discipline_incidents_insert ON public.discipline_incidents FOR INSERT TO authenticated
 WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
 DROP POLICY IF EXISTS discipline_incidents_update ON public.discipline_incidents;
+DROP POLICY IF EXISTS discipline_incidents_update ON public.discipline_incidents;
 CREATE POLICY discipline_incidents_update ON public.discipline_incidents FOR UPDATE TO authenticated
 USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin')
 WITH CHECK (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin' AND recorded_by = private.auth_user_id());
+DROP POLICY IF EXISTS discipline_incidents_delete ON public.discipline_incidents;
 DROP POLICY IF EXISTS discipline_incidents_delete ON public.discipline_incidents;
 CREATE POLICY discipline_incidents_delete ON public.discipline_incidents FOR DELETE TO authenticated
 USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin');
