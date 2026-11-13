@@ -27,6 +27,7 @@ export const TimetableView: React.FC = () => {
   const [settings, setSettings] = useState({ firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
+  const [printMode, setPrintMode] = useState<'single' | 'multiple'>('multiple');
   const [printClassIds, setPrintClassIds] = useState<string[]>([]);
   const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
 
@@ -263,10 +264,11 @@ export const TimetableView: React.FC = () => {
     ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
     : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
-  const runTimetablePrint = (classIds: string[]) => {
-    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5).map(klass => klass.id);
+  const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple') => {
+    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, mode === 'single' ? 1 : 5).map(klass => klass.id);
     if (!validIds.length) { setNotice('Dooro ugu yaraan hal fasal oo jadwalkiisu diyaar yahay.'); return; }
     setPrintClassIds(validIds);
+    setPrintMode(mode);
     setPrintAllClasses(true);
     window.setTimeout(() => {
       window.print();
@@ -314,8 +316,8 @@ export const TimetableView: React.FC = () => {
           </>}
           
           <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>
-          <button type="button" onClick={() => runTimetablePrint([selectedClassId])} disabled={viewMode !== 'class' || !selectedClassId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print this class</button>
-          <button type="button" onClick={() => runTimetablePrint(displayClassIds)} disabled={viewMode !== 'class' || !displayClassIds.length} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-xs font-semibold text-white disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print selected (max 5) · one sheet</button>
+          <button type="button" onClick={() => runTimetablePrint([selectedClassId], 'single')} disabled={viewMode !== 'class' || !selectedClassId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print this class</button>
+          <button type="button" onClick={() => runTimetablePrint(displayClassIds, 'multiple')} disabled={viewMode !== 'class' || !displayClassIds.length} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-xs font-semibold text-white disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print selected (max 5) · one sheet</button>
 
           <button
             onClick={() => {
@@ -358,8 +360,8 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
       </details>
-      <style>{`@page { size: A4 landscape; margin: 5mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 3mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; } .timetable-print-class h2 { font-size: 7pt; margin-bottom: 1mm; } .timetable-print-class table { font-size: 5pt; } .timetable-print-class th, .timetable-print-class td { padding: 0.7mm !important; } }`}</style>
-      {printAllClasses && <section className="timetable-print-all hidden">
+      <style>{`@page { size: A4 landscape; margin: 5mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 3mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; } .timetable-print-class h2 { font-size: 7pt; margin-bottom: 1mm; } .timetable-print-class table { font-size: 5pt; } .timetable-print-class th, .timetable-print-class td { padding: 0.7mm !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-grid { display: block !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-class { width: 100%; } .timetable-print-all[data-print-mode='single'] .timetable-print-class h2 { font-size: 14pt; margin-bottom: 3mm; } .timetable-print-all[data-print-mode='single'] .timetable-print-class table { font-size: 10pt; table-layout: auto; } .timetable-print-all[data-print-mode='single'] .timetable-print-class th, .timetable-print-all[data-print-mode='single'] .timetable-print-class td { padding: 2mm !important; line-height: 1.3; } }`}</style>
+      {printAllClasses && <section className="timetable-print-all hidden" data-print-mode={printMode}>
         <h1 className="mb-1 text-lg font-bold">{school?.name || 'School'} · Timetables</h1>
         <p className="mb-2 text-[9px]">{printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
         <div className="timetable-print-grid grid grid-cols-3 gap-2">
