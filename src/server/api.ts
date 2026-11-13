@@ -6820,9 +6820,9 @@ async function getSchoolSetupState(school: School) {
   ] = await Promise.all([
     queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,staff_id,user_id'),
-    db.queryPage('students', { school_id: school.id }, 1, 1, undefined, 'id'),
-    db.queryPage('students', { school_id: school.id }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
+    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
     db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
@@ -6966,7 +6966,7 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
   res.json({ progress, checklist: state.checklist, canFinish: canFinishSchoolSetup(progress, state.checklist) });
 });
 
-apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
+apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   let updates: Partial<School>;
@@ -6997,6 +6997,12 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
     details: `Updated school configuration fields: ${Object.keys(updates).join(', ')}.`,
     severity: 'info'
   });
+  try {
+    await db.flush();
+  } catch {
+    res.status(503).json({ error: 'School settings could not be confirmed as saved. Please retry.' });
+    return;
+  }
   res.json(updated);
 });
 
