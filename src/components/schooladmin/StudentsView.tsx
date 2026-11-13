@@ -43,6 +43,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [showAllClass, setShowAllClass] = useState(false);
   const [feeFilter, setFeeFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [pinSlip, setPinSlip] = useState<{ studentName: string; studentId: string; pin: string } | null>(null);
@@ -68,9 +69,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 50, allClass: Boolean(classFilter) }),
+    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }),
     ApiClient.getClasses(), ApiClient.getBranches()
-  ]), [school?.id, search, classFilter, branchFilter, feeFilter, page], Boolean(school));
+  ]), [school?.id, search, classFilter, branchFilter, feeFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
@@ -268,7 +269,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             type="text"
             placeholder="Search by student name, ID, or phone..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full rounded-xl border border-[#d5e2de] bg-[#f8fbfa] py-3 pl-10 pr-4 text-sm text-[#18312d] outline-none transition placeholder:text-[#91a19c] focus:border-[#0e8078] focus:ring-2 focus:ring-[#0e8078]/10"
           />
         </div>
@@ -281,7 +282,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           {/* Class Filter */}
           <select
             value={classFilter}
-            onChange={e => { setClassFilter(e.target.value); setPage(1); }}
+            onChange={e => { setClassFilter(e.target.value); setShowAllClass(false); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
             <option value="">All Classes</option>
@@ -293,7 +294,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           {/* Fee Payment Status Filter */}
           <select
             value={feeFilter}
-            onChange={e => setFeeFilter(e.target.value)}
+            onChange={e => { setFeeFilter(e.target.value); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
             <option value="all">All Fee Statuses</option>
@@ -301,6 +302,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <option value="partial">Partial Payment</option>
             <option value="unpaid">Unpaid Fees</option>
           </select>
+          {classFilter && (
+            <label className="inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-medium text-[#334155]">
+              <input type="checkbox" checked={showAllClass} onChange={event => { setShowAllClass(event.target.checked); setPage(1); }} className="h-3.5 w-3.5 accent-[#0F766E]" />
+              Show all students in this class
+            </label>
+          )}
         </div>
       </div>
 
@@ -378,7 +385,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               </tbody>
             </table>
           </div>
-          <PaginationControls info={pageInfo} onPage={setPage} />
+          {!showAllClass && <PaginationControls info={pageInfo} onPage={setPage} />}
         </div>
 
         {/* 360-DEGREE STUDENT PROFILE (6 TABS) */}
