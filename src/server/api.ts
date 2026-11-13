@@ -6494,7 +6494,7 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
   res.json({ progress, checklist: state.checklist, canFinish: canFinishSchoolSetup(progress, state.checklist) });
 });
 
-apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, (req, res) => {
+apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   let updates: Partial<School>;
@@ -6525,6 +6525,12 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
     details: `Updated school configuration fields: ${Object.keys(updates).join(', ')}.`,
     severity: 'info'
   });
+  try {
+    await db.flush();
+  } catch {
+    res.status(503).json({ error: 'School settings could not be confirmed as saved. Please retry.' });
+    return;
+  }
   res.json(updated);
 });
 
