@@ -106,7 +106,10 @@ export interface School {
   name: string;
   code: string; // e.g., "MOG01"
   address: string;
+  country?: string;
+  region?: string;
   city: string;
+  schoolType?: 'primary' | 'secondary' | 'combined';
   phone: string;
   email: string;
   whatsappPhone?: string;
