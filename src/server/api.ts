@@ -1788,6 +1788,7 @@ apiRouter.post('/superadmin/broadcasts', requireAuth, requireSuperAdmin, async (
   if (immediate) {
     const user = (req as any).user as User;
     db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+    await db.flush();
   }
   res.status(201).json(broadcast);
 });
@@ -1801,6 +1802,7 @@ apiRouter.post('/superadmin/broadcasts/:id/send', requireAuth, requireSuperAdmin
   const broadcast = await db.publishBroadcast(req.params.id);
   if (!broadcast) { res.status(404).json({ error: 'Only draft or scheduled broadcasts can be sent.' }); return; }
   db.logAudit({ action: 'PLATFORM_BROADCAST_PUBLISHED', category: 'security', userId: user.id, userName: user.fullName, userRole: user.role, details: `Published platform broadcast ${broadcast.id}.`, severity: 'warning' });
+  await db.flush();
   res.json(broadcast);
 });
 
@@ -5609,11 +5611,18 @@ apiRouter.post('/support/tickets/:id/reply', requireAuth, requireSchoolContextFo
     res.status(400).json({ error: 'A support reply of 1–5000 characters is required.' });
     return;
   }
+  const requestedStatus = req.body?.status;
+  const allowedTicketStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+  if (user.role === 'super_admin' && requestedStatus !== undefined && !allowedTicketStatuses.includes(String(requestedStatus))) {
+    res.status(400).json({ error: 'Choose a valid support ticket status.' });
+    return;
+  }
   const ticket = await db.replyTicket(req.params.id, {
     senderId: user.id,
     senderName: user.fullName,
     senderRole: user.role,
-    content
+    content,
+    ...(user.role === 'super_admin' && requestedStatus ? { status: requestedStatus } : {})
   }, user.role === 'super_admin' ? undefined : user.schoolId, user.role === 'school_admin' || user.role === 'super_admin' ? undefined : user.id);
   if (!ticket) {
     res.status(404).json({ error: 'Ticket not found' });
@@ -5628,6 +5637,11 @@ apiRouter.get('/school/backup', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const user = (req as any).user as User;
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Disposition', 'attachment; filename="school-backup.json"');
+  const backup = await db.generateSchoolBackup(school.id);
+  if (!backup) {
+    res.status(404).json({ error: 'School backup could not be generated because the school was not found.' });
+    return;
+  }
   db.logAudit({
     action: 'SCHOOL_BACKUP_DOWNLOADED',
     category: 'security',
@@ -5639,7 +5653,8 @@ apiRouter.get('/school/backup', requireAuth, requireSchoolAdminOrSuperAdmin, req
     details: `Downloaded a data backup for ${school.name}.`,
     severity: 'warning'
   });
-  res.json(await db.generateSchoolBackup(school.id));
+  await db.flush();
+  res.json(backup);
 });
 apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
