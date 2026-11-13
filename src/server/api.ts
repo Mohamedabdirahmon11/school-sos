@@ -833,6 +833,27 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // 1. AUTHENTICATION & LOGIN (PASSWORD, STAFF FIRST-LOGIN, STUDENT/PARENT PIN)
 // ==============================================================================
 
+async function syncLinkedSupabaseAuthPassword(user: User, password: string): Promise<boolean> {
+  const authUserId = String(user.authUserId || '').trim();
+  if (!authUserId) return true;
+  if (!isSupabaseConfigured || !user.email || !supabaseUrl || !supabaseKey) return false;
+
+  try {
+    const adminClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const { error } = await adminClient.auth.admin.updateUserById(authUserId, { password });
+    if (error) {
+      console.error('[auth] Linked Supabase Auth password update failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[auth] Linked Supabase Auth password update failed.');
+    return false;
+  }
+}
+
 apiRouter.post('/auth/login', async (req, res) => {
   const { email, phone, schoolCode, pin, password } = req.body;
   const requestedRole = normalizeRole(req.body?.role);
@@ -1330,6 +1351,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     return;
   }
   if (verifyPassword(newPassword, user.passwordHash)) { res.status(400).json({ error: 'Choose a new password that is different from your temporary sign-in password.' }); return; }
+  if (!(await syncLinkedSupabaseAuthPassword(user, newPassword))) {
+    res.status(503).json({ error: 'The password could not be updated in the linked authentication account. No local password changes were saved.' });
+    return;
+  }
 
   const updated = db.updateUser(user.id, {
     passwordHash: hashPassword(newPassword),
@@ -1346,9 +1371,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: 'User password was updated successfully with scrypt hashing.',
+    details: 'User password was updated successfully and synchronized with linked authentication.',
     severity: 'info'
   });
+  await db.flush();
 
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'Password updated successfully.' });
@@ -1377,6 +1403,10 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     const passwordError = passwordPolicyError(newPassword);
     if (passwordError) { res.status(400).json({ error: passwordError, code: 'PASSWORD_POLICY_FAILED' }); return; }
     if (typeof currentPassword !== 'string' || !verifyPassword(currentPassword, user.passwordHash)) { res.status(400).json({ error: 'Current password is incorrect.' }); return; }
+    if (!(await syncLinkedSupabaseAuthPassword(user, newPassword))) {
+      res.status(503).json({ error: 'The password could not be updated in the linked authentication account. No local password changes were saved.' });
+      return;
+    }
   }
   if (cleanEmail && cleanEmail !== (user.email || '').toLowerCase()) {
     const existing = await db.findUserForLogin(cleanEmail, user.schoolId);
@@ -1387,7 +1417,8 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
-  if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings.', severity: 'info' });
+  if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings and synchronized linked authentication.', severity: 'info' });
+  await db.flush();
   res.json(sanitizeUser(updated));
 });
 
@@ -6187,7 +6218,11 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     res.status(403).json({ error: 'Only staff account passwords can be reset here.' });
     return;
   }
-  const temporaryPassword = String(randomInt(100000, 1_000_000));
+  const temporaryPassword = `Sa${randomBytes(12).toString('base64url')}9`;
+  if (!(await syncLinkedSupabaseAuthPassword(targetUser, temporaryPassword))) {
+    res.status(503).json({ error: 'The linked authentication password could not be reset. The existing password remains unchanged.' });
+    return;
+  }
   const updatedUser = db.updateUser(targetUser.id, {
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -6206,7 +6241,7 @@ apiRouter.post('/users/:id/reset-password', requireAuth, requireSchoolAdminOrSup
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
-    details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}).`,
+    details: `Password reset for user ${targetUser.fullName} (${targetUser.email || targetUser.phone}); linked authentication was synchronized.`,
     severity: 'warning'
   });
   await db.flush();
