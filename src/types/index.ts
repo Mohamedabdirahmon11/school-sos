@@ -229,6 +229,7 @@ export interface Teacher {
   fullName: string;
   email?: string;
   phone: string;
+  address?: string;
   gender: 'male' | 'female';
   qualification: string;
   department: string;
