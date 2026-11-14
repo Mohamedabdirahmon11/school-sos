@@ -3014,7 +3014,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
     if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
   }
   const newClass = db.createClass({
-    schoolId: school.id, name, classCode, academicYear, gradeLevel, section,
+    schoolId: school.id, branchId: req.body?.branchId || undefined, name, classCode, academicYear, gradeLevel, section,
     roomNumber: String(req.body?.roomNumber || '').trim(), capacity,
     classTeacherId: req.body?.classTeacherId || null,
     monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
