@@ -151,6 +151,15 @@ BEGIN
      WHERE id = v_parent_id;
   END IF;
 
+  INSERT INTO public.audit_logs (
+    id, action, category, school_id, school_name, user_id, user_name, user_role, details, severity
+  ) VALUES (
+    'log-' || pg_catalog.gen_random_uuid()::TEXT, 'STUDENT_REGISTERED', 'school',
+    v_school_id, COALESCE(p_payload->>'school_name', ''), p_payload->>'created_by',
+    COALESCE(p_payload->>'created_by_name', ''), COALESCE(p_payload->>'created_by_role', 'school_admin')::public.user_role_enum,
+    'Registered student ' || v_student_id || ' and linked parent/guardian account.', 'info'
+  );
+
   SELECT to_jsonb(s) INTO v_student FROM public.students AS s
    WHERE s.id = v_student_pk AND s.school_id = v_school_id;
   RETURN jsonb_build_object('student', v_student, 'student_id', v_student_id);
