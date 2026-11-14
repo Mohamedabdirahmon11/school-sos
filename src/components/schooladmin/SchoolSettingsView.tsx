@@ -267,6 +267,9 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     if (!Number.isInteger(timetableSettings.periodMinutes) || timetableSettings.periodMinutes < 20 || timetableSettings.periodMinutes > 120) { setError('First shift period length must be between 20 and 120 minutes.'); return; }
     if (!Number.isInteger(timetableSettings.breakAfterPeriod) || timetableSettings.breakAfterPeriod < 1 || timetableSettings.breakAfterPeriod > 5) { setError('First shift break position must be between periods 1 and 5.'); return; }
     if (!Number.isInteger(timetableSettings.breakMinutes) || timetableSettings.breakMinutes < 0 || timetableSettings.breakMinutes > 120) { setError('First shift break length must be between 0 and 120 minutes.'); return; }
+    const configuredPeriods = Math.min(6, Math.max(1, Number(school?.setupData?.workingHours?.periodsPerDay || 6)));
+    const shiftOneFinish = minutesOf(timetableSettings.firstPeriodStart) + configuredPeriods * timetableSettings.periodMinutes + (configuredPeriods > timetableSettings.breakAfterPeriod ? timetableSettings.breakMinutes : 0);
+    if (shiftOneFinish > minutesOf(closingTime)) { setError('Shift 1 must finish at or before the school closing time.'); return; }
     if (timetableSettings.shiftCount === 2) {
       if (!validTime(timetableSettings.shift2FirstPeriodStart)) { setError('Second shift start must use HH:MM.'); return; }
       if (!Number.isInteger(timetableSettings.shift2PeriodMinutes) || timetableSettings.shift2PeriodMinutes < 20 || timetableSettings.shift2PeriodMinutes > 120) { setError('Second shift period length must be between 20 and 120 minutes.'); return; }
