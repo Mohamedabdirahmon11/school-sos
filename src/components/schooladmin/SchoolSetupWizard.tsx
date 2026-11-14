@@ -104,7 +104,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         const firstFinish = shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, periods);
         const secondFinish = shiftFinish(timetable.shift2FirstPeriodStart, timetable.shift2PeriodMinutes, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, periods);
         if (timetable.periodMinutes < 20 || timetable.periodMinutes > 120 || timetable.shift2PeriodMinutes < 20 || timetable.shift2PeriodMinutes > 120) throw new Error('Each shift period must be between 20 and 120 minutes.');
-        if (firstFinish > toMinutes(data.workingHours.closingTime)) throw new Error('Shift 1 finishes after the school closing time. Adjust its finish time or school closing time.');
+        if (firstFinish > toMinutes(data.workingHours.closingTime)) throw new Error('Shift 1 must finish at or before the school closing time. Adjust its finish time or school closing time.');
         if (timetable.shiftCount === 2 && (toMinutes(timetable.shift2FirstPeriodStart) < firstFinish || secondFinish > toMinutes(data.workingHours.closingTime))) throw new Error('Shift 2 must start after Shift 1 and finish no later than the school closing time.');
         await ApiClient.saveTimetableSettings(timetable);
       }
