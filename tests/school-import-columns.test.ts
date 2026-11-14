@@ -23,7 +23,7 @@ test('XLSX import reads admission date, address and guardian details', () => {
 test('unexpected Status and Reason columns are ignored in CSV and XLSX', () => {
   const headers = [...IMPORT_COLUMNS, 'Status', 'Reason'];
   const values = ['Grade 3','B','Sahra Amina Yusuf','female','2026-11-14','Jijiga','Yusuf Omar','+251911000001','','','inactive','ignore'];
-  const csvRows = parseSchoolImport(Buffer.from([headers.join(','), values.join(',')].join('\\n')), 'csv');
+  const csvRows = parseSchoolImport(Buffer.from([headers.join(','), values.join(',')].join('\n')), 'csv');
   assert.equal(csvRows.length, 1);
   assert.equal('status' in csvRows[0], false);
   assert.equal('reason' in csvRows[0], false);
