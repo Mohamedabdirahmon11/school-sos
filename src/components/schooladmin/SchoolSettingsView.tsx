@@ -289,7 +289,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     }
     setSavingSection('timetable');
     try {
-      const currentHours = school?.setupData?.workingHours || {};
+      const currentHours = (school?.setupData?.workingHours || {}) as { openingTime?: string; breakStartTime?: string; breakEndTime?: string; periodsPerDay?: number };
       await ApiClient.saveSchoolSetupStep(5, { workingHours: {
         openingTime: currentHours.openingTime || '07:30',
         classStartTime: timetableSettings.firstPeriodStart,
