@@ -145,7 +145,7 @@ test('import scope rejects cross-school attempts; read-only schools and teacher 
 });
 
 test('mid-transaction failure leaves classes, students, users and audit rows unchanged', async () => {
-  const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
+  const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test User', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
   const before = ['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length);
   memory.failNextBulkImport();
   const failed = await confirm(admin, body.rows.map((row: any) => row.data));
