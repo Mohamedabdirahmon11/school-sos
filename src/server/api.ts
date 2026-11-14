@@ -230,7 +230,6 @@ type ImportValidation = { row: number; data: SchoolImportRow; status: 'valid' | 
 async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): Promise<{ rows: ImportValidation[]; totals: { total: number; valid: number; errors: number; skipped: number } }> {
   const [classes, students] = await Promise.all([db.getClasses(schoolId), db.getStudents(schoolId)]);
   const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\u0000${item.section.trim().toLowerCase()}`, item]));
-  const branchByName = new Map(branches.map(item => [item.name.trim().toLowerCase(), item]));
   const seen = new Set<string>();
   const capacityUse = new Map<string, number>();
   for (const student of students) capacityUse.set(student.classId, (capacityUse.get(student.classId) || 0) + 1);
