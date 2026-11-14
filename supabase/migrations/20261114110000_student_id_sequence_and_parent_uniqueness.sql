@@ -79,7 +79,7 @@ BEGIN
   IF length(v_guardian_name) > 160 OR length(v_guardian_phone) > 30 THEN RAISE EXCEPTION 'Guardian details exceed the allowed length.'; END IF;
 
   v_student_id := (public.schoolos_reserve_student_ids(v_school_id, 1))[1];
-  v_student_pk := 'std-' || gen_random_uuid()::TEXT;
+  v_student_pk := 'std-' || pg_catalog.gen_random_uuid()::TEXT;
   v_normalized_phone := regexp_replace(v_guardian_phone, '[^0-9]', '', 'g');
   IF v_normalized_phone = '' THEN RAISE EXCEPTION 'Guardian phone number is invalid.'; END IF;
 
@@ -116,7 +116,7 @@ BEGIN
    ORDER BY u.created_at, u.id LIMIT 1 FOR UPDATE;
 
   IF v_parent_id IS NULL THEN
-    v_parent_id := 'usr-parent-' || gen_random_uuid()::TEXT;
+    v_parent_id := 'usr-parent-' || pg_catalog.gen_random_uuid()::TEXT;
     INSERT INTO public.users (
       id, school_id, role, full_name, phone, parent_phone, password_hash,
       pin_hash, linked_student_ids, is_blocked, failed_login_attempts
