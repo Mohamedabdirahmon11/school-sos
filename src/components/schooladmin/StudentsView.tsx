@@ -363,7 +363,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className}</td>
-                        <td className="px-5 py-4 text-[#334155]">{s.fatherPhone || "—"}</td>
+                        <td className="px-5 py-4 text-[#334155]"><><span className="block font-medium">{s.fatherName || 'Parent / Guardian'}</span><span className="font-mono text-[11px] text-slate-500">{s.fatherPhone || '—'}</span></></td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
                             normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
@@ -566,7 +566,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             {['firstName','middleName','lastName'].map((field,index) => <label key={field} className="block text-xs font-medium">{['First name','Father name','Grandfather name'][index]}<input required value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
             <label className="block text-xs font-medium">Gender<select value={editForm.gender} onChange={e => setEditForm((value:any) => ({...value,gender:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
             <label className="block text-xs font-medium">Class<select required value={editForm.classId} onChange={e => setEditForm((value:any) => ({...value,classId:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}</select></label>
-            {['studentPhone','fatherPhone','motherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Father phone','Mother phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <label className="block text-xs font-medium">Parent / Guardian name<input value={editForm.fatherName || ''} maxLength={160} onChange={e => setEditForm((value:any) => ({...value,fatherName:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>
+            <label className="block text-xs font-medium">Student address<textarea value={editForm.address || ''} maxLength={500} rows={2} onChange={e => setEditForm((value:any) => ({...value,address:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>
+            {['studentPhone','fatherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Parent / guardian phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
             <div className="flex justify-end gap-2 border-t pt-3"><button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button type="submit" disabled={isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></div>
           </form>
         </div>
@@ -667,7 +669,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                 >
                   {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.roomNumber})</option>
+                    <option key={c.id} value={c.id}>{c.name} · Section {c.section || 'A'}</option>
                   ))}
                 </select>
               </div>
