@@ -35,7 +35,6 @@ export const TeachersView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [teacherId, setTeacherId] = useState('');
   const [teacherPin, setTeacherPin] = useState('');
   const [teacherPassword, setTeacherPassword] = useState('');
   const [joinedDate, setJoinedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -138,7 +137,6 @@ export const TeachersView: React.FC = () => {
         fullName: name,
         phone: phone.trim(),
         address: address.trim(),
-        teacherId: teacherId.trim().toUpperCase(),
         pin: teacherPin.trim() || undefined,
         password: teacherPassword,
         joinedDate,
@@ -154,7 +152,6 @@ export const TeachersView: React.FC = () => {
       setFullName('');
       setPhone('');
       setAddress('');
-      setTeacherId('');
       setTeacherPin('');
       setTeacherPassword('');
       setJoinedDate(new Date().toISOString().slice(0, 10));
