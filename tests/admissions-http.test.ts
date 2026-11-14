@@ -528,7 +528,7 @@ test('teacher IDs are simple alphanumeric and teacher profile updates and PIN re
   const created = await fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers,
     body: JSON.stringify({
-      fullName: 'PIN Reset Teacher', gender: 'female', teacherId: 'T902', pin: '4321',
+      fullName: 'PIN Reset Teacher', gender: 'female', pin: '4321',
       qualification: 'B.Ed', monthlySalary: 550
     })
   });
