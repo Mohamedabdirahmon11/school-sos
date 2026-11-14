@@ -206,7 +206,9 @@ export interface Student {
   dateOfBirth?: string;
   studentPhone?: string;
   fatherPhone: string;
+  fatherName?: string;
   motherPhone?: string;
+  address?: string;
   classId: string;
   section?: string;
   status: 'active' | 'inactive' | 'graduated' | 'transferred';
