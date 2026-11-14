@@ -6,8 +6,17 @@ ALTER TABLE public.students
   ADD COLUMN IF NOT EXISTS address TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS father_name VARCHAR(160) NOT NULL DEFAULT '';
 
-CREATE INDEX IF NOT EXISTS idx_students_school_guardian_phone
-  ON public.students (school_id, father_phone);
+-- Preserve existing real parent names when they are already available in parent accounts.
+UPDATE public.students AS s
+   SET father_name = u.full_name
+  FROM public.users AS u
+ WHERE u.school_id = s.school_id
+   AND u.role = 'parent'::public.user_role_enum
+   AND NULLIF(btrim(u.full_name), '') IS NOT NULL
+   AND u.full_name !~* '^Parent of '
+   AND regexp_replace(COALESCE(NULLIF(u.phone, ''), u.parent_phone, ''), '[^0-9]', '', 'g')
+       = regexp_replace(COALESCE(s.father_phone, ''), '[^0-9]', '', 'g')
+   AND btrim(s.father_name) = '';
 
 CREATE OR REPLACE FUNCTION public.schoolos_create_student(p_payload JSONB)
 RETURNS JSONB
