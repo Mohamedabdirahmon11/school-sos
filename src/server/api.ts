@@ -3332,21 +3332,7 @@ const formatSimpleStudentId = (number: number) => `S${String(number).padStart(3,
 
 /** Simple per-school student IDs (S001, S002, ...). Existing IDs are never reused or changed. */
 async function nextSchoolStudentIds(schoolId: string, count: number): Promise<string[]> {
-  const total = (await db.queryPage('students', { school_id: schoolId }, 1, 1, undefined, 'id')).total;
-  const picked: string[] = [];
-  let start = total + 1;
-  for (let guard = 0; guard < 50 && picked.length < count; guard += 1) {
-    const window = Array.from({ length: count - picked.length + 50 }, (_, index) => formatSimpleStudentId(start + index));
-    const existing = new Set((await queryAllRows('students', { school_id: schoolId, student_id: window }, 'student_id'))
-      .map((row: any) => String(row.studentId || '').toUpperCase()));
-    for (const candidate of window) {
-      if (picked.length >= count) break;
-      if (!existing.has(candidate.toUpperCase())) picked.push(candidate);
-    }
-    start += window.length;
-  }
-  if (picked.length < count) throw new Error('Unable to allocate student IDs.');
-  return picked;
+  return db.reserveStudentIds(schoolId, count);
 }
 
 const studentNameKey = (student: any) => [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ').trim();
