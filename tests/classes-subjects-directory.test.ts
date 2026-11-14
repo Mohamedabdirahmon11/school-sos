@@ -27,3 +27,16 @@ test('Teacher directory includes Form Teacher classes as well as profile class a
   assert.match(teachersSource, /displayedClassIds = Array\.from\(new Set/);
   assert.match(teachersSource, /\(Form Teacher\)/);
 });
+
+
+test('class creation defaults to KG and follows the entered KG/Grade label', () => {
+  assert.match(classesSource, /const \[gradeLevel, setGradeLevel\] = useState\(0\)/);
+  assert.match(classesSource, /setGradeLevel\(0\)/);
+  assert.match(classesSource, /Kindergarten\|Nursery/);
+  assert.match(classesSource, /\(\?:Grade\|Gr\)/);
+});
+
+test('class creation falls back to the configured capacity when the optional field is cleared', () => {
+  assert.match(classesSource, /const safeCapacity = Number\.isInteger\(capacity\)/);
+  assert.match(classesSource, /capacity: safeCapacity/);
+});

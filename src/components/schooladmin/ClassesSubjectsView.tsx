@@ -44,7 +44,7 @@ export const ClassesSubjectsView: React.FC = () => {
   const [className, setClassName] = useState('');
   const [classCode, setClassCode] = useState('');
   const [classAcademicYear, setClassAcademicYear] = useState(school?.academicYear || '2026-2027');
-  const [gradeLevel, setGradeLevel] = useState(10);
+  const [gradeLevel, setGradeLevel] = useState(0);
   const [classShift, setClassShift] = useState<1 | 2>(1);
   const [availableShiftCount, setAvailableShiftCount] = useState<1 | 2>(1);
   const [section, setSection] = useState('');
@@ -127,6 +127,9 @@ export const ClassesSubjectsView: React.FC = () => {
     e.preventDefault();
     if (!className.trim() || !classCode.trim()) return;
     try {
+      const safeCapacity = Number.isInteger(capacity) && capacity >= 1 && capacity <= 500
+        ? capacity
+        : (school?.defaultClassCapacity || 40);
       const payload = {
         name: className.trim(),
         classCode: classCode.trim().toUpperCase(),
@@ -135,7 +138,7 @@ export const ClassesSubjectsView: React.FC = () => {
         shift: classShift,
         section: section.trim(),
         roomNumber,
-        capacity,
+        capacity: safeCapacity,
         monthlyFee,
         branchId: branchId || undefined,
         classTeacherId: formTeacherId || null
@@ -254,7 +257,7 @@ export const ClassesSubjectsView: React.FC = () => {
                 className="inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
                 <Upload className="h-4 w-4 text-[#0F766E]" /> {t('bulk_import')}
               </button>
-              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(10); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
+              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(0); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
                 disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
                 <Plus className="h-4 w-4" /> Create class
               </button>
@@ -442,7 +445,15 @@ export const ClassesSubjectsView: React.FC = () => {
                   type="text"
                   required
                   value={className}
-                  onChange={e => setClassName(e.target.value)}
+                  onChange={e => {
+                    const nextName = e.target.value;
+                    setClassName(nextName);
+                    if (/^\s*(?:KG|Kindergarten|Nursery)(?:[\s-]*\d+)?\s*$/i.test(nextName)) setGradeLevel(0);
+                    else {
+                      const match = /^\s*(?:Grade|Gr)\s*[- ]?(\d{1,2})(?:\b|$)/i.exec(nextName);
+                      if (match) setGradeLevel(Number(match[1]));
+                    }
+                  }}
                   placeholder="e.g. Grade 10 - Alpha"
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
