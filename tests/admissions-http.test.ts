@@ -394,6 +394,7 @@ test('student profile updates validate phones and keep parent/student login link
   const users = await storage.db.getUsers(school.id, 'parent');
   const oldFather = users.find(user => user.phone === '+15550007301');
   const newFather = users.find(user => user.phone === '+15550007306');
+  console.log('guardian relink debug', { firstId: first.id, siblingId: sibling.id, oldFather: oldFather && { id: oldFather.id, linkedStudentIds: oldFather.linkedStudentIds }, newFather: newFather && { id: newFather.id, linkedStudentIds: newFather.linkedStudentIds } });
   assert.ok(oldFather?.linkedStudentIds?.includes(sibling.id));
   assert.equal(oldFather?.linkedStudentIds?.includes(first.id), false);
   assert.ok(newFather?.linkedStudentIds?.includes(first.id));
