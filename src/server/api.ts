@@ -7171,8 +7171,10 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (!Number.isInteger(step) || step < 1 || step > 5) { res.status(400).json({ error: 'Setup step must be between 1 and 5.' }); return; }
   const existing = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}) } as any;
   const completedBefore = Array.isArray(existing.completedSteps) ? existing.completedSteps : [];
-  if (step > 1 && !completedBefore.includes(step) && !completedBefore.includes(step - 1)) {
-    res.status(409).json({ error: 'Complete the previous setup step before saving this step.' });
+  // Academic year (step 2 in the settings form) is independent of the school profile
+  // and is the first item in the owner's ten-step onboarding order.
+  if (step > 1 && step !== 2 && !completedBefore.includes(step) && !completedBefore.includes(step - 1)) {
+    res.status(409).json({ error: 'Complete the previous setup section before saving this section.' });
     return;
   }
   const validationError = validateSchoolSetupStep(step, req.body?.data, existing);
