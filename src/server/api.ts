@@ -2727,7 +2727,7 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
     const branch = branchName ? branchByName.get(branchName.toLowerCase()) : undefined;
     const key = `${academicYear}\\u0000${classCode.toLowerCase()}`;
     if (!name || !classCode) errors.push(`Row ${index + 2}: className and classCode are required.`);
-    else if (!/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1) errors.push(`Row ${index + 2}: academicYear must use consecutive years such as 2026-2027.`);
+    else if (!/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1) errors.push(`Row ${index + 2}: academicYear must use consecutive years such as 2026-2027.`);
     else if (classCode.length > 40) errors.push(`Row ${index + 2}: classCode must be 40 characters or fewer.`);
     else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class code ${classCode} for ${academicYear}.`);
     else if (!Number.isInteger(grade) || !allowedLevels.has(grade)) errors.push(`Row ${index + 2}: gradeLevel must be KG or an offered grade from 1 to 12.`);
