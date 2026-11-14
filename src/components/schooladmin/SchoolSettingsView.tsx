@@ -891,6 +891,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             </div>
           </section>
           {timetableSettings.shiftCount === 2 && (
+            <>
             <section className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-4">
               <div>
                 <h3 className="font-bold text-sm text-[#132A29]">Shift 2 · Afternoon</h3>
@@ -924,6 +925,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 </>;
               })()}
             </div>
+            </>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
             <p className="max-w-xl text-[11px] text-[#64748B]">Changes are school-specific. Existing timetable entries are not deleted when you update shift settings.</p>
