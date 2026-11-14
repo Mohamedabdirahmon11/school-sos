@@ -4528,7 +4528,7 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (body.joinedDate !== undefined) {
     const date = typeof body.joinedDate === 'string' ? body.joinedDate.trim() : '';
     const parsed = new Date(`${date}T00:00:00.000Z`);
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
     updates.joinedDate = date;
   }
   if (body.gender !== undefined) {
@@ -4614,10 +4614,10 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   if (address.length > 250) { res.status(400).json({ error: 'Teacher address must be at most 250 characters.' }); return; }
   if (!validTeacherId(requestedTeacherId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only.' }); return; }
-  if (!/^\\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
+  if (!/^\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
   if (initialPassword && passwordPolicyError(initialPassword)) { res.status(400).json({ error: passwordPolicyError(initialPassword) }); return; }
   const parsedJoinedDate = new Date(`${joinedDate}T00:00:00.000Z`);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(joinedDate) || Number.isNaN(parsedJoinedDate.getTime()) || parsedJoinedDate.toISOString().slice(0, 10) !== joinedDate) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedDate) || Number.isNaN(parsedJoinedDate.getTime()) || parsedJoinedDate.toISOString().slice(0, 10) !== joinedDate) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
   if (body.phone !== undefined && (typeof body.phone !== 'string' || phone.length > 30 || (phone && !validImportPhone(phone)))) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
   const qualification = body.qualification === undefined ? '' : body.qualification;
   const department = body.department === undefined ? '' : body.department;
