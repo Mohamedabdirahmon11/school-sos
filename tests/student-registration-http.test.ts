@@ -128,7 +128,7 @@ test('bulk student PIN reset returns one-time PINs and stores hashes for the sel
   assert.equal(result.pinSlips.length, 1);
   assert.equal(result.pinSlips[0].studentId, studentId);
   assert.equal(result.pinSlips[0].studentName, 'Muna Amina Hassan');
-  assert.match(result.pinSlips[0].newPin, /^\\d{4}$/);
+  assert.match(result.pinSlips[0].newPin, /^[0-9]{4}$/);
 
   const student = memory.rows('students').find(row => row.student_id === studentId);
   const studentUser = memory.rows('users').find(row => row.student_id === studentId && row.role === 'student');
