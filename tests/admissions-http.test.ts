@@ -229,24 +229,26 @@ test('student creation whitelists profile fields, enforces capacity and protects
   await storage.db.flush();
   const first = await create({
     firstName: 'First', middleName: 'Full', lastName: 'Student', gender: 'male',
-    classId: fullClass.id, studentId: 'FULL-CLASS-01', fatherPhone: '+15550007113'
+    classId: fullClass.id, studentId: 'FULL-CLASS-01', guardianName: 'Full Class Guardian', guardianPhone: '+15550007113'
   });
   assert.equal(first.status, 201, await first.clone().text());
   const second = await create({
     firstName: 'Second', middleName: 'Full', lastName: 'Student', gender: 'male',
-    classId: fullClass.id, studentId: 'FULL-CLASS-02', fatherPhone: '+15550007114'
+    classId: fullClass.id, studentId: 'FULL-CLASS-02', guardianName: 'Full Class Guardian', guardianPhone: '+15550007114'
   });
   assert.equal(second.status, 409);
 
   const duplicate = await create({
     firstName: 'Duplicate', middleName: 'Student', lastName: 'ID', gender: 'male',
-    classId: klass.id, studentId: 'STU-CLEAN-001', fatherPhone: '+15550007115'
+    classId: klass.id, studentId: 'STU-CLEAN-001', guardianName: 'Duplicate Guardian', guardianPhone: '+15550007115'
   });
-  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.status, 201, await duplicate.clone().text());
+  const duplicateResult = await duplicate.json();
+  assert.notEqual(duplicateResult.studentId, 'STU-CLEAN-001');
 
   const invalidPin = await create({
     firstName: 'Invalid', middleName: 'PIN', lastName: 'Student', gender: 'male',
-    classId: klass.id, studentId: 'STU-INVALID-PIN', fatherPhone: '+15550007116', pin: '12ab'
+    classId: klass.id, studentId: 'STU-INVALID-PIN', guardianName: 'Invalid PIN Guardian', guardianPhone: '+15550007116', pin: '12ab'
   });
   assert.equal(invalidPin.status, 400);
 });
