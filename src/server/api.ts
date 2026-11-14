@@ -2512,7 +2512,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     if (!classIds.has(key) && !classPayload.has(key)) {
       const id = `cls-${randomUUID()}`;
       const grade = /\b(?:KG|KINDERGARTEN|NURSERY)\b/i.test(row.data.className) ? 0 : Number(/\d+/.exec(row.data.className)?.[0] || 1);
-      const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), classCode: `IMP-${randomUUID().slice(0, 8).toUpperCase()}`, academicYear: school.academicYear, gradeLevel: grade === 0 ? 0 : Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), shift: 1, roomNumber: '', capacity: 40, monthlyFee: 0 };
+      const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), classCode: `IMP-${randomUUID().slice(0, 8).toUpperCase()}`, academicYear: school.academicYear || '2026-2027', gradeLevel: grade === 0 ? 0 : Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), shift: 1, roomNumber: '', capacity: 40, monthlyFee: 0 };
       classPayload.set(key, record);
       classRecords.push(record);
       classIds.set(key, id);
