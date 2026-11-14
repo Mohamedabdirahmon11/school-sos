@@ -67,9 +67,9 @@ const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const timeToMinutes = (time: string) => { const [hours, minutes] = time.split(':').map(Number); return hours * 60 + minutes; };
 const minutesToTime = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
+  timeToMinutes(start) + periods * periodMinutes + (periods > breakAfterPeriod ? breakMinutes : 0);
 const periodLengthForFinish = (start: string, finish: string, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
   Math.round((timeToMinutes(finish) - timeToMinutes(start) - (periods > breakAfterPeriod ? breakMinutes : 0)) / periods);
-  timeToMinutes(start) + periods * periodMinutes + (periods > breakAfterPeriod ? breakMinutes : 0);
 
 export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
