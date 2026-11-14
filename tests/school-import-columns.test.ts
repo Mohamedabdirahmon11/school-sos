@@ -4,12 +4,12 @@ import * as XLSX from 'xlsx';
 import { IMPORT_COLUMNS, parseSchoolImport } from '../src/server/school-import.ts';
 
 test('student import columns match registration and omit DOB/status/reason', () => {
-  assert.deepEqual(IMPORT_COLUMNS, ['className','section','studentName','gender','admissionDate','address','parentName','parentPhone','studentPhone','branch']);
+  assert.deepEqual(IMPORT_COLUMNS, ['className','section','studentName','gender','admissionDate','address','parentName','parentPhone','studentPhone']);
   for (const unwanted of ['dateOfBirth','status','reason']) assert.equal((IMPORT_COLUMNS as readonly string[]).includes(unwanted), false);
 });
 
 test('XLSX import reads admission date, address and guardian details', () => {
-  const sheet = XLSX.utils.aoa_to_sheet([[...IMPORT_COLUMNS], ['Grade 3','B','Sahra Amina Yusuf','female','2026-11-14','Jijiga','Yusuf Omar','+251911000001','','']]);
+  const sheet = XLSX.utils.aoa_to_sheet([[...IMPORT_COLUMNS], ['Grade 3','B','Sahra Amina Yusuf','female','2026-11-14','Jijiga','Yusuf Omar','+251911000001','']]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Students');
   const rows = parseSchoolImport(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer, 'xlsx');
@@ -22,7 +22,7 @@ test('XLSX import reads admission date, address and guardian details', () => {
 
 test('unexpected Status and Reason columns are ignored in CSV and XLSX', () => {
   const headers = [...IMPORT_COLUMNS, 'Status', 'Reason'];
-  const values = ['Grade 3','B','Sahra Amina Yusuf','female','2026-11-14','Jijiga','Yusuf Omar','+251911000001','','','inactive','ignore'];
+  const values = ['Grade 3','B','Sahra Amina Yusuf','female','2026-11-14','Jijiga','Yusuf Omar','+251911000001','','inactive','ignore'];
   const csvRows = parseSchoolImport(Buffer.from([headers.join(','), values.join(',')].join('\n')), 'csv');
   assert.equal(csvRows.length, 1);
   assert.equal('status' in csvRows[0], false);
