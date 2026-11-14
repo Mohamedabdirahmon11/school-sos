@@ -180,7 +180,7 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_student RECORD;
   v_old_phone TEXT;
@@ -249,7 +249,7 @@ BEGIN
      WHERE id = v_parent_id;
   END IF;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.schoolos_sync_student_guardian(TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_student_guardian(TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
