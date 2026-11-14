@@ -251,7 +251,7 @@ test('student creation whitelists profile fields, enforces capacity and protects
   assert.equal(invalidPin.status, 400);
 });
 
-test('teacher creation ignores client-controlled identity and credential fields', async () => {
+test('teacher creation accepts school-issued ID and PIN while ignoring forged account identity fields', async () => {
   const post = (body: Record<string, unknown>) => fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers, body: JSON.stringify(body)
   });
@@ -264,7 +264,8 @@ test('teacher creation ignores client-controlled identity and credential fields'
     twoFactorSecret: 'forged-secret',
     recoveryCodes: ['forged-code'],
     pin: '9999',
-    staffId: 'STF-SEC-001',
+    teacherId: 'T901',
+    staffId: 'FORGED-STAFF-ID',
     fullName: 'Scoped Teacher',
     phone: '+15550007201',
     gender: 'male',
@@ -278,6 +279,7 @@ test('teacher creation ignores client-controlled identity and credential fields'
   const result = await response.json();
   assert.notEqual(result.id, 'forged-teacher-id');
   assert.equal(result.schoolId, school.id);
+  assert.equal(result.staffId, 'T901');
   assert.notEqual(result.userId, 'forged-user');
   assert.equal(result.initialPin.length, 4);
   assert.equal('passwordHash' in result, false);
@@ -507,7 +509,7 @@ test('teacher IDs are simple alphanumeric and teacher profile updates and PIN re
   const created = await fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers,
     body: JSON.stringify({
-      fullName: 'PIN Reset Teacher', gender: 'female',
+      fullName: 'PIN Reset Teacher', gender: 'female', teacherId: 'T902', pin: '4321',
       qualification: 'B.Ed', monthlySalary: 550
     })
   });
