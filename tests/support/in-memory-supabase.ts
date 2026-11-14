@@ -593,6 +593,60 @@ export class InMemorySupabase {
       sequence.last_number = start + count - 1;
       return { data: Array.from({ length: count }, (_, index) => 'S' + String(start + index).padStart(3, '0')), error: null };
     }
+    if (name === 'schoolos_create_student') {
+      const payload = args?.p_payload || {};
+      const schoolId = String(payload.school_id || '');
+      const phone = String(payload.guardian_phone || '');
+      const normalize = (value: string) => value.replace(/\\D/g, '');
+      const phoneKey = normalize(phone);
+      if (!schoolId || !phoneKey || !payload.guardian_name || !payload.pin_hash) {
+        return { data: null, error: { message: 'Student and guardian details are required.' } };
+      }
+      const reserved = await this.rpc('schoolos_reserve_student_ids', { p_school_id: schoolId, p_count: 1 });
+      if (reserved.error) return reserved;
+      const studentId = reserved.data[0];
+      const studentPk = 'std-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      const student = {
+        id: studentPk, school_id: schoolId, branch_id: payload.branch_id || null,
+        student_id: studentId, first_name: payload.first_name, middle_name: payload.middle_name,
+        last_name: payload.last_name, gender: payload.gender, admission_date: payload.admission_date,
+        student_phone: payload.student_phone || null, father_phone: phone, father_name: payload.guardian_name,
+        class_id: payload.class_id, section: payload.section || 'A', status: 'active',
+        pin_hash: payload.pin_hash, address: payload.address || ''
+      };
+      this.rows('students').push(student);
+      this.rows('users').push({
+        id: 'usr-student-' + studentPk, school_id: schoolId, branch_id: payload.branch_id || null,
+        role: 'student', full_name: [payload.first_name,payload.middle_name,payload.last_name].filter(Boolean).join(' '),
+        phone: payload.student_phone || phone, student_id: studentId, password_hash: '',
+        pin_hash: payload.pin_hash, is_blocked: false, failed_login_attempts: 0
+      });
+      let parent = this.rows('users').find(row => String(row.school_id ?? row.schoolId) === schoolId
+        && row.role === 'parent'
+        && [row.phone, row.parent_phone, row.parentPhone].some((value: any) => normalize(String(value || '')) === phoneKey));
+      if (parent) {
+        const links = parent.linked_student_ids ?? parent.linkedStudentIds ?? [];
+        parent.linked_student_ids = [...new Set([...links, studentPk])];
+        parent.linkedStudentIds = parent.linked_student_ids;
+        if (!parent.phone) parent.phone = phone;
+        if (!parent.parent_phone && !parent.parentPhone) parent.parent_phone = phone;
+      } else {
+        parent = {
+          id: 'usr-parent-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          school_id: schoolId, role: 'parent', full_name: payload.guardian_name,
+          phone, parent_phone: phone, password_hash: '', pin_hash: payload.pin_hash,
+          linked_student_ids: [studentPk], is_blocked: false, failed_login_attempts: 0
+        };
+        this.rows('users').push(parent);
+      }
+      this.rows('audit_logs').push({
+        id: 'audit-student-' + Date.now(), action: 'STUDENT_REGISTERED', category: 'school',
+        school_id: schoolId, school_name: payload.school_name, user_id: payload.created_by,
+        user_name: payload.created_by_name, user_role: payload.created_by_role,
+        details: 'Registered student ' + studentId, severity: 'info'
+      });
+      return { data: { student, student_id: studentId }, error: null };
+    }
     if (name !== 'schoolos_bulk_import') return { data: null, error: null };
     if (this.failBulkImport) {
       this.failBulkImport = false;
