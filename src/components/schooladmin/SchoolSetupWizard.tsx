@@ -7,6 +7,12 @@ import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
 
+type TimetableSettings = { shiftCount: 1 | 2; firstPeriodStart: string; periodMinutes: number; breakAfterPeriod: number; breakMinutes: number; shift2FirstPeriodStart: string; shift2PeriodMinutes: number; shift2BreakAfterPeriod: number; shift2BreakMinutes: number };
+const toMinutes = (value: string) => { const [h, m] = value.split(':').map(Number); return h * 60 + m; };
+const toTime = (value: number) => `${String(Math.floor(value / 60) % 24).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+const shiftFinish = (start: string, duration: number, breakAfter: number, breakMinutes: number, periods: number) => toMinutes(start) + duration * periods + (periods > breakAfter ? breakMinutes : 0);
+const updateDurationForFinish = (start: string, finish: string, breakAfter: number, breakMinutes: number, periods: number) => Math.round((toMinutes(finish) - toMinutes(start) - (periods > breakAfter ? breakMinutes : 0)) / periods);
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DEFAULT_DATA: SchoolSetupData = {
   schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' },
@@ -34,6 +40,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [timetable, setTimetable] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
 
   useEffect(() => {
     let active = true;
@@ -56,6 +63,25 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
     return () => { active = false; };
   }, [school?.id]);
 
+  useEffect(() => {
+    let active = true;
+    ApiClient.getTimetableSettings().then(settings => {
+      if (!active) return;
+      setTimetable({
+        shiftCount: settings.shiftCount === 2 ? 2 : 1,
+        firstPeriodStart: settings.firstPeriodStart || '08:00',
+        periodMinutes: Number(settings.periodMinutes) || 40,
+        breakAfterPeriod: Number(settings.breakAfterPeriod) || 3,
+        breakMinutes: Number(settings.breakMinutes ?? 20),
+        shift2FirstPeriodStart: settings.shift2FirstPeriodStart || '13:00',
+        shift2PeriodMinutes: Number(settings.shift2PeriodMinutes) || 40,
+        shift2BreakAfterPeriod: Number(settings.shift2BreakAfterPeriod) || 3,
+        shift2BreakMinutes: Number(settings.shift2BreakMinutes ?? 20)
+      });
+    }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Unable to load shift timetable settings.'); });
+    return () => { active = false; };
+  }, [school?.id]);
+
   const patch = <K extends keyof SchoolSetupData>(key: K, value: SchoolSetupData[K]) => setData(current => ({ ...current, [key]: value }));
   const saveStep = async (advance: boolean) => {
     setSaving(true); setError(null);
@@ -72,6 +98,15 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         const uploaded = await ApiClient.uploadSchoolLogo(legacyFile);
         section.schoolInformation = { ...data.schoolInformation, logoUrl: uploaded.logoUrl };
         setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: uploaded.logoUrl } }));
+      }
+      if (step === 5) {
+        const periods = Math.min(6, Math.max(1, Number(data.workingHours.periodsPerDay || 6)));
+        const firstFinish = shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, periods);
+        const secondFinish = shiftFinish(timetable.shift2FirstPeriodStart, timetable.shift2PeriodMinutes, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, periods);
+        if (timetable.periodMinutes < 20 || timetable.periodMinutes > 120 || timetable.shift2PeriodMinutes < 20 || timetable.shift2PeriodMinutes > 120) throw new Error('Each shift period must be between 20 and 120 minutes.');
+        if (firstFinish > toMinutes(data.workingHours.closingTime)) throw new Error('Shift 1 finishes after the school closing time. Adjust its finish time or school closing time.');
+        if (timetable.shiftCount === 2 && (toMinutes(timetable.shift2FirstPeriodStart) < firstFinish || secondFinish > toMinutes(data.workingHours.closingTime))) throw new Error('Shift 2 must start after Shift 1 and finish no later than the school closing time.');
+        await ApiClient.saveTimetableSettings(timetable);
       }
       const result = await ApiClient.saveSchoolSetupStep(step, section);
       setData(result.data); setSaved(result.data.completedSteps || []);
@@ -135,13 +170,38 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         <div className="space-y-2"><h3 className="text-sm font-bold text-slate-800">School holidays</h3>{data.calendar.schoolHolidays.map((h, i) => <div key={i} className="space-y-2 rounded-xl border border-slate-200 p-3"><input aria-label="School holiday name" value={h.name} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, name: e.target.value } : x) })} placeholder="Holiday name" className="w-full rounded-lg border border-slate-200 p-2 text-sm" /><div className="grid grid-cols-2 gap-2"><div className="min-w-0 space-y-1"><input aria-label="Holiday start date (Gregorian equivalent)" type="date" value={h.startDate} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, startDate: e.target.value } : x) })} className="w-full rounded-lg border border-slate-200 p-2 text-sm" />{h.startDate && <p className="text-[10px] text-slate-500">ET: {getEthiopianCalendarInfo(h.startDate).dateLabel}</p>}</div><div className="min-w-0 space-y-1"><input aria-label="Holiday end date (Gregorian equivalent)" type="date" value={h.endDate} onChange={e => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.map((x, n) => n === i ? { ...x, endDate: e.target.value } : x) })} className="w-full rounded-lg border border-slate-200 p-2 text-sm" />{h.endDate && <p className="text-[10px] text-slate-500">ET: {getEthiopianCalendarInfo(h.endDate).dateLabel}</p>}</div></div><button type="button" onClick={() => patch('calendar', { ...data.calendar, schoolHolidays: data.calendar.schoolHolidays.filter((_, n) => n !== i) })} className="text-xs font-semibold text-rose-600">Remove holiday</button></div>)}<button type="button" onClick={() => patch('calendar', { ...data.calendar, schoolHolidays: [...data.calendar.schoolHolidays, { name: '', startDate: '', endDate: '' }] })} className="text-sm font-semibold text-teal-700">+ Add school holiday</button></div></div>
       </div>}
 
-      {step === 5 && <div className="grid gap-4 sm:grid-cols-2">
-        {field('School opening time', data.workingHours.openingTime, v => patch('workingHours', { ...data.workingHours, openingTime: v }), 'time')}
-        {field('Class start time', data.workingHours.classStartTime, v => patch('workingHours', { ...data.workingHours, classStartTime: v }), 'time')}
-        {field('School closing time', data.workingHours.closingTime, v => patch('workingHours', { ...data.workingHours, closingTime: v }), 'time')}
-        {field('Break start time', data.workingHours.breakStartTime, v => patch('workingHours', { ...data.workingHours, breakStartTime: v }), 'time')}
-        {field('Break end time', data.workingHours.breakEndTime, v => patch('workingHours', { ...data.workingHours, breakEndTime: v }), 'time')}
-        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per day</span><input type="number" min="1" max="6" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+      {step === 5 && <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {field('School opening time', data.workingHours.openingTime, v => patch('workingHours', { ...data.workingHours, openingTime: v }), 'time')}
+          {field('School closing time', data.workingHours.closingTime, v => patch('workingHours', { ...data.workingHours, closingTime: v }), 'time')}
+          {field('Break start time', data.workingHours.breakStartTime, v => patch('workingHours', { ...data.workingHours, breakStartTime: v }), 'time')}
+          {field('Break end time', data.workingHours.breakEndTime, v => patch('workingHours', { ...data.workingHours, breakEndTime: v }), 'time')}
+          <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per shift</span><input type="number" min="1" max="6" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+          <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Number of shifts</span><select value={timetable.shiftCount} onChange={e => setTimetable(v => ({ ...v, shiftCount: Number(e.target.value) as 1 | 2 }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm"><option value={1}>One shift</option><option value={2}>Two shifts</option></select></label>
+        </div>
+        <section className="rounded-2xl border border-teal-200 bg-teal-50/40 p-4 space-y-4">
+          <div><h3 className="font-bold text-slate-900">Shift 1 · Morning</h3><p className="text-xs text-slate-600">Edit the arrival time, departure time, lesson duration and break. Departure time updates the lesson duration automatically.</p></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {field('Shift 1 starts', timetable.firstPeriodStart, v => { setTimetable(x => ({ ...x, firstPeriodStart: v })); patch('workingHours', { ...data.workingHours, classStartTime: v }); }, 'time')}
+            {field('Shift 1 finishes', toTime(shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay)), v => { const duration = updateDurationForFinish(timetable.firstPeriodStart, v, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay); if (duration >= 20 && duration <= 120) setTimetable(x => ({ ...x, periodMinutes: duration })); }, 'time')}
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Lesson duration (minutes)</span><input type="number" min="20" max="120" value={timetable.periodMinutes} onChange={e => setTimetable(x => ({ ...x, periodMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break after period</span><select value={timetable.breakAfterPeriod} onChange={e => setTimetable(x => ({ ...x, breakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break duration (minutes)</span><input type="number" min="0" max="120" value={timetable.breakMinutes} onChange={e => setTimetable(x => ({ ...x, breakMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+          </div>
+          <p className="text-xs font-semibold text-teal-900">Calculated Shift 1 finish: {toTime(shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay))}</p>
+        </section>
+        {timetable.shiftCount === 2 && <section className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
+          <div><h3 className="font-bold text-slate-900">Shift 2 · Afternoon</h3><p className="text-xs text-slate-600">Set independent start, finish, lesson duration and break times for the second shift.</p></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {field('Shift 2 starts', timetable.shift2FirstPeriodStart, v => setTimetable(x => ({ ...x, shift2FirstPeriodStart: v })), 'time')}
+            {field('Shift 2 finishes', toTime(shiftFinish(timetable.shift2FirstPeriodStart, timetable.shift2PeriodMinutes, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, data.workingHours.periodsPerDay)), v => { const duration = updateDurationForFinish(timetable.shift2FirstPeriodStart, v, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, data.workingHours.periodsPerDay); if (duration >= 20 && duration <= 120) setTimetable(x => ({ ...x, shift2PeriodMinutes: duration })); }, 'time')}
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Lesson duration (minutes)</span><input type="number" min="20" max="120" value={timetable.shift2PeriodMinutes} onChange={e => setTimetable(x => ({ ...x, shift2PeriodMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break after period</span><select value={timetable.shift2BreakAfterPeriod} onChange={e => setTimetable(x => ({ ...x, shift2BreakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break duration (minutes)</span><input type="number" min="0" max="120" value={timetable.shift2BreakMinutes} onChange={e => setTimetable(x => ({ ...x, shift2BreakMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+          </div>
+          <p className="text-xs font-semibold text-indigo-900">Calculated Shift 2 finish: {toTime(shiftFinish(timetable.shift2FirstPeriodStart, timetable.shift2PeriodMinutes, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, data.workingHours.periodsPerDay))}</p>
+        </section>}
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">All shift settings are saved to this school and also appear under Settings → School Shifts. Shift 2 must start after Shift 1 and both shifts must finish by the school closing time.</p>
       </div>}
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
