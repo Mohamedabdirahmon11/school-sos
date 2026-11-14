@@ -695,6 +695,7 @@ export class ApiClient {
     return this.request<Array<{
       id: string;
       phone: string;
+      name: string;
       relationships: string[];
       students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
     }>>(`/parents/contacts?${query.toString()}`);
