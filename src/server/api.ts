@@ -55,7 +55,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
-  students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,class_id,section,status',
+  students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
   teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
   fee_payments: 'id,school_id,student_id,receipt_number,reference_number,academic_year,month,fee_type,fee_structure_id,amount_due,amount_paid,remaining_amount,payment_method,status,date,recorded_by,notes,voided_at,voided_by,void_reason',
   payroll_records: 'id,school_id,user_id,staff_id,staff_name,payroll_month,base_salary,allowances,allowance_total,deductions,deduction_total,net_salary,status,created_by,approved_by,paid_by,created_at,approved_at,paid_at',
@@ -4150,82 +4150,54 @@ apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, re
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
-  const requiredText = ['firstName', 'middleName', 'lastName', 'classId'] as const;
-  if (requiredText.some(field => typeof body[field] !== 'string' || !body[field].trim() || body[field].trim().length > 100)) {
-    res.status(400).json({ error: 'First, middle and last names and a class are required (maximum 100 characters each).' }); return;
+  const requiredText = ['firstName', 'middleName', 'lastName', 'classId', 'guardianName', 'guardianPhone'] as const;
+  if (requiredText.some(field => typeof body[field] !== 'string' || !body[field].trim() || body[field].trim().length > (field === 'guardianName' ? 160 : 100))) {
+    res.status(400).json({ error: 'Three student names, class, guardian name and guardian phone are required.' }); return;
   }
   if (!['male', 'female'].includes(body.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   const klass = await db.getClassById(body.classId.trim(), school.id);
   if (!klass || klass.isArchived) { res.status(400).json({ error: 'Class is unavailable or does not belong to this school.' }); return; }
-  const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
+  const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : klass.branchId || undefined;
   const branches = branchId ? await db.getBranches(school.id) : [];
   if (branchId && !branches.some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (branchId && klass.branchId && branchId !== klass.branchId) { res.status(400).json({ error: 'Student branch must match the selected class branch.' }); return; }
   const classCount = await db.queryPage('students', { school_id: school.id, class_id: klass.id }, 1, 1, undefined, 'id');
   if (classCount.total >= klass.capacity) { res.status(409).json({ error: 'The selected class has reached capacity.' }); return; }
 
-  const studentId = typeof body.studentId === 'string' && body.studentId.trim()
-    ? body.studentId.trim()
-    : (await nextSchoolStudentIds(school.id, 1))[0];
-  if (!/^[A-Za-z0-9._-]{2,40}$/.test(studentId)) { res.status(400).json({ error: 'Student ID must be 2–40 letters, numbers, dots, underscores or hyphens.' }); return; }
-  const duplicate = await db.queryPage('students', { school_id: school.id, student_id: studentId }, 1, 1, undefined, 'id');
-  if (duplicate.total) { res.status(409).json({ error: 'That Student ID is already used in this school.' }); return; }
-
-  const phoneFields = ['fatherPhone', 'motherPhone', 'studentPhone'] as const;
-  const phones: Record<string, string> = {};
-  for (const field of phoneFields) {
-    const value = body[field] === undefined || body[field] === null ? '' : body[field];
-    if (typeof value !== 'string' || value.length > 30 || (value.trim() && !validImportPhone(value.trim()))) {
-      res.status(400).json({ error: `${field} must be a valid international phone number.` }); return;
-    }
-    phones[field] = value.trim();
+  const guardianPhone = String(body.guardianPhone).trim();
+  const studentPhone = body.studentPhone === undefined || body.studentPhone === null ? '' : body.studentPhone;
+  if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim()))) {
+    res.status(400).json({ error: 'Guardian and student phone numbers must be valid international numbers.' }); return;
   }
-  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\\d{4}$/.test(body.pin))) {
     res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
   }
-  const isDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  const isDate = (value: unknown) => typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
   const admissionDate = body.admissionDate === undefined || body.admissionDate === '' ? new Date().toISOString().slice(0, 10) : body.admissionDate;
-  if (!isDate(admissionDate) || (body.dateOfBirth !== undefined && body.dateOfBirth !== '' && !isDate(body.dateOfBirth))) {
-    res.status(400).json({ error: 'Admission date and date of birth must use a real YYYY-MM-DD date.' }); return;
-  }
-  if (body.status !== undefined && !['active', 'inactive', 'graduated', 'transferred'].includes(body.status)) {
-    res.status(400).json({ error: 'Student status is invalid.' }); return;
-  }
-  if (body.section !== undefined && (typeof body.section !== 'string' || body.section.trim().length > 50)) {
-    res.status(400).json({ error: 'Section must be text of at most 50 characters.' }); return;
-  }
-  if (body.bloodGroup !== undefined && (typeof body.bloodGroup !== 'string' || body.bloodGroup.length > 10)) {
-    res.status(400).json({ error: 'Blood group must be at most 10 characters.' }); return;
-  }
-  if (body.allergies !== undefined && (typeof body.allergies !== 'string' || body.allergies.length > 1000)) {
-    res.status(400).json({ error: 'Allergy notes must be at most 1,000 characters.' }); return;
+  if (!isDate(admissionDate)) { res.status(400).json({ error: 'Admission date must be a real YYYY-MM-DD date.' }); return; }
+  if (body.address !== undefined && (typeof body.address !== 'string' || body.address.trim().length > 500)) {
+    res.status(400).json({ error: 'Address must be 500 characters or fewer.' }); return;
   }
 
-  // Hydrate existing parent accounts before linking the student's family.
-  await db.getParents(school.id);
-  const student = db.createStudent({
-    schoolId: school.id,
-    branchId: klass.branchId || branchId,
-    studentId,
-    firstName: body.firstName.trim(),
-    middleName: body.middleName.trim(),
-    lastName: body.lastName.trim(),
+  const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(1000, 10000));
+  const student = await db.createStudentAtomically({
+    school_id: school.id,
+    branch_id: branchId || null,
+    first_name: body.firstName.trim(),
+    middle_name: body.middleName.trim(),
+    last_name: body.lastName.trim(),
     gender: body.gender,
-    admissionDate,
-    dateOfBirth: body.dateOfBirth || undefined,
-    studentPhone: phones.studentPhone || undefined,
-    fatherPhone: phones.fatherPhone,
-    motherPhone: phones.motherPhone || undefined,
-    classId: klass.id,
+    admission_date: admissionDate,
+    student_phone: studentPhone.trim(),
+    guardian_name: body.guardianName.trim(),
+    guardian_phone: guardianPhone,
+    class_id: klass.id,
     section: typeof body.section === 'string' && body.section.trim() ? body.section.trim() : klass.section,
-    status: body.status || 'active',
-    pin: body.pin,
-    bloodGroup: typeof body.bloodGroup === 'string' ? body.bloodGroup.trim() : undefined,
-    allergies: typeof body.allergies === 'string' ? body.allergies.trim() : undefined
+    address: typeof body.address === 'string' ? body.address.trim() : '',
+    pin_hash: hashPin(initialPin)
   });
-  await db.flush();
-  res.status(201).json({ ...sanitizeStudent(student), initialPin: student.pin });
+  res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
