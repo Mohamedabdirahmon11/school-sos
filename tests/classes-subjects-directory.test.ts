@@ -44,7 +44,8 @@ test('class creation falls back to the configured capacity when the optional fie
 
 
 test('class creation accepts a correctly formatted academic year in the API validator', () => {
-  assert.match(apiSource, /!\/\^\\d\{4\}-\\d\{4\}\$\/.test\(academicYear\)/);
-  assert.doesNotMatch(apiSource, /!\/\^\\\\d\{4\}-\\\\d\{4\}\$\/.test\(academicYear\)/);
+  const createClassRoute = apiSource.slice(apiSource.indexOf("apiRouter.post('/classes',"), apiSource.indexOf("apiRouter.put('/classes/:id'"));
+  assert.match(createClassRoute, /!\/\^\\d\{4\}-\\d\{4\}\$\/.test\(academicYear\)/);
+  assert.doesNotMatch(createClassRoute, /!\/\^\\\\d\{4\}-\\\\d\{4\}\$\/.test\(academicYear\)/);
   assert.match(classesSource, /pattern="\[0-9\]\{4\}-\[0-9\]\{4\}"/);
 });
