@@ -506,6 +506,25 @@ test('concurrent attendance submissions converge on one daily row without automa
 });
 
 
+test('teacher can be created with a strong password when no PIN is supplied', async () => {
+  const response = await fetch(`${baseUrl}/teachers`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      fullName: 'Password Only Teacher', gender: 'female',
+      teacherId: 'T905', password: 'TeacherPass905',
+      qualification: 'B.Ed'
+    })
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  const teacher = await response.json();
+  assert.equal(teacher.staffId, 'T905');
+  assert.equal(teacher.initialPin, '');
+  const account = await storage.db.getUserById(teacher.userId, school.id);
+  const { verifyPassword } = await import('../src/server/auth-security.ts');
+  assert.ok(account?.passwordHash && verifyPassword('TeacherPass905', account.passwordHash));
+  assert.equal(account?.pin, undefined);
+});
+
 test('teacher IDs are simple alphanumeric and teacher profile updates and PIN resets persist', async () => {
   const created = await fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers,
