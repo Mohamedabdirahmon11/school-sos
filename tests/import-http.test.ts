@@ -46,13 +46,13 @@ function tokenFor(user: typeof admin) {
   return createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: user.schoolId, createdAt: Date.now(), expiresAt: Date.now() + 60_000 });
 }
 const csv = (...rows: string[][]) => [
-  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone,branch',
-  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[6],row[7],row[8]].join(','))
-].join('\n');
+  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone',
+  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[6],row[7]].join(','))
+].join('\\n');
 const csvWithGuardians = (...rows: string[][]) => [
-  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone,branch',
-  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[7] || row[6],row[10],row[11]].join(','))
-].join('\n');
+  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone',
+  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[7] || row[6],row[10]].join(','))
+].join('\\n');
 
 async function preview(user: typeof admin, text: string, headers: Record<string, string> = {}) {
   const form = new FormData();
@@ -208,8 +208,8 @@ test('CSV without a Status column imports and every new student is active', asyn
 
 test('an unexpected Status column in an uploaded file is ignored and does not change the active default', async () => {
   const text = [
-    'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone,branch,Status',
-    'Grade 6,A,Farah Amina Ali,male,2026-11-14,Jijiga,Ali Warsame,+252611555102,,,inactive'
+    'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone,Status',
+    'Grade 6,A,Farah Amina Ali,male,2026-11-14,Jijiga,Ali Warsame,+252611555102,,inactive'
   ].join('\n');
   const { response, body } = await preview(admin, text);
   assert.equal(response.status, 200);
