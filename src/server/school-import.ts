@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 
-export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'dateOfBirth', 'parentName', 'parentPhone', 'fatherPhone', 'motherName', 'motherPhone', 'studentPhone', 'branch'] as const;
-const PHONE_IMPORT_COLUMNS = new Set(['parentPhone', 'fatherPhone', 'motherPhone', 'studentPhone']);
+export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'admissionDate', 'address', 'parentName', 'parentPhone', 'studentPhone', 'branch'] as const;
+const PHONE_IMPORT_COLUMNS = new Set(['parentPhone', 'studentPhone']);
 
 export function normalizeImportPhone(value: unknown): string {
   // Spreadsheet applications use a leading apostrophe to force phone numbers to text.
@@ -16,12 +16,10 @@ export interface SchoolImportRow {
   section: string;
   studentName: string;
   gender: string;
-  dateOfBirth: string;
+  admissionDate: string;
+  address: string;
   parentName: string;
   parentPhone: string;
-  fatherPhone: string;
-  motherName: string;
-  motherPhone: string;
   studentPhone: string;
   branch: string;
 }
@@ -80,7 +78,7 @@ export function parseSchoolImport(file: Buffer, extension: 'csv' | 'xlsx'): Scho
   if (values.length > MAX_IMPORT_ROWS) throw new Error('File exceeds the 2,000 row limit.');
   return values.map(value => {
     const normalized = Object.fromEntries(Object.entries(value).map(([key, field]) => {
-      if (key.trim() === 'dateOfBirth' && typeof field === 'number') {
+      if (key.trim() === 'admissionDate' && typeof field === 'number') {
         const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(field) * 86_400_000);
         return [key.trim(), date.toISOString().slice(0, 10)];
       }
@@ -103,6 +101,6 @@ export function validImportPhone(value: string): boolean {
 
 export function splitStudentName(value: string): { firstName: string; middleName: string; lastName: string } {
   const parts = value.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) throw new Error('Student name must contain at least two names.');
-  return { firstName: parts[0], middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : '', lastName: parts.at(-1)! };
+  if (parts.length < 3) throw new Error('Student name must contain first, middle and last names.');
+  return { firstName: parts[0], middleName: parts.slice(1, -1).join(' '), lastName: parts.at(-1)! };
 }
