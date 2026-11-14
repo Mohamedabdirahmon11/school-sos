@@ -56,7 +56,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,class_id,section,status',
-  teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
+  teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
   fee_payments: 'id,school_id,student_id,receipt_number,reference_number,academic_year,month,fee_type,fee_structure_id,amount_due,amount_paid,remaining_amount,payment_method,status,date,recorded_by,notes,voided_at,voided_by,void_reason',
   payroll_records: 'id,school_id,user_id,staff_id,staff_name,payroll_month,base_salary,allowances,allowance_total,deductions,deduction_total,net_salary,status,created_by,approved_by,paid_by,created_at,approved_at,paid_at',
   attendance_records: 'id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at',
@@ -4515,18 +4515,24 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
   }
   const updates: Record<string, unknown> = {};
-  for (const field of ['fullName', 'phone', 'qualification', 'department'] as const) {
+  for (const field of ['fullName', 'phone', 'address', 'qualification', 'department'] as const) {
     if (body[field] === undefined) continue;
     const value = body[field];
-    if (typeof value !== 'string' || value.trim().length > (field === 'phone' ? 30 : 120)) {
+    if (typeof value !== 'string' || value.trim().length > (field === 'phone' ? 30 : field === 'address' ? 250 : 120)) {
       res.status(400).json({ error: `${field} must be valid text.` }); return;
     }
     if (field === 'fullName' && !value.trim()) { res.status(400).json({ error: 'Teacher name is required.' }); return; }
     if (field === 'phone' && value.trim() && !validImportPhone(value.trim())) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
     updates[field] = value.trim();
   }
+  if (body.joinedDate !== undefined) {
+    const date = typeof body.joinedDate === 'string' ? body.joinedDate.trim() : '';
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
+    updates.joinedDate = date;
+  }
   if (body.gender !== undefined) {
-    if (!['male', 'female'].includes(body.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+    if (!['male', 'female'].includes(body.gender) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
     updates.gender = body.gender;
   }
   if (body.status !== undefined) {
@@ -4598,9 +4604,20 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
   const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const address = typeof body.address === 'string' ? body.address.trim() : '';
   const gender = body.gender;
+  const requestedTeacherId = normalizeStaffId(body.teacherId ?? body.staffId);
+  const initialPin = typeof body.pin === 'string' ? body.pin.trim() : '';
+  const initialPassword = typeof body.password === 'string' ? body.password : '';
+  const joinedDate = typeof body.joinedDate === 'string' && body.joinedDate.trim() ? body.joinedDate.trim() : new Date().toISOString().slice(0, 10);
   if (!fullName || fullName.length > 120) { res.status(400).json({ error: 'Teacher full name is required and must be at most 120 characters.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+  if (address.length > 250) { res.status(400).json({ error: 'Teacher address must be at most 250 characters.' }); return; }
+  if (!validTeacherId(requestedTeacherId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only.' }); return; }
+  if (!/^\\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
+  if (initialPassword && passwordPolicyError(initialPassword)) { res.status(400).json({ error: passwordPolicyError(initialPassword) }); return; }
+  const parsedJoinedDate = new Date(`${joinedDate}T00:00:00.000Z`);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(joinedDate) || Number.isNaN(parsedJoinedDate.getTime()) || parsedJoinedDate.toISOString().slice(0, 10) !== joinedDate) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
   if (body.phone !== undefined && (typeof body.phone !== 'string' || phone.length > 30 || (phone && !validImportPhone(phone)))) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
   const qualification = body.qualification === undefined ? '' : body.qualification;
   const department = body.department === undefined ? '' : body.department;
@@ -4609,8 +4626,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = await nextSchoolTeacherId(school);
-  if (!validTeacherId(staffId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only (no spaces or symbols).' }); return; }
+  const staffId = requestedTeacherId;
   const [usedStaffIds, existingTeachers] = await Promise.all([
     queryAllRows('users', {}, 'id,staff_id'),
     queryAllRows('teachers', {}, 'id,staff_id')
@@ -4641,10 +4657,9 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
 
-  const initialPin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
   const account = db.createUser({
     schoolId: school.id, role: 'teacher', staffId, fullName, phone,
-    passwordHash: randomBytes(32).toString('base64url'), pin: initialPin,
+    passwordHash: initialPassword ? hashPassword(initialPassword) : randomBytes(32).toString('base64url'), pin: initialPin,
     mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
     assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
   });
@@ -4656,13 +4671,14 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
     fullName,
     email: '',
     phone,
+    address,
     gender,
     qualification: qualification.trim(),
     department: department.trim(),
     assignedClasses,
     assignedSubjects,
     status: 'active',
-    joinedDate: new Date().toISOString().slice(0, 10),
+    joinedDate,
     monthlySalary
   });
   if (formTeacherClassId) {
