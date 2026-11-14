@@ -13,7 +13,7 @@ const DEFAULT_DATA: SchoolSetupData = {
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
   terms: [{ name: 'Term 1', startDate: '', endDate: '' }, { name: 'Term 2', startDate: '', endDate: '' }],
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' },
-  workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 },
+  workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 6 },
   completedSteps: []
 };
 
@@ -46,7 +46,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         academicYear: { ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}) },
         terms: incoming.terms?.length ? incoming.terms : DEFAULT_DATA.terms,
         calendar: { ...DEFAULT_DATA.calendar, ...(incoming.calendar || {}) },
-        workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}) },
+        workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}), periodsPerDay: Math.min(6, Math.max(1, Number(incoming.workingHours?.periodsPerDay || DEFAULT_DATA.workingHours.periodsPerDay))) },
         completedSteps: incoming.completedSteps || []
       });
       setSaved(incoming.completedSteps || []);
@@ -141,7 +141,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         {field('School closing time', data.workingHours.closingTime, v => patch('workingHours', { ...data.workingHours, closingTime: v }), 'time')}
         {field('Break start time', data.workingHours.breakStartTime, v => patch('workingHours', { ...data.workingHours, breakStartTime: v }), 'time')}
         {field('Break end time', data.workingHours.breakEndTime, v => patch('workingHours', { ...data.workingHours, breakEndTime: v }), 'time')}
-        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per day</span><input type="number" min="1" max="16" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Number(e.target.value) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per day</span><input type="number" min="1" max="6" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
       </div>}
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
