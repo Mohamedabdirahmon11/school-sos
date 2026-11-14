@@ -2466,7 +2466,7 @@ apiRouter.get('/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, r
     ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Two', '+251922222222', '+251933333333', ''],
     ['Grade 5', 'A', 'EXAMPLE Student Three', 'female', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Three', '+251944444444', '', '']
   ];
-  const csv = records.map(record => record.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\\r\\n');
+  const csv = records.map(record => record.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-student-import-template.csv"' }).send(csv);
 });
 
@@ -2542,11 +2542,11 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     for (const guardian of guardians) {
       const phoneValue = guardian.phone.trim();
       if (!phoneValue) continue;
-      const phoneKey = phoneValue.replace(/[\s()-]/g, '');
+      const phoneKey = phoneValue.replace(/\D/g, '');
       let parentRecord = parentRecords.get(phoneKey);
       if (!parentRecord) {
         const parent = existingParentAccounts.find(item =>
-          [item.phone, item.parentPhone].some(value => String(value || '').replace(/[\s()-]/g, '') === phoneKey)
+          [item.phone, item.parentPhone].some(value => String(value || '').replace(/\D/g, '') === phoneKey)
         );
         const existingPinHash = parent?.pin || (parent as any)?.pinHash;
         const parentPin = existingPinHash ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
