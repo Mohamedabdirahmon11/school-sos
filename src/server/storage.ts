@@ -1664,6 +1664,19 @@ class StorageEngine {
     return (await this.queryRows<Student>('students', { id, school_id: schoolId }))[0] || null;
   }
 
+  public async createStudentAtomically(payload: Record<string, unknown>): Promise<Student> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic student registration is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_create_student', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_create_student', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Student registration failed.');
+    const row = data?.student;
+    if (!row || typeof row !== 'object') throw new Error('Student registration returned no student record.');
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
+    return fromSupabaseRow(row, 'students') as Student;
+  }
+
   public createStudent(studentData: Omit<Student, 'id' | 'createdAt'>): Student {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const rawPin = studentData.pin || randomInt(1000, 10000).toString();
