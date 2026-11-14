@@ -572,6 +572,27 @@ export class InMemorySupabase {
         return { data: null, error: { message: error instanceof Error ? error.message : 'Atomic admission approval failed.' } };
       }
     }
+    if (name === 'schoolos_reserve_student_ids') {
+      const schoolId = String(args?.p_school_id || '');
+      const count = Number(args?.p_count || 0);
+      if (!schoolId || !Number.isInteger(count) || count < 1 || count > 2000) {
+        return { data: null, error: { message: 'Student ID reservation request is invalid.' } };
+      }
+      const sequences = this.rows('school_student_id_sequences');
+      let sequence = sequences.find(row => String(row.school_id ?? row.schoolId) === schoolId);
+      if (!sequence) {
+        const max = this.rows('students').filter(row => String(row.school_id ?? row.schoolId) === schoolId)
+          .reduce((value, row) => {
+            const match = String(row.student_id ?? row.studentId ?? '').match(/^S(\\d+)$/i);
+            return match ? Math.max(value, Number(match[1])) : value;
+          }, 0);
+        sequence = { school_id: schoolId, last_number: max };
+        sequences.push(sequence);
+      }
+      const start = Number(sequence.last_number ?? sequence.lastNumber ?? 0) + 1;
+      sequence.last_number = start + count - 1;
+      return { data: Array.from({ length: count }, (_, index) => 'S' + String(start + index).padStart(3, '0')), error: null };
+    }
     if (name !== 'schoolos_bulk_import') return { data: null, error: null };
     if (this.failBulkImport) {
       this.failBulkImport = false;
@@ -586,7 +607,7 @@ export class InMemorySupabase {
     try {
       this.rows('classes').push(...(payload.classes || []).map(toCamel));
       this.rows('students').push(...(payload.students || []).map((row: Record<string, any>) => ({
-        ...toCamel(row), admissionDate: new Date().toISOString().slice(0, 10), status: 'active'
+        ...toCamel(row), admissionDate: row.admission_date || row.admissionDate || new Date().toISOString().slice(0, 10), status: 'active'
       })));
       for (const incoming of (payload.users || []).map(toCamel)) {
         const existing = this.rows('users').find(row => row.id === incoming.id);
