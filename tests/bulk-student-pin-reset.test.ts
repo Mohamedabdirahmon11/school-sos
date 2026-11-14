@@ -130,8 +130,8 @@ test('teachers cannot bulk reset student PINs', async () => {
 
 test('bulk PIN reset wizard selects a class and students and exports one-time PIN data', () => {
   const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
-  assert.match(wizard, /ApiClient\\.getClasses\\(\\)/);
-  assert.match(wizard, /ApiClient\\.getAllStudents\\(classId/);
+  assert.match(wizard, /ApiClient\.getClasses\(\)/);
+  assert.match(wizard, /ApiClient\.getAllStudents\(classId/);
   assert.match(wizard, /selectedIds/);
   assert.match(wizard, /Download PIN CSV/);
   assert.match(wizard, /New PIN/);
