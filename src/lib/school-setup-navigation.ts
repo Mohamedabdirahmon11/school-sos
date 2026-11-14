@@ -16,3 +16,20 @@ export const SCHOOL_SETUP_ALLOWED_VIEWS: ReadonlySet<string> = new Set([
 export const SCHOOL_SETUP_STEP_TARGETS = {
   fees: 'sch_fees'
 } as const;
+
+
+/**
+ * Only a fully validated ten-step onboarding record may unlock the School Admin dashboard.
+ * The older five-step profile wizard used to write completedAt and step 10 prematurely.
+ */
+export function isSchoolSetupProgressComplete(progress: unknown): boolean {
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return false;
+  const value = progress as Record<string, unknown>;
+  if (typeof value.completedAt !== 'string' || !value.completedAt.trim()) return false;
+  const completed = new Set(Array.isArray(value.completedSteps) ? value.completedSteps.filter(Number.isInteger) as number[] : []);
+  const skipped = new Set(Array.isArray(value.skippedSteps) ? value.skippedSteps.filter(Number.isInteger) as number[] : []);
+  const required = [1, 2, 3, 4, 5, 6, 8, 10];
+  return required.every(step => completed.has(step))
+    && [7, 9].every(step => completed.has(step) || skipped.has(step))
+    && [...skipped].every(step => (step === 7 || step === 9) && !completed.has(step));
+}
