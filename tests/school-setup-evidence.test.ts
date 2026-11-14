@@ -38,5 +38,6 @@ test('the five-step school profile endpoint never sets the ten-step completion t
   const route = api.slice(start, end);
   assert.ok(route.includes('const progress = normalizeSchoolSetupProgress(school.setupProgress)'));
   assert.ok(route.includes('coreSetupCompleted'));
+  assert.ok(route.includes('step !== 2'));
   assert.ok(!route.includes('completedAt: allDone'));
 });
