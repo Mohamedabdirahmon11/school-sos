@@ -1664,6 +1664,22 @@ class StorageEngine {
     return (await this.queryRows<Student>('students', { id, school_id: schoolId }))[0] || null;
   }
 
+  public async reserveStudentIds(schoolId: string, count: number): Promise<string[]> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Student ID reservation is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_reserve_student_ids', {
+      p_school_id: schoolId,
+      p_count: count
+    });
+    this.recordQuery('rpc:schoolos_reserve_student_ids', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to reserve student IDs.');
+    if (!Array.isArray(data) || data.length !== count || data.some(id => typeof id !== 'string')) {
+      throw new Error('Student ID reservation returned an invalid result.');
+    }
+    return data as string[];
+  }
+
   public async createStudentAtomically(payload: Record<string, unknown>): Promise<Student> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic student registration is unavailable.');
