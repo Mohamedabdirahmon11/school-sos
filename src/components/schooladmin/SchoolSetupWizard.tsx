@@ -38,7 +38,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 4, title: 'Subjects', description: 'Add the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }] },
   { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific IDs and PIN/password login.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }] },
   { id: 6, title: 'Students & Parents', description: 'Register students, bulk import records and PINs, and add parent contacts.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
-  { id: 7, title: 'Timetable', description: 'Create the timetable now or skip and configure it later.', optional: true, views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
+  { id: 7, title: 'Timetable', description: 'Review the school calendar and working hours, then create the timetable or skip timetable setup for now.', optional: true, coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
   { id: 8, title: 'Attendance & Exams', description: 'Review attendance rules and configure examinations.', views: [{ label: 'Open Attendance', view: 'sch_attendance' }, { label: 'Open Exams', view: 'sch_exams' }] },
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; configure optional modules as needed.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
@@ -53,7 +53,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const [saved, setSaved] = useState<number[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
   const [timetable, setTimetable] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
-  const [showChecklist, setShowChecklist] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(true);
+  const [returnToChecklist, setReturnToChecklist] = useState(false);
   const [setupState, setSetupState] = useState<SchoolSetupState | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(false);
 
@@ -137,10 +138,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       setSaved(incoming.completedSteps || []);
       const nextCoreStep = [1, 2, 3, 4, 5].find(id => !(incoming.completedSteps || []).includes(id)) || 5;
       setStep(nextCoreStep);
-      if ([1, 2, 3, 4, 5].every(id => (incoming.completedSteps || []).includes(id))) {
-        setShowChecklist(true);
-        void refreshSetupProgress();
-      }
+      void refreshSetupProgress();
     }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load school setup.'))
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -194,8 +192,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       const result = await ApiClient.saveSchoolSetupStep(step, section);
       setData(result.data); setSaved(result.data.completedSteps || []);
       if (result.completed) await onComplete();
-      else if (result.coreSetupCompleted) {
+      else if (result.coreSetupCompleted || returnToChecklist) {
         setShowChecklist(true);
+        setReturnToChecklist(false);
         await refreshSetupProgress();
       } else if (advance && step < 5) setStep(step + 1);
     } catch (err) { setError(err instanceof Error ? err.message : 'This setup step could not be saved.'); }
@@ -221,6 +220,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
 
+    {checklistLoading && !setupState && <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading school readiness checks…</div>}
     <section className="space-y-3">
       {CHECKLIST_STEPS.map(item => {
         const evidence = setupState?.checklist[item.id];
@@ -239,7 +239,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
               {!completed && !skipped && evidence?.reason && <p className="mt-2 text-xs text-amber-700">{evidence.reason}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
-              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : 'School profile'}</button>)}
+              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setReturnToChecklist(true); setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 1 ? 'School profile' : coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : coreStep === 4 ? 'Academic calendar' : 'Working hours'}</button>)}
               {item.views?.map(target => <button key={target.view} type="button" onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{target.label}</button>)}
               {item.optional && !completed && !skipped && <button type="button" disabled={saving} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
             </div>
@@ -254,7 +254,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
         <button type="button" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Finishing…' : 'Finish setup and open Dashboard'}</button>
-        <button type="button" onClick={() => { setShowChecklist(false); setStep(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Edit school settings</button>
+        <button type="button" onClick={() => { setReturnToChecklist(false); setShowChecklist(false); setStep(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Open all school settings</button>
       </div>
     </section>
   </main>;
