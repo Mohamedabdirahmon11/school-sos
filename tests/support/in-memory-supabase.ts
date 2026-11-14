@@ -621,20 +621,22 @@ export class InMemorySupabase {
         phone: payload.student_phone || phone, student_id: studentId, password_hash: '',
         pin_hash: payload.pin_hash, is_blocked: false, failed_login_attempts: 0
       });
-      let parent = this.rows('users').find(row => String(row.school_id ?? row.schoolId) === schoolId
-        && row.role === 'parent'
-        && [row.phone, row.parent_phone, row.parentPhone].some((value: any) => normalize(String(value || '')) === phoneKey));
+      const parentRows = this.rows('users').filter(row => String(row.school_id ?? row.schoolId) === schoolId && row.role === 'parent');
+      let parent = parentRows.find(row => row.normalized_phone === phoneKey
+        || [row.phone, row.parent_phone, row.parentPhone].some((value: any) =>
+          String(value || '').split('').filter((character: string) => character >= '0' && character <= '9').join('') === phoneKey));
       if (parent) {
         const links = parent.linked_student_ids ?? parent.linkedStudentIds ?? [];
         parent.linked_student_ids = [...new Set([...links, studentPk])];
         parent.linkedStudentIds = parent.linked_student_ids;
         if (!parent.phone) parent.phone = phone;
         if (!parent.parent_phone && !parent.parentPhone) parent.parent_phone = phone;
+        parent.normalized_phone = phoneKey;
       } else {
         parent = {
           id: 'usr-parent-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
           school_id: schoolId, role: 'parent', full_name: payload.guardian_name,
-          phone, parent_phone: phone, password_hash: '', pin_hash: payload.pin_hash,
+          phone, parent_phone: phone, normalized_phone: phoneKey, password_hash: '', pin_hash: payload.pin_hash,
           linked_student_ids: [studentPk], is_blocked: false, failed_login_attempts: 0
         };
         this.rows('users').push(parent);
