@@ -139,7 +139,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const openStudentEditor = () => {
     if (!selectedStudent || isReadOnly) return;
     setModalError(null);
-    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
+    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', fatherName: selectedStudent.fatherName || '', address: selectedStudent.address || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
     setShowEditModal(true);
   };
   const handleSaveStudent = async (event: React.FormEvent) => {
@@ -379,7 +379,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                             event.stopPropagation();
                             setSelectedStudent(s);
                             setModalError(null);
-                            setEditForm({ firstName: s.firstName || '', middleName: s.middleName || '', lastName: s.lastName || '', gender: s.gender || 'male', studentPhone: s.studentPhone || '', fatherPhone: s.fatherPhone || '', motherPhone: s.motherPhone || '', classId: s.classId || '' });
+                            setEditForm({ firstName: s.firstName || '', middleName: s.middleName || '', lastName: s.lastName || '', gender: s.gender || 'male', studentPhone: s.studentPhone || '', fatherPhone: s.fatherPhone || '', fatherName: s.fatherName || '', address: s.address || '', motherPhone: s.motherPhone || '', classId: s.classId || '' });
                             setShowEditModal(true);
                           }} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[11px] font-semibold text-[#0F766E] hover:bg-[#F0FDFA] disabled:opacity-50">Edit</button>
                         </td>
