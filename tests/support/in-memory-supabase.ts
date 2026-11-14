@@ -166,6 +166,37 @@ export class InMemorySupabase {
   failNextBackupRestore() { this.failBackupRestore = true; }
 
   async rpc(name: string, args?: any) {
+    if (name === 'schoolos_sync_student_guardian') {
+      const schoolId = String(args?.p_school_id || '');
+      const studentId = String(args?.p_student_pk || '');
+      const oldPhone = String(args?.p_old_phone || '').replace(/\\D/g, '');
+      const newPhone = String(args?.p_new_phone || '').replace(/\\D/g, '');
+      const guardianName = String(args?.p_guardian_name || '');
+      const digits = (value: unknown) => String(value || '').replace(/\\D/g, '');
+      const students = this.rows('students').filter(row => String(row.school_id ?? row.schoolId) === schoolId);
+      const student = students.find(row => String(row.id) === studentId);
+      if (!student) return { data: null, error: { message: 'Student was not found.' } };
+      for (const parent of this.rows('users').filter(row => String(row.school_id ?? row.schoolId) === schoolId && row.role === 'parent')) {
+        const matchesOld = [parent.phone, parent.parent_phone, parent.parentPhone].some((value: unknown) => digits(value) === oldPhone);
+        const matchesNew = [parent.phone, parent.parent_phone, parent.parentPhone].some((value: unknown) => digits(value) === newPhone);
+        const linked = Array.isArray(parent.linked_student_ids) ? parent.linked_student_ids : (Array.isArray(parent.linkedStudentIds) ? parent.linkedStudentIds : []);
+        if (matchesOld && oldPhone !== newPhone) {
+          const next = linked.filter((id: string) => id !== studentId);
+          parent.linked_student_ids = next;
+          parent.linkedStudentIds = next;
+        }
+        if (matchesNew && newPhone) {
+          const next = [...new Set([...linked.filter((id: string) => id !== studentId || !matchesOld), studentId])];
+          parent.linked_student_ids = next;
+          parent.linkedStudentIds = next;
+          if (guardianName && (!parent.full_name || String(parent.full_name).startsWith('Parent of '))) {
+            parent.full_name = guardianName;
+            parent.fullName = guardianName;
+          }
+        }
+      }
+      return { data: null, error: null };
+    }
     if (name === 'schoolos_next_fee_receipt') {
       const schoolId = String(args?.p_school_id || '');
       const academicYear = String(args?.p_academic_year || '');
