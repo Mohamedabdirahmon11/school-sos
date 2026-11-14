@@ -96,6 +96,7 @@ BEGIN
   v_student_pk := 'std-' || pg_catalog.gen_random_uuid()::TEXT;
   v_normalized_phone := regexp_replace(v_guardian_phone, '[^0-9]', '', 'g');
   IF v_normalized_phone = '' THEN RAISE EXCEPTION 'Guardian phone number is invalid.'; END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_school_id || ':' || v_normalized_phone, 1));
 
   INSERT INTO public.students (
     id, school_id, branch_id, student_id, first_name, middle_name, last_name,
