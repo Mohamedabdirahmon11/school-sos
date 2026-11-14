@@ -4532,7 +4532,7 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     updates.joinedDate = date;
   }
   if (body.gender !== undefined) {
-    if (!['male', 'female'].includes(body.gender) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
+    if (!['male', 'female'].includes(body.gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
     updates.gender = body.gender;
   }
   if (body.status !== undefined) {
