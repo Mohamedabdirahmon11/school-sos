@@ -76,7 +76,7 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
     }
   }
   for (const [label, needle] of [
-    ['student', "db.createStudent({\n    schoolId: school.id"],
+    ['student', "db.createStudentAtomically({"],
         ['teacher', "db.createTeacher({\n    schoolId: school.id"],
     ['staff', "db.createStaffMember({ schoolId: school.id"]
   ]) assert.ok(apiSource.includes(needle), `${label} HTTP insert path is covered by schema mapping fixture`);
@@ -310,4 +310,20 @@ test('school backup restore rejects single-column foreign keys that cross school
   assert.match(backupRestoreMigration, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
   assert.match(backupRestoreMigration, /v_fk_scope := CASE[\s\S]*target_row\.role::text = ''super_admin''/);
   assert.match(sql, /FOR v_fk IN[\s\S]*target_row\.school_id = \$2[\s\S]*references a record outside this school/);
+});
+
+test('student registration migrations add address, guardian identity, and atomic ID allocation', () => {
+  const registration = readFileSync(new URL('../supabase/migrations/20261114100000_student_management_registration.sql', import.meta.url), 'utf8');
+  const sequence = readFileSync(new URL('../supabase/migrations/20261114110000_student_id_sequence_and_parent_uniqueness.sql', import.meta.url), 'utf8');
+  const bulk = readFileSync(new URL('../supabase/migrations/20261114120000_student_bulk_import_profile.sql', import.meta.url), 'utf8');
+  assert.match(registration, /ADD COLUMN IF NOT EXISTS address/);
+  assert.match(registration, /ADD COLUMN IF NOT EXISTS father_name/);
+  assert.match(sequence, /schoolos_reserve_student_ids/);
+  assert.match(sequence, /pg_advisory_xact_lock|UPDATE public\.school_student_id_sequences/);
+  assert.match(sequence, /uq_parent_phone_normalized_school/);
+  assert.match(apiSource, /schoolos_create_student/);
+  assert.match(apiSource, /studentId.*client|body\.studentId/);
+  assert.match(bulk, /admission_date/);
+  assert.match(bulk, /father_name/);
+  assert.match(bulk, /address/);
 });
