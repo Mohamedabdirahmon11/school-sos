@@ -31,9 +31,9 @@ const STEPS = [
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
 
-const CHECKLIST_STEPS = [
-  { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the current academic year and semester dates.', coreStep: 2 },
-  { id: 2, title: 'School Information & WhatsApp', description: 'Confirm the school profile and administration WhatsApp number.', coreStep: 1 },
+const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; coreSteps?: number[]; optional?: boolean; views?: Array<{ label: string; view: string }> }> = [
+  { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the current academic year and semester dates.', coreSteps: [2, 3] },
+  { id: 2, title: 'School Information & WhatsApp', description: 'Confirm the school profile and administration WhatsApp number.', coreSteps: [1] },
   { id: 3, title: 'Classes & Grades', description: 'Create the school classes and sections. KG 1 and KG 2 are supported.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
   { id: 4, title: 'Subjects', description: 'Add the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }] },
   { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific IDs and PIN/password login.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }] },
@@ -43,7 +43,7 @@ const CHECKLIST_STEPS = [
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; configure optional modules as needed.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
 
-export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
+export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
   const { school } = useAuth();
   const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
   const [step, setStep] = useState(1);
@@ -238,7 +238,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
               {!completed && !skipped && evidence?.reason && <p className="mt-2 text-xs text-amber-700">{evidence.reason}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
-              {item.coreStep && <button type="button" onClick={() => { setShowChecklist(false); setStep(item.coreStep!); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">Review settings</button>}
+              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : 'School profile'}</button>)}
               {item.views?.map(target => <button key={target.view} type="button" onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{target.label}</button>)}
               {item.optional && !completed && !skipped && <button type="button" disabled={saving} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
             </div>
