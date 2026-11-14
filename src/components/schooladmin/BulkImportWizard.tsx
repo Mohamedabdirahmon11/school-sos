@@ -12,6 +12,7 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [result, setResult] = useState<{ counts: Record<string, number>; pinSlips: PinSlip[] } | null>(null);
   const [errorsOnly, setErrorsOnly] = useState(false);
+  const [edited, setEdited] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const visibleRows = useMemo(() => (preview?.rows || []).filter(row => !errorsOnly || row.status === 'error'), [preview, errorsOnly]);
@@ -36,9 +37,36 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
       const response = await fetch('/api/import/preview', { method: 'POST', credentials: 'include', body: form });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Preview failed.');
-      setPreview(body); setResult(null); setErrorsOnly(false);
+      setPreview(body); setResult(null); setErrorsOnly(false); setEdited(false);
     } catch (reason: any) { setError(reason.message || 'Preview failed.'); }
     finally { setLoading(false); }
+  };
+
+  const updatePreviewCell = (rowNumber: number, field: string, value: string) => {
+    setPreview(current => current ? {
+      ...current,
+      rows: current.rows.map(row => row.row === rowNumber
+        ? { ...row, data: { ...row.data, [field]: value } }
+        : row)
+    } : current);
+    setEdited(true);
+  };
+
+  const validateEdits = async () => {
+    if (!preview) return;
+    setLoading(true); setError('');
+    try {
+      const response = await fetch('/api/import/validate', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: preview.rows.map(row => row.data) })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Edited rows could not be validated.');
+      setPreview(body); setEdited(false);
+    } catch (reason: any) {
+      setError(reason.message || 'Edited rows could not be validated.');
+    } finally { setLoading(false); }
   };
 
   const confirmImport = async () => {
@@ -47,13 +75,16 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
     try {
       const response = await fetch('/api/import/confirm', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: preview.rows.map(row => row.data) }) });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Import failed.');
+      if (!response.ok) {
+        if (body.preview) { setPreview(body.preview); setEdited(false); }
+        throw new Error(body.error || 'Import failed.');
+      }
       setResult(body); onComplete();
     } catch (reason: any) { setError(reason.message || 'Import failed.'); }
     finally { setLoading(false); }
   };
 
-  const reset = () => { setFile(null); setPreview(null); setResult(null); setError(''); setErrorsOnly(false); };
+  const reset = () => { setFile(null); setPreview(null); setResult(null); setError(''); setErrorsOnly(false); setEdited(false); };
   const step = result ? t('import_step_result') : preview ? t('import_step_preview') : t('import_step_upload');
   return (
     <>
@@ -86,17 +117,35 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
                 <div className="flex flex-wrap gap-2 text-xs"><span className="rounded bg-emerald-50 px-2 py-1 text-emerald-800">{t('import_valid_count')}: {preview.totals.valid}</span><span className="rounded bg-rose-50 px-2 py-1 text-rose-800">{t('import_error_count')}: {preview.totals.errors}</span><span className="rounded bg-slate-100 px-2 py-1 text-slate-700">{t('import_skipped_count')}: {preview.totals.skipped}</span></div>
                 <label className="flex items-center gap-2 text-xs text-[#334155]"><input type="checkbox" checked={errorsOnly} onChange={event => setErrorsOnly(event.target.checked)} />{t('import_error_only')}</label>
               </div>
-              <div className="max-h-[40vh] overflow-auto rounded-lg border border-[#E2E8F0]">
-                <table className="min-w-[780px] w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-50 text-[#475569]"><tr><th className="px-3 py-2">{t('import_row')}</th><th className="px-3 py-2">studentName</th><th className="px-3 py-2">className / section</th><th className="px-3 py-2">parentPhone</th><th className="px-3 py-2">{t('import_status')}</th><th className="px-3 py-2">{t('import_reason')}</th></tr></thead>
-                  <tbody>{visibleRows.map(row => <tr key={row.row} className={row.status === 'valid' ? 'bg-emerald-50/70' : row.status === 'error' ? 'bg-rose-50' : 'bg-slate-50'}><td className="border-t border-white px-3 py-2">{row.row}</td><td className="border-t border-white px-3 py-2">{row.data.studentName}</td><td className="border-t border-white px-3 py-2">{row.data.className} / {row.data.section}</td><td className="border-t border-white px-3 py-2">{row.data.parentPhone}</td><td className="border-t border-white px-3 py-2 font-semibold capitalize">{row.status}</td><td className="border-t border-white px-3 py-2">{row.reasons.join(' ') || '—'}</td></tr>)}</tbody>
+              <div className="max-h-[45vh] overflow-auto rounded-lg border border-[#E2E8F0]">
+                <table className="min-w-[1500px] w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-50 text-[#475569]"><tr>
+                    <th className="px-2 py-2">Row</th><th className="px-2 py-2">Student full name</th><th className="px-2 py-2">Class</th><th className="px-2 py-2">Section</th>
+                    <th className="px-2 py-2">Gender</th><th className="px-2 py-2">Admission date</th><th className="px-2 py-2">Address</th>
+                    <th className="px-2 py-2">Parent / Guardian</th><th className="px-2 py-2">Parent phone</th><th className="px-2 py-2">Student phone</th>
+                    <th className="px-2 py-2">Status</th><th className="px-2 py-2">Row errors</th>
+                  </tr></thead>
+                  <tbody>{visibleRows.map(row => <tr key={row.row} className={row.status === 'valid' ? 'bg-emerald-50/70' : row.status === 'error' ? 'bg-rose-50' : 'bg-slate-50'}>
+                    <td className="border-t border-white px-2 py-2">{row.row}</td>
+                    {(['studentName','className','section'] as const).map(field => <td key={field} className="border-t border-white px-2 py-2"><input aria-label={field} value={row.data[field] || ''} onChange={event => updatePreviewCell(row.row, field, event.target.value)} className="w-36 rounded border border-slate-300 bg-white px-2 py-1" /></td>)}
+                    <td className="border-t border-white px-2 py-2"><select aria-label="gender" value={row.data.gender || ''} onChange={event => updatePreviewCell(row.row,'gender',event.target.value)} className="rounded border border-slate-300 bg-white px-2 py-1"><option value="">Select</option><option value="male">Male</option><option value="female">Female</option></select></td>
+                    <td className="border-t border-white px-2 py-2"><input aria-label="admissionDate" type="date" value={row.data.admissionDate || ''} onChange={event => updatePreviewCell(row.row,'admissionDate',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
+                    <td className="border-t border-white px-2 py-2"><input aria-label="address" value={row.data.address || ''} onChange={event => updatePreviewCell(row.row,'address',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
+                    <td className="border-t border-white px-2 py-2"><input aria-label="parentName" value={row.data.parentName || ''} onChange={event => updatePreviewCell(row.row,'parentName',event.target.value)} className="w-36 rounded border border-slate-300 bg-white px-2 py-1" /></td>
+                    <td className="border-t border-white px-2 py-2"><input aria-label="parentPhone" value={row.data.parentPhone || ''} onChange={event => updatePreviewCell(row.row,'parentPhone',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
+                    <td className="border-t border-white px-2 py-2"><input aria-label="studentPhone" value={row.data.studentPhone || ''} onChange={event => updatePreviewCell(row.row,'studentPhone',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
+                    <td className="border-t border-white px-2 py-2 font-semibold capitalize">{row.status}</td>
+                    <td className="border-t border-white px-2 py-2 text-rose-700">{row.reasons.join(' ') || '—'}</td>
+                  </tr>)}</tbody>
                 </table>
-                {!visibleRows.length && <p className="p-5 text-center text-xs text-[#64748B]">{preview.rows.length ? t('import_empty_preview') : t('import_empty_preview')}</p>}
+                {!visibleRows.length && <p className="p-5 text-center text-xs text-[#64748B]">{t('import_empty_preview')}</p>}
               </div>
+              {edited && <p className="text-xs text-amber-700">You changed preview data. Validate the edited rows before importing.</p>}
               {preview.totals.errors > 0 && <p className="text-xs text-rose-700">{t('import_error_count')}: {preview.totals.errors}. Fix these rows and preview the file again.</p>}
               <div className="flex flex-col-reverse gap-2 border-t border-[#E2E8F0] pt-4 sm:flex-row sm:justify-between">
                 <button onClick={reset} className="min-h-10 rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs font-semibold text-[#334155]">{t('import_back')}</button>
-                <button onClick={confirmImport} disabled={loading || Boolean(preview.totals.errors) || !preview.totals.valid} className="min-h-10 rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{loading ? t('import_loading') : t('import_confirm_button')}</button>
+                {edited && <button onClick={validateEdits} disabled={loading} className="min-h-10 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 disabled:opacity-50">{loading ? 'Checking…' : 'Validate edited rows'}</button>}
+                <button onClick={confirmImport} disabled={loading || edited || Boolean(preview.totals.errors) || !preview.totals.valid} className="min-h-10 rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{loading ? t('import_loading') : t('import_confirm_button')}</button>
               </div>
             </div>}
             {!preview && <p className="mt-5 rounded-lg bg-slate-50 p-5 text-center text-xs text-[#64748B]">{t('import_empty_preview')}</p>}

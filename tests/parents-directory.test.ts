@@ -17,7 +17,7 @@ test('parent contacts are derived from active students scoped to the current sch
   assert.match(route, /class_id: classId/);
 });
 
-test('guardian phone numbers are normalized and deduplicated across father and mother records', () => {
+test('guardian phone numbers are normalized and deduplicated per school', () => {
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);

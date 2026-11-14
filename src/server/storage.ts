@@ -1664,6 +1664,51 @@ class StorageEngine {
     return (await this.queryRows<Student>('students', { id, school_id: schoolId }))[0] || null;
   }
 
+  public async reserveStudentIds(schoolId: string, count: number): Promise<string[]> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Student ID reservation is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_reserve_student_ids', {
+      p_school_id: schoolId,
+      p_count: count
+    });
+    this.recordQuery('rpc:schoolos_reserve_student_ids', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to reserve student IDs.');
+    if (!Array.isArray(data) || data.length !== count || data.some(id => typeof id !== 'string')) {
+      throw new Error('Student ID reservation returned an invalid result.');
+    }
+    return data as string[];
+  }
+
+  public async syncStudentGuardian(schoolId: string, studentPk: string, oldPhone: string, newPhone: string, guardianName: string): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Guardian account synchronization is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_sync_student_guardian', {
+      p_school_id: schoolId,
+      p_student_pk: studentPk,
+      p_old_phone: oldPhone,
+      p_new_phone: newPhone,
+      p_guardian_name: guardianName
+    });
+    this.recordQuery('rpc:schoolos_sync_student_guardian', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to synchronize the parent / guardian account.');
+    this.invalidateAuthContextsForSchool(schoolId);
+  }
+
+  public async createStudentAtomically(payload: Record<string, unknown>): Promise<Student> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Atomic student registration is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_create_student', { p_payload: payload });
+    this.recordQuery('rpc:schoolos_create_student', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Student registration failed.');
+    const row = data?.student;
+    if (!row || typeof row !== 'object') throw new Error('Student registration returned no student record.');
+    this.invalidateAuthContextsForSchool(String(payload.school_id || ''));
+    return fromSupabaseRow(row, 'students') as Student;
+  }
+
   public createStudent(studentData: Omit<Student, 'id' | 'createdAt'>): Student {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const rawPin = studentData.pin || randomInt(1000, 10000).toString();
@@ -1702,7 +1747,7 @@ class StorageEngine {
     const parentPhones = [...new Set([student.fatherPhone, student.motherPhone]
       .filter((phone): phone is string => typeof phone === 'string' && phone.trim().length > 0)
       .map(phone => phone.trim()))];
-    const normalizePhone = (phone: string) => phone.replace(/[\s()-]/g, '');
+    const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
     for (const parentPhone of parentPhones) {
       const normalizedPhone = normalizePhone(parentPhone);
       const existingParent = this.data.users.find(user =>
@@ -1715,12 +1760,13 @@ class StorageEngine {
         if (!existingParent.linkedStudentIds.includes(id)) existingParent.linkedStudentIds.push(id);
         if (!existingParent.phone) existingParent.phone = parentPhone;
         if (!existingParent.parentPhone) existingParent.parentPhone = parentPhone;
+        if (student.fatherName && (!existingParent.fullName || existingParent.fullName.startsWith('Parent of '))) existingParent.fullName = student.fatherName;
       } else {
         this.data.users.push({
           id: `usr-parent-${randomUUID()}`,
           schoolId: student.schoolId,
           role: 'parent',
-          fullName: `Parent of ${student.firstName}`,
+          fullName: student.fatherName || `Parent of ${student.firstName}`,
           phone: parentPhone,
           parentPhone,
           passwordHash: '',
@@ -1785,7 +1831,7 @@ class StorageEngine {
     if (!current) current = await this.getStudentById(id, schoolId || updates.schoolId) || undefined;
     if (!current) return null;
     const tenantId = schoolId || current.schoolId;
-    const parentContactsChanged = updates.fatherPhone !== undefined || updates.motherPhone !== undefined;
+    const parentContactsChanged = updates.fatherPhone !== undefined || updates.motherPhone !== undefined || updates.fatherName !== undefined;
     const studentLoginChanged = updates.firstName !== undefined || updates.middleName !== undefined ||
       updates.lastName !== undefined || updates.studentPhone !== undefined ||
       updates.fatherPhone !== undefined || updates.branchId !== undefined;
@@ -1803,8 +1849,12 @@ class StorageEngine {
     this.data.students[idx] = updated;
 
     if (parentContactsChanged) {
-      const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : '';
-      const newParentPhones = new Set([updated.fatherPhone, updated.motherPhone].map(normalizePhone).filter(Boolean));
+      const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/\D/g, '') : '';
+      const newParentPhones = new Map<string, string>();
+      for (const rawPhone of [updated.fatherPhone, updated.motherPhone]) {
+        const normalized = normalizePhone(rawPhone);
+        if (normalized && rawPhone) newParentPhones.set(normalized, rawPhone);
+      }
       const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
 
       // Reconcile parent links without removing siblings or changing an existing
@@ -1816,7 +1866,7 @@ class StorageEngine {
           [student.fatherPhone, student.motherPhone].some(phone => contactPhones.has(normalizePhone(phone)))
         );
         const linkedIds = new Set(parent.linkedStudentIds || []);
-        if ([...newParentPhones].some(phone => contactPhones.has(phone))) linkedIds.add(id);
+        if ([...newParentPhones.keys()].some(phone => contactPhones.has(phone))) linkedIds.add(id);
         else linkedIds.delete(id);
         for (const sibling of matchingSiblings) linkedIds.add(sibling.id);
         if (linkedIds.size || parent.linkedStudentIds) parent.linkedStudentIds = [...linkedIds];
@@ -1827,22 +1877,23 @@ class StorageEngine {
         (user.id === `usr-student-${id}` || user.studentId === updated.studentId)
       );
       const parentPin = updated.pinHash || studentAccount?.pin || '';
-      for (const phone of newParentPhones) {
+      for (const [phone, displayPhone] of newParentPhones) {
         const parent = parentUsers.find(user =>
           [user.phone, user.parentPhone].some(value => normalizePhone(value) === phone)
         );
         if (parent) {
           parent.linkedStudentIds = [...new Set([...(parent.linkedStudentIds || []), id])];
-          if (!parent.phone) parent.phone = phone;
-          if (!parent.parentPhone) parent.parentPhone = phone;
+          if (updated.fatherName && (!parent.fullName || parent.fullName.startsWith('Parent of '))) parent.fullName = updated.fatherName;
+          if (!parent.phone) parent.phone = displayPhone;
+          if (!parent.parentPhone) parent.parentPhone = displayPhone;
         } else {
           const createdParent: User = {
             id: `usr-parent-${randomUUID()}`,
             schoolId: tenantId,
             role: 'parent',
-            fullName: `Parent of ${updated.firstName}`,
-            phone,
-            parentPhone: phone,
+            fullName: updated.fatherName || `Parent of ${updated.firstName}`,
+            phone: displayPhone,
+            parentPhone: displayPhone,
             passwordHash: '',
             pin: parentPin,
             linkedStudentIds: [id],
@@ -1869,6 +1920,7 @@ class StorageEngine {
     }
 
     this.save();
+    await this.flush();
     return updated;
   }
   public async deleteStudent(id: string, schoolId?: string): Promise<boolean> {

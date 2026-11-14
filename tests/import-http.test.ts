@@ -46,12 +46,12 @@ function tokenFor(user: typeof admin) {
   return createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: user.schoolId, createdAt: Date.now(), expiresAt: Date.now() + 60_000 });
 }
 const csv = (...rows: string[][]) => [
-  'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,studentPhone,branch',
-  ...rows.map(row => row.join(','))
+  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone',
+  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[6],row[7]].join(','))
 ].join('\n');
 const csvWithGuardians = (...rows: string[][]) => [
-  'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,fatherPhone,motherName,motherPhone,studentPhone,branch',
-  ...rows.map(row => row.join(','))
+  'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone',
+  ...rows.map(row => [row[0],row[1],row[2],row[3],row[4],'',row[5],row[7] || row[6],row[10]].join(','))
 ].join('\n');
 
 async function preview(user: typeof admin, text: string, headers: Record<string, string> = {}) {
@@ -66,8 +66,8 @@ async function confirm(user: typeof admin, rows: any[]) {
 
 test('CSV import creates one missing class, students, linked parent and one-time PIN slips', async () => {
   const { response, body } = await preview(admin, csv(
-    ['Grade 2', 'A', 'Amal Noor', 'female', '2017-02-04', 'Amina Noor', '+252611234567', '', ''],
-    ['Grade 2', 'A', 'Ibrahim Noor', 'male', '2017-08-09', 'Amina Noor', '+252611234567', '+252622234567', '']
+    ['Grade 2', 'A', 'Amal Amina Noor', 'female', '2017-02-04', 'Amina Noor', '+252611234567', '', ''],
+    ['Grade 2', 'A', 'Ibrahim Yusuf Noor', 'male', '2017-08-09', 'Amina Noor', '+252611234567', '+252622234567', '']
   ));
   assert.equal(response.status, 200);
   assert.equal(body.totals.valid, 2);
@@ -88,7 +88,7 @@ test('CSV import creates one missing class, students, linked parent and one-time
   assert.equal(JSON.stringify(students).includes(result.pinSlips[0].pin), false);
 });
 
-test('bulk import links father and mother accounts and never resets an existing parent PIN', async () => {
+test('bulk import links the existing guardian account and never resets its PIN', async () => {
   const existingPinHash = hashPin('2468');
   await memory.from('users').insert([{
     id: 'existing-father-parent',
@@ -103,7 +103,7 @@ test('bulk import links father and mother accounts and never resets an existing 
     failedLoginAttempts: 0
   }]);
   const { response, body } = await preview(admin, csvWithGuardians([
-    'Grade 8', 'A', 'Ayaan Hassan', 'female', '2015-05-04',
+    'Grade 8', 'A', 'Ayaan Hodan Hassan', 'female', '2015-05-04',
     'Existing Father', '', '+252611199991', 'Hodan Hassan', '+252622299992', '', ''
   ]));
   assert.equal(response.status, 200);
@@ -111,23 +111,21 @@ test('bulk import links father and mother accounts and never resets an existing 
   const imported = await confirm(admin, body.rows.map((row: any) => row.data));
   assert.equal(imported.status, 200);
   const result = await imported.json() as any;
-  assert.equal(result.counts.parents, 2);
-  assert.equal(result.pinSlips.length, 2);
+  assert.equal(result.counts.parents, 1);
+  assert.equal(result.pinSlips.length, 1);
   const studentSlip = result.pinSlips.find((slip: any) => slip.type === 'student');
   const student = memory.rows('students').find(row => row.studentId === studentSlip?.studentId);
   assert.equal(student?.fatherPhone, '+252611199991');
-  assert.equal(student?.motherPhone, '+252622299992');
+  assert.equal(student?.motherPhone, null);
   const father = memory.rows('users').find(row => row.id === 'existing-father-parent');
   assert.equal(father?.pinHash, existingPinHash);
   assert.ok(father?.linkedStudentIds?.includes(student.id));
-  const mother = memory.rows('users').find(row => row.role === 'parent' && row.phone === '+252622299992');
-  assert.ok(mother?.linkedStudentIds?.includes(student.id));
 });
 
 test('preview rejects duplicate rows and invalid parent phone with row reasons', async () => {
   const { response, body } = await preview(admin, csv(
-    ['Grade 3', 'A', 'Hodan Ali', 'female', '2017-02-04', 'Parent Ali', '+252611234568', '', ''],
-    ['Grade 3', 'A', 'Hodan Ali', 'female', '2017-02-04', 'Parent Ali', '+252611234568', '', ''],
+    ['Grade 3', 'A', 'Hodan Amina Ali', 'female', '2017-02-04', 'Parent Ali', '+252611234568', '', ''],
+    ['Grade 3', 'A', 'Hodan Amina Ali', 'female', '2017-02-04', 'Parent Ali', '+252611234568', '', ''],
     ['Grade 3', 'A', 'Bad Phone Student', 'male', '2016-11-10', 'Parent Bad', 'not-a-phone', '', '']
   ));
   assert.equal(response.status, 200);
@@ -147,7 +145,7 @@ test('import scope rejects cross-school attempts; read-only schools and teacher 
 });
 
 test('mid-transaction failure leaves classes, students, users and audit rows unchanged', async () => {
-  const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
+  const { body } = await preview(admin, csv(['Grade 5', 'A', 'Rollback Test User', 'female', '2016-01-01', 'Parent Rollback', '+252611234572', '', '']));
   const before = ['classes', 'students', 'users', 'audit_logs'].map(table => memory.rows(table).length);
   memory.failNextBulkImport();
   const failed = await confirm(admin, body.rows.map((row: any) => row.data));
@@ -159,8 +157,8 @@ test('template contains required headers and explicitly skipped examples', async
   const response = await fetch(`${baseUrl}/import/template`, { headers: { Cookie: `schoolos_session=${tokenFor(admin)}` } });
   const text = await response.text();
   assert.equal(response.status, 200);
-  assert.match(text, /"?className"?,"?section"?,"?studentName"?,"?gender"?,"?dateOfBirth"?,"?parentName"?,"?parentPhone"?,"?fatherPhone"?,"?motherName"?,"?motherPhone"?,"?studentPhone"?,"?branch"?/);
-  assert.equal((text.match(/EXAMPLE/g) || []).length, 9);
+  assert.match(text, /className.*section.*studentName.*admissionDate.*address.*parentName.*parentPhone/);
+  assert.equal((text.match(/EXAMPLE/g) || []).length, 6);
   assert.match(text, /Grade 5/);
 });
 
@@ -195,7 +193,7 @@ test('student import template has no Status or Reason column', async () => {
 });
 
 test('CSV without a Status column imports and every new student is active', async () => {
-  const text = csv(['Grade 6', 'A', 'Hodan Ali', 'female', '2014-03-02', 'Ali Warsame', '+252611555101', '', '']);
+  const text = csv(['Grade 6', 'A', 'Hodan Amina Ali', 'female', '2014-03-02', 'Ali Warsame', '+252611555101', '', '']);
   assert.equal(text.split('\n')[0].toLowerCase().includes('status'), false);
   const { response, body } = await preview(admin, text);
   assert.equal(response.status, 200);
@@ -210,8 +208,8 @@ test('CSV without a Status column imports and every new student is active', asyn
 
 test('an unexpected Status column in an uploaded file is ignored and does not change the active default', async () => {
   const text = [
-    'className,section,studentName,gender,dateOfBirth,parentName,parentPhone,studentPhone,branch,Status',
-    'Grade 6,A,Farah Ali,male,2014-05-06,Ali Warsame,+252611555102,,,inactive'
+    'className,section,studentName,gender,admissionDate,address,parentName,parentPhone,studentPhone,Status',
+    'Grade 6,A,Farah Amina Ali,male,2026-11-14,Jijiga,Ali Warsame,+252611555102,,inactive'
   ].join('\n');
   const { response, body } = await preview(admin, text);
   assert.equal(response.status, 200);

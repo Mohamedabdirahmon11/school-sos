@@ -128,12 +128,12 @@ test('teachers cannot bulk reset student PINs', async () => {
   assert.equal(response.status, 403);
 });
 
-test('bulk PIN reset wizard accepts CSV and XLSX filename extensions', () => {
+test('bulk PIN reset wizard selects a class and students and exports one-time PIN data', () => {
   const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
-  const matcherSource = wizard.split('\n').find(line => line.includes('file.name'))?.split('!/')[1]?.split('/i.test')[0];
-  assert.ok(matcherSource, 'file extension validation is present');
-  const matcher = new RegExp(matcherSource, 'i');
-  assert.equal(matcher.test('students.csv'), true);
-  assert.equal(matcher.test('students.xlsx'), true);
-  assert.equal(matcher.test('students.txt'), false);
+  assert.match(wizard, /ApiClient\.getClasses\(\)/);
+  assert.match(wizard, /ApiClient\.getAllStudents\(classId/);
+  assert.match(wizard, /selectedIds/);
+  assert.match(wizard, /Download PIN CSV/);
+  assert.match(wizard, /New PIN/);
+  assert.doesNotMatch(wizard, /Choose CSV or XLSX file/);
 });

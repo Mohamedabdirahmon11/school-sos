@@ -197,7 +197,7 @@ export interface Student {
   id: string;
   schoolId: string;
   branchId?: string;
-  studentId: string; // STD-<SCHOOLCODE>-01
+  studentId: string; // S001, S002, ... (generated per school)
   firstName: string;
   middleName: string;
   lastName: string;
@@ -206,7 +206,9 @@ export interface Student {
   dateOfBirth?: string;
   studentPhone?: string;
   fatherPhone: string;
+  fatherName?: string;
   motherPhone?: string;
+  address?: string;
   classId: string;
   section?: string;
   status: 'active' | 'inactive' | 'graduated' | 'transferred';

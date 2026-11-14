@@ -65,6 +65,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split('T')[0]);
   const [studentPhone, setStudentPhone] = useState('');
   const [fatherPhone, setFatherPhone] = useState('');
+  const [guardianName, setGuardianName] = useState('');
+  const [address, setAddress] = useState('');
   const [motherPhone, setMotherPhone] = useState('');
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,8 +107,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         gender,
         admissionDate,
         studentPhone,
-        fatherPhone,
-        motherPhone,
+        guardianName,
+        guardianPhone: fatherPhone,
+        address,
         classId
       }, school?.id);
 
@@ -120,6 +123,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       setLastName('');
       setStudentPhone('');
       setFatherPhone('');
+      setGuardianName('');
+      setAddress('');
       setMotherPhone('');
       await fetchStudents();
       loadStudentDetails(newStudent);
@@ -134,7 +139,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const openStudentEditor = () => {
     if (!selectedStudent || isReadOnly) return;
     setModalError(null);
-    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
+    setEditForm({ firstName: selectedStudent.firstName || '', middleName: selectedStudent.middleName || '', lastName: selectedStudent.lastName || '', gender: selectedStudent.gender || 'male', studentPhone: selectedStudent.studentPhone || '', fatherPhone: selectedStudent.fatherPhone || '', fatherName: selectedStudent.fatherName || '', address: selectedStudent.address || '', motherPhone: selectedStudent.motherPhone || '', classId: selectedStudent.classId || '' });
     setShowEditModal(true);
   };
   const handleSaveStudent = async (event: React.FormEvent) => {
@@ -358,7 +363,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className}</td>
-                        <td className="px-5 py-4 text-[#334155]">{s.fatherPhone || "—"}</td>
+                        <td className="px-5 py-4 text-[#334155]"><><span className="block font-medium">{s.fatherName || 'Parent / Guardian'}</span><span className="font-mono text-[11px] text-slate-500">{s.fatherPhone || '—'}</span></></td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
                             normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
@@ -374,7 +379,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                             event.stopPropagation();
                             setSelectedStudent(s);
                             setModalError(null);
-                            setEditForm({ firstName: s.firstName || '', middleName: s.middleName || '', lastName: s.lastName || '', gender: s.gender || 'male', studentPhone: s.studentPhone || '', fatherPhone: s.fatherPhone || '', motherPhone: s.motherPhone || '', classId: s.classId || '' });
+                            setEditForm({ firstName: s.firstName || '', middleName: s.middleName || '', lastName: s.lastName || '', gender: s.gender || 'male', studentPhone: s.studentPhone || '', fatherPhone: s.fatherPhone || '', fatherName: s.fatherName || '', address: s.address || '', motherPhone: s.motherPhone || '', classId: s.classId || '' });
                             setShowEditModal(true);
                           }} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[11px] font-semibold text-[#0F766E] hover:bg-[#F0FDFA] disabled:opacity-50">Edit</button>
                         </td>
@@ -561,7 +566,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             {['firstName','middleName','lastName'].map((field,index) => <label key={field} className="block text-xs font-medium">{['First name','Father name','Grandfather name'][index]}<input required value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
             <label className="block text-xs font-medium">Gender<select value={editForm.gender} onChange={e => setEditForm((value:any) => ({...value,gender:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
             <label className="block text-xs font-medium">Class<select required value={editForm.classId} onChange={e => setEditForm((value:any) => ({...value,classId:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}</select></label>
-            {['studentPhone','fatherPhone','motherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Father phone','Mother phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
+            <label className="block text-xs font-medium">Parent / Guardian name<input value={editForm.fatherName || ''} maxLength={160} onChange={e => setEditForm((value:any) => ({...value,fatherName:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>
+            <label className="block text-xs font-medium">Student address<textarea value={editForm.address || ''} maxLength={500} rows={2} onChange={e => setEditForm((value:any) => ({...value,address:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>
+            {['studentPhone','fatherPhone'].map((field,index) => <label key={field} className="block text-xs font-medium">{['Student phone','Parent / guardian phone'][index]}<input type="tel" value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
             <div className="flex justify-end gap-2 border-t pt-3"><button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button type="submit" disabled={isReadOnly} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></div>
           </form>
         </div>
@@ -662,37 +669,30 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                 >
                   {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.roomNumber})</option>
+                    <option key={c.id} value={c.id}>{c.name} · Section {c.section || 'A'}</option>
                   ))}
                 </select>
               </div>
 
               {/* Contact Numbers */}
               <div className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-3">
-                <span className="font-semibold text-[#132A29] block">Parent & Student Phone Numbers</span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-[#334155]">Father Phone *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={fatherPhone}
-                      onChange={e => setFatherPhone(e.target.value)}
-                      placeholder="+25261..."
-                      className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-[#334155]">Mother Phone *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={motherPhone}
-                      onChange={e => setMotherPhone(e.target.value)}
-                      placeholder="+25261..."
-                      className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white font-mono"
-                    />
-                  </div>
+                <span className="font-semibold text-[#132A29] block">Parent / Guardian Details</span>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#334155]">Parent / Guardian Full Name *</label>
+                  <input type="text" required maxLength={160} value={guardianName}
+                    onChange={e => setGuardianName(e.target.value)} placeholder="Enter parent or guardian name"
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#334155]">Parent / Guardian Phone *</label>
+                  <input type="tel" required value={fatherPhone} onChange={e => setFatherPhone(e.target.value)}
+                    placeholder="+2519..." className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white font-mono" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#334155]">Address</label>
+                  <textarea maxLength={500} rows={2} value={address} onChange={e => setAddress(e.target.value)}
+                    placeholder="Student home address"
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none bg-white" />
                 </div>
 
                 <div>
