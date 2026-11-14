@@ -104,6 +104,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
   const [timetableSettings, setTimetableSettings] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
+  const [closingTime, setClosingTime] = useState(school?.setupData?.workingHours?.closingTime || '16:00');
 
   // Documents & Notifications State
   const [reportCardHeader, setReportCardHeader] = useState(school?.reportCardHeader || '');
@@ -125,6 +126,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   useEffect(() => {
     if (!school) return;
+    setClosingTime(school.setupData?.workingHours?.closingTime || '16:00');
     ApiClient.getBranches()
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
       .catch((err: any) => setBranchError(err.message || 'Failed to load campus branches.'));
@@ -261,6 +263,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
       return hour * 60 + minute;
     };
     if (!validTime(timetableSettings.firstPeriodStart)) { setError('First shift start must use HH:MM.'); return; }
+    if (!validTime(closingTime)) { setError('School closing time must use HH:MM.'); return; }
     if (!Number.isInteger(timetableSettings.periodMinutes) || timetableSettings.periodMinutes < 20 || timetableSettings.periodMinutes > 120) { setError('First shift period length must be between 20 and 120 minutes.'); return; }
     if (!Number.isInteger(timetableSettings.breakAfterPeriod) || timetableSettings.breakAfterPeriod < 1 || timetableSettings.breakAfterPeriod > 5) { setError('First shift break position must be between periods 1 and 5.'); return; }
     if (!Number.isInteger(timetableSettings.breakMinutes) || timetableSettings.breakMinutes < 0 || timetableSettings.breakMinutes > 120) { setError('First shift break length must be between 0 and 120 minutes.'); return; }
@@ -278,11 +281,20 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
         + (periodsPerShift > timetableSettings.shift2BreakAfterPeriod ? timetableSettings.shift2BreakMinutes : 0);
       if (minutesOf(timetableSettings.shift2FirstPeriodStart) < firstShiftEnd) { setError('Second shift must start after the first shift has finished. Adjust the shift times or period lengths.'); return; }
       if (secondShiftEnd > 1440) { setError('Second shift timetable cannot run past midnight.'); return; }
-      const schoolClosing = school?.setupData?.workingHours?.closingTime;
-      if (schoolClosing && validTime(schoolClosing) && secondShiftEnd > minutesOf(schoolClosing)) { setError('Second shift must finish before the school closing time configured in School Setup.'); return; }
+      if (firstShiftEnd > minutesOf(closingTime)) { setError('Shift 1 must finish at or before the school closing time.'); return; }
+      if (secondShiftEnd > minutesOf(closingTime)) { setError('Shift 2 must finish at or before the school closing time.'); return; }
     }
     setSavingSection('timetable');
     try {
+      const currentHours = school?.setupData?.workingHours || {};
+      await ApiClient.saveSchoolSetupStep(5, { workingHours: {
+        openingTime: currentHours.openingTime || '07:30',
+        classStartTime: timetableSettings.firstPeriodStart,
+        closingTime,
+        breakStartTime: currentHours.breakStartTime || '10:00',
+        breakEndTime: currentHours.breakEndTime || '10:30',
+        periodsPerDay: Math.min(6, Math.max(1, Number(currentHours.periodsPerDay || 6)))
+      } });
       const updated = await ApiClient.saveTimetableSettings(timetableSettings) as TimetableSettings;
       setTimetableSettings({ ...timetableSettings, ...updated, shiftCount: updated.shiftCount === 2 ? 2 : 1 });
       await refreshUser();
@@ -872,6 +884,10 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             </div>
             <span className="rounded-full bg-[#E7F4F0] px-3 py-1 text-[11px] font-semibold text-[#0F766E]">{timetableSettings.shiftCount === 2 ? 'Two shifts enabled' : 'One shift enabled'}</span>
           </div>
+          <div className="grid grid-cols-1 gap-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 sm:grid-cols-2">
+            <label className="space-y-1"><span className="font-semibold text-[#334155]">School closing time</span><input type="time" required value={closingTime} disabled={isReadOnly} onChange={e => setClosingTime(e.target.value)} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono" /></label>
+            <p className="self-end text-[11px] text-[#64748B]">Students leave when the final lesson ends. A shift may finish exactly at this closing time.</p>
+          </div>
           <div className="max-w-sm space-y-1">
             <label className="font-semibold text-[#334155]">Number of school shifts</label>
             <select value={timetableSettings.shiftCount} onChange={e => setTimetableSettings(prev => ({ ...prev, shiftCount: Number(e.target.value) as 1 | 2 }))} disabled={isReadOnly} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-medium">
@@ -925,7 +941,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                     <div><p className="text-slate-500">Shift 2 finishes</p><p className="font-bold text-slate-900">{minutesToTime(finish)}</p></div>
                     <div><p className="text-slate-500">School closes</p><p className="font-bold text-slate-900">{validClosing ? closing : 'Not set'}</p></div>
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-500">Timetable generation supports up to 6 periods per shift. Edit closing time in School Setup → Step 5: Working Hours.</p>
+                  <p className="mt-2 text-[11px] text-slate-500">Timetable generation supports up to 6 periods per shift. Closing time is editable here and in School Setup → Step 5: Working Hours.</p>
                 </>;
               })()}
             </div>
