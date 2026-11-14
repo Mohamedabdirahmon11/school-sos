@@ -597,7 +597,7 @@ export class InMemorySupabase {
       const payload = args?.p_payload || {};
       const schoolId = String(payload.school_id || '');
       const phone = String(payload.guardian_phone || '');
-      const normalize = (value: string) => value.replace(/\\D/g, '');
+      const normalize = (value: string) => value.replace(/\D/g, '');
       const phoneKey = normalize(phone);
       if (!schoolId || !phoneKey || !payload.guardian_name || !payload.pin_hash) {
         return { data: null, error: { message: 'Student and guardian details are required.' } };
