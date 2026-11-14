@@ -1834,7 +1834,11 @@ class StorageEngine {
 
     if (parentContactsChanged) {
       const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/\D/g, '') : '';
-      const newParentPhones = new Map([updated.fatherPhone, updated.motherPhone].filter((value): value is string => Boolean(value)).map(value => [normalizePhone(value), value]).filter(([key]) => Boolean(key)));
+      const newParentPhones = new Map<string, string>();
+      for (const rawPhone of [updated.fatherPhone, updated.motherPhone]) {
+        const normalized = normalizePhone(rawPhone);
+        if (normalized && rawPhone) newParentPhones.set(normalized, rawPhone);
+      }
       const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
 
       // Reconcile parent links without removing siblings or changing an existing
