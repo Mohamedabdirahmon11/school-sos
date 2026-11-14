@@ -258,11 +258,8 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
     if (data.parentPhone && !validImportPhone(data.parentPhone)) reasons.push('parentPhone must be a valid international phone number.');
     if (data.studentPhone && !validImportPhone(data.studentPhone)) reasons.push('studentPhone must be a valid international phone number.');
 
-    const branch = data.branch ? branchByName.get(data.branch.trim().toLowerCase()) : undefined;
-    if (data.branch && !branch) reasons.push(`Unknown branch: ${data.branch}.`);
     const classKey = `${data.className.trim().toLowerCase()}\u0000${data.section.trim().toLowerCase()}`;
     const existingClass = byClass.get(classKey);
-    if (branch && existingClass?.branchId && existingClass.branchId !== branch.id) reasons.push('branch does not match the existing class branch.');
 
     const normalizedPhone = data.parentPhone.replace(/\D/g, '');
     const normalizedName = data.studentName.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -278,7 +275,7 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
     const used = capacityUse.get(capacityKey) || 0;
     if (used >= (existingClass?.capacity || 40)) reasons.push(`Class capacity exceeded for ${data.className} / ${data.section}.`);
     if (reasons.length === 0) capacityUse.set(capacityKey, used + 1);
-    return { row: index + 2, data, status: reasons.length ? 'error' : 'valid', reasons, classId: existingClass?.id, branchId: existingClass?.branchId || branch?.id };
+    return { row: index + 2, data, status: reasons.length ? 'error' : 'valid', reasons, classId: existingClass?.id, branchId: existingClass?.branchId };
   });
   return {
     rows: results,
@@ -2462,9 +2459,9 @@ apiRouter.get('/branches', requireAuth, requireSchoolContext, async (req, res) =
 apiRouter.get('/import/template', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireImportSchoolAccess, (_req, res) => {
   const records = [
     [...IMPORT_COLUMNS],
-    ['KG 1', 'A', 'EXAMPLE Student One', 'female', '2026-11-14', 'Jijiga', 'EXAMPLE Parent One', '+251911111111', '', ''],
-    ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Two', '+251922222222', '+251933333333', ''],
-    ['Grade 5', 'A', 'EXAMPLE Student Three', 'female', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Three', '+251944444444', '', '']
+    ['KG 1', 'A', 'EXAMPLE Student One', 'female', '2026-11-14', 'Jijiga', 'EXAMPLE Parent One', '+251911111111', ''],
+    ['Grade 1', 'A', 'EXAMPLE Student Two', 'male', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Two', '+251922222222', '+251933333333'],
+    ['Grade 5', 'A', 'EXAMPLE Student Three', 'female', '2026-11-14', 'Jijiga', 'EXAMPLE Parent Three', '+251944444444', '']
   ];
   const csv = records.map(record => record.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schoolos-student-import-template.csv"' }).send(csv);
@@ -2512,7 +2509,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     if (!classIds.has(key) && !classPayload.has(key)) {
       const id = `cls-${randomUUID()}`;
       const grade = /\b(?:KG|KINDERGARTEN|NURSERY)\b/i.test(row.data.className) ? 0 : Number(/\d+/.exec(row.data.className)?.[0] || 1);
-      const record = { id, schoolId: school.id, branchId: row.branchId || branches.find(branch => branch.name.toLowerCase() === row.data.branch.toLowerCase())?.id, name: row.data.className.trim(), classCode: `IMP-${randomUUID().slice(0, 8).toUpperCase()}`, academicYear: school.academicYear || '2026-2027', gradeLevel: grade === 0 ? 0 : Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), shift: 1, roomNumber: '', capacity: 40, monthlyFee: 0 };
+      const record = { id, schoolId: school.id, branchId: row.branchId, name: row.data.className.trim(), classCode: `IMP-${randomUUID().slice(0, 8).toUpperCase()}`, academicYear: school.academicYear || '2026-2027', gradeLevel: grade === 0 ? 0 : Math.min(12, Math.max(1, grade)), section: row.data.section.trim(), shift: 1, roomNumber: '', capacity: 40, monthlyFee: 0 };
       classPayload.set(key, record);
       classRecords.push(record);
       classIds.set(key, id);
