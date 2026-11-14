@@ -4279,7 +4279,7 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   // Only the editable student profile fields may be changed through this route.
   const editableFields = [
     'firstName', 'middleName', 'lastName', 'gender', 'admissionDate',
-    'dateOfBirth', 'studentPhone', 'fatherPhone', 'motherPhone',
+    'dateOfBirth', 'studentPhone', 'fatherPhone', 'fatherName', 'address', 'motherPhone',
     'classId', 'section', 'status', 'branchId', 'bloodGroup',
     'allergies', 'busRouteId', 'documents', 'notes'
   ] as const;
@@ -4301,6 +4301,12 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
       }
       payload[field] = value.trim();
     }
+  }
+  if (payload.fatherName !== undefined && (typeof payload.fatherName !== 'string' || payload.fatherName.trim().length > 160)) {
+    res.status(400).json({ error: 'Parent / guardian name must be 160 characters or fewer.' }); return;
+  }
+  if (payload.address !== undefined && (typeof payload.address !== 'string' || payload.address.trim().length > 500)) {
+    res.status(400).json({ error: 'Student address must be 500 characters or fewer.' }); return;
   }
   if (payload.classId !== undefined && (typeof payload.classId !== 'string' || !payload.classId.trim())) {
     res.status(400).json({ error: 'Class selection is invalid.' }); return;
