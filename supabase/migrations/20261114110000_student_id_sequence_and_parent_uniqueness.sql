@@ -169,6 +169,91 @@ $$;
 
 REVOKE ALL ON FUNCTION public.schoolos_create_student(JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_create_student(JSONB) TO service_role;
+CREATE OR REPLACE FUNCTION public.schoolos_sync_student_guardian(
+  p_school_id TEXT,
+  p_student_pk TEXT,
+  p_old_phone TEXT,
+  p_new_phone TEXT,
+  p_guardian_name TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_student RECORD;
+  v_old_phone TEXT;
+  v_new_phone TEXT;
+  v_parent_id VARCHAR(64);
+  v_linked_ids TEXT[];
+  v_name TEXT;
+BEGIN
+  SELECT id, school_id, first_name, branch_id, pin_hash
+    INTO v_student
+    FROM public.students
+   WHERE id = p_student_pk AND school_id = p_school_id
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Student was not found in this school.'; END IF;
+
+  v_old_phone := regexp_replace(COALESCE(p_old_phone, ''), '[^0-9]', '', 'g');
+  v_new_phone := regexp_replace(COALESCE(p_new_phone, ''), '[^0-9]', '', 'g');
+  IF v_new_phone = '' THEN RAISE EXCEPTION 'Parent / guardian phone number is invalid.'; END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_school_id || ':' || v_new_phone, 1));
+
+  IF v_old_phone <> '' AND v_old_phone <> v_new_phone THEN
+    UPDATE public.users
+       SET linked_student_ids = array_remove(COALESCE(linked_student_ids, ARRAY[]::TEXT[]), p_student_pk)
+     WHERE school_id = p_school_id
+       AND role = 'parent'::public.user_role_enum
+       AND (
+         regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = v_old_phone
+         OR regexp_replace(COALESCE(parent_phone, ''), '[^0-9]', '', 'g') = v_old_phone
+       );
+  END IF;
+
+  SELECT id, COALESCE(linked_student_ids, ARRAY[]::TEXT[])
+    INTO v_parent_id, v_linked_ids
+    FROM public.users
+   WHERE school_id = p_school_id
+     AND role = 'parent'::public.user_role_enum
+     AND (
+       regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = v_new_phone
+       OR regexp_replace(COALESCE(parent_phone, ''), '[^0-9]', '', 'g') = v_new_phone
+     )
+   ORDER BY created_at, id
+   LIMIT 1
+   FOR UPDATE;
+
+  v_name := COALESCE(NULLIF(btrim(p_guardian_name), ''), 'Parent of ' || v_student.first_name);
+  IF v_parent_id IS NULL THEN
+    INSERT INTO public.users (
+      id, school_id, branch_id, role, full_name, phone, parent_phone,
+      password_hash, pin_hash, linked_student_ids, is_blocked, failed_login_attempts
+    ) VALUES (
+      'usr-parent-' || pg_catalog.gen_random_uuid()::TEXT,
+      p_school_id, v_student.branch_id, 'parent'::public.user_role_enum,
+      v_name, p_new_phone, p_new_phone, '', v_student.pin_hash,
+      ARRAY[p_student_pk], false, 0
+    );
+  ELSE
+    UPDATE public.users
+       SET linked_student_ids = CASE
+             WHEN p_student_pk = ANY(v_linked_ids) THEN v_linked_ids
+             ELSE array_append(v_linked_ids, p_student_pk) END,
+           full_name = CASE
+             WHEN full_name IS NULL OR btrim(full_name) = '' OR full_name LIKE 'Parent of %'
+             THEN v_name ELSE full_name END,
+           phone = COALESCE(NULLIF(phone, ''), p_new_phone),
+           parent_phone = COALESCE(NULLIF(parent_phone, ''), p_new_phone)
+     WHERE id = v_parent_id;
+  END IF;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.schoolos_sync_student_guardian(TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_sync_student_guardian(TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_parent_phone_normalized_school
   ON public.users (
