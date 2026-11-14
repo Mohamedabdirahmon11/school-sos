@@ -197,7 +197,7 @@ export interface Student {
   id: string;
   schoolId: string;
   branchId?: string;
-  studentId: string; // STD-<SCHOOLCODE>-01
+  studentId: string; // S001, S002, ... (generated per school)
   firstName: string;
   middleName: string;
   lastName: string;
