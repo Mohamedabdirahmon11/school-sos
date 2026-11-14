@@ -231,7 +231,7 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
   const [classes, students, branches] = await Promise.all([
     db.getClasses(schoolId), db.getStudents(schoolId), db.getBranches(schoolId)
   ]);
-  const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\\u0000${item.section.trim().toLowerCase()}`, item]));
+  const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\u0000${item.section.trim().toLowerCase()}`, item]));
   const branchByName = new Map(branches.map(item => [item.name.trim().toLowerCase(), item]));
   const seen = new Set<string>();
   const capacityUse = new Map<string, number>();
@@ -249,7 +249,7 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
       reasons.push('studentName must contain first, middle and last names.');
     }
     if (data.gender && !['male', 'female'].includes(data.gender.toLowerCase())) reasons.push('gender must be male or female.');
-    if (data.admissionDate && (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.admissionDate)
+    if (data.admissionDate && (!/^\d{4}-\d{2}-\d{2}$/.test(data.admissionDate)
       || Number.isNaN(Date.parse(`${data.admissionDate}T00:00:00Z`))
       || new Date(`${data.admissionDate}T00:00:00Z`).toISOString().slice(0, 10) !== data.admissionDate)) {
       reasons.push('admissionDate must be a real YYYY-MM-DD date.');
@@ -260,17 +260,17 @@ async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): 
 
     const branch = data.branch ? branchByName.get(data.branch.trim().toLowerCase()) : undefined;
     if (data.branch && !branch) reasons.push(`Unknown branch: ${data.branch}.`);
-    const classKey = `${data.className.trim().toLowerCase()}\\u0000${data.section.trim().toLowerCase()}`;
+    const classKey = `${data.className.trim().toLowerCase()}\u0000${data.section.trim().toLowerCase()}`;
     const existingClass = byClass.get(classKey);
     if (branch && existingClass?.branchId && existingClass.branchId !== branch.id) reasons.push('branch does not match the existing class branch.');
 
-    const normalizedPhone = data.parentPhone.replace(/\\D/g, '');
-    const normalizedName = data.studentName.trim().replace(/\\s+/g, ' ').toLowerCase();
-    const identity = `${normalizedName}\\u0000${classKey}\\u0000${normalizedPhone}`;
+    const normalizedPhone = data.parentPhone.replace(/\D/g, '');
+    const normalizedName = data.studentName.trim().replace(/\s+/g, ' ').toLowerCase();
+    const identity = `${normalizedName}\u0000${classKey}\u0000${normalizedPhone}`;
     if (seen.has(identity) || students.some(student => {
-      const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.replace(/\\s+/g, ' ').trim().toLowerCase();
+      const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.replace(/\s+/g, ' ').trim().toLowerCase();
       return fullName === normalizedName && student.classId === existingClass?.id
-        && String(student.fatherPhone || '').replace(/\\D/g, '') === normalizedPhone;
+        && String(student.fatherPhone || '').replace(/\D/g, '') === normalizedPhone;
     })) reasons.push('Duplicate student with the same name, class, and parent phone.');
     seen.add(identity);
 
@@ -4186,10 +4186,10 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim()))) {
     res.status(400).json({ error: 'Guardian and student phone numbers must be valid international numbers.' }); return;
   }
-  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\\d{4}$/.test(body.pin))) {
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
     res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
   }
-  const isDate = (value: unknown) => typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+  const isDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
   const admissionDate = body.admissionDate === undefined || body.admissionDate === '' ? new Date().toISOString().slice(0, 10) : body.admissionDate;
   if (!isDate(admissionDate)) { res.status(400).json({ error: 'Admission date must be a real YYYY-MM-DD date.' }); return; }
