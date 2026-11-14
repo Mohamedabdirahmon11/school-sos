@@ -31,5 +31,5 @@ export function isSchoolSetupProgressComplete(progress: unknown): boolean {
   const required = [1, 2, 3, 4, 5, 6, 8, 10];
   return required.every(step => completed.has(step))
     && [7, 9].every(step => completed.has(step) || skipped.has(step))
-    && [...skipped].every(step => step === 7 || step === 9);
+    && [...skipped].every(step => (step === 7 || step === 9) && !completed.has(step));
 }
