@@ -8,7 +8,7 @@ import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-sup
 process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = randomBytes(48).toString('hex');
 const memory = new InMemorySupabase();
-const { hashPassword, verifyPin, createSignedSessionToken } = await import('../src/server/auth-security.ts');
+const { hashPassword, hashPin, verifyPin, createSignedSessionToken } = await import('../src/server/auth-security.ts');
 const admin = {
   id: 'student-admin', role: 'school_admin', schoolId: 'student-school',
   fullName: 'Student Admin', email: 'student-admin@example.test',
@@ -95,4 +95,50 @@ test('student registration generates IDs server-side and reuses one normalized g
   assert.equal(parent.pin_hash, originalParentPinHash);
   assert.equal(parent.linked_student_ids.length, 2);
   assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 2);
+});
+
+
+test('bulk student PIN reset returns one-time PINs and stores hashes for the selected school students only', async () => {
+  const studentId = 'PIN-RESET-TEST-001';
+  const initialStudentHash = hashPin('1234');
+  const initialUserHash = hashPin('5678');
+  await memory.from('students').insert([{
+    id: 'pin-reset-student-record', school_id: 'student-school', student_id: studentId,
+    first_name: 'Muna', middle_name: 'Amina', last_name: 'Hassan',
+    class_id: 'student-class-1', section: 'A', status: 'active', pin_hash: initialStudentHash
+  }]);
+  await memory.from('users').insert([{
+    id: 'usr-student-pin-reset-test', school_id: 'student-school', role: 'student',
+    full_name: 'Muna Amina Hassan', student_id: studentId, pin_hash: initialUserHash,
+    failed_login_attempts: 4
+  }]);
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
+  const parentPinHash = parent?.pin_hash;
+  const cookie = adminCookie();
+
+  const response = await fetch(`${baseUrl}/students/bulk-reset-pin`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows: [{ studentId }] })
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json() as any;
+  assert.equal(result.success, true);
+  assert.equal(result.updatedCount, 1);
+  assert.equal(result.pinSlips.length, 1);
+  assert.equal(result.pinSlips[0].studentId, studentId);
+  assert.equal(result.pinSlips[0].studentName, 'Muna Amina Hassan');
+  assert.match(result.pinSlips[0].newPin, /^[0-9]{4}$/);
+
+  const student = memory.rows('students').find(row => row.student_id === studentId);
+  const studentUser = memory.rows('users').find(row => row.student_id === studentId && row.role === 'student');
+  assert.ok(student?.pin_hash);
+  assert.ok(studentUser?.pin_hash);
+  assert.equal(verifyPin(result.pinSlips[0].newPin, student.pin_hash), true);
+  assert.equal(verifyPin(result.pinSlips[0].newPin, studentUser.pin_hash), true);
+  assert.notEqual(student.pin_hash, initialStudentHash);
+  assert.notEqual(studentUser.pin_hash, initialUserHash);
+  assert.equal(parent?.pin_hash, parentPinHash);
+  assert.equal(Object.hasOwn(student, 'pin'), false);
+  assert.equal(Object.hasOwn(studentUser, 'pin'), false);
 });

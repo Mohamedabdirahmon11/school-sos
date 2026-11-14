@@ -4280,14 +4280,24 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
       changed_by_role: user.role,
       students: rows
     });
-    const pinSlips = (result.students || []).map(student => {
-      const studentId = String(student.student_id);
-      return {
-        studentId,
-        studentName: [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' '),
-        newPin: pinByStudent.get(studentId)
-      };
+    const updatedStudents = Array.isArray(result.students) ? result.students : [];
+    if (Number(result.updated_count) !== rows.length || updatedStudents.length !== rows.length) {
+      throw new Error('PIN reset result did not confirm every requested student. Do not retry; contact support.');
+    }
+    const returnedIds = new Set<string>();
+    const pinSlips = updatedStudents.map(student => {
+      const studentId = String(student.student_id || '');
+      const studentName = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ');
+      const newPin = pinByStudent.get(studentId);
+      if (!studentId || returnedIds.has(studentId) || !seenStudents.has(studentId) || !studentName || !newPin) {
+        throw new Error('PIN reset returned an incomplete student receipt. Do not retry; contact support.');
+      }
+      returnedIds.add(studentId);
+      return { studentId, studentName, newPin };
     });
+    if (returnedIds.size !== rows.length) {
+      throw new Error('PIN reset receipt is incomplete. Do not retry; contact support.');
+    }
     res.json({ success: true, updatedCount: result.updated_count, pinSlips });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Bulk PIN reset failed.';
