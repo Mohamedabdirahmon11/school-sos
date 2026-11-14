@@ -593,6 +593,45 @@ export class InMemorySupabase {
       sequence.last_number = start + count - 1;
       return { data: Array.from({ length: count }, (_, index) => 'S' + String(start + index).padStart(3, '0')), error: null };
     }
+    if (name === 'schoolos_sync_student_guardian') {
+      const schoolId = String(args?.p_school_id || '');
+      const studentPk = String(args?.p_student_pk || '');
+      const oldDigits = String(args?.p_old_phone || '').split('').filter(character => character >= '0' && character <= '9').join('');
+      const newDigits = String(args?.p_new_phone || '').split('').filter(character => character >= '0' && character <= '9').join('');
+      const student = this.rows('students').find(row => String(row.school_id ?? row.schoolId) === schoolId && String(row.id) === studentPk);
+      if (!student || !newDigits) return { data: null, error: { message: 'Student or guardian phone was not found.' } };
+      const digits = (value: any) => String(value || '').split('').filter(character => character >= '0' && character <= '9').join('');
+      if (oldDigits && oldDigits !== newDigits) {
+        for (const parent of this.rows('users').filter(row => String(row.school_id ?? row.schoolId) === schoolId && row.role === 'parent')) {
+          if ([parent.phone, parent.parent_phone, parent.parentPhone].some(value => digits(value) === oldDigits)) {
+            const links = parent.linked_student_ids ?? parent.linkedStudentIds ?? [];
+            parent.linked_student_ids = links.filter((id: string) => id !== studentPk);
+            parent.linkedStudentIds = parent.linked_student_ids;
+          }
+        }
+      }
+      let parent = this.rows('users').find(row => String(row.school_id ?? row.schoolId) === schoolId && row.role === 'parent'
+        && [row.phone, row.parent_phone, row.parentPhone].some(value => digits(value) === newDigits));
+      if (parent) {
+        const links = parent.linked_student_ids ?? parent.linkedStudentIds ?? [];
+        parent.linked_student_ids = [...new Set([...links, studentPk])];
+        parent.linkedStudentIds = parent.linked_student_ids;
+        if (!parent.full_name && !parent.fullName) parent.full_name = args?.p_guardian_name || ('Parent of ' + student.first_name);
+        if (!parent.phone) parent.phone = args?.p_new_phone;
+        if (!parent.parent_phone && !parent.parentPhone) parent.parent_phone = args?.p_new_phone;
+      } else {
+        parent = {
+          id: 'usr-parent-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          school_id: schoolId, role: 'parent',
+          full_name: args?.p_guardian_name || ('Parent of ' + student.first_name),
+          phone: args?.p_new_phone, parent_phone: args?.p_new_phone,
+          pin_hash: student.pin_hash, password_hash: '', linked_student_ids: [studentPk],
+          is_blocked: false, failed_login_attempts: 0
+        };
+        this.rows('users').push(parent);
+      }
+      return { data: null, error: null };
+    }
     if (name === 'schoolos_create_student') {
       const payload = args?.p_payload || {};
       const schoolId = String(payload.school_id || '');
