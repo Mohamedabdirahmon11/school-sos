@@ -4166,6 +4166,7 @@ apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, re
 
 apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const requiredText = ['firstName', 'middleName', 'lastName', 'classId', 'guardianName', 'guardianPhone'] as const;
   if (requiredText.some(field => typeof body[field] !== 'string' || !body[field].trim() || body[field].trim().length > (field === 'guardianName' ? 160 : 100))) {
@@ -4212,7 +4213,11 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     class_id: klass.id,
     section: typeof body.section === 'string' && body.section.trim() ? body.section.trim() : klass.section,
     address: typeof body.address === 'string' ? body.address.trim() : '',
-    pin_hash: hashPin(initialPin)
+    pin_hash: hashPin(initialPin),
+    created_by: user.id,
+    created_by_name: user.fullName,
+    created_by_role: user.role,
+    school_name: school.name
   });
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
