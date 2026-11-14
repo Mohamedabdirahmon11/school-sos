@@ -4606,7 +4606,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
   const address = typeof body.address === 'string' ? body.address.trim() : '';
   const gender = body.gender;
-  const requestedTeacherId = normalizeStaffId(body.teacherId ?? body.staffId);
+  const requestedTeacherId = normalizeStaffId(body.teacherId);
   const initialPin = typeof body.pin === 'string' ? body.pin.trim() : '';
   const initialPassword = typeof body.password === 'string' ? body.password : '';
   const joinedDate = typeof body.joinedDate === 'string' && body.joinedDate.trim() ? body.joinedDate.trim() : new Date().toISOString().slice(0, 10);
