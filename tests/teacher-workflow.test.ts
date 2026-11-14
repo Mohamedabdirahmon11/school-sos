@@ -69,7 +69,7 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.match(admin, /selectedSubjectIds/);
   assert.match(admin, /selectedFormTeacherClassId/);
   assert.match(admin, /Teacher ID \*/);
-  assert.match(admin, /Login PIN \*/);
+  assert.match(admin, /Login PIN \(optional\)/);
   assert.match(admin, /Date of Joining/);
   assert.match(api, /requestedTeacherId/);
   assert.match(api, /Teacher PIN must contain 4–6 digits/);
