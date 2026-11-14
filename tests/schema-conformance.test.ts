@@ -321,6 +321,7 @@ test('student registration migrations add address, guardian identity, and atomic
   assert.match(sequence, /schoolos_reserve_student_ids/);
   assert.match(sequence, /pg_advisory_xact_lock|UPDATE public\.school_student_id_sequences/);
   assert.match(sequence, /uq_parent_phone_normalized_school/);
+  assert.match(sequence, /schoolos_sync_student_guardian/);
   assert.match(apiSource, /db\.createStudentAtomically/);
   const registrationRoute = apiSource.slice(apiSource.indexOf("apiRouter.post('/students'"), apiSource.indexOf("apiRouter.post('/students/:id/reset-pin'"));
   assert.doesNotMatch(registrationRoute, /body\.studentId/);
