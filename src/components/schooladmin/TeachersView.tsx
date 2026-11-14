@@ -351,7 +351,6 @@ export const TeachersView: React.FC = () => {
               <div>
                   <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
                   <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-                </div>
               </div>
               <div>
                 <label className="block font-medium text-[#334155]">Password (optional)</label>
