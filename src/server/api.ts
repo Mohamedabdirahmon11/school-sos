@@ -4421,10 +4421,11 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (payload.classId && !klass) { res.status(400).json({ error: 'Class does not belong to this school.' }); return; }
   if (klass?.branchId) payload.branchId = klass.branchId;
   if (payload.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === payload.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
+  const previousGuardianPhone = existingStudent.fatherPhone;
   const updated = await db.updateStudent(req.params.id, payload, school.id);
   if (updated && payload.fatherPhone !== undefined) {
     const digits = (value: unknown) => typeof value === 'string' ? value.replace(/\D/g, '') : '';
-    const oldPhone = digits(existingStudent.fatherPhone);
+    const oldPhone = digits(previousGuardianPhone);
     const newPhone = digits(updated.fatherPhone);
     if (oldPhone && oldPhone !== newPhone) {
       const parents = await db.getUsers(school.id, 'parent');
