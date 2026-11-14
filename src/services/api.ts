@@ -663,14 +663,14 @@ export class ApiClient {
     return allStudents;
   }
 
-  public static async createStudent(studentData: Partial<Student>, schoolId?: string) {
+  public static async createStudent(studentData: Partial<Student> & { guardianName?: string; guardianPhone?: string; address?: string }, schoolId?: string) {
     return this.request<Student>('/students', {
       method: 'POST',
       body: JSON.stringify(schoolId ? { ...studentData, schoolId } : studentData)
     });
   }
 
-  public static async addStudent(studentData: Partial<Student>, schoolId?: string) {
+  public static async addStudent(studentData: Partial<Student> & { guardianName?: string; guardianPhone?: string; address?: string }, schoolId?: string) {
     return this.createStudent(studentData, schoolId);
   }
 
