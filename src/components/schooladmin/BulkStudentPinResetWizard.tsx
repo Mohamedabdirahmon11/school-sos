@@ -77,7 +77,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
       const result = await ApiClient.bulkResetStudentPins(rows);
       const returned = Array.isArray(result?.pinSlips) ? result.pinSlips : [];
       if (!result?.success || Number(result.updatedCount) !== rows.length || returned.length !== rows.length
-        || returned.some(item => !item.studentId || !item.studentName || !/^\\d{4}$/.test(item.newPin || ''))
+        || returned.some(item => !item.studentId || !item.studentName || !/^\d{4}$/.test(item.newPin || ''))
         || new Set(returned.map(item => item.studentId)).size !== rows.length
         || rows.some(row => !returned.some(item => item.studentId === row.studentId))) {
         throw new Error('The server did not return a complete PIN receipt. Contact support before retrying to avoid resetting PINs twice.');
@@ -96,7 +96,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
     const csv = [
       ['Student ID', 'Student Name', 'New PIN'].map(escape).join(','),
       ...pinSlips.map(item => [item.studentId, item.studentName, item.newPin].map(escape).join(','))
-    ].join('\\r\\n');
+    ].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -110,9 +110,9 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
   const copyAllPins = async () => {
     if (!pinSlips.length) return;
     const text = [
-      'Student ID\\tStudent Name\\tNew PIN',
-      ...pinSlips.map(item => [item.studentId, item.studentName, item.newPin].join('\\t'))
-    ].join('\\n');
+      'Student ID\tStudent Name\tNew PIN',
+      ...pinSlips.map(item => [item.studentId, item.studentName, item.newPin].join('\t'))
+    ].join('\n');
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
       await navigator.clipboard.writeText(text);
