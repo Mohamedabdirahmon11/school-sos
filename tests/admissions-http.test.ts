@@ -329,19 +329,20 @@ test('teacher creation accepts school-issued ID and PIN while ignoring forged ac
   assert.ok(studentTeacher);
   assert.equal('monthlySalary' in studentTeacher, false);
 
-  // Client-supplied IDs are ignored; the server must issue a fresh school-scoped ID.
+  // A second administrator-issued ID is accepted and remains globally unique.
   const secondTeacher = await post({
-    staffId: 'STF-SEC-001', fullName: 'Second Generated Teacher',
+    staffId: 'FORGED-SECOND-ID', teacherId: 'T903', pin: '8888',
+    fullName: 'Second Generated Teacher',
     gender: 'female', assignedClasses: [], assignedSubjects: []
   });
   assert.equal(secondTeacher.status, 201, await secondTeacher.clone().text());
   const secondTeacherResult = await secondTeacher.json();
-  assert.match(secondTeacherResult.staffId, /^T[0-9]{3,}$/);
+  assert.equal(secondTeacherResult.staffId, 'T903');
   assert.notEqual(secondTeacherResult.staffId, result.staffId);
-  assert.notEqual(secondTeacherResult.staffId, 'STF-SEC-001');
+  assert.notEqual(secondTeacherResult.staffId, 'FORGED-SECOND-ID');
 
   const invalidAssignments = await post({
-    staffId: 'STF-SEC-002', fullName: 'Invalid Assignments',
+    teacherId: 'T904', pin: '7777', fullName: 'Invalid Assignments',
     gender: 'female', assignedClasses: [klass.id, null], assignedSubjects: []
   });
   assert.equal(invalidAssignments.status, 400);
