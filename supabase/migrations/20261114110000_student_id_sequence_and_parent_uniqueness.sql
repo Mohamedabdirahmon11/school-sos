@@ -67,6 +67,8 @@ DECLARE
   v_linked_ids TEXT[];
   v_parent_id VARCHAR(64);
   v_student JSONB;
+  v_class public.classes%ROWTYPE;
+  v_enrolled INTEGER;
 BEGIN
   IF jsonb_typeof(p_payload) <> 'object' THEN RAISE EXCEPTION 'Invalid student registration payload.'; END IF;
   v_school_id := NULLIF(btrim(p_payload->>'school_id'), '');
@@ -78,6 +80,18 @@ BEGIN
   END IF;
   IF length(v_guardian_name) > 160 OR length(v_guardian_phone) > 30 THEN RAISE EXCEPTION 'Guardian details exceed the allowed length.'; END IF;
 
+  SELECT * INTO v_class
+    FROM public.classes
+   WHERE id = p_payload->>'class_id'
+     AND school_id = v_school_id
+     AND is_archived = false
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Class is unavailable or does not belong to this school.'; END IF;
+  SELECT count(*)::INTEGER INTO v_enrolled
+    FROM public.students
+   WHERE school_id = v_school_id AND class_id = v_class.id AND status = 'active';
+  IF v_enrolled >= v_class.capacity THEN RAISE EXCEPTION 'The selected class has reached capacity.'; END IF;
+
   v_student_id := (public.schoolos_reserve_student_ids(v_school_id, 1))[1];
   v_student_pk := 'std-' || pg_catalog.gen_random_uuid()::TEXT;
   v_normalized_phone := regexp_replace(v_guardian_phone, '[^0-9]', '', 'g');
@@ -88,12 +102,12 @@ BEGIN
     gender, admission_date, student_phone, father_phone, father_name,
     class_id, section, status, pin_hash, address
   ) VALUES (
-    v_student_pk, v_school_id, NULLIF(p_payload->>'branch_id', ''),
+    v_student_pk, v_school_id, v_class.branch_id,
     v_student_id, btrim(p_payload->>'first_name'), btrim(p_payload->>'middle_name'),
     btrim(p_payload->>'last_name'), p_payload->>'gender',
     COALESCE(NULLIF(p_payload->>'admission_date', '')::DATE, CURRENT_DATE),
     NULLIF(btrim(p_payload->>'student_phone'), ''), v_guardian_phone, v_guardian_name,
-    p_payload->>'class_id', COALESCE(NULLIF(btrim(p_payload->>'section'), ''), 'A'),
+    v_class.id, COALESCE(NULLIF(btrim(v_class.section), ''), 'A'),
     'active', v_pin_hash, COALESCE(p_payload->>'address', '')
   );
 
@@ -101,7 +115,7 @@ BEGIN
     id, school_id, branch_id, role, full_name, phone, student_id,
     password_hash, pin_hash, is_blocked, failed_login_attempts
   ) VALUES (
-    'usr-student-' || v_student_pk, v_school_id, NULLIF(p_payload->>'branch_id', ''),
+    'usr-student-' || v_student_pk, v_school_id, v_class.branch_id,
     'student'::public.user_role_enum,
     btrim(concat_ws(' ', p_payload->>'first_name', p_payload->>'middle_name', p_payload->>'last_name')),
     COALESCE(NULLIF(btrim(p_payload->>'student_phone'), ''), v_guardian_phone),
