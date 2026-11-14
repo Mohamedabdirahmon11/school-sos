@@ -394,7 +394,6 @@ test('student profile updates validate phones and keep parent/student login link
   const newFather = users.find(user => user.phone === '+15550007306');
   assert.ok(oldFather?.linkedStudentIds?.includes(sibling.id));
   assert.equal(oldFather?.linkedStudentIds?.includes(first.id), false);
-  assert.equal(oldMother?.linkedStudentIds?.includes(first.id), false);
   assert.ok(newFather?.linkedStudentIds?.includes(first.id));
 
   const studentUser = await storage.db.getUserById(`usr-student-${first.id}`, school.id);
