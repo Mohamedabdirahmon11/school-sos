@@ -9,7 +9,7 @@ test('CSV import normalizes spreadsheet apostrophe markers in guardian phone', (
     admissionDate: '2026-11-14', address: 'Jijiga', parentName: 'Parent Name',
     parentPhone: "'+251911000001", studentPhone: "'+251911000002"
   };
-  const csv = [IMPORT_COLUMNS.join(','), IMPORT_COLUMNS.map(column => JSON.stringify(values[column] || '')).join(',')].join('\\n');
+  const csv = [IMPORT_COLUMNS.join(','), IMPORT_COLUMNS.map(column => JSON.stringify(values[column] || '')).join(',')].join('\n');
   const [row] = parseSchoolImport(Buffer.from(csv, 'utf8'), 'csv');
   assert.equal(row.parentPhone, '+251911000001');
   assert.equal(row.studentPhone, '+251911000002');
