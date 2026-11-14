@@ -64,6 +64,10 @@ const defaultTerms = { semester1Start: '', semester1End: '', semester2Start: '',
 const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, requireExcusedReason: true, allowParentExcuses: false };
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const timeToMinutes = (time: string) => { const [hours, minutes] = time.split(':').map(Number); return hours * 60 + minutes; };
+const minutesToTime = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
+  timeToMinutes(start) + periods * periodMinutes + (periods > breakAfterPeriod ? breakMinutes : 0);
 
 export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
@@ -263,7 +267,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
       if (!Number.isInteger(timetableSettings.shift2PeriodMinutes) || timetableSettings.shift2PeriodMinutes < 20 || timetableSettings.shift2PeriodMinutes > 120) { setError('Second shift period length must be between 20 and 120 minutes.'); return; }
       if (!Number.isInteger(timetableSettings.shift2BreakAfterPeriod) || timetableSettings.shift2BreakAfterPeriod < 1 || timetableSettings.shift2BreakAfterPeriod > 5) { setError('Second shift break position must be between periods 1 and 5.'); return; }
       if (!Number.isInteger(timetableSettings.shift2BreakMinutes) || timetableSettings.shift2BreakMinutes < 0 || timetableSettings.shift2BreakMinutes > 120) { setError('Second shift break length must be between 0 and 120 minutes.'); return; }
-      const periodsPerShift = Math.max(1, Number(school?.setupData?.workingHours?.periodsPerDay || 6));
+      const periodsPerShift = Math.min(6, Math.max(1, Number(school?.setupData?.workingHours?.periodsPerDay || 6)));
       const firstShiftEnd = minutesOf(timetableSettings.firstPeriodStart)
         + periodsPerShift * timetableSettings.periodMinutes
         + (periodsPerShift > timetableSettings.breakAfterPeriod ? timetableSettings.breakMinutes : 0);
@@ -899,6 +903,27 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="space-y-1"><span className="font-semibold text-[#334155]">Break length (minutes)</span><input type="number" min={0} max={120} required value={timetableSettings.shift2BreakMinutes} disabled={isReadOnly} onChange={e => setTimetableSettings(prev => ({ ...prev, shift2BreakMinutes: Number(e.target.value) }))} className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono" /></label>
               </div>
             </section>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs">
+              {(() => {
+                const periods = Math.min(6, Math.max(1, Number(school?.setupData?.workingHours?.periodsPerDay || 6)));
+                const finish = calculateShiftFinish(timetableSettings.shift2FirstPeriodStart, timetableSettings.shift2PeriodMinutes, timetableSettings.shift2BreakAfterPeriod, timetableSettings.shift2BreakMinutes, periods);
+                const closing = school?.setupData?.workingHours?.closingTime;
+                const validClosing = typeof closing === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(closing);
+                const withinClosing = !validClosing || finish <= timeToMinutes(closing);
+                return <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-700">Live Shift 2 finish-time preview</span>
+                    <span className={`rounded-full px-2.5 py-1 font-semibold ${withinClosing ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{withinClosing ? 'Within closing time' : 'Exceeds closing time'}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <div><p className="text-slate-500">Periods used</p><p className="font-bold text-slate-900">{periods}</p></div>
+                    <div><p className="text-slate-500">Shift 2 finishes</p><p className="font-bold text-slate-900">{minutesToTime(finish)}</p></div>
+                    <div><p className="text-slate-500">School closes</p><p className="font-bold text-slate-900">{validClosing ? closing : 'Not set'}</p></div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">Timetable generation supports up to 6 periods per shift. Edit closing time in School Setup → Step 5: Working Hours.</p>
+                </>;
+              })()}
+            </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
             <p className="max-w-xl text-[11px] text-[#64748B]">Changes are school-specific. Existing timetable entries are not deleted when you update shift settings.</p>
