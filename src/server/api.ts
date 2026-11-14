@@ -228,44 +228,67 @@ async function sendDatabasePage(req: Request, res: Response, table: string, filt
 type ImportValidation = { row: number; data: SchoolImportRow; status: 'valid' | 'error' | 'skipped'; reasons: string[]; classId?: string; branchId?: string };
 
 async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): Promise<{ rows: ImportValidation[]; totals: { total: number; valid: number; errors: number; skipped: number } }> {
-  const [classes, students, branches] = await Promise.all([db.getClasses(schoolId), db.getStudents(schoolId), db.getBranches(schoolId)]);
-  const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\u0000${item.section.trim().toLowerCase()}`, item]));
+  const [classes, students, branches] = await Promise.all([
+    db.getClasses(schoolId), db.getStudents(schoolId), db.getBranches(schoolId)
+  ]);
+  const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\\u0000${item.section.trim().toLowerCase()}`, item]));
   const branchByName = new Map(branches.map(item => [item.name.trim().toLowerCase(), item]));
   const seen = new Set<string>();
   const capacityUse = new Map<string, number>();
   for (const student of students) capacityUse.set(student.classId, (capacityUse.get(student.classId) || 0) + 1);
+
   const results: ImportValidation[] = rows.map((source, index) => {
     const data = Object.fromEntries(IMPORT_COLUMNS.map(column => [column, String((source as any)?.[column] ?? '').trim()])) as unknown as SchoolImportRow;
     const reasons: string[] = [];
     if (isExampleImportRow(data)) return { row: index + 2, data, status: 'skipped', reasons: ['Example row is skipped.'] };
-    for (const column of ['className', 'section', 'studentName', 'gender'] as const) {
-      if (!data[column].trim()) reasons.push(`${column} is required.`);
+
+    for (const column of ['className', 'section', 'studentName', 'gender', 'admissionDate', 'parentName', 'parentPhone'] as const) {
+      if (!data[column]) reasons.push(`${column} is required.`);
     }
-    if (!data.parentPhone) reasons.push('parentPhone is required.');
-    if (data.parentPhone && !data.parentName) reasons.push('parentName is required when parentPhone is provided.');
-    if (data.studentName && (() => { try { splitStudentName(data.studentName); return false; } catch { return true; } })()) reasons.push('studentName must contain at least two names.');
+    if (data.studentName && (() => { try { splitStudentName(data.studentName); return false; } catch { return true; } })()) {
+      reasons.push('studentName must contain first, middle and last names.');
+    }
     if (data.gender && !['male', 'female'].includes(data.gender.toLowerCase())) reasons.push('gender must be male or female.');
-    if (data.dateOfBirth && (!/^\d{4}-\d{2}-\d{2}$/.test(data.dateOfBirth) || Number.isNaN(Date.parse(`${data.dateOfBirth}T00:00:00Z`)))) reasons.push('dateOfBirth must use YYYY-MM-DD.');
+    if (data.admissionDate && (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.admissionDate)
+      || Number.isNaN(Date.parse(`${data.admissionDate}T00:00:00Z`))
+      || new Date(`${data.admissionDate}T00:00:00Z`).toISOString().slice(0, 10) !== data.admissionDate)) {
+      reasons.push('admissionDate must be a real YYYY-MM-DD date.');
+    }
+    if (data.address.length > 500) reasons.push('address must be 500 characters or fewer.');
     if (data.parentPhone && !validImportPhone(data.parentPhone)) reasons.push('parentPhone must be a valid international phone number.');
     if (data.studentPhone && !validImportPhone(data.studentPhone)) reasons.push('studentPhone must be a valid international phone number.');
+
     const branch = data.branch ? branchByName.get(data.branch.trim().toLowerCase()) : undefined;
     if (data.branch && !branch) reasons.push(`Unknown branch: ${data.branch}.`);
-    const key = `${data.className.trim().toLowerCase()}\u0000${data.section.trim().toLowerCase()}`;
-    const existingClass = byClass.get(key);
+    const classKey = `${data.className.trim().toLowerCase()}\\u0000${data.section.trim().toLowerCase()}`;
+    const existingClass = byClass.get(classKey);
     if (branch && existingClass?.branchId && existingClass.branchId !== branch.id) reasons.push('branch does not match the existing class branch.');
-    const identity = `${data.studentName.trim().toLowerCase()}\u0000${key}\u0000${data.fatherPhone.replace(/[\s()-]/g, '')}`;
+
+    const normalizedPhone = data.parentPhone.replace(/\\D/g, '');
+    const normalizedName = data.studentName.trim().replace(/\\s+/g, ' ').toLowerCase();
+    const identity = `${normalizedName}\\u0000${classKey}\\u0000${normalizedPhone}`;
     if (seen.has(identity) || students.some(student => {
-      const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.replace(/\s+/g, ' ').trim().toLowerCase();
-      return fullName === data.studentName.trim().replace(/\s+/g, ' ').toLowerCase() && student.classId === existingClass?.id && (student.fatherPhone || '').replace(/[\s()-]/g, '') === data.fatherPhone.replace(/[\s()-]/g, '');
-    })) reasons.push('Duplicate student with the same name, class, and parentPhone.');
+      const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.replace(/\\s+/g, ' ').trim().toLowerCase();
+      return fullName === normalizedName && student.classId === existingClass?.id
+        && String(student.fatherPhone || '').replace(/\\D/g, '') === normalizedPhone;
+    })) reasons.push('Duplicate student with the same name, class, and parent phone.');
     seen.add(identity);
-    const capacityKey = existingClass?.id || key;
+
+    const capacityKey = existingClass?.id || classKey;
     const used = capacityUse.get(capacityKey) || 0;
     if (used >= (existingClass?.capacity || 40)) reasons.push(`Class capacity exceeded for ${data.className} / ${data.section}.`);
     if (reasons.length === 0) capacityUse.set(capacityKey, used + 1);
     return { row: index + 2, data, status: reasons.length ? 'error' : 'valid', reasons, classId: existingClass?.id, branchId: existingClass?.branchId || branch?.id };
   });
-  return { rows: results, totals: { total: rows.length, valid: results.filter(row => row.status === 'valid').length, errors: results.filter(row => row.status === 'error').length, skipped: results.filter(row => row.status === 'skipped').length } };
+  return {
+    rows: results,
+    totals: {
+      total: rows.length,
+      valid: results.filter(row => row.status === 'valid').length,
+      errors: results.filter(row => row.status === 'error').length,
+      skipped: results.filter(row => row.status === 'skipped').length
+    }
+  };
 }
 
 // Redact sensitive properties at the HTTP boundary, including later-added routes.
@@ -3956,7 +3979,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
       fullName: studentNameKey(student),
       className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
     };
-    const guardians: Array<{ phone: string; relationship: string }> = [
+    const guardians: Array<{ phone: string; name: string; relationship: string }> = [
       { phone: String(student.fatherPhone || ''), name: String(student.fatherName || ''), relationship: 'Parent / Guardian' }
     ];
     for (const guardian of guardians) {
