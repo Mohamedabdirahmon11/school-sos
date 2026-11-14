@@ -251,7 +251,7 @@ test('student creation whitelists profile fields, enforces capacity and protects
   assert.equal(invalidPin.status, 400);
 });
 
-test('teacher creation ignores client-controlled identity and credential fields', async () => {
+test('teacher creation accepts school-issued ID and PIN while ignoring forged account identity fields', async () => {
   const post = (body: Record<string, unknown>) => fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers, body: JSON.stringify(body)
   });
@@ -264,7 +264,8 @@ test('teacher creation ignores client-controlled identity and credential fields'
     twoFactorSecret: 'forged-secret',
     recoveryCodes: ['forged-code'],
     pin: '9999',
-    staffId: 'STF-SEC-001',
+    teacherId: 'T901',
+    staffId: 'FORGED-STAFF-ID',
     fullName: 'Scoped Teacher',
     phone: '+15550007201',
     gender: 'male',
@@ -278,6 +279,7 @@ test('teacher creation ignores client-controlled identity and credential fields'
   const result = await response.json();
   assert.notEqual(result.id, 'forged-teacher-id');
   assert.equal(result.schoolId, school.id);
+  assert.equal(result.staffId, 'T901');
   assert.notEqual(result.userId, 'forged-user');
   assert.equal(result.initialPin.length, 4);
   assert.equal('passwordHash' in result, false);
@@ -327,19 +329,20 @@ test('teacher creation ignores client-controlled identity and credential fields'
   assert.ok(studentTeacher);
   assert.equal('monthlySalary' in studentTeacher, false);
 
-  // Client-supplied IDs are ignored; the server must issue a fresh school-scoped ID.
+  // A second administrator-issued ID is accepted and remains globally unique.
   const secondTeacher = await post({
-    staffId: 'STF-SEC-001', fullName: 'Second Generated Teacher',
+    staffId: 'FORGED-SECOND-ID', teacherId: 'T903', pin: '8888',
+    fullName: 'Second Generated Teacher',
     gender: 'female', assignedClasses: [], assignedSubjects: []
   });
   assert.equal(secondTeacher.status, 201, await secondTeacher.clone().text());
   const secondTeacherResult = await secondTeacher.json();
-  assert.match(secondTeacherResult.staffId, /^T[0-9]{3,}$/);
+  assert.equal(secondTeacherResult.staffId, 'T903');
   assert.notEqual(secondTeacherResult.staffId, result.staffId);
-  assert.notEqual(secondTeacherResult.staffId, 'STF-SEC-001');
+  assert.notEqual(secondTeacherResult.staffId, 'FORGED-SECOND-ID');
 
   const invalidAssignments = await post({
-    staffId: 'STF-SEC-002', fullName: 'Invalid Assignments',
+    teacherId: 'T904', pin: '7777', fullName: 'Invalid Assignments',
     gender: 'female', assignedClasses: [klass.id, null], assignedSubjects: []
   });
   assert.equal(invalidAssignments.status, 400);
@@ -503,11 +506,30 @@ test('concurrent attendance submissions converge on one daily row without automa
 });
 
 
+test('teacher can be created with a strong password when no PIN is supplied', async () => {
+  const response = await fetch(`${baseUrl}/teachers`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      fullName: 'Password Only Teacher', gender: 'female',
+      teacherId: 'T905', password: 'TeacherPass905',
+      qualification: 'B.Ed'
+    })
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  const teacher = await response.json();
+  assert.equal(teacher.staffId, 'T905');
+  assert.equal(teacher.initialPin, '');
+  const account = await storage.db.getUserById(teacher.userId, school.id);
+  const { verifyPassword } = await import('../src/server/auth-security.ts');
+  assert.ok(account?.passwordHash && verifyPassword('TeacherPass905', account.passwordHash));
+  assert.equal(account?.pin, undefined);
+});
+
 test('teacher IDs are simple alphanumeric and teacher profile updates and PIN resets persist', async () => {
   const created = await fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers,
     body: JSON.stringify({
-      fullName: 'PIN Reset Teacher', gender: 'female',
+      fullName: 'PIN Reset Teacher', gender: 'female', teacherId: 'T902', pin: '4321',
       qualification: 'B.Ed', monthlySalary: 550
     })
   });

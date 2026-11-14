@@ -34,6 +34,11 @@ export const TeachersView: React.FC = () => {
   // Form State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [teacherId, setTeacherId] = useState('');
+  const [teacherPin, setTeacherPin] = useState('');
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [joinedDate, setJoinedDate] = useState(new Date().toISOString().slice(0, 10));
   const [gender, setGender] = useState<'male' | 'female'>('male');
     const [qualification, setQualification] = useState('B.Ed / B.Sc');
   const [monthlySalary, setMonthlySalary] = useState(550);
@@ -79,6 +84,8 @@ export const TeachersView: React.FC = () => {
     setEditForm({
       fullName: teacher.fullName || '',
       phone: teacher.phone || '',
+      address: teacher.address || '',
+      joinedDate: teacher.joinedDate || '',
       gender: teacher.gender || 'male',
       qualification: teacher.qualification || '',
       department: teacher.department || '',
@@ -123,12 +130,18 @@ export const TeachersView: React.FC = () => {
     e.preventDefault();
     const name = fullName.trim();
     if (!name || isCreatingTeacher) return;
+    if (!teacherPin.trim() && !teacherPassword) { setNotice('Set either a 4–6 digit PIN or a strong password for teacher sign-in.'); return; }
 
     setIsCreatingTeacher(true);
     try {
       const created = await ApiClient.addTeacher({
         fullName: name,
         phone: phone.trim(),
+        address: address.trim(),
+        teacherId: teacherId.trim().toUpperCase(),
+        pin: teacherPin.trim() || undefined,
+        password: teacherPassword,
+        joinedDate,
         gender,
         qualification: qualification.trim(),
         monthlySalary,
@@ -140,10 +153,15 @@ export const TeachersView: React.FC = () => {
       setShowAddModal(false);
       setFullName('');
       setPhone('');
+      setAddress('');
+      setTeacherId('');
+      setTeacherPin('');
+      setTeacherPassword('');
+      setJoinedDate(new Date().toISOString().slice(0, 10));
       setSelectedClassIds([]);
       setSelectedSubjectIds([]);
       setSelectedFormTeacherClassId('');
-      setInitialPassword(`Teacher ID: ${(created as any).staffId}\nInitial PIN: ${(created as any).initialPin}`);
+      setInitialPassword([`Teacher ID: ${(created as any).staffId}`, teacherPin.trim() ? `Initial PIN: ${teacherPin.trim()}` : '', teacherPassword ? `Password: ${teacherPassword}` : ''].filter(Boolean).join('\n'));
       setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
       window.setTimeout(() => setNotice(null), 4500);
@@ -287,6 +305,8 @@ export const TeachersView: React.FC = () => {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium">Full name<input required maxLength={120} value={String(editForm.fullName || '')} onChange={e => setEditForm(v => ({...v,fullName:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
               <label className="text-xs font-medium">Phone<input value={String(editForm.phone || '')} onChange={e => setEditForm(v => ({...v,phone:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Address<input maxLength={250} value={String(editForm.address || '')} onChange={e => setEditForm(v => ({...v,address:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
+              <label className="text-xs font-medium">Date of joining<input required type="date" value={String(editForm.joinedDate || '')} onChange={e => setEditForm(v => ({...v,joinedDate:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
               <label className="text-xs font-medium">Gender<select value={editForm.gender || 'male'} onChange={e => setEditForm(v => ({...v,gender:e.target.value as 'male'|'female'}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="male">Male</option><option value="female">Female</option></select></label>
               <label className="text-xs font-medium">Status<select value={String(editForm.status || 'active')} onChange={e => setEditForm(v => ({...v,status:e.target.value as any}))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option><option value="on_leave">On leave</option></select></label>
               <label className="text-xs font-medium">Qualification<input value={String(editForm.qualification || '')} onChange={e => setEditForm(v => ({...v,qualification:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
@@ -331,6 +351,29 @@ export const TeachersView: React.FC = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-[#334155]">Teacher ID *</label>
+                  <input required value={teacherId} onChange={e => setTeacherId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))} minLength={3} maxLength={20} pattern="[A-Z0-9]{3,20}" placeholder="e.g. T001" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+                </div>
+                <div>
+                  <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
+                  <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium text-[#334155]">Password (optional)</label>
+                <input type="password" autoComplete="new-password" value={teacherPassword} onChange={e => setTeacherPassword(e.target.value)} minLength={teacherPassword ? 8 : undefined} placeholder="Optional: 8+ characters, uppercase, lowercase and number" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </div>
+              <p className="text-[10px] text-slate-500">Provide at least one sign-in method: a 4–6 digit PIN or a strong password.</p>
+              <div>
+                <label className="block font-medium text-[#334155]">Address (optional)</label>
+                <input value={address} onChange={e => setAddress(e.target.value)} maxLength={250} placeholder="Teacher address" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </div>
+              <div>
+                <label className="block font-medium text-[#334155]">Date of Joining</label>
+                <input type="date" value={joinedDate} onChange={e => setJoinedDate(e.target.value)} required className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
+              </div>
               <div>
                 <label className="block font-medium text-[#334155]">Phone Number (optional)</label>
                 <input
