@@ -1815,7 +1815,7 @@ class StorageEngine {
     if (!current) current = await this.getStudentById(id, schoolId || updates.schoolId) || undefined;
     if (!current) return null;
     const tenantId = schoolId || current.schoolId;
-    const parentContactsChanged = updates.fatherPhone !== undefined || updates.motherPhone !== undefined;
+    const parentContactsChanged = updates.fatherPhone !== undefined || updates.motherPhone !== undefined || updates.fatherName !== undefined;
     const studentLoginChanged = updates.firstName !== undefined || updates.middleName !== undefined ||
       updates.lastName !== undefined || updates.studentPhone !== undefined ||
       updates.fatherPhone !== undefined || updates.branchId !== undefined;
@@ -1863,6 +1863,7 @@ class StorageEngine {
         );
         if (parent) {
           parent.linkedStudentIds = [...new Set([...(parent.linkedStudentIds || []), id])];
+          if (updated.fatherName && (!parent.fullName || parent.fullName.startsWith('Parent of '))) parent.fullName = updated.fatherName;
           if (!parent.phone) parent.phone = phone;
           if (!parent.parentPhone) parent.parentPhone = phone;
         } else {
@@ -1870,7 +1871,7 @@ class StorageEngine {
             id: `usr-parent-${randomUUID()}`,
             schoolId: tenantId,
             role: 'parent',
-            fullName: `Parent of ${updated.firstName}`,
+            fullName: updated.fatherName || `Parent of ${updated.firstName}`,
             phone,
             parentPhone: phone,
             passwordHash: '',
