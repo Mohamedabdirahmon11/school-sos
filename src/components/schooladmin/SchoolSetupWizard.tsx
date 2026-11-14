@@ -135,7 +135,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         completedSteps: incoming.completedSteps || []
       });
       setSaved(incoming.completedSteps || []);
-      setStep(Math.min(5, Math.max(1, result.progress?.currentStep || 1)));
+      const nextCoreStep = [1, 2, 3, 4, 5].find(id => !(incoming.completedSteps || []).includes(id)) || 5;
+      setStep(nextCoreStep);
       if ([1, 2, 3, 4, 5].every(id => (incoming.completedSteps || []).includes(id))) {
         setShowChecklist(true);
         void refreshSetupProgress();
