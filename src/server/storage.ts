@@ -1834,7 +1834,7 @@ class StorageEngine {
 
     if (parentContactsChanged) {
       const normalizePhone = (value: unknown) => typeof value === 'string' ? value.replace(/\D/g, '') : '';
-      const newParentPhones = new Set([updated.fatherPhone, updated.motherPhone].map(normalizePhone).filter(Boolean));
+      const newParentPhones = new Map([updated.fatherPhone, updated.motherPhone].filter((value): value is string => Boolean(value)).map(value => [normalizePhone(value), value]).filter(([key]) => Boolean(key)));
       const parentUsers = this.data.users.filter(user => user.schoolId === tenantId && user.role === 'parent');
 
       // Reconcile parent links without removing siblings or changing an existing
@@ -1846,7 +1846,7 @@ class StorageEngine {
           [student.fatherPhone, student.motherPhone].some(phone => contactPhones.has(normalizePhone(phone)))
         );
         const linkedIds = new Set(parent.linkedStudentIds || []);
-        if ([...newParentPhones].some(phone => contactPhones.has(phone))) linkedIds.add(id);
+        if ([...newParentPhones.keys()].some(phone => contactPhones.has(phone))) linkedIds.add(id);
         else linkedIds.delete(id);
         for (const sibling of matchingSiblings) linkedIds.add(sibling.id);
         if (linkedIds.size || parent.linkedStudentIds) parent.linkedStudentIds = [...linkedIds];
@@ -1857,23 +1857,23 @@ class StorageEngine {
         (user.id === `usr-student-${id}` || user.studentId === updated.studentId)
       );
       const parentPin = updated.pinHash || studentAccount?.pin || '';
-      for (const phone of newParentPhones) {
+      for (const [phone, displayPhone] of newParentPhones) {
         const parent = parentUsers.find(user =>
           [user.phone, user.parentPhone].some(value => normalizePhone(value) === phone)
         );
         if (parent) {
           parent.linkedStudentIds = [...new Set([...(parent.linkedStudentIds || []), id])];
           if (updated.fatherName && (!parent.fullName || parent.fullName.startsWith('Parent of '))) parent.fullName = updated.fatherName;
-          if (!parent.phone) parent.phone = phone;
-          if (!parent.parentPhone) parent.parentPhone = phone;
+          if (!parent.phone) parent.phone = displayPhone;
+          if (!parent.parentPhone) parent.parentPhone = displayPhone;
         } else {
           const createdParent: User = {
             id: `usr-parent-${randomUUID()}`,
             schoolId: tenantId,
             role: 'parent',
             fullName: updated.fatherName || `Parent of ${updated.firstName}`,
-            phone,
-            parentPhone: phone,
+            phone: displayPhone,
+            parentPhone: displayPhone,
             passwordHash: '',
             pin: parentPin,
             linkedStudentIds: [id],
