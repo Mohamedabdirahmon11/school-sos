@@ -583,7 +583,7 @@ export class InMemorySupabase {
       if (!sequence) {
         const max = this.rows('students').filter(row => String(row.school_id ?? row.schoolId) === schoolId)
           .reduce((value, row) => {
-            const match = String(row.student_id ?? row.studentId ?? '').match(/^S(\\d+)$/i);
+            const match = String(row.student_id ?? row.studentId ?? '').match(/^S(\d+)$/i);
             return match ? Math.max(value, Number(match[1])) : value;
           }, 0);
         sequence = { school_id: schoolId, last_number: max };
