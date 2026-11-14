@@ -1680,6 +1680,22 @@ class StorageEngine {
     return data as string[];
   }
 
+  public async syncStudentGuardian(schoolId: string, studentPk: string, oldPhone: string, newPhone: string, guardianName: string): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Guardian account synchronization is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_sync_student_guardian', {
+      p_school_id: schoolId,
+      p_student_pk: studentPk,
+      p_old_phone: oldPhone,
+      p_new_phone: newPhone,
+      p_guardian_name: guardianName
+    });
+    this.recordQuery('rpc:schoolos_sync_student_guardian', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to synchronize the parent / guardian account.');
+    this.invalidateAuthContextsForSchool(schoolId);
+  }
+
   public async createStudentAtomically(payload: Record<string, unknown>): Promise<Student> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic student registration is unavailable.');
