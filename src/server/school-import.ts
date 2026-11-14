@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'admissionDate', 'address', 'parentName', 'parentPhone', 'studentPhone', 'branch'] as const;
+export const IMPORT_COLUMNS = ['className', 'section', 'studentName', 'gender', 'admissionDate', 'address', 'parentName', 'parentPhone', 'studentPhone'] as const;
 const PHONE_IMPORT_COLUMNS = new Set(['parentPhone', 'studentPhone']);
 
 export function normalizeImportPhone(value: unknown): string {
@@ -21,7 +21,6 @@ export interface SchoolImportRow {
   parentName: string;
   parentPhone: string;
   studentPhone: string;
-  branch: string;
 }
 
 export function extractImportFile(body: Buffer, contentType: string): { file: Buffer; extension: 'csv' | 'xlsx' } {
