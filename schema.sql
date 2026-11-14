@@ -335,6 +335,7 @@ CREATE TABLE IF NOT EXISTS teachers (
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(150) NOT NULL,
   phone VARCHAR(50) NOT NULL,
+  address TEXT NOT NULL DEFAULT '',
   staff_id VARCHAR(40),
   gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female')),
   qualification VARCHAR(150),
