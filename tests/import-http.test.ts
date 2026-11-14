@@ -116,7 +116,7 @@ test('bulk import links the existing guardian account and never resets its PIN',
   const studentSlip = result.pinSlips.find((slip: any) => slip.type === 'student');
   const student = memory.rows('students').find(row => row.studentId === studentSlip?.studentId);
   assert.equal(student?.fatherPhone, '+252611199991');
-  assert.equal(student?.motherPhone, undefined);
+  assert.equal(student?.motherPhone, null);
   const father = memory.rows('users').find(row => row.id === 'existing-father-parent');
   assert.equal(father?.pinHash, existingPinHash);
   assert.ok(father?.linkedStudentIds?.includes(student.id));
