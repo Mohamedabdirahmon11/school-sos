@@ -68,7 +68,7 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.match(admin, /selectedClassIds/);
   assert.match(admin, /selectedSubjectIds/);
   assert.match(admin, /selectedFormTeacherClassId/);
-  assert.match(admin, /Teacher ID: /);
+  assert.doesNotMatch(admin, /Teacher ID \*/);
   assert.match(admin, /Login PIN \(optional\)/);
   assert.match(admin, /Date of Joining/);
   assert.match(api, /nextSchoolTeacherId\(school\)/);
@@ -77,7 +77,7 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.match(admin, /Form Teacher class/);
   assert.match(api, /body\.formTeacherClassId/);
   assert.match(api, /classTeacherId: account\.id/);
-  assert.match(admin, /Teacher ID:/);
+  assert.match(admin, /Teacher ID: /);
   assert.match(admin, /Initial PIN:/);
   assert.match(admin, /Reset PIN/);
   assert.match(api, /Teacher ID and PIN are required/);
