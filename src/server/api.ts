@@ -228,9 +228,7 @@ async function sendDatabasePage(req: Request, res: Response, table: string, filt
 type ImportValidation = { row: number; data: SchoolImportRow; status: 'valid' | 'error' | 'skipped'; reasons: string[]; classId?: string; branchId?: string };
 
 async function validateSchoolImport(rows: SchoolImportRow[], schoolId: string): Promise<{ rows: ImportValidation[]; totals: { total: number; valid: number; errors: number; skipped: number } }> {
-  const [classes, students, branches] = await Promise.all([
-    db.getClasses(schoolId), db.getStudents(schoolId), db.getBranches(schoolId)
-  ]);
+  const [classes, students] = await Promise.all([db.getClasses(schoolId), db.getStudents(schoolId)]);
   const byClass = new Map(classes.map(item => [`${item.name.trim().toLowerCase()}\u0000${item.section.trim().toLowerCase()}`, item]));
   const branchByName = new Map(branches.map(item => [item.name.trim().toLowerCase(), item]));
   const seen = new Set<string>();
