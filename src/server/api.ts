@@ -2460,6 +2460,15 @@ apiRouter.post('/import/preview', express.raw({ type: 'multipart/form-data', lim
   }
 });
 
+apiRouter.post('/import/validate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireImportSchoolAccess, async (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 2000) {
+    res.status(400).json({ error: 'Validate between 1 and 2,000 student rows.' }); return;
+  }
+  const result = await validateSchoolImport(rows, (req as any).school.id);
+  res.set({ 'Cache-Control': 'private, no-store' }).json(result);
+});
+
 apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireImportSchoolAccess, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
