@@ -321,7 +321,7 @@ test('student registration migrations add address, guardian identity, and atomic
   assert.match(sequence, /schoolos_reserve_student_ids/);
   assert.match(sequence, /pg_advisory_xact_lock|UPDATE public\.school_student_id_sequences/);
   assert.match(sequence, /uq_parent_phone_normalized_school/);
-  assert.match(apiSource, /schoolos_create_student/);
+  assert.match(apiSource, /db\\.createStudentAtomically/);
   assert.match(apiSource, /studentId.*client|body\.studentId/);
   assert.match(bulk, /admission_date/);
   assert.match(bulk, /father_name/);
