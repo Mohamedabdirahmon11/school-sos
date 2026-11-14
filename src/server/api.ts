@@ -4606,14 +4606,12 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
   const address = typeof body.address === 'string' ? body.address.trim() : '';
   const gender = body.gender;
-  const requestedTeacherId = normalizeStaffId(body.teacherId);
   const initialPin = typeof body.pin === 'string' ? body.pin.trim() : '';
   const initialPassword = typeof body.password === 'string' ? body.password : '';
   const joinedDate = typeof body.joinedDate === 'string' && body.joinedDate.trim() ? body.joinedDate.trim() : new Date().toISOString().slice(0, 10);
   if (!fullName || fullName.length > 120) { res.status(400).json({ error: 'Teacher full name is required and must be at most 120 characters.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   if (address.length > 250) { res.status(400).json({ error: 'Teacher address must be at most 250 characters.' }); return; }
-  if (!validTeacherId(requestedTeacherId)) { res.status(400).json({ error: 'Teacher ID must be 3–20 letters or numbers only.' }); return; }
   if (!initialPin && !initialPassword) { res.status(400).json({ error: 'Set either a 4–6 digit Teacher PIN or a strong password.' }); return; }
   if (initialPin && !/^\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
   if (initialPassword && passwordPolicyError(initialPassword)) { res.status(400).json({ error: passwordPolicyError(initialPassword) }); return; }
@@ -4627,14 +4625,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const staffId = requestedTeacherId;
-  const [usedStaffIds, existingTeachers] = await Promise.all([
-    queryAllRows('users', {}, 'id,staff_id'),
-    queryAllRows('teachers', {}, 'id,staff_id')
-  ]);
-  if ([...usedStaffIds, ...existingTeachers].some((record: any) => String(record.staffId || '').toUpperCase() === staffId)) {
-    res.status(409).json({ error: 'That staff ID is already used in this school.' }); return;
-  }
+  const staffId = await nextSchoolTeacherId(school);
   const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
   if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (body.assignedClasses !== undefined && (!Array.isArray(body.assignedClasses) || body.assignedClasses.length > 100 || body.assignedClasses.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
@@ -4694,7 +4685,6 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
-const validTeacherId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });

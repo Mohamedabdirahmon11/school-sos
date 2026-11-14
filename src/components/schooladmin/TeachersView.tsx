@@ -35,7 +35,6 @@ export const TeachersView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [teacherId, setTeacherId] = useState('');
   const [teacherPin, setTeacherPin] = useState('');
   const [teacherPassword, setTeacherPassword] = useState('');
   const [joinedDate, setJoinedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -138,7 +137,6 @@ export const TeachersView: React.FC = () => {
         fullName: name,
         phone: phone.trim(),
         address: address.trim(),
-        teacherId: teacherId.trim().toUpperCase(),
         pin: teacherPin.trim() || undefined,
         password: teacherPassword,
         joinedDate,
@@ -154,7 +152,6 @@ export const TeachersView: React.FC = () => {
       setFullName('');
       setPhone('');
       setAddress('');
-      setTeacherId('');
       setTeacherPin('');
       setTeacherPassword('');
       setJoinedDate(new Date().toISOString().slice(0, 10));
@@ -351,15 +348,9 @@ export const TeachersView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-[#334155]">Teacher ID *</label>
-                  <input required value={teacherId} onChange={e => setTeacherId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))} minLength={3} maxLength={20} pattern="[A-Z0-9]{3,20}" placeholder="e.g. T001" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-                </div>
-                <div>
+              <div>
                   <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
                   <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-                </div>
               </div>
               <div>
                 <label className="block font-medium text-[#334155]">Password (optional)</label>
