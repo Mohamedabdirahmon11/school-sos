@@ -464,7 +464,7 @@ export const ClassesSubjectsView: React.FC = () => {
               </div>
               <div>
                 <label className="block font-medium">Academic Year *</label>
-                <input type="text" required pattern="\d{4}-\d{4}" value={classAcademicYear} onChange={e => setClassAcademicYear(e.target.value)} placeholder="2026-2027" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
+                <input type="text" required pattern="[0-9]{4}-[0-9]{4}" value={classAcademicYear} onChange={e => setClassAcademicYear(e.target.value)} placeholder="2026-2027" className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
               </div>
               <div>
                 <label className="block font-medium">Branch</label>
