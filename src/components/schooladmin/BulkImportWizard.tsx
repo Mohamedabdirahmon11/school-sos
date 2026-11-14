@@ -118,7 +118,7 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
                 <label className="flex items-center gap-2 text-xs text-[#334155]"><input type="checkbox" checked={errorsOnly} onChange={event => setErrorsOnly(event.target.checked)} />{t('import_error_only')}</label>
               </div>
               <div className="max-h-[45vh] overflow-auto rounded-lg border border-[#E2E8F0]">
-                <table className="min-w-[1600px] w-full text-left text-xs">
+                <table className="min-w-[1500px] w-full text-left text-xs">
                   <thead className="sticky top-0 bg-slate-50 text-[#475569]"><tr>
                     <th className="px-2 py-2">Row</th><th className="px-2 py-2">Student full name</th><th className="px-2 py-2">Class</th><th className="px-2 py-2">Section</th>
                     <th className="px-2 py-2">Gender</th><th className="px-2 py-2">Admission date</th><th className="px-2 py-2">Address</th>
@@ -134,7 +134,6 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
                     <td className="border-t border-white px-2 py-2"><input aria-label="parentName" value={row.data.parentName || ''} onChange={event => updatePreviewCell(row.row,'parentName',event.target.value)} className="w-36 rounded border border-slate-300 bg-white px-2 py-1" /></td>
                     <td className="border-t border-white px-2 py-2"><input aria-label="parentPhone" value={row.data.parentPhone || ''} onChange={event => updatePreviewCell(row.row,'parentPhone',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
                     <td className="border-t border-white px-2 py-2"><input aria-label="studentPhone" value={row.data.studentPhone || ''} onChange={event => updatePreviewCell(row.row,'studentPhone',event.target.value)} className="w-32 rounded border border-slate-300 bg-white px-2 py-1" /></td>
-                    <td className="border-t border-white px-2 py-2"><input aria-label="branch" value={row.data.branch || ''} onChange={event => updatePreviewCell(row.row,'branch',event.target.value)} className="w-28 rounded border border-slate-300 bg-white px-2 py-1" /></td>
                     <td className="border-t border-white px-2 py-2 font-semibold capitalize">{row.status}</td>
                     <td className="border-t border-white px-2 py-2 text-rose-700">{row.reasons.join(' ') || '—'}</td>
                   </tr>)}</tbody>
