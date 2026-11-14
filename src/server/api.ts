@@ -4422,6 +4422,21 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   if (klass?.branchId) payload.branchId = klass.branchId;
   if (payload.branchId && !(await db.getBranches(school.id)).some(branch => branch.id === payload.branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   const updated = await db.updateStudent(req.params.id, payload, school.id);
+  if (updated && payload.fatherPhone !== undefined) {
+    const digits = (value: unknown) => typeof value === 'string' ? value.replace(/\\D/g, '') : '';
+    const oldPhone = digits(existingStudent.fatherPhone);
+    const newPhone = digits(updated.fatherPhone);
+    if (oldPhone && oldPhone !== newPhone) {
+      const parents = await db.getUsers(school.id, 'parent');
+      for (const parent of parents) {
+        const matchesOldPhone = [parent.phone, parent.parentPhone].some(value => digits(value) === oldPhone);
+        if (matchesOldPhone && parent.linkedStudentIds?.includes(existingStudent.id)) {
+          db.updateUser(parent.id, { linkedStudentIds: parent.linkedStudentIds.filter(id => id !== existingStudent.id) });
+        }
+      }
+      await db.flush();
+    }
+  }
   res.json(sanitizeStudent(updated));
 });
 
