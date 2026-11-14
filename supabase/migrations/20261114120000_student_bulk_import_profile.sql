@@ -7,11 +7,11 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO public.classes (id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee)
-  SELECT id, school_id, branch_id, name, grade_level, section, room_number, capacity, monthly_fee
+  INSERT INTO public.classes (id, school_id, branch_id, name, class_code, academic_year, grade_level, section, shift, room_number, capacity, monthly_fee)
+  SELECT id, school_id, branch_id, name, class_code, academic_year, grade_level, section, COALESCE(shift, 1), room_number, capacity, monthly_fee
     FROM jsonb_to_recordset(COALESCE(p_payload->'classes', '[]'::jsonb)) AS x(
-      id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, grade_level INTEGER,
-      section VARCHAR, room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
+      id VARCHAR, school_id VARCHAR, branch_id VARCHAR, name VARCHAR, class_code VARCHAR, academic_year VARCHAR,
+      grade_level INTEGER, section VARCHAR, shift SMALLINT, room_number VARCHAR, capacity INTEGER, monthly_fee NUMERIC
     );
 
   INSERT INTO public.students (
