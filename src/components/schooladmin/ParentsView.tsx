@@ -12,6 +12,7 @@ import { Search, ExternalLink, Phone, MessageSquare, Users } from 'lucide-react'
 type ParentContact = {
   id: string;
   phone: string;
+  name: string;
   relationships: string[];
   students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
 };
@@ -145,7 +146,7 @@ export const ParentsView: React.FC = () => {
                     <tr key={contact.id} className="align-top hover:bg-[#F8FAFC]">
                       <td className="px-4 py-3 text-slate-400">{((pageInfo?.page || page) - 1) * (pageInfo?.pageSize || 50) + rowIndex + 1}</td>
                       <td className="px-4 py-3">
-                        <span className="font-mono font-semibold text-[#132A29]">{contact.phone}</span>
+                        <span className="block font-semibold text-[#132A29]">{contact.name || 'Parent / Guardian'}</span><span className="font-mono text-[11px] text-slate-600">{contact.phone}</span>
                         {contactActions(contact.phone)}
                       </td>
                       <td className="px-4 py-3 text-[#334155]">{contact.relationships.join(' / ')}</td>
