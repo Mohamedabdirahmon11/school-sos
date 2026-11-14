@@ -72,7 +72,7 @@ test('student registration generates IDs server-side and reuses one normalized g
   const firstResponse = await register('Hodan Amina Noor', '+251911234567', 'CLIENT-SUPPLIED-001');
   assert.equal(firstResponse.status, 201);
   const first = await firstResponse.json() as any;
-  assert.match(first.studentId, /^S\\d{3,}$/);
+  assert.match(first.studentId, /^S\d{3,}$/);
   assert.notEqual(first.studentId, 'CLIENT-SUPPLIED-001');
   assert.match(first.initialPin, /^\d{4}$/);
   const firstStudent = memory.rows('students').find(row => row.student_id === first.studentId);
