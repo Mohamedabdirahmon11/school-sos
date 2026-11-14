@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const classesSource = readFileSync(new URL('../src/components/schooladmin/ClassesSubjectsView.tsx', import.meta.url), 'utf8');
 const teachersSource = readFileSync(new URL('../src/components/schooladmin/TeachersView.tsx', import.meta.url), 'utf8');
+const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 
 test('Classes & Sections are grouped by academic year, grade, branch and shift with searchable section cards', () => {
   assert.match(classesSource, /const classGroups = visibleClasses\.reduce/);
@@ -39,4 +40,12 @@ test('class creation defaults to KG and follows the entered KG/Grade label', () 
 test('class creation falls back to the configured capacity when the optional field is cleared', () => {
   assert.match(classesSource, /const safeCapacity = Number\.isInteger\(capacity\)/);
   assert.match(classesSource, /capacity: safeCapacity/);
+});
+
+
+test('class creation accepts a correctly formatted academic year in the API validator', () => {
+  const createClassRoute = apiSource.slice(apiSource.indexOf("apiRouter.post('/classes',"), apiSource.indexOf("apiRouter.put('/classes/:id'"));
+  assert.match(createClassRoute, /!\/\^\\d\{4\}-\\d\{4\}\$\/.test\(academicYear\)/);
+  assert.doesNotMatch(createClassRoute, /!\/\^\\\\d\{4\}-\\\\d\{4\}\$\/.test\(academicYear\)/);
+  assert.match(classesSource, /pattern="\[0-9\]\{4\}-\[0-9\]\{4\}"/);
 });

@@ -2727,7 +2727,7 @@ apiRouter.post('/classes/bulk-import', requireAuth, requireSchoolAdminOrSuperAdm
     const branch = branchName ? branchByName.get(branchName.toLowerCase()) : undefined;
     const key = `${academicYear}\\u0000${classCode.toLowerCase()}`;
     if (!name || !classCode) errors.push(`Row ${index + 2}: className and classCode are required.`);
-    else if (!/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1) errors.push(`Row ${index + 2}: academicYear must use consecutive years such as 2026-2027.`);
+    else if (!/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1) errors.push(`Row ${index + 2}: academicYear must use consecutive years such as 2026-2027.`);
     else if (classCode.length > 40) errors.push(`Row ${index + 2}: classCode must be 40 characters or fewer.`);
     else if (seen.has(key)) errors.push(`Row ${index + 2}: duplicate class code ${classCode} for ${academicYear}.`);
     else if (!Number.isInteger(grade) || !allowedLevels.has(grade)) errors.push(`Row ${index + 2}: gradeLevel must be KG or an offered grade from 1 to 12.`);
@@ -2994,7 +2994,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const [yearStart, yearEnd] = academicYear.split('-').map(Number);
   const classCode = String(req.body?.classCode || `${gradeLevel === 0 ? 'KG' : `G${gradeLevel}`}-${section || 'MAIN'}-${academicYear.slice(0, 4)}`).trim().toUpperCase();
   const capacity = req.body?.capacity === undefined || req.body.capacity === '' ? school.defaultClassCapacity : Number(req.body.capacity);
-  if (!name || !Number.isInteger(gradeLevel) || gradeLevel < 0 || gradeLevel > 12 || !/^\\d{4}-\\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500 || (req.body?.section !== undefined && typeof req.body.section !== 'string')) {
+  if (!name || !Number.isInteger(gradeLevel) || gradeLevel < 0 || gradeLevel > 12 || !/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500 || (req.body?.section !== undefined && typeof req.body.section !== 'string')) {
     res.status(400).json({ error: 'Enter a class name, unique class code, valid academic year, KG–12 level, and valid optional capacity/section.' }); return;
   }
   const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
