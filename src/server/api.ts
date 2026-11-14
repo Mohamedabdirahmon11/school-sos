@@ -4685,7 +4685,6 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
-const validTeacherId = (value: string) => /^[A-Z0-9]{3,20}$/.test(value);
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
