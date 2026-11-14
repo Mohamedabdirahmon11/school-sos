@@ -348,12 +348,7 @@ export const TeachersView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-[#334155]">Teacher ID *</label>
-                  <input required value={teacherId} onChange={e => setTeacherId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))} minLength={3} maxLength={20} pattern="[A-Z0-9]{3,20}" placeholder="e.g. T001" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
-                </div>
-                <div>
+              <div>
                   <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
                   <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
                 </div>
