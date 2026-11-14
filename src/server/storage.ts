@@ -1744,12 +1744,13 @@ class StorageEngine {
         if (!existingParent.linkedStudentIds.includes(id)) existingParent.linkedStudentIds.push(id);
         if (!existingParent.phone) existingParent.phone = parentPhone;
         if (!existingParent.parentPhone) existingParent.parentPhone = parentPhone;
+        if (student.fatherName && (!existingParent.fullName || existingParent.fullName.startsWith('Parent of '))) existingParent.fullName = student.fatherName;
       } else {
         this.data.users.push({
           id: `usr-parent-${randomUUID()}`,
           schoolId: student.schoolId,
           role: 'parent',
-          fullName: `Parent of ${student.firstName}`,
+          fullName: student.fatherName || `Parent of ${student.firstName}`,
           phone: parentPhone,
           parentPhone,
           passwordHash: '',
