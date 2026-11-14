@@ -8,6 +8,7 @@ import {
   normalizeSchoolSetupProgress,
   sanitizeSchoolSetupProgressUpdate
 } from '../src/server/school-setup.ts';
+import { isSchoolSetupProgressComplete } from '../src/lib/school-setup-navigation.ts';
 
 const school: School = {
   id: 'school-1',
@@ -87,6 +88,30 @@ test('teacher setup requires a school-specific staff ID and linked login credent
     teachers: [{ staffId: '', userId: 'teacher-user-1', hasLogin: false }]
   });
   assert.equal(checklist[5].ready, false);
+});
+
+test('the old five-step profile completion cannot unlock the ten-step dashboard gate', () => {
+  const normalized = normalizeSchoolSetupProgress({
+    currentStep: 5,
+    completedSteps: [1, 2, 3, 4, 5, 10],
+    skippedSteps: [],
+    completedAt: '2026-11-14T12:00:00.000Z'
+  });
+  assert.equal(normalized.completedAt, null);
+  assert.deepEqual(normalized.completedSteps, [1, 2, 3, 4, 5]);
+  assert.equal(normalized.currentStep, 6);
+  assert.equal(isSchoolSetupProgressComplete(normalized), false);
+});
+
+test('a full ten-step record with both optional steps explicitly skipped remains complete', () => {
+  const progress = {
+    currentStep: 10,
+    completedSteps: [1, 2, 3, 4, 5, 6, 8, 10],
+    skippedSteps: [7, 9],
+    completedAt: '2026-11-14T12:00:00.000Z'
+  };
+  assert.equal(isSchoolSetupProgressComplete(progress), true);
+  assert.equal(normalizeSchoolSetupProgress(progress).completedAt, progress.completedAt);
 });
 
 test('malformed saved progress safely normalizes to the first setup step', () => {
