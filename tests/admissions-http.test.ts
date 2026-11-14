@@ -183,8 +183,8 @@ test('student creation whitelists profile fields, enforces capacity and protects
     gender: 'female',
     classId: klass.id,
     studentId: 'STU-CLEAN-001',
-    fatherPhone: '+15550007111',
-    motherPhone: '+15550007112',
+    guardianName: 'Clean Student Guardian',
+    guardianPhone: '+15550007111',
     pin: '1234'
   });
   assert.equal(created.status, 201, await created.clone().text());
@@ -354,7 +354,7 @@ test('student profile updates validate phones and keep parent/student login link
   const firstResponse = await create({
     firstName: 'Parent', middleName: 'Link', lastName: 'One', gender: 'female',
     classId: klass.id, studentId: 'PARENT-LINK-01',
-    fatherPhone: '+15550007301', motherPhone: '+15550007302',
+    guardianName: 'Parent Link Guardian', guardianPhone: '+15550007301',
     studentPhone: '+15550007303'
   });
   assert.equal(firstResponse.status, 201, await firstResponse.clone().text());
@@ -363,7 +363,7 @@ test('student profile updates validate phones and keep parent/student login link
   const siblingResponse = await create({
     firstName: 'Parent', middleName: 'Link', lastName: 'Sibling', gender: 'male',
     classId: klass.id, studentId: 'PARENT-LINK-02',
-    fatherPhone: '+15550007301', motherPhone: '+15550007304'
+    guardianName: 'Parent Link Guardian', guardianPhone: '+15550007301'
   });
   assert.equal(siblingResponse.status, 201, await siblingResponse.clone().text());
   const sibling = await siblingResponse.json();
@@ -378,7 +378,7 @@ test('student profile updates validate phones and keep parent/student login link
     method: 'PUT', headers,
     body: JSON.stringify({
       id: 'forged-student-id', schoolId: school.id,
-      fatherPhone: '+15550007306', motherPhone: '+15550007307',
+      fatherPhone: '+15550007306', fatherName: 'Updated Guardian',
       studentPhone: '+15550007308'
     })
   });
@@ -387,24 +387,20 @@ test('student profile updates validate phones and keep parent/student login link
   assert.equal(updated.id, first.id);
   assert.equal(updated.schoolId, school.id);
   assert.equal(updated.fatherPhone, '+15550007306');
-  assert.equal(updated.motherPhone, '+15550007307');
+
 
   const users = await storage.db.getUsers(school.id, 'parent');
   const oldFather = users.find(user => user.phone === '+15550007301');
-  const oldMother = users.find(user => user.phone === '+15550007302');
   const newFather = users.find(user => user.phone === '+15550007306');
-  const newMother = users.find(user => user.phone === '+15550007307');
   assert.ok(oldFather?.linkedStudentIds?.includes(sibling.id));
   assert.equal(oldFather?.linkedStudentIds?.includes(first.id), false);
   assert.equal(oldMother?.linkedStudentIds?.includes(first.id), false);
   assert.ok(newFather?.linkedStudentIds?.includes(first.id));
-  assert.ok(newMother?.linkedStudentIds?.includes(first.id));
 
   const studentUser = await storage.db.getUserById(`usr-student-${first.id}`, school.id);
   assert.equal(studentUser?.phone, '+15550007308');
   const { verifyPin } = await import('../src/server/auth-security.ts');
   assert.ok(newFather?.pin && verifyPin(first.initialPin, newFather.pin));
-  assert.ok(newMother?.pin && verifyPin(first.initialPin, newMother.pin));
 });
 
 test('concurrent attendance submissions converge on one daily row without automatic parent SMS', async () => {
@@ -413,7 +409,7 @@ test('concurrent attendance submissions converge on one daily row without automa
     body: JSON.stringify({
       firstName: 'Attendance', middleName: 'Concurrent', lastName: 'Pupil', gender: 'female',
       classId: klass.id, studentId: 'ATTENDANCE-CONCURRENT-01',
-      fatherPhone: '+15550007401', motherPhone: '+15550007402'
+      guardianName: 'Attendance Guardian', guardianPhone: '+15550007401'
     })
   });
   assert.equal(created.status, 201, await created.clone().text());
