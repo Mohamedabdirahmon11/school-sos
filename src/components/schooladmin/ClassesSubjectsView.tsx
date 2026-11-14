@@ -448,9 +448,9 @@ export const ClassesSubjectsView: React.FC = () => {
                   onChange={e => {
                     const nextName = e.target.value;
                     setClassName(nextName);
-                    if (/^\\s*(?:KG|Kindergarten|Nursery)(?:[\\s-]*\\d+)?\\s*$/i.test(nextName)) setGradeLevel(0);
+                    if (/^\s*(?:KG|Kindergarten|Nursery)(?:[\s-]*\d+)?\s*$/i.test(nextName)) setGradeLevel(0);
                     else {
-                      const match = /^\\s*(?:Grade|Gr)\\s*[- ]?(\\d{1,2})(?:\\b|$)/i.exec(nextName);
+                      const match = /^\s*(?:Grade|Gr)\s*[- ]?(\d{1,2})(?:\b|$)/i.exec(nextName);
                       if (match) setGradeLevel(Number(match[1]));
                     }
                   }}
