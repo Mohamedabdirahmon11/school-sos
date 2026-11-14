@@ -1899,6 +1899,7 @@ class StorageEngine {
     }
 
     this.save();
+    await this.flush();
     return updated;
   }
   public async deleteStudent(id: string, schoolId?: string): Promise<boolean> {
