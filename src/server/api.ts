@@ -3945,6 +3945,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
     id: string;
     phone: string;
     normalizedPhone: string;
+    name: string;
     relationships: Set<string>;
     students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
   }>();
@@ -3956,8 +3957,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
       className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
     };
     const guardians: Array<{ phone: string; relationship: string }> = [
-      { phone: String(student.fatherPhone || ''), relationship: 'Father' },
-      { phone: String(student.motherPhone || ''), relationship: 'Mother' }
+      { phone: String(student.fatherPhone || ''), name: String(student.fatherName || ''), relationship: 'Parent / Guardian' }
     ];
     for (const guardian of guardians) {
       const phone = guardian.phone.trim();
@@ -3969,11 +3969,13 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
           id: `${school.id}:${normalizedPhone}`,
           phone,
           normalizedPhone,
+          name: guardian.name,
           relationships: new Set<string>(),
           students: []
         };
         contacts.set(normalizedPhone, contact);
       }
+      if (!contact.name && guardian.name) contact.name = guardian.name;
       contact.relationships.add(guardian.relationship);
       if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
     }
@@ -3984,10 +3986,11 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const filtered = [...contacts.values()]
     .filter(contact => !query || contact.phone.toLowerCase().includes(query)
       || (queryDigits.length > 0 && contact.normalizedPhone.includes(queryDigits))
-      || contact.students.some(child => `${child.fullName} ${child.studentId} ${child.className}`.toLowerCase().includes(query)))
+      || contact.name.toLowerCase().includes(query) || contact.students.some(child => `${child.fullName} ${child.studentId} ${child.className}`.toLowerCase().includes(query)))
     .map(contact => ({
       id: contact.id,
       phone: contact.phone,
+      name: contact.name,
       relationships: [...contact.relationships].sort(),
       students: contact.students.sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }))
     }))
