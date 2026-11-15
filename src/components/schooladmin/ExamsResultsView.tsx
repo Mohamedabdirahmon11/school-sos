@@ -241,7 +241,7 @@ export const ExamsResultsView: React.FC = () => {
       const dateForDay = (dayOffset: number) => {
         const date = new Date(`${autoStartDate}T00:00:00`);
         date.setDate(date.getDate() + dayOffset);
-        return date.toISOString().slice(0, 10);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       };
       const addMinutes = (time: string, minutes: number) => {
         const [hours, mins] = time.split(':').map(Number);
@@ -283,7 +283,6 @@ export const ExamsResultsView: React.FC = () => {
       for (const plan of plans) {
         const startTime = addMinutes(autoStartTime, plan.slot * autoDurationMinutes);
         const endTime = addMinutes(startTime, autoDurationMinutes);
-        const klass = activeClasses.find(item => item.id === plan.classId);
         const roomName = `${autoRoom.trim()} - ${plan.className}`.slice(0, 120);
         await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
