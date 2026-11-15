@@ -6159,6 +6159,11 @@ BEGIN;
 
 ALTER TABLE public.exam_schedules ALTER COLUMN class_id DROP NOT NULL;
 
+CREATE INDEX IF NOT EXISTS idx_exam_cohort_class_school ON public.exam_schedule_cohort_students (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_exam_cohort_schedule_school ON public.exam_schedule_cohort_students (schedule_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_exam_cohort_student_school ON public.exam_schedule_cohort_students (student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_exam_schedules_room_school ON public.exam_schedules (room_id, school_id);
+
 CREATE OR REPLACE FUNCTION public.schoolos_publish_exam_schedule(
   p_school_id VARCHAR(64),
   p_schedule_id VARCHAR(64),
@@ -6327,4 +6332,3 @@ REVOKE ALL ON FUNCTION public.schoolos_publish_exam_schedule(VARCHAR, VARCHAR, V
 GRANT EXECUTE ON FUNCTION public.schoolos_publish_exam_schedule(VARCHAR, VARCHAR, VARCHAR) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
-COMMIT;
