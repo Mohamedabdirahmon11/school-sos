@@ -13,7 +13,7 @@ import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeM
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
-import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
+import { isSchoolSetupProgressComplete, SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
@@ -129,7 +129,7 @@ const AppContent: React.FC = () => {
     return 'sch_dashboard';
   };
 
-  const setupRequired = user.role === 'school_admin' && !school?.setupProgress?.completedAt;
+  const setupRequired = user.role === 'school_admin' && !isSchoolSetupProgressComplete(school?.setupProgress);
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')

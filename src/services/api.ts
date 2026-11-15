@@ -261,11 +261,11 @@ export class ApiClient {
   }
 
   public static async getSchoolSetupData() {
-    return this.request<{ data: SchoolSetupData; school: { name: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
+    return this.request<{ data: SchoolSetupData; school: { name: string; address: string; city: string; phone: string; email: string; whatsappPhone: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; skippedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
   }
 
   public static async saveSchoolSetupStep(step: number, data: Partial<SchoolSetupData>) {
-    return this.request<{ data: SchoolSetupData; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null }; completed: boolean }>('/school/setup-data', {
+    return this.request<{ data: SchoolSetupData; progress: { currentStep: number; completedSteps: number[]; skippedSteps: number[]; completedAt: string | null }; completed: boolean; coreSetupCompleted: boolean }>('/school/setup-data', {
       method: 'PUT',
       body: JSON.stringify({ step, data })
     });
