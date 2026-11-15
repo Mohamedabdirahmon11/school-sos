@@ -77,9 +77,7 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleDate, setScheduleDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
   const [scheduleStartTime, setScheduleStartTime] = useState('08:00');
   const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
-  const [scheduleRoom, setScheduleRoom] = useState('');
   const [scheduleShiftName, setScheduleShiftName] = useState('General');
-  const [scheduleCapacity, setScheduleCapacity] = useState(40);
   const [autoStartDate, setAutoStartDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
   const [autoDays, setAutoDays] = useState(5);
   const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState<2 | 3>(2);
@@ -882,7 +880,7 @@ export const ExamsResultsView: React.FC = () => {
                 <input type="time" required value={scheduleEndTime} onChange={event => setScheduleEndTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
               </label>
               <label className="text-xs font-semibold text-[#475569]">Exam room
-                <select required value={scheduleRoomId} onChange={event => { const room = examRooms.find(item => item.id === event.target.value); setScheduleRoomId(event.target.value); setScheduleRoom(room?.name || ''); if (room) { setScheduleCapacity(Number(room.capacity)); setScheduleShiftName(room.shiftName || 'General'); } }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                <select required value={scheduleRoomId} onChange={event => { const room = examRooms.find(item => item.id === event.target.value); setScheduleRoomId(event.target.value); if (room) setScheduleShiftName(room.shiftName || 'General'); }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
                   <option value="">Choose a room</option>{examRooms.filter(room => room.isActive).map(room => <option key={room.id} value={room.id}>{room.name} · {room.capacity} seats</option>)}
                 </select>
               </label>
