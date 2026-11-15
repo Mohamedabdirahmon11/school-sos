@@ -81,6 +81,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   // Identity Form State
   const [name, setName] = useState(school?.name || '');
+  const [nameArabic, setNameArabic] = useState(school?.nameArabic || '');
   const [brandColor, setBrandColor] = useState(school?.brandColor || '#0F766E');
   const [logoUrl, setLogoUrl] = useState(school?.logoUrl || '');
   const [address, setAddress] = useState(school?.address || '');
@@ -167,6 +168,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
         method: 'PUT',
         body: JSON.stringify({
           name,
+          nameArabic,
           brandColor,
           logoUrl,
           address,
@@ -576,6 +578,11 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 onChange={e => setName(e.target.value)}
                 className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E]"
               />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#334155] mb-1">Arabic School Name</label>
+              <input type="text" dir="rtl" value={nameArabic} onChange={e => setNameArabic(e.target.value)} maxLength={255} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg text-right" placeholder="اسم المدرسة باللغة العربية" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
