@@ -126,7 +126,7 @@ export const ParentPortalView: React.FC = () => {
 
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
         <h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2>
-        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} />}
+        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || currentChild.className || school?.examTimetableClassGroup} />}
       </section>
 
       {/* Academic Results & Fee Invoices */}
