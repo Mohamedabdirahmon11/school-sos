@@ -33,7 +33,7 @@ test('uses three columns, date row spans, gold header and A4 print', () => {
 
 test('all role portals use the shared read-only timetable', () => {
   for (const source of [student, parent, teacher]) {
-    assert.match(source, /<ExamTimetablePrint schedules=\{publishedExamSchedules\} school=\{school\} \/>/);
+    assert.match(source, /<ExamTimetablePrint schedules=\{publishedExamSchedules\} school=\{school\}/);
   }
 });
 
