@@ -1512,7 +1512,7 @@ export const ExamsResultsView: React.FC = () => {
                       return (
                         <tr key={group.key}>
                           <td className="exam-print-number">{groupIndex + 1}</td>
-                          <td><strong>{schedule.subjectName}</strong><small className="exam-print-subline">{schedule.examName} · {schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</small></td>
+                          <td><strong>{schedule.subjectName}</strong><small className="exam-print-subline">{schedule.examName} · {schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</small><span className="sr-only">All classes assigned to this subject</span></td>
                           <td>{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                           <td className="exam-print-time">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
                           <td>{roomNames.join(', ') || '________________'}</td>
@@ -1522,7 +1522,7 @@ export const ExamsResultsView: React.FC = () => {
                             {group.sessions.map(roomSession => <div key={roomSession.id} className="flex flex-wrap justify-end gap-1">
                               {roomSession.status === 'draft' && <>
                                 <button type="button" onClick={() => void openEditExamSchedule(roomSession)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button>
-                                <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish'}</button>
+                                <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                                 <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel</button>
                               </>}
                               {roomSession.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(roomSession)} aria-label="Print seating roster" className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Print seats</button>}
