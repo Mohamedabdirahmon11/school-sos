@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
 import { buildResultsCsv } from '../../lib/results-csv.ts';
+import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -79,6 +80,11 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
   const [scheduleShiftName, setScheduleShiftName] = useState('General');
   const [autoStartDate, setAutoStartDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [autoEndDate, setAutoEndDate] = useState(() => {
+    const date = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+    date.setDate(date.getDate() + 4);
+    return date.toISOString().slice(0, 10);
+  });
   const [autoDays, setAutoDays] = useState(5);
   const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState(2);
   const [autoStartTime, setAutoStartTime] = useState('08:00');
@@ -299,6 +305,7 @@ export const ExamsResultsView: React.FC = () => {
     setScheduleSaving(true);
     setScheduleError('');
     let createdCount = 0;
+    const createdScheduleIds: string[] = [];
     try {
       const dateForDay = (dayOffset: number) => {
         const date = new Date(`${autoStartDate}T00:00:00`);
@@ -369,7 +376,7 @@ export const ExamsResultsView: React.FC = () => {
       }));
       if (conflictingSession) throw new Error(`${conflictingSession.room.name} already has an exam during ${conflictingSession.startTime}–${conflictingSession.endTime} on ${conflictingSession.examDate}. Choose another date or start time.`);
       for (const session of plannedSessions) {
-        await ApiClient.createExamSchedule({
+        const created = await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
           subjectId: session.plan.subject.id,
           cohortStudentIds: session.cohortStudentIds,
@@ -383,12 +390,20 @@ export const ExamsResultsView: React.FC = () => {
           shiftName: session.room.shiftName || autoShiftName.trim() || 'General',
           seatCapacity: Number(session.room.capacity)
         });
+        if (created?.id) createdScheduleIds.push(created.id);
         createdCount += 1;
       }
       setExamSchedules(await ApiClient.getExamSchedules());
       setNotice(`Created ${createdCount} room sessions for ${plans.length} shared subjects across ${requiredDays} days. Students are randomly distributed among active rooms; each room has its own seating list. Review and publish the drafts.`);
     } catch (reason) {
-      setScheduleError(`Created ${createdCount} draft sessions before stopping: ${reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.'}`);
+      // Preserve historical rows: roll back this failed generation by cancelling
+      // only the new draft sessions created by this attempt.
+      const rollback = await Promise.allSettled(createdScheduleIds.map(id => ApiClient.cancelExamSchedule(id)));
+      const rollbackFailed = rollback.filter(result => result.status === 'rejected').length;
+      const detail = reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.';
+      setScheduleError(rollbackFailed
+        ? `Generation stopped: ${detail} Draft rollback was incomplete for ${rollbackFailed} session(s); review the timetable and cancel those drafts manually.`
+        : `Generation stopped: ${detail} The ${createdCount} draft session(s) created by this attempt were safely cancelled; no historical schedule was deleted.`);
       if (createdCount) setExamSchedules(await ApiClient.getExamSchedules());
     } finally {
       setScheduleSaving(false);
@@ -520,6 +535,8 @@ export const ExamsResultsView: React.FC = () => {
   const continuousMax = assessmentComponents.filter(component => component.category === 'continuous').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
   const finalMax = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
   const maxCombined = continuousMax + finalMax;
+
+  const groupedExamSchedules = groupExamRoomSessions(examSchedules);
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
@@ -936,11 +953,24 @@ export const ExamsResultsView: React.FC = () => {
               <p className="mt-1 text-xs text-[#64748B]">Builds one shared session per unique subject. Classes studying the same subject are grouped together, then students are randomly split across active exam rooms according to each room's seat capacity.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-xs font-semibold text-[#475569]">First exam date
-                <input type="date" value={autoStartDate} onChange={event => setAutoStartDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+              <label className="text-xs font-semibold text-[#475569]">Start date
+                <input type="date" value={autoStartDate} onChange={event => {
+                  const nextStart = event.target.value;
+                  setAutoStartDate(nextStart);
+                  const end = new Date(`${nextStart}T00:00:00`);
+                  end.setDate(end.getDate() + Math.max(0, autoDays - 1));
+                  setAutoEndDate(`${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`);
+                }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Exam duration (days)
-                <input type="number" min={1} max={30} value={autoDays} onChange={event => setAutoDays(Math.max(1, Math.min(30, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+              <label className="text-xs font-semibold text-[#475569]">End date
+                <input type="date" min={autoStartDate} value={autoEndDate} onChange={event => {
+                  const nextEnd = event.target.value;
+                  setAutoEndDate(nextEnd);
+                  const start = new Date(`${autoStartDate}T00:00:00`);
+                  const end = new Date(`${nextEnd}T00:00:00`);
+                  setAutoDays(Math.max(1, Math.min(30, Math.floor((end.getTime() - start.getTime()) / 86400000) + 1)));
+                }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+                <span className="mt-1 block font-normal text-slate-500">{autoDays} total exam days</span>
               </label>
               <label className="text-xs font-semibold text-[#475569]">Subjects per day
                 <select value={autoSubjectsPerDay} onChange={event => setAutoSubjectsPerDay(Math.max(1, Math.min(6, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">{[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count} {count === 1 ? 'subject' : 'subjects'}</option>)}</select>
@@ -1017,27 +1047,35 @@ export const ExamsResultsView: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
-                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Exam rooms</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {examSchedules.slice().sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime))).map(schedule => (
-                      <tr key={schedule.id}>
-                        <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
-                        <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All classes assigned to this subject</p></td>
-                        <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                        <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
-                        <td className="px-3 py-3">{new Set(examSchedules.filter(row => row.examDate === schedule.examDate && row.examName === schedule.examName).map(row => row.subjectName)).size} subjects</td>
-                        <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
-                        <td className="px-3 py-3"><div className="flex justify-end gap-2">
-                          {schedule.status === 'draft' && <>
-                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold">Edit</button>
-                            <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
-                            <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
-                          </>}
-                          {schedule.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold"><Printer className="h-3.5 w-3.5"/>Print seating</button>}
-                        </div></td>
-                      </tr>
-                    ))}
+                    {groupedExamSchedules.map(group => {
+                      const schedule = group.sessions[0];
+                      const roomNames = [...new Set(group.sessions.map(session => session.roomName).filter(Boolean))];
+                      const allPublished = group.sessions.every(session => session.status === 'published');
+                      return (
+                        <tr key={group.key}>
+                          <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
+                          <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All classes assigned to this subject</p></td>
+                          <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                          <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
+                          <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{roomNames.map(name => <span key={name} className="rounded bg-slate-100 px-2 py-1 text-[10px]">{name}</span>)}</div><p className="mt-1 text-[10px] text-[#64748B]">{group.sessions.length} room session{group.sessions.length === 1 ? '' : 's'}</p></td>
+                          <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${allPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{allPublished ? 'Published' : 'Draft'}</span></td>
+                          <td className="px-3 py-3"><div className="flex min-w-[220px] flex-col items-end gap-2">
+                            {group.sessions.map(roomSession => <div key={roomSession.id} className="flex flex-wrap justify-end gap-1">
+                              <span className="self-center text-[10px] font-semibold text-slate-500">{roomSession.roomName}</span>
+                              {roomSession.status === 'draft' && <>
+                                <button type="button" onClick={() => void openEditExamSchedule(roomSession)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button>
+                                <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish & assign seats'}</button>
+                                <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50" >Cancel draft</button>
+                              </>}
+                              {roomSession.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(roomSession)} aria-label="Print seating roster" className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold"><Printer className="h-3 w-3"/>Print roster</button>}
+                            </div>)}
+                          </div></td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1127,8 +1165,8 @@ export const ExamsResultsView: React.FC = () => {
               <p className="mt-1 text-xs">{seatSheet.schedule.examDate} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
             </header>
             <table className="w-full border-collapse text-sm">
-              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Class</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
-              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.studentIdLabel}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">{seat.className || '—'}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
+              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Roll Number</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Class</th><th className="border border-slate-500 p-2 text-left">Subject</th><th className="border border-slate-500 p-2 text-left">Room</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
+              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.rollNumberLabel || '—'}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">{seat.className || '—'}</td><td className="border border-slate-500 p-2">{seatSheet.schedule.subjectName || '—'}</td><td className="border border-slate-500 p-2">{seatSheet.schedule.roomName || '—'}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
             </table>
             <p className="mt-5 text-right text-xs">Total assigned students: {seatSheet.seats.length} · Room roster for display at the examination-room entrance</p>
           </section>

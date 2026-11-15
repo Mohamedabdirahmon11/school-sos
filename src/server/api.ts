@@ -55,7 +55,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
-  students: 'id,school_id,branch_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
+  students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
   teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
   fee_payments: 'id,school_id,student_id,receipt_number,reference_number,academic_year,month,fee_type,fee_structure_id,amount_due,amount_paid,remaining_amount,payment_method,status,date,recorded_by,notes,voided_at,voided_by,void_reason',
   payroll_records: 'id,school_id,user_id,staff_id,staff_name,payroll_month,base_salary,allowances,allowance_total,deductions,deduction_total,net_salary,status,created_by,approved_by,paid_by,created_at,approved_at,paid_at',

@@ -300,6 +300,7 @@ CREATE TABLE IF NOT EXISTS students (
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   branch_id VARCHAR(64) REFERENCES school_branches(id) ON DELETE SET NULL,
   student_id VARCHAR(50) NOT NULL,
+  roll_number VARCHAR(40),
   first_name VARCHAR(100) NOT NULL,
   middle_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
@@ -325,6 +326,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_students_school_sid ON students(school_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_students_school_class ON students(school_id, class_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_students_school_class_roll_number ON students(school_id, class_id, roll_number) WHERE roll_number IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_students_father_phone ON students(school_id, father_phone);
 CREATE INDEX IF NOT EXISTS idx_students_mother_phone ON students(school_id, mother_phone);
 CREATE INDEX IF NOT EXISTS idx_students_phone ON students(school_id, student_phone);
