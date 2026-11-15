@@ -94,6 +94,11 @@ const gradingScaleSchema = z.array(z.object({
 
 const schoolSettingsSchema = z.object({
   name: z.string().trim().min(1, 'School name is required.').max(255, 'School name must be 255 characters or fewer.').optional(),
+  nameArabic: z.string().trim().max(255, 'Arabic school name must be 255 characters or fewer.').optional(),
+  examTimetableTitle: z.string().trim().max(180, 'Exam timetable title must be 180 characters or fewer.').optional(),
+  examTimetableAcademicYearTitle: z.string().trim().max(180, 'Academic year heading must be 180 characters or fewer.').optional(),
+  examTimetableClassGroup: z.string().trim().max(180, 'Class group heading must be 180 characters or fewer.').optional(),
+  examTimetableIncludeFriday: z.boolean().optional(),
   email: z.string().trim().max(150, 'School email must be 150 characters or fewer.').regex(EMAIL, 'School email must be a valid email address.').optional(),
   address: z.string().trim().max(500, 'Address must be 500 characters or fewer.').optional(),
   city: z.string().trim().max(100, 'City must be 100 characters or fewer.').optional(),
