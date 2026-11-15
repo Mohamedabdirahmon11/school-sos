@@ -29,7 +29,7 @@ test('uses three columns, date row spans, gold header and A4 print', () => {
   assert.match(print, /rowSpan=\{dayGroups\.length\}/);
   assert.ok(print.includes('#D9A425'));
   assert.ok(print.includes('size:A4 portrait'));
-  assert.match(print, /body\\.exam-timetable-printing \\*\\{visibility:hidden/);
+  assert.match(print, /body\.exam-timetable-printing \*\{visibility:hidden/);
   assert.match(print, /export function printExamTimetable/);
 });
 
