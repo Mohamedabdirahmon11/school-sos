@@ -335,31 +335,58 @@ export const ExamsResultsView: React.FC = () => {
       if (!plans.length) throw new Error('No active classes with assigned subjects and active students were found.');
       const requiredDays = Math.ceil(plans.length / autoSubjectsPerDay);
       if (requiredDays > autoDays) throw new Error(`${plans.length} unique school subjects need ${requiredDays} days at ${autoSubjectsPerDay} subjects per day. Increase the exam duration.`);
-      const oversized = plans.find(plan => plan.studentIds.length > 500);
-      if (oversized) throw new Error(`${oversized.subject.name} has ${oversized.studentIds.length} students across its participating classes. Split that subject into multiple room sessions before generating it.`);
+      const activeRooms = examRooms.filter(room => room.isActive && Number(room.capacity) > 0);
+      if (!activeRooms.length) throw new Error('Register and activate at least one Exam Room before generating the school timetable.');
+      const plannedSessions: Array<{ plan: typeof plans[number]; room: typeof activeRooms[number]; cohortStudentIds: string[]; examDate: string; startTime: string; endTime: string }> = [];
       for (let index = 0; index < plans.length; index += 1) {
         const plan = plans[index];
         const day = Math.floor(index / autoSubjectsPerDay);
         const slot = index % autoSubjectsPerDay;
         const startTime = addMinutes(autoStartTime, slot * autoDurationMinutes);
         const endTime = addMinutes(startTime, autoDurationMinutes);
+        const studentIds = [...new Set(plan.studentIds)];
+        const totalRoomCapacity = activeRooms.reduce((total, room) => total + Number(room.capacity), 0);
+        if (studentIds.length > totalRoomCapacity) throw new Error(`${plan.subject.name} has ${studentIds.length} students, but the active exam rooms hold ${totalRoomCapacity} seats in total. Increase room capacity or activate more rooms.`);
+        const shuffled = [...studentIds];
+        for (let cursor = shuffled.length - 1; cursor > 0; cursor -= 1) {
+          const swapIndex = Math.floor(Math.random() * (cursor + 1));
+          [shuffled[cursor], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[cursor]];
+        }
+        let offset = 0;
+        for (const room of activeRooms) {
+          const roomStudents = shuffled.slice(offset, offset + Number(room.capacity));
+          if (!roomStudents.length) break;
+          plannedSessions.push({ plan, room, cohortStudentIds: roomStudents, examDate: dateForDay(day), startTime, endTime });
+          offset += roomStudents.length;
+        }
+      }
+      const existingSchedules = await ApiClient.getExamSchedules();
+      const conflictingSession = plannedSessions.find(session => existingSchedules.some(existing => {
+        if (existing.status === 'cancelled' || existing.examDate !== session.examDate || existing.roomId !== session.room.id) return false;
+        const existingStart = String(existing.startTime).slice(0, 5);
+        const existingEnd = String(existing.endTime).slice(0, 5);
+        return session.startTime < existingEnd && existingStart < session.endTime;
+      }));
+      if (conflictingSession) throw new Error(`${conflictingSession.room.name} already has an exam during ${conflictingSession.startTime}–${conflictingSession.endTime} on ${conflictingSession.examDate}. Choose another date or start time.`);
+      for (const session of plannedSessions) {
         await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
-          subjectId: plan.subject.id,
-          cohortStudentIds: plan.studentIds,
+          subjectId: session.plan.subject.id,
+          cohortStudentIds: session.cohortStudentIds,
           examType: scheduleExamType,
           semester: selectedSemester,
-          examDate: dateForDay(day),
-          startTime,
-          endTime,
-          roomName: 'Room not assigned',
-          shiftName: autoShiftName.trim() || 'General',
-          seatCapacity: 500
+          examDate: session.examDate,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          roomName: session.room.name,
+          roomId: session.room.id,
+          shiftName: session.room.shiftName || autoShiftName.trim() || 'General',
+          seatCapacity: Number(session.room.capacity)
         });
         createdCount += 1;
       }
       setExamSchedules(await ApiClient.getExamSchedules());
-      setNotice(`Created ${createdCount} shared subject sessions across ${requiredDays} days. Classes that study the same subject are grouped together; sessions remain drafts until rooms are assigned and published.`);
+      setNotice(`Created ${createdCount} room sessions for ${plans.length} shared subjects across ${requiredDays} days. Students are randomly distributed among active rooms; each room has its own seating list. Review and publish the drafts.`);
     } catch (reason) {
       setScheduleError(`Created ${createdCount} draft sessions before stopping: ${reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.'}`);
       if (createdCount) setExamSchedules(await ApiClient.getExamSchedules());
@@ -906,7 +933,7 @@ export const ExamsResultsView: React.FC = () => {
           {scheduleSection === 'timetable' && <section className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
             <div className="mb-4">
               <h2 className="text-base font-bold text-[#132A29]">Auto Generate · School-wide subjects</h2>
-              <p className="mt-1 text-xs text-[#64748B]">Builds one shared draft session per unique subject. Classes studying the same subject are grouped together; subjects are distributed by the editable daily limit.</p>
+              <p className="mt-1 text-xs text-[#64748B]">Builds one shared session per unique subject. Classes studying the same subject are grouped together, then students are randomly split across active exam rooms according to each room's seat capacity.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs font-semibold text-[#475569]">First exam date
@@ -929,7 +956,7 @@ export const ExamsResultsView: React.FC = () => {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
-              <p className="text-[11px] text-[#64748B]">All active classes are grouped by the subjects they study. Generated sessions remain drafts until a registered room is assigned.</p>
+              <p className="text-[11px] text-[#64748B]">All active classes are grouped by subject. Each active room receives its own draft session and printable student list; room capacity and existing time conflicts are checked before saving.</p>
               <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoStartDate} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Generate school timetable'}</button>
             </div>
           </section>}
