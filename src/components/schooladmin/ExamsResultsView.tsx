@@ -64,6 +64,10 @@ export const ExamsResultsView: React.FC = () => {
 
   // Exam timetable, room allocation, and seat list state
   const [examSchedules, setExamSchedules] = useState<any[]>([]);
+  const [examRooms, setExamRooms] = useState<any[]>([]);
+  const [roomForm, setRoomForm] = useState({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' });
+  const [editingRoomId, setEditingRoomId] = useState('');
+  const [scheduleRoomId, setScheduleRoomId] = useState('');
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [publishingScheduleId, setPublishingScheduleId] = useState('');
@@ -85,7 +89,7 @@ export const ExamsResultsView: React.FC = () => {
   const [autoShiftName, setAutoShiftName] = useState('Morning');
   const [autoCapacity, setAutoCapacity] = useState(500);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
-  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number } | null>(null);
+  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
   const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
@@ -131,9 +135,14 @@ export const ExamsResultsView: React.FC = () => {
     let cancelled = false;
     setScheduleLoading(true);
     setScheduleError('');
-    ApiClient.getExamSchedules()
-      .then(rows => { if (!cancelled) setExamSchedules(Array.isArray(rows) ? rows : []); })
-      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam schedules.'); })
+    Promise.all([ApiClient.getExamSchedules(), ApiClient.getExamRooms(true)])
+      .then(([rows, rooms]) => {
+        if (!cancelled) {
+          setExamSchedules(Array.isArray(rows) ? rows : []);
+          setExamRooms(Array.isArray(rooms) ? rooms : []);
+        }
+      })
+      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam rooms and schedules.'); })
       .finally(() => { if (!cancelled) setScheduleLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, school?.id]);
@@ -211,8 +220,46 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const handleSaveExamRoom = async () => {
+    if (isReadOnly || !roomForm.name.trim() || roomForm.capacity < 1 || roomForm.capacity > 500) return;
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      if (editingRoomId) {
+        await ApiClient.updateExamRoom(editingRoomId, { ...roomForm, isActive: true });
+        setNotice('Exam room updated.');
+      } else {
+        await ApiClient.createExamRoom(roomForm);
+        setNotice('Exam room created and ready for exam sessions.');
+      }
+      setExamRooms(await ApiClient.getExamRooms(true));
+      setRoomForm({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' });
+      setEditingRoomId('');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to save exam room.');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handleEditExamRoom = (room: any) => {
+    setEditingRoomId(room.id);
+    setRoomForm({ name: room.name || '', roomCode: room.roomCode || '', capacity: Number(room.capacity) || 1, location: room.location || '', shiftName: room.shiftName || 'General' });
+  };
+
+  const handleToggleExamRoom = async (room: any) => {
+    setScheduleError('');
+    try {
+      await ApiClient.updateExamRoom(room.id, { name: room.name, roomCode: room.roomCode || '', capacity: Number(room.capacity), location: room.location || '', shiftName: room.shiftName || 'General', isActive: !room.isActive });
+      setExamRooms(await ApiClient.getExamRooms(true));
+      setNotice(room.isActive ? 'Exam room deactivated. Existing schedules are preserved.' : 'Exam room activated.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to change exam room status.');
+    }
+  };
+
   const handleCreateExamSchedule = async () => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    if (isReadOnly || !selectedClassId || !selectedSubjectId || !scheduleRoomId) return;
     setScheduleSaving(true);
     setScheduleError('');
     try {
@@ -225,9 +272,10 @@ export const ExamsResultsView: React.FC = () => {
         examDate: scheduleDate,
         startTime: scheduleStartTime,
         endTime: scheduleEndTime,
-        roomName: scheduleRoom.trim(),
-        shiftName: scheduleShiftName.trim(),
-        seatCapacity: scheduleCapacity
+        roomName: examRooms.find(room => room.id === scheduleRoomId)?.name || '',
+        roomId: scheduleRoomId,
+        shiftName: examRooms.find(room => room.id === scheduleRoomId)?.shiftName || scheduleShiftName.trim(),
+        seatCapacity: Number(examRooms.find(room => room.id === scheduleRoomId)?.capacity || 0)
       });
       const rows = await ApiClient.getExamSchedules();
       setExamSchedules(rows);
@@ -323,6 +371,7 @@ export const ExamsResultsView: React.FC = () => {
       startTime: String(schedule.startTime).slice(0, 5),
       endTime: String(schedule.endTime).slice(0, 5),
       roomName: schedule.roomName,
+      roomId: schedule.roomId || '',
       shiftName: schedule.shiftName || 'General',
       seatCapacity: schedule.seatCapacity
     });
@@ -369,7 +418,7 @@ export const ExamsResultsView: React.FC = () => {
     setScheduleSaving(true);
     setScheduleError('');
     try {
-      await ApiClient.updateExamSchedule(editingSchedule.id, { ...editDraft, cohortStudentIds });
+      await ApiClient.updateExamSchedule(editingSchedule.id, { ...editDraft, roomName: examRooms.find(room => room.id === editDraft.roomId)?.name || editDraft.roomName, roomId: editDraft.roomId || undefined, seatCapacity: Number(examRooms.find(room => room.id === editDraft.roomId)?.capacity || editDraft.seatCapacity), cohortStudentIds });
       setExamSchedules(await ApiClient.getExamSchedules());
       setEditingSchedule(null);
       setEditDraft(null);
