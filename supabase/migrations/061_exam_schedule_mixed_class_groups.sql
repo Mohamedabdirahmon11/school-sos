@@ -153,7 +153,15 @@ BEGIN
        AND v_schedule.start_time < other.end_time
        AND other.start_time < v_schedule.end_time
      WHERE current_assignment.school_id = p_school_id
-       AND current_assignment.class_id = v_schedule.class_id
+       AND (
+         current_assignment.class_id = v_schedule.class_id
+         OR EXISTS (
+           SELECT 1 FROM public.exam_schedule_cohort_students AS cohort_class
+            WHERE cohort_class.school_id = p_school_id
+              AND cohort_class.schedule_id = p_schedule_id
+              AND cohort_class.class_id = current_assignment.class_id
+         )
+       )
        AND current_assignment.subject_id = v_schedule.subject_id
        AND current_assignment.is_active IS TRUE
        AND current_assignment.teacher_id IS NOT NULL
