@@ -2419,12 +2419,12 @@ class StorageEngine {
 
   public async getExamScheduleCohortScheduleIds(schoolId: string, classIds: string[]): Promise<string[]> {
     if (!classIds.length) return [];
-    const rows = await this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, class_id: classIds });
+    const rows = await this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, class_id: classIds, is_selected: 'true' });
     return [...new Set(rows.map(row => String(row.scheduleId)))];
   }
 
   public async getExamScheduleCohort(schoolId: string, scheduleId: string): Promise<any[]> {
-    return this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, schedule_id: scheduleId });
+    return this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, schedule_id: scheduleId, is_selected: 'true' });
   }
 
   public async setExamScheduleCohort(schoolId: string, scheduleId: string, studentIds: string[]): Promise<number> {
