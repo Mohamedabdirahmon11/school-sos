@@ -50,7 +50,7 @@ const EXAM_REDESIGN_STYLES = `
     var(--exam-canvas);
   border-radius: 24px;
 }
-.exam-management-redesign > .flex:first-child {
+.exam-management-redesign > div:first-of-type {
   position: relative;
   overflow: hidden;
   padding: clamp(22px, 3vw, 34px);
@@ -60,7 +60,7 @@ const EXAM_REDESIGN_STYLES = `
   background: linear-gradient(116deg, #102d3b 0%, #14545a 58%, #0b9385 115%);
   box-shadow: 0 18px 42px rgba(14, 57, 67, .16);
 }
-.exam-management-redesign > .flex:first-child::after {
+.exam-management-redesign > div:first-of-type::after {
   content: "";
   position: absolute;
   width: 270px;
@@ -72,15 +72,15 @@ const EXAM_REDESIGN_STYLES = `
   box-shadow: 0 0 0 30px rgba(255,255,255,.035), 0 0 0 65px rgba(255,255,255,.025);
   pointer-events: none;
 }
-.exam-management-redesign > .flex:first-child h1 {
+.exam-management-redesign > div:first-of-type h1 {
   color: #fff !important;
   font-size: clamp(24px, 2.4vw, 34px) !important;
   font-weight: 800;
   letter-spacing: -.045em;
 }
-.exam-management-redesign > .flex:first-child h1 svg { color: #9de8dc !important; }
-.exam-management-redesign > .flex:first-child p { color: rgba(233,248,248,.76) !important; line-height: 1.7; }
-.exam-management-redesign > .flex:nth-child(2) {
+.exam-management-redesign > div:first-of-type h1 svg { color: #9de8dc !important; }
+.exam-management-redesign > div:first-of-type p { color: rgba(233,248,248,.76) !important; line-height: 1.7; }
+.exam-management-redesign > div:nth-of-type(2) {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -93,7 +93,7 @@ const EXAM_REDESIGN_STYLES = `
   background: rgba(255,255,255,.86);
   box-shadow: 0 7px 24px rgba(21,57,65,.055);
 }
-.exam-management-redesign > .flex:nth-child(2) button {
+.exam-management-redesign > div:nth-of-type(2) button {
   min-height: 40px;
   padding: 9px 15px;
   border: 1px solid transparent;
@@ -103,8 +103,8 @@ const EXAM_REDESIGN_STYLES = `
   font-weight: 700;
   transition: all .18s ease;
 }
-.exam-management-redesign > .flex:nth-child(2) button:hover { color: #075b59; background: #edf7f6; }
-.exam-management-redesign > .flex:nth-child(2) button[class*="bg-white"] {
+.exam-management-redesign > div:nth-of-type(2) button:hover { color: #075b59; background: #edf7f6; }
+.exam-management-redesign > div:nth-of-type(2) button[class*="bg-white"] {
   color: #075b59 !important;
   border-color: #cce7e3;
   background: linear-gradient(135deg, #f0fbf8, #fff) !important;
@@ -230,15 +230,15 @@ const EXAM_REDESIGN_STYLES = `
 }
 @media (max-width: 767px) {
   .exam-management-redesign { padding: 12px 10px 24px; border-radius: 0; }
-  .exam-management-redesign > .flex:first-child { padding: 21px 18px; border-radius: 19px; }
-  .exam-management-redesign > .flex:nth-child(2) {
+  .exam-management-redesign > div:first-of-type { padding: 21px 18px; border-radius: 19px; }
+  .exam-management-redesign > div:nth-of-type(2) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     gap: 5px;
     padding: 6px;
   }
-  .exam-management-redesign > .flex:nth-child(2) button { justify-content: center; padding-inline: 8px; }
+  .exam-management-redesign > div:nth-of-type(2) button { justify-content: center; padding-inline: 8px; }
   .exam-management-redesign .overflow-x-auto { max-width: 100%; }
   .exam-management-redesign table { min-width: 720px; }
   .exam-management-redesign .exam-wall-print table { min-width: 900px; }
@@ -246,8 +246,8 @@ const EXAM_REDESIGN_STYLES = `
 }
 @media print {
   .exam-management-redesign { padding: 0; background: #fff; }
-  .exam-management-redesign > .flex:first-child,
-  .exam-management-redesign > .flex:nth-child(2) { display: none !important; }
+  .exam-management-redesign > div:first-of-type,
+  .exam-management-redesign > div:nth-of-type(2) { display: none !important; }
 }
 `;
 
