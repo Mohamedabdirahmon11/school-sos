@@ -2417,6 +2417,12 @@ class StorageEngine {
     return fromSupabaseRow(data, 'exam_schedules');
   }
 
+  public async getExamScheduleCohortScheduleIds(schoolId: string, classIds: string[]): Promise<string[]> {
+    if (!classIds.length) return [];
+    const rows = await this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, class_id: classIds });
+    return [...new Set(rows.map(row => String(row.scheduleId)))];
+  }
+
   public async getExamScheduleCohort(schoolId: string, scheduleId: string): Promise<any[]> {
     return this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, schedule_id: scheduleId });
   }
