@@ -2366,6 +2366,35 @@ class StorageEngine {
     return this.data.examConfigs[idx];
   }
 
+  public async getExamRooms(schoolId: string, includeInactive = false): Promise<any[]> {
+    const rows = await this.queryRows<any>('exam_rooms', { school_id: schoolId, ...(includeInactive ? {} : { is_active: 'true' }) });
+    return rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }
+
+  public async createExamRoom(room: { id: string; schoolId: string; name: string; roomCode?: string; capacity: number; location?: string; shiftName?: string }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam room storage is unavailable.');
+    const { data, error } = await client.from('exam_rooms').insert({
+      id: room.id, school_id: room.schoolId, name: room.name.trim(), room_code: room.roomCode?.trim() || null,
+      capacity: room.capacity, location: room.location?.trim() || '', shift_name: room.shiftName?.trim() || 'General'
+    }).select('*').single();
+    if (error) throw new Error(error.message || 'Unable to create exam room.');
+    return fromSupabaseRow(data, 'exam_rooms');
+  }
+
+  public async updateExamRoom(schoolId: string, roomId: string, updates: { name: string; roomCode?: string; capacity: number; location?: string; shiftName?: string; isActive?: boolean }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam room storage is unavailable.');
+    const { data, error } = await client.from('exam_rooms').update({
+      name: updates.name.trim(), room_code: updates.roomCode?.trim() || null, capacity: updates.capacity,
+      location: updates.location?.trim() || '', shift_name: updates.shiftName?.trim() || 'General',
+      ...(updates.isActive === undefined ? {} : { is_active: updates.isActive }), updated_at: new Date().toISOString()
+    }).eq('id', roomId).eq('school_id', schoolId).select('*').maybeSingle();
+    if (error) throw new Error(error.message || 'Unable to update exam room.');
+    if (!data) throw new Error('Exam room was not found in this school.');
+    return fromSupabaseRow(data, 'exam_rooms');
+  }
+
   public async getExamSchedules(schoolId: string): Promise<any[]> {
     const rows = await this.queryRows<any>('exam_schedules', { school_id: schoolId });
     return rows.sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime)));
@@ -2385,7 +2414,7 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { error } = await client.from('exam_schedules').insert({
-      id: schedule.id, school_id: schedule.schoolId, class_id: schedule.classId,
+      id: schedule.id, school_id: schedule.schoolId, room_id: (schedule as any).roomId || null, class_id: schedule.classId,
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
@@ -2396,7 +2425,7 @@ class StorageEngine {
   }
 
   public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
@@ -2406,6 +2435,7 @@ class StorageEngine {
         start_time: updates.startTime,
         end_time: updates.endTime,
         room_name: updates.roomName,
+        room_id: updates.roomId || null,
         shift_name: updates.shiftName || 'General',
         seat_capacity: updates.seatCapacity,
         updated_at: new Date().toISOString()
