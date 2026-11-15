@@ -62,13 +62,13 @@ BEGIN
     ALTER TABLE public.exam_schedules
       ADD CONSTRAINT exam_schedules_timetable_school_fk
       FOREIGN KEY (timetable_id, school_id)
-      REFERENCES public.exam_timetables(id, school_id) ON DELETE SET NULL;
+      REFERENCES public.exam_timetables(id, school_id) ON DELETE RESTRICT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exam_schedules_time_slot_school_fk') THEN
     ALTER TABLE public.exam_schedules
       ADD CONSTRAINT exam_schedules_time_slot_school_fk
       FOREIGN KEY (time_slot_id, school_id)
-      REFERENCES public.exam_time_slots(id, school_id) ON DELETE SET NULL;
+      REFERENCES public.exam_time_slots(id, school_id) ON DELETE RESTRICT;
   END IF;
 END $$;
 
