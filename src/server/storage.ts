@@ -2379,7 +2379,7 @@ class StorageEngine {
   public async createExamSchedule(schedule: {
     id: string; schoolId: string; classId: string; subjectId: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
-    examDate: string; startTime: string; endTime: string; roomName: string;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName?: string;
     seatCapacity: number; createdBy: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
@@ -2389,10 +2389,54 @@ class StorageEngine {
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
-      seat_capacity: schedule.seatCapacity, status: 'draft', created_by: schedule.createdBy
+      seat_capacity: schedule.seatCapacity, shift_name: schedule.shiftName || 'General', status: 'draft', created_by: schedule.createdBy
     });
     if (error) throw new Error(error.message || 'Unable to create exam schedule.');
     return (await this.getExamSchedules(schedule.schoolId)).find(row => row.id === schedule.id);
+  }
+
+  public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number;
+  }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam schedule storage is unavailable.');
+    const { data, error } = await client.from('exam_schedules')
+      .update({
+        exam_date: updates.examDate,
+        start_time: updates.startTime,
+        end_time: updates.endTime,
+        room_name: updates.roomName,
+        shift_name: updates.shiftName || 'General',
+        seat_capacity: updates.seatCapacity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', scheduleId).eq('school_id', schoolId).eq('status', 'draft')
+      .select('*').maybeSingle();
+    if (error) throw new Error(error.message || 'Unable to update exam schedule.');
+    if (!data) throw new Error('Only a draft exam schedule can be edited.');
+    return fromSupabaseRow(data, 'exam_schedules');
+  }
+
+  public async getExamScheduleCohortScheduleIds(schoolId: string, classIds: string[]): Promise<string[]> {
+    if (!classIds.length) return [];
+    const rows = await this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, class_id: classIds, is_selected: 'true' });
+    return [...new Set(rows.map(row => String(row.scheduleId)))];
+  }
+
+  public async getExamScheduleCohort(schoolId: string, scheduleId: string): Promise<any[]> {
+    return this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, schedule_id: scheduleId, is_selected: 'true' });
+  }
+
+  public async setExamScheduleCohort(schoolId: string, scheduleId: string, studentIds: string[]): Promise<number> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Exam group storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_set_exam_schedule_cohort', {
+      p_school_id: schoolId, p_schedule_id: scheduleId, p_student_ids: studentIds
+    });
+    this.recordQuery('rpc:schoolos_set_exam_schedule_cohort', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save the mixed-class exam group.');
+    return Number(data) || 0;
   }
 
   public async cancelExamSchedule(schoolId: string, scheduleId: string): Promise<any> {

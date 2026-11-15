@@ -4999,9 +4999,14 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   const [allSchedules, classes, subjects] = await Promise.all([
     db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
   ]);
+  const allowedCohortScheduleIds = new Set(
+    allowedClassIds?.size
+      ? await db.getExamScheduleCohortScheduleIds(school.id, [...allowedClassIds])
+      : []
+  );
   const schedules = allSchedules.filter(schedule =>
-    (!requestedClassId || schedule.classId === requestedClassId) &&
-    (allowedClassIds === null || allowedClassIds.has(schedule.classId))
+    (!requestedClassId || schedule.classId === requestedClassId || allowedCohortScheduleIds.has(schedule.id)) &&
+    (allowedClassIds === null || allowedClassIds.has(schedule.classId) || allowedCohortScheduleIds.has(schedule.id))
   );
   const classNames = new Map(classes.map(item => [item.id, item.name]));
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
@@ -5039,6 +5044,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
   const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : 'General';
   const seatCapacity = Number(body.seatCapacity);
 
   const [dateYear, dateMonth, dateDay] = examDate.split('-').map(Number);
@@ -5053,7 +5059,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       !['small', 'big'].includes(examType) ||
       !['Semester 1', 'Semester 2'].includes(semester) ||
       !validDate || !validTime(startTime) || !validTime(endTime) ||
-      startTime >= endTime || !roomName || roomName.length > 120 ||
+      startTime >= endTime || !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 ||
       !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid exam name, class, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
     return;
@@ -5099,6 +5105,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       startTime,
       endTime,
       roomName,
+      shiftName,
       seatCapacity,
       createdBy: user.id
     });
@@ -5112,6 +5119,72 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
     res.status(201).json(schedule);
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to create exam schedule.' });
+  }
+});
+
+apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
+  if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  if (schedule.status !== 'draft') { res.status(409).json({ error: 'Only draft exam schedules can be edited.' }); return; }
+
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
+  const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
+  const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
+  const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : (schedule.shiftName || 'General');
+  const seatCapacity = Number(body.seatCapacity);
+  const [year, month, day] = examDate.split('-').map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
+  const validTime = (value: string) => {
+    if (!/^\d{2}:\d{2}$/.test(value)) return false;
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
+  };
+  if (!validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
+      !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
+    res.status(400).json({ error: 'Enter a valid date, time range, room, and capacity (1–500).' });
+    return;
+  }
+
+  const existingSchedules = await db.getExamSchedules(school.id);
+  const overlaps = existingSchedules.some(other => {
+    if (other.id === schedule.id || other.status === 'cancelled' || other.examDate !== examDate) return false;
+    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameClass = other.classId === schedule.classId;
+    const otherStart = String(other.startTime).slice(0, 5);
+    const otherEnd = String(other.endTime).slice(0, 5);
+    return (sameRoom || sameClass) && startTime < otherEnd && otherStart < endTime;
+  });
+  if (overlaps) {
+    res.status(409).json({ error: 'This room or class already has an overlapping exam schedule on that date.' });
+    return;
+  }
+
+  try {
+    if (Array.isArray(body.cohortStudentIds)) {
+      if (body.cohortStudentIds.length > seatCapacity || body.cohortStudentIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+        res.status(400).json({ error: 'Choose valid students within the room capacity.' });
+        return;
+      }
+    }
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
+    if (Array.isArray(body.cohortStudentIds)) {
+      await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
+    }
+    db.logAudit({
+      action: 'EXAM_SCHEDULE_UPDATED', category: 'academics', schoolId: school.id,
+      schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Updated draft exam schedule "${schedule.examName}" for ${examDate} in room ${roomName}.`,
+      severity: 'info'
+    });
+    await db.flush();
+    res.json(updated);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to update exam schedule.' });
   }
 });
 
@@ -5155,6 +5228,14 @@ apiRouter.post('/exams/schedules/:id/publish', requireAuth, requireSchoolAdminOr
     const message = error instanceof Error ? error.message : 'Unable to publish exam schedule.';
     res.status(message.includes('already booked') || message.includes('capacity') ? 409 : 400).json({ error: message });
   }
+});
+
+apiRouter.get('/exams/schedules/:id/cohort', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
+  if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  const cohort = await db.getExamScheduleCohort(school.id, schedule.id);
+  res.json(cohort.map((row: any) => ({ studentId: row.studentId, classId: row.classId })));
 });
 
 apiRouter.get('/exams/schedules/:id/seats', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {

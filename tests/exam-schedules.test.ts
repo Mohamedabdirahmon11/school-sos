@@ -4,6 +4,8 @@ import { test } from 'node:test';
 
 const migration = readFileSync(new URL('../supabase/migrations/058_exam_schedules_and_seating.sql', import.meta.url), 'utf8');
 const rlsMigration = readFileSync(new URL('../supabase/migrations/059_exam_schedule_service_role_policies.sql', import.meta.url), 'utf8');
+const shiftMigration = readFileSync(new URL('../supabase/migrations/060_exam_schedule_shifts.sql', import.meta.url), 'utf8');
+const cohortMigration = readFileSync(new URL('../supabase/migrations/061_exam_schedule_mixed_class_groups.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
@@ -24,6 +26,15 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.match(migration, /SET search_path = ''/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_publish_exam_schedule/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_publish_exam_schedule/);
+  assert.match(shiftMigration, /shift_name VARCHAR\(80\) NOT NULL DEFAULT 'General'/);
+  assert.ok(cohortMigration.includes('exam_schedule_cohort_students'));
+  assert.ok(cohortMigration.includes('schoolos_set_exam_schedule_cohort'));
+  assert.equal((cohortMigration.match(/SECURITY INVOKER/g) || []).length, 2);
+  assert.doesNotMatch(cohortMigration, /SECURITY DEFINER/i);
+  assert.ok(cohortMigration.includes('is_selected BOOLEAN NOT NULL DEFAULT TRUE'));
+  assert.doesNotMatch(cohortMigration, /DELETE FROM public\.exam_schedule_cohort_students/i);
+  assert.ok(cohortMigration.includes('teacher already has an overlapping exam'));
+  assert.ok(cohortMigration.includes('already have an exam at this time'));
 });
 
 test('exam schedule API is school-admin scoped and validates schedule inputs', () => {
@@ -35,16 +46,31 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.ok(api.includes('This room or class already has an overlapping exam schedule'));
   assert.ok(api.includes('validTime(startTime)'));
   assert.ok(api.includes('seatCapacity > 500'));
+  assert.ok(api.includes("apiRouter.put('/exams/schedules/:id'"));
+  assert.ok(api.includes('db.updateExamSchedule'));
+  assert.ok(api.includes('db.setExamScheduleCohort'));
+  assert.ok(api.includes("apiRouter.get('/exams/schedules/:id/cohort'"));
+  assert.ok(api.includes('allowedCohortScheduleIds'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
   assert.ok(storage.includes('schoolos_publish_exam_schedule'));
   assert.ok(storage.includes('getExamScheduleSeats'));
+  assert.ok(storage.includes('updateExamSchedule'));
+  assert.ok(storage.includes('setExamScheduleCohort'));
+  assert.ok(client.includes('getExamScheduleCohort'));
   assert.ok(client.includes('/exams/schedules'));
+  assert.ok(client.includes('updateExamSchedule'));
   assert.ok(ui.includes("setActiveTab('schedule')"));
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
   assert.ok(ui.includes('Cancel draft'));
   assert.ok(ui.includes('Print seating'));
   assert.ok(ui.includes('exam-seat-print'));
+  assert.ok(ui.includes('Auto Generate all classes'));
+  assert.ok(ui.includes('handleAutoGenerateExamSchedules'));
+  assert.ok(ui.includes('Edit draft'));
+  assert.ok(ui.includes('Save draft changes'));
+  assert.ok(ui.includes('Mixed-class student group'));
+  assert.ok(ui.includes('Shift for generated sessions'));
 });

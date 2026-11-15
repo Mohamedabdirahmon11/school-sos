@@ -931,9 +931,22 @@ export class ApiClient {
   public static async createExamSchedule(schedule: {
     examName: string; classId: string; subjectId: string; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
-    endTime: string; roomName: string; seatCapacity: number;
+    endTime: string; roomName: string; shiftName?: string; seatCapacity: number;
   }) {
     return this.request<any>('/exams/schedules', { method: 'POST', body: JSON.stringify(schedule) });
+  }
+
+  public static async updateExamSchedule(scheduleId: string, updates: {
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string;
+    seatCapacity: number; cohortStudentIds?: string[];
+  }) {
+    return this.request<any>(`/exams/schedules/${encodeURIComponent(scheduleId)}`, {
+      method: 'PUT', body: JSON.stringify(updates)
+    });
+  }
+
+  public static async getExamScheduleCohort(scheduleId: string) {
+    return this.request<Array<{ studentId: string; classId: string }>>(`/exams/schedules/${encodeURIComponent(scheduleId)}/cohort`);
   }
 
   public static async cancelExamSchedule(scheduleId: string) {
