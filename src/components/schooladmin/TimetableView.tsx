@@ -213,7 +213,7 @@ export const TimetableView: React.FC = () => {
       setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
       const unfilledCount = result.unfilled.length;
       const skippedCount = result.skipped.length;
-      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la sameeyay. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyay.`);
+      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la sameeyay. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyay.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh: marka hore macallin u qoondee maaddooyinka (Class Subjects) si jadwalku u noqdo mid buuxa.` : ''}`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
     }

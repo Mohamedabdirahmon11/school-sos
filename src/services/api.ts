@@ -606,11 +606,11 @@ export class ApiClient {
   }
 
   public static async generateTimetable(classId: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
   }
 
   public static async generateAllTimetables() {
-    return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }> }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
+    return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
   }
 
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {

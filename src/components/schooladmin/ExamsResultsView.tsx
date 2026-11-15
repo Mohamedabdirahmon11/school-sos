@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
+import { buildResultsCsv } from '../../lib/results-csv.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -250,6 +251,20 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const downloadResultsCsv = (kind: 'semester' | 'yearly') => {
+    const rows = kind === 'semester' ? semRankings : yearlyRankings;
+    const className = classes.find(item => item.id === selectedClassId)?.name || 'class';
+    const csv = buildResultsCsv(kind, rows, percentage => getGradeLabel(percentage, school?.gradingScale), examConfig?.passMarkPercentage || 50);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `results-${kind}-${className.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const handlePrintExamSeats = async (schedule: any) => {
     setScheduleError('');
     try {
@@ -430,6 +445,15 @@ export const ExamsResultsView: React.FC = () => {
               </select>
               <button
                 type="button"
+                onClick={() => downloadResultsCsv('semester')}
+                disabled={!semRankings.length}
+                className="px-3 py-1.5 border border-[#0F766E] text-[#0F766E] rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download CSV
+              </button>
+              <button
+                type="button"
                 onClick={() => window.print()}
                 className="px-3 py-1.5 bg-[#0F766E] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
               >
@@ -542,6 +566,15 @@ export const ExamsResultsView: React.FC = () => {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => downloadResultsCsv('yearly')}
+                disabled={!yearlyRankings.length}
+                className="px-3 py-1.5 border border-[#0F766E] text-[#0F766E] rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download CSV
+              </button>
               <button
                 type="button"
                 onClick={() => window.print()}
