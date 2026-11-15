@@ -85,7 +85,7 @@ export const ExamsResultsView: React.FC = () => {
   const [autoDurationMinutes, setAutoDurationMinutes] = useState(120);
   const [autoShiftName, setAutoShiftName] = useState('Morning');
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
-  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
+  const [editDraft, setEditDraft] = useState<{ examName: string; examType: 'small' | 'big'; semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
   const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
@@ -370,6 +370,9 @@ export const ExamsResultsView: React.FC = () => {
   const openEditExamSchedule = async (schedule: any) => {
     setEditingSchedule(schedule);
     setEditDraft({
+      examName: schedule.examName || '',
+      examType: schedule.examType || 'small',
+      semester: schedule.semester || 'Semester 1',
       examDate: schedule.examDate,
       startTime: String(schedule.startTime).slice(0, 5),
       endTime: String(schedule.endTime).slice(0, 5),
@@ -931,12 +934,20 @@ export const ExamsResultsView: React.FC = () => {
             </div>
           </section>}
 
-          {scheduleSection !== 'timetable' && editingSchedule && editDraft && (
+          {editingSchedule && editDraft && (
             <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.className} · {editingSchedule.subjectName}</p></div>
+                <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.subjectName} · School-wide subject session</p></div>
                 <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); setCohortCounts({}); setCohortStudentIds([]); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
               </div>
+              {scheduleSection === 'timetable' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="text-xs font-semibold text-[#475569]">Exam name<input maxLength={120} value={editDraft.examName} onChange={event => setEditDraft({ ...editDraft, examName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam type<select value={editDraft.examType} onChange={event => setEditDraft({ ...editDraft, examType: event.target.value as 'small' | 'big' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="small">Small Exam</option><option value="big">Big Exam</option></select></label>
+                <label className="text-xs font-semibold text-[#475569]">Semester<select value={editDraft.semester} onChange={event => setEditDraft({ ...editDraft, semester: event.target.value as 'Semester 1' | 'Semester 2' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option></select></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Start time<input type="time" value={editDraft.startTime} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">End time<input type="time" value={editDraft.endTime} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+              </div>}
               {scheduleSection === 'rooms' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Start<input type="time" value={String(editDraft.startTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
@@ -992,6 +1003,7 @@ export const ExamsResultsView: React.FC = () => {
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
                           {schedule.status === 'draft' && <>
+                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold">Edit</button>
                             <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                             <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                           </>}
