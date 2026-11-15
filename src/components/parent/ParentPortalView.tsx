@@ -8,6 +8,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { ExamTimetablePrint } from '../common/ExamTimetablePrint.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
   Users, 
@@ -125,12 +126,7 @@ export const ParentPortalView: React.FC = () => {
 
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
         <h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2>
-        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : publishedExamSchedules.length === 0 ? <p className="text-[#64748B]">No exam timetable has been published for this child's class yet.</p> : publishedExamSchedules.map((exam: any) => (
-          <div key={exam.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <p className="font-bold text-[#132A29]">{exam.examName} · {exam.subjectName}</p>
-            <p className="mt-1 text-[#475569]">{exam.examDate} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)} · Room {exam.roomName}</p>
-          </div>
-        ))}
+        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} />}
       </section>
 
       {/* Academic Results & Fee Invoices */}
