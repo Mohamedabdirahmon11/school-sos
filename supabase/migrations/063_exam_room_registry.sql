@@ -59,5 +59,26 @@ CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_room_date
   ON public.exam_schedules (school_id, room_id, exam_date, start_time)
   WHERE status <> 'cancelled';
 
+-- Keep the database-side school backup restore allowlist in sync with the new room table.
+DO $
+DECLARE
+  v_definition TEXT;
+BEGIN
+  SELECT pg_get_functiondef('public.schoolos_restore_school_backup(jsonb)'::regprocedure)
+    INTO v_definition;
+  IF position('exam_rooms' IN v_definition) = 0 THEN
+    v_definition := replace(
+      v_definition,
+      '''school_branches'', ''classes''',
+      '''school_branches'', ''exam_rooms'', ''classes'''
+    );
+    IF position('exam_rooms' IN v_definition) = 0 THEN
+      RAISE EXCEPTION 'Could not add exam_rooms to the school backup restore allowlist.';
+    END IF;
+    EXECUTE v_definition;
+  END IF;
+END
+$;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
