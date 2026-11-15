@@ -75,6 +75,9 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(storage.includes('getExamRooms'));
   assert.ok(storage.includes('createExamRoom'));
   assert.ok(storage.includes('updateExamRoom'));
+  assert.ok(storage.includes("'exam_rooms', 'exam_schedules', 'exam_schedule_cohort_students', 'exam_seat_assignments'"));
+  assert.ok(api.includes('exam_schedule_cohort_students'));
+  assert.ok(schema.includes('exam_schedule_cohort_students'));
   assert.ok(client.includes('getExamScheduleCohort'));
   assert.ok(client.includes('getExamRooms'));
   assert.ok(client.includes('createExamRoom'));
