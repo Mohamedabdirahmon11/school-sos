@@ -2379,7 +2379,7 @@ class StorageEngine {
   public async createExamSchedule(schedule: {
     id: string; schoolId: string; classId: string; subjectId: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
-    examDate: string; startTime: string; endTime: string; roomName: string;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName?: string;
     seatCapacity: number; createdBy: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
