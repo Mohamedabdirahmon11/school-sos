@@ -4999,10 +4999,11 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   const [allSchedules, classes, subjects] = await Promise.all([
     db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
   ]);
-  const cohortRows = allowedClassIds?.size
-    ? await db.queryRows<any>('exam_schedule_cohort_students', { school_id: school.id, class_id: [...allowedClassIds] })
-    : [];
-  const allowedCohortScheduleIds = new Set(cohortRows.map((row: any) => row.scheduleId));
+  const allowedCohortScheduleIds = new Set(
+    allowedClassIds?.size
+      ? await db.getExamScheduleCohortScheduleIds(school.id, [...allowedClassIds])
+      : []
+  );
   const schedules = allSchedules.filter(schedule =>
     (!requestedClassId || schedule.classId === requestedClassId || allowedCohortScheduleIds.has(schedule.id)) &&
     (allowedClassIds === null || allowedClassIds.has(schedule.classId) || allowedCohortScheduleIds.has(schedule.id))
