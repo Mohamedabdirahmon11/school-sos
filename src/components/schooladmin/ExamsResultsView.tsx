@@ -521,6 +521,27 @@ export const ExamsResultsView: React.FC = () => {
   const finalMax = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
   const maxCombined = continuousMax + finalMax;
 
+  // Keep the database's individual room sessions intact, but present one school-wide
+  // timetable row for the same subject, date, time, exam and semester.
+  const groupedExamSchedules = (() => {
+    const groups = new Map<string, { key: string; sessions: any[] }>();
+    for (const schedule of examSchedules) {
+      const key = [
+        schedule.subjectId, schedule.examDate, String(schedule.startTime).slice(0, 5),
+        String(schedule.endTime).slice(0, 5), schedule.examName, schedule.examType,
+        schedule.semester, schedule.shiftName || 'General'
+      ].join('|');
+      const group = groups.get(key) || { key, sessions: [] };
+      group.sessions.push(schedule);
+      groups.set(key, group);
+    }
+    return [...groups.values()].sort((a, b) =>
+      String(a.sessions[0]?.examDate).localeCompare(String(b.sessions[0]?.examDate)) ||
+      String(a.sessions[0]?.startTime).localeCompare(String(b.sessions[0]?.startTime)) ||
+      String(a.sessions[0]?.subjectName).localeCompare(String(b.sessions[0]?.subjectName))
+    );
+  })();
+
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
@@ -1017,27 +1038,35 @@ export const ExamsResultsView: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
-                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Exam rooms</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {examSchedules.slice().sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime))).map(schedule => (
-                      <tr key={schedule.id}>
-                        <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
-                        <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All classes assigned to this subject</p></td>
-                        <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                        <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
-                        <td className="px-3 py-3">{new Set(examSchedules.filter(row => row.examDate === schedule.examDate && row.examName === schedule.examName).map(row => row.subjectName)).size} subjects</td>
-                        <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
-                        <td className="px-3 py-3"><div className="flex justify-end gap-2">
-                          {schedule.status === 'draft' && <>
-                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold">Edit</button>
-                            <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
-                            <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
-                          </>}
-                          {schedule.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold"><Printer className="h-3.5 w-3.5"/>Print seating</button>}
-                        </div></td>
-                      </tr>
-                    ))}
+                    {groupedExamSchedules.map(group => {
+                      const schedule = group.sessions[0];
+                      const roomNames = [...new Set(group.sessions.map(session => session.roomName).filter(Boolean))];
+                      const allPublished = group.sessions.every(session => session.status === 'published');
+                      return (
+                        <tr key={group.key}>
+                          <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
+                          <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All participating classes</p></td>
+                          <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                          <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
+                          <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{roomNames.map(name => <span key={name} className="rounded bg-slate-100 px-2 py-1 text-[10px]">{name}</span>)}</div><p className="mt-1 text-[10px] text-[#64748B]">{group.sessions.length} room session{group.sessions.length === 1 ? '' : 's'}</p></td>
+                          <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${allPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{allPublished ? 'Published' : 'Draft'}</span></td>
+                          <td className="px-3 py-3"><div className="flex min-w-[220px] flex-col items-end gap-2">
+                            {group.sessions.map(roomSession => <div key={roomSession.id} className="flex flex-wrap justify-end gap-1">
+                              <span className="self-center text-[10px] font-semibold text-slate-500">{roomSession.roomName}</span>
+                              {roomSession.status === 'draft' && <>
+                                <button type="button" onClick={() => void openEditExamSchedule(roomSession)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button>
+                                <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish'}</button>
+                                <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel</button>
+                              </>}
+                              {roomSession.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(roomSession)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold"><Printer className="h-3 w-3"/>Print roster</button>}
+                            </div>)}
+                          </div></td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
