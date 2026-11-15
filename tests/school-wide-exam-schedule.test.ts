@@ -8,7 +8,7 @@ const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
 
-test('shared subject exam sessions require explicit mixed cohorts and keep room guards', () => {
+test('shared subject sessions require a saved mixed cohort and registered room', () => {
   assert.match(migration, /ALTER TABLE public\.exam_schedules ALTER COLUMN class_id DROP NOT NULL/);
   assert.match(migration, /Select participating students before publishing a school-wide subject session/);
   assert.match(migration, /Assign an active Exam Room before publishing this session/);
@@ -18,14 +18,14 @@ test('shared subject exam sessions require explicit mixed cohorts and keep room 
   assert.match(client, /classId\?: string/);
 });
 
-test('exam generator creates one shared schedule per unique subject with an editable daily limit', () => {
+test('generator groups classes by shared subject and keeps subjects-per-day editable', () => {
   assert.match(ui, /subjectPlans = new Map/);
   assert.match(ui, /setAutoSubjectsPerDay\(Math\.max\(1, Math\.min\(6/);
-  assert.match(ui, /All classes assigned to this subject/);
   assert.match(ui, /Generate school timetable/);
+  assert.match(ui, /All classes assigned to this subject/);
 });
 
-test('printed room seating roster identifies the class for each mixed student', () => {
+test('room printout includes the class beside each mixed student', () => {
   assert.match(storage, /className: student \? \(classNames\.get\(student\.classId\)/);
   assert.match(ui, /Room roster for display at the examination-room entrance/);
   assert.match(ui, /seat\.className/);
