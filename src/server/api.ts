@@ -5017,6 +5017,66 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   })));
 });
 
+apiRouter.get('/exams/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await db.getExamRooms(school.id, req.query.includeInactive === 'true'));
+});
+
+apiRouter.post('/exams/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const roomCode = typeof body.roomCode === 'string' ? body.roomCode.trim() : '';
+  const location = typeof body.location === 'string' ? body.location.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : 'General';
+  const capacity = Number(body.capacity);
+  if (!name || name.length > 120 || roomCode.length > 40 || location.length > 160 || !shiftName || shiftName.length > 80 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500) {
+    res.status(400).json({ error: 'Enter a room name, optional code/location, shift, and capacity from 1 to 500.' });
+    return;
+  }
+  try {
+    const room = await db.createExamRoom({ id: 'room-' + randomUUID(), schoolId: school.id, name, roomCode, capacity, location, shiftName });
+    db.logAudit({ action: 'EXAM_ROOM_CREATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Created exam room "${name}" with capacity ${capacity}.`, severity: 'info' });
+    await db.flush();
+    res.status(201).json(room);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to create exam room.' });
+  }
+});
+
+apiRouter.put('/exams/rooms/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const room = (await db.getExamRooms(school.id, true)).find(item => item.id === req.params.id);
+  if (!room) { res.status(404).json({ error: 'Exam room was not found in this school.' }); return; }
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const roomCode = typeof body.roomCode === 'string' ? body.roomCode.trim() : '';
+  const location = typeof body.location === 'string' ? body.location.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : 'General';
+  const capacity = Number(body.capacity);
+  const isActive = body.isActive === undefined ? Boolean(room.isActive) : body.isActive === true;
+  if (!name || name.length > 120 || roomCode.length > 40 || location.length > 160 || !shiftName || shiftName.length > 80 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500) {
+    res.status(400).json({ error: 'Enter a room name, optional code/location, shift, and capacity from 1 to 500.' });
+    return;
+  }
+  const linkedSchedules = (await db.getExamSchedules(school.id)).filter(item => item.roomId === room.id && item.status !== 'cancelled');
+  if (linkedSchedules.some(item => Number(item.seatCapacity) > capacity)) {
+    res.status(409).json({ error: 'Room capacity cannot be lower than the capacity already assigned to one of its exam sessions.' });
+    return;
+  }
+  try {
+    const updated = await db.updateExamRoom(school.id, room.id, { name, roomCode, capacity, location, shiftName, isActive });
+    db.logAudit({ action: 'EXAM_ROOM_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated exam room "${name}".`, severity: 'info' });
+    await db.flush();
+    res.json(updated);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to update exam room.' });
+  }
+});
+
 apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const [schedules, classes, subjects] = await Promise.all([
