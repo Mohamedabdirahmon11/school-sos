@@ -59,6 +59,48 @@ CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_room_date
   ON public.exam_schedules (school_id, room_id, exam_date, start_time)
   WHERE status <> 'cancelled';
 
+DO $exam_room_constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid = 'public.exam_schedules'::regclass
+       AND conname = 'exam_schedules_published_room_required'
+  ) THEN
+    ALTER TABLE public.exam_schedules
+      ADD CONSTRAINT exam_schedules_published_room_required
+      CHECK (status <> 'published' OR room_id IS NOT NULL);
+  END IF;
+END
+$exam_room_constraint$;
+
+
+-- Enforce room registry and capacity rules inside the publish RPC as well as the API.
+DO $exam_publish_guard$
+DECLARE
+  v_definition TEXT;
+  v_old_guard TEXT := $old$IF v_schedule.status <> 'draft' THEN RAISE EXCEPTION 'Only draft exam schedules can be published.'; END IF;$old$;
+  v_new_guard TEXT := $new$IF v_schedule.status <> 'draft' THEN RAISE EXCEPTION 'Only draft exam schedules can be published.'; END IF;
+  IF v_schedule.room_id IS NULL THEN RAISE EXCEPTION 'Assign an active Exam Room before publishing this session.'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.exam_rooms AS room
+     WHERE room.id = v_schedule.room_id
+       AND room.school_id = p_school_id
+       AND room.is_active IS TRUE
+       AND v_schedule.seat_capacity <= room.capacity
+  ) THEN RAISE EXCEPTION 'The assigned room is inactive or its capacity is too small.'; END IF;$new$;
+BEGIN
+  SELECT pg_get_functiondef('public.schoolos_publish_exam_schedule(varchar, varchar, varchar)'::regprocedure)
+    INTO v_definition;
+  IF position('Assign an active Exam Room before publishing this session.' IN v_definition) = 0 THEN
+    v_definition := replace(v_definition, v_old_guard, v_new_guard);
+    IF position('Assign an active Exam Room before publishing this session.' IN v_definition) = 0 THEN
+      RAISE EXCEPTION 'Could not add registered room validation to the exam publish RPC.';
+    END IF;
+    EXECUTE v_definition;
+  END IF;
+END
+$exam_publish_guard$;
+
 -- Keep the database-side school backup restore allowlist in sync with exam room and seating data.
 DO $exam_room_restore$
 DECLARE
