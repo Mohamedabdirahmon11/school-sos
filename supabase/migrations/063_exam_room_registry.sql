@@ -60,7 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_room_date
   WHERE status <> 'cancelled';
 
 -- Keep the database-side school backup restore allowlist in sync with the new room table.
-DO $
+DO $exam_room_restore$
 DECLARE
   v_definition TEXT;
 BEGIN
@@ -78,7 +78,7 @@ BEGIN
     EXECUTE v_definition;
   END IF;
 END
-$;
+$exam_room_restore$;
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
