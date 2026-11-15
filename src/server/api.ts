@@ -5137,9 +5137,9 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   const seatCapacity = Number(body.seatCapacity);
   const [year, month, day] = examDate.split('-').map(Number);
   const parsedDate = new Date(Date.UTC(year, month - 1, day));
-  const validDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
   const validTime = (value: string) => {
-    if (!/^\\d{2}:\\d{2}$/.test(value)) return false;
+    if (!/^\d{2}:\d{2}$/.test(value)) return false;
     const [hours, minutes] = value.split(':').map(Number);
     return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
   };
@@ -5164,12 +5164,14 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   }
 
   try {
-    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
     if (Array.isArray(body.cohortStudentIds)) {
       if (body.cohortStudentIds.length > seatCapacity || body.cohortStudentIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
         res.status(400).json({ error: 'Choose valid students within the room capacity.' });
         return;
       }
+    }
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
+    if (Array.isArray(body.cohortStudentIds)) {
       await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
     }
     db.logAudit({
