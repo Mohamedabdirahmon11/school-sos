@@ -73,4 +73,10 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes('Save draft changes'));
   assert.ok(ui.includes('Mixed-class student group'));
   assert.ok(ui.includes('Shift for generated sessions'));
+  assert.ok(ui.includes("setScheduleSection('timetable')") || ui.includes("'Exam Timetable'"));
+  assert.ok(ui.includes("'Exam Rooms'"));
+  assert.ok(ui.includes("'Student Mixing'"));
+  assert.ok(ui.includes('Print wall timetable'));
+  assert.ok(ui.includes('randomly selects students'));
+  assert.ok(!ui.includes('up to three classes'));
 });
