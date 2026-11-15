@@ -11,6 +11,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Student, SchoolClass, SchoolBranch } from '../../types/index.ts';
 import { BulkImportWizard } from './BulkImportWizard.tsx';
 import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
+import { getPendingPinSlips } from '../../lib/bulk-pin-results.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
@@ -53,7 +54,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [showBulkPinReset, setShowBulkPinReset] = useState(false);
+  // Re-open on the results screen if the PIN slips survived a remount of this screen.
+  const [showBulkPinReset, setShowBulkPinReset] = useState(() => getPendingPinSlips(school?.id).length > 0);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -214,8 +216,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
-  if (isLoading) return <div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>;
-  if (studentLoad.error) return <ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />;
+  // The PIN wizard stays mounted while the list reloads so one-time PINs are never lost.
+  const pinResetWizard = <BulkStudentPinResetWizard open={showBulkPinReset} schoolId={school?.id} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />;
+  if (isLoading) return <><div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>{pinResetWizard}</>;
+  if (studentLoad.error) return <><ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />{pinResetWizard}</>;
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
@@ -241,6 +245,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <span>{t('bulk_import')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setShowBulkPinReset(true)}
             disabled={isReadOnly}
             className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
@@ -733,7 +738,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       )}
 
       <BulkImportWizard open={showBulkImport} onClose={() => setShowBulkImport(false)} onComplete={() => { void fetchStudents(); }} />
-      <BulkStudentPinResetWizard open={showBulkPinReset} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />
+      {pinResetWizard}
     </div>
   );
 };

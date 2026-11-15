@@ -6,6 +6,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { User, School, UserRole } from '../types/index.ts';
 import { ApiClient } from '../services/api.ts';
 import { translations, LanguageCode, TranslationDict } from '../lib/translations.ts';
+import { clearPendingPinSlips } from '../lib/bulk-pin-results.ts';
 
 interface AuthContextType {
   user: User | null;
@@ -128,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await ApiClient.logout().catch(() => {});
+    clearPendingPinSlips();
     setUser(null);
     setSchool(null);
     setInspectedSchool(null);

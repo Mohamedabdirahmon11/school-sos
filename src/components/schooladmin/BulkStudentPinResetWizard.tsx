@@ -1,19 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { CheckCircle2, Copy, Download, LoaderCircle, Printer, X } from 'lucide-react';
+import { clearPendingPinSlips, getPendingPinSlips, setPendingPinSlips } from '../../lib/bulk-pin-results.ts';
+import type { PinSlip } from '../../lib/bulk-pin-results.ts';
 
 type StudentRow = { id: string; studentId: string; firstName: string; middleName?: string; lastName: string };
-type PinSlip = { studentId: string; studentName: string; newPin: string };
 
-export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () => void; onComplete: () => void }> = ({ open, onClose, onComplete }) => {
+export const BulkStudentPinResetWizard: React.FC<{ open: boolean; schoolId?: string; onClose: () => void; onComplete: () => void }> = ({ open, schoolId, onClose, onComplete }) => {
   const [classes, setClasses] = useState<any[]>([]);
   const [classId, setClassId] = useState('');
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pinSlips, setPinSlips] = useState<PinSlip[]>([]);
+  // Start from any slips kept in memory so a remount of the parent screen
+  // cannot throw away PINs the server will never show again.
+  const [pinSlips, setPinSlips] = useState<PinSlip[]>(() => getPendingPinSlips(schoolId));
   const [copied, setCopied] = useState(false);
+  const [warning, setWarning] = useState('');
+  const [secured, setSecured] = useState(false);
+
+  // Never let the tab close or refresh while PINs are being generated, or
+  // while freshly generated PINs have not been downloaded, copied or printed.
+  useEffect(() => {
+    if (!open || !(loading || (pinSlips.length > 0 && !secured))) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [open, loading, pinSlips.length, secured]);
 
   useEffect(() => {
     if (!open) return;
@@ -56,9 +70,13 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
 
   const reset = () => {
     setStudents([]); setSelectedIds([]); setPinSlips([]); setClassId('');
-    setClasses([]); setError(''); setCopied(false);
+    setClasses([]); setError(''); setWarning(''); setCopied(false); setSecured(false);
+    clearPendingPinSlips();
   };
   const close = () => {
+    if (loading) return;
+    if (pinSlips.length > 0 && !secured
+      && !window.confirm('These PINs are shown only once and have not been downloaded, copied or printed. Close anyway?')) return;
     const completed = pinSlips.length > 0;
     reset();
     if (completed) onComplete();
@@ -75,15 +93,21 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
         return { studentId: student.studentId, pin: '' };
       });
       const result = await ApiClient.bulkResetStudentPins(rows);
-      const returned = Array.isArray(result?.pinSlips) ? result.pinSlips : [];
-      if (!result?.success || Number(result.updatedCount) !== rows.length || returned.length !== rows.length
-        || returned.some(item => !item.studentId || !item.studentName || !/^\d{4}$/.test(item.newPin || ''))
-        || new Set(returned.map(item => item.studentId)).size !== rows.length
-        || rows.some(row => !returned.some(item => item.studentId === row.studentId))) {
-        throw new Error('The server did not return a complete PIN receipt. Contact support before retrying to avoid resetting PINs twice.');
+      const returned: PinSlip[] = (Array.isArray(result?.pinSlips) ? result.pinSlips : [])
+        .map(item => ({ studentId: String(item?.studentId || ''), studentName: String(item?.studentName || ''), newPin: String(item?.newPin ?? '').trim() }))
+        .filter(item => item.studentId && /^\d{4}$/.test(item.newPin));
+      // The server has already changed the PINs at this point. Show every PIN it
+      // returned instead of discarding them, and flag any that are missing.
+      if (!returned.length) {
+        throw new Error('The PINs were reset, but the server returned no PIN list. Reset the students again to get new PINs.');
       }
+      const returnedIds = new Set(returned.map(item => item.studentId));
+      const missing = rows.filter(row => !returnedIds.has(row.studentId)).map(row => row.studentId);
+      setWarning(missing.length ? `PINs for ${missing.length} student(s) were not returned: ${missing.join(', ')}. Reset those students again.` : '');
+      setPendingPinSlips(schoolId, returned);
       setPinSlips(returned);
       setCopied(false);
+      setSecured(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Bulk PIN reset failed. Please retry.');
     } finally {
@@ -105,6 +129,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setSecured(true);
   };
 
   const copyAllPins = async () => {
@@ -117,6 +142,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      setSecured(true);
       setError('');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not copy PINs. Please use Download CSV.');
@@ -125,14 +151,15 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
 
   return (
     <>
-      <style>{`@media print { body * { visibility: hidden !important; } .bulk-pin-print, .bulk-pin-print * { visibility: visible !important; } .bulk-pin-print { position: fixed; inset: 0; overflow: auto; background: white; padding: 24px; } .bulk-pin-dialog { display: none !important; } }`}</style>
+      <style>{`@media print { body * { visibility: hidden !important; } .bulk-pin-print, .bulk-pin-print * { visibility: visible !important; } .bulk-pin-print { position: absolute !important; left: 0; top: 0; width: 100%; background: white; padding: 24px; overflow: visible !important; border: 0 !important; } .bulk-pin-dialog { position: static !important; background: transparent !important; padding: 0 !important; display: block !important; } .bulk-pin-dialog > section { max-height: none !important; overflow: visible !important; box-shadow: none !important; padding: 0 !important; } .bulk-pin-print-title { display: block !important; } } .bulk-pin-print-title { display: none; }`}</style>
       <div className="bulk-pin-dialog fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
         <section role="dialog" aria-modal="true" aria-label="Bulk student PIN reset" className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6">
           <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
             <div><h2 className="text-lg font-bold text-slate-900">Bulk student PIN reset</h2><p className="mt-1 text-xs text-slate-500">Choose a class, select one or more students, then generate a unique four-digit PIN for each.</p></div>
-            <button type="button" onClick={close} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5"/></button>
+            <button type="button" onClick={close} disabled={loading} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><X className="h-5 w-5"/></button>
           </header>
           {error && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+          {warning && <p role="alert" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{warning}</p>}
           {!pinSlips.length ? <>
             <div className="mt-5">
               <label className="block text-xs font-semibold text-slate-700">1. Select class</label>
@@ -167,10 +194,11 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; onClose: () =>
             <div className="my-4 flex flex-wrap gap-2">
               <button type="button" onClick={downloadPins} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold"><Download className="h-4 w-4"/>Download PIN CSV</button>
               <button type="button" onClick={() => void copyAllPins()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold"><Copy className="h-4 w-4"/>{copied ? 'Copied all PINs' : 'Copy All PINs'}</button>
-              <button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white"><Printer className="h-4 w-4"/>Print PIN slips</button>
+              <button type="button" onClick={() => { setSecured(true); window.print(); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white"><Printer className="h-4 w-4"/>Print PIN slips</button>
               <button type="button" onClick={close} className="min-h-10 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold">Close</button>
             </div>
             <div className="bulk-pin-print overflow-x-auto rounded-xl border border-slate-200">
+              <h2 className="bulk-pin-print-title mb-3 text-lg font-bold">Student PINs — keep private</h2>
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">Student name</th><th className="px-4 py-3">New PIN</th></tr></thead>
                 <tbody>{pinSlips.map(slip => <tr key={slip.studentId} className="border-t border-slate-100"><td className="px-4 py-3 font-mono">{slip.studentId}</td><td className="px-4 py-3 font-medium text-slate-800">{slip.studentName}</td><td className="px-4 py-3 font-mono text-lg font-bold tracking-widest">{slip.newPin}</td></tr>)}</tbody>
