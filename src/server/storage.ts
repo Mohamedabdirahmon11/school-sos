@@ -3823,7 +3823,7 @@ class StorageEngine {
     // Each query is explicitly scoped to this school ID.
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
-      'bus_assignments', 'class_subjects', 'classes', 'exam_schedules', 'exam_seat_assignments',
+      'bus_assignments', 'class_subjects', 'classes', 'exam_rooms', 'exam_schedules', 'exam_seat_assignments',
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',
