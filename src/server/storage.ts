@@ -2417,6 +2417,22 @@ class StorageEngine {
     return fromSupabaseRow(data, 'exam_schedules');
   }
 
+  public async getExamScheduleCohort(schoolId: string, scheduleId: string): Promise<any[]> {
+    return this.queryRows<any>('exam_schedule_cohort_students', { school_id: schoolId, schedule_id: scheduleId });
+  }
+
+  public async setExamScheduleCohort(schoolId: string, scheduleId: string, studentIds: string[]): Promise<number> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Exam group storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_set_exam_schedule_cohort', {
+      p_school_id: schoolId, p_schedule_id: scheduleId, p_student_ids: studentIds
+    });
+    this.recordQuery('rpc:schoolos_set_exam_schedule_cohort', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save the mixed-class exam group.');
+    return Number(data) || 0;
+  }
+
   public async cancelExamSchedule(schoolId: string, scheduleId: string): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
