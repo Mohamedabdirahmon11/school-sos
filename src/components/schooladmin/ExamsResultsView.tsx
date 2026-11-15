@@ -86,6 +86,9 @@ export const ExamsResultsView: React.FC = () => {
   const [autoCapacity, setAutoCapacity] = useState(500);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number } | null>(null);
+  const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
+  const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
+  const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
 
   // Load classes, subjects, and exam configuration with a retryable failure state.
@@ -312,12 +315,60 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const openEditExamSchedule = async (schedule: any) => {
+    setEditingSchedule(schedule);
+    setEditDraft({
+      examDate: schedule.examDate,
+      startTime: String(schedule.startTime).slice(0, 5),
+      endTime: String(schedule.endTime).slice(0, 5),
+      roomName: schedule.roomName,
+      shiftName: schedule.shiftName || 'General',
+      seatCapacity: schedule.seatCapacity
+    });
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      const [studentLists, existingCohort] = await Promise.all([
+        Promise.all(classes.map(async klass => ({
+          classId: klass.id,
+          students: (await ApiClient.getAllStudents(klass.id)).filter((student: any) => student.status === 'active')
+        }))),
+        ApiClient.getExamScheduleCohort(schedule.id)
+      ]);
+      const lists = Object.fromEntries(studentLists.map(item => [item.classId, item.students])) as Record<string, Student[]>;
+      const counts: Record<string, number> = {};
+      existingCohort.forEach(row => { counts[row.classId] = (counts[row.classId] || 0) + 1; });
+      setCohortClassStudents(lists);
+      setCohortCounts(counts);
+      setCohortStudentIds(existingCohort.map(row => row.studentId));
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to load students for the mixed-class group.');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handleCohortCountChange = (classId: string, requestedCount: number) => {
+    const studentsInClass = cohortClassStudents[classId] || [];
+    const count = Math.max(0, Math.min(studentsInClass.length, requestedCount || 0));
+    const selectedClassCount = Object.entries(cohortCounts).filter(([id, value]) => id !== classId && value > 0).length;
+    if (count > 0 && selectedClassCount >= 3) {
+      setScheduleError('A mixed exam group can combine up to three classes.');
+      return;
+    }
+    const classStudentIds = new Set(studentsInClass.map(student => student.id));
+    const nextIds = studentsInClass.slice(0, count).map(student => student.id);
+    setCohortStudentIds(current => [...current.filter(id => !classStudentIds.has(id)), ...nextIds]);
+    setCohortCounts(current => ({ ...current, [classId]: count }));
+    setScheduleError('');
+  };
+
   const handleSaveExamScheduleEdit = async () => {
     if (isReadOnly || !editingSchedule || !editDraft) return;
     setScheduleSaving(true);
     setScheduleError('');
     try {
-      await ApiClient.updateExamSchedule(editingSchedule.id, editDraft);
+      await ApiClient.updateExamSchedule(editingSchedule.id, { ...editDraft, cohortStudentIds });
       setExamSchedules(await ApiClient.getExamSchedules());
       setEditingSchedule(null);
       setEditDraft(null);
@@ -838,7 +889,7 @@ export const ExamsResultsView: React.FC = () => {
             <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.className} · {editingSchedule.subjectName}</p></div>
-                <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
+                <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); setCohortCounts({}); setCohortStudentIds([]); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
@@ -847,6 +898,26 @@ export const ExamsResultsView: React.FC = () => {
                 <label className="text-xs font-semibold text-[#475569]">Room<input maxLength={120} value={editDraft.roomName} onChange={event => setEditDraft({ ...editDraft, roomName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Shift<input maxLength={80} value={editDraft.shiftName} onChange={event => setEditDraft({ ...editDraft, shiftName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Capacity<input type="number" min={1} max={500} value={editDraft.seatCapacity} onChange={event => setEditDraft({ ...editDraft, seatCapacity: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+              </div>
+              <div className="mt-5 border-t border-amber-200 pt-4">
+                <h3 className="text-xs font-bold text-[#132A29]">Mixed-class student group (optional)</h3>
+                <p className="mt-1 text-[11px] text-[#64748B]">Choose how many active students to include from each class. Up to three classes can be combined. Leave all counts at zero to use the complete class attached to this schedule.</p>
+                {scheduleSaving && !Object.keys(cohortClassStudents).length ? <p className="mt-2 text-xs text-slate-500">Loading class students…</p> : (
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {classes.map(klass => {
+                      const available = cohortClassStudents[klass.id] || [];
+                      return <label key={klass.id} className="rounded-lg border border-amber-200 bg-white p-3 text-xs font-semibold text-[#475569]">
+                        <span>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</span>
+                        <span className="mt-1 block text-[10px] font-normal text-slate-500">{available.length} active students available</span>
+                        <input type="number" min={0} max={available.length} value={cohortCounts[klass.id] || 0}
+                          onChange={event => handleCohortCountChange(klass.id, Number(event.target.value))}
+                          disabled={!Object.prototype.hasOwnProperty.call(cohortClassStudents, klass.id)}
+                          className="mt-2 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+                      </label>;
+                    })}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-[#64748B]">Selected: {cohortStudentIds.length} students from {Object.values(cohortCounts).filter(count => count > 0).length} classes. The scheduled subject must be assigned to every selected class.</p>
               </div>
               <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamScheduleEdit()} disabled={isReadOnly || scheduleSaving || !editDraft.roomName.trim() || editDraft.seatCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : 'Save draft changes'}</button></div>
             </section>
@@ -874,7 +945,7 @@ export const ExamsResultsView: React.FC = () => {
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
                           {schedule.status === 'draft' && <>
-                            <button type="button" onClick={() => { setEditingSchedule(schedule); setEditDraft({ examDate: schedule.examDate, startTime: String(schedule.startTime).slice(0,5), endTime: String(schedule.endTime).slice(0,5), roomName: schedule.roomName, shiftName: schedule.shiftName || 'General', seatCapacity: schedule.seatCapacity }); }} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[10px] font-semibold text-[#334155] disabled:opacity-50">Edit draft</button>
+                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[10px] font-semibold text-[#334155] disabled:opacity-50">Edit draft</button>
                             <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                             <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                           </>}
