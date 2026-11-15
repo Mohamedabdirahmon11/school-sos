@@ -14,7 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
 import { buildResultsCsv } from '../../lib/results-csv.ts';
-import { ExamTimetablePrint } from '../common/ExamTimetablePrint.tsx';
+import { ExamTimetablePrint, formatSomaliExamDate } from '../common/ExamTimetablePrint.tsx';
 import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
@@ -1385,7 +1385,7 @@ export const ExamsResultsView: React.FC = () => {
                 </select>
               </label>
               <label className="text-xs font-semibold text-[#475569]">Exam date
-                <input type="date" required value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
+                <input type="date" required value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />{scheduleDate && <span className="mt-1 block text-[11px] font-normal text-[#64748B]">Maalinta: {formatSomaliExamDate(scheduleDate).split(' ')[0]}</span>}
               </label>
               <label className="text-xs font-semibold text-[#475569]">Start time
                 <input type="time" required value={scheduleStartTime} onChange={event => setScheduleStartTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
@@ -1465,7 +1465,7 @@ export const ExamsResultsView: React.FC = () => {
                 <label className="text-xs font-semibold text-[#475569]">Exam name<input maxLength={120} value={editDraft.examName} onChange={event => setEditDraft({ ...editDraft, examName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Exam type<select value={editDraft.examType} onChange={event => setEditDraft({ ...editDraft, examType: event.target.value as 'small' | 'big' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="small">Small Exam</option><option value="big">Big Exam</option></select></label>
                 <label className="text-xs font-semibold text-[#475569]">Semester<select value={editDraft.semester} onChange={event => setEditDraft({ ...editDraft, semester: event.target.value as 'Semester 1' | 'Semester 2' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option></select></label>
-                <label className="text-xs font-semibold text-[#475569]">Exam date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />{editDraft.examDate && <span className="mt-1 block text-[11px] font-normal text-[#64748B]">Maalinta: {formatSomaliExamDate(editDraft.examDate).split(' ')[0]}</span>}</label>
                 <label className="text-xs font-semibold text-[#475569]">Start time<input type="time" value={editDraft.startTime} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">End time<input type="time" value={editDraft.endTime} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
               </div>}
