@@ -3862,6 +3862,7 @@ CREATE TABLE IF NOT EXISTS public.exam_schedules (
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   room_name VARCHAR(120) NOT NULL,
+  shift_name VARCHAR(80) NOT NULL DEFAULT 'General',
   seat_capacity INTEGER NOT NULL CHECK (seat_capacity BETWEEN 1 AND 500),
   status VARCHAR(16) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'cancelled')),
   created_by VARCHAR(64) NOT NULL,
