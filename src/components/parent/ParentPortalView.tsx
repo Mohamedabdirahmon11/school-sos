@@ -8,7 +8,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { ExamTimetablePrint } from '../common/ExamTimetablePrint.tsx';
+import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
   Users, 
@@ -125,7 +125,7 @@ export const ParentPortalView: React.FC = () => {
       </section>
 
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
-        <h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2>
+        <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
         {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || currentChild.className || school?.examTimetableClassGroup} />}
       </section>
 
