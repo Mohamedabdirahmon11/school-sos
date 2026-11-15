@@ -2395,6 +2395,27 @@ class StorageEngine {
     return (await this.getExamSchedules(schedule.schoolId)).find(row => row.id === schedule.id);
   }
 
+  public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
+    examDate: string; startTime: string; endTime: string; roomName: string; seatCapacity: number;
+  }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam schedule storage is unavailable.');
+    const { data, error } = await client.from('exam_schedules')
+      .update({
+        exam_date: updates.examDate,
+        start_time: updates.startTime,
+        end_time: updates.endTime,
+        room_name: updates.roomName,
+        seat_capacity: updates.seatCapacity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', scheduleId).eq('school_id', schoolId).eq('status', 'draft')
+      .select('*').maybeSingle();
+    if (error) throw new Error(error.message || 'Unable to update exam schedule.');
+    if (!data) throw new Error('Only a draft exam schedule can be edited.');
+    return fromSupabaseRow(data, 'exam_schedules');
+  }
+
   public async cancelExamSchedule(schoolId: string, scheduleId: string): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
