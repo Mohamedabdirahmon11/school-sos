@@ -525,7 +525,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
         <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
           <h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2>
-          {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} />}
+          {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={[...new Set(publishedExamSchedules.map((exam: any) => exam.className).filter(Boolean))].join(" / ") || school?.examTimetableClassGroup} />}
         </section>
 
         </section>
