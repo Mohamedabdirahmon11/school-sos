@@ -3645,7 +3645,7 @@ BEGIN
   v_user_name := COALESCE(NULLIF(p_payload->>'approved_by_name', ''), 'School Administrator');
   v_user_role := COALESCE(NULLIF(p_payload->>'approved_by_role', ''), 'school_admin')::public.user_role_enum;
 
-  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'notification_templates', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits'] LOOP
+  FOREACH v_table IN ARRAY ARRAY['school_branches', 'classes', 'subjects', 'teachers', 'students', 'staff_members', 'admission_applications', 'assignments', 'fee_structures', 'fee_ranges', 'fee_receipt_sequences', 'inventory_items', 'library_books', 'transport_routes', 'school_notices', 'exam_configs', 'report_card_templates', 'school_events', 'support_tickets', 'timetable_settings', 'teacher_unavailability', 'timetable_slots', 'class_subjects', 'fee_payments', 'attendance_records', 'student_marks', 'assignment_submissions', 'promotions', 'promotion_history', 'inventory_transactions', 'library_loans', 'bus_assignments', 'notice_reads', 'direct_messages', 'discipline_incidents', 'payroll_records', 'school_expenses', 'bank_statement_entries', 'notification_templates', 'exam_rooms', 'exam_schedules', 'exam_seat_assignments', 'school_health_visits'] LOOP
     v_rows := v_tables->v_table;
     IF v_rows IS NULL OR v_rows = 'null'::jsonb THEN
       CONTINUE;
@@ -3843,6 +3843,23 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON school_health_visits TO authenticated, s
 -- Exam schedules and seat assignments (school scoped)
 -- School-scoped exam timetable, room allocation, and automatically assigned seats.
 BEGIN;
+-- Reusable exam rooms registered by each school.
+CREATE TABLE IF NOT EXISTS public.exam_rooms (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  room_code VARCHAR(40),
+  capacity INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 500),
+  location VARCHAR(160) NOT NULL DEFAULT '',
+  shift_name VARCHAR(80) NOT NULL DEFAULT 'General',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT exam_rooms_id_school_unique UNIQUE (id, school_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_exam_rooms_school_name ON public.exam_rooms (school_id, lower(btrim(name)));
+CREATE INDEX IF NOT EXISTS idx_exam_rooms_school_active ON public.exam_rooms (school_id, is_active, name);
+
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_classes_id_school_unique
   ON public.classes (id, school_id);
@@ -3862,6 +3879,7 @@ CREATE TABLE IF NOT EXISTS public.exam_schedules (
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   room_name VARCHAR(120) NOT NULL,
+  room_id VARCHAR(64),
   shift_name VARCHAR(80) NOT NULL DEFAULT 'General',
   seat_capacity INTEGER NOT NULL CHECK (seat_capacity BETWEEN 1 AND 500),
   status VARCHAR(16) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'cancelled')),
@@ -3875,13 +3893,16 @@ CREATE TABLE IF NOT EXISTS public.exam_schedules (
   CONSTRAINT exam_schedules_class_school_fk FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
   CONSTRAINT exam_schedules_subject_school_fk FOREIGN KEY (subject_id, school_id)
-    REFERENCES public.subjects(id, school_id) ON DELETE CASCADE
+    REFERENCES public.subjects(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT exam_schedules_room_school_fk FOREIGN KEY (room_id, school_id)
+    REFERENCES public.exam_rooms(id, school_id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_date
   ON public.exam_schedules (school_id, exam_date, start_time);
 CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_class
   ON public.exam_schedules (school_id, class_id, academic_year, semester);
+CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_room_date ON public.exam_schedules (school_id, room_id, exam_date, start_time) WHERE status <> 'cancelled';
 
 CREATE TABLE IF NOT EXISTS public.exam_seat_assignments (
   id VARCHAR(64) PRIMARY KEY,
@@ -3901,10 +3922,13 @@ CREATE TABLE IF NOT EXISTS public.exam_seat_assignments (
 CREATE INDEX IF NOT EXISTS idx_exam_seats_school_schedule
   ON public.exam_seat_assignments (school_id, schedule_id, seat_number);
 
+ALTER TABLE public.exam_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_seat_assignments ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.exam_schedules, public.exam_seat_assignments FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.exam_schedules, public.exam_seat_assignments TO service_role;
+REVOKE ALL ON TABLE public.exam_rooms, public.exam_schedules, public.exam_seat_assignments FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.exam_rooms, public.exam_schedules, public.exam_seat_assignments TO service_role;
+DROP POLICY IF EXISTS exam_rooms_service_role_all ON public.exam_rooms;
+CREATE POLICY exam_rooms_service_role_all ON public.exam_rooms FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE OR REPLACE FUNCTION public.schoolos_publish_exam_schedule(
   p_school_id VARCHAR(64),
