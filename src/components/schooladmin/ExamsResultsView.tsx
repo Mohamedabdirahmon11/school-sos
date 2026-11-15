@@ -225,6 +225,128 @@ const EXAM_REDESIGN_STYLES = `
 }
 .exam-management-redesign .rounded-full { letter-spacing: .015em; }
 .exam-management-redesign section + section { margin-top: 4px; }
+
+.exam-management-redesign .exam-wall-print.exam-print-document {
+  max-width: 100%;
+  padding: 28px 30px;
+  border: 1px solid #111 !important;
+  border-radius: 0 !important;
+  color: #111 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.exam-management-redesign .exam-print-heading {
+  padding: 4px 0 18px;
+  margin-bottom: 18px;
+  text-align: center;
+  color: #111 !important;
+  border-bottom: 2px solid #111;
+}
+.exam-management-redesign .exam-print-heading .exam-print-school {
+  margin: 0 0 7px;
+  color: #111 !important;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.exam-management-redesign .exam-print-heading .exam-print-title {
+  margin: 0;
+  color: #111 !important;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.exam-management-redesign .exam-print-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0 16px;
+  color: #111 !important;
+  font-size: 11px;
+}
+.exam-management-redesign .exam-print-meta strong { font-weight: 700; }
+.exam-management-redesign .exam-wall-print table.exam-print-table {
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
+  border-collapse: collapse !important;
+  border: 1.5px solid #111 !important;
+  color: #111 !important;
+  font-size: 10.5px;
+}
+.exam-management-redesign .exam-wall-print table.exam-print-table th,
+.exam-management-redesign .exam-wall-print table.exam-print-table td {
+  padding: 10px 8px !important;
+  border: 1px solid #111 !important;
+  color: #111 !important;
+  background: #fff !important;
+  text-align: left;
+  vertical-align: middle;
+  white-space: normal;
+}
+.exam-management-redesign .exam-wall-print table.exam-print-table thead th {
+  background: #e9e9e9 !important;
+  color: #111 !important;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .025em;
+}
+.exam-management-redesign .exam-wall-print table.exam-print-table tbody tr:hover {
+  background: #fff !important;
+}
+.exam-management-redesign .exam-print-signatures {
+  display: flex;
+  justify-content: space-between;
+  gap: 50px;
+  margin-top: 42px;
+  color: #111 !important;
+  font-size: 11px;
+}
+.exam-management-redesign .exam-print-signatures > div {
+  width: 34%;
+  padding-top: 7px;
+  border-top: 1px solid #111;
+  text-align: center;
+}
+.exam-management-redesign .exam-print-footer {
+  margin-top: 24px;
+  padding-top: 8px;
+  border-top: 1px solid #777;
+  color: #333 !important;
+  font-size: 9px;
+  text-align: center;
+}
+@media print {
+  .exam-management-redesign .exam-wall-print.exam-print-document {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .exam-management-redesign .exam-wall-print .exam-print-heading {
+    margin-top: 0;
+    break-after: avoid;
+  }
+  .exam-management-redesign .exam-wall-print .exam-print-hide { display: none !important; }
+  .exam-management-redesign .exam-wall-print table.exam-print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .exam-management-redesign .exam-wall-print .exam-print-signatures {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 @media (min-width: 1100px) {
   .exam-management-redesign { padding: 30px 34px 38px; }
 }
@@ -1258,32 +1380,41 @@ export const ExamsResultsView: React.FC = () => {
             </section>
           )}
 
-          {scheduleSection === 'timetable' && <><style>{`@media print { body * { visibility: hidden !important; } .exam-wall-print, .exam-wall-print * { visibility: visible !important; } .exam-wall-print { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; } .exam-wall-print .no-print { display: none !important; } } @page { size: A4 landscape; margin: 12mm; }`}</style><section className="exam-wall-print overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          {scheduleSection === 'timetable' && <><style>{`@media print { body * { visibility: hidden !important; } .exam-wall-print, .exam-wall-print * { visibility: visible !important; } .exam-wall-print { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; } .exam-wall-print .no-print { display: none !important; } } @page { size: A4 landscape; margin: 14mm; }`}</style><section className="exam-wall-print exam-print-document overflow-hidden rounded-xl border border-[#111] bg-white shadow-none">
             <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4">
               <div><h2 className="text-sm font-bold text-[#132A29]">Printable exam timetable</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} subject sessions · {school?.academicYear || 'Current year'}</p></div>
               <button type="button" onClick={() => window.print()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white"><Printer className="mr-1 inline h-3.5 w-3.5"/>Print wall timetable</button>
               <button type="button" onClick={() => { setScheduleError(''); setScheduleLoading(true); ApiClient.getExamSchedules().then(setExamSchedules).catch(error => setScheduleError(error.message || 'Unable to refresh schedules.')).finally(() => setScheduleLoading(false)); }} disabled={scheduleLoading} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] disabled:opacity-50">{scheduleLoading ? 'Refreshing…' : 'Refresh'}</button>
             </div>
+            <header className="exam-print-heading">
+              <p className="exam-print-school">{school?.name || 'School Name'}</p>
+              <h1 className="exam-print-title">Examination Timetable</h1>
+            </header>
+            <div className="exam-print-meta">
+              <span><strong>Academic Year:</strong> {school?.academicYear || '________________'}</span>
+              <span><strong>Exam Sessions:</strong> {examSchedules.length}</span>
+            </div>
             {scheduleLoading ? <p className="p-6 text-center text-xs text-[#64748B]">Loading exam schedules…</p> : examSchedules.length === 0 ? <p className="p-8 text-center text-xs text-[#64748B]">No exam schedules yet. Create a draft above.</p> : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-left text-xs">
+                <table className="exam-print-table w-full min-w-[980px] text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
-                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Exam rooms</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                    <th className="px-3 py-3">No.</th><th className="px-3 py-3">Examination</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Time</th><th className="px-3 py-3">Examination Hall</th><th className="exam-print-hide px-3 py-3">Status</th><th className="exam-print-hide px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {groupedExamSchedules.map(group => {
+                    {groupedExamSchedules.map((group, groupIndex) => {
                       const schedule = group.sessions[0];
                       const roomNames = [...new Set(group.sessions.map(session => session.roomName).filter(Boolean))];
                       const allPublished = group.sessions.every(session => session.status === 'published');
                       return (
                         <tr key={group.key}>
+                          <td className="px-3 py-3 text-center">{groupIndex + 1}</td>
                           <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
                           <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All classes assigned to this subject</p></td>
                           <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
                           <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
                           <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{roomNames.map(name => <span key={name} className="rounded bg-slate-100 px-2 py-1 text-[10px]">{name}</span>)}</div><p className="mt-1 text-[10px] text-[#64748B]">{group.sessions.length} room session{group.sessions.length === 1 ? '' : 's'}</p></td>
-                          <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${allPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{allPublished ? 'Published' : 'Draft'}</span></td>
-                          <td className="px-3 py-3"><div className="flex min-w-[220px] flex-col items-end gap-2">
+                          <td className="exam-print-hide px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${allPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{allPublished ? 'Published' : 'Draft'}</span></td>
+                          <td className="exam-print-hide px-3 py-3"><div className="flex min-w-[220px] flex-col items-end gap-2">
                             {group.sessions.map(roomSession => <div key={roomSession.id} className="flex flex-wrap justify-end gap-1">
                               <span className="self-center text-[10px] font-semibold text-slate-500">{roomSession.roomName}</span>
                               {roomSession.status === 'draft' && <>
@@ -1301,6 +1432,12 @@ export const ExamsResultsView: React.FC = () => {
                 </table>
               </div>
             )}
+            {!scheduleLoading && examSchedules.length > 0 && <div className="exam-print-signatures">
+              <div>Prepared by</div>
+              <div>Checked by</div>
+              <div>Approved by / Principal</div>
+            </div>}
+            <p className="exam-print-footer">Official school examination timetable · Please follow the dates, times and examination hall assignments shown above.</p>
           </section></>}
           {scheduleSection === 'rooms' && <div className="space-y-4">
             <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
