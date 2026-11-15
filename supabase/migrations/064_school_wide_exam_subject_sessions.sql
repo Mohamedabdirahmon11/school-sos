@@ -25,6 +25,14 @@ BEGIN
    FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Exam schedule was not found in this school.'; END IF;
   IF v_schedule.status <> 'draft' THEN RAISE EXCEPTION 'Only draft exam schedules can be published.'; END IF;
+  IF v_schedule.room_id IS NULL THEN RAISE EXCEPTION 'Assign an active Exam Room before publishing this session.'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.exam_rooms AS room
+     WHERE room.id = v_schedule.room_id
+       AND room.school_id = p_school_id
+       AND room.is_active IS TRUE
+       AND v_schedule.seat_capacity <= room.capacity
+  ) THEN RAISE EXCEPTION 'The assigned room is inactive or its capacity is too small.'; END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended(
     p_school_id || ':' || v_schedule.exam_date::text || ':room:' || lower(btrim(v_schedule.room_name)), 0
