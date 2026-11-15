@@ -14,7 +14,7 @@ import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { ExamTimetablePrint } from '../common/ExamTimetablePrint.tsx';
+import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { 
   SchoolClass, 
   Subject, 
@@ -524,7 +524,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             )}
           </div>
         <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
-          <h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2>
+          <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
           {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={[...new Set(publishedExamSchedules.map((exam: any) => exam.className).filter(Boolean))].join(" / ") || school?.examTimetableClassGroup} />}
         </section>
 
