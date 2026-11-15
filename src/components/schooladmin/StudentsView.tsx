@@ -214,10 +214,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
-  if (isLoading) return <div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>;
-  if (studentLoad.error) return <ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />;
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
+    <>
+      {isLoading ? (
+        <div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>
+      ) : studentLoad.error ? (
+        <ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />
+      ) : (
+        <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -732,8 +736,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         </div>
       )}
 
+        </div>
+      )}
       <BulkImportWizard open={showBulkImport} onClose={() => setShowBulkImport(false)} onComplete={() => { void fetchStudents(); }} />
       <BulkStudentPinResetWizard open={showBulkPinReset} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />
-    </div>
+    </>
   );
 };
