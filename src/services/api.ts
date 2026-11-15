@@ -944,6 +944,10 @@ export class ApiClient {
     });
   }
 
+  public static async getExamScheduleCohort(scheduleId: string) {
+    return this.request<Array<{ studentId: string; classId: string }>>(`/exams/schedules/${encodeURIComponent(scheduleId)}/cohort`);
+  }
+
   public static async cancelExamSchedule(scheduleId: string) {
     return this.request<{ success: boolean; schedule: any }>(
       `/exams/schedules/${encodeURIComponent(scheduleId)}/cancel`, { method: 'POST', body: JSON.stringify({}) }
