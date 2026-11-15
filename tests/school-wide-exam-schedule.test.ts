@@ -25,6 +25,10 @@ test('generator groups classes by shared subject and keeps subjects-per-day edit
   assert.match(ui, /Edit draft schedule/);
   assert.match(api, /examName, examType, semester, examDate, startTime, endTime/);
   assert.match(ui, /All classes assigned to this subject/);
+  assert.match(ui, /activeRooms = examRooms\.filter/);
+  assert.match(ui, /plannedSessions\.push/);
+  assert.match(ui, /roomId: session\.room\.id/);
+  assert.match(ui, /Each active room receives its own draft session/);
 });
 
 test('room printout includes the class beside each mixed student', () => {
