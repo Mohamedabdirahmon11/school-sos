@@ -336,7 +336,7 @@ export const ExamsResultsView: React.FC = () => {
       for (const plan of plans) {
         const startTime = addMinutes(autoStartTime, plan.slot * autoDurationMinutes);
         const endTime = addMinutes(startTime, autoDurationMinutes);
-        const roomName = `${autoRoom.trim()} - ${plan.className}`.slice(0, 120);
+        const roomName = 'Room not assigned';
         await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
           classId: plan.classId,
@@ -348,7 +348,7 @@ export const ExamsResultsView: React.FC = () => {
           endTime,
           roomName,
           shiftName: autoShiftName.trim() || 'General',
-          seatCapacity: autoCapacity
+          seatCapacity: 500
         });
         createdCount += 1;
       }
