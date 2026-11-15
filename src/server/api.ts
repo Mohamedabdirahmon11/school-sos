@@ -4999,9 +4999,13 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   const [allSchedules, classes, subjects] = await Promise.all([
     db.getPublishedExamSchedules(school.id), db.getClasses(school.id), db.getSubjects(school.id)
   ]);
+  const cohortRows = allowedClassIds?.size
+    ? await db.queryRows<any>('exam_schedule_cohort_students', { school_id: school.id, class_id: [...allowedClassIds] })
+    : [];
+  const allowedCohortScheduleIds = new Set(cohortRows.map((row: any) => row.scheduleId));
   const schedules = allSchedules.filter(schedule =>
-    (!requestedClassId || schedule.classId === requestedClassId) &&
-    (allowedClassIds === null || allowedClassIds.has(schedule.classId))
+    (!requestedClassId || schedule.classId === requestedClassId || allowedCohortScheduleIds.has(schedule.id)) &&
+    (allowedClassIds === null || allowedClassIds.has(schedule.classId) || allowedCohortScheduleIds.has(schedule.id))
   );
   const classNames = new Map(classes.map(item => [item.id, item.name]));
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
@@ -5161,6 +5165,13 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
 
   try {
     const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
+    if (Array.isArray(body.cohortStudentIds)) {
+      if (body.cohortStudentIds.length > seatCapacity || body.cohortStudentIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+        res.status(400).json({ error: 'Choose valid students within the room capacity.' });
+        return;
+      }
+      await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
+    }
     db.logAudit({
       action: 'EXAM_SCHEDULE_UPDATED', category: 'academics', schoolId: school.id,
       schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
@@ -5214,6 +5225,14 @@ apiRouter.post('/exams/schedules/:id/publish', requireAuth, requireSchoolAdminOr
     const message = error instanceof Error ? error.message : 'Unable to publish exam schedule.';
     res.status(message.includes('already booked') || message.includes('capacity') ? 409 : 400).json({ error: message });
   }
+});
+
+apiRouter.get('/exams/schedules/:id/cohort', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
+  if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  const cohort = await db.getExamScheduleCohort(school.id, schedule.id);
+  res.json(cohort.map((row: any) => ({ studentId: row.studentId, classId: row.classId })));
 });
 
 apiRouter.get('/exams/schedules/:id/seats', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
