@@ -2406,7 +2406,7 @@ class StorageEngine {
   }
 
   public async createExamSchedule(schedule: {
-    id: string; schoolId: string; classId: string; subjectId: string; examName: string;
+    id: string; schoolId: string; classId: string; subjectId: string; roomId?: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
     examDate: string; startTime: string; endTime: string; roomName: string; shiftName?: string;
     seatCapacity: number; createdBy: string;
@@ -2414,7 +2414,7 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { error } = await client.from('exam_schedules').insert({
-      id: schedule.id, school_id: schedule.schoolId, room_id: (schedule as any).roomId || null, class_id: schedule.classId,
+      id: schedule.id, school_id: schedule.schoolId, room_id: schedule.roomId || null, class_id: schedule.classId,
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
@@ -3852,7 +3852,7 @@ class StorageEngine {
     // Each query is explicitly scoped to this school ID.
     const schoolTables = [
       'admission_applications', 'assignment_submissions', 'assignments', 'attendance_records',
-      'bus_assignments', 'class_subjects', 'classes', 'exam_schedules', 'exam_seat_assignments',
+      'bus_assignments', 'class_subjects', 'classes', 'exam_rooms', 'exam_schedules', 'exam_schedule_cohort_students', 'exam_seat_assignments',
       'direct_messages', 'discipline_incidents', 'exam_configs',
       'fee_payments', 'fee_ranges', 'fee_receipt_sequences', 'fee_structures', 'inventory_items',
       'inventory_transactions', 'library_books', 'library_loans', 'notice_reads',

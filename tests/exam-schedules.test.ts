@@ -7,6 +7,7 @@ const rlsMigration = readFileSync(new URL('../supabase/migrations/059_exam_sched
 const shiftMigration = readFileSync(new URL('../supabase/migrations/060_exam_schedule_shifts.sql', import.meta.url), 'utf8');
 const cohortMigration = readFileSync(new URL('../supabase/migrations/061_exam_schedule_mixed_class_groups.sql', import.meta.url), 'utf8');
 const randomizedSeatMigration = readFileSync(new URL('../supabase/migrations/062_exam_schedule_randomized_seating.sql', import.meta.url), 'utf8');
+const roomRegistryMigration = readFileSync(new URL('../supabase/migrations/063_exam_room_registry.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
@@ -37,6 +38,13 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.ok(cohortMigration.includes('teacher already has an overlapping exam'));
   assert.ok(randomizedSeatMigration.includes('md5(cohort.student_id || v_schedule.id)'));
   assert.ok(randomizedSeatMigration.includes('SECURITY INVOKER'));
+  assert.match(roomRegistryMigration, /CREATE TABLE IF NOT EXISTS public\.exam_rooms/);
+  assert.match(roomRegistryMigration, /capacity INTEGER NOT NULL CHECK \(capacity BETWEEN 1 AND 500\)/);
+  assert.match(roomRegistryMigration, /FOREIGN KEY \(room_id, school_id\)/);
+  assert.match(roomRegistryMigration, /ALTER TABLE public\.exam_rooms ENABLE ROW LEVEL SECURITY/);
+  assert.match(roomRegistryMigration, /ON DELETE RESTRICT/);
+  assert.ok(roomRegistryMigration.includes('Assign an active Exam Room before publishing this session.'));
+  assert.ok(roomRegistryMigration.includes('exam_schedules_published_room_required'));
   assert.ok(cohortMigration.includes('already have an exam at this time'));
 });
 
@@ -53,6 +61,12 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.ok(api.includes('db.updateExamSchedule'));
   assert.ok(api.includes('db.setExamScheduleCohort'));
   assert.ok(api.includes("apiRouter.get('/exams/schedules/:id/cohort'"));
+  assert.ok(api.includes("apiRouter.get('/exams/rooms'"));
+  assert.ok(api.includes("apiRouter.post('/exams/rooms'"));
+  assert.ok(api.includes("apiRouter.put('/exams/rooms/:id'"));
+  assert.ok(api.includes('Assign an active Exam Room before publishing'));
+  assert.ok(api.includes("roomName !== 'Room not assigned'"));
+  assert.ok(api.includes('Choose an active exam room belonging to this school'));
   assert.ok(api.includes('allowedCohortScheduleIds'));
 });
 
@@ -61,7 +75,16 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(storage.includes('getExamScheduleSeats'));
   assert.ok(storage.includes('updateExamSchedule'));
   assert.ok(storage.includes('setExamScheduleCohort'));
+  assert.ok(storage.includes('getExamRooms'));
+  assert.ok(storage.includes('createExamRoom'));
+  assert.ok(storage.includes('updateExamRoom'));
+  assert.ok(storage.includes("'exam_rooms', 'exam_schedules', 'exam_schedule_cohort_students', 'exam_seat_assignments'"));
+  assert.ok(api.includes('exam_schedule_cohort_students'));
+  assert.ok(schema.includes('exam_schedule_cohort_students'));
   assert.ok(client.includes('getExamScheduleCohort'));
+  assert.ok(client.includes('getExamRooms'));
+  assert.ok(client.includes('createExamRoom'));
+  assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
   assert.ok(ui.includes("setActiveTab('schedule')"));
@@ -79,6 +102,10 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes("setScheduleSection('timetable')") || ui.includes("'Exam Timetable'"));
   assert.ok(ui.includes("'Exam Rooms'"));
   assert.ok(ui.includes("'Student Mixing'"));
+  assert.ok(ui.includes('Register exam room'));
+  assert.ok(ui.includes('Registered exam rooms'));
+  assert.ok(ui.includes('Add exam room'));
+  assert.ok(ui.includes('Deactivate'));
   assert.ok(ui.includes('Print wall timetable'));
   assert.ok(ui.includes('randomly selects students'));
   assert.ok(!ui.includes('up to three classes'));

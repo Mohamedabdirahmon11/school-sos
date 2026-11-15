@@ -5103,9 +5103,14 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
-  const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const roomId = typeof body.roomId === 'string' ? body.roomId.trim() : '';
+  const requestedRoomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
   const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : 'General';
-  const seatCapacity = Number(body.seatCapacity);
+  const requestedCapacity = Number(body.seatCapacity);
+  const selectedRoom = roomId ? (await db.getExamRooms(school.id)).find(room => room.id === roomId) : null;
+  if (roomId && !selectedRoom) { res.status(400).json({ error: 'Choose an active exam room belonging to this school.' }); return; }
+  const roomName = selectedRoom?.name || requestedRoomName;
+  const seatCapacity = selectedRoom ? Number(selectedRoom.capacity) : requestedCapacity;
 
   const [dateYear, dateMonth, dateDay] = examDate.split('-').map(Number);
   const parsedDate = new Date(Date.UTC(dateYear, dateMonth - 1, dateDay));
@@ -5140,7 +5145,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const existingSchedules = await db.getExamSchedules(school.id);
   const overlaps = existingSchedules.some(other => {
     if (other.status === 'cancelled' || other.examDate !== examDate) return false;
-    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameRoom = selectedRoom ? other.roomId === selectedRoom.id : (roomName !== 'Room not assigned' && !other.roomId && String(other.roomName).trim().toLowerCase() === roomName.toLowerCase());
     const sameClass = other.classId === classId;
     const otherStart = String(other.startTime).slice(0, 5);
     const otherEnd = String(other.endTime).slice(0, 5);
@@ -5157,6 +5162,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       schoolId: school.id,
       classId,
       subjectId,
+      roomId: selectedRoom?.id,
       examName,
       examType,
       academicYear: school.academicYear,
@@ -5193,9 +5199,14 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
-  const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const roomId = typeof body.roomId === 'string' ? body.roomId.trim() : '';
+  const requestedRoomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
   const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : (schedule.shiftName || 'General');
-  const seatCapacity = Number(body.seatCapacity);
+  const requestedCapacity = Number(body.seatCapacity);
+  const selectedRoom = roomId ? (await db.getExamRooms(school.id)).find(room => room.id === roomId) : null;
+  if (roomId && !selectedRoom) { res.status(400).json({ error: 'Choose an active exam room belonging to this school.' }); return; }
+  const roomName = selectedRoom?.name || requestedRoomName;
+  const seatCapacity = selectedRoom ? Number(selectedRoom.capacity) : requestedCapacity;
   const [year, month, day] = examDate.split('-').map(Number);
   const parsedDate = new Date(Date.UTC(year, month - 1, day));
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
@@ -5213,7 +5224,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   const existingSchedules = await db.getExamSchedules(school.id);
   const overlaps = existingSchedules.some(other => {
     if (other.id === schedule.id || other.status === 'cancelled' || other.examDate !== examDate) return false;
-    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameRoom = selectedRoom ? other.roomId === selectedRoom.id : (roomName !== 'Room not assigned' && !other.roomId && String(other.roomName).trim().toLowerCase() === roomName.toLowerCase());
     const sameClass = other.classId === schedule.classId;
     const otherStart = String(other.startTime).slice(0, 5);
     const otherEnd = String(other.endTime).slice(0, 5);
@@ -5231,7 +5242,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
         return;
       }
     }
-    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, roomId: selectedRoom?.id, shiftName, seatCapacity });
     if (Array.isArray(body.cohortStudentIds)) {
       await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
     }
@@ -5274,6 +5285,9 @@ apiRouter.post('/exams/schedules/:id/publish', requireAuth, requireSchoolAdminOr
   const user = (req as any).user as User;
   const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
   if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  if (!schedule.roomId) { res.status(409).json({ error: 'Assign an active Exam Room before publishing this session.' }); return; }
+  const assignedRoom = (await db.getExamRooms(school.id)).find(room => room.id === schedule.roomId);
+  if (!assignedRoom || Number(schedule.seatCapacity) > Number(assignedRoom.capacity)) { res.status(409).json({ error: 'The assigned room is inactive or its capacity is smaller than this exam session.' }); return; }
   try {
     const result = await db.publishExamSchedule(school.id, schedule.id, user.id);
     db.logAudit({
@@ -6756,7 +6770,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_schedules","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_rooms","exam_schedules","exam_schedule_cohort_students","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;
