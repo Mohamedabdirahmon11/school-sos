@@ -919,6 +919,18 @@ export class ApiClient {
     });
   }
 
+  public static async getExamRooms(includeInactive = false) {
+    return this.request<any[]>('/exams/rooms' + (includeInactive ? '?includeInactive=true' : ''));
+  }
+
+  public static async createExamRoom(room: { name: string; roomCode?: string; capacity: number; location?: string; shiftName?: string }) {
+    return this.request<any>('/exams/rooms', { method: 'POST', body: JSON.stringify(room) });
+  }
+
+  public static async updateExamRoom(roomId: string, room: { name: string; roomCode?: string; capacity: number; location?: string; shiftName?: string; isActive: boolean }) {
+    return this.request<any>(`/exams/rooms/${encodeURIComponent(roomId)}`, { method: 'PUT', body: JSON.stringify(room) });
+  }
+
   public static async getExamSchedules() {
     return this.request<any[]>('/exams/schedules');
   }
@@ -931,13 +943,13 @@ export class ApiClient {
   public static async createExamSchedule(schedule: {
     examName: string; classId: string; subjectId: string; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
-    endTime: string; roomName: string; shiftName?: string; seatCapacity: number;
+    endTime: string; roomName: string; roomId?: string; shiftName?: string; seatCapacity: number;
   }) {
     return this.request<any>('/exams/schedules', { method: 'POST', body: JSON.stringify(schedule) });
   }
 
   public static async updateExamSchedule(scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string;
+    examDate: string; startTime: string; endTime: string; roomName: string; roomId?: string; shiftName: string;
     seatCapacity: number; cohortStudentIds?: string[];
   }) {
     return this.request<any>(`/exams/schedules/${encodeURIComponent(scheduleId)}`, {
