@@ -137,3 +137,48 @@ test('bulk PIN reset wizard selects a class and students and exports one-time PI
   assert.match(wizard, /New PIN/);
   assert.doesNotMatch(wizard, /Choose CSV or XLSX file/);
 });
+
+test('one-time PINs survive a remount of the Students screen and are cleared on close', async () => {
+  const store = await import('../src/lib/bulk-pin-results.ts');
+  store.clearPendingPinSlips();
+  assert.deepEqual(store.getPendingPinSlips('school-a'), []);
+  store.setPendingPinSlips('school-a', [{ studentId: 'S001', studentName: 'Ayaan Ali', newPin: '2468' }]);
+  assert.equal(store.getPendingPinSlips('school-a')[0].newPin, '2468');
+  assert.deepEqual(store.getPendingPinSlips('school-b'), [], 'another school never sees these PINs');
+  store.clearPendingPinSlips();
+  assert.deepEqual(store.getPendingPinSlips('school-a'), []);
+
+  const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
+  const students = readFileSync(new URL('../src/components/schooladmin/StudentsView.tsx', import.meta.url), 'utf8');
+  const auth = readFileSync(new URL('../src/context/AuthContext.tsx', import.meta.url), 'utf8');
+  assert.match(wizard, /useState<PinSlip\[\]>\(\(\) => getPendingPinSlips\(schoolId\)\)/);
+  assert.match(wizard, /setPendingPinSlips\(schoolId, returned\)/);
+  assert.match(wizard, /clearPendingPinSlips\(\)/);
+  assert.match(students, /useState\(\(\) => getPendingPinSlips\(school\?\.id\)\.length > 0\)/);
+  assert.match(auth, /clearPendingPinSlips\(\)/);
+});
+
+test('the PIN wizard stays mounted while the student list reloads', () => {
+  const students = readFileSync(new URL('../src/components/schooladmin/StudentsView.tsx', import.meta.url), 'utf8');
+  assert.match(students, /if \(isLoading\) return <>[\s\S]*\{pinResetWizard\}<\/>/);
+  assert.match(students, /if \(studentLoad\.error\) return <>[\s\S]*\{pinResetWizard\}<\/>/);
+  assert.match(students, /onClick=\{\(\) => setShowBulkPinReset\(true\)\}/);
+  assert.match(students, /type="button"\s+onClick=\{\(\) => setShowBulkPinReset\(true\)\}/);
+});
+
+test('the PIN wizard shows every returned PIN and guards against closing or refreshing', () => {
+  const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(wizard, /did not return a complete PIN receipt/, 'a partial receipt must not discard PINs the server already changed');
+  assert.match(wizard, /addEventListener\('beforeunload'/);
+  assert.match(wizard, /disabled=\{loading\} aria-label="Close"/);
+  assert.match(wizard, /Copy All PINs/);
+  assert.match(wizard, /Download PIN CSV/);
+  assert.match(wizard, /Print PIN slips/);
+});
+
+test('printing keeps the PIN table visible instead of hiding its own dialog', () => {
+  const wizard = readFileSync(new URL('../src/components/schooladmin/BulkStudentPinResetWizard.tsx', import.meta.url), 'utf8');
+  const css = wizard.match(/@media print \{[^`]*\}/)?.[0] || '';
+  assert.match(css, /\.bulk-pin-print, \.bulk-pin-print \* \{ visibility: visible/);
+  assert.doesNotMatch(css, /\.bulk-pin-dialog \{ display: none/, 'the table lives inside the dialog, so the dialog must not be display:none when printing');
+});
