@@ -80,6 +80,11 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
   const [scheduleShiftName, setScheduleShiftName] = useState('General');
   const [autoStartDate, setAutoStartDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [autoEndDate, setAutoEndDate] = useState(() => {
+    const date = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+    date.setDate(date.getDate() + 4);
+    return date.toISOString().slice(0, 10);
+  });
   const [autoDays, setAutoDays] = useState(5);
   const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState(2);
   const [autoStartTime, setAutoStartTime] = useState('08:00');
@@ -300,6 +305,7 @@ export const ExamsResultsView: React.FC = () => {
     setScheduleSaving(true);
     setScheduleError('');
     let createdCount = 0;
+    const createdScheduleIds: string[] = [];
     try {
       const dateForDay = (dayOffset: number) => {
         const date = new Date(`${autoStartDate}T00:00:00`);
@@ -370,7 +376,7 @@ export const ExamsResultsView: React.FC = () => {
       }));
       if (conflictingSession) throw new Error(`${conflictingSession.room.name} already has an exam during ${conflictingSession.startTime}–${conflictingSession.endTime} on ${conflictingSession.examDate}. Choose another date or start time.`);
       for (const session of plannedSessions) {
-        await ApiClient.createExamSchedule({
+        const created = await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
           subjectId: session.plan.subject.id,
           cohortStudentIds: session.cohortStudentIds,
@@ -384,12 +390,20 @@ export const ExamsResultsView: React.FC = () => {
           shiftName: session.room.shiftName || autoShiftName.trim() || 'General',
           seatCapacity: Number(session.room.capacity)
         });
+        if (created?.id) createdScheduleIds.push(created.id);
         createdCount += 1;
       }
       setExamSchedules(await ApiClient.getExamSchedules());
       setNotice(`Created ${createdCount} room sessions for ${plans.length} shared subjects across ${requiredDays} days. Students are randomly distributed among active rooms; each room has its own seating list. Review and publish the drafts.`);
     } catch (reason) {
-      setScheduleError(`Created ${createdCount} draft sessions before stopping: ${reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.'}`);
+      // Preserve historical rows: roll back this failed generation by cancelling
+      // only the new draft sessions created by this attempt.
+      const rollback = await Promise.allSettled(createdScheduleIds.map(id => ApiClient.cancelExamSchedule(id)));
+      const rollbackFailed = rollback.filter(result => result.status === 'rejected').length;
+      const detail = reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.';
+      setScheduleError(rollbackFailed
+        ? `Generation stopped: ${detail} Draft rollback was incomplete for ${rollbackFailed} session(s); review the timetable and cancel those drafts manually.`
+        : `Generation stopped: ${detail} The ${createdCount} draft session(s) created by this attempt were safely cancelled; no historical schedule was deleted.`);
       if (createdCount) setExamSchedules(await ApiClient.getExamSchedules());
     } finally {
       setScheduleSaving(false);
@@ -939,11 +953,24 @@ export const ExamsResultsView: React.FC = () => {
               <p className="mt-1 text-xs text-[#64748B]">Builds one shared session per unique subject. Classes studying the same subject are grouped together, then students are randomly split across active exam rooms according to each room's seat capacity.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-xs font-semibold text-[#475569]">First exam date
-                <input type="date" value={autoStartDate} onChange={event => setAutoStartDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+              <label className="text-xs font-semibold text-[#475569]">Start date
+                <input type="date" value={autoStartDate} onChange={event => {
+                  const nextStart = event.target.value;
+                  setAutoStartDate(nextStart);
+                  const end = new Date(`${nextStart}T00:00:00`);
+                  end.setDate(end.getDate() + Math.max(0, autoDays - 1));
+                  setAutoEndDate(`${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`);
+                }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Exam duration (days)
-                <input type="number" min={1} max={30} value={autoDays} onChange={event => setAutoDays(Math.max(1, Math.min(30, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+              <label className="text-xs font-semibold text-[#475569]">End date
+                <input type="date" min={autoStartDate} value={autoEndDate} onChange={event => {
+                  const nextEnd = event.target.value;
+                  setAutoEndDate(nextEnd);
+                  const start = new Date(`${autoStartDate}T00:00:00`);
+                  const end = new Date(`${nextEnd}T00:00:00`);
+                  setAutoDays(Math.max(1, Math.min(30, Math.floor((end.getTime() - start.getTime()) / 86400000) + 1)));
+                }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
+                <span className="mt-1 block font-normal text-slate-500">{autoDays} total exam days</span>
               </label>
               <label className="text-xs font-semibold text-[#475569]">Subjects per day
                 <select value={autoSubjectsPerDay} onChange={event => setAutoSubjectsPerDay(Math.max(1, Math.min(6, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">{[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count} {count === 1 ? 'subject' : 'subjects'}</option>)}</select>
