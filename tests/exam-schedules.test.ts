@@ -6,6 +6,7 @@ const migration = readFileSync(new URL('../supabase/migrations/058_exam_schedule
 const rlsMigration = readFileSync(new URL('../supabase/migrations/059_exam_schedule_service_role_policies.sql', import.meta.url), 'utf8');
 const shiftMigration = readFileSync(new URL('../supabase/migrations/060_exam_schedule_shifts.sql', import.meta.url), 'utf8');
 const cohortMigration = readFileSync(new URL('../supabase/migrations/061_exam_schedule_mixed_class_groups.sql', import.meta.url), 'utf8');
+const randomizedSeatMigration = readFileSync(new URL('../supabase/migrations/062_exam_schedule_randomized_seating.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
@@ -34,6 +35,8 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.ok(cohortMigration.includes('is_selected BOOLEAN NOT NULL DEFAULT TRUE'));
   assert.doesNotMatch(cohortMigration, /DELETE FROM public\.exam_schedule_cohort_students/i);
   assert.ok(cohortMigration.includes('teacher already has an overlapping exam'));
+  assert.ok(randomizedSeatMigration.includes('md5(cohort.student_id || v_schedule.id)'));
+  assert.ok(randomizedSeatMigration.includes('SECURITY INVOKER'));
   assert.ok(cohortMigration.includes('already have an exam at this time'));
 });
 
