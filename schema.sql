@@ -112,6 +112,11 @@ CREATE TABLE IF NOT EXISTS plans (
 CREATE TABLE IF NOT EXISTS schools (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  name_arabic TEXT NOT NULL DEFAULT '',
+  exam_timetable_title TEXT NOT NULL DEFAULT '',
+  exam_timetable_academic_year_title TEXT NOT NULL DEFAULT '',
+  exam_timetable_class_group TEXT NOT NULL DEFAULT 'DHAMMAAN FASALLADA',
+  exam_timetable_include_friday BOOLEAN NOT NULL DEFAULT FALSE,
   code VARCHAR(20) NOT NULL UNIQUE,
   address TEXT NOT NULL,
   city VARCHAR(100) NOT NULL,
