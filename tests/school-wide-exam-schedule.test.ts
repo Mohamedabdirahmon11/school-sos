@@ -22,6 +22,8 @@ test('generator groups classes by shared subject and keeps subjects-per-day edit
   assert.match(ui, /subjectPlans = new Map/);
   assert.match(ui, /setAutoSubjectsPerDay\(Math\.max\(1, Math\.min\(6/);
   assert.match(ui, /Generate school timetable/);
+  assert.match(ui, /Edit draft schedule/);
+  assert.match(api, /examName, examType, semester, examDate, startTime, endTime/);
   assert.match(ui, /All classes assigned to this subject/);
 });
 
