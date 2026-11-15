@@ -59,24 +59,32 @@ CREATE INDEX IF NOT EXISTS idx_exam_schedules_school_room_date
   ON public.exam_schedules (school_id, room_id, exam_date, start_time)
   WHERE status <> 'cancelled';
 
--- Keep the database-side school backup restore allowlist in sync with the new room table.
+-- Keep the database-side school backup restore allowlist in sync with exam room and seating data.
 DO $exam_room_restore$
 DECLARE
   v_definition TEXT;
 BEGIN
-  SELECT pg_get_functiondef('public.schoolos_restore_school_backup(jsonb)'::regprocedure)
+  SELECT pg_get_functiondef('public.schoolos_restore_school_backup_legacy(jsonb)'::regprocedure)
     INTO v_definition;
+
   IF position('exam_rooms' IN v_definition) = 0 THEN
     v_definition := replace(
       v_definition,
       '''school_branches'', ''classes''',
       '''school_branches'', ''exam_rooms'', ''classes'''
     );
-    IF position('exam_rooms' IN v_definition) = 0 THEN
-      RAISE EXCEPTION 'Could not add exam_rooms to the school backup restore allowlist.';
-    END IF;
-    EXECUTE v_definition;
   END IF;
+  IF position('exam_schedules' IN v_definition) = 0 THEN
+    v_definition := replace(
+      v_definition,
+      '''school_notices'', ''exam_configs''',
+      '''school_notices'', ''exam_configs'', ''exam_schedules'', ''exam_schedule_cohort_students'', ''exam_seat_assignments'''
+    );
+  END IF;
+  IF position('exam_rooms' IN v_definition) = 0 OR position('exam_schedule_cohort_students' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not synchronize exam tables in the school backup restore allowlist.';
+  END IF;
+  EXECUTE v_definition;
 END
 $exam_room_restore$;
 
