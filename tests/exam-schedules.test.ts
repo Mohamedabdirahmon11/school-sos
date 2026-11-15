@@ -43,6 +43,8 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.match(roomRegistryMigration, /FOREIGN KEY \(room_id, school_id\)/);
   assert.match(roomRegistryMigration, /ALTER TABLE public\.exam_rooms ENABLE ROW LEVEL SECURITY/);
   assert.match(roomRegistryMigration, /ON DELETE RESTRICT/);
+  assert.ok(roomRegistryMigration.includes('Assign an active Exam Room before publishing this session.'));
+  assert.ok(roomRegistryMigration.includes('exam_schedules_published_room_required'));
   assert.ok(cohortMigration.includes('already have an exam at this time'));
 });
 
