@@ -1,6 +1,6 @@
--- Exam timetable groups, class visibility, reusable time slots, and notes.
--- Additive only: existing exam_schedules rows and marks are not modified or deleted.
--- This migration is intentionally committed as a file only; do not apply to production without approval.
+-- Exam timetable groups, class visibility, editable time slots and reusable entries.
+-- Additive only: legacy exam_schedules, marks, seats and results are not modified.
+-- This file is prepared for review only. DO NOT apply to production without approval.
 
 CREATE TABLE IF NOT EXISTS public.exam_timetables (
   id VARCHAR(64) PRIMARY KEY,
@@ -52,25 +52,30 @@ CREATE TABLE IF NOT EXISTS public.exam_time_slots (
   CONSTRAINT exam_time_slots_id_school_unique UNIQUE (id, school_id)
 );
 
-ALTER TABLE public.exam_schedules
-  ADD COLUMN IF NOT EXISTS timetable_id VARCHAR(64),
-  ADD COLUMN IF NOT EXISTS time_slot_id VARCHAR(64);
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exam_schedules_timetable_school_fk') THEN
-    ALTER TABLE public.exam_schedules
-      ADD CONSTRAINT exam_schedules_timetable_school_fk
-      FOREIGN KEY (timetable_id, school_id)
-      REFERENCES public.exam_timetables(id, school_id) ON DELETE RESTRICT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exam_schedules_time_slot_school_fk') THEN
-    ALTER TABLE public.exam_schedules
-      ADD CONSTRAINT exam_schedules_time_slot_school_fk
-      FOREIGN KEY (time_slot_id, school_id)
-      REFERENCES public.exam_time_slots(id, school_id) ON DELETE RESTRICT;
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.exam_timetable_entries (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  timetable_id VARCHAR(64) NOT NULL,
+  subject_id VARCHAR(64) NOT NULL,
+  exam_date DATE,
+  time_slot_id VARCHAR(64),
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT exam_timetable_entries_valid_time CHECK (start_time < end_time),
+  CONSTRAINT exam_timetable_entries_id_school_unique UNIQUE (id, school_id),
+  CONSTRAINT exam_timetable_entries_timetable_school_fk
+    FOREIGN KEY (timetable_id, school_id)
+    REFERENCES public.exam_timetables(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT exam_timetable_entries_subject_school_fk
+    FOREIGN KEY (subject_id, school_id)
+    REFERENCES public.subjects(id, school_id) ON DELETE RESTRICT,
+  CONSTRAINT exam_timetable_entries_slot_school_fk
+    FOREIGN KEY (time_slot_id, school_id)
+    REFERENCES public.exam_time_slots(id, school_id) ON DELETE RESTRICT
+);
 
 CREATE INDEX IF NOT EXISTS idx_exam_timetables_school_status
   ON public.exam_timetables (school_id, status, academic_year, semester);
@@ -78,30 +83,142 @@ CREATE INDEX IF NOT EXISTS idx_exam_timetable_classes_school_class
   ON public.exam_timetable_classes (school_id, class_id, timetable_id);
 CREATE INDEX IF NOT EXISTS idx_exam_time_slots_school_active
   ON public.exam_time_slots (school_id, is_active, sort_order);
-CREATE INDEX IF NOT EXISTS idx_exam_schedules_timetable_date
-  ON public.exam_schedules (school_id, timetable_id, exam_date, start_time);
+CREATE INDEX IF NOT EXISTS idx_exam_timetable_entries_timetable_date
+  ON public.exam_timetable_entries (school_id, timetable_id, exam_date, start_time);
 
--- All three new tables are tenant-scoped and inaccessible to browser roles.
--- The server accesses them using its server-only service role; RLS remains enabled
--- as defense in depth and no client-side bypass is granted.
+-- Prevent overlapping exams for any class shared by two timetables.
+-- NULL dates are permitted only for copied templates and are not clash-checked.
+CREATE OR REPLACE FUNCTION public.schoolos_check_exam_timetable_entry_clash()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.exam_date IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM public.exam_timetable_entries AS other_entry
+      JOIN public.exam_timetables AS other_timetable
+        ON other_timetable.id = other_entry.timetable_id
+       AND other_timetable.school_id = other_entry.school_id
+      JOIN public.exam_timetable_classes AS other_class
+        ON other_class.timetable_id = other_timetable.id
+       AND other_class.school_id = other_timetable.school_id
+      JOIN public.exam_timetable_classes AS new_class
+        ON new_class.class_id = other_class.class_id
+       AND new_class.school_id = other_class.school_id
+     WHERE other_entry.school_id = NEW.school_id
+       AND other_entry.exam_date = NEW.exam_date
+       AND other_entry.id <> NEW.id
+       AND other_timetable.status <> 'cancelled'
+       AND other_entry.start_time < NEW.end_time
+       AND NEW.start_time < other_entry.end_time
+       AND new_class.timetable_id = NEW.timetable_id
+  ) THEN
+    RAISE EXCEPTION 'Fasalkan imtixaan kale ayuu leeyahay isla taariikhda iyo waqtigaas.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM public.exam_timetable_entries AS other_entry
+      JOIN public.exam_timetables AS other_timetable
+        ON other_timetable.id = other_entry.timetable_id
+       AND other_timetable.school_id = other_entry.school_id
+      JOIN public.exam_timetable_classes AS other_class
+        ON other_class.timetable_id = other_timetable.id
+       AND other_class.school_id = other_timetable.school_id
+      JOIN public.exam_timetable_classes AS new_class
+        ON new_class.class_id = other_class.class_id
+       AND new_class.school_id = other_class.school_id
+     WHERE other_entry.school_id = NEW.school_id
+       AND other_entry.exam_date = NEW.exam_date
+       AND other_entry.id <> NEW.id
+       AND other_timetable.status <> 'cancelled'
+       AND other_entry.start_time < NEW.end_time
+       AND NEW.start_time < other_entry.end_time
+       AND new_class.timetable_id = NEW.timetable_id
+  ) THEN
+    RAISE EXCEPTION 'Fasalkan imtixaan kale ayuu leeyahay isla taariikhda iyo waqtigaas.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS exam_timetable_entry_clash_guard ON public.exam_timetable_entries;
+CREATE TRIGGER exam_timetable_entry_clash_guard
+  BEFORE INSERT OR UPDATE OF timetable_id, exam_date, start_time, end_time
+  ON public.exam_timetable_entries
+  FOR EACH ROW EXECUTE FUNCTION public.schoolos_check_exam_timetable_entry_clash();
+
+-- Protect against adding a class to a timetable when its existing dated rows
+-- overlap with another active timetable already assigned to that class.
+CREATE OR REPLACE FUNCTION public.schoolos_check_exam_timetable_class_clash()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM public.exam_timetable_entries AS new_entry
+      JOIN public.exam_timetables AS new_timetable
+        ON new_timetable.id = new_entry.timetable_id
+       AND new_timetable.school_id = new_entry.school_id
+      JOIN public.exam_timetable_entries AS other_entry
+        ON other_entry.school_id = new_entry.school_id
+       AND other_entry.exam_date = new_entry.exam_date
+       AND other_entry.start_time < new_entry.end_time
+       AND new_entry.start_time < other_entry.end_time
+       AND other_entry.timetable_id <> new_entry.timetable_id
+      JOIN public.exam_timetables AS other_timetable
+        ON other_timetable.id = other_entry.timetable_id
+       AND other_timetable.school_id = other_entry.school_id
+      JOIN public.exam_timetable_classes AS other_class
+        ON other_class.timetable_id = other_timetable.id
+       AND other_class.school_id = other_timetable.school_id
+     WHERE new_entry.timetable_id = NEW.timetable_id
+       AND new_entry.school_id = NEW.school_id
+       AND new_entry.exam_date IS NOT NULL
+       AND new_timetable.status <> 'cancelled'
+       AND other_timetable.status <> 'cancelled'
+       AND other_class.class_id = NEW.class_id
+  ) THEN
+    RAISE EXCEPTION 'Fasalkan jadwal kale ayuu leeyahay oo isku dhacaya. Fadlan beddel taariikhda ama waqtiga.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS exam_timetable_class_clash_guard ON public.exam_timetable_classes;
+CREATE TRIGGER exam_timetable_class_clash_guard
+  BEFORE INSERT OR UPDATE OF timetable_id, class_id
+  ON public.exam_timetable_classes
+  FOR EACH ROW EXECUTE FUNCTION public.schoolos_check_exam_timetable_class_clash();
+
 ALTER TABLE public.exam_timetables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_timetable_classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_time_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exam_timetable_entries ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.exam_timetables, public.exam_timetable_classes, public.exam_time_slots FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.exam_timetables, public.exam_timetable_classes, public.exam_time_slots TO service_role;
+REVOKE ALL ON TABLE public.exam_timetables, public.exam_timetable_classes, public.exam_time_slots, public.exam_timetable_entries FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.exam_timetables, public.exam_timetable_classes, public.exam_time_slots, public.exam_timetable_entries TO service_role;
 
 DROP POLICY IF EXISTS exam_timetables_service_role_all ON public.exam_timetables;
-CREATE POLICY exam_timetables_service_role_all ON public.exam_timetables
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY exam_timetables_service_role_all ON public.exam_timetables FOR ALL TO service_role USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS exam_timetable_classes_service_role_all ON public.exam_timetable_classes;
-CREATE POLICY exam_timetable_classes_service_role_all ON public.exam_timetable_classes
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY exam_timetable_classes_service_role_all ON public.exam_timetable_classes FOR ALL TO service_role USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS exam_time_slots_service_role_all ON public.exam_time_slots;
-CREATE POLICY exam_time_slots_service_role_all ON public.exam_time_slots
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY exam_time_slots_service_role_all ON public.exam_time_slots FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS exam_timetable_entries_service_role_all ON public.exam_timetable_entries;
+CREATE POLICY exam_timetable_entries_service_role_all ON public.exam_timetable_entries FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Default reusable slots for existing schools. These are editable in the admin UI.
+-- Two editable school defaults: 07:30-09:00 and 09:30-11:00.
 INSERT INTO public.exam_time_slots (id, school_id, label, start_time, end_time, is_default, sort_order)
 SELECT 'exam-slot-1-' || school.id, school.id, 'Waqtiga 1', TIME '07:30', TIME '09:00', TRUE, 1
 FROM public.schools AS school
@@ -140,3 +257,5 @@ CREATE TRIGGER schools_seed_exam_time_slots
   FOR EACH ROW EXECUTE FUNCTION public.schoolos_seed_exam_time_slots();
 
 REVOKE ALL ON FUNCTION public.schoolos_seed_exam_time_slots() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_check_exam_timetable_entry_clash() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_check_exam_timetable_class_clash() FROM PUBLIC, anon, authenticated;
