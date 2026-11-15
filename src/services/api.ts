@@ -931,7 +931,7 @@ export class ApiClient {
   public static async createExamSchedule(schedule: {
     examName: string; classId: string; subjectId: string; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
-    endTime: string; roomName: string; seatCapacity: number;
+    endTime: string; roomName: string; shiftName?: string; seatCapacity: number;
   }) {
     return this.request<any>('/exams/schedules', { method: 'POST', body: JSON.stringify(schedule) });
   }
