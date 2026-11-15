@@ -1513,7 +1513,7 @@ export const ExamsResultsView: React.FC = () => {
                         <tr key={group.key}>
                           <td className="exam-print-number">{groupIndex + 1}</td>
                           <td><strong>{schedule.subjectName}</strong><small className="exam-print-subline">{schedule.examName} · {schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</small><span className="sr-only">All classes assigned to this subject</span></td>
-                          <td>{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                          <td>{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</td>
                           <td className="exam-print-time">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
                           <td>{roomNames.join(', ') || '________________'}</td>
                           <td className="exam-print-handwrite"><span>____________________</span></td>
