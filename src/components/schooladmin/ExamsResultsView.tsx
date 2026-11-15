@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
 import { buildResultsCsv } from '../../lib/results-csv.ts';
+import { ExamTimetablePrint } from '../common/ExamTimetablePrint.tsx';
 import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
@@ -471,7 +472,7 @@ const EXAM_REDESIGN_STYLES = `
 `;
 
 export const ExamsResultsView: React.FC = () => {
-  const { school, isReadOnly, t } = useAuth();
+  const { school, isReadOnly, t, refreshUser } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -536,6 +537,11 @@ export const ExamsResultsView: React.FC = () => {
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
   const [scheduleSection, setScheduleSection] = useState<'timetable' | 'rooms' | 'mixing'>('timetable');
+  const [printTitle, setPrintTitle] = useState(school?.examTimetableTitle || '');
+  const [printAcademicYearTitle, setPrintAcademicYearTitle] = useState(school?.examTimetableAcademicYearTitle || '');
+  const [printClassGroup, setPrintClassGroup] = useState(school?.examTimetableClassGroup || 'DHAMMAAN FASALLADA');
+  const [printIncludeFriday, setPrintIncludeFriday] = useState(school?.examTimetableIncludeFriday === true);
+  const [printSettingsSaving, setPrintSettingsSaving] = useState(false);
 
   // Load classes, subjects, and exam configuration with a retryable failure state.
   const loadExamSetup = async () => {
@@ -659,6 +665,24 @@ export const ExamsResultsView: React.FC = () => {
     } catch (err: any) {
       setNotice(err.message || 'Failed to approve marks.');
     }
+  };
+
+  const handleSaveExamTimetablePrintSettings = async () => {
+    if (isReadOnly || !school) return;
+    setPrintSettingsSaving(true);
+    setScheduleError('');
+    try {
+      await ApiClient.request('/school/settings', { method: 'PUT', body: JSON.stringify({
+        examTimetableTitle: printTitle.trim(),
+        examTimetableAcademicYearTitle: printAcademicYearTitle.trim(),
+        examTimetableClassGroup: printClassGroup.trim(),
+        examTimetableIncludeFriday: printIncludeFriday
+      }) });
+      await refreshUser();
+      setNotice('Exam timetable print settings saved for this school.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to save exam timetable print settings.');
+    } finally { setPrintSettingsSaving(false); }
   };
 
   const handleSaveExamRoom = async () => {
@@ -1477,71 +1501,24 @@ export const ExamsResultsView: React.FC = () => {
             </section>
           )}
 
-          {scheduleSection === 'timetable' && <><style>{`@media print { body * { visibility: hidden !important; } .exam-wall-print, .exam-wall-print * { visibility: visible !important; } .exam-wall-print { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; } .exam-wall-print .no-print { display: none !important; } } @page { size: A4 landscape; margin: 14mm; }`}</style><section className="exam-wall-print exam-print-document overflow-hidden rounded-xl border border-[#111] bg-white shadow-none">
-            <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4">
-              <div><h2 className="text-sm font-bold text-[#132A29]">Printable exam timetable</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} subject sessions · {school?.academicYear || 'Current year'}</p></div>
-              <button type="button" onClick={() => window.print()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white"><Printer className="mr-1 inline h-3.5 w-3.5"/>Print wall timetable</button>
-              <button type="button" onClick={() => { setScheduleError(''); setScheduleLoading(true); ApiClient.getExamSchedules().then(setExamSchedules).catch(error => setScheduleError(error.message || 'Unable to refresh schedules.')).finally(() => setScheduleLoading(false)); }} disabled={scheduleLoading} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] disabled:opacity-50">{scheduleLoading ? 'Refreshing…' : 'Refresh'}</button>
-            </div>
-            <header className="exam-print-heading">
-              <p className="exam-print-school">{school?.name || 'School Name'}</p>
-              <h1 className="exam-print-title">Examination Timetable</h1>
-            </header>
-            <div className="exam-print-meta">
-              <span><strong>Academic Year:</strong> {school?.academicYear || '________________'}</span>
-              <span><strong>Exam Sessions:</strong> {examSchedules.length}</span>
-            </div>
-            {scheduleLoading ? <p className="p-6 text-center text-xs text-[#64748B]">Loading exam schedules…</p> : examSchedules.length === 0 ? <p className="p-8 text-center text-xs text-[#64748B]">No exam schedules yet. Create a draft above.</p> : (
-              <div className="overflow-x-auto">
-                <table className="exam-print-table exam-print-grid w-full text-left text-xs">
-                  <thead><tr>
-                    <th className="exam-print-number">No.</th>
-                    <th>Subject</th>
-                    <th><span className="sr-only">Day / Date</span>Exam Date</th>
-                    <th>Time</th>
-                    <th>Examination Hall</th>
-                    <th className="exam-print-handwrite">Invigilator / Signature</th>
-                    <th className="exam-print-hide">Status</th>
-                    <th className="exam-print-hide">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    {groupedExamSchedules.map((group, groupIndex) => {
-                      const schedule = group.sessions[0];
-                      const roomNames = [...new Set(group.sessions.map(session => session.roomName).filter(Boolean))];
-                      const allPublished = group.sessions.every(session => session.status === 'published');
-                      return (
-                        <tr key={group.key}>
-                          <td className="exam-print-number">{groupIndex + 1}</td>
-                          <td><strong>{schedule.subjectName}</strong><small className="exam-print-subline">{schedule.examName} · {schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</small><span className="sr-only">All classes assigned to this subject</span></td>
-                          <td>{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                          <td className="exam-print-time">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
-                          <td>{roomNames.join(', ') || '________________'}</td>
-                          <td className="exam-print-handwrite"><span>____________________</span></td>
-                          <td className="exam-print-hide"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${allPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{allPublished ? 'Published' : 'Draft'}</span></td>
-                          <td className="exam-print-hide"><div className="flex min-w-[190px] flex-wrap justify-end gap-1">
-                            {group.sessions.map(roomSession => <div key={roomSession.id} className="flex flex-wrap justify-end gap-1">
-                              {roomSession.status === 'draft' && <>
-                                <button type="button" onClick={() => void openEditExamSchedule(roomSession)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button>
-                                <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish & assign seats'}</button>
-                                <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
-                              </>}
-                              {roomSession.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(roomSession)} aria-label="Print seating roster" className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Print seats</button>}
-                            </div>)}
-                          </div></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {!scheduleLoading && examSchedules.length > 0 && <div className="exam-print-signatures">
-              <div>Prepared by</div>
-              <div>Checked by</div>
-              <div>Approved by / Principal</div>
-            </div>}
-            <p className="exam-print-footer">Official school examination timetable · Please follow the dates, times and examination hall assignments shown above.</p>
-          </section></>}
+          {scheduleSection === 'timetable' && <div className="space-y-4">
+<section className="no-print rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm">
+<div className="mb-3"><h2 className="text-sm font-bold text-[#132A29]">Printable timetable headings</h2><p className="mt-1 text-[11px] text-[#64748B]">Edit the three title rows and choose whether Friday exam sessions appear.</p></div>
+<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+<label className="text-xs font-semibold text-[#475569]">Title row 1<input maxLength={180} value={printTitle} onChange={event=>setPrintTitle(event.target.value)} placeholder={`JADWALKA IMTIXAANKA ${examSchedules[0]?.semester||'SEMESTER'}`} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal"/></label>
+<label className="text-xs font-semibold text-[#475569]">Title row 2<input maxLength={180} value={printAcademicYearTitle} onChange={event=>setPrintAcademicYearTitle(event.target.value)} placeholder={`SANNAD DUGSIYEEDKA ${school?.academicYear||''}`} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal"/></label>
+<label className="text-xs font-semibold text-[#475569]">Class group<input maxLength={180} value={printClassGroup} onChange={event=>setPrintClassGroup(event.target.value)} placeholder="DHAMMAAN FASALLADA" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal"/></label>
+</div>
+<div className="mt-3 flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-[#475569]"><input type="checkbox" checked={printIncludeFriday} onChange={event=>setPrintIncludeFriday(event.target.checked)}/> Include Friday exam sessions</label><button type="button" onClick={()=>void handleSaveExamTimetablePrintSettings()} disabled={isReadOnly||printSettingsSaving} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{printSettingsSaving?'Saving…':'Save timetable headings'}</button></div>
+</section>
+<section className="exam-wall-print overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-none">
+<div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4"><div><h2 className="text-sm font-bold text-[#132A29]">Printable exam timetable</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} subject sessions · {school?.academicYear||'Current year'}</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={()=>window.print()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white"><Printer className="mr-1 inline h-3.5 w-3.5"/>Print / Save PDF</button><button type="button" onClick={()=>{setScheduleError('');setScheduleLoading(true);ApiClient.getExamSchedules().then(setExamSchedules).catch(error=>setScheduleError(error.message||'Unable to refresh schedules.')).finally(()=>setScheduleLoading(false));}} disabled={scheduleLoading} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] disabled:opacity-50">{scheduleLoading?'Refreshing…':'Refresh'}</button></div></div>
+{scheduleLoading?<p className="p-6 text-center text-xs text-[#64748B]">Loading exam schedules…</p>:<ExamTimetablePrint schedules={examSchedules} school={school} title={printTitle} academicYearTitle={printAcademicYearTitle} classGroup={printClassGroup} includeFriday={printIncludeFriday}/>}
+</section>
+<section className="no-print rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Manage exam sessions</h2><p className="mt-1 text-[11px] text-[#64748B]">Edit or cancel draft rows, publish sessions and print assigned room lists. These controls stay outside the printed timetable.</p><div className="mt-3 divide-y divide-[#E2E8F0]">
+{groupedExamSchedules.map(group=>{const schedule=group.sessions[0];return <div key={group.key} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong className="text-[#132A29]">{schedule.subjectName}</strong><p className="mt-1 text-[#64748B]">{schedule.examDate} · {String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)} · {group.roomNames.join(', ')||'Room not assigned'}</p></div><div className="flex flex-wrap gap-2">{group.sessions.map(roomSession=><div key={roomSession.id} className="flex flex-wrap gap-1">{roomSession.status==='draft'&&<><button type="button" onClick={()=>void openEditExamSchedule(roomSession)} disabled={isReadOnly||scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button><button type="button" onClick={()=>void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly||publishingScheduleId===roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId===roomSession.id?'Publishing…':'Publish & assign seats'}</button><button type="button" onClick={()=>void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly||publishingScheduleId===roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button></>}{roomSession.status==='published'&&<button type="button" onClick={()=>void handlePrintExamSeats(roomSession)} aria-label="Print seating roster" className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Print seats</button>}</div>)}</div></div>;})}
+{!groupedExamSchedules.length&&<p className="py-5 text-center text-xs text-[#64748B]">No exam sessions yet. Create a draft to start building the timetable.</p>}
+</div></section></div>}
           {scheduleSection === 'rooms' && <div className="space-y-4">
             <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-bold text-[#132A29]">{editingRoomId ? 'Edit exam room' : 'Register exam room'}</h2><p className="mt-1 text-xs text-[#64748B]">Create reusable school exam halls. Capacity, location and shift are stored once and reused across sessions.</p></div>{editingRoomId && <button type="button" onClick={() => { setEditingRoomId(''); setRoomForm({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' }); }} className="rounded-lg border px-3 py-2 text-xs font-semibold">Cancel edit</button>}</div>
