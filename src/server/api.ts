@@ -5039,6 +5039,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
   const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : 'General';
   const seatCapacity = Number(body.seatCapacity);
 
   const [dateYear, dateMonth, dateDay] = examDate.split('-').map(Number);
@@ -5053,7 +5054,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       !['small', 'big'].includes(examType) ||
       !['Semester 1', 'Semester 2'].includes(semester) ||
       !validDate || !validTime(startTime) || !validTime(endTime) ||
-      startTime >= endTime || !roomName || roomName.length > 120 ||
+      startTime >= endTime || !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 ||
       !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid exam name, class, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
     return;
@@ -5099,6 +5100,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       startTime,
       endTime,
       roomName,
+      shiftName,
       seatCapacity,
       createdBy: user.id
     });
@@ -5127,6 +5129,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
   const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const shiftName = typeof body.shiftName === 'string' ? body.shiftName.trim() : (schedule.shiftName || 'General');
   const seatCapacity = Number(body.seatCapacity);
   const [year, month, day] = examDate.split('-').map(Number);
   const parsedDate = new Date(Date.UTC(year, month - 1, day));
@@ -5137,7 +5140,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
     return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
   };
   if (!validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
-      !roomName || roomName.length > 120 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
+      !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid date, time range, room, and capacity (1–500).' });
     return;
   }
@@ -5157,7 +5160,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   }
 
   try {
-    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, seatCapacity });
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, shiftName, seatCapacity });
     db.logAudit({
       action: 'EXAM_SCHEDULE_UPDATED', category: 'academics', schoolId: school.id,
       schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
