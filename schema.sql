@@ -3893,8 +3893,8 @@ CREATE TABLE IF NOT EXISTS public.exam_schedules (
   CONSTRAINT exam_schedules_class_school_fk FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
   CONSTRAINT exam_schedules_subject_school_fk FOREIGN KEY (subject_id, school_id)
-    REFERENCES public.subjects(id, school_id) ON DELETE CASCADE
-,  CONSTRAINT exam_schedules_room_school_fk FOREIGN KEY (room_id, school_id)
+    REFERENCES public.subjects(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT exam_schedules_room_school_fk FOREIGN KEY (room_id, school_id)
     REFERENCES public.exam_rooms(id, school_id) ON DELETE RESTRICT
 );
 
