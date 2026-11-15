@@ -5869,6 +5869,7 @@ BEGIN
            SELECT 1 FROM public.exam_schedule_cohort_students AS cohort_class
             WHERE cohort_class.school_id = p_school_id
               AND cohort_class.schedule_id = p_schedule_id
+              AND cohort_class.is_selected IS TRUE
               AND cohort_class.class_id = current_assignment.class_id
          )
        )
@@ -5879,7 +5880,7 @@ BEGIN
 
   SELECT COUNT(*) INTO v_cohort_count
     FROM public.exam_schedule_cohort_students
-   WHERE school_id = p_school_id AND schedule_id = p_schedule_id;
+   WHERE school_id = p_school_id AND schedule_id = p_schedule_id AND is_selected IS TRUE;
 
   IF v_cohort_count > 0 THEN
     SELECT COUNT(*) INTO v_student_count
@@ -5900,6 +5901,7 @@ BEGIN
         JOIN public.exam_schedules AS other
           ON other.id = seat.schedule_id AND other.school_id = p_school_id
        WHERE cohort.school_id = p_school_id AND cohort.schedule_id = p_schedule_id
+         AND cohort.is_selected IS TRUE
          AND other.id <> p_schedule_id AND other.status = 'published'
          AND other.exam_date = v_schedule.exam_date
          AND v_schedule.start_time < other.end_time
@@ -5937,7 +5939,7 @@ BEGIN
            ROW_NUMBER() OVER (ORDER BY student.student_id, student.id)::INTEGER
       FROM public.exam_schedule_cohort_students AS cohort
       JOIN public.students AS student ON student.id = cohort.student_id AND student.school_id = p_school_id
-     WHERE cohort.school_id = p_school_id AND cohort.schedule_id = p_schedule_id;
+     WHERE cohort.school_id = p_school_id AND cohort.schedule_id = p_schedule_id AND cohort.is_selected IS TRUE;
   ELSE
     INSERT INTO public.exam_seat_assignments (id, school_id, schedule_id, student_id, seat_number)
     SELECT 'seat-' || gen_random_uuid()::TEXT, p_school_id, p_schedule_id, student.id,
