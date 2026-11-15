@@ -107,6 +107,8 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes('Add exam room'));
   assert.ok(ui.includes('Deactivate'));
   assert.ok(ui.includes('Print wall timetable'));
+  assert.ok(ui.includes('Day / Date'));
+  assert.ok(ui.includes("weekday: 'long'"));
   assert.ok(ui.includes('randomly selects students'));
   assert.ok(!ui.includes('up to three classes'));
 });
