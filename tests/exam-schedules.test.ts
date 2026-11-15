@@ -26,7 +26,7 @@ test('exam schedule schema is tenant-scoped and protects room and seat allocatio
   assert.match(migration, /SET search_path = ''/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_publish_exam_schedule/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_publish_exam_schedule/);
-  assert.match(shiftMigration, /shift_name VARCHAR\\(80\\) NOT NULL DEFAULT 'General'/);
+  assert.match(shiftMigration, /shift_name VARCHAR\(80\) NOT NULL DEFAULT 'General'/);
   assert.ok(cohortMigration.includes('exam_schedule_cohort_students'));
   assert.ok(cohortMigration.includes('schoolos_set_exam_schedule_cohort'));
   assert.ok(cohortMigration.includes('teacher already has an overlapping exam'));
