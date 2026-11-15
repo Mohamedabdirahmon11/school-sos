@@ -2406,7 +2406,7 @@ class StorageEngine {
   }
 
   public async createExamSchedule(schedule: {
-    id: string; schoolId: string; classId: string; subjectId: string; roomId?: string; examName: string;
+    id: string; schoolId: string; classId: string | null; subjectId: string; roomId?: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
     examDate: string; startTime: string; endTime: string; roomName: string; shiftName?: string;
     seatCapacity: number; createdBy: string;
@@ -2414,7 +2414,7 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { error } = await client.from('exam_schedules').insert({
-      id: schedule.id, school_id: schedule.schoolId, room_id: schedule.roomId || null, class_id: schedule.classId,
+      id: schedule.id, school_id: schedule.schoolId, room_id: schedule.roomId || null, class_id: schedule.classId || null,
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
@@ -2425,12 +2425,15 @@ class StorageEngine {
   }
 
   public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
+    examName: string; examType: 'small' | 'big'; semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { data, error } = await client.from('exam_schedules')
       .update({
+        exam_name: updates.examName,
+        exam_type: updates.examType,
+        semester: updates.semester,
         exam_date: updates.examDate,
         start_time: updates.startTime,
         end_time: updates.endTime,
@@ -2496,14 +2499,19 @@ class StorageEngine {
   public async getExamScheduleSeats(schoolId: string, scheduleId: string): Promise<any[]> {
     const seats = await this.queryRows<any>('exam_seat_assignments', { school_id: schoolId, schedule_id: scheduleId });
     if (!seats.length) return [];
-    const students = await this.queryRows<any>('students', { school_id: schoolId, id: seats.map(seat => seat.studentId) });
+    const [students, classes] = await Promise.all([
+      this.queryRows<any>('students', { school_id: schoolId, id: seats.map(seat => seat.studentId) }),
+      this.getClasses(schoolId)
+    ]);
     const byId = new Map(students.map(student => [student.id, student]));
+    const classNames = new Map(classes.map(klass => [klass.id, klass.name]));
     return seats.map(seat => {
       const student: any = byId.get(seat.studentId);
       return {
         ...seat,
         studentIdLabel: student?.studentId || seat.studentId,
-        studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : 'Unknown student'
+        studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : 'Unknown student',
+        className: student ? (classNames.get(student.classId) || student.classId || '—') : '—'
       };
     }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
   }

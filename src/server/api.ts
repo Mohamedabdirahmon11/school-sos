@@ -5012,7 +5012,7 @@ apiRouter.get('/exams/schedules/published', requireAuth, requireSchoolContext, a
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
   res.json(schedules.map(schedule => ({
     ...schedule,
-    className: classNames.get(schedule.classId) || schedule.classId,
+    className: schedule.classId ? (classNames.get(schedule.classId) || schedule.classId) : 'All participating classes',
     subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
   })));
 });
@@ -5086,7 +5086,7 @@ apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
   res.json(schedules.map(schedule => ({
     ...schedule,
-    className: classNames.get(schedule.classId) || schedule.classId,
+    className: schedule.classId ? (classNames.get(schedule.classId) || schedule.classId) : 'All participating classes',
     subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
   })));
 });
@@ -5097,6 +5097,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const examName = typeof body.examName === 'string' ? body.examName.trim() : '';
   const classId = typeof body.classId === 'string' ? body.classId.trim() : '';
+  const cohortStudentIds = Array.isArray(body.cohortStudentIds) ? body.cohortStudentIds : [];
   const subjectId = typeof body.subjectId === 'string' ? body.subjectId.trim() : '';
   const examType = body.examType;
   const semester = body.semester;
@@ -5120,21 +5121,29 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const [hours, minutes] = value.split(':').map(Number);
     return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
   };
-  if (!examName || examName.length > 120 || !classId || !subjectId ||
+  if (!examName || examName.length > 120 || !subjectId ||
       !['small', 'big'].includes(examType) ||
       !['Semester 1', 'Semester 2'].includes(semester) ||
       !validDate || !validTime(startTime) || !validTime(endTime) ||
       startTime >= endTime || !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 ||
       !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
-    res.status(400).json({ error: 'Enter a valid exam name, class, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
+    res.status(400).json({ error: 'Enter a valid exam name, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
     return;
   }
 
   const [classRow, subjects] = await Promise.all([
-    db.getClassById(classId, school.id), db.getSubjects(school.id)
+    classId ? db.getClassById(classId, school.id) : Promise.resolve(null), db.getSubjects(school.id)
   ]);
-  if (!classRow || classRow.isArchived) {
+  if (classId && (!classRow || classRow.isArchived)) {
     res.status(400).json({ error: 'The selected class is not active in this school.' });
+    return;
+  }
+  if (!classId && (!cohortStudentIds.length || cohortStudentIds.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
+    res.status(400).json({ error: 'A school-wide subject session must include its participating students.' });
+    return;
+  }
+  if (cohortStudentIds.length > seatCapacity || new Set(cohortStudentIds).size !== cohortStudentIds.length) {
+    res.status(400).json({ error: 'The selected student group must be unique and within room capacity.' });
     return;
   }
   if (!subjects.some(subject => subject.id === subjectId)) {
@@ -5146,7 +5155,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const overlaps = existingSchedules.some(other => {
     if (other.status === 'cancelled' || other.examDate !== examDate) return false;
     const sameRoom = selectedRoom ? other.roomId === selectedRoom.id : (roomName !== 'Room not assigned' && !other.roomId && String(other.roomName).trim().toLowerCase() === roomName.toLowerCase());
-    const sameClass = other.classId === classId;
+    const sameClass = Boolean(classId) && other.classId === classId;
     const otherStart = String(other.startTime).slice(0, 5);
     const otherEnd = String(other.endTime).slice(0, 5);
     return (sameRoom || sameClass) && startTime < otherEnd && otherStart < endTime;
@@ -5160,7 +5169,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const schedule = await db.createExamSchedule({
       id: 'exam-' + randomUUID(),
       schoolId: school.id,
-      classId,
+      classId: classId || null,
       subjectId,
       roomId: selectedRoom?.id,
       examName,
@@ -5175,10 +5184,18 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       seatCapacity,
       createdBy: user.id
     });
+    if (!classId) {
+      try {
+        await db.setExamScheduleCohort(school.id, schedule.id, cohortStudentIds);
+      } catch (cohortError) {
+        await db.cancelExamSchedule(school.id, schedule.id);
+        throw cohortError;
+      }
+    }
     db.logAudit({
       action: 'EXAM_SCHEDULE_CREATED', category: 'academics', schoolId: school.id,
       schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
-      details: `Created draft exam schedule "${examName}" for ${classRow.name} in room ${roomName}.`,
+      details: `Created draft exam schedule "${examName}" for ${classRow?.name || 'participating classes'} in room ${roomName}.`,
       severity: 'info'
     });
     await db.flush();
@@ -5196,6 +5213,9 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   if (schedule.status !== 'draft') { res.status(409).json({ error: 'Only draft exam schedules can be edited.' }); return; }
 
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const examName = typeof body.examName === 'string' ? body.examName.trim() : schedule.examName;
+  const examType = ['small', 'big'].includes(body.examType) ? body.examType : schedule.examType;
+  const semester = ['Semester 1', 'Semester 2'].includes(body.semester) ? body.semester : schedule.semester;
   const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
@@ -5215,7 +5235,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
     const [hours, minutes] = value.split(':').map(Number);
     return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
   };
-  if (!validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
+  if (!examName || examName.length > 120 || !['small', 'big'].includes(examType) || !['Semester 1', 'Semester 2'].includes(semester) || !validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
       !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid date, time range, room, and capacity (1–500).' });
     return;
@@ -5242,7 +5262,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
         return;
       }
     }
-    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, roomId: selectedRoom?.id, shiftName, seatCapacity });
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examName, examType, semester, examDate, startTime, endTime, roomName, roomId: selectedRoom?.id, shiftName, seatCapacity });
     if (Array.isArray(body.cohortStudentIds)) {
       await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
     }

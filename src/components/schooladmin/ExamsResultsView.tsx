@@ -80,12 +80,12 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleShiftName, setScheduleShiftName] = useState('General');
   const [autoStartDate, setAutoStartDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
   const [autoDays, setAutoDays] = useState(5);
-  const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState<2 | 3>(2);
+  const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState(2);
   const [autoStartTime, setAutoStartTime] = useState('08:00');
   const [autoDurationMinutes, setAutoDurationMinutes] = useState(120);
   const [autoShiftName, setAutoShiftName] = useState('Morning');
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
-  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
+  const [editDraft, setEditDraft] = useState<{ examName: string; examType: 'small' | 'big'; semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
   const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
@@ -255,27 +255,38 @@ export const ExamsResultsView: React.FC = () => {
   };
 
   const handleCreateExamSchedule = async () => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId || !scheduleRoomId) return;
+    if (isReadOnly || !selectedSubjectId || !scheduleRoomId) return;
     setScheduleSaving(true);
     setScheduleError('');
     try {
+      const room = examRooms.find(item => item.id === scheduleRoomId);
+      const classGroups = await Promise.all(classes.filter(klass => !(klass as any).isArchived).map(async klass => {
+        const [details, classStudents] = await Promise.all([
+          ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 }),
+          ApiClient.getAllStudents(klass.id)
+        ]);
+        const studiesSubject = (details.subjects || []).some((row: any) => row.subject?.id === selectedSubjectId);
+        return studiesSubject ? classStudents.filter((student: any) => student.status === 'active') : [];
+      }));
+      const cohortStudentIds = classGroups.flat().map((student: any) => student.id);
+      if (!cohortStudentIds.length) throw new Error('No active students are enrolled in a class that studies this subject.');
+      if (cohortStudentIds.length > Number(room?.capacity || 0)) throw new Error(`${cohortStudentIds.length} students study this subject, but ${room?.name || 'the selected room'} holds only ${room?.capacity || 0}. Use Student Mixing to split them across rooms.`);
       await ApiClient.createExamSchedule({
         examName: scheduleExamName.trim(),
-        classId: selectedClassId,
         subjectId: selectedSubjectId,
+        cohortStudentIds,
         examType: scheduleExamType,
         semester: selectedSemester,
         examDate: scheduleDate,
         startTime: scheduleStartTime,
         endTime: scheduleEndTime,
-        roomName: examRooms.find(room => room.id === scheduleRoomId)?.name || '',
+        roomName: room?.name || '',
         roomId: scheduleRoomId,
-        shiftName: examRooms.find(room => room.id === scheduleRoomId)?.shiftName || scheduleShiftName.trim(),
-        seatCapacity: Number(examRooms.find(room => room.id === scheduleRoomId)?.capacity || 0)
+        shiftName: room?.shiftName || scheduleShiftName.trim(),
+        seatCapacity: Number(room?.capacity || 0)
       });
-      const rows = await ApiClient.getExamSchedules();
-      setExamSchedules(rows);
-      setNotice('Exam schedule saved as a draft. Publish it to assign seats.');
+      setExamSchedules(await ApiClient.getExamSchedules());
+      setNotice('Shared subject exam draft saved for all participating classes.');
     } catch (reason) {
       setScheduleError(reason instanceof Error ? reason.message : 'Unable to create exam schedule.');
     } finally {
@@ -301,68 +312,67 @@ export const ExamsResultsView: React.FC = () => {
         return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
       };
       const activeClasses = classes.filter(klass => !(klass as any).isArchived);
-      const plans: Array<{ classId: string; className: string; subject: Subject; day: number; slot: number }> = [];
-      for (const klass of activeClasses) {
-        const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
-        const classSubjects = (details.subjects || [])
-          .map((row: any) => row.subject)
-          .filter((subject: Subject | null): subject is Subject => Boolean(subject));
-        const languageSubjects = ['english', 'amharic', 'somali']
-          .map(language => classSubjects.find(subject => subject.name.toLowerCase().includes(language)))
-          .filter((subject): subject is Subject => Boolean(subject));
-        const remainingSubjects = classSubjects.filter(subject => !languageSubjects.some(language => language.id === subject.id));
-        let day = 0;
-        if (languageSubjects.length) {
-          languageSubjects.forEach((subject, slot) => plans.push({ classId: klass.id, className: klass.name, subject, day: 0, slot }));
-          day = 1;
-        }
-        for (let index = 0; index < remainingSubjects.length; index += autoSubjectsPerDay) {
-          const group = remainingSubjects.slice(index, index + autoSubjectsPerDay);
-          group.forEach((subject, slot) => plans.push({ classId: klass.id, className: klass.name, subject, day, slot }));
-          day += 1;
-        }
-        if (!classSubjects.length) {
-          setScheduleError(`No subjects are assigned to ${klass.name}. Assign class subjects before generating its exam timetable.`);
-          return;
-        }
-        if (day > autoDays) {
-          setScheduleError(`${klass.name} needs ${day} exam days, but the selected duration is only ${autoDays} days. Increase the duration and try again.`);
-          return;
+      const classData = await Promise.all(activeClasses.map(async klass => {
+        const [details, classStudents] = await Promise.all([
+          ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 }),
+          ApiClient.getAllStudents(klass.id)
+        ]);
+        const assignedSubjectIds = new Set<string>((details.subjects || []).map((row: any) => row.subject?.id).filter((id: unknown): id is string => typeof id === 'string'));
+        return { klass, assignedSubjectIds, students: classStudents.filter((student: any) => student.status === 'active') };
+      }));
+      const subjectPlans = new Map<string, { subject: Subject; classIds: string[]; studentIds: string[] }>();
+      for (const group of classData) {
+        for (const subjectId of group.assignedSubjectIds) {
+          const subject = subjects.find(item => item.id === subjectId);
+          if (!subject) continue;
+          const plan = subjectPlans.get(subjectId) || { subject, classIds: [], studentIds: [] };
+          plan.classIds.push(group.klass.id);
+          plan.studentIds.push(...group.students.map(student => student.id));
+          subjectPlans.set(subjectId, plan);
         }
       }
-      if (!plans.length) throw new Error('No active classes with assigned subjects were found.');
-      for (const plan of plans) {
-        const startTime = addMinutes(autoStartTime, plan.slot * autoDurationMinutes);
+      const plans = [...subjectPlans.values()].filter(plan => plan.studentIds.length).sort((a, b) => a.subject.name.localeCompare(b.subject.name));
+      if (!plans.length) throw new Error('No active classes with assigned subjects and active students were found.');
+      const requiredDays = Math.ceil(plans.length / autoSubjectsPerDay);
+      if (requiredDays > autoDays) throw new Error(`${plans.length} unique school subjects need ${requiredDays} days at ${autoSubjectsPerDay} subjects per day. Increase the exam duration.`);
+      const oversized = plans.find(plan => plan.studentIds.length > 500);
+      if (oversized) throw new Error(`${oversized.subject.name} has ${oversized.studentIds.length} students across its participating classes. Split that subject into multiple room sessions before generating it.`);
+      for (let index = 0; index < plans.length; index += 1) {
+        const plan = plans[index];
+        const day = Math.floor(index / autoSubjectsPerDay);
+        const slot = index % autoSubjectsPerDay;
+        const startTime = addMinutes(autoStartTime, slot * autoDurationMinutes);
         const endTime = addMinutes(startTime, autoDurationMinutes);
-        const roomName = 'Room not assigned';
         await ApiClient.createExamSchedule({
           examName: scheduleExamName.trim() || 'Examination',
-          classId: plan.classId,
           subjectId: plan.subject.id,
+          cohortStudentIds: plan.studentIds,
           examType: scheduleExamType,
           semester: selectedSemester,
-          examDate: dateForDay(plan.day),
+          examDate: dateForDay(day),
           startTime,
           endTime,
-          roomName,
+          roomName: 'Room not assigned',
           shiftName: autoShiftName.trim() || 'General',
           seatCapacity: 500
         });
         createdCount += 1;
       }
       setExamSchedules(await ApiClient.getExamSchedules());
-      setNotice(`Auto Generate created ${createdCount} draft exam sessions across ${activeClasses.length} classes. Review and edit every draft before publishing.`);
+      setNotice(`Created ${createdCount} shared subject sessions across ${requiredDays} days. Classes that study the same subject are grouped together; sessions remain drafts until rooms are assigned and published.`);
     } catch (reason) {
-      setScheduleError(`Created ${createdCount} draft sessions before stopping: ${reason instanceof Error ? reason.message : 'Unable to generate the complete exam timetable.'}`);
+      setScheduleError(`Created ${createdCount} draft sessions before stopping: ${reason instanceof Error ? reason.message : 'Unable to generate the complete school-wide exam timetable.'}`);
       if (createdCount) setExamSchedules(await ApiClient.getExamSchedules());
     } finally {
       setScheduleSaving(false);
     }
   };
-
   const openEditExamSchedule = async (schedule: any) => {
     setEditingSchedule(schedule);
     setEditDraft({
+      examName: schedule.examName || '',
+      examType: schedule.examType || 'small',
+      semester: schedule.semester || 'Semester 1',
       examDate: schedule.examDate,
       startTime: String(schedule.startTime).slice(0, 5),
       endTime: String(schedule.endTime).slice(0, 5),
@@ -842,7 +852,7 @@ export const ExamsResultsView: React.FC = () => {
           {scheduleSection === 'timetable' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-base font-bold text-[#132A29]">Create exam schedule</h2>
-              <p className="mt-1 text-xs text-[#64748B]">Create a subject session in a registered exam room. Room capacity and shift are taken from the selected room.</p>
+              <p className="mt-1 text-xs text-[#64748B]">Create one shared subject session for all active classes assigned to that subject. Room capacity and shift are taken from the selected room.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs font-semibold text-[#475569]">Exam name
@@ -854,11 +864,7 @@ export const ExamsResultsView: React.FC = () => {
                   <option value="big">Big Exam</option>
                 </select>
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Class
-                <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
-                  {classes.map(item => <option key={item.id} value={item.id}>{item.name} {item.section ? `· ${item.section}` : ''}</option>)}
-                </select>
-              </label>
+              <div className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-900"><strong>School-wide subject timetable</strong><p className="mt-1 font-normal">One exam entry is created for this subject and shared by every active class that studies it.</p></div>
               <label className="text-xs font-semibold text-[#475569]">Subject
                 <select value={selectedSubjectId} onChange={event => setSelectedSubjectId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
                   {subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -899,8 +905,8 @@ export const ExamsResultsView: React.FC = () => {
 
           {scheduleSection === 'timetable' && <section className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
             <div className="mb-4">
-              <h2 className="text-base font-bold text-[#132A29]">Auto Generate · All classes</h2>
-              <p className="mt-1 text-xs text-[#64748B]">Builds draft sessions from each class's assigned subjects. English, Amharic and Somali are placed on day one when those subjects are assigned; remaining subjects are distributed by the daily limit. Nothing is published automatically.</p>
+              <h2 className="text-base font-bold text-[#132A29]">Auto Generate · School-wide subjects</h2>
+              <p className="mt-1 text-xs text-[#64748B]">Builds one shared draft session per unique subject. Classes studying the same subject are grouped together; subjects are distributed by the editable daily limit.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs font-semibold text-[#475569]">First exam date
@@ -910,7 +916,7 @@ export const ExamsResultsView: React.FC = () => {
                 <input type="number" min={1} max={30} value={autoDays} onChange={event => setAutoDays(Math.max(1, Math.min(30, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
               </label>
               <label className="text-xs font-semibold text-[#475569]">Subjects per day
-                <select value={autoSubjectsPerDay} onChange={event => setAutoSubjectsPerDay(Number(event.target.value) as 2 | 3)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value={2}>2 subjects</option><option value={3}>3 subjects</option></select>
+                <select value={autoSubjectsPerDay} onChange={event => setAutoSubjectsPerDay(Math.max(1, Math.min(6, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">{[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count} {count === 1 ? 'subject' : 'subjects'}</option>)}</select>
               </label>
               <label className="text-xs font-semibold text-[#475569]">First session
                 <input type="time" value={autoStartTime} onChange={event => setAutoStartTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
@@ -923,17 +929,25 @@ export const ExamsResultsView: React.FC = () => {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
-              <p className="text-[11px] text-[#64748B]">All active classes are included. Generated sessions remain drafts with no room assigned; assign a registered room in Exam Rooms before publishing.</p>
-              <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoStartDate} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Auto Generate all classes'}</button>
+              <p className="text-[11px] text-[#64748B]">All active classes are grouped by the subjects they study. Generated sessions remain drafts until a registered room is assigned.</p>
+              <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoStartDate} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Generate school timetable'}</button>
             </div>
           </section>}
 
-          {scheduleSection !== 'timetable' && editingSchedule && editDraft && (
+          {editingSchedule && editDraft && (
             <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.className} · {editingSchedule.subjectName}</p></div>
+                <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.subjectName} · School-wide subject session</p></div>
                 <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); setCohortCounts({}); setCohortStudentIds([]); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
               </div>
+              {scheduleSection === 'timetable' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="text-xs font-semibold text-[#475569]">Exam name<input maxLength={120} value={editDraft.examName} onChange={event => setEditDraft({ ...editDraft, examName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam type<select value={editDraft.examType} onChange={event => setEditDraft({ ...editDraft, examType: event.target.value as 'small' | 'big' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="small">Small Exam</option><option value="big">Big Exam</option></select></label>
+                <label className="text-xs font-semibold text-[#475569]">Semester<select value={editDraft.semester} onChange={event => setEditDraft({ ...editDraft, semester: event.target.value as 'Semester 1' | 'Semester 2' })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option></select></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Start time<input type="time" value={editDraft.startTime} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">End time<input type="time" value={editDraft.endTime} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+              </div>}
               {scheduleSection === 'rooms' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Start<input type="time" value={String(editDraft.startTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
@@ -976,19 +990,20 @@ export const ExamsResultsView: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
-                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Class / Subject</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
                     {examSchedules.slice().sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime))).map(schedule => (
                       <tr key={schedule.id}>
                         <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
-                        <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
+                        <td className="px-3 py-3"><p className="font-semibold">{schedule.subjectName}</p><p className="mt-1 text-[10px] text-[#64748B]">All classes assigned to this subject</p></td>
                         <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</td>
                         <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
                         <td className="px-3 py-3">{new Set(examSchedules.filter(row => row.examDate === schedule.examDate && row.examName === schedule.examName).map(row => row.subjectName)).size} subjects</td>
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
                           {schedule.status === 'draft' && <>
+                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-[10px] font-semibold">Edit</button>
                             <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                             <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                           </>}
@@ -1014,7 +1029,7 @@ export const ExamsResultsView: React.FC = () => {
               <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamRoom()} disabled={isReadOnly || scheduleSaving || !roomForm.name.trim() || roomForm.capacity < 1 || roomForm.capacity > 500} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : editingRoomId ? 'Save room changes' : 'Add exam room'}</button></div>
             </section>
             <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Registered exam rooms ({examRooms.length})</h2><div className="mt-3 divide-y">{examRooms.map(room => <div key={room.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{room.name}</strong><p className="text-slate-500">{room.roomCode || 'No code'} · {room.location || 'Location not set'} · {room.shiftName} · {room.capacity} seats · {room.isActive ? 'Active' : 'Inactive'}</p></div><div className="flex gap-2"><button type="button" onClick={() => handleEditExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">Edit</button><button type="button" onClick={() => void handleToggleExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">{room.isActive ? 'Deactivate' : 'Activate'}</button></div></div>)}{!examRooms.length && <p className="py-4 text-xs text-slate-500">No exam rooms registered yet.</p>}</div></section>
-            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomId ? schedule.roomName : 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Assign room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>
+            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomId ? schedule.roomName : 'Room not assigned'}</strong><p className="text-slate-500">{schedule.subjectName} · All participating classes · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Assign room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>
           </div>}
           {scheduleSection === 'mixing' && <section className="rounded-xl border border-amber-200 bg-amber-50/40 p-5"><h2 className="text-sm font-bold text-[#132A29]">Student mixing by room</h2><p className="mt-1 text-xs text-[#64748B]">Choose a room session, then mix students from as many selected classes as needed. Seat numbers are shuffled for the room when the schedule is published.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.examName} · {schedule.roomName}</strong><p className="text-slate-500">{schedule.examDate} · {schedule.subjectName} · {schedule.className}</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Mix students</button> : <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="rounded-lg border bg-white px-3 py-2 font-semibold">Print room list</button>}</div>)}</div></section>}
         </div>
@@ -1081,14 +1096,14 @@ export const ExamsResultsView: React.FC = () => {
             <header className="mb-6 border-b-2 border-slate-900 pb-4 text-center">
               <h1 className="text-xl font-bold">{school?.name}</h1>
               <h2 className="mt-2 text-lg font-semibold">{seatSheet.schedule.examName} · Seating Plan</h2>
-              <p className="mt-1 text-sm">{seatSheet.schedule.className} · {seatSheet.schedule.subjectName}</p>
+              <p className="mt-1 text-sm">{seatSheet.schedule.subjectName} · All participating classes</p>
               <p className="mt-1 text-xs">{seatSheet.schedule.examDate} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
             </header>
             <table className="w-full border-collapse text-sm">
-              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
-              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.studentIdLabel}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
+              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Class</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
+              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.studentIdLabel}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">{seat.className || '—'}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
             </table>
-            <p className="mt-5 text-right text-xs">Total assigned seats: {seatSheet.seats.length}</p>
+            <p className="mt-5 text-right text-xs">Total assigned students: {seatSheet.seats.length} · Room roster for display at the examination-room entrance</p>
           </section>
         </>
       )}

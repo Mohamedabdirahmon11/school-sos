@@ -93,7 +93,7 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes('Cancel draft'));
   assert.ok(ui.includes('Print seating'));
   assert.ok(ui.includes('exam-seat-print'));
-  assert.ok(ui.includes('Auto Generate all classes'));
+  assert.ok(ui.includes('Generate school timetable'));
   assert.ok(ui.includes('handleAutoGenerateExamSchedules'));
   assert.ok(ui.includes('Edit draft'));
   assert.ok(ui.includes('Save draft changes'));
