@@ -64,6 +64,10 @@ export const ExamsResultsView: React.FC = () => {
 
   // Exam timetable, room allocation, and seat list state
   const [examSchedules, setExamSchedules] = useState<any[]>([]);
+  const [examRooms, setExamRooms] = useState<any[]>([]);
+  const [roomForm, setRoomForm] = useState({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' });
+  const [editingRoomId, setEditingRoomId] = useState('');
+  const [scheduleRoomId, setScheduleRoomId] = useState('');
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [publishingScheduleId, setPublishingScheduleId] = useState('');
@@ -85,7 +89,7 @@ export const ExamsResultsView: React.FC = () => {
   const [autoShiftName, setAutoShiftName] = useState('Morning');
   const [autoCapacity, setAutoCapacity] = useState(500);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
-  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number } | null>(null);
+  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
   const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
@@ -131,9 +135,14 @@ export const ExamsResultsView: React.FC = () => {
     let cancelled = false;
     setScheduleLoading(true);
     setScheduleError('');
-    ApiClient.getExamSchedules()
-      .then(rows => { if (!cancelled) setExamSchedules(Array.isArray(rows) ? rows : []); })
-      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam schedules.'); })
+    Promise.all([ApiClient.getExamSchedules(), ApiClient.getExamRooms(true)])
+      .then(([rows, rooms]) => {
+        if (!cancelled) {
+          setExamSchedules(Array.isArray(rows) ? rows : []);
+          setExamRooms(Array.isArray(rooms) ? rooms : []);
+        }
+      })
+      .catch(reason => { if (!cancelled) setScheduleError(reason instanceof Error ? reason.message : 'Unable to load exam rooms and schedules.'); })
       .finally(() => { if (!cancelled) setScheduleLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, school?.id]);
@@ -211,8 +220,46 @@ export const ExamsResultsView: React.FC = () => {
     }
   };
 
+  const handleSaveExamRoom = async () => {
+    if (isReadOnly || !roomForm.name.trim() || roomForm.capacity < 1 || roomForm.capacity > 500) return;
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      if (editingRoomId) {
+        await ApiClient.updateExamRoom(editingRoomId, { ...roomForm, isActive: true });
+        setNotice('Exam room updated.');
+      } else {
+        await ApiClient.createExamRoom(roomForm);
+        setNotice('Exam room created and ready for exam sessions.');
+      }
+      setExamRooms(await ApiClient.getExamRooms(true));
+      setRoomForm({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' });
+      setEditingRoomId('');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to save exam room.');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handleEditExamRoom = (room: any) => {
+    setEditingRoomId(room.id);
+    setRoomForm({ name: room.name || '', roomCode: room.roomCode || '', capacity: Number(room.capacity) || 1, location: room.location || '', shiftName: room.shiftName || 'General' });
+  };
+
+  const handleToggleExamRoom = async (room: any) => {
+    setScheduleError('');
+    try {
+      await ApiClient.updateExamRoom(room.id, { name: room.name, roomCode: room.roomCode || '', capacity: Number(room.capacity), location: room.location || '', shiftName: room.shiftName || 'General', isActive: !room.isActive });
+      setExamRooms(await ApiClient.getExamRooms(true));
+      setNotice(room.isActive ? 'Exam room deactivated. Existing schedules are preserved.' : 'Exam room activated.');
+    } catch (reason) {
+      setScheduleError(reason instanceof Error ? reason.message : 'Unable to change exam room status.');
+    }
+  };
+
   const handleCreateExamSchedule = async () => {
-    if (isReadOnly || !selectedClassId || !selectedSubjectId) return;
+    if (isReadOnly || !selectedClassId || !selectedSubjectId || !scheduleRoomId) return;
     setScheduleSaving(true);
     setScheduleError('');
     try {
@@ -225,9 +272,10 @@ export const ExamsResultsView: React.FC = () => {
         examDate: scheduleDate,
         startTime: scheduleStartTime,
         endTime: scheduleEndTime,
-        roomName: scheduleRoom.trim(),
-        shiftName: scheduleShiftName.trim(),
-        seatCapacity: scheduleCapacity
+        roomName: examRooms.find(room => room.id === scheduleRoomId)?.name || '',
+        roomId: scheduleRoomId,
+        shiftName: examRooms.find(room => room.id === scheduleRoomId)?.shiftName || scheduleShiftName.trim(),
+        seatCapacity: Number(examRooms.find(room => room.id === scheduleRoomId)?.capacity || 0)
       });
       const rows = await ApiClient.getExamSchedules();
       setExamSchedules(rows);
@@ -323,6 +371,7 @@ export const ExamsResultsView: React.FC = () => {
       startTime: String(schedule.startTime).slice(0, 5),
       endTime: String(schedule.endTime).slice(0, 5),
       roomName: schedule.roomName,
+      roomId: schedule.roomId || '',
       shiftName: schedule.shiftName || 'General',
       seatCapacity: schedule.seatCapacity
     });
@@ -369,7 +418,7 @@ export const ExamsResultsView: React.FC = () => {
     setScheduleSaving(true);
     setScheduleError('');
     try {
-      await ApiClient.updateExamSchedule(editingSchedule.id, { ...editDraft, cohortStudentIds });
+      await ApiClient.updateExamSchedule(editingSchedule.id, { ...editDraft, roomName: examRooms.find(room => room.id === editDraft.roomId)?.name || editDraft.roomName, roomId: editDraft.roomId || undefined, seatCapacity: Number(examRooms.find(room => room.id === editDraft.roomId)?.capacity || editDraft.seatCapacity), cohortStudentIds });
       setExamSchedules(await ApiClient.getExamSchedules());
       setEditingSchedule(null);
       setEditDraft(null);
@@ -794,10 +843,10 @@ export const ExamsResultsView: React.FC = () => {
             {([['timetable', 'Exam Timetable'], ['rooms', 'Exam Rooms'], ['mixing', 'Student Mixing']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => { setScheduleSection(key); setEditingSchedule(null); setEditDraft(null); }} className={`rounded-lg px-4 py-2 text-xs font-semibold ${scheduleSection === key ? 'bg-[#0F766E] text-white' : 'text-[#475569] hover:bg-slate-50'}`}>{label}</button>)}
           </div>
           {scheduleError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{scheduleError}</div>}
-          {scheduleSection === 'rooms' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+          {scheduleSection === 'timetable' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-base font-bold text-[#132A29]">Create exam schedule</h2>
-              <p className="mt-1 text-xs text-[#64748B]">Set the exam date, time, room and seating capacity. Publishing assigns a seat to every active student in the selected class.</p>
+              <p className="mt-1 text-xs text-[#64748B]">Create a subject session in a registered exam room. Room capacity and shift are taken from the selected room.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs font-semibold text-[#475569]">Exam name
@@ -834,19 +883,19 @@ export const ExamsResultsView: React.FC = () => {
               <label className="text-xs font-semibold text-[#475569]">End time
                 <input type="time" required value={scheduleEndTime} onChange={event => setScheduleEndTime(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Room / Hall
-                <input maxLength={120} required value={scheduleRoom} onChange={event => setScheduleRoom(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="e.g. Hall A" />
+              <label className="text-xs font-semibold text-[#475569]">Exam room
+                <select required value={scheduleRoomId} onChange={event => { const room = examRooms.find(item => item.id === event.target.value); setScheduleRoomId(event.target.value); setScheduleRoom(room?.name || ''); if (room) { setScheduleCapacity(Number(room.capacity)); setScheduleShiftName(room.shiftName || 'General'); } }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
+                  <option value="">Choose a room</option>{examRooms.filter(room => room.isActive).map(room => <option key={room.id} value={room.id}>{room.name} · {room.capacity} seats</option>)}
+                </select>
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Room seat capacity
-                <input type="number" min={1} max={500} step={1} required value={scheduleCapacity} onChange={event => setScheduleCapacity(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
-              </label>
+              <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2 text-xs text-[#475569]"><span className="font-semibold">Room capacity:</span> {examRooms.find(room => room.id === scheduleRoomId)?.capacity ?? 'Choose a room'} seats</div>
               <label className="text-xs font-semibold text-[#475569]">Shift
                 <input maxLength={80} value={scheduleShiftName} onChange={event => setScheduleShiftName(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Morning / Afternoon" />
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
               <p className="text-[11px] text-[#64748B]">Academic year: {school?.academicYear || 'Current school year'} · Room and class time conflicts are checked when publishing.</p>
-              <button type="button" onClick={() => void handleCreateExamSchedule()} disabled={isReadOnly || scheduleSaving || !classes.length || !subjects.length || !scheduleExamName.trim() || !scheduleRoom.trim() || scheduleCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={() => void handleCreateExamSchedule()} disabled={isReadOnly || scheduleSaving || !classes.length || !subjects.length || !scheduleExamName.trim() || !scheduleRoomId} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
                 {scheduleSaving ? 'Saving draft…' : 'Save schedule draft'}
               </button>
             </div>
@@ -893,9 +942,9 @@ export const ExamsResultsView: React.FC = () => {
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Start<input type="time" value={String(editDraft.startTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">End<input type="time" value={String(editDraft.endTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
-                <label className="text-xs font-semibold text-[#475569]">Room<input maxLength={120} value={editDraft.roomName} onChange={event => setEditDraft({ ...editDraft, roomName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Exam room<select value={editDraft.roomId} onChange={event => { const room = examRooms.find(item => item.id === event.target.value); setEditDraft({ ...editDraft, roomId: event.target.value, roomName: room?.name || '', seatCapacity: Number(room?.capacity || 0), shiftName: room?.shiftName || editDraft.shiftName }); }} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal"><option value="">Choose a room</option>{examRooms.filter(room => room.isActive).map(room => <option key={room.id} value={room.id}>{room.name} · {room.capacity} seats</option>)}</select></label>
                 <label className="text-xs font-semibold text-[#475569]">Shift<input maxLength={80} value={editDraft.shiftName} onChange={event => setEditDraft({ ...editDraft, shiftName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
-                <label className="text-xs font-semibold text-[#475569]">Capacity<input type="number" min={1} max={500} value={editDraft.seatCapacity} onChange={event => setEditDraft({ ...editDraft, seatCapacity: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <div className="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#475569]"><span className="font-semibold">Room capacity:</span> {examRooms.find(room => room.id === editDraft.roomId)?.capacity ?? 'Choose a room'} seats</div>
               </div>}
               {scheduleSection === 'mixing' && <div className="mt-5 border-t border-amber-200 pt-4">
                 <h3 className="text-xs font-bold text-[#132A29]">Mixed-class student group (optional)</h3>
@@ -956,7 +1005,21 @@ export const ExamsResultsView: React.FC = () => {
               </div>
             )}
           </section></>}
-          {scheduleSection === 'rooms' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><p className="mt-1 text-xs text-[#64748B]">Rooms are managed separately from the printable timetable. Edit a draft to assign its exam hall and seat capacity.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomName || 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Manage room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>}
+          {scheduleSection === 'rooms' && <div className="space-y-4">
+            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-bold text-[#132A29]">{editingRoomId ? 'Edit exam room' : 'Register exam room'}</h2><p className="mt-1 text-xs text-[#64748B]">Create reusable school exam halls. Capacity, location and shift are stored once and reused across sessions.</p></div>{editingRoomId && <button type="button" onClick={() => { setEditingRoomId(''); setRoomForm({ name: '', roomCode: '', capacity: 40, location: '', shiftName: 'General' }); }} className="rounded-lg border px-3 py-2 text-xs font-semibold">Cancel edit</button>}</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <label className="text-xs font-semibold text-[#475569]">Room name<input maxLength={120} value={roomForm.name} onChange={event => setRoomForm({ ...roomForm, name: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Hall A" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Room code<input maxLength={40} value={roomForm.roomCode} onChange={event => setRoomForm({ ...roomForm, roomCode: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="EX-01" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Seat capacity<input type="number" min={1} max={500} value={roomForm.capacity} onChange={event => setRoomForm({ ...roomForm, capacity: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Location<input maxLength={160} value={roomForm.location} onChange={event => setRoomForm({ ...roomForm, location: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Block B, first floor" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Shift<input maxLength={80} value={roomForm.shiftName} onChange={event => setRoomForm({ ...roomForm, shiftName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Morning" /></label>
+              </div>
+              <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamRoom()} disabled={isReadOnly || scheduleSaving || !roomForm.name.trim() || roomForm.capacity < 1 || roomForm.capacity > 500} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : editingRoomId ? 'Save room changes' : 'Add exam room'}</button></div>
+            </section>
+            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Registered exam rooms ({examRooms.length})</h2><div className="mt-3 divide-y">{examRooms.map(room => <div key={room.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{room.name}</strong><p className="text-slate-500">{room.roomCode || 'No code'} · {room.location || 'Location not set'} · {room.shiftName} · {room.capacity} seats · {room.isActive ? 'Active' : 'Inactive'}</p></div><div className="flex gap-2"><button type="button" onClick={() => handleEditExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">Edit</button><button type="button" onClick={() => void handleToggleExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">{room.isActive ? 'Deactivate' : 'Activate'}</button></div></div>)}{!examRooms.length && <p className="py-4 text-xs text-slate-500">No exam rooms registered yet.</p>}</div></section>
+            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomName || 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Assign room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>
+          </div>}
           {scheduleSection === 'mixing' && <section className="rounded-xl border border-amber-200 bg-amber-50/40 p-5"><h2 className="text-sm font-bold text-[#132A29]">Student mixing by room</h2><p className="mt-1 text-xs text-[#64748B]">Choose a room session, then mix students from as many selected classes as needed. Seat numbers are shuffled for the room when the schedule is published.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.examName} · {schedule.roomName}</strong><p className="text-slate-500">{schedule.examDate} · {schedule.subjectName} · {schedule.className}</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Mix students</button> : <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="rounded-lg border bg-white px-3 py-2 font-semibold">Print room list</button>}</div>)}</div></section>}
         </div>
       )}
