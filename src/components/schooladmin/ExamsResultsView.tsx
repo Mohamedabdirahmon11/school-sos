@@ -31,6 +31,226 @@ import {
   CalendarDays
 } from 'lucide-react';
 
+
+const EXAM_REDESIGN_STYLES = `
+.exam-management-redesign {
+  --exam-ink: #142b35;
+  --exam-muted: #647987;
+  --exam-line: #e2ebef;
+  --exam-teal: #087f78;
+  --exam-teal-dark: #075b59;
+  --exam-canvas: #f3f7f8;
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+  padding: clamp(16px, 2.2vw, 32px);
+  color: var(--exam-ink);
+  background:
+    radial-gradient(ellipse at 92% 0%, rgba(30, 154, 146, .075), transparent 28%),
+    var(--exam-canvas);
+  border-radius: 24px;
+}
+.exam-management-redesign > div:first-of-type {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid rgba(17, 119, 113, .18);
+  border-radius: 24px;
+  color: #fff;
+  background: linear-gradient(116deg, #102d3b 0%, #14545a 58%, #0b9385 115%);
+  box-shadow: 0 18px 42px rgba(14, 57, 67, .16);
+}
+.exam-management-redesign > div:first-of-type::after {
+  content: "";
+  position: absolute;
+  width: 270px;
+  height: 270px;
+  right: -78px;
+  top: -170px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 30px rgba(255,255,255,.035), 0 0 0 65px rgba(255,255,255,.025);
+  pointer-events: none;
+}
+.exam-management-redesign > div:first-of-type h1 {
+  color: #fff !important;
+  font-size: clamp(24px, 2.4vw, 34px) !important;
+  font-weight: 800;
+  letter-spacing: -.045em;
+}
+.exam-management-redesign > div:first-of-type h1 svg { color: #9de8dc !important; }
+.exam-management-redesign > div:first-of-type p { color: rgba(233,248,248,.76) !important; line-height: 1.7; }
+.exam-management-redesign > div:nth-of-type(2) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 18px 0;
+  padding: 7px;
+  border: 1px solid #dce9e9;
+  border-radius: 16px;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 7px 24px rgba(21,57,65,.055);
+}
+.exam-management-redesign > div:nth-of-type(2) button {
+  min-height: 40px;
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #647987;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all .18s ease;
+}
+.exam-management-redesign > div:nth-of-type(2) button:hover { color: #075b59; background: #edf7f6; }
+.exam-management-redesign > div:nth-of-type(2) button[class*="bg-white"] {
+  color: #075b59 !important;
+  border-color: #cce7e3;
+  background: linear-gradient(135deg, #f0fbf8, #fff) !important;
+  box-shadow: 0 3px 10px rgba(7,91,89,.09);
+}
+.exam-management-redesign > .space-y-4,
+.exam-management-redesign > .bg-white,
+.exam-management-redesign section {
+  min-width: 0;
+}
+.exam-management-redesign .rounded-xl.border,
+.exam-management-redesign .rounded-2xl.border,
+.exam-management-redesign .bg-white.rounded-xl,
+.exam-management-redesign .bg-white.rounded-2xl {
+  border-color: var(--exam-line) !important;
+  border-radius: 17px !important;
+  box-shadow: 0 7px 24px rgba(19,54,64,.045);
+}
+.exam-management-redesign .bg-white { background-color: #fff; }
+.exam-management-redesign h2 {
+  color: #173642 !important;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -.018em;
+}
+.exam-management-redesign h3 { color: #214653; font-weight: 750; }
+.exam-management-redesign p { line-height: 1.6; }
+.exam-management-redesign label {
+  color: #4c6470;
+  font-size: 11px;
+  font-weight: 700;
+}
+.exam-management-redesign input,
+.exam-management-redesign select,
+.exam-management-redesign textarea {
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid #d7e4e8 !important;
+  border-radius: 10px !important;
+  color: #173642;
+  background: #fff;
+  font-size: 12px;
+  box-shadow: inset 0 1px 2px rgba(16,48,58,.025);
+}
+.exam-management-redesign input:focus,
+.exam-management-redesign select:focus,
+.exam-management-redesign textarea:focus {
+  border-color: #0e9388 !important;
+  outline: 3px solid rgba(14,147,136,.12);
+}
+.exam-management-redesign button {
+  min-height: 36px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.exam-management-redesign button:not(:disabled):hover { transform: translateY(-1px); }
+.exam-management-redesign button:focus-visible {
+  outline: 3px solid rgba(14,147,136,.28);
+  outline-offset: 2px;
+}
+.exam-management-redesign button:disabled { cursor: not-allowed; }
+.exam-management-redesign button[class*="bg-[#0F766E]"],
+.exam-management-redesign button[class*="bg-[#0B2B2A]"] {
+  background: linear-gradient(110deg, #0c827a, #075f62) !important;
+  box-shadow: 0 5px 13px rgba(7,95,98,.16);
+}
+.exam-management-redesign button[class*="border-[#0F766E]"] {
+  border-color: #a8d8d2 !important;
+  color: #08756f !important;
+  background: #f5fcfa;
+}
+.exam-management-redesign .overflow-x-auto {
+  border: 1px solid var(--exam-line);
+  border-radius: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #b8d0d3 transparent;
+}
+.exam-management-redesign table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  font-size: 11px;
+}
+.exam-management-redesign table thead th {
+  padding: 13px 12px;
+  color: #58717c;
+  background: #f2f7f8;
+  border-color: #e2ebef;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .035em;
+  white-space: nowrap;
+}
+.exam-management-redesign table tbody td {
+  padding: 12px;
+  border-color: #eaf0f2;
+  color: #29434e;
+  vertical-align: middle;
+}
+.exam-management-redesign table tbody tr { transition: background .14s ease; }
+.exam-management-redesign table tbody tr:hover { background: #f4faf9 !important; }
+.exam-management-redesign .exam-wall-print { border-radius: 18px !important; }
+.exam-management-redesign .exam-wall-print > .no-print {
+  padding: 18px 20px;
+  background: linear-gradient(90deg, #f2f9f8, #fff);
+}
+.exam-management-redesign .exam-wall-print table thead th { background: #eaf4f4; }
+.exam-management-redesign .exam-wall-print table tbody td { padding-top: 15px; padding-bottom: 15px; }
+.exam-management-redesign [role="alert"] {
+  border-radius: 13px;
+  box-shadow: 0 4px 15px rgba(21,57,65,.035);
+}
+.exam-management-redesign .bg-teal-50,
+.exam-management-redesign .bg-amber-50\/40 {
+  border-radius: 14px;
+}
+.exam-management-redesign .rounded-full { letter-spacing: .015em; }
+.exam-management-redesign section + section { margin-top: 4px; }
+@media (min-width: 1100px) {
+  .exam-management-redesign { padding: 30px 34px 38px; }
+}
+@media (max-width: 767px) {
+  .exam-management-redesign { padding: 12px 10px 24px; border-radius: 0; }
+  .exam-management-redesign > div:first-of-type { padding: 21px 18px; border-radius: 19px; }
+  .exam-management-redesign > div:nth-of-type(2) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 5px;
+    padding: 6px;
+  }
+  .exam-management-redesign > div:nth-of-type(2) button { justify-content: center; padding-inline: 8px; }
+  .exam-management-redesign .overflow-x-auto { max-width: 100%; }
+  .exam-management-redesign table { min-width: 720px; }
+  .exam-management-redesign .exam-wall-print table { min-width: 900px; }
+  .exam-management-redesign .grid { min-width: 0; }
+}
+@media print {
+  .exam-management-redesign { padding: 0; background: #fff; }
+  .exam-management-redesign > div:first-of-type,
+  .exam-management-redesign > div:nth-of-type(2) { display: none !important; }
+}
+`;
+
 export const ExamsResultsView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -539,7 +759,8 @@ export const ExamsResultsView: React.FC = () => {
   const groupedExamSchedules = groupExamRoomSessions(examSchedules);
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="exam-management-redesign mx-auto min-w-0 w-full max-w-[1680px] space-y-6">
+      <style>{EXAM_REDESIGN_STYLES}</style>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
