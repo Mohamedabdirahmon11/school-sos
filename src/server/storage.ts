@@ -2377,7 +2377,7 @@ class StorageEngine {
   }
 
   public async createExamSchedule(schedule: {
-    id: string; schoolId: string; classId: string; subjectId: string; examName: string;
+    id: string; schoolId: string; classId: string; subjectId: string; roomId?: string; examName: string;
     examType: 'small' | 'big'; academicYear: string; semester: 'Semester 1' | 'Semester 2';
     examDate: string; startTime: string; endTime: string; roomName: string; shiftName?: string;
     seatCapacity: number; createdBy: string;
@@ -2385,7 +2385,7 @@ class StorageEngine {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { error } = await client.from('exam_schedules').insert({
-      id: schedule.id, school_id: schedule.schoolId, class_id: schedule.classId,
+      id: schedule.id, school_id: schedule.schoolId, room_id: schedule.roomId || null, class_id: schedule.classId,
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
@@ -2396,7 +2396,7 @@ class StorageEngine {
   }
 
   public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
@@ -2406,6 +2406,7 @@ class StorageEngine {
         start_time: updates.startTime,
         end_time: updates.endTime,
         room_name: updates.roomName,
+        room_id: updates.roomId || null,
         shift_name: updates.shiftName || 'General',
         seat_capacity: updates.seatCapacity,
         updated_at: new Date().toISOString()
