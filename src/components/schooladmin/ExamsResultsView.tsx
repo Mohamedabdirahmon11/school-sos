@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
 import { buildResultsCsv } from '../../lib/results-csv.ts';
+import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -521,26 +522,7 @@ export const ExamsResultsView: React.FC = () => {
   const finalMax = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
   const maxCombined = continuousMax + finalMax;
 
-  // Keep the database's individual room sessions intact, but present one school-wide
-  // timetable row for the same subject, date, time, exam and semester.
-  const groupedExamSchedules = (() => {
-    const groups = new Map<string, { key: string; sessions: any[] }>();
-    for (const schedule of examSchedules) {
-      const key = [
-        schedule.subjectId, schedule.examDate, String(schedule.startTime).slice(0, 5),
-        String(schedule.endTime).slice(0, 5), schedule.examName, schedule.examType,
-        schedule.semester, schedule.shiftName || 'General'
-      ].join('|');
-      const group = groups.get(key) || { key, sessions: [] };
-      group.sessions.push(schedule);
-      groups.set(key, group);
-    }
-    return [...groups.values()].sort((a, b) =>
-      String(a.sessions[0]?.examDate).localeCompare(String(b.sessions[0]?.examDate)) ||
-      String(a.sessions[0]?.startTime).localeCompare(String(b.sessions[0]?.startTime)) ||
-      String(a.sessions[0]?.subjectName).localeCompare(String(b.sessions[0]?.subjectName))
-    );
-  })();
+  const groupedExamSchedules = groupExamRoomSessions(examSchedules);
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
@@ -1156,8 +1138,8 @@ export const ExamsResultsView: React.FC = () => {
               <p className="mt-1 text-xs">{seatSheet.schedule.examDate} · {String(seatSheet.schedule.startTime).slice(0,5)}–{String(seatSheet.schedule.endTime).slice(0,5)} · Room {seatSheet.schedule.roomName}</p>
             </header>
             <table className="w-full border-collapse text-sm">
-              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Student ID</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Class</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
-              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.studentIdLabel}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">{seat.className || '—'}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
+              <thead><tr><th className="border border-slate-500 p-2 text-left">Seat No.</th><th className="border border-slate-500 p-2 text-left">Roll Number</th><th className="border border-slate-500 p-2 text-left">Student Name</th><th className="border border-slate-500 p-2 text-left">Class</th><th className="border border-slate-500 p-2 text-left">Signature</th></tr></thead>
+              <tbody>{seatSheet.seats.map((seat: any) => <tr key={seat.id}><td className="border border-slate-500 p-2 font-bold">{seat.seatNumber}</td><td className="border border-slate-500 p-2">{seat.rollNumberLabel || '—'}</td><td className="border border-slate-500 p-2">{seat.studentName}</td><td className="border border-slate-500 p-2">{seat.className || '—'}</td><td className="border border-slate-500 p-2">&nbsp;</td></tr>)}</tbody>
             </table>
             <p className="mt-5 text-right text-xs">Total assigned students: {seatSheet.seats.length} · Room roster for display at the examination-room entrance</p>
           </section>
