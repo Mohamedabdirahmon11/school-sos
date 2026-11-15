@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.exam_schedule_cohort_students (
   schedule_id VARCHAR(64) NOT NULL,
   student_id VARCHAR(64) NOT NULL,
   class_id VARCHAR(64) NOT NULL,
+  is_selected BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT exam_cohort_schedule_school_fk FOREIGN KEY (schedule_id, school_id)
     REFERENCES public.exam_schedules(id, school_id) ON DELETE CASCADE,
@@ -79,15 +80,18 @@ BEGIN
     RAISE EXCEPTION 'Every selected class must have the scheduled subject assigned.';
   END IF;
 
-  DELETE FROM public.exam_schedule_cohort_students
-   WHERE school_id = p_school_id AND schedule_id = p_schedule_id;
+  UPDATE public.exam_schedule_cohort_students
+     SET is_selected = FALSE
+   WHERE school_id = p_school_id AND schedule_id = p_schedule_id AND is_selected IS TRUE;
 
-  INSERT INTO public.exam_schedule_cohort_students (id, school_id, schedule_id, student_id, class_id)
-  SELECT 'cohort-' || gen_random_uuid()::TEXT, p_school_id, p_schedule_id, student.id, student.class_id
+  INSERT INTO public.exam_schedule_cohort_students (id, school_id, schedule_id, student_id, class_id, is_selected)
+  SELECT 'cohort-' || gen_random_uuid()::TEXT, p_school_id, p_schedule_id, student.id, student.class_id, TRUE
     FROM public.students AS student
    WHERE student.school_id = p_school_id
      AND student.status = 'active'
-     AND student.id = ANY(COALESCE(p_student_ids, ARRAY[]::TEXT[]));
+     AND student.id = ANY(COALESCE(p_student_ids, ARRAY[]::TEXT[]))
+  ON CONFLICT (schedule_id, student_id)
+  DO UPDATE SET class_id = EXCLUDED.class_id, is_selected = TRUE;
 
   RETURN v_requested_count;
 END;
@@ -178,7 +182,7 @@ BEGIN
         ON student.id = cohort.student_id
        AND student.school_id = p_school_id
        AND student.status = 'active'
-     WHERE cohort.school_id = p_school_id AND cohort.schedule_id = p_schedule_id;
+     WHERE cohort.school_id = p_school_id AND cohort.schedule_id = p_schedule_id AND cohort.is_selected IS TRUE;
     IF v_student_count <> v_cohort_count THEN
       RAISE EXCEPTION 'The selected exam group contains inactive students. Rebuild the group before publishing.';
     END IF;
