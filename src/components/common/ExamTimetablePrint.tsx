@@ -1,9 +1,7 @@
 import React from 'react';
-import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
-import { School } from '../../types/index.ts';
-
-type ExamScheduleRow = { id:string; subjectId:string; subjectName?:string; examDate:string; startTime:string; endTime:string; examName?:string; examType?:string; semester?:string; roomName?:string; status:string; };
-type ExamTimetablePrintProps = { schedules:ExamScheduleRow[]; school?:School|null; title?:string; academicYearTitle?:string; classGroup?:string; includeFriday?:boolean; };
+import { groupExamRoomSessions, type ExamRoomSession } from '../../lib/exam-timetable.ts';
+import type { School } from '../../types/index.ts';
+type ExamTimetablePrintProps = { schedules:ExamRoomSession[]; school?:School|null; title?:string; academicYearTitle?:string; classGroup?:string; includeFriday?:boolean; };
 const SOMALI_WEEKDAYS=['Axad','Isniin','Talaado','Arbaco','Khamiis','Jimce','Sabti'];
 export function formatSomaliExamDate(value:string):string { const [y,m,d]=String(value).slice(0,10).split('-'); const date=new Date(Number(y),Number(m)-1,Number(d)); return `${SOMALI_WEEKDAYS[date.getDay()]||''} ${d}/${m}/${y}`; }
 export function isExamTimetableFriday(value:string):boolean { const [y,m,d]=String(value).slice(0,10).split('-'); return new Date(Number(y),Number(m)-1,Number(d)).getDay()===5; }
