@@ -5145,7 +5145,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const existingSchedules = await db.getExamSchedules(school.id);
   const overlaps = existingSchedules.some(other => {
     if (other.status === 'cancelled' || other.examDate !== examDate) return false;
-    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameRoom = selectedRoom ? other.roomId === selectedRoom.id : (roomName !== 'Room not assigned' && !other.roomId && String(other.roomName).trim().toLowerCase() === roomName.toLowerCase());
     const sameClass = other.classId === classId;
     const otherStart = String(other.startTime).slice(0, 5);
     const otherEnd = String(other.endTime).slice(0, 5);
@@ -5224,7 +5224,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   const existingSchedules = await db.getExamSchedules(school.id);
   const overlaps = existingSchedules.some(other => {
     if (other.id === schedule.id || other.status === 'cancelled' || other.examDate !== examDate) return false;
-    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameRoom = selectedRoom ? other.roomId === selectedRoom.id : (roomName !== 'Room not assigned' && !other.roomId && String(other.roomName).trim().toLowerCase() === roomName.toLowerCase());
     const sameClass = other.classId === schedule.classId;
     const otherStart = String(other.startTime).slice(0, 5);
     const otherEnd = String(other.endTime).slice(0, 5);
