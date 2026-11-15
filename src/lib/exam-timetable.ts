@@ -27,8 +27,7 @@ export function groupExamRoomSessions(schedules: ExamRoomSession[]): GroupedExam
   for (const schedule of schedules) {
     const key = [
       schedule.subjectId, schedule.examDate, String(schedule.startTime).slice(0, 5),
-      String(schedule.endTime).slice(0, 5), schedule.examName, schedule.examType,
-      schedule.semester, schedule.shiftName || 'General'
+      String(schedule.endTime).slice(0, 5)
     ].join('|');
     const sessions = groups.get(key) || [];
     sessions.push(schedule);
