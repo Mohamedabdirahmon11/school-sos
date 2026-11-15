@@ -90,6 +90,7 @@ export const ExamsResultsView: React.FC = () => {
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
+  const [scheduleSection, setScheduleSection] = useState<'timetable' | 'rooms' | 'mixing'>('timetable');
 
   // Load classes, subjects, and exam configuration with a retryable failure state.
   const loadExamSetup = async () => {
@@ -351,13 +352,13 @@ export const ExamsResultsView: React.FC = () => {
   const handleCohortCountChange = (classId: string, requestedCount: number) => {
     const studentsInClass = cohortClassStudents[classId] || [];
     const count = Math.max(0, Math.min(studentsInClass.length, requestedCount || 0));
-    const selectedClassCount = Object.entries(cohortCounts).filter(([id, value]) => id !== classId && value > 0).length;
-    if (count > 0 && selectedClassCount >= 3) {
-      setScheduleError('A mixed exam group can combine up to three classes.');
-      return;
-    }
     const classStudentIds = new Set(studentsInClass.map(student => student.id));
-    const nextIds = studentsInClass.slice(0, count).map(student => student.id);
+    const shuffled = [...studentsInClass];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    const nextIds = shuffled.slice(0, count).map(student => student.id);
     setCohortStudentIds(current => [...current.filter(id => !classStudentIds.has(id)), ...nextIds]);
     setCohortCounts(current => ({ ...current, [classId]: count }));
     setScheduleError('');
@@ -789,8 +790,11 @@ export const ExamsResultsView: React.FC = () => {
       {/* EXAM TIMETABLE, ROOM AND SEATING */}
       {activeTab === 'schedule' && (
         <div className="space-y-5">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-[#E2E8F0] bg-white p-2 shadow-sm">
+            {([['timetable', 'Exam Timetable'], ['rooms', 'Exam Rooms'], ['mixing', 'Student Mixing']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => { setScheduleSection(key); setEditingSchedule(null); setEditDraft(null); }} className={`rounded-lg px-4 py-2 text-xs font-semibold ${scheduleSection === key ? 'bg-[#0F766E] text-white' : 'text-[#475569] hover:bg-slate-50'}`}>{label}</button>)}
+          </div>
           {scheduleError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{scheduleError}</div>}
-          <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+          {scheduleSection === 'rooms' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-base font-bold text-[#132A29]">Create exam schedule</h2>
               <p className="mt-1 text-xs text-[#64748B]">Set the exam date, time, room and seating capacity. Publishing assigns a seat to every active student in the selected class.</p>
@@ -846,9 +850,9 @@ export const ExamsResultsView: React.FC = () => {
                 {scheduleSaving ? 'Saving draft…' : 'Save schedule draft'}
               </button>
             </div>
-          </section>
+          </section>}
 
-          <section className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
+          {scheduleSection === 'timetable' && <section className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
             <div className="mb-4">
               <h2 className="text-base font-bold text-[#132A29]">Auto Generate · All classes</h2>
               <p className="mt-1 text-xs text-[#64748B]">Builds draft sessions from each class's assigned subjects. English, Amharic and Somali are placed on day one when those subjects are assigned; remaining subjects are distributed by the daily limit. Nothing is published automatically.</p>
@@ -869,39 +873,33 @@ export const ExamsResultsView: React.FC = () => {
               <label className="text-xs font-semibold text-[#475569]">Minutes per subject
                 <input type="number" min={30} max={300} step={15} value={autoDurationMinutes} onChange={event => setAutoDurationMinutes(Math.max(30, Math.min(300, Number(event.target.value) || 30)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
               </label>
-              <label className="text-xs font-semibold text-[#475569]">Exam room prefix
-                <input maxLength={80} value={autoRoom} onChange={event => setAutoRoom(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" placeholder="Exam Hall" />
-              </label>
-              <label className="text-xs font-semibold text-[#475569]">Room capacity
-                <input type="number" min={1} max={500} value={autoCapacity} onChange={event => setAutoCapacity(Math.max(1, Math.min(500, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
-              </label>
               <label className="text-xs font-semibold text-[#475569]">Shift for generated sessions
                 <input maxLength={80} value={autoShiftName} onChange={event => setAutoShiftName(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" placeholder="Morning / Afternoon" />
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
-              <p className="text-[11px] text-[#64748B]">All active classes are included. Each class gets a separate room label to prevent accidental room overlap. Generated schedules remain drafts.</p>
+              <p className="text-[11px] text-[#64748B]">All active classes are included. Generated sessions remain drafts; manage room names and capacities in the separate Exam Rooms section before publishing.</p>
               <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoRoom.trim() || !autoStartDate || autoCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Auto Generate all classes'}</button>
             </div>
-          </section>
+          </section>}
 
-          {editingSchedule && editDraft && (
+          {scheduleSection !== 'timetable' && editingSchedule && editDraft && (
             <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.className} · {editingSchedule.subjectName}</p></div>
                 <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); setCohortCounts({}); setCohortStudentIds([]); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              {scheduleSection === 'rooms' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Start<input type="time" value={String(editDraft.startTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">End<input type="time" value={String(editDraft.endTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Room<input maxLength={120} value={editDraft.roomName} onChange={event => setEditDraft({ ...editDraft, roomName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Shift<input maxLength={80} value={editDraft.shiftName} onChange={event => setEditDraft({ ...editDraft, shiftName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Capacity<input type="number" min={1} max={500} value={editDraft.seatCapacity} onChange={event => setEditDraft({ ...editDraft, seatCapacity: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
-              </div>
-              <div className="mt-5 border-t border-amber-200 pt-4">
+              </div>}
+              {scheduleSection === 'mixing' && <div className="mt-5 border-t border-amber-200 pt-4">
                 <h3 className="text-xs font-bold text-[#132A29]">Mixed-class student group (optional)</h3>
-                <p className="mt-1 text-[11px] text-[#64748B]">Choose how many active students to include from each class. Up to three classes can be combined. Leave all counts at zero to use the complete class attached to this schedule.</p>
+                <p className="mt-1 text-[11px] text-[#64748B]">Choose the number of active students from every class you want represented in this room. The system randomly selects students from each chosen class; there is no three-class limit.</p>
                 {scheduleSaving && !Object.keys(cohortClassStudents).length ? <p className="mt-2 text-xs text-slate-500">Loading class students…</p> : (
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {classes.map(klass => {
@@ -918,34 +916,34 @@ export const ExamsResultsView: React.FC = () => {
                   </div>
                 )}
                 <p className="mt-2 text-[11px] text-[#64748B]">Selected: {cohortStudentIds.length} students from {Object.values(cohortCounts).filter(count => count > 0).length} classes. The scheduled subject must be assigned to every selected class.</p>
-              </div>
+              </div>}
               <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamScheduleEdit()} disabled={isReadOnly || scheduleSaving || !editDraft.roomName.trim() || editDraft.seatCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : 'Save draft changes'}</button></div>
             </section>
           )}
 
-          <section className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4">
-              <div><h2 className="text-sm font-bold text-[#132A29]">Exam timetable and seating</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} schedules · {school?.academicYear || 'Current year'}</p></div>
+          {scheduleSection === 'timetable' && <><style>{`@media print { body * { visibility: hidden !important; } .exam-wall-print, .exam-wall-print * { visibility: visible !important; } .exam-wall-print { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; } .exam-wall-print .no-print { display: none !important; } } @page { size: A4 landscape; margin: 12mm; }`}</style><section className="exam-wall-print overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+            <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] p-4">
+              <div><h2 className="text-sm font-bold text-[#132A29]">Printable exam timetable</h2><p className="mt-1 text-[11px] text-[#64748B]">{examSchedules.length} subject sessions · {school?.academicYear || 'Current year'}</p></div>
+              <button type="button" onClick={() => window.print()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white"><Printer className="mr-1 inline h-3.5 w-3.5"/>Print wall timetable</button>
               <button type="button" onClick={() => { setScheduleError(''); setScheduleLoading(true); ApiClient.getExamSchedules().then(setExamSchedules).catch(error => setScheduleError(error.message || 'Unable to refresh schedules.')).finally(() => setScheduleLoading(false)); }} disabled={scheduleLoading} className="rounded-lg border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] disabled:opacity-50">{scheduleLoading ? 'Refreshing…' : 'Refresh'}</button>
             </div>
             {scheduleLoading ? <p className="p-6 text-center text-xs text-[#64748B]">Loading exam schedules…</p> : examSchedules.length === 0 ? <p className="p-8 text-center text-xs text-[#64748B]">No exam schedules yet. Create a draft above.</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-left text-xs">
                   <thead className="bg-[#F8FAFC] text-[#64748B]"><tr>
-                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Class / Subject</th><th className="px-3 py-3">Date / Time</th><th className="px-3 py-3">Room</th><th className="px-3 py-3">Capacity</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
+                    <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Class / Subject</th><th className="px-3 py-3">Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {examSchedules.map(schedule => (
+                    {examSchedules.slice().sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime))).map(schedule => (
                       <tr key={schedule.id}>
                         <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
                         <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
-                        <td className="px-3 py-3"><p>{schedule.examDate}</p><p className="mt-1 text-[10px] text-[#64748B]">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</p></td>
-                        <td className="px-3 py-3">{schedule.roomName}</td>
-                        <td className="px-3 py-3">{schedule.seatCapacity} seats</td>
+                        <td className="px-3 py-3">{new Date(`${schedule.examDate}T00:00:00`).toLocaleDateString()}</td>
+                        <td className="px-3 py-3 font-mono">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</td>
+                        <td className="px-3 py-3">{new Set(examSchedules.filter(row => row.examDate === schedule.examDate && row.examName === schedule.examName).map(row => row.subjectName)).size} subjects</td>
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
                           {schedule.status === 'draft' && <>
-                            <button type="button" onClick={() => void openEditExamSchedule(schedule)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[10px] font-semibold text-[#334155] disabled:opacity-50">Edit draft</button>
                             <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                             <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                           </>}
@@ -957,7 +955,9 @@ export const ExamsResultsView: React.FC = () => {
                 </table>
               </div>
             )}
-          </section>
+          </section></>}
+          {scheduleSection === 'rooms' && <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><p className="mt-1 text-xs text-[#64748B]">Rooms are managed separately from the printable timetable. Edit a draft to assign its exam hall and seat capacity.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomName || 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Manage room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>}
+          {scheduleSection === 'mixing' && <section className="rounded-xl border border-amber-200 bg-amber-50/40 p-5"><h2 className="text-sm font-bold text-[#132A29]">Student mixing by room</h2><p className="mt-1 text-xs text-[#64748B]">Choose a room session, then mix students from as many selected classes as needed. Seat numbers are shuffled for the room when the schedule is published.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.examName} · {schedule.roomName}</strong><p className="text-slate-500">{schedule.examDate} · {schedule.subjectName} · {schedule.className}</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Mix students</button> : <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="rounded-lg border bg-white px-3 py-2 font-semibold">Print room list</button>}</div>)}</div></section>}
         </div>
       )}
 
