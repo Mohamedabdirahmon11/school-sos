@@ -74,6 +74,7 @@ export const ExamsResultsView: React.FC = () => {
   const [scheduleStartTime, setScheduleStartTime] = useState('08:00');
   const [scheduleEndTime, setScheduleEndTime] = useState('10:00');
   const [scheduleRoom, setScheduleRoom] = useState('');
+  const [scheduleShiftName, setScheduleShiftName] = useState('General');
   const [scheduleCapacity, setScheduleCapacity] = useState(40);
   const [autoStartDate, setAutoStartDate] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
   const [autoDays, setAutoDays] = useState(5);
@@ -81,9 +82,10 @@ export const ExamsResultsView: React.FC = () => {
   const [autoStartTime, setAutoStartTime] = useState('08:00');
   const [autoDurationMinutes, setAutoDurationMinutes] = useState(120);
   const [autoRoom, setAutoRoom] = useState('Exam Hall');
+  const [autoShiftName, setAutoShiftName] = useState('Morning');
   const [autoCapacity, setAutoCapacity] = useState(500);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
-  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; seatCapacity: number } | null>(null);
+  const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number } | null>(null);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
 
   // Load classes, subjects, and exam configuration with a retryable failure state.
@@ -220,6 +222,7 @@ export const ExamsResultsView: React.FC = () => {
         startTime: scheduleStartTime,
         endTime: scheduleEndTime,
         roomName: scheduleRoom.trim(),
+        shiftName: scheduleShiftName.trim(),
         seatCapacity: scheduleCapacity
       });
       const rows = await ApiClient.getExamSchedules();
@@ -294,6 +297,7 @@ export const ExamsResultsView: React.FC = () => {
           startTime,
           endTime,
           roomName,
+          shiftName: autoShiftName.trim() || 'General',
           seatCapacity: autoCapacity
         });
         createdCount += 1;
@@ -781,6 +785,9 @@ export const ExamsResultsView: React.FC = () => {
               <label className="text-xs font-semibold text-[#475569]">Room seat capacity
                 <input type="number" min={1} max={500} step={1} required value={scheduleCapacity} onChange={event => setScheduleCapacity(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" />
               </label>
+              <label className="text-xs font-semibold text-[#475569]">Shift
+                <input maxLength={80} value={scheduleShiftName} onChange={event => setScheduleShiftName(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-normal" placeholder="Morning / Afternoon" />
+              </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
               <p className="text-[11px] text-[#64748B]">Academic year: {school?.academicYear || 'Current school year'} · Room and class time conflicts are checked when publishing.</p>
@@ -817,6 +824,9 @@ export const ExamsResultsView: React.FC = () => {
               <label className="text-xs font-semibold text-[#475569]">Room capacity
                 <input type="number" min={1} max={500} value={autoCapacity} onChange={event => setAutoCapacity(Math.max(1, Math.min(500, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
               </label>
+              <label className="text-xs font-semibold text-[#475569]">Shift for generated sessions
+                <input maxLength={80} value={autoShiftName} onChange={event => setAutoShiftName(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" placeholder="Morning / Afternoon" />
+              </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
               <p className="text-[11px] text-[#64748B]">All active classes are included. Each class gets a separate room label to prevent accidental room overlap. Generated schedules remain drafts.</p>
@@ -830,11 +840,12 @@ export const ExamsResultsView: React.FC = () => {
                 <div><h2 className="text-sm font-bold text-[#132A29]">Edit draft schedule</h2><p className="mt-1 text-xs text-[#64748B]">{editingSchedule.className} · {editingSchedule.subjectName}</p></div>
                 <button type="button" onClick={() => { setEditingSchedule(null); setEditDraft(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">Close</button>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <label className="text-xs font-semibold text-[#475569]">Date<input type="date" value={editDraft.examDate} onChange={event => setEditDraft({ ...editDraft, examDate: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Start<input type="time" value={String(editDraft.startTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, startTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">End<input type="time" value={String(editDraft.endTime).slice(0,5)} onChange={event => setEditDraft({ ...editDraft, endTime: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Room<input maxLength={120} value={editDraft.roomName} onChange={event => setEditDraft({ ...editDraft, roomName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-xs font-semibold text-[#475569]">Shift<input maxLength={80} value={editDraft.shiftName} onChange={event => setEditDraft({ ...editDraft, shiftName: event.target.value })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
                 <label className="text-xs font-semibold text-[#475569]">Capacity<input type="number" min={1} max={500} value={editDraft.seatCapacity} onChange={event => setEditDraft({ ...editDraft, seatCapacity: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" /></label>
               </div>
               <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamScheduleEdit()} disabled={isReadOnly || scheduleSaving || !editDraft.roomName.trim() || editDraft.seatCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : 'Save draft changes'}</button></div>
@@ -855,7 +866,7 @@ export const ExamsResultsView: React.FC = () => {
                   <tbody className="divide-y divide-[#E2E8F0]">
                     {examSchedules.map(schedule => (
                       <tr key={schedule.id}>
-                        <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester}</p></td>
+                        <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
                         <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
                         <td className="px-3 py-3"><p>{schedule.examDate}</p><p className="mt-1 text-[10px] text-[#64748B]">{String(schedule.startTime).slice(0,5)}–{String(schedule.endTime).slice(0,5)}</p></td>
                         <td className="px-3 py-3">{schedule.roomName}</td>
@@ -863,7 +874,7 @@ export const ExamsResultsView: React.FC = () => {
                         <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${schedule.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{schedule.status}</span></td>
                         <td className="px-3 py-3"><div className="flex justify-end gap-2">
                           {schedule.status === 'draft' && <>
-                            <button type="button" onClick={() => { setEditingSchedule(schedule); setEditDraft({ examDate: schedule.examDate, startTime: String(schedule.startTime).slice(0,5), endTime: String(schedule.endTime).slice(0,5), roomName: schedule.roomName, seatCapacity: schedule.seatCapacity }); }} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[10px] font-semibold text-[#334155] disabled:opacity-50">Edit draft</button>
+                            <button type="button" onClick={() => { setEditingSchedule(schedule); setEditDraft({ examDate: schedule.examDate, startTime: String(schedule.startTime).slice(0,5), endTime: String(schedule.endTime).slice(0,5), roomName: schedule.roomName, shiftName: schedule.shiftName || 'General', seatCapacity: schedule.seatCapacity }); }} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[10px] font-semibold text-[#334155] disabled:opacity-50">Edit draft</button>
                             <button type="button" onClick={() => void handlePublishExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg bg-[#0F766E] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === schedule.id ? 'Publishing…' : 'Publish & assign seats'}</button>
                             <button type="button" onClick={() => void handleCancelExamSchedule(schedule.id)} disabled={isReadOnly || publishingScheduleId === schedule.id} className="rounded-lg border border-rose-200 px-3 py-2 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                           </>}
