@@ -2389,14 +2389,14 @@ class StorageEngine {
       subject_id: schedule.subjectId, exam_name: schedule.examName, exam_type: schedule.examType,
       academic_year: schedule.academicYear, semester: schedule.semester, exam_date: schedule.examDate,
       start_time: schedule.startTime, end_time: schedule.endTime, room_name: schedule.roomName,
-      seat_capacity: schedule.seatCapacity, status: 'draft', created_by: schedule.createdBy
+      seat_capacity: schedule.seatCapacity, shift_name: schedule.shiftName || 'General', status: 'draft', created_by: schedule.createdBy
     });
     if (error) throw new Error(error.message || 'Unable to create exam schedule.');
     return (await this.getExamSchedules(schedule.schoolId)).find(row => row.id === schedule.id);
   }
 
   public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; seatCapacity: number;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number;
   }): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
@@ -2406,6 +2406,7 @@ class StorageEngine {
         start_time: updates.startTime,
         end_time: updates.endTime,
         room_name: updates.roomName,
+        shift_name: updates.shiftName || 'General',
         seat_capacity: updates.seatCapacity,
         updated_at: new Date().toISOString()
       })
