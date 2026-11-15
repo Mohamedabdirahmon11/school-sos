@@ -65,6 +65,7 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.ok(api.includes("apiRouter.post('/exams/rooms'"));
   assert.ok(api.includes("apiRouter.put('/exams/rooms/:id'"));
   assert.ok(api.includes('Assign an active Exam Room before publishing'));
+  assert.ok(api.includes("roomName !== 'Room not assigned'"));
   assert.ok(api.includes('Choose an active exam room belonging to this school'));
   assert.ok(api.includes('allowedCohortScheduleIds'));
 });
