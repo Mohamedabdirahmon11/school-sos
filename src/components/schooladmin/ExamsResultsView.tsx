@@ -1497,7 +1497,7 @@ export const ExamsResultsView: React.FC = () => {
                   <thead><tr>
                     <th className="exam-print-number">No.</th>
                     <th>Subject</th>
-                    <th>Exam Date</th>
+                    <th><span className="sr-only">Day / Date</span>Exam Date</th>
                     <th>Time</th>
                     <th>Examination Hall</th>
                     <th className="exam-print-handwrite">Invigilator / Signature</th>
