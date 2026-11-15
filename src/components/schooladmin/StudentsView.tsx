@@ -245,6 +245,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <span>{t('bulk_import')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setShowBulkPinReset(true)}
             disabled={isReadOnly}
             className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
