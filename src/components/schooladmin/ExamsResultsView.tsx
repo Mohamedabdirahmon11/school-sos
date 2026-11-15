@@ -85,9 +85,7 @@ export const ExamsResultsView: React.FC = () => {
   const [autoSubjectsPerDay, setAutoSubjectsPerDay] = useState<2 | 3>(2);
   const [autoStartTime, setAutoStartTime] = useState('08:00');
   const [autoDurationMinutes, setAutoDurationMinutes] = useState(120);
-  const [autoRoom, setAutoRoom] = useState('Exam Hall');
   const [autoShiftName, setAutoShiftName] = useState('Morning');
-  const [autoCapacity, setAutoCapacity] = useState(500);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [editDraft, setEditDraft] = useState<{ examDate: string; startTime: string; endTime: string; roomName: string; roomId: string; shiftName: string; seatCapacity: number } | null>(null);
   const [cohortClassStudents, setCohortClassStudents] = useState<Record<string, Student[]>>({});
@@ -288,7 +286,7 @@ export const ExamsResultsView: React.FC = () => {
   };
 
   const handleAutoGenerateExamSchedules = async () => {
-    if (isReadOnly || !classes.length || !autoRoom.trim() || !autoStartDate) return;
+    if (isReadOnly || !classes.length || !autoStartDate) return;
     setScheduleSaving(true);
     setScheduleError('');
     let createdCount = 0;
@@ -927,8 +925,8 @@ export const ExamsResultsView: React.FC = () => {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
-              <p className="text-[11px] text-[#64748B]">All active classes are included. Generated sessions remain drafts; manage room names and capacities in the separate Exam Rooms section before publishing.</p>
-              <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoRoom.trim() || !autoStartDate || autoCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Auto Generate all classes'}</button>
+              <p className="text-[11px] text-[#64748B]">All active classes are included. Generated sessions remain drafts with no room assigned; assign a registered room in Exam Rooms before publishing.</p>
+              <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoStartDate} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Auto Generate all classes'}</button>
             </div>
           </section>}
 
@@ -1018,7 +1016,7 @@ export const ExamsResultsView: React.FC = () => {
               <div className="mt-4 flex justify-end"><button type="button" onClick={() => void handleSaveExamRoom()} disabled={isReadOnly || scheduleSaving || !roomForm.name.trim() || roomForm.capacity < 1 || roomForm.capacity > 500} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Saving…' : editingRoomId ? 'Save room changes' : 'Add exam room'}</button></div>
             </section>
             <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Registered exam rooms ({examRooms.length})</h2><div className="mt-3 divide-y">{examRooms.map(room => <div key={room.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{room.name}</strong><p className="text-slate-500">{room.roomCode || 'No code'} · {room.location || 'Location not set'} · {room.shiftName} · {room.capacity} seats · {room.isActive ? 'Active' : 'Inactive'}</p></div><div className="flex gap-2"><button type="button" onClick={() => handleEditExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">Edit</button><button type="button" onClick={() => void handleToggleExamRoom(room)} className="rounded-lg border px-3 py-2 font-semibold">{room.isActive ? 'Deactivate' : 'Activate'}</button></div></div>)}{!examRooms.length && <p className="py-4 text-xs text-slate-500">No exam rooms registered yet.</p>}</div></section>
-            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomName || 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Assign room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>
+            <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-[#132A29]">Room assignments</h2><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.roomId ? schedule.roomName : 'Room not assigned'}</strong><p className="text-slate-500">{schedule.className} · {schedule.subjectName} · {schedule.examDate} · {schedule.seatCapacity} seats</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border px-3 py-2 font-semibold">Assign room</button> : <span className="text-slate-500">Published · room locked</span>}</div>)}</div></section>
           </div>}
           {scheduleSection === 'mixing' && <section className="rounded-xl border border-amber-200 bg-amber-50/40 p-5"><h2 className="text-sm font-bold text-[#132A29]">Student mixing by room</h2><p className="mt-1 text-xs text-[#64748B]">Choose a room session, then mix students from as many selected classes as needed. Seat numbers are shuffled for the room when the schedule is published.</p><div className="mt-3 divide-y">{examSchedules.map(schedule => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div><strong>{schedule.examName} · {schedule.roomName}</strong><p className="text-slate-500">{schedule.examDate} · {schedule.subjectName} · {schedule.className}</p></div>{schedule.status === 'draft' ? <button type="button" onClick={() => void openEditExamSchedule(schedule)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold">Mix students</button> : <button type="button" onClick={() => void handlePrintExamSeats(schedule)} className="rounded-lg border bg-white px-3 py-2 font-semibold">Print room list</button>}</div>)}</div></section>}
         </div>
