@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
+import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -109,6 +110,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; note: string }>>({});
   const [isLoadingClassData, setIsLoadingClassData] = useState(false);
   const ethiopianCalendar = getEthiopianCalendarInfo(attendanceDate, school?.timezone || 'Africa/Addis_Ababa');
+  const calendarStatus = getSchoolCalendarStatus(attendanceDate, school?.setupData?.calendar, school?.timezone || 'Africa/Addis_Ababa');
   const attendanceCounts = (['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => ({
     status,
     count: students.filter(student => (attendanceMap[student.id]?.status || 'present') === status).length
@@ -560,6 +562,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               />
               <p className="mt-1 text-[11px] text-[#64748B]">Ethiopian date: {ethiopianCalendar.dateLabel}</p>
               {ethiopianCalendar.holiday && <p className="mt-1 text-[11px] font-semibold text-amber-700">Ethiopian public holiday: {ethiopianCalendar.holiday}</p>}
+              {(calendarStatus.isWeeklyHoliday || (calendarStatus.holidayName && calendarStatus.holidayName !== ethiopianCalendar.holiday)) && <p className="mt-1 text-[11px] font-semibold text-amber-700">{calendarStatus.isWeeklyHoliday ? 'This date is configured as a weekly school holiday.' : 'School holiday: ' + calendarStatus.holidayName}</p>}
             </div>
             <div>
               <button
