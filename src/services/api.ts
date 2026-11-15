@@ -937,7 +937,8 @@ export class ApiClient {
   }
 
   public static async updateExamSchedule(scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; seatCapacity: number;
+    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string;
+    seatCapacity: number; cohortStudentIds?: string[];
   }) {
     return this.request<any>(`/exams/schedules/${encodeURIComponent(scheduleId)}`, {
       method: 'PUT', body: JSON.stringify(updates)
