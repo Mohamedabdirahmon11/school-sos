@@ -352,13 +352,13 @@ export const ExamsResultsView: React.FC = () => {
   const handleCohortCountChange = (classId: string, requestedCount: number) => {
     const studentsInClass = cohortClassStudents[classId] || [];
     const count = Math.max(0, Math.min(studentsInClass.length, requestedCount || 0));
-    const selectedClassCount = Object.entries(cohortCounts).filter(([id, value]) => id !== classId && value > 0).length;
-    if (count > 0 && selectedClassCount >= 3) {
-      setScheduleError('A mixed exam group can combine up to three classes.');
-      return;
-    }
     const classStudentIds = new Set(studentsInClass.map(student => student.id));
-    const nextIds = studentsInClass.slice(0, count).map(student => student.id);
+    const shuffled = [...studentsInClass];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    const nextIds = shuffled.slice(0, count).map(student => student.id);
     setCohortStudentIds(current => [...current.filter(id => !classStudentIds.has(id)), ...nextIds]);
     setCohortCounts(current => ({ ...current, [classId]: count }));
     setScheduleError('');
@@ -878,7 +878,7 @@ export const ExamsResultsView: React.FC = () => {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 pt-4">
-              <p className="text-[11px] text-[#64748B]">All active classes are included. Each class gets a separate room label to prevent accidental room overlap. Generated schedules remain drafts.</p>
+              <p className="text-[11px] text-[#64748B]">All active classes are included. Generated sessions remain drafts; manage room names and capacities in the separate Exam Rooms section before publishing.</p>
               <button type="button" onClick={() => void handleAutoGenerateExamSchedules()} disabled={isReadOnly || scheduleSaving || !classes.length || !autoRoom.trim() || !autoStartDate || autoCapacity < 1} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{scheduleSaving ? 'Generating…' : 'Auto Generate all classes'}</button>
             </div>
           </section>}
@@ -899,7 +899,7 @@ export const ExamsResultsView: React.FC = () => {
               </div>}
               {scheduleSection === 'mixing' && <div className="mt-5 border-t border-amber-200 pt-4">
                 <h3 className="text-xs font-bold text-[#132A29]">Mixed-class student group (optional)</h3>
-                <p className="mt-1 text-[11px] text-[#64748B]">Choose how many active students to include from each class. Up to three classes can be combined. Leave all counts at zero to use the complete class attached to this schedule.</p>
+                <p className="mt-1 text-[11px] text-[#64748B]">Choose the number of active students from every class you want represented in this room. The system randomly selects students from each chosen class; there is no three-class limit.</p>
                 {scheduleSaving && !Object.keys(cohortClassStudents).length ? <p className="mt-2 text-xs text-slate-500">Loading class students…</p> : (
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {classes.map(klass => {
@@ -934,7 +934,7 @@ export const ExamsResultsView: React.FC = () => {
                     <th className="px-3 py-3">Exam</th><th className="px-3 py-3">Class / Subject</th><th className="px-3 py-3">Date</th><th className="px-3 py-3">Start–End</th><th className="px-3 py-3">Daily subjects</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {examSchedules.map(schedule => (
+                    {examSchedules.slice().sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime))).map(schedule => (
                       <tr key={schedule.id}>
                         <td className="px-3 py-3"><p className="font-semibold text-[#132A29]">{schedule.examName}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.examType === 'small' ? 'Small Exam' : 'Big Exam'} · {schedule.semester} · {schedule.shiftName || 'General'}</p></td>
                         <td className="px-3 py-3"><p className="font-semibold">{schedule.className}</p><p className="mt-1 text-[10px] text-[#64748B]">{schedule.subjectName}</p></td>
