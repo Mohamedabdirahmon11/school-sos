@@ -5086,7 +5086,7 @@ apiRouter.get('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const subjectNames = new Map(subjects.map(item => [item.id, item.name]));
   res.json(schedules.map(schedule => ({
     ...schedule,
-    className: classNames.get(schedule.classId) || schedule.classId,
+    className: schedule.classId ? (classNames.get(schedule.classId) || schedule.classId) : 'All participating classes',
     subjectName: subjectNames.get(schedule.subjectId) || schedule.subjectId
   })));
 });
@@ -5127,7 +5127,7 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
       !validDate || !validTime(startTime) || !validTime(endTime) ||
       startTime >= endTime || !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 ||
       !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
-    res.status(400).json({ error: 'Enter a valid exam name, class, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
+    res.status(400).json({ error: 'Enter a valid exam name, subject, exam type, semester, date, time range, room, and capacity (1–500).' });
     return;
   }
 
