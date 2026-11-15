@@ -1401,7 +1401,7 @@ export const ExamsResultsView: React.FC = () => {
                     <th className="px-3 py-3">No.</th><th className="px-3 py-3">Examination</th><th className="px-3 py-3">Subject / Classes</th><th className="px-3 py-3">Day / Date</th><th className="px-3 py-3">Time</th><th className="px-3 py-3">Examination Hall</th><th className="exam-print-hide px-3 py-3">Status</th><th className="exam-print-hide px-3 py-3 text-right">Actions</th>
                   </tr></thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {groupedExamSchedules.map(group => {
+                    {groupedExamSchedules.map((group, groupIndex) => {
                       const schedule = group.sessions[0];
                       const roomNames = [...new Set(group.sessions.map(session => session.roomName).filter(Boolean))];
                       const allPublished = group.sessions.every(session => session.status === 'published');
