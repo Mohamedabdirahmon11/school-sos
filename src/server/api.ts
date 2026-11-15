@@ -5115,6 +5115,62 @@ apiRouter.post('/exams/schedules', requireAuth, requireSchoolAdminOrSuperAdmin, 
   }
 });
 
+apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const schedule = (await db.getExamSchedules(school.id)).find(item => item.id === req.params.id);
+  if (!schedule) { res.status(404).json({ error: 'Exam schedule was not found in this school.' }); return; }
+  if (schedule.status !== 'draft') { res.status(409).json({ error: 'Only draft exam schedules can be edited.' }); return; }
+
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
+  const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
+  const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
+  const roomName = typeof body.roomName === 'string' ? body.roomName.trim() : '';
+  const seatCapacity = Number(body.seatCapacity);
+  const [year, month, day] = examDate.split('-').map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  const validDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(examDate) && parsedDate.toISOString().slice(0, 10) === examDate;
+  const validTime = (value: string) => {
+    if (!/^\\d{2}:\\d{2}$/.test(value)) return false;
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
+  };
+  if (!validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
+      !roomName || roomName.length > 120 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
+    res.status(400).json({ error: 'Enter a valid date, time range, room, and capacity (1–500).' });
+    return;
+  }
+
+  const existingSchedules = await db.getExamSchedules(school.id);
+  const overlaps = existingSchedules.some(other => {
+    if (other.id === schedule.id || other.status === 'cancelled' || other.examDate !== examDate) return false;
+    const sameRoom = String(other.roomName).trim().toLowerCase() === roomName.toLowerCase();
+    const sameClass = other.classId === schedule.classId;
+    const otherStart = String(other.startTime).slice(0, 5);
+    const otherEnd = String(other.endTime).slice(0, 5);
+    return (sameRoom || sameClass) && startTime < otherEnd && otherStart < endTime;
+  });
+  if (overlaps) {
+    res.status(409).json({ error: 'This room or class already has an overlapping exam schedule on that date.' });
+    return;
+  }
+
+  try {
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, seatCapacity });
+    db.logAudit({
+      action: 'EXAM_SCHEDULE_UPDATED', category: 'academics', schoolId: school.id,
+      schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
+      details: `Updated draft exam schedule "${schedule.examName}" for ${examDate} in room ${roomName}.`,
+      severity: 'info'
+    });
+    await db.flush();
+    res.json(updated);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to update exam schedule.' });
+  }
+});
+
 apiRouter.post('/exams/schedules/:id/cancel', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
