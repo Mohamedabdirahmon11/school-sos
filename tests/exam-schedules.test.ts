@@ -35,16 +35,24 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.ok(api.includes('This room or class already has an overlapping exam schedule'));
   assert.ok(api.includes('validTime(startTime)'));
   assert.ok(api.includes('seatCapacity > 500'));
+  assert.ok(api.includes("apiRouter.put('/exams/schedules/:id'"));
+  assert.ok(api.includes('db.updateExamSchedule'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
   assert.ok(storage.includes('schoolos_publish_exam_schedule'));
   assert.ok(storage.includes('getExamScheduleSeats'));
+  assert.ok(storage.includes('updateExamSchedule'));
   assert.ok(client.includes('/exams/schedules'));
+  assert.ok(client.includes('updateExamSchedule'));
   assert.ok(ui.includes("setActiveTab('schedule')"));
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
   assert.ok(ui.includes('Cancel draft'));
   assert.ok(ui.includes('Print seating'));
   assert.ok(ui.includes('exam-seat-print'));
+  assert.ok(ui.includes('Auto Generate all classes'));
+  assert.ok(ui.includes('handleAutoGenerateExamSchedules'));
+  assert.ok(ui.includes('Edit draft'));
+  assert.ok(ui.includes('Save draft changes'));
 });
