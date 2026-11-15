@@ -5742,7 +5742,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_set_exam_schedule_cohort(
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 DECLARE
@@ -5813,7 +5813,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_publish_exam_schedule(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 DECLARE
