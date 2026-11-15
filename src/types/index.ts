@@ -114,6 +114,11 @@ export interface SchoolSetupProgressUpdate {
 export interface School {
   id: string;
   name: string;
+  nameArabic?: string;
+  examTimetableTitle?: string;
+  examTimetableAcademicYearTitle?: string;
+  examTimetableClassGroup?: string;
+  examTimetableIncludeFriday?: boolean;
   code: string; // e.g., "MOG01"
   address: string;
   country?: string;
