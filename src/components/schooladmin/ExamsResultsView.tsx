@@ -1523,7 +1523,7 @@ export const ExamsResultsView: React.FC = () => {
                               {roomSession.status === 'draft' && <>
                                 <button type="button" onClick={() => void openEditExamSchedule(roomSession)} disabled={isReadOnly || scheduleSaving} className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Edit</button>
                                 <button type="button" onClick={() => void handlePublishExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg bg-[#0F766E] px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{publishingScheduleId === roomSession.id ? 'Publishing…' : 'Publish & assign seats'}</button>
-                                <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel</button>
+                                <button type="button" onClick={() => void handleCancelExamSchedule(roomSession.id)} disabled={isReadOnly || publishingScheduleId === roomSession.id} className="rounded-lg border border-rose-200 px-2 py-1.5 text-[10px] font-semibold text-rose-700 disabled:opacity-50">Cancel draft</button>
                               </>}
                               {roomSession.status === 'published' && <button type="button" onClick={() => void handlePrintExamSeats(roomSession)} aria-label="Print seating roster" className="rounded-lg border border-[#CBD5E1] px-2 py-1.5 text-[10px] font-semibold">Print seats</button>}
                             </div>)}
