@@ -2425,12 +2425,15 @@ class StorageEngine {
   }
 
   public async updateExamSchedule(schoolId: string, scheduleId: string, updates: {
-    examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
+    examName: string; examType: 'small' | 'big'; semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string; endTime: string; roomName: string; shiftName: string; seatCapacity: number; roomId?: string;
   }): Promise<any> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam schedule storage is unavailable.');
     const { data, error } = await client.from('exam_schedules')
       .update({
+        exam_name: updates.examName,
+        exam_type: updates.examType,
+        semester: updates.semester,
         exam_date: updates.examDate,
         start_time: updates.startTime,
         end_time: updates.endTime,
