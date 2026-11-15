@@ -2512,7 +2512,7 @@ class StorageEngine {
         studentIdLabel: student?.studentId || seat.studentId,
         rollNumberLabel: student?.rollNumber || '',
         studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : 'Unknown student',
-        className: student ? [classNames.get(student.classId) || student.classId, student.section].filter(Boolean).join(' · ') || '—' : '—'
+        className: student ? (classNames.get(student.classId) || student.classId || '—') + (student.section ? ' · ' + student.section : '') : '—'
       };
     }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
   }
