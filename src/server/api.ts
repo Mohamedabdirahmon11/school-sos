@@ -5213,6 +5213,9 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
   if (schedule.status !== 'draft') { res.status(409).json({ error: 'Only draft exam schedules can be edited.' }); return; }
 
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const examName = typeof body.examName === 'string' ? body.examName.trim() : schedule.examName;
+  const examType = ['small', 'big'].includes(body.examType) ? body.examType : schedule.examType;
+  const semester = ['Semester 1', 'Semester 2'].includes(body.semester) ? body.semester : schedule.semester;
   const examDate = typeof body.examDate === 'string' ? body.examDate.trim() : '';
   const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
   const endTime = typeof body.endTime === 'string' ? body.endTime.trim() : '';
@@ -5232,7 +5235,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
     const [hours, minutes] = value.split(':').map(Number);
     return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
   };
-  if (!validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
+  if (!examName || examName.length > 120 || !['small', 'big'].includes(examType) || !['Semester 1', 'Semester 2'].includes(semester) || !validDate || !validTime(startTime) || !validTime(endTime) || startTime >= endTime ||
       !roomName || roomName.length > 120 || !shiftName || shiftName.length > 80 || !Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 500) {
     res.status(400).json({ error: 'Enter a valid date, time range, room, and capacity (1–500).' });
     return;
@@ -5259,7 +5262,7 @@ apiRouter.put('/exams/schedules/:id', requireAuth, requireSchoolAdminOrSuperAdmi
         return;
       }
     }
-    const updated = await db.updateExamSchedule(school.id, schedule.id, { examDate, startTime, endTime, roomName, roomId: selectedRoom?.id, shiftName, seatCapacity });
+    const updated = await db.updateExamSchedule(school.id, schedule.id, { examName, examType, semester, examDate, startTime, endTime, roomName, roomId: selectedRoom?.id, shiftName, seatCapacity });
     if (Array.isArray(body.cohortStudentIds)) {
       await db.setExamScheduleCohort(school.id, schedule.id, body.cohortStudentIds);
     }
