@@ -119,21 +119,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   return <>
     {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
     <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] ${isCollapsed ? 'md:w-[76px]' : 'md:w-[276px]'} shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className={`flex h-[82px] shrink-0 items-center gap-3 border-b border-white/10 ${isCollapsed ? 'px-2 md:justify-center' : 'px-5'}`}>
+      <div className={`relative flex h-[96px] shrink-0 flex-col items-center justify-center gap-1 border-b border-white/10 ${isCollapsed ? 'px-2' : 'px-5'}`}>
         <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--brand-color)', color: 'var(--brand-foreground)' } : undefined}>
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>
-        <div className={`min-w-0 flex-1 ${isCollapsed ? 'md:hidden' : ''}`}>
-          <div className="truncate text-[15px] font-bold tracking-tight">{school?.name || (role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : 'School workspace')}</div>
-          <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[.16em] text-teal-200/70">{school ? `School code · ${school.code}` : 'School workspace'}</div>
+        <div className={`min-w-0 max-w-full text-center ${isCollapsed ? 'md:hidden' : ''}`}>
+          <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || (role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : 'School workspace')}</div>
+          {school && <div className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em] text-teal-200/70">{school.code}</div>}
         </div>
-        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!isCollapsed} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="hidden rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:inline-flex">
-          {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
-        </button>
-        <button onClick={onCloseMobile} aria-label="Close menu" className="rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
+        <button onClick={onCloseMobile} aria-label="Close menu" className="absolute right-2 top-2 rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
       <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
+        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!isCollapsed} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 text-teal-100/70 hover:bg-white/10 md:flex">
+          {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
+        </button>
         {groups.map(group => <section key={group.title}>
           <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50 ${isCollapsed ? "md:hidden" : ""}`}>{group.title}</h2>
           <div className="space-y-1">
