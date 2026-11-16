@@ -20,8 +20,20 @@
   .documents-paper { position:absolute !important; left:0 !important; top:0 !important; width:100% !important; min-height:0 !important; max-width:none !important; margin:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
   .documents-paper[data-page-size="A5"] { page:document-a5; width:148mm !important; }
   .documents-paper[data-page-size="Letter"] { page:document-letter; width:8.5in !important; }
-  .document-page-header { break-inside:avoid; }
-  .document-page-footer { break-inside:avoid; }
+  /* Fixed print furniture repeats in Chromium/Edge print output. */
+  .document-page-header {
+    position:fixed !important; top:0 !important; left:0 !important; right:0 !important;
+    width:100% !important; box-sizing:border-box !important; margin:0 !important;
+    padding:8mm 12mm 4mm !important; background:#fff !important; z-index:10 !important;
+    break-inside:avoid;
+  }
+  .document-page-footer {
+    position:fixed !important; bottom:0 !important; left:0 !important; right:0 !important;
+    width:100% !important; box-sizing:border-box !important; margin:0 !important;
+    padding:3mm 12mm !important; background:#fff !important; z-index:10 !important;
+    break-inside:avoid;
+  }
+  .documents-paper { padding-top:38mm !important; padding-bottom:18mm !important; }
   .document-editable table { border-collapse:collapse !important; }
   .document-editable tr,.document-editable img { break-inside:avoid; page-break-inside:avoid; }
   .document-page-break { break-after:page; page-break-after:always; border:0 !important; height:0 !important; margin:0 !important; }
