@@ -76,3 +76,6 @@ Updated: 2026-11-11
 - Added additive migration `20261116100000_school_documents_phase3.sql` for immutable document version snapshots, document sharing grants, audit events, final/explicit lock metadata and private student attachment metadata/storage bucket.
 - Version snapshots and audit events are captured by a database trigger; locked documents reject content/metadata edits until a separate unlock operation. Audit records are read-only to authenticated users through RLS.
 - The migration is not applied to Supabase. API endpoints, UI integration, automated runtime tests, and real file upload/download verification remain in progress.
+
+
+- Phase 3 API/UI implementation now includes version restore, role/user grant enforcement for read/edit, audit history, final/manual locking, and private student attachment upload/download/soft-delete. New static regression coverage was added; CI and live browser/storage verification are still pending.
