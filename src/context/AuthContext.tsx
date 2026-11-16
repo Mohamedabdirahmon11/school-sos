@@ -176,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     root.style.setProperty('--sidebar-background', theme ? (presets[theme.preset] || safeHex(theme.backgroundColor, '#102c2a')) : '#102c2a');
     root.style.setProperty('--sidebar-text', safeHex(theme?.textColor, '#ffffff'));
     root.style.setProperty('--sidebar-accent', safeHex(theme?.accentColor, brandColor));
+    root.style.setProperty('--sidebar-accent-foreground', getBrandForeground(safeHex(theme?.accentColor, brandColor)));
     root.style.setProperty('--sidebar-width', `${Math.min(320, Math.max(240, theme?.width || 276))}px`);
     root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
     root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
