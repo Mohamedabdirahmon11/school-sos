@@ -46,7 +46,7 @@ test('invoice generation uses only active students and respects class/grade fee 
   assert.doesNotMatch(source, /student_invoices'\)\.insert/);
   assert.match(migration, /pg_advisory_xact_lock/);
   assert.match(migration, /previous_item\.cadence = 'one_time'/);
-  assert.match(source, /UNIQUE|23505/);
+  assert.match(migration, /UNIQUE \(school_id, student_id, academic_year, billing_period\)/);
 });
 
 test('invoice payment uses an atomic database RPC and returns a linked receipt', () => {
