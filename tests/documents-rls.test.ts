@@ -14,6 +14,9 @@ test('document tables enable RLS and restrict rows to the authenticated school',
   }
   assert.match(migration,/school_id = private\.auth_school_id\(\)/);
   assert.match(migration,/private\.auth_user_role\(\) = 'school_admin'/);
+  for (const index of ['idx_school_documents_school_updated','idx_school_documents_template_id','idx_school_documents_student_id','idx_school_documents_class_id','idx_school_documents_created_by','idx_school_documents_updated_by','idx_school_documents_deleted_by','idx_school_document_templates_school_updated','idx_school_document_templates_created_by','idx_school_document_templates_updated_by','idx_school_document_templates_deleted_by']) {
+    assert.match(migration,new RegExp('CREATE INDEX IF NOT EXISTS '+index));
+  }
 });
 
 test('document API reads and writes always include the current school id', () => {
