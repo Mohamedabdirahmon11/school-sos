@@ -40,6 +40,7 @@ export const StaffAccessView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [roleTitle, setRoleTitle] = useState('Accountant');
   const [email, setEmail] = useState('');
+  const [staffPin, setStaffPin] = useState('');
   const [staffId, setStaffId] = useState('');
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('500');
@@ -92,7 +93,7 @@ export const StaffAccessView: React.FC = () => {
         });
         setMessage('Staff profile and permissions updated successfully.');
       } else {
-        const created = await ApiClient.request<StaffMember & { initialPassword?: string }>('/school/staff', {
+        const created = await ApiClient.request<StaffMember & { initialPin?: string }>('/school/staff', {
           method: 'POST',
           body: JSON.stringify({
             fullName,
@@ -102,11 +103,12 @@ export const StaffAccessView: React.FC = () => {
             phone,
             monthlySalary: parseFloat(salary) || 0,
             permissions: selectedPermissions,
+            pin: staffPin,
             createLogin
           })
         });
-        if (created.initialPassword) {
-          window.alert(`Sign-in account created for ${created.email}.\nTemporary password (shown once):\n${created.initialPassword}\nThe staff member must change it after signing in.`);
+        if (created.initialPin) {
+          window.alert(`Accountant sign-in created.\nStaff ID: ${created.staffId}\nInitial PIN (shown once): ${created.initialPin}\nShare it securely with the staff member.`);
         }
         setMessage(createLogin ? `Staff sign-in account created for ${fullName} (${created.staffId}).` : `Staff record created for ${fullName} (${created.staffId}) without login access.`);
       }
@@ -115,6 +117,7 @@ export const StaffAccessView: React.FC = () => {
       setEditingStaff(null);
       setFullName('');
       setEmail('');
+      setStaffPin('');
       setStaffId('');
       setPhone('');
       setCreateLogin(true);
@@ -352,14 +355,14 @@ export const StaffAccessView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Email (Login ID)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Contact Email (optional)</label>
                   <input
                     type="email"
-                    required={createLogin}
+                    required={false}
                     disabled={!createLogin}
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder={createLogin ? "staff@school.so" : "Not needed for drivers"}
+                    placeholder="Optional contact email"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-400 focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
                 </div>
@@ -375,6 +378,7 @@ export const StaffAccessView: React.FC = () => {
                 </div>
               </div>
 
+              {createLogin && !editingStaff && <div><label className="block text-xs font-medium text-slate-700 mb-1">Initial Accountant PIN (4–6 digits)</label><input type="password" inputMode="numeric" maxLength={6} required value={staffPin} onChange={e => setStaffPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 4–6 digit PIN" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg" /></div>}
               <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} disabled={!!editingStaff || roleTitle === 'Driver'} /> Create a system login for this staff member</label>
               {!createLogin && <p className="text-[11px] text-slate-500">This person is recorded in Staff & Access only. No username, password or separate portal is created.</p>}
 
