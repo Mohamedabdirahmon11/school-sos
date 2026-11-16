@@ -7,8 +7,8 @@ type Props = {
   onSaveNow: () => void;
   direction: 'ltr' | 'rtl';
   onDirectionChange: (value: 'ltr' | 'rtl') => void;
-  pageSize: 'A4' | 'A5' | 'Letter';
-  onPageSizeChange: (value: 'A4' | 'A5' | 'Letter') => void;
+  pageSize: 'A4' | 'A5' | 'Letter' | 'CR80';
+  onPageSizeChange: (value: 'A4' | 'A5' | 'Letter' | 'CR80') => void;
   margins: number;
   onMarginsChange: (value: number) => void;
   school: any;
@@ -269,7 +269,7 @@ export const DocumentEditor: React.FC<Props> = ({
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <label className="text-xs font-semibold text-slate-600">Cabbirka bogga
           <select value={pageSize} onChange={event => onPageSizeChange(event.target.value as Props['pageSize'])} className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            <option value="A4">A4</option><option value="A5">A5</option><option value="Letter">Letter</option>
+            <option value="A4">A4</option><option value="A5">A5</option><option value="Letter">Letter</option><option value="CR80">ID Card (85.6 × 54 mm)</option>
           </select>
         </label>
         <label className="text-xs font-semibold text-slate-600">Jiho qoraal
