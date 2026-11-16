@@ -735,7 +735,10 @@ export interface StaffPayrollRecord {
   deductions: number | Array<{ label: string; amount: number }>;
   deductionTotal: number;
   netSalary: number;
-  status: 'draft' | 'approved' | 'paid';
+  paidAmount?: number;
+  balanceDue?: number;
+  paymentHistory?: Array<{ id: string; amount: number; paymentMethod: 'cash' | 'bank_transfer' | 'mobile_money' | 'other'; paymentDate: string; reference?: string; notes?: string; recordedBy: string; recordedAt: string }>;
+  status: 'draft' | 'approved' | 'partially_paid' | 'paid';
   paymentStatus?: 'pending' | 'paid';
   createdBy?: string;
   approvedBy?: string;
