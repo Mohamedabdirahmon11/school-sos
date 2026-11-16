@@ -446,10 +446,10 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     try {
       const uploaded = await ApiClient.uploadSchoolLogo(file);
       setLogoUrl(uploaded.logoUrl);
-      setNotice("Logo uploaded. Save school identity settings to apply it.");
+      setNotice('Logo uploaded. Save school identity settings to apply it.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
-      setError(err.message || "School logo upload failed.");
+      setError(err.message || 'School logo upload failed.');
     } finally {
       setIsSaving(false);
     }
