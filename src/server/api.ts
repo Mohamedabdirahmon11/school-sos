@@ -7572,7 +7572,7 @@ function documentClientRow(row: any, includeContent = false) {
   return result;
 }
 function documentTemplateClientRow(row: any) {
-  return { id: row.id, title: row.title, documentType: row.document_type, contentHtml: row.content_html, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, documentType: row.document_type, contentHtml: row.content_html, updatedAt: row.updated_at, deletedAt: row.deleted_at || null };
 }
 function documentServiceClient(res: Response) {
   if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
