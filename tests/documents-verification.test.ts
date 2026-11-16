@@ -18,3 +18,9 @@ test('document verification links do not permit script or protocol-relative dest
 test('document verification QR rejects malformed 36-character token strings', () => {
   assert.equal(sanitizeDocumentHtml('<img src="/api/public/document-verification/------------------------------------/qr">'),'<img>');
 });
+
+test('document sanitizer retains bounded image rotation and layer styles only', () => {
+  assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg);z-index:2">'), '<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg);z-index:2">');
+  assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg);z-index:999">'), '<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg)">');
+  assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="transform:translateX(999px)">'), '<img src="/api/documents/images?path=school/a.png">');
+});
