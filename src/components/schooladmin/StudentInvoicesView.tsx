@@ -7,7 +7,8 @@ import { ErrorState } from '../common/ErrorState.tsx';
 import { Download, FileText, Plus, Search, Wallet, X } from 'lucide-react';
 
 const today = () => new Date().toISOString().slice(0, 10);
-const currentPeriod = () => new Date().toLocaleString('en', { month: 'long', year: 'numeric' });
+const currentPeriod = () => new Date().toISOString().slice(0, 7);
+const formatPeriod = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? new Date(value + '-01T00:00:00.000Z').toLocaleDateString('en', { month: 'long', year: 'numeric' }) : value;
 
 export const StudentInvoicesView: React.FC = () => {
   const { school, user, isReadOnly } = useAuth();
@@ -116,7 +117,7 @@ export const StudentInvoicesView: React.FC = () => {
             const shownStatus=overdue?'overdue':invoice.status;
             const badge=shownStatus==='paid'?'bg-emerald-100 text-emerald-800':shownStatus==='overdue'?'bg-red-100 text-red-800':shownStatus==='partially_paid'?'bg-amber-100 text-amber-800':'bg-slate-100 text-slate-700';
             return <tr key={invoice.id} className="hover:bg-slate-50">
-              <td className="p-3 font-mono text-xs font-semibold">{invoice.invoice_number}</td><td className="p-3 font-medium">{studentName(invoice.student_id)}</td><td className="p-3">{invoice.billing_period}</td><td className="p-3">{invoice.due_date}</td>
+              <td className="p-3 font-mono text-xs font-semibold">{invoice.invoice_number}</td><td className="p-3 font-medium">{studentName(invoice.student_id)}</td><td className="p-3">{formatPeriod(invoice.billing_period)}</td><td className="p-3">{invoice.due_date}</td>
               <td className="p-3 text-right tabular-nums">{money(invoice.total_amount,invoice.currency)}</td><td className="p-3 text-right tabular-nums">{money(invoice.amount_paid,invoice.currency)}</td><td className="p-3 text-right font-semibold tabular-nums">{money(invoice.balance_due,invoice.currency)}</td>
               <td className="p-3"><span className={`rounded-full px-2 py-1 text-[11px] font-bold ${badge}`}>{shownStatus.replace('_',' ')}</span></td>
               <td className="p-3"><div className="flex justify-end gap-2">
@@ -132,7 +133,7 @@ export const StudentInvoicesView: React.FC = () => {
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Generate class invoices</h2><button type="button" onClick={()=>setShowGenerate(false)} aria-label="Close"><X size={19}/></button></div>
       <p className="text-sm text-slate-500">One invoice per active student. Existing invoices for the same period are skipped.</p>
       <label className="block text-sm font-medium">Class<select required value={classId} onChange={event=>setClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select class</option>{classes.map((item:any)=><option key={item.id} value={item.id}>{item.name} {item.section||''}</option>)}</select></label>
-      <label className="block text-sm font-medium">Billing period<input required maxLength={80} value={period} onChange={event=>setPeriod(event.target.value)} placeholder="e.g. November 2026" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+      <label className="block text-sm font-medium">Billing period<input required type="month" value={period} onChange={event=>setPeriod(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="block text-sm font-medium">Payment due date<input required type="date" min={today()} value={dueDate} onChange={event=>setDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includeAnnual} onChange={event=>setIncludeAnnual(event.target.checked)}/> Include annual registration and annual custom fees</label>
       <div className="flex justify-end gap-2 border-t pt-4"><button type="button" onClick={()=>setShowGenerate(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy?'Generating…':'Generate invoices'}</button></div>
