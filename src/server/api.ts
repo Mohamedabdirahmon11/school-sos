@@ -6296,10 +6296,30 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
     prepared.push({student,lines,subtotal:lines.reduce((sum,line)=>sum+line.line_total,0)});
   }
 
+  // If an invoice for this student and billing period already exists, safely add
+  // the missing bus fee once. The database RPC locks the invoice and preserves payments.
+  const repairExistingBusFee = async (student: any): Promise<boolean> => {
+    const bus = busAssignments.find((assignment: any) => assignment.studentId === student.id && assignment.active);
+    const feeAmount = Number(bus?.feeAmount);
+    if (!bus || !Number.isFinite(feeAmount) || feeAmount <= 0) return false;
+    const { data: existingInvoice, error: invoiceError } = await client
+      .from('student_invoices').select('id').eq('school_id', school.id)
+      .eq('student_id', student.id).eq('academic_year', school.academicYear)
+      .eq('billing_period', billingPeriod).maybeSingle();
+    if (invoiceError) throw new Error('Could not find the existing invoice to repair.');
+    if (!existingInvoice) return false;
+    const { data, error } = await client.rpc('schoolos_add_missing_student_invoice_bus_fee', {
+      p_invoice_id: existingInvoice.id, p_school_id: school.id, p_fee_amount: feeAmount
+    });
+    if (error) throw new Error('The missing bus fee could not be added safely.');
+    return data?.added === true;
+  };
+
   // Allocate and create invoices concurrently in small batches instead of waiting for
   // two database RPC round-trips for every student one after another.
   const created:any[]=[];
   let skippedExisting=0;
+  let busFeesAdded=0;
   const batchSize=10;
   for(let offset=0;offset<prepared.length;offset+=batchSize){
     const batch=prepared.slice(offset,offset+batchSize);
@@ -6320,21 +6340,27 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
         p_items:lines
       });
       if(creationError){
-        if(/already been billed|already exists/i.test(creationError.message||''))return {duplicate:true};
+        if(/already been billed|already exists/i.test(creationError.message||'')) {
+          return { duplicate: true, busFeeAdded: await repairExistingBusFee(student) };
+        }
         throw new Error('Invoice could not be created atomically.');
       }
-      if(creation?.duplicate)return {duplicate:true};
+      if(creation?.duplicate) {
+        return { duplicate: true, busFeeAdded: await repairExistingBusFee(student) };
+      }
       if(!creation?.invoice)throw new Error('Invoice creation returned an invalid result.');
       return {invoice:creation.invoice};
     }));
     for(const outcome of outcomes){
-      if(outcome.duplicate)skippedExisting++;
-      else if(outcome.invoice)created.push(outcome.invoice);
+      if(outcome.duplicate) {
+        skippedExisting++;
+        if(outcome.busFeeAdded) busFeesAdded++;
+      } else if(outcome.invoice) created.push(outcome.invoice);
     }
   }
   db.logAudit({action:'STUDENT_INVOICES_GENERATED',category:'finance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Generated ${created.length} student invoices for ${billingPeriod}; skipped ${skippedExisting} duplicates and ${skippedNoFees} students without configured fees.`,severity:'info'});
   await db.flush();
-  res.status(201).json({generatedCount:created.length,skippedExisting,skippedNoFees,invoices:created});
+  res.status(201).json({generatedCount:created.length,skippedExisting,skippedNoFees,busFeesAdded,invoices:created});
 });
 
 apiRouter.get('/student-invoices/:id/items', requireAuth, requireSchoolContext, async(req,res)=>{
