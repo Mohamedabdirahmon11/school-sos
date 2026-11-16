@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/20261115150000_student_invoices.sql', import.meta.url), 'utf8');
+const view = readFileSync(new URL('../src/components/schooladmin/StudentInvoicesView.tsx', import.meta.url), 'utf8');
+
+const route = (method: string, path: string) => {
+  const start = api.indexOf(`apiRouter.${method}('${path}'`);
+  assert.notEqual(start, -1, `missing ${method.toUpperCase()} ${path}`);
+  const nextRoute = api.indexOf('apiRouter.', start + 1);
+  return api.slice(start, nextRoute === -1 ? undefined : nextRoute);
+};
+
+test('student invoice endpoints are authenticated, school-scoped and permission-gated', () => {
+  for (const [method, path] of [
+    ['get', '/student-invoices'],
+    ['post', '/student-invoices/generate'],
+    ['post', '/student-invoices/:id/pay'],
+    ['get', '/student-invoices/:id/pdf']
+  ]) {
+    const source = route(method, path);
+    assert.match(source, /requireAuth/);
+    assert.match(source, /requireSchoolContext/);
+  }
+  assert.match(route('post', '/student-invoices/generate'), /requireSchoolAdminOrStaffPermission\('fees_manage'\)/);
+  assert.match(route('post', '/student-invoices/:id/pay'), /requireSchoolAdminOrStaffPermission\('fees_manage'\)/);
+  assert.match(route('get', '/student-invoices/:id/items'), /fees_manage/);
+  assert.match(route('get', '/student-invoices/:id/pdf'), /fees_manage/);
+});
+
+test('invoice generation uses only active students and respects class/grade fee targeting', () => {
+  const source = route('post', '/student-invoices/generate');
+  assert.match(source, /student\.status==='active'/);
+  assert.match(source, /item\.classId===student\.classId/);
+  assert.match(source, /klass\.gradeLevel>=item\.minGrade&&klass\.gradeLevel<=item\.maxGrade/);
+  assert.match(source, /includeAnnualRegistration/);
+  assert.match(source, /includeOneTimeFees/);
+  assert.match(source, /busAssignments\.find/);
+  assert.match(source, /itemError[\s\S]{0,260}student_invoices'\)\.delete/);
+  assert.match(source, /UNIQUE|23505/);
+});
+
+test('invoice payment uses an atomic database RPC and returns a linked receipt', () => {
+  const source = route('post', '/student-invoices/:id/pay');
+  assert.match(source, /schoolos_apply_student_invoice_payment/);
+  assert.match(source, /p_idempotency_key:idempotencyKey/);
+  assert.match(source, /STUDENT_INVOICE_PAYMENT_RECORDED/);
+  assert.match(migration, /invoice_id VARCHAR\(64\)[\s\S]{0,100}REFERENCES student_invoices\(id\)/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.schoolos_apply_student_invoice_payment/);
+  assert.match(migration, /FOR UPDATE/);
+  assert.match(migration, /p_payment_method IS NULL/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_apply_student_invoice_payment[\s\S]{0,260}GRANT EXECUTE[\s\S]{0,180}TO service_role/);
+});
+
+test('invoice schema enforces tenant uniqueness, balanced totals and row-level security', () => {
+  assert.match(migration, /UNIQUE \(school_id, invoice_number\)/);
+  assert.match(migration, /UNIQUE \(school_id, student_id, academic_year, billing_period\)/);
+  assert.match(migration, /CHECK \(total_amount = subtotal - discount_amount\)/);
+  assert.match(migration, /CHECK \(balance_due = total_amount - amount_paid\)/);
+  assert.match(migration, /ALTER TABLE student_invoices ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /ALTER TABLE student_invoice_items ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /auth_school_id\(\)/);
+  assert.match(migration, /auth_can_access_student\(invoice\.student_id\)/);
+  assert.match(migration, /CREATE TRIGGER trg_sync_student_invoice_void/);
+  assert.match(migration, /NEW\.invoice_id IS NOT NULL/);
+});
+
+test('invoice screen reuses a retry key after uncertain payment responses and exposes PDF receipts', () => {
+  assert.match(view, /paymentKeyRef\.current \|\|=/);
+  assert.match(view, /paymentKeyRef\.current = null/);
+  assert.match(view, /ApiClient\.downloadReceiptPdf\(lastReceiptId\)/);
+  assert.match(view, /ApiClient\.downloadStudentInvoicePdf\(invoice\.id\)/);
+  assert.match(view, /type="month"/);
+});
