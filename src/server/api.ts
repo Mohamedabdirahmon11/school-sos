@@ -7906,8 +7906,8 @@ apiRouter.post('/students/:studentId/document-attachments', requireAuth, require
     const validImage=bytes && mime!=='application/pdf' ? Boolean(detectSchoolLogoImage(bytes,mime)) : false;
     const validPdf=Boolean(bytes && mime==='application/pdf' && bytes.subarray(0,5).toString('ascii')==='%PDF-');
     if(!bytes || (!validImage && !validPdf)){res.status(400).json({error:'Geli PDF ama sawir JPEG, PNG ama WebP sax ah oo ka yar 10 MB.'});return;}
-    let rawName=String(req.headers['x-file-name']||'lifaaq'); try { rawName=decodeURIComponent(rawName); } catch { rawName='lifaaq'; } rawName=rawName.replace(/[\\/\\0-\\x1f\\x7f]/g,' ').trim();
-    const fileName=(rawName.split(/[\\/]/).pop()||'lifaaq').slice(0,180);
+    let rawName=String(req.headers['x-file-name']||'lifaaq'); try { rawName=decodeURIComponent(rawName); } catch { rawName='lifaaq'; } rawName=rawName.replace(/[\/\\\0-\x1f\x7f]/g,' ').trim();
+    const fileName=(rawName.split(/[\/\\]/).pop()||'lifaaq').slice(0,180);
     const extension=mime==='application/pdf'?'pdf':mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp';
     const client=documentServiceClient(res);if(!client)return;
     const storagePath=school.id+'/'+student.id+'/'+randomUUID()+'.'+extension;
@@ -7931,7 +7931,7 @@ apiRouter.get('/students/:studentId/document-attachments/:attachmentId/download'
   if(!attachment || !attachment.storage_path.startsWith(school.id+'/'+req.params.studentId+'/')){res.status(404).json({error:'Lifaaqa lama helin.'});return;}
   const {data,error}=await client.storage.from('student-document-attachments').download(attachment.storage_path);
   if(error||!data){res.status(404).json({error:'Faylka lama helin.'});return;}
-  const safeName=attachment.file_name.replace(/[\\r\\n"]/g,'_');
+  const safeName=attachment.file_name.replace(/[\r\n"]/g,'_');
   res.setHeader('Content-Type',attachment.mime_type);
   res.setHeader('Content-Disposition',`attachment; filename="${safeName}"`);
   res.setHeader('X-Content-Type-Options','nosniff');
