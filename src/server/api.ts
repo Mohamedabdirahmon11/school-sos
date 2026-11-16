@@ -6286,7 +6286,7 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
       if(!classMatch)return false;
       if(item.feeType==='annual_registration')return body.includeAnnualRegistration!==false&&!billedAnnual.has(item.id);
       if(item.feeType==='monthly_tuition')return item.cadence==='monthly';
-      if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration===true&&!billedAnnual.has(item.id)||item.cadence==='one_time'&&body.includeOneTimeFees!==false&&!billedOneTime.has(item.id);
+      if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration!==false&&!billedAnnual.has(item.id)||item.cadence==='one_time'&&body.includeOneTimeFees!==false&&!billedOneTime.has(item.id);
       return false;
     });
     const lines:Array<{fee_structure_id:string|null;fee_type:'monthly_tuition'|'annual_registration'|'bus'|'custom';description:string;quantity:number;unit_amount:number;line_total:number;cadence:'monthly'|'annual'|'one_time'}>=applicable.map(item=>({fee_structure_id:item.id,fee_type:item.feeType,description:item.name,quantity:1,unit_amount:Number(item.amount),line_total:Number(item.amount),cadence:item.cadence}));
