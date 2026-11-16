@@ -244,3 +244,13 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Current comparison: feature branch is 75 commits ahead and **7 commits behind** `main`; the histories have diverged. Reconciliation is required before merge, but should be done only after inspecting the seven main-only commits and resolving the existing main-side typecheck blocker without overwriting unrelated work.
 - The earlier run **43839661548** remains a valid pass for the rate-limiter commit (386/386 tests); it does not cover the newer canonical UUID hardening.
 - PR #181 remains Draft and unmerged. No production migration has been applied.
+
+
+### Documents editor interaction and audit follow-up — 2026-11-16
+- The rich-text editor now supports selecting an inserted image, changing its width (existing), rotating it by 0/90/180/-90 degrees, moving it forward/backward in a bounded layer stack, aligning it left/center/right, and nudging it with arrow keys (Shift = 10 px). Image positioning is clamped to ±500 px.
+- The sanitizer now permits only bounded rotation, relative positioning, small z-index values, safe offsets and simple alignment styles; unsupported transforms/absolute positioning/large offsets are stripped. Added sanitizer tests for accepted and rejected styles.
+- Selected-image outline is editor-only and removed from print output.
+- Successful private artwork uploads now create an artwork_uploaded audit event containing only object path, MIME type and byte size. If audit insertion fails, the just-uploaded object is removed and the API returns an error instead of silently losing the audit trail.
+- A CI run on the prior image-controls commit caught one sanitizer edge case (margin-right:0); the validator was corrected to allow the zero value. TypeScript had passed in that run; the full suite then failed only on this assertion. The latest upload-audit commit is awaiting a fresh CI result.
+- This is a richer image editing workflow, not a complete positioned canvas designer: freeform drag handles, text/QR/barcode/signature/stamp fields, guides/snapping, copy/paste and layer locking are still not implemented.
+- PDF backgrounds/PDF.js page selection, batch PDF/ZIP export, multi-card A4 imposition/crop marks, embedded Arabic font output, browser/PDF visual inspection and live authenticated cross-school tests remain release gates.
