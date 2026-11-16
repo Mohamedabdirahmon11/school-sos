@@ -7694,7 +7694,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const title = typeof body.title === 'string' ? body.title.trim().slice(0,180) : '';
   const documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
-  const pageSize = ['A4','A5','Letter'].includes(body.pageSize) ? body.pageSize : 'A4';
+  const pageSize = ['A4','A5','Letter','CR80'].includes(body.pageSize) ? body.pageSize : 'A4';
   let templateId: string | null = null;
   const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
   const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
@@ -7740,7 +7740,7 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
   if (body.status === 'final') { updates.status = 'final'; updates.locked_at = new Date().toISOString(); updates.locked_by = user.id; updates.lock_reason = 'Final document'; }
   else if (body.status === 'draft') { updates.status = 'draft'; }
-  if (['A4','A5','Letter'].includes(body.pageSize)) updates.page_size = body.pageSize;
+  if (['A4','A5','Letter','CR80'].includes(body.pageSize)) updates.page_size = body.pageSize;
   if (['ltr','rtl'].includes(body.direction)) updates.direction = body.direction;
   if (Number.isInteger(body.pageMargins)) updates.page_margins = Math.min(40,Math.max(5,body.pageMargins));
   const { data, error } = await client.from('school_documents').update(updates)
