@@ -97,75 +97,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     };
   }, [user?.id, school?.id, unreadState.retry]);
 
-  const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : t('notice_board');
+  const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : menuT('notice_board');
   const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label: menuText(label), icon });
   const groups: NavGroup[] = (() => {
     if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform', items: [
-      item('sa_dashboard', t('dashboard'), LayoutDashboard), item('sa_schools', t('schools'), Building2),
-      item('sa_plans', t('plans_billing'), Receipt), item('sa_users', t('users'), Users),
-      item('sa_analytics', t('analytics'), BarChart3), item('sa_broadcasts', t('broadcasts'), Radio),
-      item('sa_support', t('support_audit'), LifeBuoy), item('sa_settings', t('platform_settings'), Settings)
+      item('sa_dashboard', menuT('dashboard'), LayoutDashboard), item('sa_schools', menuT('schools'), Building2),
+      item('sa_plans', menuT('plans_billing'), Receipt), item('sa_users', menuT('users'), Users),
+      item('sa_analytics', menuT('analytics'), BarChart3), item('sa_broadcasts', menuT('broadcasts'), Radio),
+      item('sa_support', menuT('support_audit'), LifeBuoy), item('sa_settings', menuT('platform_settings'), Settings)
     ] }];
     if (role === 'teacher') return [{ title: 'Teaching', items: [
-      item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
-      item('t_students', t('students'), GraduationCap), item('t_attendance', t('attendance'), CalendarCheck),
+      item('t_dashboard', menuT('dashboard'), LayoutDashboard), item('t_timetable', menuT('timetable'), CalendarDays),
+      item('t_students', menuT('students'), GraduationCap), item('t_attendance', menuT('attendance'), CalendarCheck),
       item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', t('assignments'), FileCheck2), item('sch_documents', 'Documents', FileText), item('t_notices', noticeLabel, BellRing),
-      item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
+      item('t_assignments', menuT('assignments'), FileCheck2), item('sch_documents', 'Documents', FileText), item('t_notices', noticeLabel, BellRing),
+      item('t_messages', menuT('messages'), MessageSquare), item('t_payslips', menuT('payroll_payslip'), Wallet)
     ] }];
     if (role === 'parent') return [{ title: 'Family', items: [
-      item('p_overview', t('dashboard'), LayoutDashboard), item('p_attendance', t('attendance'), CalendarCheck),
-      item('p_results', t('exams_results'), FileSpreadsheet), item('p_fees', t('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText), item('p_messages', t('messages'), MessageSquare)
+      item('p_overview', menuT('dashboard'), LayoutDashboard), item('p_attendance', menuT('attendance'), CalendarCheck),
+      item('p_results', menuT('exams_results'), FileSpreadsheet), item('p_fees', menuT('fees_payments'), CreditCard),
+      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText), item('p_messages', menuT('messages'), MessageSquare)
     ] }];
     if (role === 'student') return [{ title: 'My learning', items: [
-      item('st_dashboard', t('dashboard'), LayoutDashboard), item('st_timetable', t('timetable'), CalendarDays),
-      item('st_assignments', t('assignments'), FileCheck2), item('st_results', t('exams_results'), FileSpreadsheet),
-      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText),
-      item('st_messages', t('messages'), MessageSquare)
+      item('st_dashboard', menuT('dashboard'), LayoutDashboard), item('st_timetable', menuT('timetable'), CalendarDays),
+      item('st_assignments', menuT('assignments'), FileCheck2), item('st_results', menuT('exams_results'), FileSpreadsheet),
+      item('st_attendance', menuT('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText),
+      item('st_messages', menuT('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
-      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Documents', FileText)] },
+      { title: 'Workspace', items: [item('acc_dashboard', menuT('dashboard'), LayoutDashboard), item('sch_documents', 'Documents', FileText)] },
       { title: 'Daily operations', items: [
-        { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
+        { ...item('sch_fees', menuT('fees_payments'), CreditCard), permission: 'fees_manage' },
         { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' },
         { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },
         { ...item('acc_bank_reconciliation', 'Bank reconciliation', Building2), permission: 'fees_manage' }
       ] },
       { title: 'Financial management', items: [
-        { ...item('sch_reports', t('reports_export'), BarChart3), permission: 'reports_export' },
-        { ...item('sch_payroll', t('payroll_management'), Wallet), permission: 'payroll_manage' }
+        { ...item('sch_reports', menuT('reports_export'), BarChart3), permission: 'reports_export' },
+        { ...item('sch_payroll', menuT('payroll_management'), Wallet), permission: 'payroll_manage' }
       ] }
     ];
 
     return [
-      { title: 'Dashboard', items: [item('sch_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'Dashboard', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
       { title: 'People', items: [
-        item('sch_students', t('students'), GraduationCap), item('sch_teachers', t('teachers'), UserCheck),
-        item('sch_parents', t('parents_contacts'), PhoneCall), item('sch_admissions', t('admissions'), UserPlus),
-        item('sch_staff', t('staff_access'), ShieldCheck)
+        item('sch_students', menuT('students'), GraduationCap), item('sch_teachers', menuT('teachers'), UserCheck),
+        item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', menuT('admissions'), UserPlus),
+        item('sch_staff', menuT('staff_access'), ShieldCheck)
       ] },
       { title: 'Academics', items: [
-        item('sch_classes', t('classes'), Layers), item('sch_subjects', t('subjects'), BookOpen),
-        item('sch_timetable', t('timetable'), CalendarDays), item('sch_attendance', t('attendance'), CalendarCheck),
-        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
+        item('sch_classes', menuT('classes'), Layers), item('sch_subjects', menuT('subjects'), BookOpen),
+        item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
+        item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
         item('sch_promotion', 'Promotion & Alumni', Award)
       ] },
       { title: 'Communication', items: [
-        item('sch_notices', noticeLabel, BellRing), item('sch_messages', t('messages'), MessageSquare),
+        item('sch_notices', noticeLabel, BellRing), item('sch_messages', menuT('messages'), MessageSquare),
         item('sch_whatsapp', 'WhatsApp parent reminders', MessageCircle),
-        item('sch_events', t('events_holidays'), CalendarDays)
+        item('sch_events', menuT('events_holidays'), CalendarDays)
       ] },
       { title: 'Finance', items: [
         { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' }
       ] },
       { title: 'Reports', items: [
-        item('sch_reports', t('reports_export'), BarChart3)
+        item('sch_reports', menuT('reports_export'), BarChart3)
       ] },
       { title: 'Resources', items: [
-        item('sch_library', t('library'), Library), item('sch_transport', t('transport'), Bus),
-        item('sch_inventory', t('inventory'), Boxes), item('sch_discipline', t('discipline'), AlertTriangle),
-        item('sch_health', t('health_nurse'), HeartPulse)
+        item('sch_library', menuT('library'), Library), item('sch_transport', menuT('transport'), Bus),
+        item('sch_inventory', menuT('inventory'), Boxes), item('sch_discipline', menuT('discipline'), AlertTriangle),
+        item('sch_health', menuT('health_nurse'), HeartPulse)
       ] },
       { title: 'Settings', items: [
         item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help & Support', LifeBuoy)
@@ -242,11 +242,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
             <option value="am" className="text-slate-900">አማርኛ</option>
           </select>
         </label>
-        <button type="button" onClick={() => void logout()} aria-label={menuText('Log out')} title={isCollapsed ? menuText('Log out') : undefined}
+        <button type="button" onClick={() => void logout()} aria-label={menuTexmenuT('Log out')} title={isCollapsed ? menuTexmenuT('Log out') : undefined}
           style={{ color: 'var(--sidebar-text)' }}
           className={`mt-1 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
           <LogOut size={15} aria-hidden="true" />
-          <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Log out')}</span>
+          <span className={isCollapsed ? "md:hidden" : ""}>{menuTexmenuT('Log out')}</span>
         </button>
       </div>
     </aside>
