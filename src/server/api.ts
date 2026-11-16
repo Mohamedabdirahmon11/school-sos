@@ -7640,13 +7640,19 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
   const pageSize = ['A4','A5','Letter'].includes(body.pageSize) ? body.pageSize : 'A4';
+  let templateId: string | null = null;
   const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
   const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
   if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga waa waajib.' }); return; }
   const client = documentServiceClient(res);
   if (!client) return;
+  if (typeof body.templateId === 'string') {
+    const { data: template } = await client.from('school_document_templates').select('id').eq('school_id',school.id).eq('id',body.templateId).is('deleted_at',null).maybeSingle();
+    if (!template) { res.status(404).json({ error: 'Template-ka lama helin dugsigan.' }); return; }
+    templateId = template.id;
+  }
   const { data, error } = await client.from('school_documents').insert({
-    school_id: school.id, title, document_type: documentType, status: 'draft',
+    school_id: school.id, title, document_type: documentType, status: 'draft', template_id:templateId,
     content_html: contentHtml, page_size: pageSize, direction, page_margins: pageMargins,
     created_by: user.id, updated_by: user.id
   }).select('*').single();
@@ -7812,7 +7818,7 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
   } else if (typeof body.classId === 'string' && body.classId) {
     const klass = await db.getClassById(body.classId,school.id);
     if (!klass) { res.status(404).json({ error: 'Fasalka lama helin.' }); return; }
-    student = (await db.getStudents(school.id,klass.id))[0] || null;
+    student = (await db.queryPage<Student>('students',{school_id:school.id,class_id:klass.id},1,1,undefined,'*','first_name',true)).items[0] || null;
   }
   if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
   const klass = await db.getClassById(student.classId,school.id);
@@ -7858,7 +7864,7 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   if (typeof body.classId === 'string' && body.classId) {
     classRecord = await db.getClassById(body.classId,school.id);
     if (!classRecord) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
-    students = (await db.getStudents(school.id,classRecord.id)).slice(0,100);
+    students = (await db.queryPage<Student>('students',{school_id:school.id,class_id:classRecord.id},1,100,undefined,'*','first_name',true)).items;
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
     for (const rawId of body.studentIds) {
       if (typeof rawId !== 'string') continue;
@@ -7873,7 +7879,9 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
     res.status(400).json({ error: 'Dooro hal arday ama fasal.' }); return;
   }
   if (!students.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
-  const today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
+  let today = '';
+  try { today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
+  catch { today = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   const teacherName = classRecord?.classTeacherId
     ? (await db.queryPage<any>('teachers',{school_id:school.id,id:classRecord.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
     : '';

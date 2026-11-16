@@ -649,7 +649,7 @@ export class ApiClient {
   }
 
   public static async getDocument(id: string) {
-    return this.request<any>('/documents/' + encodeURIComponent(id));
+    return this.request<any>(`/documents/${encodeURIComponent(id)}`);
   }
 
   public static async createDocument(input: Record<string, unknown>) {
@@ -657,19 +657,19 @@ export class ApiClient {
   }
 
   public static async updateDocument(id: string, input: Record<string, unknown>) {
-    return this.request<any>('/documents/' + encodeURIComponent(id), { method:'PUT', body:JSON.stringify(input) });
+    return this.request<any>(`/documents/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
   }
 
   public static async deleteDocument(id: string) {
-    return this.request<{success:boolean}>('/documents/' + encodeURIComponent(id), { method:'DELETE' });
+    return this.request<{success:boolean}>(`/documents/${encodeURIComponent(id)}`, { method:'DELETE' });
   }
 
   public static async restoreDocument(id: string) {
-    return this.request<any>('/documents/' + encodeURIComponent(id) + '/restore', { method:'POST' });
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/restore`, { method:'POST' });
   }
 
   public static async duplicateDocument(id: string) {
-    return this.request<any>('/documents/' + encodeURIComponent(id) + '/duplicate', { method:'POST' });
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
   }
 
   public static async getDocumentTemplates() {
@@ -681,15 +681,15 @@ export class ApiClient {
   }
 
   public static async duplicateDocumentTemplate(id: string) {
-    return this.request<any>('/document-templates/' + encodeURIComponent(id) + '/duplicate', { method:'POST' });
+    return this.request<any>(`/document-templates/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
   }
 
   public static async updateDocumentTemplate(id: string, input: Record<string, unknown>) {
-    return this.request<any>('/document-templates/' + encodeURIComponent(id), { method:'PUT', body:JSON.stringify(input) });
+    return this.request<any>(`/document-templates/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
   }
 
   public static async deleteDocumentTemplate(id: string) {
-    return this.request<{success:boolean}>('/document-templates/' + encodeURIComponent(id), { method:'DELETE' });
+    return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}`, { method:'DELETE' });
   }
 
   public static async previewDocumentGeneration(input: Record<string, unknown>) {

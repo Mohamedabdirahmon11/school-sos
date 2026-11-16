@@ -160,6 +160,7 @@ export const DocumentsView: React.FC = () => {
         title:template?.title || 'Dukumenti cusub',
         documentType:template?.documentType || 'other',
         contentHtml:source,
+        templateId:template?.isBuiltin ? undefined : template?.id,
         status:'draft',pageSize:'A4',direction:'ltr',pageMargins:20
       }) as DocumentRow;
       await loadDocuments();

@@ -1,4 +1,6 @@
 .documents-paper { box-sizing:border-box; min-height:297mm; background:#fff; color:#111827; }
+.documents-paper[data-page-size="A5"] { min-height:210mm; }
+.documents-paper[data-page-size="Letter"] { min-height:11in; }
 .document-editable { overflow-wrap:anywhere; }
 .document-editable table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .document-editable td,.document-editable th { border:1px solid #94a3b8; min-width:55px; padding:7px; vertical-align:top; resize:horizontal; overflow:auto; }
