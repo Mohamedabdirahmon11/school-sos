@@ -14,7 +14,7 @@ const DEFAULT_THEME: SidebarTheme = {
   density: 'comfortable',
   iconStyle: 'outline',
   showGroupLabels: true,
-  width: 276,
+  width: 260,
   defaultCollapsed: false,
   fontSize: 'normal',
   showLogo: true,
