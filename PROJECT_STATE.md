@@ -68,3 +68,11 @@ Updated: 2026-11-11
 - Phase 2 is in progress on PR #175 (feature/documents-phase2), based on Phase 1 branch: browser-side DOCX import/export (paragraphs, headings, basic emphasis, tables), CSV/XLS/XLSX import to editable tables, multi-sheet XLSX export, first-table CSV export, and 15 MB import limits. Existing SheetJS dependency is reused; no package dependency or database migration added. Imported HTML is sanitized before entering the editor.
 - Phase 2 CI run 43812789103 passed TypeScript, full tests, route parity, RLS source audit, and production build; follow-up run 43812985734 also passed after CSV formula-injection protections and regression tests. Browser fixture/round-trip tests (real DOCX/XLSX/CSV files) remain unverified and are required before final release sign-off. PR #175 is draft and must not merge before PR #174.
 - Phase 3 remains planned: document history, expanded permissions, audit log, student attachments, and final-document locking.
+
+
+
+## Documents module — Phase 3 implementation (2026-11-16)
+- Work is isolated on `feature/documents-phase3`, based on `feature/documents-phase2`; no production database changes are made by branch commits.
+- Added additive migration `20261116100000_school_documents_phase3.sql` for immutable document version snapshots, document sharing grants, audit events, final/explicit lock metadata and private student attachment metadata/storage bucket.
+- Version snapshots and audit events are captured by a database trigger; locked documents reject content/metadata edits until a separate unlock operation. Audit records are read-only to authenticated users through RLS.
+- The migration is not applied to Supabase. API endpoints, UI integration, automated runtime tests, and real file upload/download verification remain in progress.
