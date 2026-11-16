@@ -467,7 +467,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       });
       return { student, subjectScores, total: subjectScores.reduce((sum, score) => sum + score.total, 0), max: subjectScores.reduce((sum, score) => sum + score.max, 0) };
     }).sort((a, b) => b.total - a.total || a.student.firstName.localeCompare(b.student.firstName));
-    return rows.map((row, index): typeof row & { rank: number } => ({ ...row, rank: index > 0 && rows[index - 1].total === row.total ? index : index + 1 }));
+    let currentRank = 0;
+    return rows.map((row, index): typeof row & { rank: number } => {
+      if (index === 0 || rows[index - 1].total !== row.total) currentRank = index + 1;
+      return { ...row, rank: currentRank };
+    });
   }, [visibleStudents, gradeSubjects, assessmentComponents, examType, marksInput, classMarks]);
 
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
