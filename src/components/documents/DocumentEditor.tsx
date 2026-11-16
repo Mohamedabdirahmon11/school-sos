@@ -160,8 +160,8 @@ export const DocumentEditor: React.FC<Props> = ({
 
   const uploadImage = async (file?: File) => {
     if (!file) return;
-    if (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 1_572_864) {
-      window.alert('Sawirka waa inuu noqdaa PNG, JPEG ama WebP, kana yaraadaa 1.5 MB.');
+    if (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 10_485_760) {
+      window.alert('Sawirka waa inuu noqdaa PNG, JPEG ama WebP, kana yaraadaa 10 MB.');
       return;
     }
     setUploading(true);
