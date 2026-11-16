@@ -5,7 +5,7 @@ import { formatMoney } from '../../lib/money.ts';
 import { getSchoolLocalDate } from '../../lib/school-local-date.ts';
 import { StaffPayrollRecord } from '../../types/index.ts';
 
-type PayrollStaff = { id: string; staffId: string; userId: string; name: string; monthlySalary: number; roleTitle?: string };
+type PayrollStaff = { id: string; staffId: string; userId?: string; name: string; monthlySalary: number; roleTitle?: string };
 type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_money' | 'other';
 
 export const AccountantPayrollView: React.FC = () => {
