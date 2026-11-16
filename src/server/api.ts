@@ -6217,7 +6217,8 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
     if(!billedOneTimeByStudent.has(studentKey))billedOneTimeByStudent.set(studentKey,new Set());
     billedOneTimeByStudent.get(studentKey)!.add((row as any).fee_structure_id);
   }
-  const created:any[]=[];let skippedExisting=0,skippedNoFees=0;
+  const prepared:Array<{student:any;lines:Array<{fee_structure_id:string|null;fee_type:'monthly_tuition'|'annual_registration'|'bus'|'custom';description:string;quantity:number;unit_amount:number;line_total:number;cadence:'monthly'|'annual'|'one_time'}>;subtotal:number}>=[];
+  let skippedNoFees=0;
   for(const student of targets){
     const klass=schoolClasses.find((item:any)=>item.id===student.classId);
     const billedAnnual=billedAnnualByStudent.get(student.id)||new Set<string>();
@@ -6239,29 +6240,44 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
     const bus=busAssignments.find((assignment:any)=>assignment.studentId===student.id&&assignment.active);
     if(bus&&Number(bus.feeAmount)>0)lines.push({fee_structure_id:null,fee_type:'bus',description:'School transport',quantity:1,unit_amount:Number(bus.feeAmount),line_total:Number(bus.feeAmount),cadence:'monthly'});
     if(!lines.length){skippedNoFees++;continue;}
-    const {data:sequence,error:sequenceError}=await client.rpc('schoolos_next_student_invoice',{p_school_id:school.id,p_academic_year:school.academicYear});
-    if(sequenceError){res.status(503).json({error:'Invoice number allocation failed.'});return;}
-    const seq=Number(sequence);
-    if(!Number.isSafeInteger(seq)||seq<1){res.status(503).json({error:'Invoice number sequence is invalid.'});return;}
-    const subtotal=lines.reduce((sum,line)=>sum+line.line_total,0);
-    const invoiceId='inv-'+randomUUID();
-    const invoiceNumber=`INV-${school.code||'SCH'}-${String(school.academicYear||'2026').slice(0,4)}-${String(seq).padStart(5,'0')}`;
-    const {data:creation,error:creationError}=await client.rpc('schoolos_create_student_invoice',{
-      p_invoice:{
-        id:invoiceId,school_id:school.id,student_id:student.id,invoice_number:invoiceNumber,
-        academic_year:school.academicYear,billing_period:billingPeriod,issue_date:new Date().toISOString().slice(0,10),
-        due_date:dueDate,currency:school.currency||'ETB',subtotal,discount_amount:0,total_amount:subtotal,
-        amount_paid:0,balance_due:subtotal,status:'issued',created_by:user.id
-      },
-      p_items:lines
-    });
-    if(creationError){
-      if(/already been billed|already exists/i.test(creationError.message||'')){skippedExisting++;continue;}
-      res.status(503).json({error:'Invoice could not be created atomically.'});return;
+    prepared.push({student,lines,subtotal:lines.reduce((sum,line)=>sum+line.line_total,0)});
+  }
+
+  // Allocate and create invoices concurrently in small batches instead of waiting for
+  // two database RPC round-trips for every student one after another.
+  const created:any[]=[];
+  let skippedExisting=0;
+  const batchSize=10;
+  for(let offset=0;offset<prepared.length;offset+=batchSize){
+    const batch=prepared.slice(offset,offset+batchSize);
+    const outcomes=await Promise.all(batch.map(async ({student,lines,subtotal})=>{
+      const {data:sequence,error:sequenceError}=await client.rpc('schoolos_next_student_invoice',{p_school_id:school.id,p_academic_year:school.academicYear});
+      if(sequenceError)throw new Error('Invoice number allocation failed.');
+      const seq=Number(sequence);
+      if(!Number.isSafeInteger(seq)||seq<1)throw new Error('Invoice number sequence is invalid.');
+      const invoiceId='inv-'+randomUUID();
+      const invoiceNumber=`INV-${school.code||'SCH'}-${String(school.academicYear||'2026').slice(0,4)}-${String(seq).padStart(5,'0')}`;
+      const {data:creation,error:creationError}=await client.rpc('schoolos_create_student_invoice',{
+        p_invoice:{
+          id:invoiceId,school_id:school.id,student_id:student.id,invoice_number:invoiceNumber,
+          academic_year:school.academicYear,billing_period:billingPeriod,issue_date:new Date().toISOString().slice(0,10),
+          due_date:dueDate,currency:school.currency||'ETB',subtotal,discount_amount:0,total_amount:subtotal,
+          amount_paid:0,balance_due:subtotal,status:'issued',created_by:user.id
+        },
+        p_items:lines
+      });
+      if(creationError){
+        if(/already been billed|already exists/i.test(creationError.message||''))return {duplicate:true};
+        throw new Error('Invoice could not be created atomically.');
+      }
+      if(creation?.duplicate)return {duplicate:true};
+      if(!creation?.invoice)throw new Error('Invoice creation returned an invalid result.');
+      return {invoice:creation.invoice};
+    }));
+    for(const outcome of outcomes){
+      if(outcome.duplicate)skippedExisting++;
+      else if(outcome.invoice)created.push(outcome.invoice);
     }
-    if(creation?.duplicate){skippedExisting++;continue;}
-    if(!creation?.invoice){res.status(503).json({error:'Invoice creation returned an invalid result.'});return;}
-    created.push(creation.invoice);
   }
   db.logAudit({action:'STUDENT_INVOICES_GENERATED',category:'finance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Generated ${created.length} student invoices for ${billingPeriod}; skipped ${skippedExisting} duplicates and ${skippedNoFees} students without configured fees.`,severity:'info'});
   await db.flush();
