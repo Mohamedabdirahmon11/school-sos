@@ -626,6 +626,7 @@ export class ApiClient {
     const tId = teacherId || classOrParams?.teacherId;
     if (tId) params.append('teacherId', tId);
     if (classOrParams?.dayOfWeek || dayOfWeek) params.append('dayOfWeek', classOrParams?.dayOfWeek || dayOfWeek!);
+    if (classOrParams?.scope === 'school') params.append('scope', 'school');
     return this.request<TimetableSlot[]>(`/timetable?${params.toString()}`);
   }
 
