@@ -5998,11 +5998,18 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
     category: expense.category, amount: Number(expense.amount) || 0, method: expense.paymentMethod,
     reference: expense.reference || '', status: expense.status
   }));
-  const payrollEntries = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))).map(record => ({
-    id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
-    description: `Payroll · ${record.staffName || record.staffId || record.userId}`, category: 'salaries',
-    amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted'
-  }));
+  const payrollEntries = payroll.flatMap(record => {
+    const history = Array.isArray(record.paymentHistory) ? record.paymentHistory : [];
+    const monthPayments = history.filter(payment => payment.paymentDate?.startsWith(month)).map(payment => ({
+      id: `payroll-${record.id}-${payment.id}`, date: payment.paymentDate, type: 'expense' as const,
+      description: `Payroll · ${record.staffName || record.staffId || record.userId || 'Staff'}`, category: 'salaries',
+      amount: Number(payment.amount) || 0, method: payment.paymentMethod, reference: payment.reference || record.payrollMonth, status: 'posted'
+    }));
+    if (monthPayments.length || history.length || record.status !== 'paid' || !(record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))) return monthPayments;
+    return [{ id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
+      description: `Payroll · ${record.staffName || record.staffId || record.userId || 'Staff'}`, category: 'salaries',
+      amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted' }];
+  });
   const entries = [...incomeEntries, ...expenseEntries, ...payrollEntries].sort((left, right) => right.date.localeCompare(left.date));
   res.json(entries);
 });
@@ -6166,11 +6173,16 @@ apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requir
   const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), canViewPayroll ? db.getPayrollRecords(school.id) : Promise.resolve([])]);
   const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
   const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
-  const paidPayroll = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month)));
+  const payrollPayments = payroll.flatMap(record => {
+    const history = Array.isArray(record.paymentHistory) ? record.paymentHistory : [];
+    const monthPayments = history.filter(payment => payment.paymentDate?.startsWith(month)).map(payment => Number(payment.amount) || 0);
+    if (monthPayments.length || history.length || record.status !== 'paid' || !(record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))) return monthPayments;
+    return [Number(record.netSalary) || 0];
+  });
+  const payrollExpenseTotal = payrollPayments.reduce((sum, amount) => sum + amount, 0);
   const totalIncome = incomeRows.reduce((sum, payment) => sum + (Number(payment.amountPaid) || 0), 0);
-  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
-    + paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0);
-  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + paidPayroll.length, payrollExpenseTotal: paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0), payrollExpenseCount: paidPayroll.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
+  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0) + payrollExpenseTotal;
+  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + payrollPayments.length, payrollExpenseTotal, payrollExpenseCount: payrollPayments.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
 });
 
 
