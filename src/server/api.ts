@@ -7746,7 +7746,19 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   const { data, error } = await client.from('school_documents').update(updates)
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin ama lama kaydin karin.' }); return; }
+  if(body.status==='final') await client.from('school_document_audit_events').insert({school_id:school.id,document_id:data.id,actor_user_id:user.id,action:'document_issued',details:{serialNumber:data.serial_number||null,title:data.title}});
   res.json(documentClientRow(data,true));
+});
+
+apiRouter.post('/documents/:id/download-audit', requireAuth, requireSchoolContext, async (req,res)=>{
+  const school=(req as any).school as School;const user=(req as any).user as User;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data:document}=await client.from('school_documents').select('id,title,serial_number').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if(!document){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
+  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}
+  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
+  if(error){res.status(503).json({error:'Diiwaanka download-ka lama kaydin karin.'});return;}
+  res.json({success:true});
 });
 
 apiRouter.delete('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
