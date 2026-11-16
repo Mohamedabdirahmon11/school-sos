@@ -290,6 +290,9 @@ export function mapStorageRowToDatabase(table: string, row: Record<string, any>)
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(row)) {
     if (value === undefined || key === 'subscription' || key === 'pinHash' && row.pin !== undefined) continue;
+    // transport_routes does not define created_at/updated_at in the deployed schema.
+    // Keep these in-memory timestamps out of Supabase writes and row-diff snapshots.
+    if (table === 'transport_routes' && (key === 'createdAt' || key === 'updatedAt')) continue;
     const column = TABLE_FIELD_MAP[table]?.[key] || DB_COLUMN_ALIASES[key] || key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
     result[column] = value;
   }
