@@ -14,3 +14,7 @@ test('document verification links do not permit script or protocol-relative dest
   assert.equal(sanitizeDocumentHtml('<a href="javascript:alert(1)">verify</a>'),'<a>verify</a>');
   assert.equal(sanitizeDocumentHtml('<a href="//evil.test">verify</a>'),'<a>verify</a>');
 });
+
+test('document verification QR rejects malformed 36-character token strings', () => {
+  assert.equal(sanitizeDocumentHtml('<img src="/api/public/document-verification/------------------------------------/qr">'),'<img>');
+});
