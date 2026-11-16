@@ -154,3 +154,12 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Added pagination tests are committed but **not executed**. Local `git remote -v` was attempted from `/` and failed with `fatal: not a git repository`; a fresh shallow clone of the exact repository URL again failed with `Could not resolve host: github.com`.
 - No local TypeScript check, full test suite, Playwright desktop/mobile run, PDF generation/render inspection, authenticated two-school RLS test, or real Storage round-trip has been run in this environment. No passing result is claimed.
 - No migrations were added or applied; production Supabase and existing records remain untouched.
+
+
+### Follow-up hardening and CI verification — 2026-11-16
+- Extracted school-brand styling into `src/lib/documents/brand-color.ts`. Built-in templates now use the school's saved six-digit hex brand color for accents when documents are created, previewed and generated. If the brand color is too light for readable text on white, the helper keeps the brand color for accents and uses dark slate for text.
+- Added `tests/documents-brand-color.test.ts` for valid colors, low-contrast colors and invalid-color fallback.
+- GitHub Actions run **43828702045** completed successfully for the feature branch: `npm run typecheck:ci` PASS; full test suite **371 tests / 371 pass / 0 fail**; route parity audit PASS; RLS source audit PASS (static source audit covering 66 declared tables); production Vite build PASS.
+- The CI RLS audit is static source inspection, not an authenticated live Supabase cross-school read/write test. CI does not perform the requested Playwright desktop/mobile run or PDF-to-PNG visual inspection.
+- New source files in this continuation: `src/lib/documents/paged-query.ts`, `src/lib/documents/brand-color.ts`; new tests: `tests/documents-paged-query.test.ts`, `tests/documents-brand-color.test.ts`.
+- Local desktop/mobile browser journeys, visual inspection of every generated template/design, real upload/download, live authenticated tenant isolation, PDF embedded Arabic font verification, and batch cancellation remain unverified due the local checkout/network limitation.
