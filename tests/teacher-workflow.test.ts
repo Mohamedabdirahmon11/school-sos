@@ -44,6 +44,11 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'students'/);
   assert.match(teacher, /activeTab === 'attendance'/);
   assert.match(teacher, /activeTab === 'grades'/);
+  assert.match(teacher, /Class examination register/);
+  assert.match(teacher, /Student name \/ ID/);
+  assert.match(teacher, /examRegisterRows/);
+  assert.match(teacher, /let currentRank = 0/);
+  assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
   assert.match(teacher, /activeTab === 'notices'/);
@@ -129,6 +134,8 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /if \(needsAttendance && !formTeacherClasses\.some/);
   assert.match(teacher, /if \(needsStudents && !classes\.some/);
   assert.match(teacher, /Your teaching class/);
+  assert.match(teacher, /Students in classes where you teach a subject or serve as Form Teacher/);
+  assert.match(teacher, /\{classes\.map\(klass => <option/);
   assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
@@ -253,7 +260,9 @@ test('teaching-class authorization avoids subject queries for the assigned Form 
 test('teacher portal provides personal timetable first and a deliberate school-wide switch', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /timetableScope, setTimetableScope/);
-  assert.match(teacher, /timetable\.filter\(isMyTimetableSlot\)/);
+  assert.match(teacher, /ApiClient\.getTimetable\(\)/);
+  assert.match(teacher, /ApiClient\.getTimetable\(\{ scope: 'school' \}\)/);
+  assert.match(teacher, /const timetableRows = timetableScope === 'mine' \? timetable : schoolTimetable/);
   assert.match(teacher, /assignment\.teacherId === slot\.teacherId/);
   assert.match(teacher, /Filter timetable by day/);
   assert.match(teacher, /All days/);
