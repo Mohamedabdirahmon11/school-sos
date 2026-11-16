@@ -13,3 +13,12 @@ test('missing and unknown variables are reported and never left as braces', () =
   assert.equal(result.html,'<p>Asha  </p>');
   assert.deepEqual(result.missing,['parent_name','unknown_key']);
 });
+
+
+test('document generation requires explicit confirmation when any student has missing values', () => {
+  const { requiresDocumentGenerationConfirmation } = require('../src/lib/documents/variables.ts') as typeof import('../src/lib/documents/variables.ts');
+  assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:['parent_name']}], false), true);
+  assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:[]}], false), false);
+  assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:['parent_name']}], true), false);
+  assert.equal(requiresDocumentGenerationConfirmation([], false), false);
+});
