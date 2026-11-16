@@ -7546,6 +7546,18 @@ function documentsAdminOnly(req: Request, res: Response): boolean {
   }
   return true;
 }
+function hasDocumentAdminAccess(user: User): boolean {
+  return ['school_admin','super_admin'].includes(user.role);
+}
+async function hasDocumentGrant(client: any, schoolId: string, user: User, documentId: string, permission: 'view'|'edit'|'download'): Promise<boolean> {
+  if (hasDocumentAdminAccess(user)) return true;
+  const {data,error}=await client.from('school_document_permissions').select('can_view,can_edit,can_download')
+    .eq('school_id',schoolId).eq('document_id',documentId)
+    .or(`user_id.eq.${user.id},role.eq.${user.role}`);
+  if(error || !data) return false;
+  const field=permission==='view'?'can_view':permission==='edit'?'can_edit':'can_download';
+  return data.some((grant:any)=>grant[field]===true);
+}
 function documentClientRow(row: any, includeContent = false) {
   const result: Record<string, any> = {
     id: row.id, title: row.title, documentType: row.document_type, status: row.status,
@@ -7602,15 +7614,25 @@ apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSc
   }
 );
 
-apiRouter.get('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const client = documentServiceClient(res);
   if (!client) return;
+  let allowedGrants: any[] = [];
+  if (!hasDocumentAdminAccess(user)) {
+    const {data:grants,error:grantError}=await client.from('school_document_permissions').select('document_id,can_edit')
+      .eq('school_id',school.id).eq('can_view',true).or(`user_id.eq.${user.id},role.eq.${user.role}`);
+    if(grantError){res.status(503).json({error:'Ogolaanshaha dukumentiyada lama hubin karin.'});return;}
+    allowedGrants=grants||[];
+    if(!allowedGrants.length){res.setHeader('Cache-Control','private, no-store');res.json([]);return;}
+  }
   let query = client.from('school_documents')
     .select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins,locked_at,locked_by,lock_reason')
     .eq('school_id', school.id)
     .order('updated_at', { ascending: false })
     .limit(100);
+  if (!hasDocumentAdminAccess(user)) query = query.in('id',allowedGrants.map(grant=>grant.document_id));
   if (req.query.includeDeleted !== 'true') query = query.is('deleted_at', null);
   if (typeof req.query.search === 'string' && req.query.search.trim()) query = query.ilike('title', '%' + req.query.search.trim().slice(0,80) + '%');
   if (typeof req.query.type === 'string' && DOCUMENT_TYPES.has(req.query.type)) query = query.eq('document_type', req.query.type);
@@ -7618,18 +7640,20 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, requireSchoolAdmi
   const { data, error } = await query;
   if (error) { res.status(503).json({ error: 'Liiska dukumentiyada lama soo dejin karin.' }); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json((data || []).map(row => documentClientRow(row)));
+  res.json((data || []).map(row => ({...documentClientRow(row),canEdit:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_edit)})));
 });
 
-apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const client = documentServiceClient(res);
   if (!client) return;
   const { data, error } = await client.from('school_documents').select('*')
     .eq('school_id', school.id).eq('id', req.params.id).is('deleted_at', null).maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  if (!await hasDocumentGrant(client,school.id,user,data.id,'view')) { res.status(403).json({error:'Ma lihid ogolaanshaha dukumentigan.'}); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json(documentClientRow(data, true));
+  res.json({...documentClientRow(data, true),canEdit:await hasDocumentGrant(client,school.id,user,data.id,'edit')});
 });
 
 apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -7661,8 +7685,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   res.status(201).json(documentClientRow(data,true));
 });
 
-apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  if (!documentsAdminOnly(req,res)) return;
+apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const body = req.body || {};
@@ -7671,6 +7694,7 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchool
   const { data: current, error: currentError } = await client.from('school_documents').select('id,locked_at,status')
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if (currentError || !current) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  if (!await hasDocumentGrant(client,school.id,user,req.params.id,'edit')) { res.status(403).json({error:'Ma lihid ogolaanshaha wax-ka-beddelka dukumentigan.'}); return; }
   if (current.locked_at || current.status === 'final') { res.status(423).json({ error: 'Dukumentigan waa la xiray ama waa final. Marka hore fur si aad wax uga beddesho.', code: 'DOCUMENT_LOCKED' }); return; }
   const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
   if (typeof body.title === 'string') {
@@ -7730,6 +7754,52 @@ apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, re
   res.status(201).json(documentClientRow(data,true));
 });
 
+
+
+apiRouter.get('/documents/:id/permissions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req,res)=>{
+  const school=(req as any).school as School;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data,error}=await client.from('school_document_permissions').select('id,user_id,role,can_view,can_edit,can_download,created_at')
+    .eq('school_id',school.id).eq('document_id',req.params.id).order('created_at',{ascending:true});
+  if(error){res.status(503).json({error:'Ogolaanshaha lama soo dejin karin.'});return;}
+  res.json((data||[]).map(row=>({id:row.id,userId:row.user_id,role:row.role,canView:row.can_view,canEdit:row.can_edit,canDownload:row.can_download,createdAt:row.created_at})));
+});
+
+apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  const body=req.body||{};
+  const targetUserId=typeof body.userId==='string'?body.userId.trim():'';
+  const targetRole=typeof body.role==='string'?body.role:'';
+  const roles=new Set(['teacher','accountant','parent','student']);
+  if(Boolean(targetUserId)===Boolean(targetRole) || (targetRole && !roles.has(targetRole))){res.status(400).json({error:'Dooro hal user ID ama hal role oo sax ah.'});return;}
+  const client=documentServiceClient(res);if(!client)return;
+  if(targetUserId){
+    const {data:target}=await client.from('users').select('id,role').eq('school_id',school.id).eq('id',targetUserId).maybeSingle();
+    if(!target){res.status(404).json({error:'User-kan kuma jiro dugsigan.'});return;}
+  }
+  const canView=body.canView!==false,canEdit=body.canEdit===true,canDownload=body.canDownload===true;
+  if(canEdit&&!canView){res.status(400).json({error:'Wax-ka-beddelku wuxuu u baahan yahay ogolaanshaha akhriska.'});return;}
+  let remove=client.from('school_document_permissions').delete().eq('school_id',school.id).eq('document_id',req.params.id);
+  remove=targetUserId?remove.eq('user_id',targetUserId).is('role',null):remove.is('user_id',null).eq('role',targetRole);
+  const {error:removeError}=await remove;
+  if(removeError){res.status(503).json({error:'Ogolaanshihii hore lama beddeli karin.'});return;}
+  const {data,error}=await client.from('school_document_permissions').insert({
+    school_id:school.id,document_id:req.params.id,user_id:targetUserId||null,role:targetRole||null,
+    can_view:canView,can_edit:canEdit,can_download:canDownload,created_by:user.id
+  }).select('id,user_id,role,can_view,can_edit,can_download,created_at').single();
+  if(error||!data){res.status(503).json({error:'Ogolaanshaha lama kaydin karin.'});return;}
+  res.status(201).json({id:data.id,userId:data.user_id,role:data.role,canView:data.can_view,canEdit:data.can_edit,canDownload:data.can_download,createdAt:data.created_at});
+});
+
+apiRouter.delete('/documents/:id/permissions/:permissionId', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req,res)=>{
+  const school=(req as any).school as School;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data,error}=await client.from('school_document_permissions').delete().eq('school_id',school.id)
+    .eq('document_id',req.params.id).eq('id',req.params.permissionId).select('id').maybeSingle();
+  if(error||!data){res.status(404).json({error:'Ogolaanshaha lama helin.'});return;}
+  res.json({success:true});
+});
 
 apiRouter.get('/documents/:id/versions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
