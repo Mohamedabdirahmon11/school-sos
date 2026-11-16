@@ -1122,10 +1122,10 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT
-  // Teachers use their school-issued staff ID and either password or PIN.
+  // Staff accounts use their school-issued ID and PIN. Super Admin alone uses email and password.
   const identifier = typeof email === 'string' ? email.trim() : '';
-  if (!identifier || (!password && !pin)) {
-    res.status(400).json({ error: requestedRole === 'teacher' ? 'Teacher ID and PIN are required.' : 'Email, School ID, or staff ID and password/PIN are required.' });
+  if (!identifier || (requestedRole === 'super_admin' ? !password : !pin)) {
+    res.status(400).json({ error: requestedRole === 'super_admin' ? 'Super Admin email and password are required.' : 'Staff ID and PIN are required.' });
     return;
   }
   if (requestedRole === 'teacher' && !validStaffId(normalizeStaffId(identifier))) {
@@ -1195,7 +1195,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // School Admin and Teacher accounts may authenticate with their issued PIN.
   // Legacy School Admin onboarding PINs are checked against their password hash
   // until the account receives a dedicated PIN hash or rotates credentials.
-  if (submittedPin && ['school_admin', 'teacher'].includes(user.role)) {
+  if (submittedPin && ['school_admin', 'teacher', 'accountant'].includes(user.role)) {
     const legacySchoolAdminPinValid = !authUserId && user.role === 'school_admin'
       && !user.pin && verifyPassword(submittedPin, user.passwordHash);
     if (legacySchoolAdminPinValid) {
@@ -1213,7 +1213,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''));
     }
   }
-  if (!isPasswordValid && authUserId) {
+  if (!isPasswordValid && user.role === 'super_admin' && authUserId) {
     if (isSupabaseConfigured && user.email) {
       try {
         // Use an isolated server-side client so password sign-in cannot mutate the
