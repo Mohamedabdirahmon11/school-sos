@@ -36,6 +36,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
     return saved === null ? Boolean(school?.sidebarTheme?.defaultCollapsed) : saved === 'true';
   });
+  useEffect(() => {
+    const theme = school?.sidebarTheme;
+    const presets: Record<string, { background: string; text: string; accent: string }> = {
+      light: { background: '#f8fafc', text: '#172033', accent: '#0f766e' },
+      dark: { background: '#102c2a', text: '#ffffff', accent: '#14b8a6' },
+      brand: { background: '#102c2a', text: '#ffffff', accent: '#0f766e' },
+      soft: { background: '#eaf2f1', text: '#183b38', accent: '#0f766e' }
+    };
+    const preset = presets[theme?.preset || 'brand'];
+    const background = theme?.preset === 'gradient'
+      ? 'linear-gradient(160deg, #102c2a 0%, #164e63 55%, #0f766e 100%)'
+      : theme?.preset === 'glass' ? 'rgba(15, 23, 42, 0.94)'
+      : theme?.preset === 'custom' ? theme.backgroundColor : (preset?.background || '#102c2a');
+    const root = document.documentElement;
+    const accent = theme?.accentColor || preset?.accent || '#0f766e';
+    const channels = [1, 3, 5].map(index => parseInt(accent.slice(index, index + 2), 16) / 255);
+    const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    root.style.setProperty('--sidebar-background', background);
+    root.style.setProperty('--sidebar-text', theme?.textColor || preset?.text || '#ffffff');
+    root.style.setProperty('--sidebar-accent', accent);
+    root.style.setProperty('--sidebar-accent-foreground', luminance > 0.42 ? '#111827' : '#ffffff');
+    root.style.setProperty('--sidebar-width', (theme?.width || 260) + 'px');
+    root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
+    root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
+  }, [school?.id, school?.sidebarTheme]);
   const menuTranslations: Record<string, { so: string; am: string }> = {
     Platform: { so: 'Madasha Guud', am: 'መድረክ' },
     Teaching: { so: 'Waxbaridda', am: 'ማስተማር' },
@@ -211,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 title={isCollapsed ? entry.label : undefined}
                 className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-[52px]' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
-                style={{ borderRadius: 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
+                style={{ borderRadius: active && school?.sidebarTheme?.activeStyle === 'pill' ? '999px' : 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' && school?.sidebarTheme?.activeStyle !== 'outline' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
                 <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active && school?.sidebarTheme?.activeStyle === 'bar' ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--sidebar-accent)" } : undefined}/>
                 <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-teal-100/65 group-hover:text-teal-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
                 <span className={`min-w-0 flex-1 truncate ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
@@ -223,32 +249,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       </nav>
 
       <div className="shrink-0 border-t border-white/10 bg-black/10 px-3 py-3">
-        {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: 'var(--sidebar-text)' }} className={`mb-2 flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-teal-100">
-            <UserCircle2 size={18} aria-hidden="true" />
-          </span>
-          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
-            <p style={{ color: 'var(--sidebar-text)' }} className="truncate text-xs font-semibold">{user?.fullName || 'Signed in'}</p>
-            <p style={{ color: 'var(--sidebar-text)', opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, ' ')}</p>
-          </div>
-        </div>}
-        <label style={{ color: 'var(--sidebar-text)' }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
+        <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
           <Languages size={15} aria-hidden="true" />
           <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
-          <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || 'guest'}`, next); }}
-            className={`min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none ${isCollapsed ? "md:hidden" : ""}`}>
+          <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
+            style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
             <option value="en" className="text-slate-900">English</option>
             <option value="so" className="text-slate-900">Soomaali</option>
             <option value="am" className="text-slate-900">አማርኛ</option>
           </select>
         </label>
-        <button type="button" onClick={() => void logout()} aria-label={menuText('Log out')} title={isCollapsed ? menuText('Log out') : undefined}
-          style={{ color: 'var(--sidebar-text)' }}
-          className={`mt-1 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
+        <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
+          style={{ color: "var(--sidebar-text)" }}
+          className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
           <LogOut size={15} aria-hidden="true" />
-          <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Log out')}</span>
+          <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
         </button>
+        {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-teal-100"><UserCircle2 size={18} aria-hidden="true" /></span>
+          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
+            <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
+            <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
+          </div>
+        </div>}
       </div>
+
     </aside>
   </>;
 };
