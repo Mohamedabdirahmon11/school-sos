@@ -1196,8 +1196,8 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Legacy School Admin onboarding PINs are checked against their password hash
   // until the account receives a dedicated PIN hash or rotates credentials.
   if (submittedPin && ['school_admin', 'teacher', 'accountant'].includes(user.role)) {
-    const legacySchoolAdminPinValid = !authUserId && user.role === 'school_admin'
-      && !user.pin && verifyPassword(submittedPin, user.passwordHash);
+    const legacySchoolAdminPinValid = user.role === 'school_admin'
+      && !user.pin && /^\d{4,6}$/.test(submittedPin) && verifyPassword(submittedPin, user.passwordHash);
     if (legacySchoolAdminPinValid) {
       // Upgrade existing School Admin accounts in place so their PIN continues
       // working even after the first-login password-change flow updates passwordHash.
@@ -1506,18 +1506,18 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (typeof fullName !== 'string' || fullName.trim().length < 2) { res.status(400).json({ error: 'Full name must contain at least two characters.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
-  if (user.role === 'school_admin' && newPassword) {
-    res.status(400).json({ error: 'School Admin credentials use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
+  if (['school_admin', 'teacher', 'accountant'].includes(user.role) && newPassword) {
+    res.status(400).json({ error: 'Staff accounts use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
   }
-  if (user.role !== 'school_admin' && newPin) {
-    res.status(400).json({ error: 'PIN changes are only available for School Admin accounts.' }); return;
+  if (!['school_admin', 'teacher', 'accountant'].includes(user.role) && newPin) {
+    res.status(400).json({ error: 'PIN changes are only available for staff accounts.' }); return;
   }
   if (newPin !== undefined && newPin !== '') {
     if (typeof newPin !== 'string' || !/^\d{4,6}$/.test(newPin)) {
       res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' }); return;
     }
     const currentPinValid = typeof currentPin === 'string'
-      && (verifyPin(currentPin.trim(), String(user.pin || '')) || (!user.pin && verifyPassword(currentPin.trim(), user.passwordHash)));
+      && (verifyPin(currentPin.trim(), String(user.pin || '')) || (!user.pin && /^\d{4,6}$/.test(currentPin.trim()) && verifyPassword(currentPin.trim(), user.passwordHash)));
     if (!currentPinValid) { res.status(400).json({ error: 'Current PIN is incorrect.' }); return; }
     if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
       res.status(400).json({ error: 'Choose a new PIN that is different from your current PIN.' }); return;
@@ -1550,7 +1550,7 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
   if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings and synchronized linked authentication.', severity: 'info' });
-  if (newPin) db.logAudit({ action: 'PIN_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'School Admin changed their PIN from profile settings.', severity: 'info' });
+  if (newPin) db.logAudit({ action: 'PIN_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'Staff member changed their sign-in PIN from profile settings.', severity: 'info' });
   await db.flush();
   res.json(sanitizeUser(updated));
 });
