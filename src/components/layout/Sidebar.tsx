@@ -242,11 +242,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
             <option value="am" className="text-slate-900">አማርኛ</option>
           </select>
         </label>
-        <button type="button" onClick={() => void logout()} aria-label={menuTexmenuT('Log out')} title={isCollapsed ? menuTexmenuT('Log out') : undefined}
+        <button type="button" onClick={() => void logout()} aria-label={menuText('Log out')} title={isCollapsed ? menuText('Log out') : undefined}
           style={{ color: 'var(--sidebar-text)' }}
           className={`mt-1 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
           <LogOut size={15} aria-hidden="true" />
-          <span className={isCollapsed ? "md:hidden" : ""}>{menuTexmenuT('Log out')}</span>
+          <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Log out')}</span>
         </button>
       </div>
     </aside>
