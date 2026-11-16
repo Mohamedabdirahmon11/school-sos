@@ -171,6 +171,9 @@ BEGIN
     SELECT * INTO payment_row FROM public.fee_payments
       WHERE school_id = p_school_id AND idempotency_key = p_idempotency_key;
     IF FOUND THEN
+      IF payment_row.invoice_id IS DISTINCT FROM p_invoice_id THEN
+        RAISE EXCEPTION 'Retry key belongs to a different invoice.';
+      END IF;
       SELECT * INTO invoice_row FROM public.student_invoices
         WHERE id = p_invoice_id AND school_id = p_school_id;
       RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',true);
@@ -180,6 +183,16 @@ BEGIN
   SELECT * INTO invoice_row FROM public.student_invoices
     WHERE id = p_invoice_id AND school_id = p_school_id FOR UPDATE;
   IF NOT FOUND OR invoice_row.status = 'void' THEN RAISE EXCEPTION 'Invoice not found or void.'; END IF;
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO payment_row FROM public.fee_payments
+      WHERE school_id = p_school_id AND idempotency_key = p_idempotency_key;
+    IF FOUND THEN
+      IF payment_row.invoice_id IS DISTINCT FROM p_invoice_id THEN
+        RAISE EXCEPTION 'Retry key belongs to a different invoice.';
+      END IF;
+      RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',true);
+    END IF;
+  END IF;
   IF p_amount > invoice_row.balance_due THEN RAISE EXCEPTION 'Payment exceeds the invoice balance.'; END IF;
 
   SELECT fee_type, fee_structure_id INTO invoice_fee_type, invoice_fee_structure_id
@@ -201,10 +214,10 @@ BEGIN
   ) VALUES (
     'fee-' || gen_random_uuid()::text, p_school_id, invoice_row.student_id,
     'REC-' || COALESCE(school_code,'SCH') || '-' || split_part(invoice_row.academic_year,'-',1) || '-' || lpad(receipt_seq::text,4,'0'),
-    invoice_row.academic_year, invoice_row.billing_period, invoice_fee_type,
+    invoice_row.academic_year, invoice_row.billing_period, invoice_fee_type::public.fee_type_enum,
     invoice_fee_structure_id, p_idempotency_key, p_amount, p_amount, 0,
     p_payment_method, 'paid', CURRENT_DATE, p_recorded_by, NULLIF(left(COALESCE(p_notes,''),1000),''),
-    CASE WHEN p_idempotency_key IS NULL THEN ARRAY[]::TEXT[] ELSE ARRAY[p_idempotency_key] END,
+    CASE WHEN p_idempotency_key IS NULL THEN '[]'::jsonb ELSE jsonb_build_array(p_idempotency_key) END,
     invoice_row.id
   ) RETURNING * INTO payment_row;
 
