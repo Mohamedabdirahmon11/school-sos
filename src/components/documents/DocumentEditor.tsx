@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
+import { isArtworkBelow200Dpi } from '../../lib/documents/artwork.ts';
 
 type Props = {
   html: string;
@@ -166,8 +167,22 @@ export const DocumentEditor: React.FC<Props> = ({
     }
     setUploading(true);
     try {
-      const url = await onUploadImage(file);
-      command('insertHTML', '<img src="' + url + '" alt="Sawir dukumenti" style="max-width:100%;height:auto;width:320px">');
+      const bitmap = await createImageBitmap(file);
+      try {
+        if (bitmap.width * bitmap.height > 40_000_000) throw new Error('Sawirku aad buu u weyn yahay; xadka waa 40 megapixels.');
+        if (isArtworkBelow200Dpi(bitmap.width,bitmap.height,pageSize) &&
+            !window.confirm('Xallinta sawirku waxay ka hooseysaa qiyaasta 200 DPI ee boggan. Tayada daabacaaddu way yaraan kartaa. Ma sii wadaysaa?')) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width; canvas.height = bitmap.height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Sawirka dib looma habayn karin.');
+        context.drawImage(bitmap,0,0);
+        // Re-encoding removes EXIF and other embedded metadata before private upload.
+        const cleaned = await new Promise<Blob>((resolve,reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Metadata-ga sawirka lama nadiifin karin.')),file.type,0.92));
+        const safeFile = new File([cleaned],file.name,{type:cleaned.type || file.type,lastModified:Date.now()});
+        const url = await onUploadImage(safeFile);
+        command('insertHTML', '<img src="' + url + '" alt="Sawir dukumenti" style="max-width:100%;height:auto;width:320px">');
+      } finally { bitmap.close(); }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Sawirka lama gelin karin.');
     } finally {
