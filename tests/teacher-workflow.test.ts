@@ -39,7 +39,7 @@ test('Form Teachers see every student and can complete every subject in their ho
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  const coreLoad = teacher.slice(teacher.indexOf('const initialData = useApi'), teacher.indexOf('const publishedExamSchedulesState'));
+  const coreLoad = teacher.slice(teacher.indexOf('const initialData = useApi'), teacher.indexOf('const [assignmentsData'));
   assert.doesNotMatch(coreLoad, /getNotices/);
   assert.match(teacher, /const noticesState = useApi\(\(\) => ApiClient\.getNotices\(\)/);
   assert.match(teacher, /noticesState\.loading/);
