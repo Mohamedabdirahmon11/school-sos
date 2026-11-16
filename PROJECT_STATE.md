@@ -69,8 +69,13 @@ Updated: 2026-11-11
 - Latest GitHub Actions run 43814470765 passed TypeScript checks, the full test suite, route parity, RLS source audit, and production build after these changes. Earlier autosave type errors were corrected before this successful run.
 - Table border color/width/style controls and horizontal/vertical cell merge controls are now present in the editor; repeating header/footer CSS is present but still requires real Chromium/Edge print verification.
 - Remaining Phase 1 release gates: add a self-hosted Arabic font asset and verify it is embedded/rendered in PDF; run desktop/mobile browser journeys; verify real print pagination/header/footer behavior; test private image upload/download against the bucket; and perform authenticated cross-school RLS isolation tests in a non-production Supabase environment.
-- Migration 20261116090000_school_documents_phase1.sql remains unapplied. No production database or existing records were changed.
-- Phase 2 has a separate open Draft PR #175; Phase 3 (history, expanded permissions, audit log, student attachments, final-document locking) has not started. Follow the user's phase-by-phase approval rule and do not start the next phase until they say "next".
+- Phase 1 migration was applied to the selected Supabase project `school management 3` on 2026-11-16; the six document-related tables are present with RLS enabled.
+- Phase 2 was merged through PR #177; CI passed. DOCX import/export and CSV/XLS/XLSX import/export are implemented, but real browser file round-trip verification remains outstanding.
+- Phase 3 was merged through PR #178 and its migration was applied to `school management 3`. Follow-up hardening was merged through PR #179 and applied: delete audit events now retain the document UUID in JSON details, locked edits are rejected, and the new foreign-key indexes are present.
+- Database smoke verification passed for document creation, version snapshots, lock rejection, separate unlock, subsequent edit, audit retention after hard delete, and cleanup of test records.
+- The `school-document-images` and `student-document-attachments` buckets are confirmed private. Attachment size/type limits are configured. The app's document API scopes reads/writes by the authenticated school; direct `anon`/`authenticated` table SELECT grants remain disabled, with service-role access kept server-side.
+- All six Documents tables have RLS enabled. Policies bind access to `private.auth_school_id()` and the intended school-admin/super-admin roles. Static source audit and GitHub CI passed.
+- Remaining live end-to-end release checks: browser round-trip with real DOCX/XLSX/CSV files, actual private Storage upload/download through the authenticated app, and two-school API isolation using authenticated school-admin sessions. These have not been claimed as complete because no authenticated browser session was available in this run.
 
 
 ## Documents module — Phase 2 implementation (2026-11-16)
@@ -83,4 +88,4 @@ Updated: 2026-11-11
 - Added additive migration `20261116100000_school_documents_phase3.sql` for document version snapshots, sharing grants, audit events, final/manual locking metadata, and private student attachment metadata/storage.
 - Added history restore, explicit school-role and user-specific sharing, audit log, final/manual lock and unlock, and private student attachment upload/download/soft-delete flows.
 - School-wide grants are limited to Teacher and Accountant; Parent/Student grants require a specific same-school user. Version history/audit are read-only to authenticated users; lock enforcement is in API and database trigger.
-- Migration remains unapplied to Supabase. CI and authenticated multi-school, real private-storage round-trip, and browser verification are required before production rollout.
+- Phase 3 and its follow-up hardening migrations are applied to `school management 3`; see the Phase 1 status above for database and runtime verification.
