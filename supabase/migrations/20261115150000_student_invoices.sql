@@ -302,6 +302,9 @@ BEGIN
       IF payment_row.invoice_id IS DISTINCT FROM p_invoice_id THEN
         RAISE EXCEPTION 'Retry key belongs to a different invoice.';
       END IF;
+      IF payment_row.voided_at IS NOT NULL THEN
+        RAISE EXCEPTION 'This payment was voided and cannot be replayed.';
+      END IF;
       SELECT * INTO invoice_row FROM public.student_invoices
         WHERE id = p_invoice_id AND school_id = p_school_id;
       RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',true);
@@ -317,6 +320,9 @@ BEGIN
     IF FOUND THEN
       IF payment_row.invoice_id IS DISTINCT FROM p_invoice_id THEN
         RAISE EXCEPTION 'Retry key belongs to a different invoice.';
+      END IF;
+      IF payment_row.voided_at IS NOT NULL THEN
+        RAISE EXCEPTION 'This payment was voided and cannot be replayed.';
       END IF;
       RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',true);
     END IF;
