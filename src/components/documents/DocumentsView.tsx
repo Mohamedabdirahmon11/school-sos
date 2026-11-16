@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, WandSparkles, Files, LayoutTemplate } from 'lucide-react';
+import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, WandSparkles, Files, LayoutTemplate, History, ShieldCheck, Lock, Unlock, Paperclip, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { DocumentEditor } from './DocumentEditor.tsx';
@@ -8,7 +8,7 @@ import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import './documents.css';
 
 type DocType = 'transfer_letter'|'certificate'|'parent_letter'|'teacher_letter'|'student_clearance'|'report_summary'|'other';
-type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string };
+type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean; canDownload?:boolean };
 type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean };
 
 const BUILTIN_TEMPLATES: TemplateRow[] = [
@@ -31,7 +31,8 @@ function localDate(value: string, timezone?: string) {
 }
 
 export const DocumentsView: React.FC = () => {
-  const { school } = useAuth();
+  const { school, user } = useAuth();
+  const isAdmin = ['school_admin','super_admin'].includes(user?.role || '');
   const [documents,setDocuments] = useState<DocumentRow[]>([]);
   const [templates,setTemplates] = useState<TemplateRow[]>(BUILTIN_TEMPLATES);
   const [selected,setSelected] = useState<DocumentRow|null>(null);
@@ -63,12 +64,21 @@ export const DocumentsView: React.FC = () => {
   const [previewMissing,setPreviewMissing] = useState<string[]>([]);
   const [previewStudent,setPreviewStudent] = useState('');
   const [message,setMessage] = useState('');
-  const savedSnapshot = useRef<{title:string;html:string;direction:'ltr'|'rtl';pageSize:'A4'|'A5'|'Letter';margins:number}>({title:'',html:'',direction:'ltr',pageSize:'A4',margins:20});
-  const draftRef = useRef({title,html,direction,pageSize,margins});
-  draftRef.current = {title,html,direction,pageSize,margins};
+  const [versions,setVersions] = useState<any[]>([]);
+  const [auditEvents,setAuditEvents] = useState<any[]>([]);
+  const [attachments,setAttachments] = useState<any[]>([]);
+  const [showHistory,setShowHistory] = useState(false);
+  const [showAudit,setShowAudit] = useState(false);
+  const [attachmentBusy,setAttachmentBusy] = useState(false);
+  const [permissions,setPermissions] = useState<any[]>([]);
+  const [showPermissions,setShowPermissions] = useState(false);
+  const [permissionUserId,setPermissionUserId] = useState('');
+  const [permissionRole,setPermissionRole] = useState('teacher');
+  const [permissionCanEdit,setPermissionCanEdit] = useState(false);
+  const [permissionCanDownload,setPermissionCanDownload] = useState(false);
+  const savedSnapshot = useRef({title:'',html:''});
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
-  const savePromiseRef = useRef<Promise<void> | null>(null);
 
   const loadDocuments = useCallback(async () => {
     setLoading(true);
@@ -88,73 +98,40 @@ export const DocumentsView: React.FC = () => {
   },[]);
 
   useEffect(() => { void loadDocuments(); },[loadDocuments]);
-  useEffect(() => { void loadTemplates(); },[loadTemplates]);
-  useEffect(() => { void ApiClient.getClasses().then(setClasses).catch(()=>setClasses([])); },[]);
+  useEffect(() => { if(isAdmin) void loadTemplates(); },[loadTemplates,isAdmin]);
+  useEffect(() => { if(isAdmin) void ApiClient.getClasses().then(setClasses).catch(()=>setClasses([])); },[isAdmin]);
 
   const markDirty = useCallback((nextTitle: string, nextHtml: string, nextDirection = direction, nextPageSize = pageSize, nextMargins = margins) => {
-    const normalizedTitle = nextTitle.trim() || 'Dukumenti aan cinwaan lahayn';
-    dirtyRef.current = normalizedTitle !== savedSnapshot.current.title
-      || nextHtml !== savedSnapshot.current.html
-      || nextDirection !== savedSnapshot.current.direction
-      || nextPageSize !== savedSnapshot.current.pageSize
-      || nextMargins !== savedSnapshot.current.margins;
+    dirtyRef.current = nextTitle !== savedSnapshot.current.title || nextHtml !== savedSnapshot.current.html || nextDirection !== (selected?.direction || 'ltr') || nextPageSize !== (selected?.pageSize || 'A4') || nextMargins !== (selected?.pageMargins || 20);
     setSaveState(dirtyRef.current ? 'unsaved' : 'saved');
-  },[direction,pageSize,margins]);
+  },[direction,pageSize,margins,selected]);
 
   const saveNow = useCallback(async () => {
-    if (!selected) return;
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-      if (dirtyRef.current) await saveNow();
-      return;
-    }
-    if (!dirtyRef.current) return;
-
-    const targetId = selected.id;
-    const draft = draftRef.current;
-    const snapshot = {
-      title: draft.title.trim() || 'Dukumenti aan cinwaan lahayn',
-      html: draft.html,
-      direction: draft.direction,
-      pageSize: draft.pageSize,
-      margins: draft.margins
-    };
+    if (!selected || !dirtyRef.current || savingRef.current) return;
+    const nextTitle = title.trim() || 'Dukumenti aan cinwaan lahayn';
+    const nextHtml = html;
     const patch: Record<string,unknown> = {};
-    if (snapshot.title !== savedSnapshot.current.title) patch.title = snapshot.title;
-    if (snapshot.html !== savedSnapshot.current.html) patch.contentHtml = snapshot.html;
-    if (snapshot.direction !== savedSnapshot.current.direction) patch.direction = snapshot.direction;
-    if (snapshot.pageSize !== savedSnapshot.current.pageSize) patch.pageSize = snapshot.pageSize;
-    if (snapshot.margins !== savedSnapshot.current.margins) patch.pageMargins = snapshot.margins;
+    if (nextTitle !== savedSnapshot.current.title) patch.title = nextTitle;
+    if (nextHtml !== savedSnapshot.current.html) patch.contentHtml = nextHtml;
+    if (direction !== (selected.direction || 'ltr')) patch.direction = direction;
+    if (pageSize !== (selected.pageSize || 'A4')) patch.pageSize = pageSize;
+    if (margins !== (selected.pageMargins || 20)) patch.pageMargins = margins;
     if (!Object.keys(patch).length) { dirtyRef.current = false; setSaveState('saved'); return; }
-
     savingRef.current = true;
     setSaveState('saving');
-    const operation = (async () => {
-      try {
-        const updated = await ApiClient.updateDocument(targetId,patch) as DocumentRow;
-        savedSnapshot.current = snapshot;
-        const latest = draftRef.current;
-        const latestTitle = latest.title.trim() || 'Dukumenti aan cinwaan lahayn';
-        dirtyRef.current = latestTitle !== snapshot.title
-          || latest.html !== snapshot.html
-          || latest.direction !== snapshot.direction
-          || latest.pageSize !== snapshot.pageSize
-          || latest.margins !== snapshot.margins;
-        setTitle(current => current === draft.title ? snapshot.title : current);
-        setSelected(current => current?.id === targetId ? {...current,...updated} : current);
-        setSaveState(dirtyRef.current ? 'unsaved' : 'saved');
-        setDocuments(current => current.map(item => item.id === targetId ? {...item,...updated} : item));
-      } catch (error) {
-        setSaveState('error');
-        setMessage(error instanceof Error ? error.message : 'Kaydintu way fashilantay.');
-      } finally {
-        savingRef.current = false;
-        savePromiseRef.current = null;
-      }
-    })();
-    savePromiseRef.current = operation;
-    await operation;
-  },[selected]);
+    try {
+      const updated = await ApiClient.updateDocument(selected.id,patch) as DocumentRow;
+      savedSnapshot.current = {title:nextTitle,html:nextHtml};
+      dirtyRef.current = false;
+      setTitle(nextTitle);
+      setSelected(current => current ? {...current,...updated} : current);
+      setSaveState('saved');
+      setDocuments(current => current.map(item => item.id === selected.id ? {...item,...updated} : item));
+    } catch (error) {
+      setSaveState('error');
+      setMessage(error instanceof Error ? error.message : 'Kaydintu way fashilantay.');
+    } finally { savingRef.current = false; }
+  },[selected,title,html,direction,pageSize,margins]);
 
   useEffect(() => {
     if (!selected || !dirtyRef.current) return;
@@ -173,13 +150,7 @@ export const DocumentsView: React.FC = () => {
   },[]);
 
   const openDocument = async (item: DocumentRow) => {
-    if (dirtyRef.current || savePromiseRef.current) {
-      await saveNow();
-      if (dirtyRef.current) {
-        setMessage('Isbeddellada lama kaydin. Fadlan mar kale kaydi ka hor intaadan dukumenti kale furin.');
-        return;
-      }
-    }
+    if (dirtyRef.current) await saveNow();
     try {
       const full = await ApiClient.getDocument(item.id) as DocumentRow;
       setSelected(full);
@@ -189,13 +160,16 @@ export const DocumentsView: React.FC = () => {
       setPageSize(full.pageSize || 'A4');
       setMargins(full.pageMargins || 20);
       setStatus(full.status || 'draft');
-      savedSnapshot.current = {
-        title:full.title,html:full.contentHtml || '',direction:full.direction || 'ltr',
-        pageSize:full.pageSize || 'A4',margins:full.pageMargins || 20
-      };
+      savedSnapshot.current = {title:full.title,html:full.contentHtml || ''};
       dirtyRef.current = false;
       setSaveState('saved');
       setMessage('');
+      void ApiClient.getDocumentVersions(full.id).then(setVersions).catch(()=>setVersions([]));
+      void ApiClient.getDocumentAudit(full.id).then(setAuditEvents).catch(()=>setAuditEvents([]));
+      if (isAdmin) void ApiClient.getDocumentPermissions(full.id).then(setPermissions).catch(()=>setPermissions([]));
+      else setPermissions([]);
+      if (full.studentId) void ApiClient.getStudentDocumentAttachments(full.studentId).then(setAttachments).catch(()=>setAttachments([]));
+      else setAttachments([]);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Dukumentiga lama furi karin.'); }
   };
 
@@ -304,20 +278,20 @@ export const DocumentsView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><div className="flex items-center gap-2"><Files className="h-6 w-6 text-teal-700" /><h1 className="text-2xl font-bold text-slate-900">Dukumentiyada</h1></div><p className="mt-1 text-sm text-slate-500">Qor, habee, samee oo daabac waraaqaha dugsiga.</p></div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setShowGenerate(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50"><WandSparkles size={16}/> U samee arday</button>
+          {isAdmin && <><button type="button" onClick={() => setShowGenerate(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50"><WandSparkles size={16}/> U samee arday</button>
           <button type="button" onClick={() => setShowTemplates(value=>!value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><LayoutTemplate size={16}/> Qaab-dhismeedyo</button>
-          <button type="button" onClick={() => void createDocument()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"><Plus size={16}/> Dukumenti cusub</button>
+          <button type="button" onClick={() => void createDocument()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"><Plus size={16}/> Dukumenti cusub</button></>}
         </div>
       </div>
 
       {message && <div role="status" className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"><span>{message}</span><button type="button" aria-label="Xir fariinta" onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-      {showTemplates && <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-2">
+      {isAdmin && showTemplates && <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-2">
         <div><h2 className="mb-3 font-bold text-slate-900">Dooro template</h2><div className="space-y-2">{templates.map(template=><div key={template.id} className={'flex items-center justify-between gap-2 rounded-lg border p-2 ' + (template.id===templateId?'border-teal-500 bg-teal-50':'border-slate-200')}><button type="button" onClick={()=>setTemplateId(template.id)} className="min-w-0 flex-1 text-left text-sm font-medium text-slate-800">{template.title}<span className="block text-xs text-slate-500">{TYPE_LABELS[template.documentType]}</span></button><>{!template.isBuiltin && <button type="button" aria-label="Wax ka beddel template" onClick={()=>{setEditingTemplateId(template.id);setTemplateTitle(template.title);setTemplateHtml(template.contentHtml);setTemplateType(template.documentType);}} className="rounded-md px-2 py-1 text-xs text-teal-700 hover:bg-teal-50">Wax ka beddel</button>}{!template.isBuiltin && <button type="button" aria-label="Tirtir template" onClick={()=>void deleteTemplate(template.id)} className="rounded-md p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={14}/></button>}<button type="button" aria-label="Nuqul ka samee template" title="Nuqul ka samee" onClick={()=>void duplicateTemplate(template)} className="rounded-md p-2 hover:bg-slate-100"><Copy size={15}/></button></></div>)}</div><button type="button" onClick={()=>void createDocument(selectedTemplate)} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Ka samee dukumenti</button></div>
         <div><h2 className="mb-3 font-bold text-slate-900">{editingTemplateId?'Wax ka beddel template':'Samee template cusub'}</h2><label className="mb-2 block text-xs font-semibold text-slate-600">Magaca template-ka<input value={templateTitle} onChange={event=>setTemplateTitle(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label><label className="mb-2 block text-xs font-semibold text-slate-600">Nooca<select value={templateType} onChange={event=>setTemplateType(event.target.value as DocType)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm">{Object.entries(TYPE_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label className="block text-xs font-semibold text-slate-600">Qoraalka template-ka<textarea rows={7} value={templateHtml} onChange={event=>setTemplateHtml(event.target.value)} placeholder="<p>Magaca ardayga: {student_name}</p>" className="mt-1 w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" /></label><p className="mt-1 text-xs text-slate-500">Doorsoomayaal: {'{student_name}'} · {'{student_id}'} · {'{class}'} · {'{parent_name}'} · {'{date}'} · {'{school_name}'} · {'{teacher_name}'} · {'{term}'} · {'{academic_year}'}</p><button type="button" onClick={()=>void saveTemplate()} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Kaydi template-ka</button></div>
       </section>}
 
-      {showGenerate && <section className="rounded-xl border border-teal-200 bg-white p-4">
+      {isAdmin && showGenerate && <section className="rounded-xl border border-teal-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-900">U samee arday</h2><button type="button" aria-label="Xir" onClick={()=>setShowGenerate(false)}><X size={18}/></button></div>
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-slate-600">Template<select value={templateId} onChange={event=>setTemplateId(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">{templates.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="text-xs font-semibold text-slate-600">Fasal<select value={classId} onChange={event=>{setClassId(event.target.value);setStudentId('');}} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Dooro fasal (dhammaan ardayda fasalka)</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name} {item.section || ''}</option>)}</select></label><label className="text-xs font-semibold text-slate-600 sm:col-span-2">Ama hal arday (haddii la doorto fasalka waa la iska indhatirayaa)<input value={studentId} onChange={event=>{setStudentId(event.target.value);if(event.target.value.trim())setClassId('');}} placeholder="Geli aqoonsiga ardayga" className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label></div>
         <p className="mt-2 text-xs text-slate-500">Xogta ardayga waxaa si toos ah looga soo qaadanayaa diiwaanka dugsiga. Meelaha xogtoodu maqan tahay waxaa lagu soo bandhigayaa digniin.</p>
@@ -330,13 +304,13 @@ export const DocumentsView: React.FC = () => {
         <aside className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center gap-2"><Search size={16} className="text-slate-400"/><input aria-label="Raadi dukumentiyada" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Raadi dukumenti…" className="min-h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-2 text-sm"/></div>
           <div className="mb-3 grid grid-cols-2 gap-2"><select aria-label="Kala saar nooca" value={typeFilter} onChange={event=>setTypeFilter(event.target.value)} className="min-h-9 min-w-0 rounded-lg border border-slate-200 px-2 text-xs"><option value="all">Nooc kasta</option>{Object.entries(TYPE_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><select aria-label="Kala saar xaaladda" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)} className="min-h-9 min-w-0 rounded-lg border border-slate-200 px-2 text-xs"><option value="all">Xaalad kasta</option><option value="draft">Qabyo</option><option value="final">Dhammaad</option></select></div>
-          <label className="mb-2 flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={event=>setIncludeDeleted(event.target.checked)}/> Tus kuwa la tirtiray</label>
+          {isAdmin && <label className="mb-2 flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={event=>setIncludeDeleted(event.target.checked)}/> Tus kuwa la tirtiray</label>}
           <div className="max-h-[68vh] space-y-1 overflow-y-auto">
             {loading && <p className="p-3 text-sm text-slate-500">Waa la soo dejinayaa…</p>}
             {!loading && documents.length===0 && <p className="p-3 text-sm text-slate-500">Weli dukumenti ma jiro.</p>}
             {documents.map(item=><div key={item.id} className={'rounded-lg border p-2 ' + (selected?.id===item.id?'border-teal-500 bg-teal-50':'border-transparent hover:bg-slate-50')}>
               <button type="button" onClick={()=>void openDocument(item)} className="block w-full min-w-0 text-left"><span className="block truncate text-sm font-semibold text-slate-800">{item.title}</span><span className="mt-1 block text-[11px] text-slate-500">{TYPE_LABELS[item.documentType] || TYPE_LABELS.other} · {item.status==='final'?'Dhammaad':'Qabyo'} · {localDate(item.updatedAt,school?.timezone)}</span></button>
-              <div className="mt-1 flex gap-1">{item.deletedAt ? <button type="button" aria-label="Soo celi dukumentiga" onClick={()=>void restoreDocument(item.id)} className="rounded p-1.5 text-teal-700 hover:bg-teal-100"><RotateCcw size={14}/></button> : <><button type="button" aria-label="Nuqul ka samee dukumentiga" onClick={()=>void duplicateDocument(item.id)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200"><Copy size={14}/></button><button type="button" aria-label="Tirtir dukumentiga" onClick={()=>void deleteDocument(item.id)} className="rounded p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 size={14}/></button></>}</div>
+              {isAdmin && <div className="mt-1 flex gap-1">{item.deletedAt ? <button type="button" aria-label="Soo celi dukumentiga" onClick={()=>void restoreDocument(item.id)} className="rounded p-1.5 text-teal-700 hover:bg-teal-100"><RotateCcw size={14}/></button> : <><button type="button" aria-label="Nuqul ka samee dukumentiga" onClick={()=>void duplicateDocument(item.id)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200"><Copy size={14}/></button><button type="button" aria-label="Tirtir dukumentiga" onClick={()=>void deleteDocument(item.id)} className="rounded p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 size={14}/></button></>}</div>}
             </div>)}
           </div>
         </aside>
@@ -345,15 +319,32 @@ export const DocumentsView: React.FC = () => {
           {!selected ? <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center"><FileText size={42} className="mb-3 text-slate-300"/><h2 className="font-bold text-slate-700">Dooro dukumenti ama mid cusub samee</h2><p className="mt-1 max-w-md text-sm text-slate-500">Dukumentiyada waxaa loo kaydiyaa si gaar ah dugsigan.</p></div> :
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-              <input aria-label="Cinwaanka dukumentiga" value={title} onChange={event=>{setTitle(event.target.value);markDirty(event.target.value,html);}} className="min-h-10 min-w-[180px] flex-1 rounded-lg border border-slate-200 px-3 text-sm font-semibold"/>
-              <select aria-label="Xaaladda dukumentiga" value={status} onChange={async event=>{const next=event.target.value as 'draft'|'final';setStatus(next);await ApiClient.updateDocument(selected.id,{status:next});await loadDocuments();}} className="min-h-10 rounded-lg border border-slate-200 px-2 text-xs"><option value="draft">Qabyo</option><option value="final">Dhammaad</option></select>
+              <input aria-label="Cinwaanka dukumentiga" value={title} disabled={(!isAdmin && !selected.canEdit) || Boolean(selected.lockedAt) || status==='final'} onChange={event=>{setTitle(event.target.value);markDirty(event.target.value,html);}} className="min-h-10 min-w-[180px] flex-1 rounded-lg border border-slate-200 px-3 text-sm font-semibold"/>
+              {isAdmin && <select aria-label="Xaaladda dukumentiga" value={status} disabled={Boolean(selected.lockedAt) || status==='final'} onChange={async event=>{const next=event.target.value as 'draft'|'final';try{await saveNow();if(dirtyRef.current)return;const result=await ApiClient.updateDocument(selected.id,{status:next});setSelected(result);setStatus(next);await loadDocuments();}catch(error){setMessage(error instanceof Error?error.message:'Xaaladda lama beddeli karin.');}}} className="min-h-10 rounded-lg border border-slate-200 px-2 text-xs"><option value="draft">Qabyo</option><option value="final">Dhammaad</option></select>}
               <span className="min-w-16 text-xs text-slate-500" role="status">{saveState==='saving'?'Waa la kaydinayaa…':saveState==='error'?'Kaydintu way fashilantay':saveState==='unsaved'?'Isbeddel lama kaydin':'Waa kaydsan yahay'}</span>
-              <button type="button" onClick={()=>void saveNow()} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Save size={14}/> Kaydi</button>
-              <button type="button" onClick={()=>window.print()} className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white"><Printer size={14}/> Daabac / PDF</button>
-              <button type="button" onClick={startTemplateFromSelected} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Copy size={14}/> Template ka dhig</button>
+              {(isAdmin || selected.canEdit) && <button type="button" onClick={()=>void saveNow()} disabled={Boolean(selected.lockedAt) || status==='final'} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 disabled:opacity-40"><Save size={14}/> Kaydi</button>}
+
+              {isAdmin && <button type="button" onClick={()=>{setShowHistory(value=>!value);setShowAudit(false);void ApiClient.getDocumentVersions(selected.id).then(setVersions).catch(error=>setMessage(error.message));}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><History size={14}/> Taariikh</button>}
+              {isAdmin && <button type="button" onClick={()=>{setShowAudit(value=>!value);setShowHistory(false);void ApiClient.getDocumentAudit(selected.id).then(setAuditEvents).catch(error=>setMessage(error.message));}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><ShieldCheck size={14}/> Audit</button>}
+              {isAdmin && (selected.lockedAt || status==='final' ? <button type="button" onClick={async()=>{try{const result=await ApiClient.unlockDocument(selected.id);setSelected(result);setStatus('draft');await loadDocuments();setMessage('Dukumentiga waa la furay.');}catch(error){setMessage(error instanceof Error?error.message:'Dukumentiga lama furi karin.');}}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-800"><Unlock size={14}/> Fur</button> : <button type="button" onClick={async()=>{try{await saveNow();if(dirtyRef.current)return;const result=await ApiClient.lockDocument(selected.id,'Manually locked');setSelected(result);await loadDocuments();setMessage('Dukumentiga waa la xiray.');}catch(error){setMessage(error instanceof Error?error.message:'Dukumentiga lama xiri karin.');}}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Lock size={14}/> Xir</button>)}
+
+              <button type="button" disabled={!isAdmin && !selected.canDownload} onClick={()=>window.print()} className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white disabled:opacity-40"><Printer size={14}/> Daabac / PDF</button>
+              {isAdmin && <button type="button" onClick={startTemplateFromSelected} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Copy size={14}/> Template ka dhig</button>}
             </div>
-            <DocumentEditor html={html} onChange={value=>{setHtml(value);markDirty(title,value);}} onSaveNow={saveNow} direction={direction} onDirectionChange={value=>{setDirection(value);markDirty(title,html,value,pageSize,margins);}} pageSize={pageSize} onPageSizeChange={value=>{setPageSize(value);markDirty(title,html,direction,value,margins);}} margins={margins} onMarginsChange={value=>{setMargins(value);markDirty(title,html,direction,pageSize,value);}} school={school} onUploadImage={uploadImage}/>
-            <DocumentFileTools html={html} title={title} onImport={value=>{setHtml(value);markDirty(title,value);}}/>
+
+
+            {isAdmin && <section className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-slate-800">Ogolaanshaha dukumentiga</h3><button type="button" onClick={()=>{setShowPermissions(value=>!value);if(!showPermissions)void ApiClient.getDocumentPermissions(selected.id).then(setPermissions).catch(error=>setMessage(error.message));}} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700">{showPermissions?'Qari':'Maamul ogolaanshaha'}</button></div>
+              {showPermissions && <><div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="text-xs font-semibold text-slate-600">User ID (ikhtiyaari)<input value={permissionUserId} onChange={event=>setPermissionUserId(event.target.value)} placeholder="Geli user ID ama dooro role" className="mt-1 min-h-9 w-full rounded-lg border border-slate-300 px-2 text-sm"/></label><label className="text-xs font-semibold text-slate-600">Role<select value={permissionRole} onChange={event=>setPermissionRole(event.target.value)} disabled={Boolean(permissionUserId.trim())} className="mt-1 min-h-9 w-full rounded-lg border border-slate-300 px-2 text-sm"><option value="teacher">Teacher</option><option value="accountant">Accountant</option></select></label></div><div className="mt-2 flex flex-wrap gap-4 text-xs"><label className="flex items-center gap-1"><input type="checkbox" checked={permissionCanEdit} onChange={event=>setPermissionCanEdit(event.target.checked)}/> Wax ka beddel</label><label className="flex items-center gap-1"><input type="checkbox" checked={permissionCanDownload} onChange={event=>setPermissionCanDownload(event.target.checked)}/> Download</label></div><button type="button" onClick={async()=>{try{await ApiClient.setDocumentPermission(selected.id,{userId:permissionUserId.trim()||undefined,role:permissionUserId.trim()?undefined:permissionRole,canView:true,canEdit:permissionCanEdit,canDownload:permissionCanDownload});setPermissionUserId('');setPermissions(await ApiClient.getDocumentPermissions(selected.id));setMessage('Ogolaanshaha waa la kaydiyey.');}catch(error){setMessage(error instanceof Error?error.message:'Ogolaanshaha lama kaydin karin.');}}} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Ku dar ogolaansho</button><div className="mt-3 space-y-2">{permissions.map(permission=><div key={permission.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-2"><div className="text-xs"><p className="font-semibold">{permission.userId?'User: '+permission.userId:'Role: '+permission.role}</p><p className="text-slate-500">{permission.canView?'Akhris':''} {permission.canEdit?'· Wax-ka-beddel':''} {permission.canDownload?'· Download':''}</p></div><button type="button" onClick={async()=>{try{await ApiClient.deleteDocumentPermission(selected.id,permission.id);setPermissions(await ApiClient.getDocumentPermissions(selected.id));}catch(error){setMessage(error instanceof Error?error.message:'Ogolaanshaha lama tirtiri karin.');}}} className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-700">Ka saar</button></div>)}</div></>}
+            </section>}
+            {isAdmin && showHistory && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><History size={16}/> Taariikhda versions</h3>{versions.length===0?<p className="text-sm text-slate-500">Weli version hore ma jiro.</p>:<div className="max-h-64 space-y-2 overflow-auto">{versions.map(version=><div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-2"><div><p className="text-sm font-semibold">Version {version.versionNumber} · {version.title}</p><p className="text-xs text-slate-500">{localDate(version.createdAt,school?.timezone)} · {version.status==='final'?'Final':'Qabyo'}</p></div><button type="button" disabled={Boolean(selected.lockedAt)||status==='final'} onClick={async()=>{if(!window.confirm('Ma soo celinaysaa version-kan? Isbeddelka hadda jira wuxuu noqonayaa version cusub.'))return;try{const result=await ApiClient.restoreDocumentVersion(selected.id,version.id);setSelected(result);setTitle(result.title);setHtml(result.contentHtml||'');setStatus(result.status);savedSnapshot.current={title:result.title,html:result.contentHtml||''};dirtyRef.current=false;setSaveState('saved');setVersions(await ApiClient.getDocumentVersions(selected.id));await loadDocuments();setMessage('Version-ka waa la soo celiyey.');}catch(error){setMessage(error instanceof Error?error.message:'Version-ka lama soo celin karin.');}}} className="rounded-lg border border-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-800 disabled:opacity-40">Soo celi</button></div>)}</div>}</section>}
+            {isAdmin && showAudit && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><ShieldCheck size={16}/> Audit log</h3>{auditEvents.length===0?<p className="text-sm text-slate-500">Audit event ma jiro.</p>:<div className="max-h-64 space-y-2 overflow-auto">{auditEvents.map(event=><div key={event.id} className="rounded-lg border border-slate-100 p-2"><p className="text-sm font-semibold">{event.action}</p><p className="text-xs text-slate-500">{localDate(event.createdAt,school?.timezone)} · {event.actorUserId||'System'}</p></div>)}</div>}</section>}
+            {isAdmin && selected.studentId && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><Paperclip size={16}/> Lifaaqyada ardayga</h3><div className="mb-3 flex flex-wrap items-center gap-2"><label className="cursor-pointer rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">{attachmentBusy?'Waa la soo gelinayaa…':'Ku dar PDF / sawir'}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={attachmentBusy} className="hidden" onChange={async event=>{const file=event.target.files?.[0];if(!file)return;setAttachmentBusy(true);try{await ApiClient.uploadStudentDocumentAttachment(selected.studentId!,file);setAttachments(await ApiClient.getStudentDocumentAttachments(selected.studentId!));setMessage('Lifaaqa waa la kaydiyey.');}catch(error){setMessage(error instanceof Error?error.message:'Lifaaqa lama soo gelin karin.');}finally{setAttachmentBusy(false);event.target.value='';}}}/></label><span className="text-xs text-slate-500">PDF, JPG, PNG ama WebP · ugu badnaan 10 MB</span></div>{attachments.length===0?<p className="text-sm text-slate-500">Ardaygani weli lifaaq ma leh.</p>:<div className="space-y-2">{attachments.map(file=><div key={file.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{file.fileName}</p><p className="text-xs text-slate-500">{Math.ceil(file.fileSize/1024)} KB · {localDate(file.createdAt,school?.timezone)}</p></div><div className="flex gap-1"><a href={ApiClient.studentDocumentAttachmentDownloadUrl(selected.studentId!,file.id)} className="rounded p-2 text-teal-700" aria-label="Soo dejiso lifaaqa"><Download size={15}/></a><button type="button" onClick={async()=>{if(!window.confirm('Ma tirtiraysaa lifaaqan?'))return;try{await ApiClient.deleteStudentDocumentAttachment(selected.studentId!,file.id);setAttachments(await ApiClient.getStudentDocumentAttachments(selected.studentId!));}catch(error){setMessage(error instanceof Error?error.message:'Lifaaqa lama tirtiri karin.');}}} className="rounded p-2 text-rose-600" aria-label="Tirtir lifaaqa"><Trash2 size={15}/></button></div></div>)}</div>}</section>}
+            {(selected.lockedAt || status==='final') ? <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><p className="flex items-center gap-2 font-bold"><Lock size={16}/> Dukumentigan waa la xiray</p><p className="mt-1">Wax ka beddelka waa la xannibay. Riix “Fur” si aad ugu celiso qabyo una sii waddo tafatirka.</p>{selected.lockReason && <p className="mt-1 text-xs">Sabab: {selected.lockReason}</p>}</div> : (isAdmin || selected.canEdit) ? <>
+              <DocumentEditor html={html} onChange={value=>{setHtml(value);markDirty(title,value);}} onSaveNow={saveNow} direction={direction} onDirectionChange={value=>{setDirection(value);markDirty(title,html,value,pageSize,margins);}} pageSize={pageSize} onPageSizeChange={value=>{setPageSize(value);markDirty(title,html,direction,value,margins);}} margins={margins} onMarginsChange={value=>{setMargins(value);markDirty(title,html,direction,pageSize,value);}} school={school} onUploadImage={uploadImage} canUploadImage={isAdmin}/>
+              {(isAdmin || selected.canDownload) && <DocumentFileTools html={html} title={title} onImport={value=>{setHtml(value);markDirty(title,value);}}/>}
+            </> : <div className="min-h-[420px] rounded-xl border border-slate-200 bg-white p-5" dir={direction} style={{padding: margins+'mm'}}><div className="mx-auto max-w-[800px] bg-white" dangerouslySetInnerHTML={{__html:sanitizeDocumentHtml(html)}}/></div>}
+
           </div>}
         </main>
       </div>
