@@ -6284,7 +6284,7 @@ apiRouter.get('/student-invoices/:id/pdf', requireAuth, requireSchoolContext, as
   const [student,items]=await Promise.all([db.getStudentById(invoice.student_id,school.id),client.from('student_invoice_items').select('*').eq('school_id',school.id).eq('invoice_id',invoice.id)]);
   if(items.error){res.status(503).json({error:'Invoice items could not be loaded.'});return;}
   const klass=student?await db.getClassById(student.classId,school.id):null;
-  const pages:PdfPageInput[]=[
+  const pages:PdfPageInput[]=[[
     school.name,school.address||'',school.phone||'','STUDENT INVOICE',
     `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
     `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
