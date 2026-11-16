@@ -127,19 +127,19 @@ export const StaffAccessView: React.FC = () => {
     }
   };
 
-  const handleResetStaffPassword = async (staff: StaffMember) => {
+  const handleResetStaffPin = async (staff: StaffMember) => {
     if (!staff.userId) {
       setError('This staff record is not linked to a sign-in account.');
       return;
     }
-    if (!confirm(`Generate a temporary password for ${staff.fullName}? They must change it at next sign-in.`)) return;
+    if (!confirm(`Generate a new PIN for ${staff.fullName}? It will be shown once.`)) return;
     setError(null);
     try {
-      const result = await ApiClient.resetUserPassword(staff.userId);
-      window.alert(`Temporary password for ${staff.fullName}:\n\n${result.temporaryPassword}\n\nThis is shown once. The user must change it at next sign-in.`);
-      setMessage(`Temporary password generated for ${staff.fullName}.`);
+      const result = await ApiClient.request<{ newPin: string; staff: { staffId: string; fullName: string } }>(`/school/staff/${staff.id}/reset-pin`, { method: 'POST' });
+      window.alert(`Staff ID: ${result.staff.staffId}\nNew PIN: ${result.newPin}\nShare it securely.`);
+      setMessage(`New PIN generated for ${staff.fullName}.`);
     } catch (err: any) {
-      setError(err.message || 'Could not reset this staff password.');
+      setError(err.message || 'Could not reset this staff PIN.');
     }
   };
 
@@ -278,8 +278,8 @@ export const StaffAccessView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {st.userId && <button type="button" onClick={() => handleResetStaffPassword(st)} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
-                          <KeyRound className="w-3 h-3" /><span>Reset password</span>
+                        {st.userId && <button type="button" onClick={() => handleResetStaffPin(st)} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
+                          <KeyRound className="w-3 h-3" /><span>Reset PIN</span>
                         </button>}
                         <button
                           onClick={() => openEditModal(st)}
