@@ -28,6 +28,7 @@ export const StudentInvoicesView: React.FC = () => {
   const [includeOneTime, setIncludeOneTime] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [lastReceiptId, setLastReceiptId] = useState<string | null>(null);
   const [paying, setPaying] = useState<any>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState<'Cash' | 'Bank Transfer' | 'Mobile Money'>('Cash');
@@ -56,6 +57,7 @@ export const StudentInvoicesView: React.FC = () => {
         includeAnnualRegistration: includeAnnual,
         includeOneTimeFees: includeOneTime
       });
+      setLastReceiptId(null);
       setNotice(`Created ${result.generatedCount} invoices. ${result.skippedExisting} duplicates and ${result.skippedNoFees} students without configured fees were skipped.`);
       setShowGenerate(false);
       await load.retry();
@@ -75,6 +77,7 @@ export const StudentInvoicesView: React.FC = () => {
       const result = await ApiClient.payStudentInvoice(paying.id, {
         amount: Number(payAmount), paymentMethod: payMethod, idempotencyKey: paymentKeyRef.current
       });
+      setLastReceiptId(result.payment.id);
       setNotice(`Payment received. Receipt ${result.payment.receiptNumber}.`);
       setPaying(null);
       setPayAmount('');
@@ -98,7 +101,7 @@ export const StudentInvoicesView: React.FC = () => {
       {['school_admin','accountant','super_admin'].includes(user?.role || '') && <button type="button" disabled={isReadOnly} onClick={() => setShowGenerate(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"><Plus size={16}/> Generate invoices</button>}
     </header>
 
-    {notice && <div role="status" className="flex items-start justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss"><X size={16}/></button></div>}
+    {notice && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900"><span>{notice}</span><div className="flex shrink-0 items-center gap-2">{lastReceiptId && <button type="button" onClick={() => void ApiClient.downloadReceiptPdf(lastReceiptId)} className="font-semibold underline">Download receipt</button>}<button onClick={() => {setNotice('');setLastReceiptId(null);}} aria-label="Dismiss"><X size={16}/></button></div></div>}
 
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold uppercase text-slate-500">Invoices</p><p className="mt-2 text-2xl font-bold">{invoices.length}</p></div>
