@@ -8055,11 +8055,17 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
     ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0]
     : null;
   const teacherName = teacher?.fullName || '';
-  const marks = klass ? await db.getMarks(school.id,klass.id) : [];
+  const annualDocument = /annual|sanad-dugsiyeedka/i.test(templateHtml);
+  const marks = klass ? await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester) : [];
   const academic = summarizeDocumentAcademicMarks(marks,student.id,school.gradingScale);
   const payments = templateHtml.includes('{fee_balance}') ? await db.getFeePayments(school.id,student.id) : [];
   const feeBalance = payments.filter(payment=>!payment.voidedAt).reduce((sum,payment)=>sum + Number(payment.remainingAmount || 0),0);
-  const attendance = templateHtml.includes('{attendance}') ? await db.getStudentAttendanceHistory(school.id,student.id) : [];
+  const attendanceRecords = templateHtml.includes('{attendance}') ? await db.getStudentAttendanceHistory(school.id,student.id) : [];
+  const attendanceStart = annualDocument ? school.terms?.semester1Start : school.currentSemester === 'Semester 1' ? school.terms?.semester1Start : school.terms?.semester2Start;
+  const attendanceEnd = annualDocument ? school.terms?.semester2End : school.currentSemester === 'Semester 1' ? school.terms?.semester1End : school.terms?.semester2End;
+  const attendance = attendanceStart && attendanceEnd
+    ? attendanceRecords.filter(record=>record.date >= attendanceStart && record.date <= attendanceEnd)
+    : attendanceRecords;
   const attendancePercent = attendance.length
     ? ((attendance.filter(record=>record.status==='present'||record.status==='late').length / attendance.length) * 100).toFixed(1) + '%'
     : '';
@@ -8152,7 +8158,8 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   const marksByClass = new Map<string,any[]>();
   const teacherByClass = new Map<string,{name:string;staffId:string}>();
   for (const klass of classesById.values()) {
-    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id));
+    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester));
     if (klass.classTeacherId) {
       const teacher = (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0];
       teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
@@ -8177,7 +8184,11 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
       (page,pageSize) => db.queryPage<any>('attendance_records',{school_id:school.id,student_id:studentIds},page,pageSize,undefined,'id,student_id,status'),
       { pageSize:100, maxItems:50000 }
     );
+    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+    const attendanceStart = annualDocument ? school.terms?.semester1Start : school.currentSemester === 'Semester 1' ? school.terms?.semester1Start : school.terms?.semester2Start;
+    const attendanceEnd = annualDocument ? school.terms?.semester2End : school.currentSemester === 'Semester 1' ? school.terms?.semester1End : school.terms?.semester2End;
     for (const record of records) {
+      if (attendanceStart && attendanceEnd && (record.date < attendanceStart || record.date > attendanceEnd)) continue;
       const summary = attendanceByStudent.get(record.studentId) || {present:0,total:0};
       summary.total += 1;
       if (record.status==='present'||record.status==='late') summary.present += 1;
