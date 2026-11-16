@@ -30,7 +30,7 @@ export const ExamTimetablePrint:React.FC<ExamTimetablePrintProps>=({schedules,sc
  .exam-timetable-print .exam-print-title-row{padding:8px 10px;border:1px solid #cbd5e1;background:#f3f4f6;color:#111827;text-align:center;font-size:12px;font-weight:800;letter-spacing:.025em;text-transform:uppercase}
  .exam-timetable-print table{width:100%;min-width:0!important;table-layout:fixed;border-collapse:collapse;border:1.5px solid #111}
  .exam-timetable-print th,.exam-timetable-print td{padding:10px 8px;border:1.5px solid #111;text-align:center;vertical-align:middle;overflow-wrap:anywhere}
- .exam-timetable-print thead th{background:#D9A425!important;color:#fff!important;font-size:12px;font-weight:800;text-transform:uppercase}
+ .exam-timetable-print thead th{background:var(--brand-color)!important;color:var(--brand-foreground)!important;font-size:12px;font-weight:800;text-transform:uppercase}
  .exam-timetable-print tbody td{color:#111;font-size:12px;font-weight:700}
  .exam-timetable-print tbody tr.exam-day-even td{background:#e5e7eb}
  .exam-timetable-print tbody tr.exam-day-odd td{background:#fff}
