@@ -4132,6 +4132,55 @@ class StorageEngine {
     return assignment;
   }
 
+  public async setBusAssignmentsBulk(schoolId: string, studentIds: string[], routeId: string): Promise<{ assignments: any[]; failures: Array<{ studentId: string; studentName: string; error: string }> }> {
+    const uniqueIds = [...new Set(studentIds.filter(id => typeof id === 'string' && id.trim()).map(id => id.trim()))];
+    if (!uniqueIds.length) return { assignments: [], failures: [] };
+    const [students, routes, currentAssignments] = await Promise.all([
+      this.getStudents(schoolId),
+      this.getTransportRoutes(schoolId),
+      this.getBusAssignments(schoolId)
+    ]);
+    const route = routes.find(item => item.id === routeId && item.active !== false);
+    if (!route) throw new Error('Choose an active bus route from this school.');
+    const studentById = new Map(students.map(student => [student.id, student]));
+    const assignments = [...currentAssignments];
+    const counts = new Map<string, number>();
+    for (const item of assignments) {
+      if (item.schoolId === schoolId && item.active !== false) counts.set(item.routeId, (counts.get(item.routeId) || 0) + 1);
+    }
+    const saved: any[] = [];
+    const failures: Array<{ studentId: string; studentName: string; error: string }> = [];
+    for (const studentId of uniqueIds) {
+      const student: any = studentById.get(studentId);
+      const studentName = student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : studentId;
+      if (!student || student.schoolId !== schoolId || student.status !== 'active') {
+        failures.push({ studentId, studentName, error: 'Student is not active in this school.' });
+        continue;
+      }
+      const existingIndex = assignments.findIndex(item => item.schoolId === schoolId && item.studentId === studentId);
+      const existing = existingIndex >= 0 ? assignments[existingIndex] : null;
+      const alreadyOnTarget = existing?.active !== false && existing?.routeId === routeId;
+      const occupied = counts.get(routeId) || 0;
+      if (!alreadyOnTarget && occupied >= Number(route.capacity || 40)) {
+        failures.push({ studentId, studentName, error: 'This bus route is full.' });
+        continue;
+      }
+      const assignment = {
+        ...(existing || {}), id: existing?.id || 'bus-' + studentId, schoolId, studentId, routeId,
+        feeAmount: Number(route.feeAmount || 0), active: true
+      };
+      if (existingIndex >= 0) assignments[existingIndex] = assignment;
+      else assignments.push(assignment);
+      if (!alreadyOnTarget) counts.set(routeId, occupied + 1);
+      saved.push(assignment);
+    }
+    if (saved.length) {
+      this.data.busAssignments = assignments;
+      this.save();
+      await this.flush();
+    }
+    return { assignments: saved, failures };
+  }
   public async removeBusAssignment(schoolId: string, studentId: string): Promise<boolean> {
     await this.getBusAssignments(schoolId);
     const previous = this.data.busAssignments.length;
