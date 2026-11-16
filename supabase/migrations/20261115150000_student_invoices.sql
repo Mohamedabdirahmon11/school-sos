@@ -45,10 +45,11 @@ CREATE TABLE IF NOT EXISTS student_invoice_items (
 );
 
 CREATE TABLE IF NOT EXISTS student_invoice_sequences (
+  id VARCHAR(160) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   academic_year VARCHAR(20) NOT NULL,
-  last_value BIGINT NOT NULL DEFAULT 0 CHECK (last_value >= 0),
-  PRIMARY KEY (school_id, academic_year)
+  next_value BIGINT NOT NULL CHECK (next_value >= 1),
+  UNIQUE (school_id, academic_year)
 );
 
 ALTER TABLE fee_payments
@@ -101,32 +102,42 @@ CREATE POLICY student_invoice_items_tenant_scope ON student_invoice_items FOR AL
     OR (school_id = auth_school_id() AND auth_user_role() IN ('school_admin','accountant'))
   );
 
-DROP POLICY IF EXISTS student_invoice_sequences_accountant_scope ON student_invoice_sequences;
-CREATE POLICY student_invoice_sequences_accountant_scope ON student_invoice_sequences FOR ALL TO authenticated
-  USING (auth_user_role() IN ('school_admin','accountant','super_admin') AND (auth_user_role() = 'super_admin' OR school_id = auth_school_id()))
-  WITH CHECK (auth_user_role() IN ('school_admin','accountant','super_admin') AND (auth_user_role() = 'super_admin' OR school_id = auth_school_id()));
+DROP POLICY IF EXISTS student_invoice_sequences_deny_client ON student_invoice_sequences;
+CREATE POLICY student_invoice_sequences_deny_client ON student_invoice_sequences
+  FOR ALL TO authenticated USING (false) WITH CHECK (false);
+REVOKE ALL ON TABLE student_invoice_sequences FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE student_invoice_sequences TO service_role;
 
-CREATE OR REPLACE FUNCTION schoolos_next_student_invoice(p_school_id VARCHAR, p_academic_year VARCHAR)
+CREATE OR REPLACE FUNCTION public.schoolos_next_student_invoice(p_school_id VARCHAR, p_academic_year VARCHAR)
 RETURNS BIGINT
 LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public, pg_temp
-AS $$
-DECLARE next_number BIGINT;
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE allocated_value BIGINT;
 BEGIN
-  IF p_school_id IS NULL OR p_academic_year IS NULL OR length(p_academic_year) > 20 THEN
-    RAISE EXCEPTION 'Invalid invoice sequence scope';
+  IF p_school_id IS NULL OR btrim(p_school_id) = ''
+    OR p_academic_year IS NULL OR btrim(p_academic_year) = '' THEN
+    RAISE EXCEPTION 'School and academic year are required for invoice allocation.';
   END IF;
-  INSERT INTO student_invoice_sequences (school_id, academic_year, last_value)
-  VALUES (p_school_id, p_academic_year, 1)
-  ON CONFLICT (school_id, academic_year)
-  DO UPDATE SET last_value = student_invoice_sequences.last_value + 1
-  RETURNING last_value INTO next_number;
-  RETURN next_number;
-END;
-$$;
+  INSERT INTO public.student_invoice_sequences AS current_sequence (
+    id, school_id, academic_year, next_value
+  )
+  SELECT p_school_id || ':' || p_academic_year, p_school_id, p_academic_year,
+    COALESCE(MAX(substring(invoice.invoice_number FROM '([0-9]+)
 
-REVOKE ALL ON FUNCTION schoolos_next_student_invoice(VARCHAR, VARCHAR) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION schoolos_next_student_invoice(VARCHAR, VARCHAR) TO authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
+)::BIGINT), 0) + 1
+  FROM public.student_invoices invoice
+  WHERE invoice.school_id = p_school_id AND invoice.academic_year = p_academic_year
+  ON CONFLICT (school_id, academic_year)
+  DO UPDATE SET next_value = GREATEST(current_sequence.next_value + 1, EXCLUDED.next_value)
+  RETURNING next_value INTO allocated_value;
+  RETURN allocated_value;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
