@@ -109,8 +109,11 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
   assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
   assert.match(payroll, /ApiClient\.getMyPayslips\(\)/);
-  assert.match(payroll, /ApiClient\.downloadPayslipPdf\(record\.id\)/);
+  assert.match(payroll, /ApiClient\.downloadPayslipPdf\(recordId\)/);
+  assert.match(payroll, /Preparing PDF/);
   assert.match(payroll, /setError\(reason instanceof Error/);
+  assert.match(messages, /selectedContact \? 'hidden md:flex'/);
+  assert.match(messages, /Back to contacts/);
 });
 
 
