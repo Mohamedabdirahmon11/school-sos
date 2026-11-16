@@ -72,7 +72,7 @@ export class ApiClient {
   }
 
   public static generateStudentInvoices(data: { classId?: string; studentId?: string; billingPeriod: string; dueDate: string; includeAnnualRegistration?: boolean; includeOneTimeFees?: boolean }) {
-    return this.request<{ generatedCount: number; skippedExisting: number; skippedNoFees: number; invoices: any[] }>('/student-invoices/generate', {
+    return this.request<{ generatedCount: number; skippedExisting: number; skippedNoFees: number; busFeesAdded: number; invoices: any[] }>('/student-invoices/generate', {
       method: 'POST', body: JSON.stringify(data)
     });
   }
