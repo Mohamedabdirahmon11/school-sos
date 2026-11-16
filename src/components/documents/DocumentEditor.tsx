@@ -115,7 +115,15 @@ export const DocumentEditor: React.FC<Props> = ({
     const table = row?.closest('table');
     if (!cell || !row || !table || cell.colSpan !== 1 || cell.rowSpan !== 1) return;
     const nextRow = row.nextElementSibling as HTMLTableRowElement | null;
-    const next = nextRow?.cells[cell.cellIndex] || null;
+    if (!nextRow) return;
+    const logicalColumn = Array.from(row.cells).slice(0, cell.cellIndex)
+      .reduce((total, item) => total + item.colSpan, 0);
+    let nextColumn = 0;
+    const next = Array.from(nextRow.cells).find(candidate => {
+      const start = nextColumn;
+      nextColumn += candidate.colSpan;
+      return logicalColumn >= start && logicalColumn < nextColumn;
+    }) || null;
     if (!next || next.colSpan !== 1 || next.rowSpan !== 1) return;
     cell.rowSpan = 2;
     cell.innerHTML += '<br>' + next.innerHTML;
