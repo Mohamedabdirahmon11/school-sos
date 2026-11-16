@@ -4072,6 +4072,16 @@ class StorageEngine {
     return this.queryRows<any>('transport_routes', { school_id: schoolId });
   }
 
+  public async updateTransportRoute(schoolId: string, routeId: string, updates: { name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; capacity: number; active?: boolean }): Promise<any> {
+    await this.queryRows<any>('transport_routes', { school_id: schoolId });
+    const route = this.data.transportRoutes.find(item => item.id === routeId && item.schoolId === schoolId);
+    if (!route) throw new Error('Transport route was not found in this school.');
+    const assigned = this.data.busAssignments.filter(item => item.schoolId === schoolId && item.routeId === routeId && item.active !== false);
+    if (updates.capacity < assigned.length) throw new Error('Bus capacity cannot be lower than the number of active student assignments.');
+    if (updates.active === false && assigned.length > 0) throw new Error('Remove or reassign all students before deactivating this route.');
+    Object.assign(route, { name: updates.name, routeNumber: updates.routeNumber || updates.vehicleNumber || null, vehicleNumber: updates.vehicleNumber || null, driverName: updates.driverName || null, driverPhone: updates.driverPhone || null, stops: Array.isArray(updates.stops) ? updates.stops : [], feeAmount: Number(updates.feeAmount), capacity: Number(updates.capacity), ...(updates.active === undefined ? {} : { active: updates.active }), updatedAt: new Date().toISOString() });
+    this.save(); await this.flush(); return route;
+  }
   public async addTransportRoute(route: { schoolId: string; name: string; routeNumber?: string; vehicleNumber?: string; driverName?: string; driverPhone?: string; stops?: string[]; feeAmount: number; capacity?: number; active?: boolean }): Promise<any> {
     await this.queryRows<any>('transport_routes', { school_id: route.schoolId });
     const { vehicleNumber, ...fields } = route;

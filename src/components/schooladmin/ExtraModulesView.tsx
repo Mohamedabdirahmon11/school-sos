@@ -51,6 +51,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [assignmentStudentId, setAssignmentStudentId] = useState('');
   const [assignmentRouteId, setAssignmentRouteId] = useState('');
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [routeName, setRouteName] = useState('');
   const [routeStops, setRouteStops] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -494,34 +495,44 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     }
   };
 
+  const resetRouteForm = () => {
+    setEditingRouteId(null); setRouteName(''); setRouteStops(''); setDriverName('');
+    setVehicleNumber(''); setDriverPhone(''); setRouteFee(25); setRouteCapacity(40);
+  };
+
+  const openRouteEditor = (route: any) => {
+    if (isReadOnly) return;
+    setEditingRouteId(route.id); setRouteName(route.name || '');
+    setRouteStops(Array.isArray(route.stops) ? route.stops.join('\n') : '');
+    setDriverName(route.driverName || ''); setVehicleNumber(route.vehicleNumber || '');
+    setDriverPhone(route.driverPhone || ''); setRouteFee(Number(route.feeAmount || 0));
+    setRouteCapacity(Number(route.capacity || 40)); setModuleError(null); setShowAddRouteModal(true);
+  };
+
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !school || !routeName.trim() || !driverName.trim()) return;
+    const payload = { name: routeName.trim(), routeNumber: vehicleNumber.trim(), vehicleNumber: vehicleNumber.trim(), driverName: driverName.trim(), driverPhone: driverPhone.trim(), feeAmount: routeFee, capacity: routeCapacity, stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean) };
     try {
-      const r = await ApiClient.addTransportRoute({
-        name: routeName,
-        routeNumber: vehicleNumber,
-        vehicleNumber,
-        driverName,
-        driverPhone,
-        feeAmount: routeFee,
-        capacity: routeCapacity,
-        active: true,
-        stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean)
-      }, school?.id);
-      setRoutes(prev => [...prev, r]);
-      setShowAddRouteModal(false);
-      setRouteName('');
-      setRouteStops('');
-      setDriverName('');
-      setVehicleNumber('');
-      setDriverPhone('');
-      setRouteCapacity(40);
-      setNotice('Transport route added.');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setModuleError(err.message || 'Unable to add this transport route.');
-    }
+      if (editingRouteId) {
+        const updated = await ApiClient.updateTransportRoute(editingRouteId, payload);
+        setRoutes(current => current.map(route => route.id === updated.id ? updated : route));
+        setNotice('Transport route updated. Existing assignments keep their saved fee until reassigned.');
+      } else {
+        const created = await ApiClient.addTransportRoute({ ...payload, active: true }, school.id);
+        setRoutes(current => [...current, created]); setNotice('Transport route added.');
+      }
+      setShowAddRouteModal(false); resetRouteForm(); setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) { setModuleError(err.message || 'Unable to save this transport route.'); }
+  };
+
+  const handleToggleRoute = async (route: any) => {
+    if (isReadOnly) return;
+    try {
+      const updated = await ApiClient.updateTransportRoute(route.id, { ...route, active: route.active === false });
+      setRoutes(current => current.map(item => item.id === updated.id ? updated : item));
+      setNotice(updated.active ? 'Transport route activated.' : 'Transport route deactivated.');
+    } catch (err: any) { setModuleError(err.message || 'Unable to change route status.'); }
   };
 
   const handleAssignBus = async () => {
@@ -742,15 +753,16 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <th className="px-4 py-2.5">Neighborhood Stops</th>
                   <th className="px-4 py-2.5">Monthly Fee</th>
                   <th className="px-4 py-2.5">Seats</th>
+                  <th className="px-4 py-2.5">Status / Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
                 {routes.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
+                    <td colSpan={8} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
                   </tr>
                 ) : routesPage.rows.length === 0 ? (
-                  <tr><td colSpan={7} className="p-6 text-center text-[#64748B]">No routes match your search.</td></tr>
+                  <tr><td colSpan={8} className="p-6 text-center text-[#64748B]">No routes match your search.</td></tr>
                 ) : (
                   routesPage.rows.map(r => (
                     <tr key={r.id} className="hover:bg-[#F8FAFC]">
@@ -761,6 +773,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <td className="px-4 py-2.5 text-[#334155]">{Array.isArray(r.stops) && r.stops.length ? r.stops.join(' → ') : 'Not set'}</td>
                       <td className="px-4 py-2.5 font-mono font-bold text-emerald-700">{formatMoney(r.feeAmount, school?.currency)}</td>
                       <td className="px-4 py-2.5 font-mono">{busAssignments.filter(item => item.routeId === r.id && item.active !== false).length} / {r.capacity || 40}</td>
+                      <td className="px-4 py-2.5"><div className="flex items-center gap-2">
+                        <span className={r.active === false ? "text-rose-700" : "text-emerald-700"}>{r.active === false ? "Inactive" : "Active"}</span>
+                        <button type="button" disabled={isReadOnly} onClick={() => openRouteEditor(r)} className="text-teal-700 disabled:opacity-40">Edit</button>
+                        <button type="button" disabled={isReadOnly} onClick={() => handleToggleRoute(r)} className="text-rose-700 disabled:opacity-40">{r.active === false ? "Activate" : "Deactivate"}</button>
+                      </div></td>
                     </tr>
                   ))
                 )}
@@ -1103,7 +1120,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       {showAddRouteModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-[#E2E8F0]">
-            <h2 className="text-base font-bold text-[#132A29] mb-4">Add Transport Bus Route</h2>
+            <h2 className="text-base font-bold text-[#132A29] mb-4">{editingRouteId ? "Edit Transport Bus Route" : "Add Transport Bus Route"}</h2>
             <form onSubmit={handleAddRoute} className="space-y-4 text-xs">
               <div>
                 <label className="block font-medium">Route Name</label>
@@ -1189,7 +1206,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddRouteModal(false)}
+                  onClick={() => { setShowAddRouteModal(false); resetRouteForm(); }}
                   className="px-4 py-2 border rounded-lg"
                 >
                   Cancel
@@ -1198,7 +1215,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   type="submit"
                   className="px-4 py-2 bg-[#0F766E] text-white rounded-lg font-semibold"
                 >
-                  Save Route
+                  {editingRouteId ? "Save Changes" : "Save Route"}
                 </button>
               </div>
             </form>
