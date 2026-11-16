@@ -72,7 +72,7 @@ test('transport routes capture and display ordered neighborhood pickup stops', (
   assert.ok(ui.includes("const [routeStops, setRouteStops] = useState('')"));
   assert.ok(ui.includes('stops: routeStops.split(/[\\r\\n,]+/)'));
   assert.ok(ui.includes('Stops / Neighborhoods (in pickup order)'));
-  assert.ok(ui.includes("r.stops.join(' → ')"));
+  assert.ok(ui.includes("route.stops.join(' → ')"));
   assert.ok(api.includes('const stops = body.stops ?? []'));
   assert.ok(api.includes('stops.length > 100'));
 });
