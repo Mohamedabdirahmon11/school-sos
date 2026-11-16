@@ -58,12 +58,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     if (role === 'parent') return [{ title: 'Family', items: [
       item('p_overview', t('dashboard'), LayoutDashboard), item('p_attendance', t('attendance'), CalendarCheck),
       item('p_results', t('exams_results'), FileSpreadsheet), item('p_fees', t('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('p_messages', t('messages'), MessageSquare)
+      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText), item('p_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'student') return [{ title: 'My learning', items: [
       item('st_dashboard', t('dashboard'), LayoutDashboard), item('st_timetable', t('timetable'), CalendarDays),
       item('st_assignments', t('assignments'), FileCheck2), item('st_results', t('exams_results'), FileSpreadsheet),
-      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing),
+      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText),
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
