@@ -111,3 +111,7 @@ test('retrying invoice generation repairs a missing bus fee on an existing invoi
   assert.match(source, /busFeesAdded/);
   assert.match(source, /assignment\.studentId === student\.id && assignment\.active/);
 });
+
+test('invoice generation reports legacy bus-fee repairs to the accountant', () => {
+  assert.match(view, /Added missing bus fees to \$\{result\.busFeesAdded \|\| 0\} existing invoices/);
+});
