@@ -42,7 +42,7 @@ export function sanitizeDocumentHtml(input: unknown): string {
     if (!ALLOWED_TAGS.has(tag)) return '';
     if (whole.startsWith('</')) return VOID_TAGS.has(tag) ? '' : '</' + tag + '>';
     const attrs: string[] = [];
-    const allowPositionedField = /data-document-field\\s*=\\s*(["']true["']|true)/i.test(rawAttrs) && /class\\s*=\\s*(["'][^"']*document-positioned-field[^"']*["'])/i.test(rawAttrs);
+    const allowPositionedField = /data-document-field\s*=\s*(["']true["']|true)/i.test(rawAttrs) && /class\s*=\s*(["'][^"']*document-positioned-field[^"']*["'])/i.test(rawAttrs);
     const matcher = /([a-zA-Z_:][a-zA-Z0-9:._-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/g;
     let match: RegExpExecArray | null;
     while ((match = matcher.exec(rawAttrs))) {
@@ -62,7 +62,7 @@ export function sanitizeDocumentHtml(input: unknown): string {
         if (name === 'dir' && !/^(ltr|rtl|auto)$/i.test(value)) continue;
         if (['colspan','rowspan'].includes(name) && !/^[1-9]\d?$/.test(value)) continue;
         if (name === 'size' && !/^[1-7]$/.test(value)) continue;
-        if (name === 'class' && !value.split(/\\s+/).every(token => ['document-page-break','document-positioned-field','document-field-drag-handle','document-positioned-field-selected'].includes(token))) continue;
+        if (name === 'class' && !value.split(/\s+/).every(token => ['document-page-break','document-positioned-field','document-field-drag-handle','document-positioned-field-selected'].includes(token))) continue;
         if (name === 'data-page-break' && value !== 'true') continue;
         if (name === 'data-document-field' && value !== 'true') continue;
         if (name === 'data-document-locked' && !/^(true|false)$/.test(value)) continue;
