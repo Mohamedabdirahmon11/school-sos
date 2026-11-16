@@ -4,7 +4,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { Download, FileText, Plus, Search, Wallet, X, SlidersHorizontal, Users } from 'lucide-react';
+import { Download, FileText, Plus, Search, Wallet, X, Users } from 'lucide-react';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentPeriod = () => new Date().toISOString().slice(0, 7);
@@ -21,7 +21,6 @@ export const StudentInvoicesView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [selectedClassFilter, setSelectedClassFilter] = useState('all');
-  const [showClassDrawer, setShowClassDrawer] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [classId, setClassId] = useState('');
   const [period, setPeriod] = useState(currentPeriod());
@@ -128,7 +127,7 @@ export const StudentInvoicesView: React.FC = () => {
       <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search invoice or student" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm"/></div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={()=>setShowClassDrawer(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"><SlidersHorizontal size={15}/> Class: {selectedClassFilter === 'all' ? 'Browse classes' : sortedClasses.find((item:any)=>item.id===selectedClassFilter)?.name || 'Selected'} </button>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600"><span>Class</span><select aria-label="Filter invoices by class" value={selectedClassFilter} onChange={event=>setSelectedClassFilter(event.target.value)} className="max-w-[190px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"><option value="all">All classes</option>{sortedClasses.map((item:any)=><option key={item.id} value={item.id}>{item.name} {item.section||''}</option>)}</select></label>
           <select aria-label="Filter invoice status" value={status} onChange={event=>setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option value="unpaid">Unpaid</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select>
         </div>
       </div>
@@ -151,29 +150,6 @@ export const StudentInvoicesView: React.FC = () => {
           })}</tbody>
         </table></div>}
     </section>
-
-    {showClassDrawer&&<div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40" onMouseDown={event=>{if(event.target===event.currentTarget)setShowClassDrawer(false);}}>
-      <aside role="dialog" aria-modal="true" aria-label="Browse students by class" className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-2xl">
-        <div className="flex items-center justify-between border-b pb-4"><div><h2 className="text-lg font-bold">Students by class</h2><p className="text-sm text-slate-500">Choose a class to view its enrolled students.</p></div><button type="button" onClick={()=>setShowClassDrawer(false)} aria-label="Close class students"><X size={19}/></button></div>
-        <div className="grid grid-cols-2 gap-2 py-4 sm:grid-cols-3">
-          {sortedClasses.map((item:any)=>{const count=students.filter((student:any)=>student.classId===item.id&&student.status==='active').length;return <button key={item.id} type="button" onClick={()=>setSelectedClassFilter(item.id)} className={\`rounded-lg border px-3 py-2 text-left text-sm \${selectedClassFilter===item.id?'border-teal-600 bg-teal-50 font-semibold text-teal-800':'border-slate-200 hover:bg-slate-50'}\`}><span className="block">{item.name} {item.section||''}</span><span className="text-xs font-normal text-slate-500">{count} active students</span></button>;})}
-        </div>
-        {selectedClassFilter!=='all'&&(()=>{
-          const selectedClass=sortedClasses.find((item:any)=>item.id===selectedClassFilter);
-          const roster=students.filter((student:any)=>student.classId===selectedClassFilter)
-            .sort((a:any,b:any)=>[a.firstName,a.middleName,a.lastName].filter(Boolean).join(' ').localeCompare([b.firstName,b.middleName,b.lastName].filter(Boolean).join(' '),undefined,{sensitivity:'base'}));
-          return <section className="mt-2 overflow-hidden rounded-xl border border-slate-200">
-            <div className="border-b bg-slate-50 px-4 py-3"><h3 className="font-semibold">{selectedClass?.name||'Class'} {selectedClass?.section||''}</h3><p className="text-xs text-slate-500">{roster.length} students · Sorted A–Z</p></div>
-            <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-white text-xs uppercase text-slate-500"><tr><th className="p-3">Student name</th><th className="p-3">Student ID</th><th className="p-3">Roll Number</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">
-              {roster.map((student:any)=><tr key={student.id}><td className="p-3 font-medium">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</td><td className="p-3 font-mono text-xs">{student.studentId||'—'}</td><td className="p-3 font-mono text-xs">{student.rollNumber||'—'}</td><td className="p-3 capitalize">{student.status||'—'}</td></tr>)}
-              {!roster.length&&<tr><td colSpan={4} className="p-6 text-center text-sm text-slate-500">No students found in this class.</td></tr>}
-            </tbody></table></div>
-          </section>;
-        })()}
-        {selectedClassFilter==='all'&&<p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Select a class above to see its students, Student IDs and Roll Numbers.</p>}
-        <div className="mt-4 flex justify-end"><button type="button" onClick={()=>setShowClassDrawer(false)} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Close</button></div>
-      </aside>
-    </div>
 
     {showGenerate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><form onSubmit={generate} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Generate class invoices</h2><button type="button" onClick={()=>setShowGenerate(false)} aria-label="Close"><X size={19}/></button></div>
