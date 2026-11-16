@@ -16,7 +16,7 @@ function safeStyle(value: string): string {
     if (name === 'position' && content !== 'relative') return '';
     if (['left','top'].includes(name) && !/^-?\d{1,3}px$/.test(content)) return '';
     if (name === 'float' && !/^(left|right|none)$/.test(content)) return '';
-    if (['margin-left','margin-right'].includes(name) && !/^(auto|-?\d{1,3}(?:px|%))$/.test(content)) return '';
+    if (['margin-left','margin-right'].includes(name) && !/^(auto|0|-?\d{1,3}(?:px|%))$/.test(content)) return '';
     if (name === 'font-size' && !/^(?:\d{1,2}(?:\.\d+)?)(?:px|pt|em|rem|%)$/i.test(content)) return '';
     if (name === 'text-align' && !/^(left|right|center|justify|start|end)$/i.test(content)) return '';
     if (name === 'direction' && !/^(ltr|rtl)$/i.test(content)) return '';
