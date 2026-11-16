@@ -86,12 +86,15 @@ export const SidebarAppearanceSettings: React.FC = () => {
     return () => apply({ ...DEFAULT_THEME, ...(school?.sidebarTheme || {}) });
   }, [theme, school?.sidebarTheme]);
 
-  const update = <K extends keyof SidebarTheme>(key: K, value: SidebarTheme[K]) =>
+  const update = <K extends keyof SidebarTheme>(key: K, value: SidebarTheme[K]) => {
+    setStatus('idle');
     setTheme(current => ({ ...current, [key]: value }));
+  };
 
   const choosePreset = (id: SidebarTheme['preset']) => {
     const preset = PRESETS.find(item => item.id === id);
     if (!preset) return;
+    setStatus('idle');
     setTheme(current => ({
       ...current,
       preset: id,
@@ -161,16 +164,16 @@ export const SidebarAppearanceSettings: React.FC = () => {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="space-y-1 text-xs font-semibold text-slate-600">Background color
-              <div className="flex gap-2"><input aria-label="Sidebar background color" type="color" value={theme.backgroundColor} onChange={e => update('backgroundColor', e.target.value)} className="h-10 w-12 rounded-lg border border-slate-200"/>
+              <div className="flex gap-2"><input aria-label="Sidebar background color" type="color" value={theme.backgroundColor} onChange={e => { update('preset', 'custom'); update('backgroundColor', e.target.value); }} className="h-10 w-12 rounded-lg border border-slate-200"/>
                 <input aria-label="Sidebar background HEX" value={theme.backgroundColor} onChange={e => { update('preset', 'custom'); update('backgroundColor', e.target.value); }} className="min-w-0 w-full rounded-lg border border-slate-200 px-2 font-mono text-xs"/></div>
             </label>
             <label className="space-y-1 text-xs font-semibold text-slate-600">Text color
               <div className="flex gap-2"><input aria-label="Sidebar text color" type="color" value={theme.textColor} onChange={e => { update('preset', 'custom'); update('textColor', e.target.value); }} className="h-10 w-12 rounded-lg border border-slate-200"/>
-                <input aria-label="Sidebar text HEX" value={theme.textColor} onChange={e => update('textColor', e.target.value)} className="min-w-0 w-full rounded-lg border border-slate-200 px-2 font-mono text-xs"/></div>
+                <input aria-label="Sidebar text HEX" value={theme.textColor} onChange={e => { update('preset', 'custom'); update('textColor', e.target.value); }} className="min-w-0 w-full rounded-lg border border-slate-200 px-2 font-mono text-xs"/></div>
             </label>
             <label className="space-y-1 text-xs font-semibold text-slate-600">Accent color
               <div className="flex gap-2"><input aria-label="Sidebar accent color" type="color" value={theme.accentColor} onChange={e => { update('preset', 'custom'); update('accentColor', e.target.value); }} className="h-10 w-12 rounded-lg border border-slate-200"/>
-                <input aria-label="Sidebar accent HEX" value={theme.accentColor} onChange={e => update('accentColor', e.target.value)} className="min-w-0 w-full rounded-lg border border-slate-200 px-2 font-mono text-xs"/></div>
+                <input aria-label="Sidebar accent HEX" value={theme.accentColor} onChange={e => { update('preset', 'custom'); update('accentColor', e.target.value); }} className="min-w-0 w-full rounded-lg border border-slate-200 px-2 font-mono text-xs"/></div>
             </label>
           </div>
 
