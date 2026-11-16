@@ -3,10 +3,10 @@ import { Download, FileSpreadsheet, FileUp, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import { docxBlobToHtml, htmlToDocxBlob } from '../../lib/documents/docx.ts';
+import { escapeSpreadsheetHtml, rowsToCsv } from '../../lib/documents/spreadsheet.ts';
 
 type Props = { html:string; title:string; onImport:(html:string)=>void };
-const escapeHtml=(value:unknown)=>String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const tableHtml=(rows:unknown[][])=>'<table><tbody>'+rows.map((row,index)=>'<tr>'+row.map(cell=>index===0?'<th>'+escapeHtml(cell)+'</th>':'<td>'+escapeHtml(cell)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p><br></p>';
+const tableHtml=(rows:unknown[][])=>'<table><tbody>'+rows.map((row,index)=>'<tr>'+row.map(cell=>index===0?'<th>'+escapeSpreadsheetHtml(cell)+'</th>':'<td>'+escapeHtml(cell)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p><br></p>';
 const download=(blob:Blob,name:string)=>{const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();URL.revokeObjectURL(url);};
 const baseName=(title:string)=>title.trim().replace(/[^a-z0-9_-]+/gi,'-').replace(/^-|-$/g,'').slice(0,60)||'school-document';
 
@@ -51,7 +51,7 @@ export const DocumentFileTools:React.FC<Props>=({html,title,onImport})=>{
   const exportCsv=()=>{
     const rows=parseTables()[0];
     if(!rows){setMessage('Ku dar jadwal dukumentiga ka hor CSV export.');return;}
-    const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+value.replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const csv=rowsToCsv(rows);
     download(new Blob([csv],{type:'text/csv;charset=utf-8'}),baseName(title)+'.csv');setMessage('CSV waa la soo dejiyey (jadwalka koowaad).');
   };
   const exportDocx=()=>{
