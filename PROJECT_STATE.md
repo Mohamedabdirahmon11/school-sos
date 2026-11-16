@@ -220,3 +220,12 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Audit follow-up: finalizing a document now records a `document_issued` event; using Print/PDF records a `document_download_requested` event after server-side school/permission checks. The UI blocks printing if the audit request cannot be recorded.
 
 - Latest GitHub Actions run for the current implementation set: `SchoolOS CI` run 43837423264 PASS — TypeScript checks, 383/383 tests, route parity audit, RLS source audit, and production build. This validates the current branch head before this documentation-only note; it does not replace browser/visual or live Supabase verification.
+
+
+### Public verification abuse protection — 2026-11-16
+- Added a bounded in-process rate limiter to both public document verification and QR image endpoints: 120 requests per client IP per 15-minute window, with HTTP 429 and Retry-After on excess requests.
+- The limiter bounds its key map and prunes expired entries to prevent unbounded memory growth.
+- Added deterministic unit tests for threshold behavior, expiry/reset, and key-map bounds.
+- Files: `src/lib/documents/verification-rate-limit.ts`, `src/server/api.ts`, `tests/documents-verification-rate-limit.test.ts`.
+- Limitation: this is per Node process; deployments with multiple app instances need a shared Redis/database limiter for a globally consistent quota. It is an additional abuse barrier, not a substitute for edge/WAF rate limiting.
+- CI run **43839661548** was triggered for this commit and is currently in progress; do not mark this change verified until it completes.
