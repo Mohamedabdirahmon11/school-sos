@@ -34,3 +34,12 @@ test('document sanitizer permits positioned fields only with the explicit field 
   assert.match(safe,/data-document-field="true"/);
   assert.equal(sanitizeDocumentHtml('<div style="position:absolute;left:20px;top:30px">unsafe</div>'),'<div style="left:20px;top:30px">unsafe</div>');
 });
+test('document sanitizer preserves only approved positioned-field attributes and safe class tokens', () => {
+  const html='<div class="document-positioned-field document-positioned-field-selected" data-document-field="true" data-document-locked="false" tabindex="0" style="position:absolute;left:20px;top:30px;width:190px;z-index:1"><span class="document-field-drag-handle" contenteditable="false">move</span>{student_name}</div>';
+  const safe=sanitizeDocumentHtml(html);
+  assert.match(safe,/class="document-positioned-field document-positioned-field-selected"/);
+  assert.match(safe,/data-document-field="true"/);
+  assert.match(safe,/data-document-locked="false"/);
+  assert.match(safe,/tabindex="0"/);
+  assert.match(safe,/contenteditable="false"/);
+});
