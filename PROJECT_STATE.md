@@ -64,16 +64,24 @@ Updated: 2026-11-11
 - Separate npm run lint was attempted and fails on pre-existing TypeScript implicit-any errors in unchanged tests/support/in-memory-supabase.ts (TS7023, TS7006, TS7022). The CI typecheck:ci check passes. That unrelated test helper was not changed, and the original CI workflow was restored.
 - Not complete / known gaps: the Arabic font is referenced through local font-family fallbacks but a self-hosted embedded Arabic font asset has not yet been added; advanced table border controls and full two-axis cell merging need more work; print headers are not guaranteed to repeat on every printed page, and browser print-dialog headers/footers remain browser-controlled.
 - Not verified: migration execution against Supabase, real authenticated cross-school RLS isolation, image upload/download against the live private bucket, Arabic font embedding/rendering in generated PDFs, and manual desktop/mobile browser journeys. CI/build success is not a substitute for those runtime checks.
-- Phase 1 follow-up hardening on 2026-11-16: autosave now serializes in-flight writes, compares the latest editor draft after a save, and prevents switching documents while unsaved changes remain after a failed save. This closes a race where edits made during a slow request could be marked saved without being persisted.
-- Class-wide document generation now pages through the complete school-scoped class roster instead of silently stopping at the first 100 students.
-- Latest GitHub Actions run 43814470765 passed TypeScript checks, the full test suite, route parity, RLS source audit, and production build after these changes. Earlier autosave type errors were corrected before this successful run.
-- Table border color/width/style controls and horizontal/vertical cell merge controls are now present in the editor; repeating header/footer CSS is present but still requires real Chromium/Edge print verification.
-- Remaining Phase 1 release gates: add a self-hosted Arabic font asset and verify it is embedded/rendered in PDF; run desktop/mobile browser journeys; verify real print pagination/header/footer behavior; test private image upload/download against the bucket; and perform authenticated cross-school RLS isolation tests in a non-production Supabase environment.
-- Migration 20261116090000_school_documents_phase1.sql remains unapplied. No production database or existing records were changed.
-- Phase 2 has a separate open Draft PR #175; Phase 3 (history, expanded permissions, audit log, student attachments, final-document locking) has not started. Follow the user's phase-by-phase approval rule and do not start the next phase until they say "next".
+- Phase 1 follow-up on PR #174: table border color/width/style, horizontal and vertical cell merge controls, and print CSS for repeated school header/footer were added. Latest CI run 43812142617 passed. Still unverified: self-hosted Arabic font/PDF embedding, real print pagination, desktop/mobile browser journeys, private storage round-trip, and live cross-school RLS isolation.
+- Phase 2 is in progress on PR #175 (feature/documents-phase2), based on Phase 1 branch: browser-side DOCX import/export (paragraphs, headings, basic emphasis, tables), CSV/XLS/XLSX import to editable tables, multi-sheet XLSX export, first-table CSV export, and 15 MB import limits. Existing SheetJS dependency is reused; no package dependency or database migration added. Imported HTML is sanitized before entering the editor.
+- Phase 1 PR #174 is merged. Phase 2 PR #175 remains Draft; CI run 43813107228 passed TypeScript, full tests, route parity, RLS source audit and production build after the latest Phase 2 changes. Real DOCX/XLSX/CSV browser fixture round-trips and desktop/mobile browser checks remain release gates.
+- Phase 3 remains planned: document history, expanded permissions, audit log, student attachments, and final-document locking.
 
 
-## Documents module — Phase 2 implementation (2026-11-16)
-- Added browser-side DOCX import/export and CSV/XLS/XLSX import/export. Spreadsheet files import into editable HTML tables; XLSX export creates one worksheet per table, and CSV export includes a UTF-8 BOM.
-- Spreadsheet import escapes cell HTML and CSV export protects against formula injection. Existing SheetJS dependency is reused; no new package dependency or database migration is added.
-- Imported content remains in the editor until the user saves. Real-file browser round-trip fixtures and desktop/mobile verification remain release checks.
+
+## Documents module — Phase 3 implementation (2026-11-16)
+- Work is isolated on `feature/documents-phase3`, based on `feature/documents-phase2`; no production database changes are made by branch commits.
+- Added additive migration `20261116100000_school_documents_phase3.sql` for immutable document version snapshots, document sharing grants, audit events, final/explicit lock metadata and private student attachment metadata/storage bucket.
+- Version snapshots and audit events are captured by a database trigger; locked documents reject content/metadata edits until a separate unlock operation. Audit records are read-only to authenticated users through RLS.
+- The migration is not applied to Supabase. API routes and UI are implemented for history restore, explicit role/user grants, audit logs, final/manual locking and student attachment upload/download/soft-delete. Static regression tests cover route and schema wiring; authenticated multi-school tests, real private-storage round-trip and browser verification remain pending.
+
+
+- Phase 3 sharing supports school-wide Teacher/Accountant grants and user-specific Parent/Student grants (never school-wide parent/student sharing). Admins retain full access. Final documents and manually locked documents are protected in both API and database trigger. Permission grants/revocations and attachment changes are recorded in audit events. The branch is isolated in PR #176 (Draft), stacked on Phase 2; no production schema or data was changed. CI is not yet visible for Phase 3 because the GitHub connector's branch commits have not triggered the repository workflow.
+
+
+## Documents delivery status (2026-11-16)
+- Phase 2 file workflows are rebased onto `main` in `feature/documents-phase2-rebased` and reviewed in PR #177; DOCX and CSV/XLS/XLSX import/export plus spreadsheet safety tests are included.
+- Phase 3 is rebased onto that Phase 2 branch in `feature/documents-phase3-rebased`; migration `20261116100000_school_documents_phase3.sql` remains additive and is not applied to production.
+- Phase 3 implements document version history/restore, explicit sharing grants, audit log, final/manual locking, and private student attachments. CI, authenticated multi-school tests, private storage round-trip and browser verification remain release gates.
