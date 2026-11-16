@@ -166,3 +166,45 @@ test('yearly report cards do not treat one approved semester as the full-year av
   assert.equal(yearly[0].yearlyPercentage, 0);
   assert.equal(yearly[0].isPass, false);
 });
+
+test('school admin can choose five 10-mark tests and the final exam adjusts to 50', async () => {
+  const memory = new InMemorySupabase();
+  const storage = await import('../src/server/storage.ts');
+  storage.installTestSupabaseClient(memory);
+  await storage.initializeStorage();
+  const db = storage.db;
+  const school = db.createSchool({
+    name: 'Five Test Plan', code: 'FIVE', address: '', city: '', phone: '', email: 'five@example.test', currency: 'ETB',
+    academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const fiveTestPlan = [
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `five-test-${index + 1}`, name: `Test ${index + 1}`, maxMarks: 10,
+      category: 'continuous' as const, order: index + 1
+    })),
+    { id: 'five-test-final', name: 'Final Examination', maxMarks: 50, category: 'final' as const, order: 6 }
+  ];
+  const saved = await db.updateExamConfig(school.id, { assessmentComponents: fiveTestPlan });
+  assert.equal(saved.assessmentComponents.filter(item => item.category === 'continuous').length, 5);
+  assert.equal(saved.assessmentComponents.find(item => item.category === 'final')?.maxMarks, 50);
+  assert.equal(saved.assessmentComponents.reduce((sum, item) => sum + item.maxMarks, 0), 100);
+
+  await assert.rejects(
+    () => db.updateExamConfig(school.id, { assessmentComponents: [
+      ...fiveTestPlan.slice(0, 5),
+      { id: 'invalid-final', name: 'Final Examination', maxMarks: 60, category: 'final' as const, order: 6 }
+    ] }),
+    /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
+  );
+  await assert.rejects(
+    () => db.updateExamConfig(school.id, { assessmentComponents: [
+      ...Array.from({ length: 6 }, (_, index) => ({
+        id: `six-test-${index + 1}`, name: `Test ${index + 1}`, maxMarks: 10,
+        category: 'continuous' as const, order: index + 1
+      })),
+      { id: 'six-test-final', name: 'Final Examination', maxMarks: 40, category: 'final' as const, order: 7 }
+    ] }),
+    /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
+  );
+});

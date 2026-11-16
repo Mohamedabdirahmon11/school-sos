@@ -633,6 +633,17 @@ export const ExamsResultsView: React.FC = () => {
   // Save Exam Config
   const handleSaveConfig = async () => {
     if (isReadOnly) return;
+    const continuous = assessmentComponents.filter(component => component.category === 'continuous');
+    const finals = assessmentComponents.filter(component => component.category === 'final');
+    const validPlan = (continuous.length === 4 || continuous.length === 5)
+      && continuous.every(component => Number(component.maxMarks) === 10)
+      && finals.length === 1
+      && Number(finals[0].maxMarks) === (continuous.length === 4 ? 60 : 50)
+      && continuousMax + finalMax === 100;
+    if (!validPlan) {
+      setNotice('Choose 4 or 5 continuous tests (10 marks each) and one final exam (60 or 50 marks) so each semester totals exactly 100.');
+      return;
+    }
     setIsSaving(true);
     try {
       const updated = await ApiClient.updateExamConfig({
@@ -1544,8 +1555,38 @@ export const ExamsResultsView: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
             <h2 className="text-base font-bold text-[#132A29]">School Exam Structure</h2>
-            <p className="mt-1 text-sm text-[#71817d]">Add or remove assessments, set each maximum score, and choose whether it belongs to continuous assessment or the final examination. Teachers will see these exact columns.</p>
+            <p className="mt-1 text-sm text-[#71817d]">The school administrator chooses whether each semester has four or five small tests. The system adjusts the final exam so the semester always totals 100 marks.</p>
           </div>
+
+          <label className="block max-w-sm text-xs font-semibold text-[#334155]">Number of small tests per semester
+            <select
+              value={assessmentComponents.filter(component => component.category === 'continuous').length === 5 ? '5' : '4'}
+              onChange={event => {
+                const count = Number(event.target.value);
+                setAssessmentComponents(rows => {
+                  const currentContinuous = rows.filter(component => component.category === 'continuous');
+                  const currentFinal = rows.find(component => component.category === 'final');
+                  const tests = Array.from({ length: count }, (_, index) => ({
+                    ...(currentContinuous[index] || { id: `test-${index + 1}`, name: `Test ${index + 1}`, maxMarks: 10, category: 'continuous' as const, order: index + 1 }),
+                    maxMarks: 10,
+                    category: 'continuous' as const,
+                    order: index + 1
+                  }));
+                  const final = {
+                    ...(currentFinal || { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final' as const, order: count + 1 }),
+                    maxMarks: count === 4 ? 60 : 50,
+                    category: 'final' as const,
+                    order: count + 1
+                  };
+                  return [...tests, final];
+                });
+              }}
+              className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2"
+            >
+              <option value="4">4 small tests × 10 + final exam 60 = 100</option>
+              <option value="5">5 small tests × 10 + final exam 50 = 100</option>
+            </select>
+          </label>
 
           <div className="space-y-3">
             {assessmentComponents.map((component, index) => (
@@ -1565,7 +1606,7 @@ export const ExamsResultsView: React.FC = () => {
                 <button type="button" onClick={() => setAssessmentComponents(rows => rows.filter(row => row.id !== component.id).map((row, rowIndex) => ({ ...row, order: rowIndex + 1 })))} disabled={assessmentComponents.length <= 2} aria-label={`Remove ${component.name}`} className="mt-5 h-9 rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-40">×</button>
               </div>
             ))}
-            <button type="button" onClick={() => setAssessmentComponents(rows => [...rows, { id: `assessment-${Date.now()}`, name: `Assessment ${rows.length + 1}`, maxMarks: 10, category: 'continuous', order: rows.length + 1 }])} disabled={assessmentComponents.length >= 20} className="rounded-lg border border-dashed border-[#0F766E] px-4 py-2 text-xs font-semibold text-[#0F766E] disabled:opacity-40">+ Add assessment</button>
+            <p className="text-xs text-slate-500">Assessment count and maximum marks are controlled by the school administrator above. Each semester is exactly 100 marks.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 rounded-xl bg-teal-50 p-4 text-xs sm:grid-cols-3">
