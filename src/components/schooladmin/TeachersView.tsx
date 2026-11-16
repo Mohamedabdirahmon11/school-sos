@@ -36,7 +36,7 @@ export const TeachersView: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [teacherPin, setTeacherPin] = useState('');
-  const [teacherPassword, setTeacherPassword] = useState('');
+
   const [joinedDate, setJoinedDate] = useState(new Date().toISOString().slice(0, 10));
   const [gender, setGender] = useState<'male' | 'female'>('male');
     const [qualification, setQualification] = useState('B.Ed / B.Sc');
@@ -129,7 +129,7 @@ export const TeachersView: React.FC = () => {
     e.preventDefault();
     const name = fullName.trim();
     if (!name || isCreatingTeacher) return;
-    if (!/^\\d{4,6}$/.test(teacherPin.trim())) { setNotice('A 4–6 digit Teacher PIN is required.'); return; }
+    if (!/^\d{4,6}$/.test(teacherPin.trim())) { setNotice('A 4–6 digit Teacher PIN is required.'); return; }
 
     setIsCreatingTeacher(true);
     try {
@@ -138,7 +138,6 @@ export const TeachersView: React.FC = () => {
         phone: phone.trim(),
         address: address.trim(),
         pin: teacherPin.trim() || undefined,
-        password: teacherPassword,
         joinedDate,
         gender,
         qualification: qualification.trim(),
@@ -153,7 +152,6 @@ export const TeachersView: React.FC = () => {
       setPhone('');
       setAddress('');
       setTeacherPin('');
-      setTeacherPassword('');
       setJoinedDate(new Date().toISOString().slice(0, 10));
       setSelectedClassIds([]);
       setSelectedSubjectIds([]);
