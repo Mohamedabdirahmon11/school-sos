@@ -4,7 +4,7 @@ const MIN_200_DPI: Record<DocumentArtworkPageSize,[number,number]> = {
   A4:[1654,2339],
   A5:[1169,1654],
   Letter:[1700,2200],
-  CR80:[675,426]
+  CR80:[426,675]
 };
 
 /** True when an image falls below approximately 200 DPI for the target page. */
