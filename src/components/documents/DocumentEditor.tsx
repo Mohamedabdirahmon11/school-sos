@@ -328,74 +328,61 @@ export const DocumentEditor: React.FC<Props> = ({
 
   return (
     <section className="documents-editor-shell min-w-0">
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-        <select aria-label="Geli doorsoome" defaultValue="" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" onChange={event => { if (event.target.value) command('insertText',event.target.value); event.target.value=''; }}><option value="">Doorsoome…</option><option value="{student_name}">Magaca ardayga</option><option value="{student_id}">Aqoonsiga ardayga</option><option value="{class}">Fasalka</option><option value="{parent_name}">Magaca waalidka</option><option value="{date}">Taariikhda</option><option value="{school_name}">Magaca dugsiga</option><option value="{teacher_name}">Magaca macallinka</option><option value="{term}">Xilli-dugsiyeedka</option><option value="{academic_year}">Sanad-dugsiyeedka</option><option value="{total_marks}">Wadarta dhibcaha</option><option value="{average}">Celceliska</option><option value="{grade}">Darajada</option><option value="{rank}">Kaalinta fasalka</option><option value="{attendance}">Xaadirinta</option><option value="{teacher_comment}">Faallada macallinka</option><option value="{fee_balance}">Haraaga lacagta (ETB)</option><option value="{staff_name}">Magaca shaqaalaha</option><option value="{staff_id}">Aqoonsiga shaqaalaha</option></select>
-         <select aria-label="Geli meel qoraal la dhaqaajin karo" defaultValue="" onChange={event=>{if(event.target.value)insertPositionedField(event.target.value);event.target.value='';}} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="">Field la dhaqaajin karo…</option><option value="{student_name}">Magaca ardayga (field)</option><option value="{student_id}">ID ardayga (field)</option><option value="{class}">Fasalka (field)</option><option value="{school_name}">Dugsiga (field)</option><option value="{date}">Taariikh (field)</option></select>
-        {button('B','Qoraal madow',() => command('bold'))}
-        {button('I','Qoraal jiifa',() => command('italic'))}
-        {button('U','Hoosta xarriiq',() => command('underline'))}
-        {button('H1','Cinwaan weyn',() => command('formatBlock','h1'))}
-        {button('H2','Cinwaan',() => command('formatBlock','h2'))}
-        <select aria-label="Cabbirka qoraalka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="3" onChange={event => command('fontSize',event.target.value)}>
-          <option value="2">Yar</option><option value="3">Dhexdhexaad</option><option value="4">Weyn</option><option value="5">Aad u weyn</option>
-        </select>
-        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Midab <input aria-label="Midabka qoraalka" type="color" className="h-6 w-7" onChange={event => command('foreColor',event.target.value)} /></label>
-        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Iftiimin <input aria-label="Midabka iftiiminta" type="color" defaultValue="#fff2a8" className="h-6 w-7" onChange={event => command('hiliteColor',event.target.value)} /></label>
-        {button('Liis •','Liis dhibco leh',() => command('insertUnorderedList'))}
-        {button('Liis 1.','Liis tiro leh',() => command('insertOrderedList'))}
-        {button('Bidix','Isku hagaaji bidix',() => command('justifyLeft'))}
-        {button('Dhexe','Isku hagaaji dhexda',() => command('justifyCenter'))}
-        {button('Midig','Isku hagaaji midig',() => command('justifyRight'))}
-        <select aria-label="Kala fogaanta sadaradda" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="1.5" onChange={event => {
-          const selection = window.getSelection();
-          const node = selection?.anchorNode;
-          const element = node instanceof Element ? node : node?.parentElement;
-          const paragraph = element?.closest('p,div,li') as HTMLElement | null;
-          if (paragraph) paragraph.style.lineHeight = event.target.value;
-          emit();
-        }}>
-          <option value="1">Sadar 1</option><option value="1.5">Sadar 1.5</option><option value="2">Sadar 2</option>
-        </select>
-        {button('LTR','Qoraal bidix ilaa midig',() => { onDirectionChange('ltr'); changeParagraphDirection('ltr'); })}
-        {button('RTL','Qoraal midig ilaa bidix',() => { onDirectionChange('rtl'); changeParagraphDirection('rtl'); })}
-        <span className="mx-1 hidden h-6 w-px bg-slate-300 sm:inline-block" />
-        {button('Jadwal +','Geli jadwal 3×3',insertTable)}
-        {button('Sadar +','Ku dar sadar jadwalka',addRow)}
-        {button('Sadar −','Ka saar sadarka la doortay',removeRow)}
-        {button('Tiir +','Ku dar tiir jadwalka',addColumn)}
-        {button('Tiir −','Ka saar tiirka la doortay',removeColumn)}
-        {button('Isku dar →','Isku dar unugga midigta',mergeRight)}
-        {button('Isku dar ↓','Isku dar unugga hoose',mergeDown)}
-        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Midabka unugga <input aria-label="Midabka unugga jadwalka" type="color" value={activeCellColor} className="h-6 w-7" onChange={event => { setActiveCellColor(event.target.value); setCellColor(event.target.value); }} /></label>
-        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Xadka <input aria-label="Midabka xadka unugga" type="color" value={cellBorderColor} className="h-6 w-7" onChange={event => setCellBorderColor(event.target.value)} /></label>
-        <select aria-label="Ballaca xadka unugga" value={cellBorderWidth} onChange={event => setCellBorderWidth(event.target.value)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="0">Xad la'aan</option><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="4">4 px</option></select>
-        <select aria-label="Nooca xadka unugga" value={cellBorderStyle} onChange={event => setCellBorderStyle(event.target.value as typeof cellBorderStyle)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="solid">Joogto</option><option value="dashed">Jajaban</option><option value="dotted">Dhibco</option><option value="double">Laba xariiq</option></select>
-        {button('Adeegso xadka','Ku dabaq xadka unugga la doortay',setCellBorder)}
-        {canUploadImage && <>{button('Sawir','Geli sawir',() => imageInputRef.current?.click())}
-        <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} /></>}
-        <select aria-label="Wareeji sawirka la doortay" defaultValue="0" onChange={event => rotateSelectedImage(Number(event.target.value))} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs">
-          <option value="0">Wareeg 0°</option><option value="90">Wareeg 90°</option><option value="180">Wareeg 180°</option><option value="-90">Wareeg -90°</option>
-        </select>
-        <select aria-label="Hagaajinta sawirka la doortay" defaultValue="center" onChange={event => alignSelectedImage(event.target.value as 'left'|'center'|'right')} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="left">Sawir bidix</option><option value="center">Sawir dhexda</option><option value="right">Sawir midig</option></select>
-        {button('Lakab +','Sawirka hore u soo qaad',() => changeSelectedImageLayer('front'))}
-        {button('Lakab −','Sawirka gadaal u dhig',() => changeSelectedImageLayer('back'))}
-        <select aria-label="Wareeji field-ka la doortay" defaultValue="0" onChange={event=>rotateSelectedField(Number(event.target.value))} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="0">Field 0°</option><option value="90">Field 90°</option><option value="180">Field 180°</option><option value="-90">Field -90°</option></select>
-        {button('Field hore','Field-ka hore u soo qaad',()=>changeSelectedFieldLayer('front'))}
-        {button('Field gadaal','Field-ka gadaal u dhig',()=>changeSelectedFieldLayer('back'))}
-        {button('Quful/Fur','Quful ama fur field-ka',toggleSelectedFieldLock)}
-        {button('Nuqul field','Samee nuqul field-ka la doortay',duplicateSelectedField)}
-        {button(showGuides?'Qari guides':'Tus guides','Tus ama qari hagayaasha canvas-ka',()=>setShowGuides(value=>!value))}
-        <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs"><input type="checkbox" checked={snapToGrid} onChange={event=>setSnapToGrid(event.target.checked)}/> Snap 10px</label>
-        <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
-          <option value="160px">Sawir yar</option><option value="320px">Sawir dhexe</option><option value="640px">Sawir weyn</option><option value="100%">Buuxa</option>
-        </select>
-        {button('Xariiq','Geli xariiq',() => command('insertHorizontalRule'))}
-        {button('Bog cusub','Geli kala goyn bog',() => command('insertHTML','<div class="document-page-break" data-page-break="true"></div>'))}
-        {button('↶','Dib u celi',() => command('undo'))}
-        {button('↷','Hore u celi',() => command('redo'))}
-        {uploading && <span className="text-xs text-teal-700" role="status">Sawirka waa la gelinayaa…</span>}
+      <div className="documents-toolbar">
+        <div className="documents-toolbar-main">
+          <select aria-label="Geli doorsoome" defaultValue="" className="documents-tool-select" onChange={event => { if (event.target.value) command('insertText',event.target.value); event.target.value=''; }}>
+            <option value="">+ Doorsoome</option><option value="{student_name}">Magaca ardayga</option><option value="{student_id}">Aqoonsiga</option><option value="{class}">Fasalka</option><option value="{parent_name}">Waalidka</option><option value="{date}">Taariikhda</option><option value="{school_name}">Dugsiga</option><option value="{teacher_name}">Macallinka</option><option value="{term}">Xilliga</option><option value="{academic_year}">Sanad-dugsiyeedka</option><option value="{average}">Celceliska</option><option value="{grade}">Darajada</option><option value="{rank}">Kaalinta</option><option value="{fee_balance}">Haraaga lacagta</option>
+          </select>
+          {button('B','Qoraal madow',() => command('bold'))}
+          {button('I','Qoraal jiifa',() => command('italic'))}
+          {button('U','Hoosta xarriiq',() => command('underline'))}
+          {button('H1','Cinwaan weyn',() => command('formatBlock','h1'))}
+          <select aria-label="Cabbirka qoraalka" className="documents-tool-select" defaultValue="3" onChange={event => command('fontSize',event.target.value)}><option value="2">Yar</option><option value="3">Dhexdhexaad</option><option value="4">Weyn</option><option value="5">Aad u weyn</option></select>
+          <label className="documents-color-tool">Midab <input aria-label="Midabka qoraalka" type="color" className="h-6 w-7" onChange={event => command('foreColor',event.target.value)} /></label>
+          {button('Bidix','Isku hagaaji bidix',() => command('justifyLeft'))}
+          {button('Dhexe','Isku hagaaji dhexda',() => command('justifyCenter'))}
+          {button('Midig','Isku hagaaji midig',() => command('justifyRight'))}
+          {button('Jadwal +','Geli jadwal 3×3',insertTable)}
+          {canUploadImage && <>{button('Sawir +','Geli sawir',() => imageInputRef.current?.click())}<input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} /></>}
+          {button('↶','Dib u celi',() => command('undo'))}
+          {button('↷','Hore u celi',() => command('redo'))}
+          {uploading && <span className="text-xs text-teal-700" role="status">Sawirka waa la gelinayaa…</span>}
+        </div>
+        <details className="documents-advanced-tools">
+          <summary>Qalab dheeraad ah</summary>
+          <div className="documents-toolbar-extra">
+            <select aria-label="Geli field la dhaqaajin karo" defaultValue="" onChange={event=>{if(event.target.value)insertPositionedField(event.target.value);event.target.value='';}} className="documents-tool-select"><option value="">Field la dhaqaajin karo…</option><option value="{student_name}">Magaca ardayga</option><option value="{student_id}">ID ardayga</option><option value="{class}">Fasalka</option><option value="{school_name}">Dugsiga</option><option value="{date}">Taariikh</option></select>
+            {button('H2','Cinwaan',() => command('formatBlock','h2'))}
+            <label className="documents-color-tool">Iftiimin <input aria-label="Midabka iftiiminta" type="color" defaultValue="#fff2a8" className="h-6 w-7" onChange={event => command('hiliteColor',event.target.value)} /></label>
+            {button('Liis •','Liis dhibco leh',() => command('insertUnorderedList'))}
+            {button('Liis 1.','Liis tiro leh',() => command('insertOrderedList'))}
+            <select aria-label="Kala fogaanta sadaradda" className="documents-tool-select" defaultValue="1.5" onChange={event => { const selection=window.getSelection(); const node=selection?.anchorNode; const element=node instanceof Element?node:node?.parentElement; const paragraph=element?.closest('p,div,li') as HTMLElement|null; if(paragraph)paragraph.style.lineHeight=event.target.value; emit(); }}><option value="1">Sadar 1</option><option value="1.5">Sadar 1.5</option><option value="2">Sadar 2</option></select>
+            {button('LTR','Qoraal bidix ilaa midig',() => { onDirectionChange('ltr'); changeParagraphDirection('ltr'); })}
+            {button('RTL','Qoraal midig ilaa bidix',() => { onDirectionChange('rtl'); changeParagraphDirection('rtl'); })}
+            {button('Sadar +','Ku dar sadar jadwalka',addRow)}{button('Sadar −','Ka saar sadarka la doortay',removeRow)}
+            {button('Tiir +','Ku dar tiir jadwalka',addColumn)}{button('Tiir −','Ka saar tiirka la doortay',removeColumn)}
+            {button('Isku dar →','Isku dar unugga midigta',mergeRight)}{button('Isku dar ↓','Isku dar unugga hoose',mergeDown)}
+            <label className="documents-color-tool">Midabka unugga <input aria-label="Midabka unugga jadwalka" type="color" value={activeCellColor} className="h-6 w-7" onChange={event => {setActiveCellColor(event.target.value);setCellColor(event.target.value);}} /></label>
+            <label className="documents-color-tool">Xadka <input aria-label="Midabka xadka unugga" type="color" value={cellBorderColor} className="h-6 w-7" onChange={event => setCellBorderColor(event.target.value)} /></label>
+            <select aria-label="Ballaca xadka unugga" value={cellBorderWidth} onChange={event=>setCellBorderWidth(event.target.value)} className="documents-tool-select"><option value="0">Xad la'aan</option><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="4">4 px</option></select>
+            <select aria-label="Nooca xadka unugga" value={cellBorderStyle} onChange={event=>setCellBorderStyle(event.target.value as typeof cellBorderStyle)} className="documents-tool-select"><option value="solid">Joogto</option><option value="dashed">Jajaban</option><option value="dotted">Dhibco</option><option value="double">Laba xariiq</option></select>
+            {button('Adeegso xadka','Ku dabaq xadka unugga la doortay',setCellBorder)}
+            <select aria-label="Wareeji sawirka la doortay" defaultValue="0" onChange={event=>rotateSelectedImage(Number(event.target.value))} className="documents-tool-select"><option value="0">Sawir 0°</option><option value="90">Sawir 90°</option><option value="180">Sawir 180°</option><option value="-90">Sawir -90°</option></select>
+            <select aria-label="Hagaajinta sawirka la doortay" defaultValue="center" onChange={event=>alignSelectedImage(event.target.value as 'left'|'center'|'right')} className="documents-tool-select"><option value="left">Sawir bidix</option><option value="center">Sawir dhexda</option><option value="right">Sawir midig</option></select>
+            {button('Sawir hore','Sawirka hore u soo qaad',()=>changeSelectedImageLayer('front'))}{button('Sawir gadaal','Sawirka gadaal u dhig',()=>changeSelectedImageLayer('back'))}
+            <select aria-label="Wareeji field-ka la doortay" defaultValue="0" onChange={event=>rotateSelectedField(Number(event.target.value))} className="documents-tool-select"><option value="0">Field 0°</option><option value="90">Field 90°</option><option value="180">Field 180°</option><option value="-90">Field -90°</option></select>
+            {button('Field hore','Field-ka hore u soo qaad',()=>changeSelectedFieldLayer('front'))}{button('Field gadaal','Field-ka gadaal u dhig',()=>changeSelectedFieldLayer('back'))}
+            {button('Quful/Fur','Quful ama fur field-ka',toggleSelectedFieldLock)}{button('Nuqul field','Samee nuqul field-ka la doortay',duplicateSelectedField)}
+            {button(showGuides?'Qari guides':'Tus guides','Tus ama qari hagayaasha canvas-ka',()=>setShowGuides(value=>!value))}
+            <label className="documents-color-tool"><input type="checkbox" checked={snapToGrid} onChange={event=>setSnapToGrid(event.target.checked)}/> Snap 10px</label>
+            <select aria-label="Ballaca sawirka" className="documents-tool-select" defaultValue="320px" onChange={event=>setImageWidth(event.target.value)}><option value="160px">Sawir yar</option><option value="320px">Sawir dhexe</option><option value="640px">Sawir weyn</option><option value="100%">Buuxa</option></select>
+            {button('Xariiq','Geli xariiq',()=>command('insertHorizontalRule'))}{button('Bog cusub','Geli kala goyn bog',()=>command('insertHTML','<div class="document-page-break" data-page-break="true"></div>'))}
+          </div>
+        </details>
       </div>
 
+      <details className="documents-page-settings">
+        <summary>Dejinta bogga · {pageSize}</summary>
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <label className="text-xs font-semibold text-slate-600">Cabbirka bogga
           <select value={pageSize} onChange={event => onPageSizeChange(event.target.value as Props['pageSize'])} className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
@@ -410,7 +397,9 @@ export const DocumentEditor: React.FC<Props> = ({
         <label className="text-xs font-semibold text-slate-600">Margin (mm)
           <input type="number" min={5} max={40} value={margins} onChange={event => onMarginsChange(Math.min(40,Math.max(5,Number(event.target.value)||20)))} className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" />
         </label>
-      </div>
+      </div>      </details>
+
+
 
       <div className="documents-paper mx-auto max-w-[900px] rounded-lg border border-slate-200 bg-white shadow-sm" data-page-size={pageSize} style={{ padding: margins + 'mm' }}>
         <header className="document-page-header mb-6 flex items-center gap-4 border-b-2 pb-4" style={{ borderColor: school?.brandColor || '#0F766E' }}>
