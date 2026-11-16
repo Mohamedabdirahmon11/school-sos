@@ -25,8 +25,6 @@ export const StudentInvoicesView: React.FC = () => {
   const [classId, setClassId] = useState('');
   const [period, setPeriod] = useState(currentPeriod());
   const [dueDate, setDueDate] = useState(today());
-  const [includeAnnual, setIncludeAnnual] = useState(true);
-  const [includeOneTime, setIncludeOneTime] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [lastReceiptId, setLastReceiptId] = useState<string | null>(null);
@@ -65,8 +63,6 @@ export const StudentInvoicesView: React.FC = () => {
     try {
       const result = await ApiClient.generateStudentInvoices({
         classId, billingPeriod: period.trim(), dueDate,
-        includeAnnualRegistration: includeAnnual,
-        includeOneTimeFees: includeOneTime
       });
       setLastReceiptId(null);
       setNotice(`Created ${result.generatedCount} invoices. ${result.skippedExisting} duplicates and ${result.skippedNoFees} students without configured fees were skipped.`);
@@ -157,8 +153,6 @@ export const StudentInvoicesView: React.FC = () => {
       <label className="block text-sm font-medium">Class<select required value={classId} onChange={event=>setClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select class</option>{sortedClasses.map((item:any)=><option key={item.id} value={item.id}>{item.name} {item.section||''}</option>)}</select></label>
       <label className="block text-sm font-medium">Billing period<input required type="month" value={period} onChange={event=>setPeriod(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="block text-sm font-medium">Payment due date<input required type="date" min={today()} value={dueDate} onChange={event=>setDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includeAnnual} onChange={event=>setIncludeAnnual(event.target.checked)}/> Include annual registration and annual custom fees (included by default)</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includeOneTime} onChange={event=>setIncludeOneTime(event.target.checked)}/> Include one-time custom fees (included by default)</label>
       <div className="flex justify-end gap-2 border-t pt-4"><button type="button" onClick={()=>setShowGenerate(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy?'Generating…':'Generate invoices'}</button></div>
     </form></div>}
 
