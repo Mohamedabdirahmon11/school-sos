@@ -119,7 +119,7 @@ DECLARE
   event_action VARCHAR(40);
 BEGIN
   actor_id := COALESCE(NEW.updated_by, NEW.created_by, OLD.updated_by, OLD.created_by);
-  IF TG_OP = 'UPDATE' AND OLD.locked_at IS NOT NULL THEN
+  IF TG_OP = 'UPDATE' AND (OLD.locked_at IS NOT NULL OR OLD.status = 'final') THEN
     IF NEW.locked_at IS NOT NULL AND (
       NEW.title IS DISTINCT FROM OLD.title OR
       NEW.document_type IS DISTINCT FROM OLD.document_type OR
