@@ -182,6 +182,7 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
 
 test('teacher dashboard shows Form Teacher class and assigned teaching subjects without duplicate task shortcuts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /EMPTY_TEACHER_DATA/);
   assert.match(teacher, /useMemo\(\(\) => \[\.\.\.new Map/);
   assert.match(teacher, /assignedClassStudentTotal/);
   assert.match(teacher, /Casharrada laguu qoondeeyay/);
