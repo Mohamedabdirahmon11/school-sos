@@ -16,6 +16,7 @@ export const DocumentFileTools:React.FC<Props>=({html,title,onImport})=>{
   const [message,setMessage]=useState('');
   const importFile=async(file?:File)=>{
     if(!file)return;
+    if(file.size>15*1024*1024){setMessage('Faylku waa inuu ka yaraadaa 15 MB.');if(importRef.current)importRef.current.value='';return;}
     setBusy(true);setMessage('');
     try{
       const extension=file.name.split('.').pop()?.toLowerCase();
