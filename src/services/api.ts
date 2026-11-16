@@ -1000,6 +1000,10 @@ export class ApiClient {
     return this.request<any>(`/school/library/loans/${encodeURIComponent(loanId)}/return`, { method: 'PUT' });
   }
 
+  public static async getTransportDrivers() {
+    return this.request<Array<{ id: string; staffId: string; fullName: string; phone: string }>>('/school/transport/drivers');
+  }
+
   public static async getTransportRoutes(schoolId?: string) {
     return this.request<any[]>('/school/transport');
   }

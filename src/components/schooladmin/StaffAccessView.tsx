@@ -44,6 +44,7 @@ export const StaffAccessView: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('500');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['fees_manage']);
+  const [createLogin, setCreateLogin] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,13 +101,14 @@ export const StaffAccessView: React.FC = () => {
             staffId,
             phone,
             monthlySalary: parseFloat(salary) || 0,
-            permissions: selectedPermissions
+            permissions: selectedPermissions,
+            createLogin
           })
         });
         if (created.initialPassword) {
           window.alert(`Sign-in account created for ${created.email}.\nTemporary password (shown once):\n${created.initialPassword}\nThe staff member must change it after signing in.`);
         }
-        setMessage(`Staff sign-in account created for ${fullName} (${created.staffId}).`);
+        setMessage(createLogin ? `Staff sign-in account created for ${fullName} (${created.staffId}).` : `Staff record created for ${fullName} (${created.staffId}) without login access.`);
       }
 
       setShowAddModal(false);
@@ -115,6 +117,7 @@ export const StaffAccessView: React.FC = () => {
       setEmail('');
       setStaffId('');
       setPhone('');
+      setCreateLogin(true);
       await fetchStaff();
     } catch (err: any) {
       setError(err.message);
@@ -146,6 +149,7 @@ export const StaffAccessView: React.FC = () => {
     setPhone(staff.phone);
     setSalary(staff.monthlySalary.toString());
     setSelectedPermissions(staff.permissions || []);
+    setCreateLogin(!!staff.userId);
     setShowAddModal(true);
   };
 
@@ -153,7 +157,7 @@ export const StaffAccessView: React.FC = () => {
     s =>
       s.fullName.toLowerCase().includes(search.toLowerCase()) ||
       s.roleTitle.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase())
+      (s.email || '').toLowerCase().includes(search.toLowerCase())
       || (s.staffId || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -173,6 +177,8 @@ export const StaffAccessView: React.FC = () => {
             setStaffId('');
             setPhone('');
             setSelectedPermissions(['fees_manage']);
+            setRoleTitle('Accountant');
+            setCreateLogin(true);
             setShowAddModal(true);
           }}
           className="px-3.5 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"
@@ -245,7 +251,7 @@ export const StaffAccessView: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      <div>{st.email}</div>
+                      <div>{st.email || 'No login account'}</div>
                       <div className="text-[11px] font-mono text-slate-500">{st.phone}</div>
                     </td>
                     <td className="py-3 px-4">
@@ -322,9 +328,10 @@ export const StaffAccessView: React.FC = () => {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Role Designation</label>
                   <select
                     value={roleTitle}
-                    onChange={e => setRoleTitle(e.target.value)}
+                    onChange={e => { setRoleTitle(e.target.value); if (e.target.value === 'Driver') { setCreateLogin(false); setSelectedPermissions([]); } else { setCreateLogin(true); } }}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   >
+                    <option value="Driver">Driver</option>
                     <option value="School Accountant">School Accountant</option>
                     <option value="Admissions Registrar">Admissions Registrar</option>
                     <option value="Head Librarian">Head Librarian</option>
@@ -348,11 +355,12 @@ export const StaffAccessView: React.FC = () => {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Email (Login ID)</label>
                   <input
                     type="email"
-                    required
+                    required={createLogin}
+                    disabled={!createLogin}
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="staff@school.so"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                    placeholder={createLogin ? "staff@school.so" : "Not needed for drivers"}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-400 focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -366,6 +374,9 @@ export const StaffAccessView: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} disabled={!!editingStaff || roleTitle === 'Driver'} /> Create a system login for this staff member</label>
+              {!createLogin && <p className="text-[11px] text-slate-500">This person is recorded in Staff & Access only. No username, password or separate portal is created.</p>}
 
               {/* Granular Permissions Section */}
               <div className="pt-2 border-t border-slate-100">
