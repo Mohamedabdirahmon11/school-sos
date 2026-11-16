@@ -81,7 +81,7 @@ export class ApiClient {
     return this.request<any[]>(`/student-invoices/${encodeURIComponent(invoiceId)}/items`);
   }
 
-  public static payStudentInvoice(invoiceId: string, data: { amount: number; paymentMethod: 'Cash' | 'Bank Transfer' | 'Mobile Money'; notes?: string; idempotencyKey: string }) {
+  public static payStudentInvoice(invoiceId: string, data: { amount: number; paymentMethod: 'Cash' | 'Bank Transfer' | 'Mobile Money'; notes?: string; confirmedReceived: true; idempotencyKey: string }) {
     return this.request<{ invoice: any; payment: FeePayment; replayed: boolean }>(`/student-invoices/${encodeURIComponent(invoiceId)}/pay`, {
       method: 'POST', body: JSON.stringify(data)
     });
