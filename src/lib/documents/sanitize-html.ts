@@ -58,16 +58,16 @@ export function sanitizeDocumentHtml(input: unknown): string {
       } else if (name === 'src' && tag === 'img') {
         const url = safeUrl(value, true);
         if (url) attrs.push('src="' + url.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '"');
-      } else if (['alt','title','dir','colspan','rowspan','width','height','size','class','data-page-break'].includes(name)) {
+      } else if (['alt','title','dir','colspan','rowspan','width','height','size','class','data-page-break','data-document-field','data-document-locked','contenteditable','tabindex'].includes(name)) {
         if (name === 'dir' && !/^(ltr|rtl|auto)$/i.test(value)) continue;
         if (['colspan','rowspan'].includes(name) && !/^[1-9]\d?$/.test(value)) continue;
         if (name === 'size' && !/^[1-7]$/.test(value)) continue;
-        if (name === 'class' && !['document-page-break','document-positioned-field','document-field-drag-handle'].includes(value)) continue;
+        if (name === 'class' && !value.split(/\\s+/).every(token => ['document-page-break','document-positioned-field','document-field-drag-handle','document-positioned-field-selected'].includes(token))) continue;
         if (name === 'data-page-break' && value !== 'true') continue;
         if (name === 'data-document-field' && value !== 'true') continue;
         if (name === 'data-document-locked' && !/^(true|false)$/.test(value)) continue;
         if (name === 'contenteditable' && !/^(true|false)$/.test(value)) continue;
-        if (name === 'tabindex' && !/^-?1|0$/.test(value)) continue;
+        if (name === 'tabindex' && !/^(?:-1|0)$/.test(value)) continue;
         if (['width','height'].includes(name) && !/^\d{1,4}(?:px|%)?$/.test(value)) continue;
         attrs.push(name + '="' + value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '"');
       }
