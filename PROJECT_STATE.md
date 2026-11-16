@@ -89,3 +89,42 @@ Updated: 2026-11-11
 - Added history restore, explicit school-role and user-specific sharing, audit log, final/manual lock and unlock, and private student attachment upload/download/soft-delete flows.
 - School-wide grants are limited to Teacher and Accountant; Parent/Student grants require a specific same-school user. Version history/audit are read-only to authenticated users; lock enforcement is in API and database trigger.
 - Phase 3 and its follow-up hardening migrations are applied to `school management 3`; see the Phase 1 status above for database and runtime verification.
+
+
+## Documents & Designer — specification audit (2026-11-15)
+
+Branch: `feature/documents-designer-finish` (based on current `main`). This audit is based on the existing Documents implementation, the Phase 1–3 migrations, and the current Documents tests. It does not claim browser or live authenticated tenant tests.
+
+### Initial checklist
+
+| Spec item | Initial status | Evidence / gap |
+|---|---|---|
+| A. Somali template library (all requested letters, certificates, ID cards, report cards, receipts, admit cards, class/attendance lists, timetable) | PARTIAL | Existing UI has six built-in templates (transfer, certificate, parent, teacher, clearance, report summary) and school-owned editable templates. The requested complete catalogue, certificate variants, front/back ID cards, full report cards, receipts/admit cards/class/attendance sheets are not present as built-ins. |
+| B. Five certificate / four ID / four letter / four report designs; school-brand styling; custom PNG/JPG/PDF backgrounds, page picker, DPI/file validation, metadata stripping, private storage | MISSING | Existing image upload supports PNG/JPEG/WebP only with a 1.5 MB cap. No evidence of the requested design catalogue, PDF.js page picker, DPI warning, metadata stripping, or full custom-background workflow. |
+| C. Visual drag-and-drop designer and all field/layer/editing controls | PARTIAL | Existing editor is contentEditable with text formatting, tables, image insertion, page breaks, RTL/LTR, A4/A5/Letter, and margins. It is not a positioned canvas designer and lacks field objects, drag/resize/rotate/align/snap/guides, nudge, zoom, lock/layers, duplicate/copy/paste, undo/redo, QR/barcode/signature/stamp/marks fields, CR80/custom mm, bleed/safe area, and sample-data preview. |
+| D. Complete variables, school-timezone date, ETB amounts, escaped text, missing-data warnings | PARTIAL | Existing variable replacement escapes text and reports missing/unknown variables; current set is limited to student, parent, class, school, teacher, term, year and date. Marks, grade, rank, attendance, staff, serial and ETB variables are not implemented. |
+| E. Single/selected/class batch PDF, ID-card A4 sheets/crop marks, ZIP, DOCX letters, embedded Somali/Arabic fonts, progress/cancel, serial + verification QR/public verify, duplicate linkage, issue log | PARTIAL | Existing generation supports one student or a whole class and class roster pagination; DOCX import/export exists. No complete PDF-per-student/ZIP/ID-sheet pipeline, serial/QR verification flow, public verify endpoint, issue log, or cancellable batch progress was found. Arabic font embedding is explicitly a remaining release gap. |
+| F. Template thumbnails, duplicate/edit/archive/restore; immutable issued snapshots; Draft/Final reopen flow | PARTIAL | Existing template list supports create/edit/duplicate/delete; document soft-delete/restore, version history and locking are implemented. Template thumbnail/archive-restore lifecycle and immutable issued-document/template-version binding need completion/verification. |
+| G. Required permission keys, teacher own-class scope, RLS/indexes/buckets, sanitization, PDF validation/limits, complete audit actions | PARTIAL | Existing RLS, school scoping, indexes, private image/attachment buckets, HTML allow-list sanitization, escaped variable text, version/audit triggers and lock enforcement exist. Named permission keys `templates_manage`, `documents_generate`, `documents_issue`, teacher own-class generation coverage, custom PDF/image validation, and upload/edit/generate/download/void/reopen audit completeness are not established. |
+| H. Query performance, on-open body fetch, 1.5s serialized autosave, font/asset cache, render stability | PARTIAL | Existing list queries are metadata-oriented, body is fetched on open, and autosave is debounced/serialized at about 1.5 seconds. Font/asset caching and full render/request profiling remain unverified. |
+
+### Work performed in this branch
+- Created the requested feature branch from the current `main`; no commits have been made to `main`.
+- No migrations were added or applied. No production database or existing records were changed.
+- The initial audit is recorded above; the post-change checklist remains the same until implementation commits are added.
+
+### Verification constraints and attempts
+- The execution container did not contain a Git checkout. `git remote -v` was attempted from the initial working directory and returned “not a git repository”.
+- A shallow clone of the exact canonical URL `https://github.com/Mohamedabdirahmon11/school-sos.git` was attempted; it failed before checkout because the container could not resolve `github.com` (DNS/network unavailable). Thus there is no local working tree in which to install dependencies, start the app, or run Playwright/PDF rendering.
+- GitHub connector access was used to inspect `PROJECT_STATE.md`, recent commits, Documents source files, migrations, and tests, and to create the isolated feature branch. Remote CI can still be triggered by the draft PR, but it cannot replace the requested local desktop/mobile and PDF-image visual checks.
+- No screenshot, generated PDF, Playwright result, authenticated cross-school test, or real upload round-trip is claimed by this audit.
+
+### Post-change checklist
+- A: PARTIAL — unchanged; complete catalogue and specialized templates remain.
+- B: MISSING — unchanged; multi-design library and custom background pipeline remain.
+- C: PARTIAL — unchanged; positioned visual designer remains.
+- D: PARTIAL — unchanged; academic, staff, serial and ETB variables remain.
+- E: PARTIAL — unchanged; complete PDF/ZIP/QR/verification/issue pipeline remains.
+- F: PARTIAL — unchanged; template archive/restore and issued-version immutability need completion.
+- G: PARTIAL — unchanged; named permissions, teacher own-class policy proof, PDF validation and complete audit coverage remain.
+- H: PARTIAL — unchanged; font/asset caching and performance profiling remain.
