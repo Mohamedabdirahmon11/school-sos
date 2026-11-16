@@ -41,7 +41,11 @@ test('invoice generation uses only active students and respects class/grade fee 
   assert.match(source, /includeAnnualRegistration/);
   assert.match(source, /includeOneTimeFees/);
   assert.match(source, /busAssignments\.find/);
-  assert.match(source, /itemError[\s\S]{0,260}student_invoices'\)\.delete/);
+  assert.match(source, /schoolos_create_student_invoice/);
+  assert.match(source, /cadence:item\.cadence/);
+  assert.doesNotMatch(source, /student_invoices'\)\.insert/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /previous_item\.cadence = 'one_time'/);
   assert.match(source, /UNIQUE|23505/);
 });
 
