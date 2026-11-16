@@ -24,3 +24,7 @@ test('document sanitizer retains bounded image rotation and layer styles only', 
   assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg);z-index:999">'), '<img src="/api/documents/images?path=school/a.png" style="transform:rotate(90deg)">');
   assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="transform:translateX(999px)">'), '<img src="/api/documents/images?path=school/a.png">');
 });
+test('document sanitizer permits bounded image positioning and alignment styles', () => {
+  assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="position:relative;left:-12px;top:20px;margin-left:auto;margin-right:0">'), '<img src="/api/documents/images?path=school/a.png" style="position:relative;left:-12px;top:20px;margin-left:auto;margin-right:0">');
+  assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="position:absolute;left:9999px;top:0px">'), '<img src="/api/documents/images?path=school/a.png" style="top:0px">');
+});
