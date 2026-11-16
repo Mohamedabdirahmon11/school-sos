@@ -484,7 +484,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => setTimetableScope('mine')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
                 <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => setTimetableScope('school')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
               </div>
-              <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} periods</span>
+              <span aria-label={`${timetable.length} school periods available`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} periods</span>
             </div>
           </div>
           {visibleTimetable.length === 0 ? (
@@ -534,6 +534,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
             </div>
             {isLoadingClassData ? <p className="p-8 text-center text-sm text-slate-500">Loading assigned students...</p> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{formTeacherClasses.length ? 'No students found in your form class.' : 'You are not the form teacher of any class yet. Ask the School Admin to assign you a form class.'}</p> : (
+              <>
               <div className="space-y-2 p-3 md:hidden">
                 {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-slate-400">#{index + 1}</span><span className="rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-slate-600">{student.studentId}</span></div>
@@ -544,9 +545,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{students.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td></tr>)}</tbody>
+                  <tbody className="divide-y divide-slate-100">{visibleStudents.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td></tr>)}</tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
@@ -725,6 +727,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </div>
                 {subjectComponents.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No assessment components are configured for this exam type. Ask School Admin to configure the exam.</p> : (
                   <div className="overflow-x-auto">
+                    <>
                     <div className="mb-3 px-3 pt-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students for marks" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
                     <div className="space-y-3 p-3 md:hidden">
                       {visibleStudents.map(student => {
@@ -764,6 +767,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                       </tbody>
                     </table>
                   </div>
+                  </>
                 )}
               </section>
             );
