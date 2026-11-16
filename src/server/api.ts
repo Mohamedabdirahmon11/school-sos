@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import QRCode from 'qrcode';
 import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
@@ -7566,7 +7567,8 @@ function documentClientRow(row: any, includeContent = false) {
     updatedAt: row.updated_at, createdAt: row.created_at, deletedAt: row.deleted_at,
     studentId: row.student_id, classId: row.class_id, templateId: row.template_id,
     pageSize: row.page_size, direction: row.direction, pageMargins: row.page_margins,
-    lockedAt: row.locked_at || null, lockedBy: row.locked_by || null, lockReason: row.lock_reason || null
+    lockedAt: row.locked_at || null, lockedBy: row.locked_by || null, lockReason: row.lock_reason || null,
+    serialNumber: row.serial_number || null, verificationToken: row.verification_token || null
   };
   if (includeContent) result.contentHtml = row.content_html || '';
   return result;
@@ -7615,6 +7617,32 @@ apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSc
     res.status(201).json({ url: '/api/documents/images?path=' + encodeURIComponent(objectPath) });
   }
 );
+
+// Public verification reveals only validity, school, student name, document type and issue date.
+apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
+  const token=String(req.params.token||''); if(!/^[0-9a-f-]{36}$/i.test(token)){res.status(404).end();return;}
+  const client=documentServiceClient(res);if(!client)return;
+  const {data}=await client.from('school_documents').select('verification_token').eq('verification_token',token).is('deleted_at',null).maybeSingle();
+  if(!data){res.status(404).end();return;}
+  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||'').replace(/\\/$/,'');
+  const qr=await QRCode.toBuffer(base+'/api/public/document-verification/'+token,{type:'png',errorCorrectionLevel:'M',margin:1,width:240});
+  res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=300');res.setHeader('X-Content-Type-Options','nosniff');res.send(qr);
+});
+
+apiRouter.get('/public/document-verification/:token', async (req,res) => {
+  const token=String(req.params.token||'');if(!/^[0-9a-f-]{36}$/i.test(token)){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
+  const client=documentServiceClient(res);if(!client)return;
+  const {data:doc}=await client.from('school_documents').select('school_id,document_type,status,created_at,student_id,deleted_at').eq('verification_token',token).maybeSingle();
+  if(!doc||doc.deleted_at){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
+  const [{data:school},{data:student}]=await Promise.all([
+    client.from('schools').select('name').eq('id',doc.school_id).maybeSingle(),
+    doc.student_id?client.from('students').select('first_name,middle_name,last_name').eq('school_id',doc.school_id).eq('id',doc.student_id).maybeSingle():Promise.resolve({data:null})
+  ]);
+  const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+  const valid=doc.status==='final';const studentName=student?[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' '):'';
+  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
+  res.status(200).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document verification</title><main style="font:16px system-ui;max-width:620px;margin:48px auto;padding:24px;border:1px solid #ddd;border-radius:16px"><h1 style="color:'+(valid?'#087443':'#b42318')+'">'+(valid?'Valid document':'Invalid document')+'</h1><p><b>School:</b> '+esc(school?.name)+'</p><p><b>Student:</b> '+esc(studentName||'—')+'</p><p><b>Document type:</b> '+esc(doc.document_type)+'</p><p><b>Issue date:</b> '+esc(new Date(doc.created_at).toISOString().slice(0,10))+'</p><p>This page confirms document status only.</p></main></html>');
+});
 
 apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
@@ -8237,10 +8265,14 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
     const safeHtml = sanitizeDocumentHtml(replaced.html);
     if (replaced.missing.length) warnings.push({studentName:studentName || student.studentId,missing:replaced.missing});
     const generatedTitle = titleTemplate.replace(/\{([a-z][a-z0-9_]*)\}/gi,(_match:string,key:string) => String((values as any)[key] || '')) + ' — ' + (studentName || student.studentId);
+    const verificationToken=randomUUID();
+    const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+    const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
     rows.push({
       school_id:school.id, title:generatedTitle.slice(0,180), document_type:documentType, status:'draft',
-      content_html:safeHtml, page_size:'A4', direction:'ltr', page_margins:20,
-      student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id
+      content_html:sanitizeDocumentHtml(safeHtml+verificationBlock), page_size:'A4', direction:'ltr', page_margins:20,
+      student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id,
+      serial_number:serialNumber, verification_token:verificationToken
     });
   }
   if (requiresDocumentGenerationConfirmation(warnings, body.confirmMissing === true)) {
