@@ -150,6 +150,7 @@ BEGIN
   END IF;
 
   IF TG_OP = 'INSERT' THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.school_id || ':' || NEW.id::text, 0));
     SELECT COALESCE(MAX(version_number), 0) + 1 INTO next_version
       FROM public.school_document_versions
       WHERE school_id = NEW.school_id AND document_id = NEW.id;
@@ -172,6 +173,7 @@ BEGIN
     NEW.student_id IS DISTINCT FROM OLD.student_id OR
     NEW.class_id IS DISTINCT FROM OLD.class_id
   ) THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.school_id || ':' || NEW.id::text, 0));
     SELECT COALESCE(MAX(version_number), 0) + 1 INTO next_version
       FROM public.school_document_versions
       WHERE school_id = NEW.school_id AND document_id = NEW.id;
