@@ -22,7 +22,7 @@ test('legacy account migration requires a verified stored password', () => {
   const migration = staffRoute.indexOf('linkLegacyLoginToSupabaseAuth(user, password)');
   const session = staffRoute.indexOf('await issueSessionCookie(res, user, req)');
   assert.ok(failedPassword >= 0 && migration > failedPassword && session > migration);
-  assert.ok(staffRoute.includes('verifiedLegacyPassword = verifyPassword(password, user.passwordHash)'));
+  assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin')"));
   assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role))"));
   assert.ok(staffRoute.includes("['school_admin', 'teacher', 'accountant'].includes(user.role)"));
   assert.ok(staffRoute.includes("user.role === 'super_admin'"));
