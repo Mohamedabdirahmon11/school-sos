@@ -7695,6 +7695,7 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if (currentError || !current) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
   if (!await hasDocumentGrant(client,school.id,user,req.params.id,'edit')) { res.status(403).json({error:'Ma lihid ogolaanshaha wax-ka-beddelka dukumentigan.'}); return; }
+  if (body.status !== undefined && !hasDocumentAdminAccess(user)) { res.status(403).json({error:'Maamulka dugsiga oo keliya ayaa beddeli kara xaaladda dukumentiga.'}); return; }
   if (current.locked_at || current.status === 'final') { res.status(423).json({ error: 'Dukumentigan waa la xiray ama waa final. Marka hore fur si aad wax uga beddesho.', code: 'DOCUMENT_LOCKED' }); return; }
   const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
   if (typeof body.title === 'string') {
@@ -7781,7 +7782,7 @@ apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, 
     if(!target){res.status(404).json({error:'User-kan kuma jiro dugsigan.'});return;}
   }
   const canView=body.canView!==false,canEdit=body.canEdit===true,canDownload=body.canDownload===true;
-  if(canEdit&&!canView){res.status(400).json({error:'Wax-ka-beddelku wuxuu u baahan yahay ogolaanshaha akhriska.'});return;}
+  if((canEdit||canDownload)&&!canView){res.status(400).json({error:'Wax-ka-beddelka iyo download-ku waxay u baahan yihiin ogolaanshaha akhriska.'});return;}
   let remove=client.from('school_document_permissions').delete().eq('school_id',school.id).eq('document_id',req.params.id);
   remove=targetUserId?remove.eq('user_id',targetUserId).is('role',null):remove.is('user_id',null).eq('role',targetRole);
   const {error:removeError}=await remove;
