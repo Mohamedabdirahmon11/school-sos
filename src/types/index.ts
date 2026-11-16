@@ -112,7 +112,7 @@ export interface SchoolSetupProgressUpdate {
 }
 
 export interface SidebarTheme {
-  preset: 'light' | 'dark' | 'brand' | 'gradient' | 'glass' | 'soft';
+  preset: 'light' | 'dark' | 'brand' | 'gradient' | 'glass' | 'soft' | 'custom';
   backgroundColor: string;
   textColor: string;
   accentColor: string;
