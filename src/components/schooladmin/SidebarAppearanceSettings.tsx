@@ -65,27 +65,26 @@ export const SidebarAppearanceSettings: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    const preset = PRESETS.find(item => item.id === theme.preset);
-    const background = theme.preset === 'gradient'
-      ? 'linear-gradient(160deg, #102c2a 0%, #164e63 55%, #0f766e 100%)'
-      : theme.preset === 'glass'
-        ? 'rgba(15, 23, 42, 0.94)'
-        : (preset?.background || theme.backgroundColor);
-    root.style.setProperty('--sidebar-background', background);
-    root.style.setProperty('--sidebar-text', theme.textColor);
-    root.style.setProperty('--sidebar-accent', theme.accentColor);
-    root.style.setProperty('--sidebar-width', `${theme.width}px`);
-    root.style.setProperty('--sidebar-radius', theme.radius === 'sharp' ? '4px' : theme.radius === 'medium' ? '10px' : '14px');
-    root.style.setProperty('--sidebar-font-size', theme.fontSize === 'small' ? '12px' : theme.fontSize === 'large' ? '14px' : '13px');
-    return () => {
-      root.style.removeProperty('--sidebar-background');
-      root.style.removeProperty('--sidebar-text');
-      root.style.removeProperty('--sidebar-accent');
-      root.style.removeProperty('--sidebar-width');
-      root.style.removeProperty('--sidebar-radius');
-      root.style.removeProperty('--sidebar-font-size');
+    const apply = (value: SidebarTheme) => {
+      const preset = PRESETS.find(item => item.id === value.preset);
+      const background = value.preset === 'gradient'
+        ? 'linear-gradient(160deg, #102c2a 0%, #164e63 55%, #0f766e 100%)'
+        : value.preset === 'glass'
+          ? 'rgba(15, 23, 42, 0.94)'
+          : value.preset === 'custom'
+            ? value.backgroundColor
+            : (preset?.background || value.backgroundColor);
+      root.style.setProperty('--sidebar-background', background);
+      root.style.setProperty('--sidebar-text', value.textColor);
+      root.style.setProperty('--sidebar-accent', value.accentColor);
+      root.style.setProperty('--sidebar-accent-foreground', readableText(value.accentColor));
+      root.style.setProperty('--sidebar-width', `${value.width}px`);
+      root.style.setProperty('--sidebar-radius', value.radius === 'sharp' ? '4px' : value.radius === 'medium' ? '10px' : '14px');
+      root.style.setProperty('--sidebar-font-size', value.fontSize === 'small' ? '12px' : value.fontSize === 'large' ? '14px' : '13px');
     };
-  }, [theme]);
+    apply(theme);
+    return () => apply({ ...DEFAULT_THEME, ...(school?.sidebarTheme || {}) });
+  }, [theme, school?.sidebarTheme]);
 
   const update = <K extends keyof SidebarTheme>(key: K, value: SidebarTheme[K]) =>
     setTheme(current => ({ ...current, [key]: value }));
