@@ -6185,22 +6185,37 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
   const targets=students.filter((student:any)=>student.status==='active'&&(studentId?student.id===studentId:student.classId===classId));
   if(studentId&&!targets.length){res.status(404).json({error:'Active student was not found in this school.'});return;}
   const activeStructures=structures.filter(item=>item.isActive&&Number(item.amount)>0);
+  const annualStructureIds=activeStructures.filter(item=>item.feeType==='annual_registration'||item.feeType==='custom'&&item.cadence==='annual').map(item=>item.id);
+  const oneTimeStructureIds=activeStructures.filter(item=>item.feeType==='custom'&&item.cadence==='one_time').map(item=>item.id);
+  const targetIds=targets.map((student:any)=>student.id);
+  const [priorAnnual,priorOneTime]=await Promise.all([
+    body.includeAnnualRegistration===true&&annualStructureIds.length&&targetIds.length
+      ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id,academic_year)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).eq('student_invoices.academic_year',school.academicYear).in('fee_structure_id',annualStructureIds)
+      : Promise.resolve({data:[],error:null}),
+    body.includeOneTimeFees===true&&oneTimeStructureIds.length&&targetIds.length
+      ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).in('fee_structure_id',oneTimeStructureIds)
+      : Promise.resolve({data:[],error:null})
+  ]);
+  if(priorAnnual.error||priorOneTime.error){res.status(503).json({error:'Could not verify previously billed annual or one-time fees.'});return;}
+  const billedAnnualByStudent=new Map<string,Set<string>>();
+  for(const row of priorAnnual.data||[]){
+    const studentKey=(row as any).student_invoices?.student_id;
+    if(!studentKey)continue;
+    if(!billedAnnualByStudent.has(studentKey))billedAnnualByStudent.set(studentKey,new Set());
+    billedAnnualByStudent.get(studentKey)!.add((row as any).fee_structure_id);
+  }
+  const billedOneTimeByStudent=new Map<string,Set<string>>();
+  for(const row of priorOneTime.data||[]){
+    const studentKey=(row as any).student_invoices?.student_id;
+    if(!studentKey)continue;
+    if(!billedOneTimeByStudent.has(studentKey))billedOneTimeByStudent.set(studentKey,new Set());
+    billedOneTimeByStudent.get(studentKey)!.add((row as any).fee_structure_id);
+  }
   const created:any[]=[];let skippedExisting=0,skippedNoFees=0;
   for(const student of targets){
     const klass=schoolClasses.find((item:any)=>item.id===student.classId);
-    const annualStructureIds=activeStructures.filter(item=>item.feeType==='annual_registration'||item.feeType==='custom'&&item.cadence==='annual').map(item=>item.id);
-    const oneTimeStructureIds=activeStructures.filter(item=>item.feeType==='custom'&&item.cadence==='one_time').map(item=>item.id);
-    const [priorAnnual,priorOneTime]=await Promise.all([
-      body.includeAnnualRegistration===true&&annualStructureIds.length
-        ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id,academic_year)').eq('school_id',school.id).eq('student_invoices.student_id',student.id).eq('student_invoices.academic_year',school.academicYear).in('fee_structure_id',annualStructureIds)
-        : Promise.resolve({data:[],error:null}),
-      body.includeOneTimeFees===true&&oneTimeStructureIds.length
-        ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id)').eq('school_id',school.id).eq('student_invoices.student_id',student.id).in('fee_structure_id',oneTimeStructureIds)
-        : Promise.resolve({data:[],error:null})
-    ]);
-    if(priorAnnual.error||priorOneTime.error){res.status(503).json({error:'Could not verify previously billed annual or one-time fees.'});return;}
-    const billedAnnual=new Set((priorAnnual.data||[]).map((row:any)=>row.fee_structure_id));
-    const billedOneTime=new Set((priorOneTime.data||[]).map((row:any)=>row.fee_structure_id));
+    const billedAnnual=billedAnnualByStudent.get(student.id)||new Set<string>();
+    const billedOneTime=billedOneTimeByStudent.get(student.id)||new Set<string>();
     const applicable=activeStructures.filter(item=>{
       if(item.feeType==='bus')return false;
       const classMatch=item.classId?item.classId===student.classId:
