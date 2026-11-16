@@ -858,7 +858,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                        <span>{Array.isArray(route.stops) && route.stops.length ? route.stops.join(" · ") : "Pickup stops not set"}</span>
+                        <span>{Array.isArray(route.stops) && route.stops.length ? route.stops.join(' → ') : "Pickup stops not set"}</span>
                         {route.driverPhone && <span>{route.driverPhone}</span>}
                       </div>
                       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">

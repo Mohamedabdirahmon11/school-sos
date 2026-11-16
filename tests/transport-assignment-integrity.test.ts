@@ -41,7 +41,7 @@ test('transport UI exposes capacity and live seat occupancy', () => {
   assert.match(ui, /routeCapacity/);
   assert.match(ui, /capacity: routeCapacity/);
   assert.match(ui, /Bus Capacity \(students\)/);
-  assert.match(ui, /item\.routeId === r\.id/);
+  assert.match(ui, /activeBusAssignments\.filter\(item => item\.routeId === route\.id\)/);
 });
 
 test('bus assignment writes remain restricted to school administrators', () => {
