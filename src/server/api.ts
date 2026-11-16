@@ -6218,9 +6218,11 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
     const billedOneTime=billedOneTimeByStudent.get(student.id)||new Set<string>();
     const applicable=activeStructures.filter(item=>{
       if(item.feeType==='bus')return false;
-      const classMatch=item.classId?item.classId===student.classId:
-        ['annual_registration','custom'].includes(item.feeType)?true:
-        item.minGrade!==undefined&&item.maxGrade!==undefined&&klass&&klass.gradeLevel>=item.minGrade&&klass.gradeLevel<=item.maxGrade;
+      const classMatch=item.classId
+        ? item.classId===student.classId
+        : item.minGrade!==undefined&&item.maxGrade!==undefined
+          ? Boolean(klass&&klass.gradeLevel>=item.minGrade&&klass.gradeLevel<=item.maxGrade)
+          : ['annual_registration','custom'].includes(item.feeType);
       if(!classMatch)return false;
       if(item.feeType==='annual_registration')return body.includeAnnualRegistration===true&&!billedAnnual.has(item.id);
       if(item.feeType==='monthly_tuition')return item.cadence==='monthly';
