@@ -347,14 +347,10 @@ export const TeachersView: React.FC = () => {
               </div>
 
               <div>
-                  <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
-                  <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+                  <label className="block font-medium text-[#334155]">Teacher PIN (required)</label>
+                  <input type="password" required inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
               </div>
-              <div>
-                <label className="block font-medium text-[#334155]">Password (optional)</label>
-                <input type="password" autoComplete="new-password" value={teacherPassword} onChange={e => setTeacherPassword(e.target.value)} minLength={teacherPassword ? 8 : undefined} placeholder="Optional: 8+ characters, uppercase, lowercase and number" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
-              </div>
-              <p className="text-[10px] text-slate-500">Provide at least one sign-in method: a 4–6 digit PIN or a strong password.</p>
+              <p className="text-[10px] text-slate-500">Teachers sign in using their school-issued Teacher ID and 4–6 digit PIN. Password login is disabled.</p>
               <div>
                 <label className="block font-medium text-[#334155]">Address (optional)</label>
                 <input value={address} onChange={e => setAddress(e.target.value)} maxLength={250} placeholder="Teacher address" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
