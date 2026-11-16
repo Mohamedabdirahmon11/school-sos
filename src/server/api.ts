@@ -48,7 +48,7 @@ import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupPr
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
-import { replaceDocumentVariables } from '../lib/documents/variables.ts';
+import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 
@@ -8242,6 +8242,11 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
       content_html:safeHtml, page_size:'A4', direction:'ltr', page_margins:20,
       student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id
     });
+  }
+  if (requiresDocumentGenerationConfirmation(warnings, body.confirmMissing === true)) {
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({ requiresConfirmation:true, documents:[], warnings });
+    return;
   }
   const { data, error } = await client.from('school_documents').insert(rows).select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins');
   if (error || !data) { res.status(503).json({ error: 'Dukumentiyada ardayda lama kaydin karin.' }); return; }
