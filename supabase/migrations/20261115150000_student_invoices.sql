@@ -150,7 +150,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_create_student_invoice(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   school_key VARCHAR(64);
   student_key VARCHAR(64);
@@ -260,7 +260,7 @@ BEGIN
 
   RETURN jsonb_build_object('duplicate',false,'invoice',to_jsonb(invoice_row));
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.schoolos_create_student_invoice(JSONB,JSONB) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_create_student_invoice(JSONB,JSONB) TO service_role;
