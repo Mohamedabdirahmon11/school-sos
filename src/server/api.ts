@@ -7957,8 +7957,10 @@ apiRouter.get('/document-templates', requireAuth, requireSchoolContext, requireS
   const school = (req as any).school as School;
   const client = documentServiceClient(res);
   if (!client) return;
-  const { data, error } = await client.from('school_document_templates').select('id,title,document_type,content_html,updated_at')
-    .eq('school_id',school.id).is('deleted_at',null).order('updated_at',{ascending:false}).limit(100);
+  let templateQuery = client.from('school_document_templates').select('id,title,document_type,content_html,updated_at,deleted_at')
+    .eq('school_id',school.id);
+  if (req.query.includeArchived !== 'true') templateQuery = templateQuery.is('deleted_at',null);
+  const { data, error } = await templateQuery.order('updated_at',{ascending:false}).limit(100);
   if (error) { res.status(503).json({ error: 'Templates-ka lama soo dejin karin.' }); return; }
   res.json((data || []).map(documentTemplateClientRow));
 });
@@ -8005,6 +8007,19 @@ apiRouter.delete('/document-templates/:id', requireAuth, requireSchoolContext, r
   const { data, error } = await client.from('school_document_templates').update({ deleted_at:new Date().toISOString(), deleted_by:user.id })
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('id').maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Template-ka lama tirtiri karin.' }); return; }
+  res.json({ success:true });
+});
+
+
+apiRouter.post('/document-templates/:id/restore', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates')
+    .update({ deleted_at:null, deleted_by:null, updated_by:user.id, updated_at:new Date().toISOString() })
+    .eq('school_id',school.id).eq('id',req.params.id).not('deleted_at','is',null).select('id').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Template-ka kaydsan lama soo celin karin.' }); return; }
   res.json({ success:true });
 });
 
