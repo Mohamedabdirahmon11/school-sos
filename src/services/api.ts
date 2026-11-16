@@ -672,6 +672,18 @@ export class ApiClient {
     return this.request<any>(`/documents/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
   }
 
+  public static async getDocumentPermissions(id: string) {
+    return this.request<any[]>(`/documents/${encodeURIComponent(id)}/permissions`);
+  }
+
+  public static async setDocumentPermission(id: string, input: {userId?:string;role?:string;canView?:boolean;canEdit?:boolean;canDownload?:boolean}) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/permissions`, {method:'POST',body:JSON.stringify(input)});
+  }
+
+  public static async deleteDocumentPermission(id: string, permissionId: string) {
+    return this.request<{success:boolean}>(`/documents/${encodeURIComponent(id)}/permissions/${encodeURIComponent(permissionId)}`, {method:'DELETE'});
+  }
+
   public static async getDocumentVersions(id: string) {
     return this.request<any[]>(`/documents/${encodeURIComponent(id)}/versions`);
   }
