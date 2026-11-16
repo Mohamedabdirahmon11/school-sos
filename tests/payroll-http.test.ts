@@ -62,12 +62,24 @@ test('accountant payroll runs are unique per staff and month, progress through a
   const superAdminPayslip = await fetch(`${baseUrl}/payroll/${record.id}/payslip.pdf`, { headers: { Cookie: superAdminCookie } });
   assert.equal(superAdminPayslip.status, 200, 'super admins may access payslips within the selected school context');
 
+  const payrollStaff = await fetch(`${baseUrl}/payroll/staff`, { headers: accountantHeaders });
+  assert.equal(payrollStaff.status, 200);
+  const payrollEmployees = await payrollStaff.json() as any[];
+  assert.ok(payrollEmployees.some(item => item.userId === admin.id && item.roleTitle === 'School Administrator'), 'school administrators are included in payroll roster');
+  assert.ok(payrollEmployees.some(item => item.userId === teacherUser.id), 'teachers are included in payroll roster');
+
   const approve = await fetch(`${baseUrl}/payroll/${record.id}/approve`, { method: 'POST', headers: accountantHeaders });
   assert.equal(approve.status, 200); assert.equal((await approve.json() as any).status, 'approved');
   const approveAgain = await fetch(`${baseUrl}/payroll/${record.id}/approve`, { method: 'POST', headers: accountantHeaders });
   assert.equal(approveAgain.status, 409);
-  const paid = await fetch(`${baseUrl}/payroll/${record.id}/pay`, { method: 'POST', headers: accountantHeaders });
-  assert.equal(paid.status, 200); assert.equal((await paid.json() as any).status, 'paid');
+  const partial = await fetch(`${baseUrl}/payroll/${record.id}/pay`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ amount: 400, paymentMethod: 'bank_transfer', paymentDate: '2026-11-15', reference: 'BANK-TEST-001' }) });
+  const partialBody = await partial.json() as any;
+  assert.equal(partial.status, 200); assert.equal(partialBody.status, 'partially_paid'); assert.equal(partialBody.paidAmount, 400); assert.equal(partialBody.balanceDue, 850); assert.equal(partialBody.paymentHistory.length, 1);
+  const overpay = await fetch(`${baseUrl}/payroll/${record.id}/pay`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ amount: 900, paymentMethod: 'cash', paymentDate: '2026-11-16' }) });
+  assert.equal(overpay.status, 400);
+  const paid = await fetch(`${baseUrl}/payroll/${record.id}/pay`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ amount: 850, paymentMethod: 'cash', paymentDate: '2026-11-16' }) });
+  const paidBody = await paid.json() as any;
+  assert.equal(paid.status, 200); assert.equal(paidBody.status, 'paid'); assert.equal(paidBody.paidAmount, 1250); assert.equal(paidBody.balanceDue, 0); assert.equal(paidBody.paymentHistory.length, 2);
   const payslip = await fetch(`${baseUrl}/payroll/${record.id}/payslip.pdf`, { headers: { Cookie: teacherCookie } });
   assert.equal(payslip.status, 200); assert.equal(payslip.headers.get('content-type'), 'application/pdf');
   assert.ok(Buffer.from(await payslip.arrayBuffer()).toString('latin1').includes('ETB'));
