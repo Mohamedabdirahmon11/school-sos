@@ -79,6 +79,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
+  const [timetableScope, setTimetableScope] = useState<'mine' | 'school'>('mine');
+  const [studentSearch, setStudentSearch] = useState('');
+  const isMyTimetableSlot = (slot: TimetableSlot) =>
+    teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId)
+    || String((slot as any).teacherName || '').trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase();
+  const visibleTimetable = timetableScope === 'mine' ? timetable.filter(isMyTimetableSlot) : timetable;
+  const visibleStudents = students.filter(student =>
+    `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
+  );
   const [formClassStudentCounts, setFormClassStudentCounts] = useState<Record<string, number>>({});
   const [formClassStudentTotal, setFormClassStudentTotal] = useState(0);
   useEffect(() => {
@@ -466,20 +475,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
                 <CalendarDays className="h-5 w-5 text-teal-700" />
-                Full school timetable
+                {timetableScope === 'mine' ? 'My teaching timetable' : 'Full school timetable'}
               </h2>
+              <p className="mt-1 text-xs text-slate-500">Start with your own lessons; switch to the school view when needed.</p>
             </div>
-            <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} school periods</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Timetable scope">
+                <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => setTimetableScope('mine')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
+                <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => setTimetableScope('school')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
+              </div>
+              <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} periods</span>
+            </div>
           </div>
-          {timetable.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#64748B]">
-              No schedule slots assigned. Contact school administration to set your timetable.
+          {visibleTimetable.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
+              {timetableScope === 'mine' && timetable.length > 0
+                ? 'No lessons could be matched to your teacher account. Switch to School to review the full timetable, or ask the administrator to verify your timetable assignments.'
+                : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {timetable.map(slot => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {visibleTimetable.map(slot => {
                 const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId) || String((slot as any).teacherName || '').trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase();
+                const mySlot = isMyTimetableSlot(slot);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
                   <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
@@ -510,12 +528,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </label>
           </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm sm:max-w-sm" />
               <div><h2 className="text-sm font-bold text-slate-900">Students in this class</h2><p className="mt-1 text-[11px] text-slate-500">Only students of the class where you are the form teacher are shown.</p></div>
               <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
             </div>
             {isLoadingClassData ? <p className="p-8 text-center text-sm text-slate-500">Loading assigned students...</p> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{formTeacherClasses.length ? 'No students found in your form class.' : 'You are not the form teacher of any class yet. Ask the School Admin to assign you a form class.'}</p> : (
-              <div className="overflow-x-auto">
+              <div className="space-y-2 p-3 md:hidden">
+                {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-slate-400">#{index + 1}</span><span className="rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-slate-600">{student.studentId}</span></div>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p>
+                </article>)}
+                {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">{students.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td></tr>)}</tbody>
@@ -584,7 +610,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
-            <div className="overflow-x-auto">
+            <div className="border-b border-slate-100 p-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Find a student by name or ID..." aria-label="Search attendance students" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
+            <div className="space-y-3 p-3 md:hidden">
+              {isLoadingClassData ? <p className="p-5 text-center text-sm text-slate-500">Loading students and attendance...</p> : visibleStudents.map(student => {
+                const current = attendanceMap[student.id] || { status: 'present' as AttendanceStatus, note: '' };
+                return <article key={student.id} className="rounded-xl border border-slate-200 p-3">
+                  <div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-bold text-slate-900">{student.firstName} {student.lastName}</p><p className="mt-0.5 font-mono text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold capitalize text-slate-600">{current.status}</span></div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => <button key={status} type="button" aria-pressed={current.status === status} onClick={() => setAttendanceMap(previous => ({ ...previous, [student.id]: { ...previous[student.id], status } }))} className={`min-h-11 rounded-lg px-2 text-xs font-bold capitalize ${current.status === status ? status === 'present' ? 'bg-emerald-600 text-white' : status === 'absent' ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{status}</button>)}
+                  </div>
+                  <input type="text" value={current.note} onChange={event => setAttendanceMap(previous => ({ ...previous, [student.id]: { ...previous[student.id], note: event.target.value } }))} placeholder="Optional attendance note" aria-label={`Attendance note for ${student.firstName} ${student.lastName}`} className="mt-3 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+                </article>;
+              })}
+              {!isLoadingClassData && visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>
@@ -594,7 +634,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {isLoadingClassData ? <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">Loading students and attendance...</td></tr> : students.map(s => {
+                {isLoadingClassData ? <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">Loading students and attendance...</td></tr> : visibleStudents.map(s => {
                   const current = attendanceMap[s.id] || { status: 'present', note: '' };
                   return (
                     <tr key={s.id} className="hover:bg-[#F8FAFC]">
@@ -685,10 +725,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </div>
                 {subjectComponents.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No assessment components are configured for this exam type. Ask School Admin to configure the exam.</p> : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] border-collapse text-xs">
+                    <div className="mb-3 px-3 pt-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students for marks" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
+                    <div className="space-y-3 p-3 md:hidden">
+                      {visibleStudents.map(student => {
+                        const key = `${student.id}:${subject.id}`;
+                        const input = marksInput[key] || { scores: {}, remarks: '' };
+                        const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+                        const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
+                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
+                        const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
+                        return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
+                          </div>
+                          <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
+                        </article>;
+                      })}
+                      {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
+                    </div>
+                    <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[760px] border-collapse text-xs">
                       <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th>{subjectComponents.map(component => <th key={component.id} className="border-l px-2 py-3 text-center">{component.name}<span className="block text-[9px] normal-case">Max {component.maxMarks}</span></th>)}<th className="border-l px-3 py-3">Exam total</th><th className="px-3 py-3">Status</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
-                        {students.map(student => {
+                        {visibleStudents.map(student => {
                           const key = `${student.id}:${subject.id}`;
                           const input = marksInput[key] || { scores: {}, remarks: '' };
                           const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
@@ -732,10 +791,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading exam results...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No assigned subject results are available for this class.</div> : gradeSubjects.map(subject => (
             <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><h3 className="text-sm font-bold text-slate-900">{subject.name}</h3><p className="mt-1 text-[10px] text-slate-500">{semester} · Small Exam + Big Exam</p></div>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 p-3 md:hidden">
+                {visibleStudents.map(student => { const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id); return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Small Exam</span><strong>{mark ? mark.smallExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Big Exam</span><strong>{mark ? mark.bigExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Total</span><strong>{mark ? mark.totalMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Percentage</span><strong>{mark ? `${mark.percentage}%` : '—'}</strong></div></div>
+                </article>; })}
+                {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[760px] text-xs">
                   <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th><th className="px-3 py-3">Small Exam</th><th className="px-3 py-3">Big Exam</th><th className="px-3 py-3">Total</th><th className="px-3 py-3">Percentage</th><th className="px-3 py-3">Status</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{students.map(student => { const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id); return <tr key={student.id} className="hover:bg-slate-50"><td className="px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-400">{student.studentId}</span></td><td className="px-3 py-3 text-center">{mark ? mark.smallExamMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? mark.bigExamMarks : '—'}</td><td className="px-3 py-3 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? `${mark.percentage}%` : '—'}</td><td className="px-3 py-3 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td></tr>; })}</tbody>
+                  <tbody className="divide-y divide-slate-100">{visibleStudents.map(student => { const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id); return <tr key={student.id} className="hover:bg-slate-50"><td className="px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-400">{student.studentId}</span></td><td className="px-3 py-3 text-center">{mark ? mark.smallExamMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? mark.bigExamMarks : '—'}</td><td className="px-3 py-3 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? `${mark.percentage}%` : '—'}</td><td className="px-3 py-3 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td></tr>; })}</tbody>
                 </table>
               </div>
             </section>
