@@ -4717,23 +4717,23 @@ apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requ
 apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { fullName, roleTitle, email, phone, monthlySalary, permissions } = req.body || {};
+  const initialPin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
   const createLogin = req.body?.createLogin !== false;
-  if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && (typeof email !== 'string' || !email.trim()))) { res.status(400).json({ error: 'Full name and role title are required; login email is required only when creating login access.' }); return; }
+  if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && !/^\d{4,6}$/.test(initialPin))) { res.status(400).json({ error: 'Full name and role title are required; a 4–6 digit PIN is required only when creating login access.' }); return; }
   if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && permissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
   if (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const cleanEmail = createLogin ? email.trim().toLowerCase() : '';
-  if (createLogin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid sign-in email.' }); return; }
-  if (createLogin && await db.findUserForLogin(cleanEmail)) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
+  const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid contact email.' }); return; }
+  if (cleanEmail && await db.findUserForLogin(cleanEmail)) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   const existingStaff = await db.getStaffMembers(school.id);
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
-  const temporaryPassword = createLogin ? String(randomInt(100000, 1_000_000)) : undefined;
-  const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(temporaryPassword!), mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0 }) : null;
+  const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin), mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0 }) : null;
   const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? permissions : [], status: 'active', ...(account ? { userId: account.id } : {}) });
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
-  res.status(201).json({ ...staff, ...(temporaryPassword ? { initialPassword: temporaryPassword } : {}) });
+  res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
