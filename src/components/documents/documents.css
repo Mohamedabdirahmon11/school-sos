@@ -47,3 +47,10 @@
 
 .document-editable img.document-image-selected { outline:2px solid #0f766e; outline-offset:2px; cursor:move; }
 @media print { .document-editable img.document-image-selected { outline:none !important; } }
+
+.document-editable { position:relative; }
+.document-positioned-field { position:absolute; display:inline-block; min-width:100px; min-height:24px; padding:4px; border:1px dashed #0f766e; background:rgba(255,255,255,.88); resize:both; overflow:auto; cursor:text; z-index:1; }
+.document-positioned-field-selected { outline:2px solid #0f766e; outline-offset:2px; }
+.document-field-drag-handle { display:inline-block; margin-right:6px; padding:0 4px; border-radius:3px; background:#e2e8f0; color:#334155; cursor:move; user-select:none; }
+.document-show-guides { background-image:linear-gradient(to right,rgba(15,118,110,.09) 1px,transparent 1px),linear-gradient(to bottom,rgba(15,118,110,.09) 1px,transparent 1px); background-size:10px 10px; }
+@media print { .document-positioned-field { border:0 !important; background:transparent !important; resize:none !important; } .document-field-drag-handle { display:none !important; } .document-positioned-field-selected { outline:none !important; } }
