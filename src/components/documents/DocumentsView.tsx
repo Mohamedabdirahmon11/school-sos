@@ -8,7 +8,7 @@ import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import './documents.css';
 
 type DocType = 'transfer_letter'|'certificate'|'parent_letter'|'teacher_letter'|'student_clearance'|'report_summary'|'other';
-type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean };
+type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean; canDownload?:boolean };
 type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean };
 
 const BUILTIN_TEMPLATES: TemplateRow[] = [
