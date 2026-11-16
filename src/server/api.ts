@@ -6176,7 +6176,7 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
   const classId=typeof body.classId==='string'?body.classId.trim():'';
   const studentId=typeof body.studentId==='string'?body.studentId.trim():'';
   const parsedDue=new Date(dueDate+'T00:00:00.000Z');
-  if(!billingPeriod||billingPeriod.length>80||!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)||Number.isNaN(parsedDue.getTime())||parsedDue.toISOString().slice(0,10)!==dueDate||Boolean(classId)===Boolean(studentId)){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(billingPeriod)||!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)||Number.isNaN(parsedDue.getTime())||parsedDue.toISOString().slice(0,10)!==dueDate||Boolean(classId)===Boolean(studentId)){
     res.status(400).json({error:'Choose one class or student, a billing period, and a valid due date.'});return;
   }
   const client=studentInvoiceServiceClient(res);if(!client)return;
