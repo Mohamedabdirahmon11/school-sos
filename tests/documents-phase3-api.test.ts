@@ -18,6 +18,8 @@ test('Phase 3 history, restore, locking, audit and permissions routes are authen
   assert.match(api, /hasDocumentGrant\(client,school\.id,user,req\.params\.id,'edit'\)/);
   assert.match(api, /hasDocumentGrant\(client,school\.id,user,data\.id,'view'\)/);
   assert.match(api, /DOCUMENT_LOCKED/);
+  assert.ok(api.includes("const roles=new Set(['teacher','accountant'])"), 'role-wide sharing must be limited to staff');
+  assert.ok(api.includes("['teacher','accountant','parent','student'].includes(target.role)"), 'parent/student grants must target one same-school user');
   assert.match(api, /school_id:school\.id,student_id:student\.id/);
 });
 
