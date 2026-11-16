@@ -7792,7 +7792,7 @@ apiRouter.post('/documents/:id/unlock', requireAuth, requireSchoolContext, requi
   if (!client) return;
   const { data, error } = await client.from('school_documents').update({
     locked_at:null, locked_by:null, lock_reason:null, status:'draft', updated_by:user.id, updated_at:new Date().toISOString()
-  }).eq('school_id',school.id).eq('id',req.params.id).not('locked_at','is',null).select('*').maybeSingle();
+  }).eq('school_id',school.id).eq('id',req.params.id).or('locked_at.not.is.null,status.eq.final').select('*').maybeSingle();
   if (error || !data) { res.status(409).json({ error:'Dukumentiga lama helin ama ma xirna.' }); return; }
   res.json(documentClientRow(data,true));
 });
