@@ -54,6 +54,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [busAssignments, setBusAssignments] = useState<any[]>([]);
   const [selectedBusStudentIds, setSelectedBusStudentIds] = useState<string[]>([]);
   const [busStudentSearch, setBusStudentSearch] = useState('');
+  const [busStudentStatusFilter, setBusStudentStatusFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [assignmentRouteId, setAssignmentRouteId] = useState('');
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
@@ -151,6 +152,22 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const loansPage = filterModuleRows(libraryLoans, ['status', 'dueDate', 'studentId', 'bookId']);
   const routesPage = filterModuleRows(routes, ['name', 'routeNumber', 'vehicleNumber', 'driverName', 'driverPhone']);
   const assignmentsPage = filterModuleRows(busAssignments, ['studentId', 'routeId']);
+  const activeBusAssignments = busAssignments.filter(item => item.active !== false);
+  const activeTransportStudents = students.filter(student => student.status === 'active');
+  const activeAssignedStudentIds = new Set(activeBusAssignments.map(item => item.studentId));
+  const filteredBusStudents = activeTransportStudents.filter(student => {
+    const isAssigned = activeAssignedStudentIds.has(student.id);
+    const classMatches = assignmentClassId === 'all' || student.classId === assignmentClassId;
+    const statusMatches = busStudentStatusFilter === 'all'
+      || (busStudentStatusFilter === 'assigned' && isAssigned)
+      || (busStudentStatusFilter === 'unassigned' && !isAssigned);
+    const className = transportClasses.find(item => item.id === student.classId)?.name || '';
+    const searchText = [student.firstName, student.middleName, student.lastName, student.studentId, className].filter(Boolean).join(' ').toLowerCase();
+    return classMatches && statusMatches && searchText.includes(busStudentSearch.trim().toLowerCase());
+  });
+  const activeTransportRoutes = routes.filter(route => route.active !== false);
+  const activeBusRevenue = activeBusAssignments.reduce((sum, item) => sum + Math.max(0, Number(item.feeAmount) || 0), 0);
+  const availableBusSeats = activeTransportRoutes.reduce((sum, route) => sum + Math.max(0, Number(route.capacity || 40) - activeBusAssignments.filter(item => item.routeId === route.id).length), 0);
   const disciplinePage = filterModuleRows(disciplineLogs, ['studentName', 'studentId', 'incidentDate', 'infractionType', 'severity', 'actionTaken', 'notes']);
   const healthPage = filterModuleRows(healthLogs, ['studentName', 'visitDate', 'symptoms', 'treatment', 'nurseName']);
   const inventoryPage = filterModuleRows(inventory, ['name', 'sku', 'category', 'location']);
@@ -740,144 +757,248 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
       {/* 2. TRANSPORT MODULE */}
       {activeModule === 'transport' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <Bus className="w-4 h-4 text-[#0F766E]" />
-              <span>School Transport Routes & Fleet</span>
-            </h2>
-            <button
-              onClick={() => setShowAddRouteModal(true)}
-              disabled={isReadOnly}
-              className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#0D655E] text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Route</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs">
-              <thead className="bg-[#F8FAFC] text-[#64748B] font-medium border-b border-[#E2E8F0]">
-                <tr>
-                  <th className="px-4 py-2.5">Route Name</th>
-                  <th className="px-4 py-2.5">Vehicle Plate</th>
-                  <th className="px-4 py-2.5">Driver Name</th>
-                  <th className="px-4 py-2.5">Driver Phone</th>
-                  <th className="px-4 py-2.5">Neighborhood Stops</th>
-                  <th className="px-4 py-2.5">Monthly Fee</th>
-                  <th className="px-4 py-2.5">Seats</th>
-                  <th className="px-4 py-2.5">Status / Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {routes.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-6 text-center text-[#64748B]">No transport routes added yet.</td>
-                  </tr>
-                ) : routesPage.rows.length === 0 ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-[#64748B]">No routes match your search.</td></tr>
-                ) : (
-                  routesPage.rows.map(r => (
-                    <tr key={r.id} className="hover:bg-[#F8FAFC]">
-                      <td className="px-4 py-2.5 font-semibold text-[#132A29]">{r.name}</td>
-                      <td className="px-4 py-2.5 font-mono">{r.vehicleNumber}</td>
-                      <td className="px-4 py-2.5 text-[#334155]">{r.driverName}</td>
-                      <td className="px-4 py-2.5 font-mono text-[#64748B]">{r.driverPhone}</td>
-                      <td className="px-4 py-2.5 text-[#334155]">{Array.isArray(r.stops) && r.stops.length ? r.stops.join(' → ') : 'Not set'}</td>
-                      <td className="px-4 py-2.5 font-mono font-bold text-emerald-700">{formatMoney(r.feeAmount, school?.currency)}</td>
-                      <td className="px-4 py-2.5 font-mono">{busAssignments.filter(item => item.routeId === r.id && item.active !== false).length} / {r.capacity || 40}</td>
-                      <td className="px-4 py-2.5"><div className="flex items-center gap-2">
-                        <span className={r.active === false ? "text-rose-700" : "text-emerald-700"}>{r.active === false ? "Inactive" : "Active"}</span>
-                        <button type="button" disabled={isReadOnly} onClick={() => openRouteEditor(r)} className="text-teal-700 disabled:opacity-40">Edit</button>
-                        <button type="button" disabled={isReadOnly} onClick={() => handleToggleRoute(r)} className="text-rose-700 disabled:opacity-40">{r.active === false ? "Activate" : "Deactivate"}</button>
-                      </div></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {renderModulePagination(routesPage, 'routes')}
-          <section className="rounded-xl border border-teal-100 bg-gradient-to-br from-white to-teal-50/40 p-4 space-y-3 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-[#132A29]">Bus students</h3><span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold text-teal-800">{busAssignments.filter(item => item.active !== false).length} assigned</span></div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_180px_minmax(0,1fr)_auto]">
-              <input
-                type="search"
-                value={busStudentSearch}
-                onChange={e => setBusStudentSearch(e.target.value)}
-                placeholder="Search students by name or ID"
-                className="min-w-0 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
-              />
-              <select value={assignmentClassId} onChange={e => setAssignmentClassId(e.target.value)} className="min-w-0 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg" aria-label="Filter students by class">
-                <option value="all">All classes</option>
-                {transportClasses.map((item: any) => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}</option>)}
-              </select>
-              <select value={assignmentRouteId} onChange={e => setAssignmentRouteId(e.target.value)} className="min-w-0 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
-                <option value="">Choose bus route</option>
-                {routes.filter(route => route.active !== false).map(route => {
-                  const occupied = busAssignments.filter(item => item.routeId === route.id && item.active !== false).length;
-                  return <option key={route.id} value={route.id}>{route.name} · {occupied}/{route.capacity || 40}</option>;
-                })}
-              </select>
-              <button type="button" onClick={handleAssignBus} disabled={isReadOnly || selectedBusStudentIds.length === 0 || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">
-                Assign {selectedBusStudentIds.length || ''} selected
-              </button>
-            </div>
-            <div className="rounded-lg border border-[#E2E8F0] overflow-hidden">
-              <div className="flex items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#64748B]">
-                <span>Select students ({students.filter(student => student.status === 'active').length} active)</span>
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-teal-950 to-teal-800 px-5 py-6 text-white sm:px-7">
+              <div className="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full border-[28px] border-white/5" />
+              <div className="relative flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">
+                    <Bus className="h-4 w-4" /> Transport management
+                  </div>
+                  <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">School transport</h2>
+                  <p className="mt-1 max-w-xl text-sm text-teal-100/80">Manage routes, assign students, and see every active bus passenger in one place.</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    const visibleIds = students.filter(student => student.status === 'active' && (assignmentClassId === 'all' || student.classId === assignmentClassId) && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).map(student => student.id);
-                    setSelectedBusStudentIds(current => visibleIds.every(id => current.includes(id))
-                      ? current.filter(id => !visibleIds.includes(id))
-                      : [...new Set([...current, ...visibleIds])]);
-                  }}
-                  className="font-semibold text-teal-700"
+                  onClick={() => setShowAddRouteModal(true)}
+                  disabled={isReadOnly}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-teal-900 shadow-sm transition hover:bg-teal-50 disabled:opacity-50"
                 >
-                  {students.filter(student => student.status === 'active' && (assignmentClassId === 'all' || student.classId === assignmentClassId) && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).length > 0 && students.filter(student => student.status === 'active' && (assignmentClassId === 'all' || student.classId === assignmentClassId) && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).every(student => selectedBusStudentIds.includes(student.id)) ? 'Clear visible selection' : 'Select all shown'}
+                  <Plus className="h-4 w-4" /> Add route
                 </button>
               </div>
-              <div className="max-h-52 overflow-y-auto divide-y divide-[#F1F5F9]">
-                {students.filter(student => student.status === 'active' && (assignmentClassId === 'all' || student.classId === assignmentClassId) && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).map(student => (
-                  <label key={student.id} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F8FAFC] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedBusStudentIds.includes(student.id)}
-                      onChange={e => setSelectedBusStudentIds(current => e.target.checked ? [...new Set([...current, student.id])] : current.filter(id => id !== student.id))}
-                      disabled={isReadOnly}
-                      className="rounded border-[#CBD5E1]"
-                    />
-                    <span className="font-medium text-[#132A29]">{student.firstName} {student.middleName ? `${student.middleName} ` : ''}{student.lastName}</span>
-                    <span className="ml-auto text-[10px] text-[#64748B]">{student.studentId}</span>
-                  </label>
-                ))}
-                {students.filter(student => student.status === 'active' && (assignmentClassId === 'all' || student.classId === assignmentClassId) && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).length === 0 && (
-                  <p className="px-3 py-4 text-center text-xs text-[#64748B]">No active students match your search.</p>
-                )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-4">
+              <div className="bg-white px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-slate-500">Active routes</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{activeTransportRoutes.length}</p>
+                <p className="mt-1 text-[11px] text-slate-400">{routes.length - activeTransportRoutes.length} inactive</p>
+              </div>
+              <div className="bg-white px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-slate-500">Students on buses</p>
+                <p className="mt-1 text-2xl font-bold text-teal-700">{activeBusAssignments.filter(item => activeTransportStudents.some(student => student.id === item.studentId)).length}</p>
+                <p className="mt-1 text-[11px] text-slate-400">Active assignments</p>
+              </div>
+              <div className="bg-white px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-slate-500">Seats available</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{availableBusSeats}</p>
+                <p className="mt-1 text-[11px] text-slate-400">Across active routes</p>
+              </div>
+              <div className="bg-white px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-slate-500">Monthly bus fees</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-700">{formatMoney(activeBusRevenue, school?.currency)}</p>
+                <p className="mt-1 text-[11px] text-slate-400">Saved assignment fees</p>
               </div>
             </div>
-            {assignmentsPage.rows.map(item => {
-              const student = students.find(row => row.id === item.studentId);
-              const route = routes.find(row => row.id === item.routeId);
-              return <div key={item.id} className="flex items-center justify-between gap-3 text-xs border border-[#E2E8F0] rounded-lg p-3">
-                <span>{student ? `${student.firstName} ${student.lastName}` : item.studentId} · {route?.name || item.routeId}</span>
-                <span className="font-mono">{formatMoney(item.feeAmount, school?.currency)}</span>
-                <button type="button" disabled={isReadOnly} onClick={async () => {
-                  if (isReadOnly) return;
-                  try {
-                    await ApiClient.removeBusAssignment(item.studentId);
-                    setBusAssignments(current => current.filter(row => row.id !== item.id));
-                    setNotice('Student is no longer using the bus. Previous fee and payment records remain unchanged.');
-                  } catch (err: any) {
-                    setModuleError(err.message || 'Unable to remove the bus assignment.');
-                  }
-                }} className="rounded-md border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40">Bus ma raaco</button>
-              </div>;
-            })}
-            {renderModulePagination(assignmentsPage, 'bus assignments')}
+          </section>
+
+          {(moduleError || notice) && (
+            <div className={moduleError ? "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"} role={moduleError ? "alert" : "status"}>
+              {moduleError || notice}
+            </div>
+          )}
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Routes & vehicles</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Capacity, driver, pickup stops and monthly fare for each route.</p>
+              </div>
+              <span className="text-xs text-slate-500">{routesPage.total} routes</span>
+            </div>
+            {routesPage.rows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+                <Bus className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-3 text-sm font-semibold text-slate-700">No transport routes yet</p>
+                <p className="mt-1 text-xs text-slate-500">Add a route to start assigning students to buses.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {routesPage.rows.map(route => {
+                  const passengers = activeBusAssignments.filter(item => item.routeId === route.id).length;
+                  const capacity = Math.max(1, Number(route.capacity || 40));
+                  const percent = Math.min(100, Math.round(passengers / capacity * 100));
+                  return (
+                    <article key={route.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-teal-200 hover:shadow-md">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700"><Bus className="h-5 w-5" /></div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="truncate font-bold text-slate-900">{route.name}</h4>
+                              <span className={route.active === false ? "rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700" : "rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"}>{route.active === false ? "Inactive" : "Active"}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">{route.vehicleNumber || "Vehicle not set"} · {route.driverName || "Driver not set"}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-emerald-700">{formatMoney(route.feeAmount, school?.currency)}</p>
+                          <p className="text-[10px] text-slate-400">per student / month</p>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="mb-1.5 flex items-center justify-between text-xs">
+                          <span className="font-medium text-slate-600">Bus occupancy</span>
+                          <span className="font-semibold text-slate-800">{passengers} / {capacity} seats</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div className={percent >= 100 ? "h-full rounded-full bg-rose-500" : "h-full rounded-full bg-teal-600"} style={{ width: percent + '%' }} />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <span>{Array.isArray(route.stops) && route.stops.length ? route.stops.join(" · ") : "Pickup stops not set"}</span>
+                        {route.driverPhone && <span>{route.driverPhone}</span>}
+                      </div>
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                        <span className="text-[11px] text-slate-500">{Math.max(0, capacity - passengers)} seats remaining</span>
+                        <div className="flex items-center gap-2">
+                          <button type="button" disabled={isReadOnly} onClick={() => openRouteEditor(route)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">Edit route</button>
+                          <button type="button" disabled={isReadOnly} onClick={() => handleToggleRoute(route)} className={route.active === false ? "rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40" : "rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40"}>{route.active === false ? "Activate" : "Deactivate"}</button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            {renderModulePagination(routesPage, 'routes')}
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Student bus register</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">Assign new students and manage current passengers from this single list.</p>
+                </div>
+                <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{activeTransportStudents.length} active students</span>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_190px_minmax(0,1fr)]">
+                <div className="relative">
+                  <input type="search" value={busStudentSearch} onChange={event => setBusStudentSearch(event.target.value)} placeholder="Search name, student ID or class..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-100" />
+                </div>
+                <select value={assignmentClassId} onChange={event => setAssignmentClassId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500">
+                  <option value="all">All classes</option>
+                  {transportClasses.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? " · " + item.section : ""}</option>)}
+                </select>
+                <select value={assignmentRouteId} onChange={event => setAssignmentRouteId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500">
+                  <option value="">Choose destination bus / route</option>
+                  {activeTransportRoutes.map(route => {
+                    const occupied = activeBusAssignments.filter(item => item.routeId === route.id).length;
+                    return <option key={route.id} value={route.id}>{route.name} · {occupied}/{route.capacity || 40} seats</option>;
+                  })}
+                </select>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+                  {([
+                    { id: 'all', label: 'All students', count: activeTransportStudents.length },
+                    { id: 'assigned', label: 'On a bus', count: activeTransportStudents.filter(student => activeAssignedStudentIds.has(student.id)).length },
+                    { id: 'unassigned', label: 'Not assigned', count: activeTransportStudents.filter(student => !activeAssignedStudentIds.has(student.id)).length }
+                  ] as const).map(filter => (
+                    <button key={filter.id} type="button" onClick={() => setBusStudentStatusFilter(filter.id)} className={busStudentStatusFilter === filter.id ? "rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-teal-800 shadow-sm" : "rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"}>
+                      {filter.label} <span className="ml-1 text-[10px] opacity-70">{filter.count}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{selectedBusStudentIds.length} selected</span>
+                  <button type="button" onClick={() => setSelectedBusStudentIds([])} disabled={!selectedBusStudentIds.length} className="text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-40">Clear selection</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const visibleIds = filteredBusStudents.map(student => student.id);
+                      setSelectedBusStudentIds(current => visibleIds.length > 0 && visibleIds.every(id => current.includes(id))
+                        ? current.filter(id => !visibleIds.includes(id))
+                        : [...new Set([...current, ...visibleIds])]);
+                    }}
+                    disabled={!filteredBusStudents.length || isReadOnly}
+                    className="text-xs font-semibold text-teal-700 disabled:opacity-40"
+                  >
+                    Select all shown
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 px-4 py-3 sm:px-5">
+              <div className="text-xs text-slate-600">
+                {filteredBusStudents.length} students shown · {activeBusAssignments.length} active bus assignments
+              </div>
+              <button type="button" onClick={handleAssignBus} disabled={isReadOnly || !selectedBusStudentIds.length || !assignmentRouteId} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40">
+                <CheckCircle2 className="h-4 w-4" /> Assign / move {selectedBusStudentIds.length || ''} selected
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {filteredBusStudents.map(student => {
+                const assignment = activeBusAssignments.find(item => item.studentId === student.id);
+                const currentRoute = assignment ? routes.find(route => route.id === assignment.routeId) : null;
+                const className = transportClasses.find(item => item.id === student.classId)?.name || student.className || "Class not set";
+                const fullName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(" ");
+                const selected = selectedBusStudentIds.includes(student.id);
+                return (
+                  <div key={student.id} className={selected ? "flex flex-wrap items-center gap-3 bg-teal-50/60 px-4 py-3 sm:px-5" : "flex flex-wrap items-center gap-3 px-4 py-3 transition hover:bg-slate-50 sm:px-5"}>
+                    <input type="checkbox" checked={selected} onChange={event => setSelectedBusStudentIds(current => event.target.checked ? [...new Set([...current, student.id])] : current.filter(id => id !== student.id))} disabled={isReadOnly} aria-label={"Select " + fullName} className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600">{(student.firstName || "?").slice(0, 1).toUpperCase()}{(student.lastName || "").slice(0, 1).toUpperCase()}</div>
+                    <div className="min-w-[150px] flex-1">
+                      <p className="text-sm font-semibold text-slate-900">{fullName || "Unnamed student"}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">{student.studentId || student.id} · {className}</p>
+                    </div>
+                    {assignment ? (
+                      <div className="min-w-[170px]">
+                        <p className="text-xs font-semibold text-teal-800">{currentRoute?.name || "Route unavailable"}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-500">{currentRoute?.vehicleNumber || "Vehicle not set"} · {formatMoney(assignment.feeAmount, school?.currency)} / month</p>
+                      </div>
+                    ) : (
+                      <div className="min-w-[170px]">
+                        <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">Not on a bus</span>
+                        <p className="mt-1 text-[11px] text-slate-400">Choose a route above to assign</p>
+                      </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      {assignment ? (
+                        <button type="button" disabled={isReadOnly} onClick={async () => {
+                          try {
+                            await ApiClient.removeBusAssignment(student.id);
+                            setBusAssignments(current => current.filter(row => row.id !== assignment.id));
+                            setSelectedBusStudentIds(current => current.filter(id => id !== student.id));
+                            setNotice("Student removed from the bus. Previous invoice and payment records remain unchanged.");
+                            setModuleError(null);
+                          } catch (err: any) {
+                            setModuleError(err.message || "Unable to remove the bus assignment.");
+                          }
+                        }} className="rounded-lg border border-rose-200 px-3 py-2 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-40">Bus ma raaco</button>
+                      ) : (
+                        <span className="text-[11px] font-medium text-slate-400">Awaiting assignment</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredBusStudents.length === 0 && (
+                <div className="px-6 py-12 text-center">
+                  <Bus className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-2 text-sm font-semibold text-slate-700">No students match these filters</p>
+                  <p className="mt-1 text-xs text-slate-500">Try another class, status or search term.</p>
+                </div>
+              )}
+            </div>
+            <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500 sm:px-5">
+              Tip: select students already on another route and use “Assign / move” to move them; their active assignment and saved monthly fare will update together.
+            </div>
           </section>
         </div>
       )}
