@@ -672,6 +672,61 @@ export class ApiClient {
     return this.request<any>(`/documents/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
   }
 
+  public static async getDocumentPermissions(id: string) {
+    return this.request<any[]>(`/documents/${encodeURIComponent(id)}/permissions`);
+  }
+
+  public static async setDocumentPermission(id: string, input: {userId?:string;role?:string;canView?:boolean;canEdit?:boolean;canDownload?:boolean}) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/permissions`, {method:'POST',body:JSON.stringify(input)});
+  }
+
+  public static async deleteDocumentPermission(id: string, permissionId: string) {
+    return this.request<{success:boolean}>(`/documents/${encodeURIComponent(id)}/permissions/${encodeURIComponent(permissionId)}`, {method:'DELETE'});
+  }
+
+  public static async getDocumentVersions(id: string) {
+    return this.request<any[]>(`/documents/${encodeURIComponent(id)}/versions`);
+  }
+
+  public static async restoreDocumentVersion(id: string, versionId: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/restore`, { method:'POST' });
+  }
+
+  public static async lockDocument(id: string, reason?: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/lock`, { method:'POST', body:JSON.stringify({reason}) });
+  }
+
+  public static async unlockDocument(id: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/unlock`, { method:'POST' });
+  }
+
+  public static async getDocumentAudit(id: string) {
+    return this.request<any[]>(`/documents/${encodeURIComponent(id)}/audit`);
+  }
+
+  public static async getStudentDocumentAttachments(studentId: string) {
+    return this.request<any[]>(`/students/${encodeURIComponent(studentId)}/document-attachments`);
+  }
+
+  public static async uploadStudentDocumentAttachment(studentId: string, file: File) {
+    const response = await fetch(`/api/students/${encodeURIComponent(studentId)}/document-attachments`, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':file.type,'X-File-Name':encodeURIComponent(file.name)},
+      body:file
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'Lifaaqa lama soo gelin karin.');
+    return body;
+  }
+
+  public static async deleteStudentDocumentAttachment(studentId: string, attachmentId: string) {
+    return this.request<{success:boolean}>(`/students/${encodeURIComponent(studentId)}/document-attachments/${encodeURIComponent(attachmentId)}`, {method:'DELETE'});
+  }
+
+  public static studentDocumentAttachmentDownloadUrl(studentId: string, attachmentId: string) {
+    return `/api/students/${encodeURIComponent(studentId)}/document-attachments/${encodeURIComponent(attachmentId)}/download`;
+  }
+
   public static async getDocumentTemplates() {
     return this.request<any[]>('/document-templates');
   }

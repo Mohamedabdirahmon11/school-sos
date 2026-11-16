@@ -52,22 +52,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
       item('t_students', t('students'), GraduationCap), item('t_attendance', t('attendance'), CalendarCheck),
       item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', t('assignments'), FileCheck2), item('t_notices', noticeLabel, BellRing),
+      item('t_assignments', t('assignments'), FileCheck2), item('sch_documents', 'Dukumentiyada', FileText), item('t_notices', noticeLabel, BellRing),
       item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
     ] }];
     if (role === 'parent') return [{ title: 'Family', items: [
       item('p_overview', t('dashboard'), LayoutDashboard), item('p_attendance', t('attendance'), CalendarCheck),
       item('p_results', t('exams_results'), FileSpreadsheet), item('p_fees', t('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('p_messages', t('messages'), MessageSquare)
+      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText), item('p_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'student') return [{ title: 'My learning', items: [
       item('st_dashboard', t('dashboard'), LayoutDashboard), item('st_timetable', t('timetable'), CalendarDays),
       item('st_assignments', t('assignments'), FileCheck2), item('st_results', t('exams_results'), FileSpreadsheet),
-      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing),
+      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText),
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
-      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Dukumentiyada', FileText)] },
       { title: 'Daily operations', items: [
         { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
         { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },

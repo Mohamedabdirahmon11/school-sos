@@ -77,3 +77,10 @@ Updated: 2026-11-11
 - Added browser-side DOCX import/export and CSV/XLS/XLSX import/export. Spreadsheet files import into editable HTML tables; XLSX export creates one worksheet per table, and CSV export includes a UTF-8 BOM.
 - Spreadsheet import escapes cell HTML and CSV export protects against formula injection. Existing SheetJS dependency is reused; no new package dependency or database migration is added.
 - Imported content remains in the editor until the user saves. Real-file browser round-trip fixtures and desktop/mobile verification remain release checks.
+
+
+## Documents module — Phase 3 implementation (2026-11-16)
+- Added additive migration `20261116100000_school_documents_phase3.sql` for document version snapshots, sharing grants, audit events, final/manual locking metadata, and private student attachment metadata/storage.
+- Added history restore, explicit school-role and user-specific sharing, audit log, final/manual lock and unlock, and private student attachment upload/download/soft-delete flows.
+- School-wide grants are limited to Teacher and Accountant; Parent/Student grants require a specific same-school user. Version history/audit are read-only to authenticated users; lock enforcement is in API and database trigger.
+- Migration remains unapplied to Supabase. CI and authenticated multi-school, real private-storage round-trip, and browser verification are required before production rollout.
