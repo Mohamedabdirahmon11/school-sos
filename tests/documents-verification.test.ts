@@ -28,3 +28,9 @@ test('document sanitizer permits bounded image positioning and alignment styles'
   assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="position:relative;left:-12px;top:20px;margin-left:auto;margin-right:0">'), '<img src="/api/documents/images?path=school/a.png" style="position:relative;left:-12px;top:20px;margin-left:auto;margin-right:0">');
   assert.equal(sanitizeDocumentHtml('<img src="/api/documents/images?path=school/a.png" style="position:absolute;left:9999px;top:0px">'), '<img src="/api/documents/images?path=school/a.png" style="top:0px">');
 });
+test('document sanitizer permits positioned fields only with the explicit field marker', () => {
+  const safe=sanitizeDocumentHtml('<div class="document-positioned-field" data-document-field="true" style="position:absolute;left:20px;top:30px;width:190px;z-index:1"><span class="document-field-drag-handle" contenteditable="false">⋮⋮</span>{student_name}</div>');
+  assert.match(safe,/position:absolute/);
+  assert.match(safe,/data-document-field="true"/);
+  assert.equal(sanitizeDocumentHtml('<div style="position:absolute;left:20px;top:30px">unsafe</div>'),'<div style="left:20px;top:30px">unsafe</div>');
+});
