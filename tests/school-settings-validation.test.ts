@@ -36,6 +36,11 @@ test('sidebar theme settings accept safe school-scoped appearance preferences', 
   assert.deepEqual(result.sidebarTheme, validSidebarTheme);
 });
 
+test('sidebar theme settings accept the custom preset', () => {
+  const result = sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, preset: 'custom' } });
+  assert.equal(result.sidebarTheme?.preset, 'custom');
+});
+
 test('sidebar theme settings reject invalid widths, CSS values, and unreadable contrast', () => {
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, width: 400 } }), /240|320/);
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, backgroundColor: 'url(javascript:alert(1))' } }), /six-digit hex/);
