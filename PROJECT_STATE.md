@@ -201,3 +201,11 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Actual GitHub Actions job `Typecheck, tests, and production build` completed with conclusion `success`. Log output: `npm run typecheck:ci` PASS; `npm test`: **380 tests, 380 pass, 0 fail**; `npm run audit:routes` PASS; `npm run audit:rls` PASS (static source audit); `npm run build` PASS.
 - This run verifies the added missing-data helper test and TypeScript/build compatibility. It does not verify browser confirmation behavior, PDF rendering, real Supabase writes, or authenticated cross-school isolation.
 - The PR remains Draft because the remaining visual designer, custom artwork/PDF background pipeline, serial/QR public verification, batch PDF/ZIP, named permission enforcement and visual/live-tenant checks are still not complete.
+
+
+### Document verification implementation (2026-11-16)
+- Added additive migration `20261116120000_document_verification.sql` with unique per-document serial numbers and opaque UUID verification tokens; existing documents receive generated identifiers without changing their content.
+- Newly generated student documents receive a serial number, verification URL, and QR image reference.
+- Added a public verification HTML page and QR PNG endpoint. The page exposes only validity, school name, student name, document type, and issue date; deleted/missing documents return not found and draft documents are marked invalid.
+- Extended the document HTML sanitizer to allow only the exact UUID-scoped QR image route; added regression tests for accepted and rejected verification URLs.
+- Migration is additive and has not been applied to production. GitHub Actions CI must pass before this work is considered verified. Public URL generation uses `APP_BASE_URL` or `PUBLIC_APP_URL` when configured; otherwise it uses a relative same-origin path.
