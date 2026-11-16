@@ -150,7 +150,18 @@ BEGIN
     END IF;
   END IF;
 
-  IF TG_OP = 'INSERT' OR (
+  IF TG_OP = 'INSERT' THEN
+    SELECT COALESCE(MAX(version_number), 0) + 1 INTO next_version
+      FROM public.school_document_versions
+      WHERE school_id = NEW.school_id AND document_id = NEW.id;
+    INSERT INTO public.school_document_versions (
+      school_id, document_id, version_number, title, document_type, status,
+      content_html, page_size, direction, page_margins, changed_by
+    ) VALUES (
+      NEW.school_id, NEW.id, next_version, NEW.title, NEW.document_type, NEW.status,
+      NEW.content_html, NEW.page_size, NEW.direction, NEW.page_margins, actor_id
+    );
+  ELSIF TG_OP = 'UPDATE' AND (
     NEW.title IS DISTINCT FROM OLD.title OR
     NEW.document_type IS DISTINCT FROM OLD.document_type OR
     NEW.status IS DISTINCT FROM OLD.status OR
