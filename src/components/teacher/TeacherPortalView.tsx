@@ -53,7 +53,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const initialData = useApi(async () => Promise.all([
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
-    ApiClient.getTimetable({ scope: 'school' }),
+    ApiClient.getTimetable(),
     ApiClient.getNotices(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
@@ -80,12 +80,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
+  // The teacher-scoped endpoint already resolves the signed-in user's teacher
+  // record on the server. Do not re-filter those trusted rows against a second
+  // client-side assignment payload (which can differ in shape/cache timing).
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
   const [timetableScope, setTimetableScope] = useState<'mine' | 'school'>('mine');
+  const [schoolTimetable, setSchoolTimetable] = useState<TimetableSlot[]>([]);
+  const [schoolTimetableLoading, setSchoolTimetableLoading] = useState(false);
+  const [schoolTimetableError, setSchoolTimetableError] = useState<string | null>(null);
   const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
-  // Timetable slots use the teacher record ID, while the signed-in user has a
-  // separate account ID. Match the exact assigned teacher ID; never infer by name.
   const isMyTimetableSlot = (slot: TimetableSlot) =>
     Boolean(slot.teacherId) && teacherAssignments.some((assignment: any) =>
       !assignment.isFormTeacher &&
@@ -93,8 +97,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       assignment.classId === slot.classId &&
       assignment.subjectId === slot.subjectId
     );
+  useEffect(() => {
+    if (timetableScope !== 'school') return;
+    let cancelled = false;
+    setSchoolTimetableLoading(true);
+    setSchoolTimetableError(null);
+    ApiClient.getTimetable({ scope: 'school' })
+      .then(rows => { if (!cancelled) setSchoolTimetable(Array.isArray(rows) ? rows : []); })
+      .catch(error => { if (!cancelled) setSchoolTimetableError(error instanceof Error ? error.message : 'Unable to load the school timetable.'); })
+      .finally(() => { if (!cancelled) setSchoolTimetableLoading(false); });
+    return () => { cancelled = true; };
+  }, [timetableScope, school?.id]);
   const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const visibleTimetable = (timetableScope === 'mine' ? timetable.filter(isMyTimetableSlot) : timetable)
+  const timetableRows = timetableScope === 'mine' ? timetable : schoolTimetable;
+  const visibleTimetable = timetableRows
     .filter(slot => timetableDay === 'all' || slot.dayOfWeek === timetableDay)
     .slice()
     .sort((a, b) => timetableDays.indexOf(a.dayOfWeek) - timetableDays.indexOf(b.dayOfWeek) || a.periodNumber - b.periodNumber);
@@ -436,6 +452,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const bigMax = examConfig?.bigExamMax || 60;
   const combinedMax = smallMax + bigMax;
   const assessmentComponents = examConfig?.assessmentComponents || [];
+  const examRegisterRows = useMemo(() => {
+    const components = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
+    const rows = visibleStudents.map(student => {
+      const subjectScores = gradeSubjects.map(subject => {
+        const key = `${student.id}:${subject.id}`;
+        const input = marksInput[key];
+        const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+        const hasSaved = Boolean(mark?.assessmentScores && components.some(component => mark.assessmentScores?.[component.id] !== undefined));
+        const hasDraft = Boolean(input && components.some(component => input.scores[component.id] !== undefined));
+        const total = components.reduce((sum, component) => sum + Number(input?.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
+        const max = components.reduce((sum, component) => sum + component.maxMarks, 0);
+        return { subjectId: subject.id, total, max, hasMarks: hasSaved || hasDraft };
+      });
+      return { student, subjectScores, total: subjectScores.reduce((sum, score) => sum + score.total, 0), max: subjectScores.reduce((sum, score) => sum + score.max, 0) };
+    }).sort((a, b) => b.total - a.total || a.student.firstName.localeCompare(b.student.firstName));
+    return rows.map((row, index) => ({ ...row, rank: index > 0 && rows[index - 1].total === row.total ? rows[index - 1].rank : index + 1 }));
+  }, [visibleStudents, gradeSubjects, assessmentComponents, examType, marksInput, classMarks]);
 
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
@@ -485,7 +518,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{assignedClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta ardayda fasalladaada</p></article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size}</p></article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Maaddooyinka aad dhigto</p><p className="mt-2 text-2xl font-black text-slate-900">{subjects.length}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.filter(isMyTimetableSlot).length}</p><p className="mt-1 text-[10px] text-slate-500">Casharrada toddobaadka</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Casharrada toddobaadka</p></article>
           </div>
         </section>
       )}
@@ -516,19 +549,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
-          {visibleTimetable.length === 0 ? (
+          {(schoolTimetableLoading && timetableScope === 'school') ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading school timetable…</div> : schoolTimetableError && timetableScope === 'school' ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{schoolTimetableError}</div> : visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
               {timetableDay !== 'all'
                 ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`
-                : timetableScope === 'mine' && timetable.length > 0
-                  ? 'No lessons are assigned to your teacher profile yet. Ask the administrator to confirm your subject and timetable assignments.'
+                : timetableScope === 'mine' && timetable.length === 0
+                  ? 'Your personal timetable has no published lessons yet. Ask the administrator to assign your teacher profile to the class timetable.'
                   : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {visibleTimetable.map(slot => {
                 const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = isMyTimetableSlot(slot);
+                const mySlot = timetableScope === 'mine' || isMyTimetableSlot(slot);
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
                   <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
@@ -748,7 +781,42 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <button type="button" aria-pressed={examType === 'big'} onClick={() => setExamType('big')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'big' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.bigExamName || 'Big Exam'} · {bigMax} marks</button>
           </div>
 
-          {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : gradeSubjects.map(subject => {
+          {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : (
+            <>
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
+                  <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[900px] border-collapse text-xs">
+                    <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
+                      <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
+                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID</th>
+                      {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
+                      <th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {examRegisterRows.map(row => <tr key={row.student.id} className="hover:bg-teal-50/40">
+                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank}</td>
+                        <td className="sticky left-9 bg-white px-3 py-2.5"><strong className="block text-slate-800">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.studentId}</span></td>
+                        {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center font-semibold text-slate-700">{score.hasMarks ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
+                        <td className="border-l bg-teal-50/60 px-3 py-2.5 text-center font-black text-teal-900">{row.total.toFixed(1).replace(/\.0$/, '')}/{row.max}</td><td className="px-3 py-2.5 text-center font-bold text-slate-700">{row.rank}</td>
+                      </tr>)}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="space-y-3 p-3 md:hidden">
+                  {examRegisterRows.map(row => <article key={row.student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{row.student.firstName} {row.student.middleName} {row.student.lastName}</p><p className="text-[10px] text-slate-500">{row.student.studentId}</p></div><span className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-xs font-bold text-white">#{row.rank}</span></div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">{row.subjectScores.map(score => <div key={score.subjectId} className="rounded-lg bg-white px-2.5 py-2"><p className="truncate text-[10px] text-slate-500">{gradeSubjects.find(subject => subject.id === score.subjectId)?.name}</p><p className="text-sm font-bold text-slate-800">{score.hasMarks ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}<span className="text-[10px] font-normal text-slate-400">/{score.max}</span></p></div>)}</div>
+                    <p className="mt-3 border-t border-slate-200 pt-2 text-right text-sm font-black text-teal-900">Total: {row.total.toFixed(1).replace(/\.0$/, '')}/{row.max}</p>
+                  </article>)}
+                </div>
+                {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
+              </section>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
+              {gradeSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
             return (
               <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -801,7 +869,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 )}
               </section>
             );
-          })}
+              })}
+            </>
+          )}
           {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you may complete all subjects for your class. Subject teachers can enter only their assigned subjects. Submitted marks are locked; forwarding sends the completed class sheet to School Admin.</p>}
         </section>
       )}
