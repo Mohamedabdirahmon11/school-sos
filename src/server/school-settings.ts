@@ -92,6 +92,35 @@ const gradingScaleSchema = z.array(z.object({
   if (bands[bands.length - 1].minPercentage !== 0) ctx.addIssue({ code: 'custom', message: 'The final grade band must start at 0%.', path: [bands.length - 1, 'minPercentage'] });
 });
 
+const sidebarThemeSchema = z.object({
+  preset: z.enum(['light', 'dark', 'brand', 'gradient', 'glass', 'soft']),
+  backgroundColor: z.string().trim().regex(HEX_COLOR, 'Sidebar background must be a six-digit hex color.'),
+  textColor: z.string().trim().regex(HEX_COLOR, 'Sidebar text must be a six-digit hex color.'),
+  accentColor: z.string().trim().regex(HEX_COLOR, 'Sidebar accent must be a six-digit hex color.'),
+  activeStyle: z.enum(['pill', 'bar', 'filled', 'outline']),
+  radius: z.enum(['sharp', 'medium', 'rounded']),
+  density: z.enum(['compact', 'comfortable', 'spacious']),
+  iconStyle: z.enum(['outline', 'filled']),
+  showGroupLabels: z.boolean(),
+  width: z.number().int().min(240).max(320),
+  defaultCollapsed: z.boolean(),
+  fontSize: z.enum(['small', 'normal', 'large']),
+  showLogo: z.boolean(),
+  showSchoolName: z.boolean(),
+  showUserCard: z.boolean()
+}).strict();
+
+function colorLuminance(hex: string): number {
+  const channels = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+  const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(first: string, second: string): number {
+  const values = [colorLuminance(first), colorLuminance(second)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 const schoolSettingsSchema = z.object({
   name: z.string().trim().min(1, 'School name is required.').max(255, 'School name must be 255 characters or fewer.').optional(),
   nameArabic: z.string().trim().max(255, 'Arabic school name must be 255 characters or fewer.').optional(),
@@ -105,6 +134,7 @@ const schoolSettingsSchema = z.object({
   phone: z.string().trim().max(50, 'School telephone must be 50 characters or fewer.').optional(),
   whatsappPhone: z.string().trim().max(50, 'Admin WhatsApp number must be 50 characters or fewer.').refine(value => value === '' || normalizeWhatsAppNumber(value) !== null, 'Admin WhatsApp number must use an international number such as +2519XXXXXXXX.').optional(),
   brandColor: z.string().trim().regex(HEX_COLOR, 'Brand color must be a six-digit hex color.').optional(),
+  sidebarTheme: sidebarThemeSchema.optional(),
   logoUrl: z.string().optional(),
   currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),
   language: z.enum(['en', 'so'], 'Language must be English or Somali.').optional(),
@@ -150,6 +180,18 @@ export function sanitizeSchoolSettings(body: unknown): Partial<School> {
   const updates: Partial<School> = { ...parsed.data } as Partial<School>;
   if (updates.email) updates.email = updates.email.toLowerCase();
   if (updates.brandColor) updates.brandColor = updates.brandColor.toLowerCase();
+  if (updates.sidebarTheme) {
+    const theme = updates.sidebarTheme;
+    if (contrastRatio(theme.backgroundColor, theme.textColor) < 4.5) {
+      throw new Error('Sidebar text and background must meet WCAG AA contrast (4.5:1). Choose a more readable color pair.');
+    }
+    updates.sidebarTheme = {
+      ...theme,
+      backgroundColor: theme.backgroundColor.toLowerCase(),
+      textColor: theme.textColor.toLowerCase(),
+      accentColor: theme.accentColor.toLowerCase()
+    };
+  }
   if (updates.logoUrl !== undefined) updates.logoUrl = cleanLogo(updates.logoUrl);
   if (updates.classLevels) updates.classLevels = [...updates.classLevels].sort((a, b) => a - b);
   if (updates.gradingScale) updates.gradingScale = [...updates.gradingScale].sort((a, b) => b.minPercentage - a.minPercentage);
