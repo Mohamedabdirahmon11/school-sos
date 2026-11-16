@@ -50,7 +50,7 @@ export const StudentInvoicesView: React.FC = () => {
     const effectiveStatus = due ? 'overdue' : invoice.status;
     const student = studentForInvoice(invoice.student_id);
     return (!query || [invoice.invoice_number, invoice.billing_period, studentName(invoice.student_id), student?.studentId].join(' ').toLowerCase().includes(query))
-      && (status === 'all' || effectiveStatus === status)
+      && (status === 'all' || (status === 'unpaid' ? Number(invoice.balance_due) > 0 && invoice.status !== 'void' : effectiveStatus === status))
       && (selectedClassFilter === 'all' || student?.classId === selectedClassFilter);
   }).sort((a: any, b: any) => studentName(a.student_id).localeCompare(studentName(b.student_id))), [invoices, search, status, selectedClassFilter, students]);
   const sortedClasses = [...classes].sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
@@ -129,7 +129,7 @@ export const StudentInvoicesView: React.FC = () => {
         <div className="relative w-full sm:max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search invoice or student" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm"/></div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={()=>setShowClassDrawer(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"><SlidersHorizontal size={15}/> Class: {selectedClassFilter === 'all' ? 'All classes' : sortedClasses.find((item:any)=>item.id===selectedClassFilter)?.name || 'Selected'} </button>
-          <select aria-label="Filter invoice status" value={status} onChange={event=>setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option value="issued">Unpaid</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select>
+          <select aria-label="Filter invoice status" value={status} onChange={event=>setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option value="unpaid">Unpaid</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select>
         </div>
       </div>
       {load.loading ? <p className="p-8 text-center text-sm text-slate-500">Loading invoices…</p> : filtered.length===0 ? <p className="p-10 text-center text-sm text-slate-500">No invoices found. Configure fee structures, then generate invoices for a class.</p> :
