@@ -111,6 +111,24 @@ export interface SchoolSetupProgressUpdate {
   complete?: boolean;
 }
 
+export interface SidebarTheme {
+  preset: 'light' | 'dark' | 'brand' | 'gradient' | 'glass' | 'soft';
+  backgroundColor: string;
+  textColor: string;
+  accentColor: string;
+  activeStyle: 'pill' | 'bar' | 'filled' | 'outline';
+  radius: 'sharp' | 'medium' | 'rounded';
+  density: 'compact' | 'comfortable' | 'spacious';
+  iconStyle: 'outline' | 'filled';
+  showGroupLabels: boolean;
+  width: number;
+  defaultCollapsed: boolean;
+  fontSize: 'small' | 'normal' | 'large';
+  showLogo: boolean;
+  showSchoolName: boolean;
+  showUserCard: boolean;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -131,6 +149,7 @@ export interface School {
 
   logoUrl?: string;
   brandColor?: string; // Default "#0F766E"
+  sidebarTheme?: SidebarTheme;
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS
   language?: SchoolLanguage; // English default; Somali enabled
   timezone?: string;
