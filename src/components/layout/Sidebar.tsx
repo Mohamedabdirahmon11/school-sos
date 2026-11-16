@@ -246,6 +246,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
             })}
           </div>
         </section>)}
+        {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: "var(--sidebar-text)" }} className={`mt-5 flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
+          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
+            <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
+            <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
+          </div>
+        </div>}
       </nav>
 
       <div className="shrink-0 border-t border-white/10 bg-black/10 px-3 py-3">
@@ -265,13 +272,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           <LogOut size={15} aria-hidden="true" />
           <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
         </button>
-        {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
-          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
-            <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
-            <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
-          </div>
-        </div>}
       </div>
 
     </aside>
