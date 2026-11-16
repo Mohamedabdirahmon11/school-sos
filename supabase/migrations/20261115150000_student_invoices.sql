@@ -69,6 +69,10 @@ ALTER TABLE student_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_invoice_sequences ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL ON TABLE student_invoices, student_invoice_items FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE student_invoices, student_invoice_items TO authenticated;
+GRANT ALL ON TABLE student_invoices, student_invoice_items TO service_role;
+
 DROP POLICY IF EXISTS student_invoices_tenant_scope ON student_invoices;
 CREATE POLICY student_invoices_tenant_scope ON student_invoices FOR ALL TO authenticated
   USING (
