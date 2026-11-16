@@ -44,7 +44,7 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
 }
 
-const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolNotice[], SchoolClass[]] = [[], null, [], [], []];
+const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly } = useAuth();
@@ -54,10 +54,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
     ApiClient.getTimetable(),
-    ApiClient.getNotices(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
-  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
+  const [assignmentsData, examConfigData, timetableData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
+  // Notices are independent from core teacher data: a notices API outage must
+  // not prevent teachers from opening lessons, attendance, marks or homework.
+  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
+
   const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
   const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -127,7 +130,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       .catch(() => { if (!cancelled) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); } });
     return () => { cancelled = true; };
   }, [activeTab, classes, school?.id]);
-  const notices: SchoolNotice[] = Array.isArray(noticesData) ? noticesData : [];
+  const notices: SchoolNotice[] = Array.isArray(noticesState.data) ? noticesState.data : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -1050,7 +1053,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">{notices.length} notices</span>
           </div>
-          {notices.length === 0 ? (
+          {noticesState.loading ? (
+            <div className="h-20 animate-pulse rounded-xl bg-slate-100" aria-label="Loading notices" />
+          ) : noticesState.error ? (
+            <ErrorState error={noticesState.error} onRetry={noticesState.retry} />
+          ) : notices.length === 0 ? (
             <p className="text-[#64748B]">No announcements posted yet.</p>
           ) : (
             <div className="space-y-3">
