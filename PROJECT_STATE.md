@@ -212,3 +212,5 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 
 - Follow-up: the private document artwork image upload cap is now 10 MB in the API, editor validation, and a new additive bucket migration. PDF artwork/page picking, PDF.js rendering, DPI inspection, and metadata stripping remain outstanding.
 - Serial/QR verification is now added to manually created, duplicated, and bulk-generated documents. Verification tokens are opaque UUIDs; the public page marks only Final documents valid and exposes the limited verification fields. The QR endpoint builds an absolute same-origin URL from configured APP_BASE_URL/PUBLIC_APP_URL or the request host.
+
+- Added a CR80 (85.6 × 54 mm) document page preset in the editor and print stylesheet, with additive DB constraints for current documents and their version snapshots. This is a single-card page preset only; A4 multi-card imposition/front-back sheet export is still outstanding.
