@@ -4,7 +4,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { Download, FileText, Plus, Search, Wallet, X } from 'lucide-react';
+import { Download, FileText, Plus, Search, Wallet, X, SlidersHorizontal, Users } from 'lucide-react';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentPeriod = () => new Date().toISOString().slice(0, 7);
@@ -20,6 +20,8 @@ export const StudentInvoicesView: React.FC = () => {
   const [invoices = [], students = [], classes = []] = load.data || [];
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [selectedClassFilter, setSelectedClassFilter] = useState('all');
+  const [showClassDrawer, setShowClassDrawer] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [classId, setClassId] = useState('');
   const [period, setPeriod] = useState(currentPeriod());
@@ -36,6 +38,7 @@ export const StudentInvoicesView: React.FC = () => {
   const [confirmedReceived, setConfirmedReceived] = useState(false);
   const paymentKeyRef = useRef<string | null>(null);
 
+  const studentForInvoice = (id: string) => students.find((item: any) => item.id === id);
   const studentName = (id: string) => {
     const student = students.find((item: any) => item.id === id);
     return student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : id;
@@ -45,9 +48,16 @@ export const StudentInvoicesView: React.FC = () => {
     const query = search.trim().toLowerCase();
     const due = Number(invoice.balance_due) > 0 && invoice.due_date < today();
     const effectiveStatus = due ? 'overdue' : invoice.status;
-    return (!query || [invoice.invoice_number, invoice.billing_period, studentName(invoice.student_id)].join(' ').toLowerCase().includes(query))
-      && (status === 'all' || effectiveStatus === status);
-  }), [invoices, search, status, students]);
+    const student = studentForInvoice(invoice.student_id);
+    return (!query || [invoice.invoice_number, invoice.billing_period, studentName(invoice.student_id), student?.studentId].join(' ').toLowerCase().includes(query))
+      && (status === 'all' || effectiveStatus === status)
+      && (selectedClassFilter === 'all' || student?.classId === selectedClassFilter);
+  }).sort((a: any, b: any) => studentName(a.student_id).localeCompare(studentName(b.student_id))), [invoices, search, status, selectedClassFilter, students]);
+  const sortedClasses = [...classes].sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const classNameForStudent = (studentId: string) => {
+    const student = studentForInvoice(studentId);
+    return sortedClasses.find((item: any) => item.id === student?.classId)?.name || '—';
+  };
 
   const generate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -117,17 +127,20 @@ export const StudentInvoicesView: React.FC = () => {
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search invoice or student" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm"/></div>
-        <select value={status} onChange={event=>setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option value="issued">Unpaid</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={()=>setShowClassDrawer(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"><SlidersHorizontal size={15}/> Class: {selectedClassFilter === 'all' ? 'All classes' : sortedClasses.find((item:any)=>item.id===selectedClassFilter)?.name || 'Selected'} </button>
+          <select aria-label="Filter invoice status" value={status} onChange={event=>setStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option value="issued">Unpaid</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select>
+        </div>
       </div>
       {load.loading ? <p className="p-8 text-center text-sm text-slate-500">Loading invoices…</p> : filtered.length===0 ? <p className="p-10 text-center text-sm text-slate-500">No invoices found. Configure fee structures, then generate invoices for a class.</p> :
         <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Invoice</th><th className="p-3">Student</th><th className="p-3">Period</th><th className="p-3">Due date</th><th className="p-3 text-right">Total</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3 text-right">Actions</th></tr></thead>
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Invoice</th><th className="p-3">Student ID</th><th className="p-3">Student (A–Z)</th><th className="p-3">Class</th><th className="p-3">Period</th><th className="p-3">Due date</th><th className="p-3 text-right">Total</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3 text-right">Actions</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{filtered.map((invoice:any)=>{
             const overdue=Number(invoice.balance_due)>0&&invoice.due_date<today();
             const shownStatus=overdue?'overdue':invoice.status;
             const badge=shownStatus==='paid'?'bg-emerald-100 text-emerald-800':shownStatus==='overdue'?'bg-red-100 text-red-800':shownStatus==='partially_paid'?'bg-amber-100 text-amber-800':'bg-slate-100 text-slate-700';
             return <tr key={invoice.id} className="hover:bg-slate-50">
-              <td className="p-3 font-mono text-xs font-semibold">{invoice.invoice_number}</td><td className="p-3 font-medium">{studentName(invoice.student_id)}</td><td className="p-3">{formatPeriod(invoice.billing_period)}</td><td className="p-3">{invoice.due_date}</td>
+              <td className="p-3 font-mono text-xs font-semibold">{invoice.invoice_number}</td><td className="p-3 font-mono text-xs">{studentForInvoice(invoice.student_id)?.studentId || '—'}</td><td className="p-3 font-medium">{studentName(invoice.student_id)}</td><td className="p-3">{classNameForStudent(invoice.student_id)}</td><td className="p-3">{formatPeriod(invoice.billing_period)}</td><td className="p-3">{invoice.due_date}</td>
               <td className="p-3 text-right tabular-nums">{money(invoice.total_amount,invoice.currency)}</td><td className="p-3 text-right tabular-nums">{money(invoice.amount_paid,invoice.currency)}</td><td className="p-3 text-right font-semibold tabular-nums">{money(invoice.balance_due,invoice.currency)}</td>
               <td className="p-3"><span className={`rounded-full px-2 py-1 text-[11px] font-bold ${badge}`}>{shownStatus.replace('_',' ')}</span></td>
               <td className="p-3"><div className="flex justify-end gap-2">
@@ -139,10 +152,20 @@ export const StudentInvoicesView: React.FC = () => {
         </table></div>}
     </section>
 
+    {showClassDrawer&&<div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40" onMouseDown={event=>{if(event.target===event.currentTarget)setShowClassDrawer(false);}}>
+      <aside role="dialog" aria-modal="true" aria-label="Filter invoices by class" className="h-full w-full max-w-sm overflow-y-auto bg-white p-5 shadow-2xl">
+        <div className="flex items-center justify-between border-b pb-4"><div><h2 className="text-lg font-bold">Filter by class</h2><p className="text-sm text-slate-500">Choose a class to view its student invoices.</p></div><button type="button" onClick={()=>setShowClassDrawer(false)} aria-label="Close class filter"><X size={19}/></button></div>
+        <div className="space-y-2 py-4">
+          <button type="button" onClick={()=>{setSelectedClassFilter('all');setShowClassDrawer(false);}} className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left text-sm ${selectedClassFilter==='all'?'border-teal-600 bg-teal-50 font-semibold text-teal-800':'border-slate-200 hover:bg-slate-50'}`}><span>All classes</span><span>{invoices.length}</span></button>
+          {sortedClasses.map((item:any)=>{const count=invoices.filter((invoice:any)=>studentForInvoice(invoice.student_id)?.classId===item.id).length;return <button key={item.id} type="button" onClick={()=>{setSelectedClassFilter(item.id);setShowClassDrawer(false);}} className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left text-sm ${selectedClassFilter===item.id?'border-teal-600 bg-teal-50 font-semibold text-teal-800':'border-slate-200 hover:bg-slate-50'}`}><span>{item.name} {item.section||''}</span><span className="text-slate-500">{count}</span></button>;})}
+        </div>
+      </aside>
+    </div>}
+
     {showGenerate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><form onSubmit={generate} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Generate class invoices</h2><button type="button" onClick={()=>setShowGenerate(false)} aria-label="Close"><X size={19}/></button></div>
       <p className="text-sm text-slate-500">One invoice per active student. Existing invoices for the same period are skipped.</p>
-      <label className="block text-sm font-medium">Class<select required value={classId} onChange={event=>setClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select class</option>{classes.map((item:any)=><option key={item.id} value={item.id}>{item.name} {item.section||''}</option>)}</select></label>
+      <label className="block text-sm font-medium">Class<select required value={classId} onChange={event=>setClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select class</option>{sortedClasses.map((item:any)=><option key={item.id} value={item.id}>{item.name} {item.section||''}</option>)}</select></label>
       <label className="block text-sm font-medium">Billing period<input required type="month" value={period} onChange={event=>setPeriod(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="block text-sm font-medium">Payment due date<input required type="date" min={today()} value={dueDate} onChange={event=>setDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includeAnnual} onChange={event=>setIncludeAnnual(event.target.checked)}/> Include annual registration and annual custom fees</label>
