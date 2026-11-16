@@ -93,7 +93,7 @@ const gradingScaleSchema = z.array(z.object({
 });
 
 const sidebarThemeSchema = z.object({
-  preset: z.enum(['light', 'dark', 'brand', 'gradient', 'glass', 'soft']),
+  preset: z.enum(['light', 'dark', 'brand', 'gradient', 'glass', 'soft', 'custom']),
   backgroundColor: z.string().trim().regex(HEX_COLOR, 'Sidebar background must be a six-digit hex color.'),
   textColor: z.string().trim().regex(HEX_COLOR, 'Sidebar text must be a six-digit hex color.'),
   accentColor: z.string().trim().regex(HEX_COLOR, 'Sidebar accent must be a six-digit hex color.'),
