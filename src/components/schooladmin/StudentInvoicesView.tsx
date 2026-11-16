@@ -14,7 +14,7 @@ export const StudentInvoicesView: React.FC = () => {
   const { school, user, isReadOnly } = useAuth();
   const load = useApi(() => Promise.all([
     ApiClient.getStudentInvoices(),
-    ApiClient.getStudents(),
+    ApiClient.getAllStudents(),
     ApiClient.getClasses()
   ]), [school?.id], Boolean(school));
   const [invoices = [], students = [], classes = []] = load.data || [];
