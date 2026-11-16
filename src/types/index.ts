@@ -808,3 +808,8 @@ export interface InventoryItem {
   condition: 'good' | 'fair' | 'needs_repair';
   value: number;
 }
+
+
+export type SchoolDocumentType = 'transfer_letter' | 'certificate' | 'parent_letter' | 'teacher_letter' | 'student_clearance' | 'report_summary' | 'other';
+export interface SchoolDocument { id:string; schoolId:string; title:string; documentType:SchoolDocumentType; status:'draft'|'final'; contentHtml?:string; pageSize:'A4'|'A5'|'Letter'; direction:'ltr'|'rtl'; pageMargins:number; studentId?:string; classId?:string; createdAt:string; updatedAt:string; deletedAt?:string|null; }
+export interface SchoolDocumentTemplate { id:string; schoolId:string; title:string; documentType:SchoolDocumentType; contentHtml:string; createdAt:string; updatedAt:string; }

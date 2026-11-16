@@ -1,0 +1,27 @@
+.documents-paper { box-sizing:border-box; min-height:297mm; background:#fff; color:#111827; }
+.document-editable { overflow-wrap:anywhere; }
+.document-editable table { width:100%; border-collapse:collapse; table-layout:fixed; }
+.document-editable td,.document-editable th { border:1px solid #94a3b8; min-width:55px; padding:7px; vertical-align:top; resize:horizontal; overflow:auto; }
+.document-editable img { max-width:100%; height:auto; object-fit:contain; resize:both; overflow:auto; }
+.document-page-break { display:block; height:1px; margin:24px 0; border-top:2px dashed #cbd5e1; break-after:page; page-break-after:always; }
+@media (max-width: 640px) {
+  .documents-editor-shell .documents-paper { padding:12mm !important; min-height:0; }
+  .documents-editor-shell .document-editable { min-height:420px; }
+}
+@media print {
+  @page { size:A4; margin:0; @bottom-right { content: counter(page) " / " counter(pages); font-size:9pt; color:#64748b; } }
+  @page document-a5 { size:A5; margin:0; }
+  @page document-letter { size:Letter; margin:0; }
+  html,body,#root { height:auto !important; overflow:visible !important; background:#fff !important; }
+  body * { visibility:hidden !important; }
+  .documents-paper,.documents-paper * { visibility:visible !important; }
+  .documents-paper { position:absolute !important; left:0 !important; top:0 !important; width:100% !important; min-height:0 !important; max-width:none !important; margin:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
+  .documents-paper[data-page-size="A5"] { page:document-a5; width:148mm !important; }
+  .documents-paper[data-page-size="Letter"] { page:document-letter; width:8.5in !important; }
+  .document-page-header { break-inside:avoid; }
+  .document-page-footer { break-inside:avoid; }
+  .document-editable table { border-collapse:collapse !important; }
+  .document-editable tr,.document-editable img { break-inside:avoid; page-break-inside:avoid; }
+  .document-page-break { break-after:page; page-break-after:always; border:0 !important; height:0 !important; margin:0 !important; }
+  .document-editable,.document-editable * { print-color-adjust:exact !important; -webkit-print-color-adjust:exact !important; }
+}

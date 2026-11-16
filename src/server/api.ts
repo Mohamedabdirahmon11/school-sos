@@ -47,6 +47,8 @@ import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/sub
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
+import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
+import { replaceDocumentVariables } from '../lib/documents/variables.ts';
 
 export const apiRouter = Router();
 
@@ -7530,6 +7532,375 @@ apiRouter.put('/bus/assignments/:studentId', requireAuth, requireSchoolContext, 
 apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json({ success: await db.removeBusAssignment(school.id, req.params.studentId) });
+});
+
+
+// Documents module — all reads and writes are explicitly bound to the authenticated school.
+const DOCUMENT_IMAGE_BUCKET = 'school-document-images';
+const DOCUMENT_TYPES = new Set(['transfer_letter','certificate','parent_letter','teacher_letter','student_clearance','report_summary','other']);
+function documentsAdminOnly(req: Request, res: Response): boolean {
+  const user = (req as any).user as User;
+  if (!user || !['school_admin','super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'Maamulka dugsiga oo keliya ayaa maamuli kara dukumentiyada.' });
+    return false;
+  }
+  return true;
+}
+function documentClientRow(row: any, includeContent = false) {
+  const result: Record<string, any> = {
+    id: row.id, title: row.title, documentType: row.document_type, status: row.status,
+    updatedAt: row.updated_at, createdAt: row.created_at, deletedAt: row.deleted_at,
+    studentId: row.student_id, classId: row.class_id, templateId: row.template_id,
+    pageSize: row.page_size, direction: row.direction, pageMargins: row.page_margins
+  };
+  if (includeContent) result.contentHtml = row.content_html || '';
+  return result;
+}
+function documentTemplateClientRow(row: any) {
+  return { id: row.id, title: row.title, documentType: row.document_type, contentHtml: row.content_html, updatedAt: row.updated_at };
+}
+function documentServiceClient(res: Response) {
+  if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
+    res.status(503).json({ error: 'Kaydinta dukumentiyada lama xiriirin Supabase.' });
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+apiRouter.get('/documents/images', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const objectPath = typeof req.query.path === 'string' ? req.query.path : '';
+  if (!objectPath.startsWith(school.id + '/documents/') || objectPath.includes('..') || objectPath.includes('\\')) {
+    res.status(404).json({ error: 'Sawirka lama helin.' }); return;
+  }
+  const storageClient = documentServiceClient(res);
+  if (!storageClient) return;
+  const { data, error } = await storageClient.storage.from(DOCUMENT_IMAGE_BUCKET).download(objectPath);
+  if (error || !data) { res.status(404).json({ error: 'Sawirka lama helin.' }); return; }
+  res.setHeader('Content-Type', data.type || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(Buffer.from(await data.arrayBuffer()));
+});
+
+apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin,
+  express.raw({ type: ['image/png','image/jpeg','image/webp'], limit: '1572864' }),
+  async (req, res) => {
+    const school = (req as any).school as School;
+    const bytes = Buffer.isBuffer(req.body) ? req.body : null;
+    const detected = bytes ? detectSchoolLogoImage(bytes, String(req.headers['content-type'] || '')) : null;
+    if (!bytes || !detected) { res.status(400).json({ error: 'Sawir PNG, JPEG ama WebP ah oo ka yar 1.5 MB geli.' }); return; }
+    const storageClient = documentServiceClient(res);
+    if (!storageClient) return;
+    const objectPath = school.id + '/documents/' + randomUUID() + '.' + detected.extension;
+    const { error } = await storageClient.storage.from(DOCUMENT_IMAGE_BUCKET).upload(objectPath, bytes, {
+      contentType: detected.contentType, cacheControl: '300', upsert: false
+    });
+    if (error) { res.status(502).json({ error: 'Sawirka dukumentiga lama kaydin karin.' }); return; }
+    res.status(201).json({ url: '/api/documents/images?path=' + encodeURIComponent(objectPath) });
+  }
+);
+
+apiRouter.get('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  let query = client.from('school_documents')
+    .select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins')
+    .eq('school_id', school.id)
+    .order('updated_at', { ascending: false })
+    .limit(100);
+  if (req.query.includeDeleted !== 'true') query = query.is('deleted_at', null);
+  if (typeof req.query.search === 'string' && req.query.search.trim()) query = query.ilike('title', '%' + req.query.search.trim().slice(0,80) + '%');
+  if (typeof req.query.type === 'string' && DOCUMENT_TYPES.has(req.query.type)) query = query.eq('document_type', req.query.type);
+  if (typeof req.query.status === 'string' && ['draft','final'].includes(req.query.status)) query = query.eq('status', req.query.status);
+  const { data, error } = await query;
+  if (error) { res.status(503).json({ error: 'Liiska dukumentiyada lama soo dejin karin.' }); return; }
+  res.setHeader('Cache-Control','private, no-store');
+  res.json((data || []).map(row => documentClientRow(row)));
+});
+
+apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').select('*')
+    .eq('school_id', school.id).eq('id', req.params.id).is('deleted_at', null).maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(documentClientRow(data, true));
+});
+
+apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  if (!documentsAdminOnly(req,res)) return;
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const title = typeof body.title === 'string' ? body.title.trim().slice(0,180) : '';
+  const documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
+  const contentHtml = sanitizeDocumentHtml(body.contentHtml);
+  const pageSize = ['A4','A5','Letter'].includes(body.pageSize) ? body.pageSize : 'A4';
+  const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
+  const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
+  if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga waa waajib.' }); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').insert({
+    school_id: school.id, title, document_type: documentType, status: 'draft',
+    content_html: contentHtml, page_size: pageSize, direction, page_margins: pageMargins,
+    created_by: user.id, updated_by: user.id
+  }).select('*').single();
+  if (error || !data) { res.status(503).json({ error: 'Dukumentiga lama abuuri karin.' }); return; }
+  res.status(201).json(documentClientRow(data,true));
+});
+
+apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  if (!documentsAdminOnly(req,res)) return;
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
+  if (typeof body.title === 'string') {
+    const title = body.title.trim().slice(0,180);
+    if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga lama madhin karo.' }); return; }
+    updates.title = title;
+  }
+  if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
+  if (['draft','final'].includes(body.status)) updates.status = body.status;
+  if (['A4','A5','Letter'].includes(body.pageSize)) updates.page_size = body.pageSize;
+  if (['ltr','rtl'].includes(body.direction)) updates.direction = body.direction;
+  if (Number.isInteger(body.pageMargins)) updates.page_margins = Math.min(40,Math.max(5,body.pageMargins));
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').update(updates)
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin ama lama kaydin karin.' }); return; }
+  res.json(documentClientRow(data,true));
+});
+
+apiRouter.delete('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').update({ deleted_at:new Date().toISOString(), deleted_by:user.id, updated_by:user.id })
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('id').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama tirtiri karin.' }); return; }
+  res.json({ success:true });
+});
+
+apiRouter.post('/documents/:id/restore', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').update({ deleted_at:null, deleted_by:null, updated_by:user.id })
+    .eq('school_id',school.id).eq('id',req.params.id).not('deleted_at','is',null).select('*').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama soo celin karin.' }); return; }
+  res.json(documentClientRow(data,true));
+});
+
+apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: original, error: readError } = await client.from('school_documents').select('*')
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if (readError || !original) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  const { data, error } = await client.from('school_documents').insert({
+    school_id:school.id, title:(original.title + ' — nuqul').slice(0,180), document_type:original.document_type,
+    status:'draft', content_html:original.content_html, page_size:original.page_size, direction:original.direction,
+    page_margins:original.page_margins, template_id:original.template_id, student_id:original.student_id,
+    class_id:original.class_id, created_by:user.id, updated_by:user.id
+  }).select('*').single();
+  if (error || !data) { res.status(503).json({ error: 'Nuqulka dukumentiga lama samayn karin.' }); return; }
+  res.status(201).json(documentClientRow(data,true));
+});
+
+apiRouter.get('/document-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates').select('id,title,document_type,content_html,updated_at')
+    .eq('school_id',school.id).is('deleted_at',null).order('updated_at',{ascending:false}).limit(100);
+  if (error) { res.status(503).json({ error: 'Templates-ka lama soo dejin karin.' }); return; }
+  res.json((data || []).map(documentTemplateClientRow));
+});
+
+apiRouter.post('/document-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const title = typeof body.title === 'string' ? body.title.trim().slice(0,160) : '';
+  if (!title || !DOCUMENT_TYPES.has(body.documentType) || typeof body.contentHtml !== 'string') {
+    res.status(400).json({ error: 'Magaca, nooca iyo qoraalka template-ka waa waajib.' }); return;
+  }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates').insert({
+    school_id:school.id, title, document_type:body.documentType, content_html:sanitizeDocumentHtml(body.contentHtml),
+    created_by:user.id, updated_by:user.id
+  }).select('*').single();
+  if (error || !data) { res.status(503).json({ error: 'Template-ka lama kaydin karin.' }); return; }
+  res.status(201).json(documentTemplateClientRow(data));
+});
+
+apiRouter.put('/document-templates/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
+  if (typeof body.title === 'string' && body.title.trim()) updates.title = body.title.trim().slice(0,160);
+  if (DOCUMENT_TYPES.has(body.documentType)) updates.document_type = body.documentType;
+  if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates').update(updates)
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Template-ka lama helin ama lama kaydin karin.' }); return; }
+  res.json(documentTemplateClientRow(data));
+});
+
+apiRouter.delete('/document-templates/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates').update({ deleted_at:new Date().toISOString(), deleted_by:user.id })
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('id').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Template-ka lama tirtiri karin.' }); return; }
+  res.json({ success:true });
+});
+
+apiRouter.post('/document-templates/:id/duplicate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: original } = await client.from('school_document_templates').select('*')
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if (!original) { res.status(404).json({ error: 'Template-ka lama helin.' }); return; }
+  const { data, error } = await client.from('school_document_templates').insert({
+    school_id:school.id, title:(original.title + ' — nuqul').slice(0,160), document_type:original.document_type,
+    content_html:original.content_html, created_by:user.id, updated_by:user.id
+  }).select('*').single();
+  if (error || !data) { res.status(503).json({ error: 'Nuqulka template-ka lama samayn karin.' }); return; }
+  res.status(201).json(documentTemplateClientRow(data));
+});
+
+
+apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const body = req.body || {};
+  const client = documentServiceClient(res);
+  if (!client) return;
+  let templateHtml = typeof body.templateHtml === 'string' ? body.templateHtml : '';
+  if (typeof body.templateId === 'string') {
+    const { data: template } = await client.from('school_document_templates').select('content_html')
+      .eq('school_id',school.id).eq('id',body.templateId).is('deleted_at',null).maybeSingle();
+    if (!template) { res.status(404).json({ error: 'Template-ka lama helin.' }); return; }
+    templateHtml = template.content_html;
+  }
+  let student: Student | null = null;
+  if (typeof body.studentId === 'string' && body.studentId.trim()) {
+    student = await db.getStudentById(body.studentId.trim(),school.id);
+    if (!student) {
+      const found = await db.queryPage<Student>('students',{school_id:school.id,student_id:body.studentId.trim()},1,1,undefined,'*');
+      student = found.items[0] || null;
+    }
+  } else if (typeof body.classId === 'string' && body.classId) {
+    const klass = await db.getClassById(body.classId,school.id);
+    if (!klass) { res.status(404).json({ error: 'Fasalka lama helin.' }); return; }
+    student = (await db.getStudents(school.id,klass.id))[0] || null;
+  }
+  if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
+  const klass = await db.getClassById(student.classId,school.id);
+  const teacherName = klass?.classTeacherId
+    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
+    : '';
+  let date = '';
+  try { date = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
+  catch { date = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
+  const replaced = replaceDocumentVariables(templateHtml,{
+    student_name:[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim(),
+    student_id:student.studentId,
+    class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
+    parent_name:student.fatherName || '', date, school_name:school.name || '',
+    teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+  });
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({ html:sanitizeDocumentHtml(replaced.html), missing:replaced.missing, studentName:[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim() });
+});
+
+apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  let templateHtml = typeof body.templateHtml === 'string' ? body.templateHtml : '';
+  let documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
+  let titleTemplate = typeof body.title === 'string' ? body.title.slice(0,160) : 'Dukumenti arday';
+  let templateDbId: string | null = null;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  if (typeof body.templateId === 'string') {
+    const { data: template } = await client.from('school_document_templates').select('*')
+      .eq('school_id',school.id).eq('id',body.templateId).is('deleted_at',null).maybeSingle();
+    if (!template) { res.status(404).json({ error: 'Template-ka lama helin dugsigan.' }); return; }
+    templateDbId = template.id;
+    templateHtml = template.content_html;
+    documentType = template.document_type;
+    titleTemplate = template.title;
+  }
+  if (!templateHtml.trim()) { res.status(400).json({ error: 'Template qoraal ah dooro.' }); return; }
+  let students: Student[] = [];
+  let classRecord: SchoolClass | null = null;
+  if (typeof body.classId === 'string' && body.classId) {
+    classRecord = await db.getClassById(body.classId,school.id);
+    if (!classRecord) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
+    students = (await db.getStudents(school.id,classRecord.id)).slice(0,100);
+  } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
+    for (const rawId of body.studentIds) {
+      if (typeof rawId !== 'string') continue;
+      const byPk = await db.getStudentById(rawId,school.id);
+      if (byPk) students.push(byPk);
+      else {
+        const match = await db.queryPage<Student>('students',{school_id:school.id,student_id:rawId},1,1,undefined,'*');
+        if (match.items[0]) students.push(match.items[0]);
+      }
+    }
+  } else {
+    res.status(400).json({ error: 'Dooro hal arday ama fasal.' }); return;
+  }
+  if (!students.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
+  const today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
+  const teacherName = classRecord?.classTeacherId
+    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:classRecord.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
+    : '';
+  const rows: Record<string,unknown>[] = [];
+  const warnings: Array<{studentName:string;missing:string[]}> = [];
+  for (const student of students) {
+    const klass = classRecord || await db.getClassById(student.classId,school.id);
+    const studentName = [student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim();
+    const values = {
+      student_name:studentName, student_id:student.studentId,
+      class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
+      parent_name:student.fatherName || '', date:today, school_name:school.name || '',
+      teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+    };
+    const replaced = replaceDocumentVariables(templateHtml,values);
+    const safeHtml = sanitizeDocumentHtml(replaced.html);
+    if (replaced.missing.length) warnings.push({studentName:studentName || student.studentId,missing:replaced.missing});
+    const generatedTitle = titleTemplate.replace(/\{([a-z][a-z0-9_]*)\}/gi,(_match:string,key:string) => String((values as any)[key] || '')) + ' — ' + (studentName || student.studentId);
+    rows.push({
+      school_id:school.id, title:generatedTitle.slice(0,180), document_type:documentType, status:'draft',
+      content_html:safeHtml, page_size:'A4', direction:'ltr', page_margins:20,
+      student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id
+    });
+  }
+  const { data, error } = await client.from('school_documents').insert(rows).select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins');
+  if (error || !data) { res.status(503).json({ error: 'Dukumentiyada ardayda lama kaydin karin.' }); return; }
+  res.status(201).json({ documents:data.map(row => documentClientRow(row)), warnings });
 });
 
 forwardAsyncErrors(apiRouter);

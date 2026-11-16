@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Academics', items: [
         item('sch_classes', t('classes'), Layers), item('sch_subjects', t('subjects'), BookOpen),
         item('sch_timetable', t('timetable'), CalendarDays), item('sch_attendance', t('attendance'), CalendarCheck),
-        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText),
+        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText), item('sch_documents', 'Dukumentiyada', FileText),
         item('sch_promotion', 'Promotion & Alumni', Award)
       ] },
       { title: 'Communication', items: [
