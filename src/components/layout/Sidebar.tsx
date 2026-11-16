@@ -8,7 +8,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle
+  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle, Languages, LogOut, UserCircle2
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,9 +22,47 @@ type NavItem = { id: string; label: string; icon: React.ComponentType<{ classNam
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
-  const { user, school, t, inspectedSchool } = useAuth();
+  const { user, school, t, inspectedSchool, language, setLanguage, logout } = useAuth();
   const role = user?.role || 'school_admin';
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`) === 'true';
+  });
+  const menuTranslations: Record<string, { so: string; am: string }> = {
+    Platform: { so: 'Madasha Guud', am: 'መድረክ' },
+    Teaching: { so: 'Waxbaridda', am: 'ማስተማር' },
+    Family: { so: 'Qoyska', am: 'ቤተሰብ' },
+    'My learning': { so: 'Waxbarashadayda', am: 'ትምህርቴ' },
+    Workspace: { so: 'Goobta Shaqada', am: 'የሥራ ቦታ' },
+    'Daily operations': { so: 'Hawlaha Maalinlaha ah', am: 'ዕለታዊ ሥራዎች' },
+    'Financial management': { so: 'Maamulka Maaliyadda', am: 'የፋይናንስ አስተዳደር' },
+    Dashboard: { so: 'Bogga Hore', am: 'ዳሽቦርድ' },
+    People: { so: 'Dadka', am: 'ሰዎች' },
+    Academics: { so: 'Waxbarashada', am: 'ትምህርት' },
+    Communication: { so: 'Isgaarsiinta', am: 'ግንኙነት' },
+    Finance: { so: 'Maaliyadda', am: 'ፋይናንስ' },
+    Reports: { so: 'Warbixinnada', am: 'ሪፖርቶች' },
+    Resources: { so: 'Adeegyada', am: 'መርጃዎች' },
+    Settings: { so: 'Dejinta', am: 'ቅንብሮች' },
+    'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች' },
+    'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች' },
+    Dukumentiyada: { so: 'Dukumentiyada', am: 'ሰነዶች' },
+    'Student invoices': { so: 'Biilasha Ardayda', am: 'የተማሪ ደረሰኞች' },
+    'Expenses & cashbook': { so: 'Kharashaadka iyo Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ' },
+    'Bank reconciliation': { so: 'Is-waafajinta Bangiga', am: 'የባንክ ማስታረቅ' },
+    'Promotion & Alumni': { so: 'Dalacsiinta iyo Qalin-jabiyeyaasha', am: 'ደረጃ ማሳደግ እና ተመራቂዎች' },
+    'WhatsApp parent reminders': { so: 'Xusuusinta Waalidiinta WhatsApp', am: 'የወላጆች WhatsApp ማስታወሻዎች' },
+    'School Settings': { so: 'Dejinta Dugsiga', am: 'የትምህርት ቤት ቅንብሮች' },
+    'Help & Support': { so: 'Caawimaad iyo Taageero', am: 'እገዛ እና ድጋፍ' },
+    'Platform workspace': { so: 'Goobta Madasha', am: 'የመድረክ ቦታ' },
+    'School workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ' },
+    'Log out': { so: 'Ka bax', am: 'ውጣ' }
+  };
+  const menuText = (value: string) => language === 'en' ? value : menuTranslations[value]?.[language] || value;
+
+  useEffect(() => {
+    window.localStorage.setItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`, String(isCollapsed));
+  }, [isCollapsed, user?.id]);
   const unreadState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(user && school));
   const unread = unreadState.data?.count || 0;
 
@@ -40,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   }, [user?.id, school?.id, unreadState.retry]);
 
   const noticeLabel = unread ? `${t('notice_board')} · ${unread > 99 ? '99+' : unread}` : t('notice_board');
-  const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label, icon });
+  const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label: menuText(label), icon });
   const groups: NavGroup[] = (() => {
     if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform', items: [
       item('sa_dashboard', t('dashboard'), LayoutDashboard), item('sa_schools', t('schools'), Building2),
@@ -122,7 +160,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] ${isCollapsed ? 'md:w-[76px]' : 'md:w-[276px]'} shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] ${isCollapsed ? 'md:w-[76px]' : 'md:w-[276px]'} shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className={`relative flex h-[96px] shrink-0 flex-col items-center justify-center gap-1 border-b border-white/10 ${isCollapsed ? 'px-2' : 'px-5'}`}>
         <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--brand-color)', color: 'var(--brand-foreground)' } : undefined}>
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
@@ -139,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
         </button>
         {groups.map(group => <section key={group.title}>
-          <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50 ${isCollapsed ? "md:hidden" : ""}`}>{group.title}</h2>
+          <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50 ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>
           <div className="space-y-1">
             {group.items.filter(entry => role !== 'accountant' || !entry.permission || hasStaffNavigationPermission(user?.permissions, entry.permission)).map(entry => {
               const Icon = entry.icon;
@@ -156,15 +194,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         </section>)}
       </nav>
 
-      <div className="shrink-0 border-t border-white/10 bg-black/10 px-4 py-4">
-        <div className={`flex items-center gap-2.5 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,.12)]"/>
+      <div className="shrink-0 border-t border-white/10 bg-black/10 px-3 py-3">
+        <div className={`mb-2 flex items-center gap-2.5 rounded-xl bg-white/[.06] px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-teal-100">
+            <UserCircle2 size={18} aria-hidden="true" />
+          </span>
           <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
-            <p className="truncate text-xs font-semibold capitalize text-white">{role.replace(/_/g, ' ')}</p>
-            <p className="truncate text-[10px] text-teal-100/45">{user?.fullName || 'Signed in'}</p>
+            <p className="truncate text-xs font-semibold text-white">{user?.fullName || 'Signed in'}</p>
+            <p className="truncate text-[10px] capitalize text-teal-100/55">{role.replace(/_/g, ' ')}</p>
           </div>
-          <span className={`text-[10px] font-medium tracking-wide text-teal-100/35 ${isCollapsed ? "md:hidden" : ""}`}>v2.6</span>
         </div>
+        <label className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] text-teal-100/75 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <Languages size={15} aria-hidden="true" />
+          <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
+          <select aria-label="Navigation language" value={language} onChange={event => setLanguage(event.target.value as 'en' | 'so' | 'am')}
+            className={`min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none ${isCollapsed ? "md:hidden" : ""}`}>
+            <option value="en" className="text-slate-900">English</option>
+            <option value="so" className="text-slate-900">Soomaali</option>
+            <option value="am" className="text-slate-900">አማርኛ</option>
+          </select>
+        </label>
+        <button type="button" onClick={() => void logout()} aria-label={menuText('Log out')} title={isCollapsed ? menuText('Log out') : undefined}
+          className={`mt-1 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold text-teal-100/75 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <LogOut size={15} aria-hidden="true" />
+          <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Log out')}</span>
+        </button>
       </div>
     </aside>
   </>;
