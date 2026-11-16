@@ -34,6 +34,7 @@ const TimetableView = React.lazy(() => import('./components/schooladmin/Timetabl
 const AttendanceView = React.lazy(() => import('./components/schooladmin/AttendanceView.tsx').then(module => ({ default: module.AttendanceView })));
 const ExamsResultsView = React.lazy(() => import('./components/schooladmin/ExamsResultsView.tsx').then(module => ({ default: module.ExamsResultsView })));
 const FeesLedgerView = React.lazy(() => import('./components/schooladmin/FeesLedgerView.tsx').then(module => ({ default: module.FeesLedgerView })));
+const StudentInvoicesView = React.lazy(() => import('./components/schooladmin/StudentInvoicesView.tsx').then(module => ({ default: module.StudentInvoicesView })));
 const ReportCardsView = React.lazy(() => import('./components/schooladmin/ReportCardsView.tsx').then(module => ({ default: module.ReportCardsView })));
 const DocumentsView = React.lazy(() => import('./components/documents/DocumentsView.tsx').then(module => ({ default: module.DocumentsView })));
 const AdmissionsView = React.lazy(() => import('./components/schooladmin/AdmissionsView.tsx').then(module => ({ default: module.AdmissionsView })));
@@ -265,6 +266,9 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_fees' && (
               <FeesLedgerView />
+            )}
+            {activeView === 'sch_student_invoices' && (
+              <StudentInvoicesView />
             )}
             {activeView === 'sch_promotion' && (
               <YearEndPromotionView />
