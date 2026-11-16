@@ -4735,6 +4735,22 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
   res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
+apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const actor = (req as any).user as User;
+  const staff = (await db.getStaffMembers(school.id)).find(item => item.id === req.params.id);
+  if (!staff?.userId) { res.status(404).json({ error: 'Staff login was not found in this school.' }); return; }
+  const accounts = await db.getUsers(school.id, 'accountant');
+  const account = accounts.find(item => item.id === staff.userId && item.schoolId === school.id);
+  if (!account) { res.status(404).json({ error: 'Accountant login was not found in this school.' }); return; }
+  const newPin = String(randomInt(1000, 10000));
+  const updated = db.updateUser(account.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null } as any);
+  if (!updated) { res.status(404).json({ error: 'Staff PIN could not be updated.' }); return; }
+  db.logAudit({ action: 'ACCOUNTANT_PIN_RESET', category: 'security', schoolId: school.id, schoolName: school.name, userId: actor.id, userName: actor.fullName, userRole: actor.role, details: 'Reset sign-in PIN for staff ID ' + staff.staffId + '.', severity: 'warning' });
+  await db.flush();
+  res.json({ success: true, newPin, staff: { id: staff.id, staffId: staff.staffId, fullName: staff.fullName } });
+});
+
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { fullName, roleTitle, email, phone, monthlySalary, permissions, status } = req.body || {};
