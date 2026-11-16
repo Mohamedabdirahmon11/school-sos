@@ -163,3 +163,12 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - The CI RLS audit is static source inspection, not an authenticated live Supabase cross-school read/write test. CI does not perform the requested Playwright desktop/mobile run or PDF-to-PNG visual inspection.
 - New source files in this continuation: `src/lib/documents/paged-query.ts`, `src/lib/documents/brand-color.ts`; new tests: `tests/documents-paged-query.test.ts`, `tests/documents-brand-color.test.ts`.
 - Local desktop/mobile browser journeys, visual inspection of every generated template/design, real upload/download, live authenticated tenant isolation, PDF embedded Arabic font verification, and batch cancellation remain unverified due the local checkout/network limitation.
+
+
+### Document variable resolution follow-up — 2026-11-16
+- Added `src/lib/documents/academic-variables.ts` to summarize only approved student marks, compute total marks/average/grade, calculate deterministic class rank and choose the latest non-empty teacher remark.
+- Document preview/generation now resolves `total_marks`, `average`, `grade`, `rank`, `teacher_comment`, `staff_name`, `staff_id`, `fee_balance` and `attendance`. Fee balance sums non-voided remaining fee amounts and uses the school's configured currency (ETB fallback). Attendance counts present/late records in the selected semester when school term dates exist; annual report templates use both semesters. If term dates are not configured, attendance falls back to the student's available attendance history.
+- Updated the editor variable picker and template help text to expose the newly supported variables.
+- Added three unit tests for approved-mark aggregation, ignoring draft marks and deterministic class ranking.
+- Latest GitHub Actions run **43829647841** completed successfully after the variable and term-scope changes: TypeScript checks PASS, full test suite PASS (**374 tests, 0 failures**), route parity PASS, static RLS source audit PASS, and production build PASS.
+- Still unresolved variable/data fields include payment transaction amount, persistent document serial number, and QR verification; these need the issuing/verification data model and are not replaced with invented values.
