@@ -727,8 +727,8 @@ export class ApiClient {
     return `/api/students/${encodeURIComponent(studentId)}/document-attachments/${encodeURIComponent(attachmentId)}/download`;
   }
 
-  public static async getDocumentTemplates() {
-    return this.request<any[]>('/document-templates');
+  public static async getDocumentTemplates(includeArchived = false) {
+    return this.request<any[]>(`/document-templates${includeArchived ? '?includeArchived=true' : ''}`);
   }
 
   public static async createDocumentTemplate(input: Record<string, unknown>) {
@@ -745,6 +745,10 @@ export class ApiClient {
 
   public static async deleteDocumentTemplate(id: string) {
     return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}`, { method:'DELETE' });
+  }
+
+  public static async restoreDocumentTemplate(id: string) {
+    return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}/restore`, { method:'POST' });
   }
 
   public static async previewDocumentGeneration(input: Record<string, unknown>) {
