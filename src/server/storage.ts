@@ -2344,6 +2344,20 @@ class StorageEngine {
     if (![nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0) || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
       throw new Error('Exam maximum marks must be positive numbers and pass mark must be between 0 and 100.');
     }
+    if (updates.assessmentComponents) {
+      const continuous = updates.assessmentComponents.filter(component => component.category === 'continuous');
+      const finals = updates.assessmentComponents.filter(component => component.category === 'final');
+      const expectedFinalMax = continuous.length === 4 ? 60 : continuous.length === 5 ? 50 : -1;
+      const validPlan = (continuous.length === 4 || continuous.length === 5)
+        && continuous.every(component => Number(component.maxMarks) === 10)
+        && finals.length === 1
+        && Number(finals[0].maxMarks) === expectedFinalMax
+        && updates.assessmentComponents.length === continuous.length + 1
+        && updates.assessmentComponents.every(component => Number.isFinite(Number(component.maxMarks)) && Number(component.maxMarks) > 0);
+      if (!validPlan) {
+        throw new Error('Each semester must use either four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final (100 marks total).');
+      }
+    }
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
     if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
     const nextConfig: ExamConfig = {
