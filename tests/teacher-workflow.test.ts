@@ -53,7 +53,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /EXAM RESULTS — READ ONLY/);
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
-  assert.match(teacher, /school periods/);
+  assert.match(teacher, /lessons/);
   assert.match(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
   assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
