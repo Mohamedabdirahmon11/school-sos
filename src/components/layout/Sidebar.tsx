@@ -112,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
-      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Dukumentiyada', FileText)] },
+      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Documents', FileText)] },
       { title: 'Daily operations', items: [
         { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
         { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' },
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Academics', items: [
         item('sch_classes', t('classes'), Layers), item('sch_subjects', t('subjects'), BookOpen),
         item('sch_timetable', t('timetable'), CalendarDays), item('sch_attendance', t('attendance'), CalendarCheck),
-        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText), item('sch_documents', 'Dukumentiyada', FileText),
+        item('sch_exams', t('exams_results'), FileSpreadsheet), item('sch_report_cards', t('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
         item('sch_promotion', 'Promotion & Alumni', Award)
       ] },
       { title: 'Communication', items: [
