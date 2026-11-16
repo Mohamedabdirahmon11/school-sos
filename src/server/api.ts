@@ -7615,6 +7615,14 @@ apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSc
       contentType: detected.contentType, cacheControl: '300', upsert: false
     });
     if (error) { res.status(502).json({ error: 'Sawirka dukumentiga lama kaydin karin.' }); return; }
+    const audit = await storageClient.from('school_document_audit_events').insert({
+      school_id:school.id, actor_user_id:(req as any).user.id, action:'artwork_uploaded',
+      details:{ objectPath, contentType:detected.contentType, sizeBytes:bytes.length }
+    });
+    if (audit.error) {
+      await storageClient.storage.from(DOCUMENT_IMAGE_BUCKET).remove([objectPath]);
+      res.status(503).json({ error: 'Diiwaanka gelinta sawirka lama kaydin karin.' }); return;
+    }
     res.status(201).json({ url: '/api/documents/images?path=' + encodeURIComponent(objectPath) });
   }
 );
