@@ -47,6 +47,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Class examination register/);
   assert.match(teacher, /Student name \/ ID/);
   assert.match(teacher, /examRegisterRows/);
+  assert.match(teacher, /let currentRank = 0/);
   assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
