@@ -1164,7 +1164,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // The shared staff sign-in resolves Super Admin, School Admin, and Accountant
   // from the matched account while keeping a single staff login form.
   const sharedAdminLogin = requestedRole === 'school_admin'
-    && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin' || normalizedRole === 'accountant');
+    && (normalizedRole === 'school_admin' || normalizedRole === 'accountant');
   // Teachers may use their school-issued staff ID on the same form. Require an
   // exact match with the account's stored staff ID before accepting this role.
   const sharedTeacherLogin = requestedRole === 'school_admin'
@@ -1230,11 +1230,11 @@ apiRouter.post('/auth/login', async (req, res) => {
         isPasswordValid = false;
       }
     }
-  } else if (!isPasswordValid) {
-    const legacyCredential = password || submittedPin;
-    verifiedLegacyPassword = verifyPassword(legacyCredential, user.passwordHash);
-    isPasswordValid = verifiedLegacyPassword
-      || (['school_admin', 'teacher'].includes(user.role) && verifyPin(legacyCredential, String(user.pin || (user as any).pinHash || '')));
+  } else if (!isPasswordValid && user.role === 'super_admin') {
+    // Super Admin alone retains email + password authentication, including
+    // accounts not yet linked to Supabase Auth. Staff accounts are PIN-only.
+    verifiedLegacyPassword = verifyPassword(password, user.passwordHash);
+    isPasswordValid = verifiedLegacyPassword;
   }
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
@@ -1280,7 +1280,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Only a verified legacy password (never a teacher PIN) can create a
   // Supabase Auth identity. Teacher ID/PIN and student/parent PIN logins retain
   // their existing sign-in flow.
-  if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role)) {
+  if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin') {
     await linkLegacyLoginToSupabaseAuth(user, password);
   }
 
@@ -4638,9 +4638,9 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!fullName || fullName.length > 120) { res.status(400).json({ error: 'Teacher full name is required and must be at most 120 characters.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   if (address.length > 250) { res.status(400).json({ error: 'Teacher address must be at most 250 characters.' }); return; }
-  if (!initialPin && !initialPassword) { res.status(400).json({ error: 'Set either a 4–6 digit Teacher PIN or a strong password.' }); return; }
+  if (!initialPin) { res.status(400).json({ error: 'A 4–6 digit Teacher PIN is required. Teacher accounts use PIN-only sign-in.' }); return; }
   if (initialPin && !/^\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
-  if (initialPassword && passwordPolicyError(initialPassword)) { res.status(400).json({ error: passwordPolicyError(initialPassword) }); return; }
+  if (initialPassword) { res.status(400).json({ error: 'Teacher accounts use PIN-only sign-in. Do not send a password.' }); return; }
   const parsedJoinedDate = new Date(`${joinedDate}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedDate) || Number.isNaN(parsedJoinedDate.getTime()) || parsedJoinedDate.toISOString().slice(0, 10) !== joinedDate) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
   if (body.phone !== undefined && (typeof body.phone !== 'string' || phone.length > 30 || (phone && !validImportPhone(phone)))) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
@@ -4677,7 +4677,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 
   const account = db.createUser({
     schoolId: school.id, role: 'teacher', staffId, fullName, phone,
-    passwordHash: initialPassword ? hashPassword(initialPassword) : randomBytes(32).toString('base64url'), pin: initialPin || undefined,
+    passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin),
     mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
     assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
   });
