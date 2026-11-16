@@ -86,6 +86,7 @@ async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 export async function docxBlobToHtml(file: File): Promise<string> {
+  if (file.size > 15 * 1024 * 1024) throw new Error('DOCX waa inuu ka yaraadaa 15 MB.');
   const bytes = new Uint8Array(await file.arrayBuffer());
   const view = new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   let eocd = -1;
@@ -96,7 +97,8 @@ export async function docxBlobToHtml(file: File): Promise<string> {
   let documentBytes:Uint8Array|null=null;
   for(let i=0;i<count;i++){
     if(view.getUint32(cursor,true)!==0x02014b50) throw new Error('Qaabka DOCX lama akhrin karo.');
-    const method=view.getUint16(cursor+10,true), compressed=view.getUint32(cursor+20,true);
+    const method=view.getUint16(cursor+10,true), compressed=view.getUint32(cursor+20,true), uncompressed=view.getUint32(cursor+24,true);
+    if (uncompressed > 12 * 1024 * 1024) throw new Error('Qoraalka gudaha DOCX aad buu u weyn yahay.');
     const nameLen=view.getUint16(cursor+28,true), extraLen=view.getUint16(cursor+30,true), commentLen=view.getUint16(cursor+32,true);
     const localOffset=view.getUint32(cursor+42,true);
     const name=decoder.decode(bytes.slice(cursor+46,cursor+46+nameLen));
