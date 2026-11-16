@@ -148,10 +148,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   useEffect(() => { if (classes.length && !selectedClassId) setSelectedClassId(classes[0].id); }, [classes, selectedClassId]);
   useEffect(() => {
-    if ((activeTab === 'attendance' || activeTab === 'students') && formTeacherClasses.length && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+    // Attendance is reserved for the Form Teacher; the student register is
+    // available to every teacher in classes where they have an active subject assignment.
+    if (activeTab === 'attendance' && formTeacherClasses.length && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
       setSelectedClassId(formTeacherClasses[0].id);
     }
-  }, [activeTab, formTeacherClasses, selectedClassId]);
+    if (activeTab === 'students' && classes.length && !classes.some(klass => klass.id === selectedClassId)) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [activeTab, formTeacherClasses, classes, selectedClassId]);
   useEffect(() => {
     if (!selectedClassId) return;
     const firstAssignedSubject = classSubjects[0]?.id || '';
@@ -174,9 +179,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     const needsStudents = activeTab === 'students';
     const needsResults = activeTab === 'exam_results';
     if (!needsAttendance && !needsGrades && !needsStudents && !needsResults) return;
-    if ((needsAttendance || needsStudents) && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
+    if (needsAttendance && !formTeacherClasses.some(klass => klass.id === selectedClassId)) {
       setStudents([]);
       setAttendanceMap({});
+      setIsLoadingClassData(false);
+      return;
+    }
+    if (needsStudents && !classes.some(klass => klass.id === selectedClassId)) {
+      setStudents([]);
       setIsLoadingClassData(false);
       return;
     }
@@ -540,7 +550,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {activeTab === 'students' && (
         <section className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <label className="block text-xs font-semibold text-slate-600">Your form class
+            <label className="block text-xs font-semibold text-slate-600">Your teaching class
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 sm:max-w-sm">
                 {formTeacherClasses.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
               </select>
