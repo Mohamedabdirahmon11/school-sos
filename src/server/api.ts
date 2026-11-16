@@ -6180,17 +6180,18 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
     res.status(400).json({error:'Choose one class or student, a billing period, and a valid due date.'});return;
   }
   const client=studentInvoiceServiceClient(res);if(!client)return;
-  const [students,structures,busAssignments]=await Promise.all([db.getStudents(school.id),db.getFeeStructures(school.id),db.getBusAssignments(school.id)]);
+  const [students,structures,busAssignments,schoolClasses]=await Promise.all([db.getStudents(school.id),db.getFeeStructures(school.id),db.getBusAssignments(school.id),db.getClasses(school.id)]);
   if(classId&&!await db.getClassById(classId,school.id)){res.status(400).json({error:'Class does not belong to this school.'});return;}
   const targets=students.filter((student:any)=>student.status==='active'&&(studentId?student.id===studentId:student.classId===classId));
   if(studentId&&!targets.length){res.status(404).json({error:'Active student was not found in this school.'});return;}
   const activeStructures=structures.filter(item=>item.isActive);
   const created:any[]=[];let skippedExisting=0,skippedNoFees=0;
   for(const student of targets){
-    const klass=await db.getClassById(student.classId,school.id);
+    const klass=schoolClasses.find((item:any)=>item.id===student.classId);
     const applicable=activeStructures.filter(item=>{
       if(item.feeType==='bus')return false;
       const classMatch=item.classId?item.classId===student.classId:
+        ['annual_registration','custom'].includes(item.feeType)?true:
         item.minGrade!==undefined&&item.maxGrade!==undefined&&klass&&klass.gradeLevel>=item.minGrade&&klass.gradeLevel<=item.maxGrade;
       if(!classMatch)return false;
       if(item.feeType==='annual_registration')return body.includeAnnualRegistration===true;
@@ -6238,6 +6239,7 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
 apiRouter.get('/student-invoices/:id/items', requireAuth, requireSchoolContext, async(req,res)=>{
   const school=(req as any).school as School;
   const user=(req as any).user as User;
+  if(user.role==='accountant'&&!staffHasPermission(await getStaffForRequest(req,user.id,school.id),'fees_manage')){res.status(403).json({error:'Your staff account does not have permission to view invoice items.'});return;}
   const client=studentInvoiceServiceClient(res);if(!client)return;
   const {data:invoice}=await client.from('student_invoices').select('id,student_id').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
   if(!invoice){res.status(404).json({error:'Invoice not found.'});return;}
@@ -6275,6 +6277,7 @@ apiRouter.get('/student-invoices/:id/pdf', requireAuth, requireSchoolContext, as
   const school=(req as any).school as School;
   const user=(req as any).user as User;
   const client=studentInvoiceServiceClient(res);if(!client)return;
+  if(user.role==='accountant'&&!staffHasPermission(await getStaffForRequest(req,user.id,school.id),'fees_manage')){res.status(403).json({error:'Your staff account does not have permission to download invoices.'});return;}
   const {data:invoice}=await client.from('student_invoices').select('*').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
   if(!invoice){res.status(404).json({error:'Invoice not found.'});return;}
   if(!['school_admin','accountant','super_admin'].includes(user.role)&&!await canAccessStudentRecord(user,invoice.student_id)){res.status(403).json({error:'You cannot download this invoice.'});return;}
