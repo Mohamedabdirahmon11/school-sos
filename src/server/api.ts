@@ -50,6 +50,7 @@ import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
+import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 
 export const apiRouter = Router();
 
@@ -8050,8 +8051,17 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
   }
   if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
   const klass = await db.getClassById(student.classId,school.id);
-  const teacherName = klass?.classTeacherId
-    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
+  const teacher = klass?.classTeacherId
+    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0]
+    : null;
+  const teacherName = teacher?.fullName || '';
+  const marks = klass ? await db.getMarks(school.id,klass.id) : [];
+  const academic = summarizeDocumentAcademicMarks(marks,student.id,school.gradingScale);
+  const payments = templateHtml.includes('{fee_balance}') ? await db.getFeePayments(school.id,student.id) : [];
+  const feeBalance = payments.filter(payment=>!payment.voidedAt).reduce((sum,payment)=>sum + Number(payment.remainingAmount || 0),0);
+  const attendance = templateHtml.includes('{attendance}') ? await db.getStudentAttendanceHistory(school.id,student.id) : [];
+  const attendancePercent = attendance.length
+    ? ((attendance.filter(record=>record.status==='present'||record.status==='late').length / attendance.length) * 100).toFixed(1) + '%'
     : '';
   let date = '';
   try { date = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
@@ -8061,7 +8071,12 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
     student_id:student.studentId,
     class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
     parent_name:student.fatherName || '', date, school_name:school.name || '',
-    teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+    teacher_name:teacherName, staff_name:teacherName, staff_id:teacher?.staffId || '',
+    term:school.currentSemester || '', academic_year:school.academicYear || '',
+    total_marks:academic.totalMarks, average:academic.average, grade:academic.grade,
+    rank:academic.rank, teacher_comment:academic.teacherComment,
+    fee_balance:templateHtml.includes('{fee_balance}') ? formatMoney(feeBalance,school.currency) : '',
+    attendance:attendancePercent
   });
   res.setHeader('Cache-Control','private, no-store');
   res.json({ html:sanitizeDocumentHtml(replaced.html), missing:replaced.missing, studentName:[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim() });
@@ -8126,19 +8141,71 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   let today = '';
   try { today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   catch { today = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
-  const teacherName = classRecord?.classTeacherId
-    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:classRecord.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
-    : '';
+  const classesById = new Map<string,SchoolClass>();
+  if (classRecord) classesById.set(classRecord.id,classRecord);
+  for (const classId of new Set(students.map(student=>student.classId))) {
+    if (!classesById.has(classId)) {
+      const klass = await db.getClassById(classId,school.id);
+      if (klass) classesById.set(classId,klass);
+    }
+  }
+  const marksByClass = new Map<string,any[]>();
+  const teacherByClass = new Map<string,{name:string;staffId:string}>();
+  for (const klass of classesById.values()) {
+    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id));
+    if (klass.classTeacherId) {
+      const teacher = (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0];
+      teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
+    }
+  }
+  const feeBalanceByStudent = new Map<string,number>();
+  if (templateHtml.includes('{fee_balance}')) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const payments = await collectPagedItems(
+      (page,pageSize) => db.queryPage<any>('fee_payments',{school_id:school.id,student_id:studentIds},page,pageSize,undefined,'id,student_id,remaining_amount,voided_at'),
+      { pageSize:100, maxItems:50000 }
+    );
+    for (const payment of payments) {
+      if (payment.voidedAt) continue;
+      feeBalanceByStudent.set(payment.studentId,(feeBalanceByStudent.get(payment.studentId)||0) + Number(payment.remainingAmount || 0));
+    }
+  }
+  const attendanceByStudent = new Map<string,{present:number;total:number}>();
+  if (templateHtml.includes('{attendance}')) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const records = await collectPagedItems(
+      (page,pageSize) => db.queryPage<any>('attendance_records',{school_id:school.id,student_id:studentIds},page,pageSize,undefined,'id,student_id,status'),
+      { pageSize:100, maxItems:50000 }
+    );
+    for (const record of records) {
+      const summary = attendanceByStudent.get(record.studentId) || {present:0,total:0};
+      summary.total += 1;
+      if (record.status==='present'||record.status==='late') summary.present += 1;
+      attendanceByStudent.set(record.studentId,summary);
+    }
+  }
   const rows: Record<string,unknown>[] = [];
   const warnings: Array<{studentName:string;missing:string[]}> = [];
   for (const student of students) {
-    const klass = classRecord || await db.getClassById(student.classId,school.id);
+    const klass = classesById.get(student.classId) || classRecord;
     const studentName = [student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim();
+    const teacher = klass ? teacherByClass.get(klass.id) : undefined;
+    const academic = summarizeDocumentAcademicMarks(klass ? marksByClass.get(klass.id) || [] : [],student.id,school.gradingScale);
+    const attendance = attendanceByStudent.get(student.id);
+    const attendancePercent = attendance && attendance.total
+      ? ((attendance.present / attendance.total) * 100).toFixed(1) + '%'
+      : '';
+    const feeBalance = feeBalanceByStudent.get(student.id) || 0;
     const values = {
       student_name:studentName, student_id:student.studentId,
       class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
       parent_name:student.fatherName || '', date:today, school_name:school.name || '',
-      teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+      teacher_name:teacher?.name || '', staff_name:teacher?.name || '', staff_id:teacher?.staffId || '',
+      term:school.currentSemester || '', academic_year:school.academicYear || '',
+      total_marks:academic.totalMarks, average:academic.average, grade:academic.grade,
+      rank:academic.rank, teacher_comment:academic.teacherComment,
+      fee_balance:templateHtml.includes('{fee_balance}') ? formatMoney(feeBalance,school.currency) : '',
+      attendance:attendancePercent
     };
     const replaced = replaceDocumentVariables(templateHtml,values);
     const safeHtml = sanitizeDocumentHtml(replaced.html);
