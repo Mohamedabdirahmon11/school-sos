@@ -9,7 +9,7 @@ import { applySchoolBrandColor } from '../../lib/documents/brand-color.ts';
 import './documents.css';
 
 type DocType = 'transfer_letter'|'certificate'|'parent_letter'|'teacher_letter'|'student_clearance'|'report_summary'|'other';
-type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean; canDownload?:boolean };
+type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'|'CR80'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean; canDownload?:boolean };
 type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean; deletedAt?:string|null };
 
 const makeBuiltin = (id:string, title:string, documentType:DocType, contentHtml:string): TemplateRow => ({
@@ -128,7 +128,7 @@ export const DocumentsView: React.FC = () => {
   const [title,setTitle] = useState('');
   const [html,setHtml] = useState('');
   const [direction,setDirection] = useState<'ltr'|'rtl'>('ltr');
-  const [pageSize,setPageSize] = useState<'A4'|'A5'|'Letter'>('A4');
+  const [pageSize,setPageSize] = useState<'A4'|'A5'|'Letter'|'CR80'>('A4');
   const [margins,setMargins] = useState(20);
   const [status,setStatus] = useState<'draft'|'final'>('draft');
   const [search,setSearch] = useState('');
