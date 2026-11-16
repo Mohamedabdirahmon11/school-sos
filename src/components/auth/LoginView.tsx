@@ -3,8 +3,8 @@
  * Supports:
  * - Super Admin: Email + Password
  * - School Admin: School ID or Admin ID + PIN
- * - Accountant: Email or Phone + Password
- * - Teacher: School-issued Teacher ID + Password or PIN
+ * - Accountant: School-issued Staff ID + PIN
+ * - Teacher: School-issued Teacher ID + PIN
  * - Student & Parent: School Code + Phone Number + PIN (with children switcher and lockout protection)
  */
 
