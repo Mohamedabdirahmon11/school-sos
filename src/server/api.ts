@@ -7551,7 +7551,8 @@ function documentClientRow(row: any, includeContent = false) {
     id: row.id, title: row.title, documentType: row.document_type, status: row.status,
     updatedAt: row.updated_at, createdAt: row.created_at, deletedAt: row.deleted_at,
     studentId: row.student_id, classId: row.class_id, templateId: row.template_id,
-    pageSize: row.page_size, direction: row.direction, pageMargins: row.page_margins
+    pageSize: row.page_size, direction: row.direction, pageMargins: row.page_margins,
+    lockedAt: row.locked_at || null, lockedBy: row.locked_by || null, lockReason: row.lock_reason || null
   };
   if (includeContent) result.contentHtml = row.content_html || '';
   return result;
@@ -7665,6 +7666,12 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchool
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const body = req.body || {};
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: current, error: currentError } = await client.from('school_documents').select('id,locked_at')
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if (currentError || !current) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  if (current.locked_at) { res.status(423).json({ error: 'Dukumentigan waa la xiray. Marka hore fur si aad wax uga beddesho.', code: 'DOCUMENT_LOCKED' }); return; }
   const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
   if (typeof body.title === 'string') {
     const title = body.title.trim().slice(0,180);
@@ -7672,7 +7679,8 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchool
     updates.title = title;
   }
   if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
-  if (['draft','final'].includes(body.status)) updates.status = body.status;
+  if (body.status === 'final') { updates.status = 'final'; updates.locked_at = new Date().toISOString(); updates.locked_by = user.id; updates.lock_reason = 'Final document'; }
+  else if (body.status === 'draft') { updates.status = 'draft'; }
   if (['A4','A5','Letter'].includes(body.pageSize)) updates.page_size = body.pageSize;
   if (['ltr','rtl'].includes(body.direction)) updates.direction = body.direction;
   if (Number.isInteger(body.pageMargins)) updates.page_margins = Math.min(40,Math.max(5,body.pageMargins));
@@ -7722,6 +7730,151 @@ apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, re
   }).select('*').single();
   if (error || !data) { res.status(503).json({ error: 'Nuqulka dukumentiga lama samayn karin.' }); return; }
   res.status(201).json(documentClientRow(data,true));
+});
+
+
+apiRouter.get('/documents/:id/versions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: document } = await client.from('school_documents').select('id')
+    .eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if (!document) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  const { data, error } = await client.from('school_document_versions').select('*')
+    .eq('school_id',school.id).eq('document_id',req.params.id)
+    .order('version_number',{ascending:false}).limit(50);
+  if (error) { res.status(503).json({ error: 'Taariikhda dukumentiga lama soo dejin karin.' }); return; }
+  res.setHeader('Cache-Control','private, no-store');
+  res.json((data || []).map(row => ({
+    id:row.id, versionNumber:row.version_number, title:row.title, status:row.status,
+    documentType:row.document_type, contentHtml:row.content_html, pageSize:row.page_size,
+    direction:row.direction, pageMargins:row.page_margins, changedBy:row.changed_by, createdAt:row.created_at
+  })));
+});
+
+apiRouter.post('/documents/:id/versions/:versionId/restore', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: current } = await client.from('school_documents').select('id,locked_at')
+    .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if (!current) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  if (current.locked_at) { res.status(423).json({ error: 'Fur dukumentiga ka hor intaadan version soo celin.', code:'DOCUMENT_LOCKED' }); return; }
+  const { data: version } = await client.from('school_document_versions').select('*')
+    .eq('school_id',school.id).eq('document_id',req.params.id).eq('id',req.params.versionId).maybeSingle();
+  if (!version) { res.status(404).json({ error: 'Version-kan lama helin.' }); return; }
+  const { data, error } = await client.from('school_documents').update({
+    title:version.title, document_type:version.document_type, status:'draft',
+    content_html:version.content_html, page_size:version.page_size, direction:version.direction,
+    page_margins:version.page_margins, updated_by:user.id, updated_at:new Date().toISOString()
+  }).eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
+  if (error || !data) { res.status(503).json({ error:'Version-ka lama soo celin karin.' }); return; }
+  res.json(documentClientRow(data,true));
+});
+
+apiRouter.post('/documents/:id/lock', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0,300) : '';
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').update({
+    locked_at:new Date().toISOString(), locked_by:user.id, lock_reason:reason || 'Manually locked',
+    updated_by:user.id, updated_at:new Date().toISOString()
+  }).eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).is('locked_at',null).select('*').maybeSingle();
+  if (error || !data) { res.status(409).json({ error:'Dukumentiga lama helin ama horay ayaa loo xiray.' }); return; }
+  res.json(documentClientRow(data,true));
+});
+
+apiRouter.post('/documents/:id/unlock', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_documents').update({
+    locked_at:null, locked_by:null, lock_reason:null, updated_by:user.id, updated_at:new Date().toISOString()
+  }).eq('school_id',school.id).eq('id',req.params.id).not('locked_at','is',null).select('*').maybeSingle();
+  if (error || !data) { res.status(409).json({ error:'Dukumentiga lama helin ama ma xirna.' }); return; }
+  res.json(documentClientRow(data,true));
+});
+
+apiRouter.get('/documents/:id/audit', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_audit_events').select('id,actor_user_id,action,details,created_at')
+    .eq('school_id',school.id).eq('document_id',req.params.id).order('created_at',{ascending:false}).limit(100);
+  if (error) { res.status(503).json({ error:'Audit log lama soo dejin karin.' }); return; }
+  res.setHeader('Cache-Control','private, no-store');
+  res.json((data || []).map(row=>({id:row.id,actorUserId:row.actor_user_id,action:row.action,details:row.details,createdAt:row.created_at})));
+});
+
+apiRouter.get('/students/:studentId/document-attachments', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const student = await db.getStudentById(req.params.studentId,school.id);
+  if (!student) { res.status(404).json({error:'Ardayga lama helin dugsigan.'}); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const {data,error}=await client.from('student_document_attachments').select('id,file_name,mime_type,file_size,uploaded_by,created_at')
+    .eq('school_id',school.id).eq('student_id',student.id).is('deleted_at',null).order('created_at',{ascending:false}).limit(100);
+  if(error){res.status(503).json({error:'Lifaaqyada ardayga lama soo dejin karin.'});return;}
+  res.json((data||[]).map(row=>({id:row.id,fileName:row.file_name,mimeType:row.mime_type,fileSize:row.file_size,uploadedBy:row.uploaded_by,createdAt:row.created_at})));
+});
+
+apiRouter.post('/students/:studentId/document-attachments', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin,
+  express.raw({type:['application/pdf','image/jpeg','image/png','image/webp'],limit:'10485760'}), async (req,res)=>{
+    const school=(req as any).school as School;
+    const user=(req as any).user as User;
+    const student=await db.getStudentById(req.params.studentId,school.id);
+    if(!student){res.status(404).json({error:'Ardayga lama helin dugsigan.'});return;}
+    const bytes=Buffer.isBuffer(req.body)?req.body:null;
+    const mime=String(req.headers['content-type']||'').split(';')[0].toLowerCase();
+    const validImage=bytes && mime!=='application/pdf' ? Boolean(detectSchoolLogoImage(bytes,mime)) : false;
+    const validPdf=Boolean(bytes && mime==='application/pdf' && bytes.subarray(0,5).toString('ascii')==='%PDF-');
+    if(!bytes || (!validImage && !validPdf)){res.status(400).json({error:'Geli PDF ama sawir JPEG, PNG ama WebP sax ah oo ka yar 10 MB.'});return;}
+    const rawName=decodeURIComponent(String(req.headers['x-file-name']||'lifaaq')).replace(/[\\/\\0-\\x1f\\x7f]/g,' ').trim();
+    const fileName=(rawName.split(/[\\/]/).pop()||'lifaaq').slice(0,180);
+    const extension=mime==='application/pdf'?'pdf':mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp';
+    const client=documentServiceClient(res);if(!client)return;
+    const storagePath=school.id+'/'+student.id+'/'+randomUUID()+'.'+extension;
+    const {error:uploadError}=await client.storage.from('student-document-attachments').upload(storagePath,bytes,{contentType:mime,cacheControl:'300',upsert:false});
+    if(uploadError){res.status(502).json({error:'Lifaaqa lama kaydin karin.'});return;}
+    const {data,error}=await client.from('student_document_attachments').insert({
+      school_id:school.id,student_id:student.id,file_name:fileName,mime_type:mime,file_size:bytes.length,
+      storage_path:storagePath,uploaded_by:user.id
+    }).select('id,file_name,mime_type,file_size,uploaded_by,created_at').single();
+    if(error||!data){await client.storage.from('student-document-attachments').remove([storagePath]);res.status(503).json({error:'Diiwaanka lifaaqa lama kaydin karin.'});return;}
+    await client.from('school_document_audit_events').insert({school_id:school.id,actor_user_id:user.id,action:'student_attachment_uploaded',details:{studentId:student.id,attachmentId:data.id,fileName}});
+    res.status(201).json({id:data.id,fileName:data.file_name,mimeType:data.mime_type,fileSize:data.file_size,uploadedBy:data.uploaded_by,createdAt:data.created_at});
+  }
+);
+
+apiRouter.get('/students/:studentId/document-attachments/:attachmentId/download', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req,res)=>{
+  const school=(req as any).school as School;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data:attachment}=await client.from('student_document_attachments').select('file_name,mime_type,storage_path')
+    .eq('school_id',school.id).eq('student_id',req.params.studentId).eq('id',req.params.attachmentId).is('deleted_at',null).maybeSingle();
+  if(!attachment || !attachment.storage_path.startsWith(school.id+'/'+req.params.studentId+'/')){res.status(404).json({error:'Lifaaqa lama helin.'});return;}
+  const {data,error}=await client.storage.from('student-document-attachments').download(attachment.storage_path);
+  if(error||!data){res.status(404).json({error:'Faylka lama helin.'});return;}
+  const safeName=attachment.file_name.replace(/[\\r\\n"]/g,'_');
+  res.setHeader('Content-Type',attachment.mime_type);
+  res.setHeader('Content-Disposition',`attachment; filename="${safeName}"`);
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Cache-Control','private, no-store');
+  res.send(Buffer.from(await data.arrayBuffer()));
+});
+
+apiRouter.delete('/students/:studentId/document-attachments/:attachmentId', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data,error}=await client.from('student_document_attachments').update({deleted_at:new Date().toISOString(),deleted_by:user.id})
+    .eq('school_id',school.id).eq('student_id',req.params.studentId).eq('id',req.params.attachmentId).is('deleted_at',null).select('id').maybeSingle();
+  if(error||!data){res.status(404).json({error:'Lifaaqa lama tirtiri karin.'});return;}
+  await client.from('school_document_audit_events').insert({school_id:school.id,actor_user_id:user.id,action:'student_attachment_deleted',details:{studentId:req.params.studentId,attachmentId:req.params.attachmentId}});
+  res.json({success:true});
 });
 
 apiRouter.get('/document-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
