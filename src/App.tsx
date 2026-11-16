@@ -34,6 +34,7 @@ const TimetableView = React.lazy(() => import('./components/schooladmin/Timetabl
 const AttendanceView = React.lazy(() => import('./components/schooladmin/AttendanceView.tsx').then(module => ({ default: module.AttendanceView })));
 const ExamsResultsView = React.lazy(() => import('./components/schooladmin/ExamsResultsView.tsx').then(module => ({ default: module.ExamsResultsView })));
 const FeesLedgerView = React.lazy(() => import('./components/schooladmin/FeesLedgerView.tsx').then(module => ({ default: module.FeesLedgerView })));
+const StudentInvoicesView = React.lazy(() => import('./components/schooladmin/StudentInvoicesView.tsx').then(module => ({ default: module.StudentInvoicesView })));
 const ReportCardsView = React.lazy(() => import('./components/schooladmin/ReportCardsView.tsx').then(module => ({ default: module.ReportCardsView })));
 const DocumentsView = React.lazy(() => import('./components/documents/DocumentsView.tsx').then(module => ({ default: module.DocumentsView })));
 const AdmissionsView = React.lazy(() => import('./components/schooladmin/AdmissionsView.tsx').then(module => ({ default: module.AdmissionsView })));
@@ -136,7 +137,7 @@ const AppContent: React.FC = () => {
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
     : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard'
       : user.role === 'accountant' && (
-        requestedView === 'sch_fees' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
+        (requestedView === 'sch_fees' || requestedView === 'sch_student_invoices') && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'acc_expenses' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'acc_bank_reconciliation' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'sch_payroll' && !hasStaffNavigationPermission(user.permissions, 'payroll_manage')
@@ -265,6 +266,9 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_fees' && (
               <FeesLedgerView />
+            )}
+            {activeView === 'sch_student_invoices' && (
+              <StudentInvoicesView />
             )}
             {activeView === 'sch_promotion' && (
               <YearEndPromotionView />

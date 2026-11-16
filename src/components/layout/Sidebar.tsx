@@ -70,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Dukumentiyada', FileText)] },
       { title: 'Daily operations', items: [
         { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
+        { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' },
         { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },
         { ...item('acc_bank_reconciliation', 'Bank reconciliation', Building2), permission: 'fees_manage' }
       ] },
@@ -96,6 +97,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_notices', noticeLabel, BellRing), item('sch_messages', t('messages'), MessageSquare),
         item('sch_whatsapp', 'WhatsApp parent reminders', MessageCircle),
         item('sch_events', t('events_holidays'), CalendarDays)
+      ] },
+      { title: 'Finance', items: [
+        { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' }
       ] },
       { title: 'Reports', items: [
         item('sch_reports', t('reports_export'), BarChart3)

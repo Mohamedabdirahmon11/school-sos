@@ -6131,6 +6131,201 @@ apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requir
   res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + paidPayroll.length, payrollExpenseTotal: paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0), payrollExpenseCount: paidPayroll.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
 });
 
+
+/* =============================================================================
+ * STUDENT INVOICES
+ * ============================================================================= */
+function studentInvoiceServiceClient(res: Response) {
+  if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
+    res.status(503).json({ error: 'Student invoice storage is not configured.' });
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+apiRouter.get('/student-invoices', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!['school_admin','accountant','super_admin','parent','student'].includes(user.role)) {
+    res.status(403).json({ error: 'Student invoice access is restricted.' }); return;
+  }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req,user.id,school.id),'fees_manage')) {
+    res.status(403).json({ error: 'Your staff account does not have permission to view invoices.' }); return;
+  }
+  const client = studentInvoiceServiceClient(res); if (!client) return;
+  let query = client.from('student_invoices').select('*').eq('school_id',school.id).order('issue_date',{ascending:false}).limit(500);
+  if (user.role === 'parent' || user.role === 'student') {
+    const linkedIds = user.role === 'student' && user.studentId
+      ? [(await db.getStudents(school.id)).find((student:any)=>student.studentId===user.studentId)?.id].filter(Boolean) as string[]
+      : (user.linkedStudentIds || []);
+    if (!linkedIds.length) { res.json([]); return; }
+    query = query.in('student_id',linkedIds);
+  }
+  const {data,error}=await query;
+  if(error){res.status(503).json({error:'Student invoices could not be loaded.'});return;}
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(data||[]);
+});
+
+apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('fees_manage'), async (req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  const body=req.body||{};
+  const billingPeriod=typeof body.billingPeriod==='string'?body.billingPeriod.trim():'';
+  const dueDate=typeof body.dueDate==='string'?body.dueDate:'';
+  const classId=typeof body.classId==='string'?body.classId.trim():'';
+  const studentId=typeof body.studentId==='string'?body.studentId.trim():'';
+  const parsedDue=new Date(dueDate+'T00:00:00.000Z');
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(billingPeriod)||!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)||Number.isNaN(parsedDue.getTime())||parsedDue.toISOString().slice(0,10)!==dueDate||Boolean(classId)===Boolean(studentId)){
+    res.status(400).json({error:'Choose one class or student, a billing period, and a valid due date.'});return;
+  }
+  const client=studentInvoiceServiceClient(res);if(!client)return;
+  const [students,structures,busAssignments,schoolClasses]=await Promise.all([db.getStudents(school.id),db.getFeeStructures(school.id),db.getBusAssignments(school.id),db.getClasses(school.id)]);
+  if(classId&&!await db.getClassById(classId,school.id)){res.status(400).json({error:'Class does not belong to this school.'});return;}
+  const targets=students.filter((student:any)=>student.status==='active'&&(studentId?student.id===studentId:student.classId===classId));
+  if(studentId&&!targets.length){res.status(404).json({error:'Active student was not found in this school.'});return;}
+  const activeStructures=structures.filter(item=>item.isActive&&Number(item.amount)>0);
+  const annualStructureIds=activeStructures.filter(item=>item.feeType==='annual_registration'||item.feeType==='custom'&&item.cadence==='annual').map(item=>item.id);
+  const oneTimeStructureIds=activeStructures.filter(item=>item.feeType==='custom'&&item.cadence==='one_time').map(item=>item.id);
+  const targetIds=targets.map((student:any)=>student.id);
+  const [priorAnnual,priorOneTime]=await Promise.all([
+    body.includeAnnualRegistration===true&&annualStructureIds.length&&targetIds.length
+      ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id,academic_year)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).eq('student_invoices.academic_year',school.academicYear).in('fee_structure_id',annualStructureIds)
+      : Promise.resolve({data:[],error:null}),
+    body.includeOneTimeFees===true&&oneTimeStructureIds.length&&targetIds.length
+      ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).in('fee_structure_id',oneTimeStructureIds)
+      : Promise.resolve({data:[],error:null})
+  ]);
+  if(priorAnnual.error||priorOneTime.error){res.status(503).json({error:'Could not verify previously billed annual or one-time fees.'});return;}
+  const billedAnnualByStudent=new Map<string,Set<string>>();
+  for(const row of priorAnnual.data||[]){
+    const studentKey=(row as any).student_invoices?.student_id;
+    if(!studentKey)continue;
+    if(!billedAnnualByStudent.has(studentKey))billedAnnualByStudent.set(studentKey,new Set());
+    billedAnnualByStudent.get(studentKey)!.add((row as any).fee_structure_id);
+  }
+  const billedOneTimeByStudent=new Map<string,Set<string>>();
+  for(const row of priorOneTime.data||[]){
+    const studentKey=(row as any).student_invoices?.student_id;
+    if(!studentKey)continue;
+    if(!billedOneTimeByStudent.has(studentKey))billedOneTimeByStudent.set(studentKey,new Set());
+    billedOneTimeByStudent.get(studentKey)!.add((row as any).fee_structure_id);
+  }
+  const created:any[]=[];let skippedExisting=0,skippedNoFees=0;
+  for(const student of targets){
+    const klass=schoolClasses.find((item:any)=>item.id===student.classId);
+    const billedAnnual=billedAnnualByStudent.get(student.id)||new Set<string>();
+    const billedOneTime=billedOneTimeByStudent.get(student.id)||new Set<string>();
+    const applicable=activeStructures.filter(item=>{
+      if(item.feeType==='bus')return false;
+      const classMatch=item.classId
+        ? item.classId===student.classId
+        : item.minGrade!==undefined&&item.maxGrade!==undefined
+          ? Boolean(klass&&klass.gradeLevel>=item.minGrade&&klass.gradeLevel<=item.maxGrade)
+          : ['annual_registration','custom'].includes(item.feeType);
+      if(!classMatch)return false;
+      if(item.feeType==='annual_registration')return body.includeAnnualRegistration===true&&!billedAnnual.has(item.id);
+      if(item.feeType==='monthly_tuition')return item.cadence==='monthly';
+      if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration===true&&!billedAnnual.has(item.id)||item.cadence==='one_time'&&body.includeOneTimeFees===true&&!billedOneTime.has(item.id);
+      return false;
+    });
+    const lines:Array<{fee_structure_id:string|null;fee_type:'monthly_tuition'|'annual_registration'|'bus'|'custom';description:string;quantity:number;unit_amount:number;line_total:number;cadence:'monthly'|'annual'|'one_time'}>=applicable.map(item=>({fee_structure_id:item.id,fee_type:item.feeType,description:item.name,quantity:1,unit_amount:Number(item.amount),line_total:Number(item.amount),cadence:item.cadence}));
+    const bus=busAssignments.find((assignment:any)=>assignment.studentId===student.id&&assignment.active);
+    if(bus&&Number(bus.feeAmount)>0)lines.push({fee_structure_id:null,fee_type:'bus',description:'School transport',quantity:1,unit_amount:Number(bus.feeAmount),line_total:Number(bus.feeAmount),cadence:'monthly'});
+    if(!lines.length){skippedNoFees++;continue;}
+    const {data:sequence,error:sequenceError}=await client.rpc('schoolos_next_student_invoice',{p_school_id:school.id,p_academic_year:school.academicYear});
+    if(sequenceError){res.status(503).json({error:'Invoice number allocation failed.'});return;}
+    const seq=Number(sequence);
+    if(!Number.isSafeInteger(seq)||seq<1){res.status(503).json({error:'Invoice number sequence is invalid.'});return;}
+    const subtotal=lines.reduce((sum,line)=>sum+line.line_total,0);
+    const invoiceId='inv-'+randomUUID();
+    const invoiceNumber=`INV-${school.code||'SCH'}-${String(school.academicYear||'2026').slice(0,4)}-${String(seq).padStart(5,'0')}`;
+    const {data:creation,error:creationError}=await client.rpc('schoolos_create_student_invoice',{
+      p_invoice:{
+        id:invoiceId,school_id:school.id,student_id:student.id,invoice_number:invoiceNumber,
+        academic_year:school.academicYear,billing_period:billingPeriod,issue_date:new Date().toISOString().slice(0,10),
+        due_date:dueDate,currency:school.currency||'ETB',subtotal,discount_amount:0,total_amount:subtotal,
+        amount_paid:0,balance_due:subtotal,status:'issued',created_by:user.id
+      },
+      p_items:lines
+    });
+    if(creationError){
+      if(/already been billed|already exists/i.test(creationError.message||'')){skippedExisting++;continue;}
+      res.status(503).json({error:'Invoice could not be created atomically.'});return;
+    }
+    if(creation?.duplicate){skippedExisting++;continue;}
+    if(!creation?.invoice){res.status(503).json({error:'Invoice creation returned an invalid result.'});return;}
+    created.push(creation.invoice);
+  }
+  db.logAudit({action:'STUDENT_INVOICES_GENERATED',category:'finance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Generated ${created.length} student invoices for ${billingPeriod}; skipped ${skippedExisting} duplicates and ${skippedNoFees} students without configured fees.`,severity:'info'});
+  await db.flush();
+  res.status(201).json({generatedCount:created.length,skippedExisting,skippedNoFees,invoices:created});
+});
+
+apiRouter.get('/student-invoices/:id/items', requireAuth, requireSchoolContext, async(req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  if(user.role==='accountant'&&!staffHasPermission(await getStaffForRequest(req,user.id,school.id),'fees_manage')){res.status(403).json({error:'Your staff account does not have permission to view invoice items.'});return;}
+  const client=studentInvoiceServiceClient(res);if(!client)return;
+  const {data:invoice}=await client.from('student_invoices').select('id,student_id').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if(!invoice){res.status(404).json({error:'Invoice not found.'});return;}
+  if(!['school_admin','accountant','super_admin'].includes(user.role)){
+    const allowed=await canAccessStudentRecord(user,invoice.student_id);
+    if(!allowed){res.status(403).json({error:'You cannot access this invoice.'});return;}
+  }
+  const {data,error}=await client.from('student_invoice_items').select('*').eq('school_id',school.id).eq('invoice_id',req.params.id).order('created_at');
+  if(error){res.status(503).json({error:'Invoice items could not be loaded.'});return;}
+  res.json(data||[]);
+});
+
+apiRouter.post('/student-invoices/:id/pay', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('fees_manage'), async(req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  const amount=Number(req.body?.amount);
+  const method=req.body?.paymentMethod||'Cash';
+  const notes=typeof req.body?.notes==='string'?req.body.notes.trim().slice(0,1000):null;
+  const idempotencyKey=typeof req.body?.idempotencyKey==='string'?req.body.idempotencyKey.trim():null;
+  const confirmedReceived=req.body?.confirmedReceived===true;
+  if(!confirmedReceived){res.status(400).json({error:'The school must confirm that the payment was received before recording it.'});return;}
+  if(!Number.isFinite(amount)||amount<=0||amount>9999999999.99||Math.round(amount*100)!==amount*100||!['Cash','Bank Transfer','Mobile Money'].includes(method)||idempotencyKey&&idempotencyKey.length>128){
+    res.status(400).json({error:'Enter a valid payment amount, method and retry key.'});return;
+  }
+  const client=studentInvoiceServiceClient(res);if(!client)return;
+  const {data,error}=await client.rpc('schoolos_apply_student_invoice_payment',{
+    p_invoice_id:req.params.id,p_school_id:school.id,p_amount:amount,p_payment_method:method,
+    p_recorded_by:user.id,p_notes:notes,p_idempotency_key:idempotencyKey
+  });
+  if(error){res.status(409).json({error:error.message||'Invoice payment could not be recorded.'});return;}
+  db.logAudit({action:'STUDENT_INVOICE_PAYMENT_RECORDED',category:'finance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:`Recorded ${amount} ${school.currency||'ETB'} against student invoice ${req.params.id}.`,severity:'info'});
+  await db.flush();
+  res.status(201).json(data);
+});
+
+apiRouter.get('/student-invoices/:id/pdf', requireAuth, requireSchoolContext, async(req,res)=>{
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  const client=studentInvoiceServiceClient(res);if(!client)return;
+  if(user.role==='accountant'&&!staffHasPermission(await getStaffForRequest(req,user.id,school.id),'fees_manage')){res.status(403).json({error:'Your staff account does not have permission to download invoices.'});return;}
+  const {data:invoice}=await client.from('student_invoices').select('*').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if(!invoice){res.status(404).json({error:'Invoice not found.'});return;}
+  if(!['school_admin','accountant','super_admin'].includes(user.role)&&!await canAccessStudentRecord(user,invoice.student_id)){res.status(403).json({error:'You cannot download this invoice.'});return;}
+  const [student,items]=await Promise.all([db.getStudentById(invoice.student_id,school.id),client.from('student_invoice_items').select('*').eq('school_id',school.id).eq('invoice_id',invoice.id)]);
+  if(items.error){res.status(503).json({error:'Invoice items could not be loaded.'});return;}
+  const klass=student?await db.getClassById(student.classId,school.id):null;
+  const pages:PdfPageInput[]=[[
+    school.name,school.address||'',school.phone||'','STUDENT INVOICE',
+    `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
+    `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
+    `Student ID: ${student?.studentId||invoice.student_id}`,`Class: ${klass?.name||''} ${klass?.section||''}`,`Billing period: ${invoice.billing_period}`,'',
+    ...(items.data||[]).map((line:any)=>`${line.description}  x${line.quantity}  ${formatMoney(Number(line.line_total),invoice.currency)}`),
+    '',`Subtotal: ${formatMoney(Number(invoice.subtotal),invoice.currency)}`,`Discount: ${formatMoney(Number(invoice.discount_amount),invoice.currency)}`,
+    `Total: ${formatMoney(Number(invoice.total_amount),invoice.currency)}`,`Paid: ${formatMoney(Number(invoice.amount_paid),invoice.currency)}`,
+    `Balance due: ${formatMoney(Number(invoice.balance_due),invoice.currency)}`,`Status: ${invoice.status}`,
+    ...(invoice.notes?[ '',invoice.notes]:[])
+  ]];
+  sendPdf(res,`invoice-${invoice.invoice_number}`,pages);
+});
+
 // ==============================================================================
 // 8. REPORT CARD DESIGNER
 // ==============================================================================
@@ -6203,7 +6398,7 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   if (!payment) { res.status(404).json({ error: 'Receipt not found.' }); return; }
   const user = (req as any).user as User;
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'fees_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view receipts.' }); return; }
-  if (!['accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
+  if (!['school_admin', 'accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);

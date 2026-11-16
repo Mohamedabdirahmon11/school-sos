@@ -67,6 +67,30 @@ export class ApiClient {
     return this.downloadPdf(`/fees/payments/${encodeURIComponent(paymentId)}/receipt.pdf`, `receipt-${paymentId}.pdf`);
   }
 
+  public static getStudentInvoices() {
+    return this.request<any[]>('/student-invoices');
+  }
+
+  public static generateStudentInvoices(data: { classId?: string; studentId?: string; billingPeriod: string; dueDate: string; includeAnnualRegistration?: boolean; includeOneTimeFees?: boolean }) {
+    return this.request<{ generatedCount: number; skippedExisting: number; skippedNoFees: number; invoices: any[] }>('/student-invoices/generate', {
+      method: 'POST', body: JSON.stringify(data)
+    });
+  }
+
+  public static getStudentInvoiceItems(invoiceId: string) {
+    return this.request<any[]>(`/student-invoices/${encodeURIComponent(invoiceId)}/items`);
+  }
+
+  public static payStudentInvoice(invoiceId: string, data: { amount: number; paymentMethod: 'Cash' | 'Bank Transfer' | 'Mobile Money'; notes?: string; confirmedReceived: true; idempotencyKey: string }) {
+    return this.request<{ invoice: any; payment: FeePayment; replayed: boolean }>(`/student-invoices/${encodeURIComponent(invoiceId)}/pay`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+  }
+
+  public static downloadStudentInvoicePdf(invoiceId: string) {
+    return this.downloadPdf(`/student-invoices/${encodeURIComponent(invoiceId)}/pdf`, `student-invoice-${invoiceId}.pdf`);
+  }
+
   public static async voidFeePayment(paymentId: string, reason: string) {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
