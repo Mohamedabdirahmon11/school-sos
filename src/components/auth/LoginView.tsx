@@ -61,6 +61,11 @@ export const LoginView: React.FC = () => {
         pin,
         password: activeTab === 'super_admin' ? password : undefined
       });
+      if (result.requirePinChange && result.challengeToken) {
+        setBootstrapToken(result.challengeToken);
+        setPinChangeRequired(true);
+        return;
+      }
       if (result.requirePasswordChange && result.challengeToken) {
         setBootstrapToken(result.challengeToken);
         setPasswordChangeRequired(true);
