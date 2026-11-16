@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         <button onClick={onCloseMobile} aria-label="Close menu" className="rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
-      <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]">
+      <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
         {groups.map(group => <section key={group.title}>
           <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50 ${isCollapsed ? "md:hidden" : ""}`}>{group.title}</h2>
           <div className="space-y-1">
