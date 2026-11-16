@@ -16,8 +16,8 @@ export const AccountantPayrollView: React.FC = () => {
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [salaryOverrides, setSalaryOverrides] = useState<Record<string, number>>({});
-  const [allowance, setAllowance] = useState(0);
-  const [deduction, setDeduction] = useState(0);
+  const [allowanceOverrides, setAllowanceOverrides] = useState<Record<string, number>>({});
+  const [deductionOverrides, setDeductionOverrides] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -65,14 +65,17 @@ export const AccountantPayrollView: React.FC = () => {
   const createDraft = async () => {
     setSaving(true); setError('');
     try {
-      const allowances = allowance > 0 ? [{ label: t('payroll_allowance'), amount: allowance }] : [];
-      const deductions = deduction > 0 ? [{ label: t('payroll_deduction'), amount: deduction }] : [];
-      await ApiClient.createPayrollDraft(month, selected.map(staffId => ({
-        staffId,
-        baseSalary: salaryOverrides[staffId] ?? staff.find(employee => employee.id === staffId)?.monthlySalary ?? 0,
-        allowances, deductions
-      })));
-      setSelected([]); setSalaryOverrides({}); await reload();
+      await ApiClient.createPayrollDraft(month, selected.map(staffId => {
+        const allowance = allowanceOverrides[staffId] || 0;
+        const deduction = deductionOverrides[staffId] || 0;
+        return {
+          staffId,
+          baseSalary: salaryOverrides[staffId] ?? staff.find(employee => employee.id === staffId)?.monthlySalary ?? 0,
+          allowances: allowance > 0 ? [{ label: t('payroll_allowance'), amount: allowance }] : [],
+          deductions: deduction > 0 ? [{ label: t('payroll_deduction'), amount: deduction }] : []
+        };
+      }));
+      setSelected([]); setSalaryOverrides({}); setAllowanceOverrides({}); setDeductionOverrides({}); await reload();
     } catch (reason: any) { setError(reason?.message || t('payroll_error')); }
     finally { setSaving(false); }
   };
@@ -135,18 +138,18 @@ export const AccountantPayrollView: React.FC = () => {
               <span className="flex min-w-0 items-center gap-2"><input type="checkbox" checked={selected.includes(employee.id)} onChange={event => setSelected(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><span className="truncate">{employee.name} · {employee.staffId}<small className="block text-slate-500">{employee.roleTitle || 'Staff'}</small></span></span>
               <span className="shrink-0 text-xs text-slate-600">{money(salaryOverrides[employee.id] ?? employee.monthlySalary)}</span>
             </label>
-            {selected.includes(employee.id) && <label className="text-xs text-slate-500 pl-6">Monthly base salary ({school?.currency || 'ETB'})
-              <input type="number" min="0" step="0.01" value={salaryOverrides[employee.id] ?? employee.monthlySalary} onChange={event => setSalaryOverrides(current => ({ ...current, [employee.id]: Number(event.target.value) }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
-            </label>}
+            {selected.includes(employee.id) && <div className="grid grid-cols-3 gap-2 pl-6">
+              <label className="text-[11px] text-slate-500">Base salary<input type="number" min="0" step="0.01" value={salaryOverrides[employee.id] ?? employee.monthlySalary} onChange={event => setSalaryOverrides(current => ({ ...current, [employee.id]: Number(event.target.value) }))} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2" /></label>
+              <label className="text-[11px] text-slate-500">Allowance<input type="number" min="0" step="0.01" value={allowanceOverrides[employee.id] ?? 0} onChange={event => setAllowanceOverrides(current => ({ ...current, [employee.id]: Number(event.target.value) }))} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2" /></label>
+              <label className="text-[11px] text-slate-500">Deduction<input type="number" min="0" step="0.01" value={deductionOverrides[employee.id] ?? 0} onChange={event => setDeductionOverrides(current => ({ ...current, [employee.id]: Number(event.target.value) }))} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2" /></label>
+            </div>}
           </div>)}
           {!available.length && <p className="text-sm text-slate-500">{t('payroll_empty')}</p>}
           {available.length > 0 && !visibleAvailable.length && <p className="text-xs text-slate-500">No staff match that search.</p>}
         </fieldset>
-        <div className="grid grid-cols-2 gap-3 content-start">
-          <label className="text-xs font-semibold text-[#475569]">{t('payroll_allowance')} ({school?.currency || 'ETB'})<input type="number" min="0" step="0.01" value={allowance} onChange={event => setAllowance(Number(event.target.value))} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-          <label className="text-xs font-semibold text-[#475569]">{t('payroll_deduction')} ({school?.currency || 'ETB'})<input type="number" min="0" step="0.01" value={deduction} onChange={event => setDeduction(Number(event.target.value))} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-          <button type="button" disabled={!selected.length || saving || loading} onClick={() => void createDraft()} className="col-span-2 px-4 py-2 bg-[#0F766E] disabled:opacity-50 text-white rounded-lg text-sm font-semibold">{saving ? t('payroll_loading') : t('payroll_create')}</button>
-          <p className="col-span-2 text-xs text-slate-500">Set a base salary for administrators who do not yet have a salary saved in their staff profile. Allowance and deduction entered here apply to each selected person.</p>
+        <div className="flex flex-col gap-3 content-start">
+          <p className="text-xs text-slate-500">For each selected employee, enter their own base salary, allowance and deduction. These amounts are saved separately in that employee's monthly payroll record.</p>
+          <button type="button" disabled={!selected.length || saving || loading} onClick={() => void createDraft()} className="px-4 py-2 bg-[#0F766E] disabled:opacity-50 text-white rounded-lg text-sm font-semibold">{saving ? t('payroll_loading') : t('payroll_create')}</button>
         </div>
       </div>
     </section>
@@ -160,7 +163,7 @@ export const AccountantPayrollView: React.FC = () => {
             const paid = Number(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0));
             const due = Number(record.balanceDue ?? (record.netSalary - paid));
             return <tr key={record.id}>
-              <td className="p-3 font-semibold">{record.staffName}</td><td className="p-3">{money(record.baseSalary)}</td><td className="p-3">{money(record.allowanceTotal)}</td><td className="p-3">{money(record.deductionTotal)}</td><td className="p-3 font-bold">{money(record.netSalary)}</td><td className="p-3 text-emerald-700">{money(paid)}</td><td className="p-3 text-amber-700">{money(due)}</td><td className="p-3">{statusText(record.status)}{Array.isArray(record.paymentHistory) && record.paymentHistory.length > 0 && <small className="block text-slate-500">{record.paymentHistory.length} payment(s)</small>}</td>
+              <td className="p-3 font-semibold">{record.staffName}</td><td className="p-3">{money(record.baseSalary)}</td><td className="p-3">{money(record.allowanceTotal)}</td><td className="p-3">{money(record.deductionTotal)}</td><td className="p-3 font-bold">{money(record.netSalary)}</td><td className="p-3 text-emerald-700">{money(paid)}</td><td className="p-3 text-amber-700">{money(due)}</td><td className="p-3">{statusText(record.status)}{Array.isArray(record.paymentHistory) && record.paymentHistory.length > 0 && <div className="mt-1 space-y-1">{record.paymentHistory.map(payment => <small key={payment.id} className="block text-slate-500">{payment.paymentDate} · {money(payment.amount)} · {payment.paymentMethod}{payment.reference ? ` · ${payment.reference}` : ''}</small>)}</div>}</td>
               <td className="p-3"><div className="flex justify-end gap-2">{record.status === 'draft' && <button type="button" disabled={transitioningId !== null} onClick={() => void transition(record)} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">{t('payroll_approve')}</button>}{(record.status === 'approved' || record.status === 'partially_paid') && due > 0 && <button type="button" disabled={transitioningId !== null} onClick={() => openPayment(record)} className="px-2 py-1 text-teal-800 border border-teal-200 rounded">Record payment</button>}<button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="px-2 py-1 text-slate-700 border border-slate-200 rounded">{t('payroll_payslip')}</button></div></td>
             </tr>;
           })}</tbody>
