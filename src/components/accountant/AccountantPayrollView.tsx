@@ -43,17 +43,21 @@ export const AccountantPayrollView: React.FC = () => {
   useEffect(() => { void reload(); }, [reload]);
 
   const available = useMemo(() => staff.filter(employee => !records.some(record => record.userId === employee.userId)), [staff, records]);
-  const summary = useMemo(() => records.reduce((value, record) => {
-    const key = record.status;
-    if (key === 'draft' || key === 'approved' || key === 'partially_paid' || key === 'paid') {
-      value[key].count += 1;
-      value[key].net += Number(record.netSalary) || 0;
-    }
-    value.total += Number(record.netSalary) || 0;
-    value.paid += Number(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0)) || 0;
-    value.balance += Number(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0))) || 0;
-    return value;
-  }, { draft: { count: 0, net: 0 }, approved: { count: 0, net: 0 }, partially_paid: { count: 0, net: 0 }, paid: { count: 0, net: 0 }, total: 0, paid: 0, balance: 0 }), [records]);
+  const summary = useMemo(() => {
+    const statusSummary = (status: StaffPayrollRecord['status']) => {
+      const rows = records.filter(record => record.status === status);
+      return { count: rows.length, net: rows.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0) };
+    };
+    return {
+      draft: statusSummary('draft'),
+      approved: statusSummary('approved'),
+      partially_paid: statusSummary('partially_paid'),
+      paid: statusSummary('paid'),
+      total: records.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0),
+      paidTotal: records.reduce((sum, record) => sum + (Number(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0)) || 0), 0),
+      balance: records.reduce((sum, record) => sum + (Number(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0))) || 0), 0)
+    };
+  }, [records]);
   const visibleAvailable = useMemo(() => available.filter(employee => `${employee.name} ${employee.staffId} ${employee.roleTitle || ''}`.toLowerCase().includes(staffSearch.toLowerCase())), [available, staffSearch]);
   const money = (amount: number) => formatMoney(Number(amount) || 0, school?.currency);
   const statusText = (status: StaffPayrollRecord['status']) => status === 'draft' ? t('payroll_draft') : status === 'approved' ? t('payroll_approved') : status === 'partially_paid' ? 'Partially paid' : t('payroll_paid');
@@ -111,7 +115,7 @@ export const AccountantPayrollView: React.FC = () => {
     <section aria-label={t('payroll_summary')} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {[
         { label: 'Total payroll', value: money(summary.total) },
-        { label: 'Paid so far', value: money(summary.paid) },
+        { label: 'Paid so far', value: money(summary.paidTotal) },
         { label: 'Still owed', value: money(summary.balance) },
         { label: 'Staff records', value: String(records.length) }
       ].map(item => <div key={item.label} className="bg-white border border-[#E2E8F0] rounded-xl p-4"><p className="text-xs text-slate-500">{item.label}</p><p className="mt-1 font-bold text-lg text-[#132A29]">{item.value}</p></div>)}
