@@ -5813,6 +5813,32 @@ const payrollAmounts = (items: unknown): { lines: Array<{ label: string; amount:
   if (!Number.isFinite(total) || total > 9999999999.99) return null;
   return { lines, total };
 };
+type PayrollEmployee = { id: string; staffId: string; userId?: string; name: string; monthlySalary: number; roleTitle: string };
+const getPayrollEmployees = async (schoolId: string): Promise<PayrollEmployee[]> => {
+  const [teachers, staffRows, admins] = await Promise.all([
+    db.getTeachers(schoolId), db.getStaffMembers(schoolId),
+    queryAllRows('users', { school_id: schoolId, role: 'school_admin', is_blocked: 'false' }, 'id,full_name,staff_id')
+  ]);
+  const employees: PayrollEmployee[] = [];
+  const seenUsers = new Set<string>();
+  for (const teacher of teachers) {
+    if (!['active', 'on_leave'].includes(teacher.status) || !teacher.userId || seenUsers.has(teacher.userId)) continue;
+    seenUsers.add(teacher.userId);
+    employees.push({ id: teacher.id, staffId: teacher.staffId || teacher.id, userId: teacher.userId, name: teacher.fullName, monthlySalary: Number(teacher.monthlySalary) || 0, roleTitle: 'Teacher' });
+  }
+  for (const member of staffRows) {
+    if (member.status !== 'active' || (member.userId && seenUsers.has(member.userId))) continue;
+    if (member.userId) seenUsers.add(member.userId);
+    employees.push({ id: member.id, staffId: member.staffId || member.id, userId: member.userId, name: member.fullName, monthlySalary: Number(member.monthlySalary) || 0, roleTitle: member.roleTitle || 'Staff' });
+  }
+  for (const admin of admins) {
+    if (!admin.id || seenUsers.has(admin.id)) continue;
+    const linked = staffRows.find(member => member.userId === admin.id);
+    seenUsers.add(admin.id);
+    employees.push({ id: admin.id, staffId: admin.staffId || linked?.staffId || admin.id, userId: admin.id, name: admin.fullName || 'School Administrator', monthlySalary: Number(linked?.monthlySalary) || 0, roleTitle: 'School Administrator' });
+  }
+  return employees.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+};
 
 apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
@@ -5822,12 +5848,7 @@ apiRouter.get('/payroll/mine', requireAuth, requireSchoolContext, async (req, re
 
 apiRouter.get('/payroll/staff', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const school = (req as any).school as School;
-  const [teachers, staffRows] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id)]);
-  const employees = [
-    ...teachers.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId, name: item.fullName, monthlySalary: item.monthlySalary })),
-    ...staffRows.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId, name: item.fullName, monthlySalary: item.monthlySalary }))
-  ];
-  res.json(employees);
+  res.json(await getPayrollEmployees(school.id));
 });
 
 apiRouter.get('/payroll', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
@@ -5840,22 +5861,21 @@ apiRouter.post('/payroll', requireAuth, requireSchoolContext, requireAccountantO
   const month = typeof req.body?.month === 'string' ? req.body.month : '';
   const selections = req.body?.staff;
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Array.isArray(selections) || selections.length < 1 || selections.length > 500) { res.status(400).json({ error: 'Choose a valid payroll month and between 1 and 500 staff members.' }); return; }
-  const [teachers, staffRows, existing] = await Promise.all([db.getTeachers(school.id), db.getStaffMembers(school.id), db.getPayrollRecords(school.id)]);
-  const employees = [
-    ...teachers.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) })),
-    ...staffRows.filter(item => item.status === 'active' && item.userId).map(item => ({ id: item.id, staffId: item.staffId || item.id, userId: item.userId!, name: item.fullName, salary: Number(item.monthlySalary) }))
-  ];
+  const [employees, existing] = await Promise.all([getPayrollEmployees(school.id), db.getPayrollRecords(school.id)]);
   const seen = new Set<string>(); const prepared: Array<Omit<StaffPayrollRecord, 'id' | 'createdAt'>> = [];
   for (const selection of selections) {
     const employee = employees.find(item => item.id === selection?.staffId || item.staffId === selection?.staffId);
     if (!employee) { res.status(400).json({ error: 'Every selected employee must be active and belong to this school.' }); return; }
-    if (seen.has(employee.userId) || existing.some(record => record.userId === employee.userId)) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
-    seen.add(employee.userId);
+    const employeeKey = employee.userId || employee.id;
+    if (seen.has(employeeKey) || existing.some(record => record.staffId === employee.id || Boolean(employee.userId && record.userId === employee.userId))) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
+    seen.add(employeeKey);
     const allowances = payrollAmounts(selection.allowances); const deductions = payrollAmounts(selection.deductions);
-    if (!allowances || !deductions || !Number.isFinite(employee.salary) || employee.salary < 0 || employee.salary > 9999999999.99 || !Number.isFinite(employee.salary + allowances.total - deductions.total) || employee.salary + allowances.total - deductions.total > 9999999999.99 || deductions.total > employee.salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
-    prepared.push({ schoolId: school.id, userId: employee.userId, staffId: employee.id, staffName: employee.name, payrollMonth: month, baseSalary: employee.salary,
+    const salary = selection.baseSalary === undefined ? Number(employee.monthlySalary) : Number(selection.baseSalary);
+    if (!allowances || !deductions || !Number.isFinite(salary) || salary < 0 || salary > 9999999999.99 || !Number.isFinite(salary + allowances.total - deductions.total) || salary + allowances.total - deductions.total > 9999999999.99 || deductions.total > salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
+    const netSalary = salary + allowances.total - deductions.total;
+    prepared.push({ schoolId: school.id, userId: employee.userId, staffId: employee.id, staffName: employee.name, payrollMonth: month, baseSalary: salary,
       allowances: allowances.lines, allowanceTotal: allowances.total, deductions: deductions.lines, deductionTotal: deductions.total,
-      netSalary: employee.salary + allowances.total - deductions.total, status: 'draft', createdBy: user.id });
+      netSalary, paidAmount: 0, balanceDue: netSalary, paymentHistory: [], status: 'draft', createdBy: user.id });
   }
   const created = prepared.map(record => db.createPayrollRecord(record));
   db.logAudit({ action: 'PAYROLL_DRAFT_CREATED', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Created payroll draft for ${month} with ${created.length} staff records.`, severity: 'info' });
@@ -5874,10 +5894,26 @@ apiRouter.post('/payroll/:id/approve', requireAuth, requireSchoolContext, requir
 apiRouter.post('/payroll/:id/pay', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('payroll_manage'), async (req, res) => {
   const user = (req as any).user as User; const school = (req as any).school as School;
   const record = (await db.getPayrollRecords(school.id)).find(item => item.id === req.params.id);
-  if (!record || record.status !== 'approved') { res.status(409).json({ error: 'Only an approved payroll record can be marked paid.' }); return; }
-  const paidAt = new Date().toISOString();
-  const updated = await db.updatePayrollRecord(record.id, school.id, { status: 'paid', paidBy: user.id, paidAt, paidDate: paidAt.slice(0, 10) });
-  db.logAudit({ action: 'PAYROLL_PAID', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Marked payroll paid for ${record.staffName}, ${record.payrollMonth}.`, severity: 'warning' });
+  if (!record || !['approved', 'partially_paid'].includes(record.status)) { res.status(409).json({ error: 'Only an approved payroll record with an outstanding balance can receive a payment.' }); return; }
+  const remaining = Math.max(0, Number(record.balanceDue ?? (record.netSalary - Number(record.paidAmount || 0))));
+  const amount = req.body?.amount === undefined ? remaining : Number(req.body.amount);
+  const paymentMethod = typeof req.body?.paymentMethod === 'string' ? req.body.paymentMethod : 'other';
+  const paymentDate = typeof req.body?.paymentDate === 'string' ? req.body.paymentDate : new Date().toISOString().slice(0, 10);
+  const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().slice(0, 120) : '';
+  const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 500) : '';
+  if (!Number.isFinite(amount) || amount <= 0 || amount > remaining || !['cash', 'bank_transfer', 'mobile_money', 'other'].includes(paymentMethod) || !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate) || Number.isNaN(Date.parse(paymentDate)) || new Date(paymentDate + 'T00:00:00.000Z').toISOString().slice(0, 10) !== paymentDate) {
+    res.status(400).json({ error: 'Enter a valid payment amount, payment method, and date. The amount cannot exceed the outstanding balance.' }); return;
+  }
+  const paidAmount = Number((Number(record.paidAmount || 0) + amount).toFixed(2));
+  const balanceDue = Number(Math.max(0, Number(record.netSalary) - paidAmount).toFixed(2));
+  const fullyPaid = balanceDue === 0;
+  const payment = { id: `paytxn-${randomUUID()}`, amount, paymentMethod, paymentDate, reference: reference || undefined, notes: notes || undefined, recordedBy: user.id, recordedAt: new Date().toISOString() };
+  const paymentHistory = [...(Array.isArray(record.paymentHistory) ? record.paymentHistory : []), payment];
+  const updated = await db.updatePayrollRecord(record.id, school.id, {
+    paidAmount, balanceDue, paymentHistory, status: fullyPaid ? 'paid' : 'partially_paid',
+    ...(fullyPaid ? { paidBy: user.id, paidAt: new Date().toISOString(), paidDate: paymentDate } : {})
+  });
+  db.logAudit({ action: 'PAYROLL_PAID', category: 'finance', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Recorded ${amount} ${school.currency || 'ETB'} payroll payment for ${record.staffName}, ${record.payrollMonth}; remaining ${balanceDue}.`, severity: 'warning' });
   await db.flush(); res.json(updated);
 });
 
@@ -5891,7 +5927,7 @@ apiRouter.get('/payroll/:id/payslip.pdf', requireAuth, requireSchoolContext, asy
   sendPdf(res, `payslip-${record.staffName}-${record.payrollMonth}`, [[school.name, 'PAYSLIP', `Staff: ${record.staffName}`, `Month: ${record.payrollMonth}`, `Status: ${record.status}`,
     `Base salary: ${formatMoney(record.baseSalary, school.currency)}`, 'Allowances:', ...(Array.isArray(record.allowances) ? record.allowances.map(line) : []),
     `Allowance total: ${formatMoney(record.allowanceTotal || 0, school.currency)}`, 'Deductions:', ...(Array.isArray(record.deductions) ? record.deductions.map(line) : []),
-    `Deduction total: ${formatMoney(record.deductionTotal || 0, school.currency)}`, `Net salary: ${formatMoney(record.netSalary, school.currency)}`]]);
+    `Deduction total: ${formatMoney(record.deductionTotal || 0, school.currency)}`, `Net salary: ${formatMoney(record.netSalary, school.currency)}`, `Paid: ${formatMoney(record.paidAmount || 0, school.currency)}`, `Balance due: ${formatMoney(record.balanceDue ?? record.netSalary, school.currency)}`, 'Payment history:', ...(Array.isArray(record.paymentHistory) ? record.paymentHistory.map((payment: any) => `${payment.paymentDate}: ${formatMoney(payment.amount, school.currency)} via ${payment.paymentMethod}`) : [])]]);
 });
 
 apiRouter.get('/fees/arrears', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
@@ -5966,11 +6002,18 @@ apiRouter.get('/fees/cashbook', requireAuth, requireSchoolContext, requireAccoun
     category: expense.category, amount: Number(expense.amount) || 0, method: expense.paymentMethod,
     reference: expense.reference || '', status: expense.status
   }));
-  const payrollEntries = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))).map(record => ({
-    id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
-    description: `Payroll · ${record.staffName || record.staffId || record.userId}`, category: 'salaries',
-    amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted'
-  }));
+  const payrollEntries = payroll.flatMap(record => {
+    const history = Array.isArray(record.paymentHistory) ? record.paymentHistory : [];
+    const monthPayments = history.filter(payment => payment.paymentDate?.startsWith(month)).map(payment => ({
+      id: `payroll-${record.id}-${payment.id}`, date: payment.paymentDate, type: 'expense' as const,
+      description: `Payroll · ${record.staffName || record.staffId || record.userId || 'Staff'}`, category: 'salaries',
+      amount: Number(payment.amount) || 0, method: payment.paymentMethod, reference: payment.reference || record.payrollMonth, status: 'posted'
+    }));
+    if (monthPayments.length || history.length || record.status !== 'paid' || !(record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))) return monthPayments;
+    return [{ id: `payroll-${record.id}`, date: record.paidDate || record.paidAt!.slice(0, 10), type: 'expense' as const,
+      description: `Payroll · ${record.staffName || record.staffId || record.userId || 'Staff'}`, category: 'salaries',
+      amount: Number(record.netSalary) || 0, method: 'payroll', reference: record.payrollMonth, status: 'posted' }];
+  });
   const entries = [...incomeEntries, ...expenseEntries, ...payrollEntries].sort((left, right) => right.date.localeCompare(left.date));
   res.json(entries);
 });
@@ -6134,11 +6177,16 @@ apiRouter.get('/fees/monthly-summary', requireAuth, requireSchoolContext, requir
   const [payments, expenses, payroll] = await Promise.all([db.getFeePayments(school.id), db.getSchoolExpenses(school.id), canViewPayroll ? db.getPayrollRecords(school.id) : Promise.resolve([])]);
   const incomeRows = payments.filter(payment => payment.date?.startsWith(month) && !payment.voidedAt && Number(payment.amountPaid) > 0);
   const expenseRows = expenses.filter(expense => expense.expenseDate?.startsWith(month) && expense.status === 'posted');
-  const paidPayroll = payroll.filter(record => record.status === 'paid' && (record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month)));
+  const payrollPayments = payroll.flatMap(record => {
+    const history = Array.isArray(record.paymentHistory) ? record.paymentHistory : [];
+    const monthPayments = history.filter(payment => payment.paymentDate?.startsWith(month)).map(payment => Number(payment.amount) || 0);
+    if (monthPayments.length || history.length || record.status !== 'paid' || !(record.paidDate?.startsWith(month) || record.paidAt?.startsWith(month))) return monthPayments;
+    return [Number(record.netSalary) || 0];
+  });
+  const payrollExpenseTotal = payrollPayments.reduce((sum, amount) => sum + amount, 0);
   const totalIncome = incomeRows.reduce((sum, payment) => sum + (Number(payment.amountPaid) || 0), 0);
-  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
-    + paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0);
-  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + paidPayroll.length, payrollExpenseTotal: paidPayroll.reduce((sum, record) => sum + (Number(record.netSalary) || 0), 0), payrollExpenseCount: paidPayroll.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
+  const totalExpenses = expenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0) + payrollExpenseTotal;
+  res.json({ month, totalIncome, incomeCount: incomeRows.length, totalExpenses, expenseCount: expenseRows.length + payrollPayments.length, payrollExpenseTotal, payrollExpenseCount: payrollPayments.length, payrollIncluded: canViewPayroll, netCashflow: totalIncome - totalExpenses });
 });
 
 

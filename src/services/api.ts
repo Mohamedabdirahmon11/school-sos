@@ -1238,7 +1238,7 @@ export class ApiClient {
   }
 
   public static async getPayrollStaff() {
-    return this.request<Array<{ id: string; staffId: string; userId: string; name: string; monthlySalary: number }>>('/payroll/staff');
+    return this.request<Array<{ id: string; staffId: string; userId: string; name: string; monthlySalary: number; roleTitle?: string }>>('/payroll/staff');
   }
 
   public static async getPayrollRecords(month: string, page = 1, pageSize = 20) {
@@ -1257,7 +1257,7 @@ export class ApiClient {
     return records;
   }
 
-  public static async createPayrollDraft(month: string, staff: Array<{ staffId: string; allowances: Array<{ label: string; amount: number }>; deductions: Array<{ label: string; amount: number }> }>) {
+  public static async createPayrollDraft(month: string, staff: Array<{ staffId: string; baseSalary?: number; allowances: Array<{ label: string; amount: number }>; deductions: Array<{ label: string; amount: number }> }>) {
     return this.request<StaffPayrollRecord[]>('/payroll', { method: 'POST', body: JSON.stringify({ month, staff }) });
   }
 
@@ -1265,8 +1265,8 @@ export class ApiClient {
     return this.request<StaffPayrollRecord>(`/payroll/${encodeURIComponent(id)}/approve`, { method: 'POST' });
   }
 
-  public static async payPayroll(id: string) {
-    return this.request<StaffPayrollRecord>(`/payroll/${encodeURIComponent(id)}/pay`, { method: 'POST' });
+  public static async payPayroll(id: string, payment: { amount: number; paymentMethod: 'cash' | 'bank_transfer' | 'mobile_money' | 'other'; paymentDate: string; reference?: string; notes?: string }) {
+    return this.request<StaffPayrollRecord>(`/payroll/${encodeURIComponent(id)}/pay`, { method: 'POST', body: JSON.stringify(payment) });
   }
 
   public static async getMyPayslips(page = 1, pageSize = 20) {
