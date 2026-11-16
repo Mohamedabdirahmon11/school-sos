@@ -133,6 +133,8 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /if \(needsAttendance && !formTeacherClasses\.some/);
   assert.match(teacher, /if \(needsStudents && !classes\.some/);
   assert.match(teacher, /Your teaching class/);
+  assert.match(teacher, /Students in classes where you teach a subject or serve as Form Teacher/);
+  assert.match(teacher, /\{classes\.map\(klass => <option/);
   assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
