@@ -238,6 +238,8 @@ export const StaffPayslipsView: React.FC = () => {
                 <h2 className="mt-2 text-lg font-bold text-slate-900">{record.payrollMonth}</h2>
                 <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Net salary</p>
                 <p className="mt-1 text-2xl font-bold tracking-tight text-teal-800">{formatMoney(record.netSalary, school?.currency)}</p>
+                <p className="mt-2 text-xs text-slate-500">Paid: {formatMoney(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0), school?.currency)} · Remaining: {formatMoney(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0)), school?.currency)}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">Status: {record.status === 'partially_paid' ? 'Partially paid' : record.status}</p>
               </div>
               <button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="inline-flex w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">{t('payroll_payslip')}</button>
             </article>
