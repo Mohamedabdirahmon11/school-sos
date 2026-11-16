@@ -194,6 +194,20 @@ export const StaffPayslipsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const downloadPayslip = async (recordId: string) => {
+    if (downloadingId) return;
+    setDownloadingId(recordId);
+    setError(null);
+    try {
+      await ApiClient.downloadPayslipPdf(recordId);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t('payroll_error'));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +262,7 @@ export const StaffPayslipsView: React.FC = () => {
                 <p className="mt-2 text-xs text-slate-500">Paid: {formatMoney(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0), school?.currency)} · Remaining: {formatMoney(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0)), school?.currency)}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-600">Status: {record.status === 'partially_paid' ? 'Partially paid' : record.status}</p>
               </div>
-              <button type="button" onClick={() => void ApiClient.downloadPayslipPdf(record.id)} className="inline-flex w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">{t('payroll_payslip')}</button>
+              <button type="button" onClick={() => void downloadPayslip(record.id)} disabled={downloadingId !== null} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-60">{downloadingId === record.id ? 'Preparing PDF…' : t('payroll_payslip')}</button>
             </article>
           ))}
         </div>
