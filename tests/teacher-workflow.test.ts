@@ -120,6 +120,9 @@ test('teacher messages and personal payslips remain available through role navig
 test('teacher class switching clears stale student data and loads only the active workflow data', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /setStudents\(\[\]\);[\s\S]*setIsLoadingClassData\(true\)/);
+  assert.match(teacher, /if \(needsAttendance && !formTeacherClasses\.some/);
+  assert.match(teacher, /if \(needsStudents && !classes\.some/);
+  assert.match(teacher, /Your teaching class/);
   assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
