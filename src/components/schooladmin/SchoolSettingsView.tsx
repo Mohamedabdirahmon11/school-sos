@@ -65,6 +65,13 @@ const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, re
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const timeToMinutes = (time: string) => { const [hours, minutes] = time.split(':').map(Number); return hours * 60 + minutes; };
+const getWhiteContrastRatio = (hex: string) => {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return 21;
+  const values = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+  const linear = values.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  return 1.05 / (luminance + 0.05);
+};
 const minutesToTime = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
   timeToMinutes(start) + periods * periodMinutes + (periods > breakAfterPeriod ? breakMinutes : 0);
@@ -432,6 +439,22 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     }
   };
 
+  const uploadSchoolLogo = async (file: File | undefined) => {
+    if (!file || isReadOnly) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const uploaded = await ApiClient.uploadSchoolLogo(file);
+      setLogoUrl(uploaded.logoUrl);
+      setNotice('Logo uploaded. Save school identity settings to apply it.');
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'School logo upload failed.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Download School Backup JSON
   const handleDownloadBackup = async () => {
     try {
@@ -587,7 +610,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Brand Theme Color</label>
+                <label className="block font-semibold text-[#334155] mb-1">Brand color</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -602,6 +625,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                     className="flex-1 px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono uppercase"
                   />
                 </div>
+                {getWhiteContrastRatio(brandColor) < 4.5 && <p className="mt-2 text-[11px] text-amber-700">This color is light. Dark text will be selected automatically to keep it readable.</p>}
               </div>
 
               <div>
@@ -620,13 +644,13 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                     Upload
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp"
                       className="hidden"
                       disabled={isReadOnly}
                       onChange={e => {
                         const file = e.target.files?.[0];
                         e.target.value = '';
-                        void uploadImage(file, setLogoUrl, 700);
+                        void uploadSchoolLogo(file);
                       }}
                     />
                   </label>

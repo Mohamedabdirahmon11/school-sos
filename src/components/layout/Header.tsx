@@ -73,6 +73,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
     <header className="h-14 bg-white border-b border-[#E2E8F0] px-4 md:px-6 flex items-center justify-between gap-4 shrink-0 z-20">
       {/* Zone 1: Contextual Breadcrumb */}
       <div className="flex items-center gap-3 min-w-0">
+        {school && <div title={school.name} className={`grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg md:hidden ${school.logoUrl ? "border border-slate-200 bg-white p-0.5" : ""}`} style={!school.logoUrl ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
+          {school.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black">{school.name.trim().charAt(0).toUpperCase() || "S"}</span>}
+        </div>}
         <span className="text-sm font-semibold text-[#132A29] truncate">
           {formatBreadcrumb()}
         </span>

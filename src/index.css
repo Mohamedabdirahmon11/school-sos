@@ -3,10 +3,14 @@
 
 :root {
   --brand-color: #0F766E;
+  --brand-foreground: #FFFFFF;
   --brand-color-dark: color-mix(in srgb, var(--brand-color) 82%, black);
 }
 
-[class~="bg-[#0F766E]"] { background-color: var(--brand-color) !important; }
+[class~="bg-[#0F766E]"] { background-color: var(--brand-color) !important; color: var(--brand-foreground) !important; }
+button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-700"], a[class~="bg-teal-600"] { background-color: var(--brand-color) !important; color: var(--brand-foreground) !important; }
+[class~="text-teal-700"], [class~="text-teal-600"] { color: var(--brand-color) !important; }
+[class~="border-teal-700"], [class~="border-teal-600"] { border-color: var(--brand-color) !important; }
 [class~="hover:bg-[#0F766E]"]:hover { background-color: var(--brand-color-dark) !important; }
 [class~="hover:bg-[#0D655E]"]:hover { background-color: var(--brand-color-dark) !important; }
 [class~="text-[#0F766E]"] { color: var(--brand-color) !important; }

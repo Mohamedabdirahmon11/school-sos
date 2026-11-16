@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
@@ -8,7 +8,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronRight, MessageCircle
+  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +24,7 @@ type NavGroup = { title: string; items: NavItem[] };
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
   const { user, school, t, inspectedSchool } = useAuth();
   const role = user?.role || 'school_admin';
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const unreadState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(user && school));
   const unread = unreadState.data?.count || 0;
 
@@ -117,28 +118,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="flex h-[82px] shrink-0 items-center gap-3 border-b border-white/10 px-5">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 text-lg font-black text-white shadow-lg shadow-teal-950/40">S</div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-bold tracking-tight">{role === 'super_admin' && !inspectedSchool ? 'SchoolOS' : school?.name || 'SchoolOS Cloud'}</div>
-          <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[.16em] text-teal-200/70">{role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : school ? `School code · ${school.code}` : 'School workspace'}</div>
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] ${isCollapsed ? 'md:w-[76px]' : 'md:w-[276px]'} shrink-0 flex-col border-r border-white/10 bg-[#102c2a] text-white shadow-2xl transition-transform duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`flex h-[82px] shrink-0 items-center gap-3 border-b border-white/10 ${isCollapsed ? 'px-2 md:justify-center' : 'px-5'}`}>
+        <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--brand-color)', color: 'var(--brand-foreground)' } : undefined}>
+          {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>
+        <div className={`min-w-0 flex-1 ${isCollapsed ? 'md:hidden' : ''}`}>
+          <div className="truncate text-[15px] font-bold tracking-tight">{school?.name || (role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : 'School workspace')}</div>
+          <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[.16em] text-teal-200/70">{school ? `School code · ${school.code}` : 'School workspace'}</div>
+        </div>
+        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!isCollapsed} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="hidden rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:inline-flex">
+          {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
+        </button>
         <button onClick={onCloseMobile} aria-label="Close menu" className="rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
-      <nav aria-label="Main navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]">
+      <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]">
         {groups.map(group => <section key={group.title}>
-          <h2 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50">{group.title}</h2>
+          <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-teal-100/50 ${isCollapsed ? "md:hidden" : ""}`}>{group.title}</h2>
           <div className="space-y-1">
             {group.items.filter(entry => role !== 'accountant' || !entry.permission || hasStaffNavigationPermission(user?.permissions, entry.permission)).map(entry => {
               const Icon = entry.icon;
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
-                className={`group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? 'bg-teal-500 text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10' : 'text-slate-300 hover:bg-white/[.075] hover:text-white'}`}>
-                <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-white' : 'text-teal-100/65 group-hover:text-teal-100'}`}/>
-                <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white"/>}
+                className={`group relative flex min-h-11 w-full items-center gap-3 rounded-xl ${isCollapsed ? "justify-center px-2" : "px-3"} text-left text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`} style={active ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
+                <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--brand-color)" } : undefined}/>
+                <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-teal-100/65 group-hover:text-teal-100"}`} style={active ? { color: "var(--brand-foreground)" } : undefined}/>
+                <span className={`min-w-0 flex-1 truncate ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
+                {active && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCollapsed ? "hidden" : ""}`} style={{ backgroundColor: "var(--brand-foreground)" }}/>}
               </button>;
             })}
           </div>
@@ -146,13 +153,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       </nav>
 
       <div className="shrink-0 border-t border-white/10 bg-black/10 px-4 py-4">
-        <div className="flex items-center gap-2.5">
+        <div className={`flex items-center gap-2.5 ${isCollapsed ? "md:justify-center" : ""}`}>
           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,.12)]"/>
-          <div className="min-w-0 flex-1">
+          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
             <p className="truncate text-xs font-semibold capitalize text-white">{role.replace(/_/g, ' ')}</p>
             <p className="truncate text-[10px] text-teal-100/45">{user?.fullName || 'Signed in'}</p>
           </div>
-          <span className="text-[10px] font-medium tracking-wide text-teal-100/35">v2.6</span>
+          <span className={`text-[10px] font-medium tracking-wide text-teal-100/35 ${isCollapsed ? "md:hidden" : ""}`}>v2.6</span>
         </div>
       </div>
     </aside>
