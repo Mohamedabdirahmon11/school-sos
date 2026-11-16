@@ -18,7 +18,7 @@ type Props = {
 
 export const DocumentEditor: React.FC<Props> = ({
   html, onChange, onSaveNow, direction, onDirectionChange, pageSize, onPageSizeChange,
-  margins, onMarginsChange, school, onUploadImage
+  margins, onMarginsChange, school, onUploadImage, canUploadImage = true
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
