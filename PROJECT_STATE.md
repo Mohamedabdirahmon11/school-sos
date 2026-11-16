@@ -194,3 +194,10 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Changed files: `src/lib/documents/variables.ts`, `tests/documents-variables.test.ts`, `src/server/api.ts`, `src/components/documents/DocumentsView.tsx`. No migration or production database change.
 - GitHub source re-fetch confirms the API guard, UI confirmation path and test import are present on the feature branch. The test suite and browser flow have **not yet been executed** in a local checkout. The commit-triggered workflow lookup returned no run; do not treat prior CI success as validation of this new change.
 - Branch comparison at this point: feature branch is 35 commits ahead of main and 1 commit behind; the behind commit is the current main-line student-invoice work. Reconcile the branch with current main before PR merge, without force-pushing or modifying main directly.
+
+
+### Missing-data confirmation gate — CI verification (2026-11-16)
+- The generation safeguard is now covered by the feature-branch CI run **43833993320** on commit `dcc5ab71e5742ab9d9611b1ffa5f70b29f554255`.
+- Actual GitHub Actions job `Typecheck, tests, and production build` completed with conclusion `success`. Log output: `npm run typecheck:ci` PASS; `npm test`: **380 tests, 380 pass, 0 fail**; `npm run audit:routes` PASS; `npm run audit:rls` PASS (static source audit); `npm run build` PASS.
+- This run verifies the added missing-data helper test and TypeScript/build compatibility. It does not verify browser confirmation behavior, PDF rendering, real Supabase writes, or authenticated cross-school isolation.
+- The PR remains Draft because the remaining visual designer, custom artwork/PDF background pipeline, serial/QR public verification, batch PDF/ZIP, named permission enforcement and visual/live-tenant checks are still not complete.
