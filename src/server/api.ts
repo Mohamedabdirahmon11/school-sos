@@ -6167,7 +6167,7 @@ apiRouter.get('/student-invoices', requireAuth, requireSchoolContext, async (req
   res.json(data||[]);
 });
 
-apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req,res)=>{
+apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('fees_manage'), async (req,res)=>{
   const school=(req as any).school as School;
   const user=(req as any).user as User;
   const body=req.body||{};
@@ -6250,7 +6250,7 @@ apiRouter.get('/student-invoices/:id/items', requireAuth, requireSchoolContext, 
   res.json(data||[]);
 });
 
-apiRouter.post('/student-invoices/:id/pay', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async(req,res)=>{
+apiRouter.post('/student-invoices/:id/pay', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('fees_manage'), async(req,res)=>{
   const school=(req as any).school as School;
   const user=(req as any).user as User;
   const amount=Number(req.body?.amount);
