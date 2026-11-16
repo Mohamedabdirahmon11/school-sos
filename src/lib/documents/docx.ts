@@ -42,7 +42,12 @@ function makeStoredZip(files: Array<{name:string;content:string}>): Blob {
   const ev = new DataView(end.buffer);
   u32(ev,0,0x06054b50); u16(ev,8,files.length); u16(ev,10,files.length);
   u32(ev,12,centralSize); u32(ev,16,offset); u16(ev,20,0);
-  return new Blob([...locals,...centrals,end],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  const parts=[...locals,...centrals,end];
+  const total=parts.reduce((sum,part)=>sum+part.length,0);
+  const combined=new Uint8Array(total);
+  let position=0;
+  for(const part of parts){combined.set(part,position);position+=part.length;}
+  return new Blob([combined.buffer as ArrayBuffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
 
 export function htmlToDocxBlob(html: string, title: string): Blob {
@@ -82,7 +87,7 @@ export function htmlToDocxBlob(html: string, title: string): Blob {
 
 async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === 'undefined') throw new Error('Browser-kan ma taageerayo furitaanka DOCX. Isticmaal Chrome ama Edge cusub.');
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw' as CompressionFormat));
+  const stream = new Blob([bytes.slice().buffer as ArrayBuffer]).stream().pipeThrough(new DecompressionStream('deflate-raw' as CompressionFormat));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 export async function docxBlobToHtml(file: File): Promise<string> {
