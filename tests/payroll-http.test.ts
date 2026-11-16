@@ -19,6 +19,7 @@ await storage.initializeStorage();
 const school = storage.db.createSchool({ name: 'Payroll Test School', code: 'PAYROLL', address: '', city: '', phone: '', email: 'payroll@example.test', currency: 'ETB', academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false, subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: new Date().toISOString(), validUntil: '2099-12-31', graceDays: 7, pricePaid: 0, autoRenew: false } } as any);
 const accountant = storage.db.createUser({ schoolId: school.id, role: 'accountant', fullName: 'Test Accountant', email: 'payroll-accountant@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 storage.db.createStaffMember({ schoolId: school.id, staffId: 'PAY-ACCT', userId: accountant.id, fullName: accountant.fullName, roleTitle: 'Accountant', email: accountant.email!, phone: '', monthlySalary: 800, permissions: ['payroll_manage'], status: 'active' });
+const nonLoginStaff = storage.db.createStaffMember({ schoolId: school.id, staffId: 'PAY-CLEAN', fullName: 'School Cleaner', roleTitle: 'Cleaner', email: '', phone: '', monthlySalary: 500, permissions: [], status: 'active' });
 const teacherUser = storage.db.createUser({ schoolId: school.id, role: 'teacher', fullName: 'Test Teacher', email: 'payroll-teacher@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
 const teacher = storage.db.createTeacher({ schoolId: school.id, userId: teacherUser.id, staffId: 'PAY-TEACHER', fullName: teacherUser.fullName, email: teacherUser.email!, phone: '+15550009900', gender: 'female', qualification: 'B.Ed', department: 'Science', assignedClasses: [], assignedSubjects: [], status: 'active', joinedDate: '2026-09-01', monthlySalary: 1200 });
 const admin = storage.db.createUser({ schoolId: school.id, role: 'school_admin', fullName: 'Test School Admin', email: 'payroll-school-admin@example.test', passwordHash: '', isBlocked: false, failedLoginAttempts: 0 } as any);
@@ -67,6 +68,11 @@ test('accountant payroll runs are unique per staff and month, progress through a
   const payrollEmployees = await payrollStaff.json() as any[];
   assert.ok(payrollEmployees.some(item => item.userId === admin.id && item.roleTitle === 'School Administrator'), 'school administrators are included in payroll roster');
   assert.ok(payrollEmployees.some(item => item.userId === teacherUser.id), 'teachers are included in payroll roster');
+  assert.ok(payrollEmployees.some(item => item.id === nonLoginStaff.id && !item.userId), 'active staff without sign-in accounts are included');
+  const nonLoginPayroll = await fetch(`${baseUrl}/payroll`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ month: '2026-11', staff: [{ staffId: nonLoginStaff.id, baseSalary: 500, allowances: [], deductions: [] }] }) });
+  assert.equal(nonLoginPayroll.status, 201, await nonLoginPayroll.clone().text());
+  const [nonLoginRecord] = await nonLoginPayroll.json() as any[];
+  assert.equal(nonLoginRecord.userId, null); assert.equal(nonLoginRecord.balanceDue, 500);
 
   const approve = await fetch(`${baseUrl}/payroll/${record.id}/approve`, { method: 'POST', headers: accountantHeaders });
   assert.equal(approve.status, 200); assert.equal((await approve.json() as any).status, 'approved');
