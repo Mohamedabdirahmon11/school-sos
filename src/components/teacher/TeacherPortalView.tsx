@@ -11,6 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
+import { TeacherTimetableGrid } from './TeacherTimetableGrid.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
@@ -466,36 +467,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
                 <CalendarDays className="h-5 w-5 text-teal-700" />
-                Full school timetable
+                Timetable
               </h2>
             </div>
             <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{timetable.length} school periods</span>
           </div>
-          {timetable.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#64748B]">
-              No schedule slots assigned. Contact school administration to set your timetable.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {timetable.map(slot => {
-                const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId) || String((slot as any).teacherName || '').trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase();
-                const s = subjects.find(sub => sub.id === slot.subjectId);
-                return (
-                  <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
-                      <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
-                    </div>
-                    <p className="font-semibold text-teal-900">{(slot as any).subjectName || s?.name || 'Subject'}</p>
-                    <p className="text-[11px] text-[#64748B]">{(slot as any).className || c?.name || 'Class'} · Room {slot.roomNumber || 'TBA'}</p>
-                    {mySlot && <span className="inline-flex rounded-full bg-teal-700 px-2 py-1 text-[10px] font-bold text-white">Your lesson</span>}
-                    <p className="font-mono text-[10px] text-[#94A3B8]">{slot.startTime} - {slot.endTime}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <TeacherTimetableGrid
+            slots={timetable}
+            isMine={slot => teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId) || (Boolean((slot as any).teacherName) && String((slot as any).teacherName).trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase())}
+            subjectLabel={slot => (slot as any).subjectName || subjects.find(sub => sub.id === slot.subjectId)?.name || 'Subject'}
+            classLabel={slot => (slot as any).className || classes.find(cls => cls.id === slot.classId)?.name || 'Class'}
+          />
         </div>
       )}
 
