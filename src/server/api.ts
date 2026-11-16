@@ -6248,10 +6248,10 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
   const oneTimeStructureIds=activeStructures.filter(item=>item.feeType==='custom'&&item.cadence==='one_time').map(item=>item.id);
   const targetIds=targets.map((student:any)=>student.id);
   const [priorAnnual,priorOneTime]=await Promise.all([
-    body.includeAnnualRegistration===true&&annualStructureIds.length&&targetIds.length
+    body.includeAnnualRegistration!==false&&annualStructureIds.length&&targetIds.length
       ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id,academic_year)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).eq('student_invoices.academic_year',school.academicYear).in('fee_structure_id',annualStructureIds)
       : Promise.resolve({data:[],error:null}),
-    body.includeOneTimeFees===true&&oneTimeStructureIds.length&&targetIds.length
+    body.includeOneTimeFees!==false&&oneTimeStructureIds.length&&targetIds.length
       ? client.from('student_invoice_items').select('fee_structure_id,student_invoices!inner(student_id)').eq('school_id',school.id).in('student_invoices.student_id',targetIds).in('fee_structure_id',oneTimeStructureIds)
       : Promise.resolve({data:[],error:null})
   ]);
@@ -6284,9 +6284,9 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
           ? Boolean(klass&&klass.gradeLevel>=item.minGrade&&klass.gradeLevel<=item.maxGrade)
           : ['annual_registration','custom'].includes(item.feeType);
       if(!classMatch)return false;
-      if(item.feeType==='annual_registration')return body.includeAnnualRegistration===true&&!billedAnnual.has(item.id);
+      if(item.feeType==='annual_registration')return body.includeAnnualRegistration!==false&&!billedAnnual.has(item.id);
       if(item.feeType==='monthly_tuition')return item.cadence==='monthly';
-      if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration===true&&!billedAnnual.has(item.id)||item.cadence==='one_time'&&body.includeOneTimeFees===true&&!billedOneTime.has(item.id);
+      if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration===true&&!billedAnnual.has(item.id)||item.cadence==='one_time'&&body.includeOneTimeFees!==false&&!billedOneTime.has(item.id);
       return false;
     });
     const lines:Array<{fee_structure_id:string|null;fee_type:'monthly_tuition'|'annual_registration'|'bus'|'custom';description:string;quantity:number;unit_amount:number;line_total:number;cadence:'monthly'|'annual'|'one_time'}>=applicable.map(item=>({fee_structure_id:item.id,fee_type:item.feeType,description:item.name,quantity:1,unit_amount:Number(item.amount),line_total:Number(item.amount),cadence:item.cadence}));
