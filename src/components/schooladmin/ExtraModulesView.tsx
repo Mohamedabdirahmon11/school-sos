@@ -51,6 +51,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [assignmentStudentId, setAssignmentStudentId] = useState('');
   const [assignmentRouteId, setAssignmentRouteId] = useState('');
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [routeName, setRouteName] = useState('');
   const [routeStops, setRouteStops] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -494,34 +495,44 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     }
   };
 
+  const resetRouteForm = () => {
+    setEditingRouteId(null); setRouteName(''); setRouteStops(''); setDriverName('');
+    setVehicleNumber(''); setDriverPhone(''); setRouteFee(25); setRouteCapacity(40);
+  };
+
+  const openRouteEditor = (route: any) => {
+    if (isReadOnly) return;
+    setEditingRouteId(route.id); setRouteName(route.name || '');
+    setRouteStops(Array.isArray(route.stops) ? route.stops.join('\n') : '');
+    setDriverName(route.driverName || ''); setVehicleNumber(route.vehicleNumber || '');
+    setDriverPhone(route.driverPhone || ''); setRouteFee(Number(route.feeAmount || 0));
+    setRouteCapacity(Number(route.capacity || 40)); setModuleError(null); setShowAddRouteModal(true);
+  };
+
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !school || !routeName.trim() || !driverName.trim()) return;
+    const payload = { name: routeName.trim(), routeNumber: vehicleNumber.trim(), vehicleNumber: vehicleNumber.trim(), driverName: driverName.trim(), driverPhone: driverPhone.trim(), feeAmount: routeFee, capacity: routeCapacity, stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean) };
     try {
-      const r = await ApiClient.addTransportRoute({
-        name: routeName,
-        routeNumber: vehicleNumber,
-        vehicleNumber,
-        driverName,
-        driverPhone,
-        feeAmount: routeFee,
-        capacity: routeCapacity,
-        active: true,
-        stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean)
-      }, school?.id);
-      setRoutes(prev => [...prev, r]);
-      setShowAddRouteModal(false);
-      setRouteName('');
-      setRouteStops('');
-      setDriverName('');
-      setVehicleNumber('');
-      setDriverPhone('');
-      setRouteCapacity(40);
-      setNotice('Transport route added.');
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err: any) {
-      setModuleError(err.message || 'Unable to add this transport route.');
-    }
+      if (editingRouteId) {
+        const updated = await ApiClient.updateTransportRoute(editingRouteId, payload);
+        setRoutes(current => current.map(route => route.id === updated.id ? updated : route));
+        setNotice('Transport route updated. Existing assignments keep their saved fee until reassigned.');
+      } else {
+        const created = await ApiClient.addTransportRoute({ ...payload, active: true }, school.id);
+        setRoutes(current => [...current, created]); setNotice('Transport route added.');
+      }
+      setShowAddRouteModal(false); resetRouteForm(); setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) { setModuleError(err.message || 'Unable to save this transport route.'); }
+  };
+
+  const handleToggleRoute = async (route: any) => {
+    if (isReadOnly) return;
+    try {
+      const updated = await ApiClient.updateTransportRoute(route.id, { ...route, active: route.active === false });
+      setRoutes(current => current.map(item => item.id === updated.id ? updated : item));
+      setNotice(updated.active ? 'Transport route activated.' : 'Transport route deactivated.');
+    } catch (err: any) { setModuleError(err.message || 'Unable to change route status.'); }
   };
 
   const handleAssignBus = async () => {
