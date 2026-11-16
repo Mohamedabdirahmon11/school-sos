@@ -2,6 +2,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --sidebar-background: #102c2a;
+  --sidebar-text: #ffffff;
+  --sidebar-accent: #0f766e;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-width: 276px;
+  --sidebar-radius: 14px;
+  --sidebar-font-size: 13px;
   --brand-color: #0F766E;
   --brand-foreground: #FFFFFF;
   --brand-color-dark: color-mix(in srgb, var(--brand-color) 82%, black);
