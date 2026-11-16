@@ -18,7 +18,7 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }>; permission?: 'fees_manage' | 'payroll_manage' | 'reports_export' };
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string; fill?: string }>; permission?: 'fees_manage' | 'payroll_manage' | 'reports_export' };
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Settings: { so: 'Dejinta', am: 'ቅንብሮች' },
     'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች' },
     'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች' },
-    Dukumentiyada: { so: 'Dukumentiyada', am: 'ሰነዶች' },
+    Documents: { so: 'Dukumentiyada', am: 'ሰነዶች' },
     'Student invoices': { so: 'Biilasha Ardayda', am: 'የተማሪ ደረሰኞች' },
     'Expenses & cashbook': { so: 'Kharashaadka iyo Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ' },
     'Bank reconciliation': { so: 'Is-waafajinta Bangiga', am: 'የባንክ ማስታረቅ' },
@@ -97,18 +97,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
       item('t_students', t('students'), GraduationCap), item('t_attendance', t('attendance'), CalendarCheck),
       item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', t('assignments'), FileCheck2), item('sch_documents', 'Dukumentiyada', FileText), item('t_notices', noticeLabel, BellRing),
+      item('t_assignments', t('assignments'), FileCheck2), item('sch_documents', 'Documents', FileText), item('t_notices', noticeLabel, BellRing),
       item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
     ] }];
     if (role === 'parent') return [{ title: 'Family', items: [
       item('p_overview', t('dashboard'), LayoutDashboard), item('p_attendance', t('attendance'), CalendarCheck),
       item('p_results', t('exams_results'), FileSpreadsheet), item('p_fees', t('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText), item('p_messages', t('messages'), MessageSquare)
+      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText), item('p_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'student') return [{ title: 'My learning', items: [
       item('st_dashboard', t('dashboard'), LayoutDashboard), item('st_timetable', t('timetable'), CalendarDays),
       item('st_assignments', t('assignments'), FileCheck2), item('st_results', t('exams_results'), FileSpreadsheet),
-      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Dukumentiyada', FileText),
+      item('st_attendance', t('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText),
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
@@ -191,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 title={isCollapsed ? entry.label : undefined}
-                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-13' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
+                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-[52px]' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
                 style={{ borderRadius: 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
                 <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active && school?.sidebarTheme?.activeStyle === 'bar' ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--sidebar-accent)" } : undefined}/>
                 <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-teal-100/65 group-hover:text-teal-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
