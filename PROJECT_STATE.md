@@ -236,3 +236,11 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Added a regression test for malformed 36-character tokens.
 - The prior rate-limit implementation commit passed GitHub Actions run **43839661548**: TypeScript, **386/386 tests**, route parity, static RLS audit, and production build all succeeded.
 - The canonical UUID hardening is newer than that CI run and is awaiting its own workflow result.
+
+
+### Latest CI result and merge blocker — 2026-11-16
+- PR workflow **43839972369** failed at TypeScript checks before tests/audits/build could run.
+- The reported syntax errors are all in `src/components/schooladmin/StudentInvoicesView.tsx` (around lines 156–175), which is a main-side file and is not among the feature branch's changed files. Do not modify that unrelated invoice page as part of the Documents task.
+- Current comparison: feature branch is 75 commits ahead and **7 commits behind** `main`; the histories have diverged. Reconciliation is required before merge, but should be done only after inspecting the seven main-only commits and resolving the existing main-side typecheck blocker without overwriting unrelated work.
+- The earlier run **43839661548** remains a valid pass for the rate-limiter commit (386/386 tests); it does not cover the newer canonical UUID hardening.
+- PR #181 remains Draft and unmerged. No production migration has been applied.
