@@ -229,3 +229,10 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Files: `src/lib/documents/verification-rate-limit.ts`, `src/server/api.ts`, `tests/documents-verification-rate-limit.test.ts`.
 - Limitation: this is per Node process; deployments with multiple app instances need a shared Redis/database limiter for a globally consistent quota. It is an additional abuse barrier, not a substitute for edge/WAF rate limiting.
 - CI run **43839661548** was triggered for this commit and is currently in progress; do not mark this change verified until it completes.
+
+
+### Verification endpoint hardening — 2026-11-16
+- Public verification routes and the HTML sanitizer now accept only canonical versioned UUID token syntax, preventing malformed UUID-shaped input from reaching the database UUID comparison.
+- Added a regression test for malformed 36-character tokens.
+- The prior rate-limit implementation commit passed GitHub Actions run **43839661548**: TypeScript, **386/386 tests**, route parity, static RLS audit, and production build all succeeded.
+- The canonical UUID hardening is newer than that CI run and is awaiting its own workflow result.
