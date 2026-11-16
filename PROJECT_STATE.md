@@ -5,7 +5,7 @@ Updated: 2026-11-11
 ## Sidebar navigation and appearance — in progress (2026-11-16)
 
 - Feature branch: `feature/sidebar-theme`; no changes have been merged to `main`.
-- Navigation defaults to English and exposes the existing English/Somali/Amharic language choices. Sidebar includes searchable grouped role navigation, remembered per-user collapse state, mobile drawer behavior, and profile/logout controls.
+- Navigation defaults to English independently of the app language and exposes English/Somali/Amharic menu-label choices, remembered per user. Sidebar includes searchable grouped role navigation, remembered per-user collapse state, mobile drawer behavior, and profile/logout controls.
 - School Admin Appearance settings persist a validated theme JSON object on the school row, so the selected theme is shared with users of that school. Existing school-settings authorization and audit logging are reused.
 - Additive migration: `20261116120000_school_sidebar_theme.sql`. It has not been applied to production.
 - TypeScript, tests, audits, build, browser visuals, and cross-tenant runtime checks remain pending until CI/browser verification is available. See `PROGRESS.md` for the exact implementation and remaining scope.
