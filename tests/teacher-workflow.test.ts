@@ -114,6 +114,12 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(payroll, /setError\(reason instanceof Error/);
   assert.match(messages, /selectedContact \? 'hidden md:flex'/);
   assert.match(messages, /Back to contacts/);
+  assert.match(messages, /hasInitializedContact/);
+  assert.match(messages, /contactId: selectedContact\?\.id/);
+  const client = read('../src/services/api.ts');
+  assert.match(client, /query\.set\('contactId', params\.contactId\)/);
+  const api = read('../src/server/api.ts');
+  assert.match(api, /and\(or\(sender_id\.eq\.\$\{user\.id\},recipient_id\.eq\.\$\{user\.id\}\),or\(sender_id\.eq\.\$\{contactId\},recipient_id\.eq\.\$\{contactId\}\)\)/);
 });
 
 
