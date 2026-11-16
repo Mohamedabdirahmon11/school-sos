@@ -61,6 +61,8 @@ test('invoice payment uses an atomic database RPC and returns a linked receipt',
   assert.match(source, /STUDENT_INVOICE_PAYMENT_RECORDED/);
   assert.match(migration, /invoice_id VARCHAR\(64\)[\s\S]{0,100}REFERENCES student_invoices\(id\)/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.schoolos_apply_student_invoice_payment/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\\.schoolos_create_student_invoice[\\s\\S]*?SET search_path = ''\\s+AS \\\\$\\\\$[\\s\\S]*?END;\\s+\\$\\$;/);
+  assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\\.schoolos_create_student_invoice[\\s\\S]*?AS \\$\\s/);
   assert.match(migration, /FOR UPDATE/);
   assert.match(migration, /p_payment_method IS NULL/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_apply_student_invoice_payment[\s\S]{0,260}GRANT EXECUTE[\s\S]{0,180}TO service_role/);
