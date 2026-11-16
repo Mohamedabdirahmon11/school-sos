@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { DirectMessage, User } from '../../types/index.ts';
 import { ApiClient } from '../../services/api.ts';
@@ -29,6 +29,7 @@ export const MessagesView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasInitializedContact = useRef(false);
 
   const fetchData = async () => {
     if (!school || !user) { setLoading(false); return; }
@@ -36,7 +37,7 @@ export const MessagesView: React.FC = () => {
     setError(null);
     try {
       const [msgData, uData] = await Promise.all([
-        ApiClient.getMessages({ page, pageSize: 20 }),
+        ApiClient.getMessages({ page, pageSize: 20, contactId: selectedContact?.id }),
         ApiClient.getMessageContacts()
       ]);
 
@@ -45,7 +46,10 @@ export const MessagesView: React.FC = () => {
 
       const permittedContacts = uData as User[];
       setContacts(permittedContacts);
-      if (!permittedContacts.some((contact: User) => contact.id === selectedContact?.id)) {
+      if (!hasInitializedContact.current) {
+        hasInitializedContact.current = true;
+        setSelectedContact(permittedContacts[0] || null);
+      } else if (selectedContact && !permittedContacts.some((contact: User) => contact.id === selectedContact.id)) {
         setSelectedContact(permittedContacts[0] || null);
       }
     } catch (err) {
@@ -58,7 +62,7 @@ export const MessagesView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [school, user, page]);
+  }, [school, user, page, selectedContact?.id]);
 
   useEffect(() => {
     if (!selectedContact || !user) return;
