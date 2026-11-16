@@ -182,6 +182,22 @@ export const DocumentEditor: React.FC<Props> = ({
     selectedField.dataset.documentLocked=selectedField.dataset.documentLocked==='true'?'false':'true'; emit();
   };
 
+  const duplicateSelectedField = () => {
+    if (!selectedField || !editorRef.current?.contains(selectedField)) return;
+    const clone=selectedField.cloneNode(true) as HTMLElement;
+    const left=Number.parseFloat(selectedField.style.left)||0;
+    const top=Number.parseFloat(selectedField.style.top)||0;
+    clone.style.left=Math.max(-500,Math.min(500,left+12))+'px';
+    clone.style.top=Math.max(-500,Math.min(500,top+12))+'px';
+    clone.style.zIndex=String(Math.max(-10,Math.min(10,(Number(selectedField.style.zIndex)||0)+1)));
+    clone.dataset.documentLocked='false';
+    clone.classList.remove('document-positioned-field-selected');
+    selectedField.parentElement?.insertBefore(clone,selectedField.nextSibling);
+    selectedField.classList.remove('document-positioned-field-selected');
+    clone.classList.add('document-positioned-field-selected');
+    setSelectedField(clone); clone.focus({preventScroll:true}); emit();
+  };
+
   const rotateSelectedImage = (degrees: number) => {
     if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
     selectedImage.style.transform = 'rotate(' + Math.max(-180,Math.min(180,degrees)) + 'deg)';
@@ -290,6 +306,7 @@ export const DocumentEditor: React.FC<Props> = ({
         if (event.key === 'ArrowUp') { event.preventDefault(); nudgeSelectedImage(0,-delta); return; }
         if (event.key === 'ArrowDown') { event.preventDefault(); nudgeSelectedImage(0,delta); return; }
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase()==='d' && selectedField) { event.preventDefault(); duplicateSelectedField(); return; }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === 's') { event.preventDefault(); onSaveNow(); }
@@ -366,6 +383,7 @@ export const DocumentEditor: React.FC<Props> = ({
         {button('Field hore','Field-ka hore u soo qaad',()=>changeSelectedFieldLayer('front'))}
         {button('Field gadaal','Field-ka gadaal u dhig',()=>changeSelectedFieldLayer('back'))}
         {button('Quful/Fur','Quful ama fur field-ka',toggleSelectedFieldLock)}
+        {button('Nuqul field','Samee nuqul field-ka la doortay',duplicateSelectedField)}
         {button(showGuides?'Qari guides':'Tus guides','Tus ama qari hagayaasha canvas-ka',()=>setShowGuides(value=>!value))}
         <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs"><input type="checkbox" checked={snapToGrid} onChange={event=>setSnapToGrid(event.target.checked)}/> Snap 10px</label>
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
