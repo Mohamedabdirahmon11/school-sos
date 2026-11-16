@@ -7781,7 +7781,12 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
     return;
   }
 
-  const updated = db.updateSchool(school.id, updates);
+  // In Supabase-backed production requests, the in-memory school snapshot is
+  // intentionally not populated. Persist settings through the database-backed
+  // updater so Appearance and other school settings do not falsely return 404.
+  const updated = isSupabaseConfigured
+    ? await db.updateSchoolFromDatabase(school.id, updates)
+    : db.updateSchool(school.id, updates);
   if (!updated) {
     res.status(404).json({ error: 'School was not found.' });
     return;
