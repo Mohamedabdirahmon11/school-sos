@@ -6199,7 +6199,7 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
       if(item.feeType==='custom')return item.cadence==='monthly'||item.cadence==='annual'&&body.includeAnnualRegistration===true||item.cadence==='one_time'&&body.includeOneTimeFees===true;
       return false;
     });
-    const lines=applicable.map(item=>({fee_structure_id:item.id,fee_type:item.feeType,description:item.name,quantity:1,unit_amount:Number(item.amount),line_total:Number(item.amount)}));
+    const lines:Array<{fee_structure_id:string|null;fee_type:'monthly_tuition'|'annual_registration'|'bus'|'custom';description:string;quantity:number;unit_amount:number;line_total:number}>=applicable.map(item=>({fee_structure_id:item.id,fee_type:item.feeType,description:item.name,quantity:1,unit_amount:Number(item.amount),line_total:Number(item.amount)}));
     const bus=busAssignments.find((assignment:any)=>assignment.studentId===student.id&&assignment.active);
     if(bus&&Number(bus.feeAmount)>0)lines.push({fee_structure_id:null,fee_type:'bus',description:'School transport',quantity:1,unit_amount:Number(bus.feeAmount),line_total:Number(bus.feeAmount)});
     if(!lines.length){skippedNoFees++;continue;}
