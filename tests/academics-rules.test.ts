@@ -126,3 +126,43 @@ test('school-defined four small tests and one final exam calculate a 100-mark re
   await db.flush();
   assert.deepEqual(memory.rows('student_marks')[0].assessment_scores, { 'test-1': 9, 'test-2': 8, 'test-3': 7, 'test-4': 6, 'final-exam': 50 });
 });
+
+test('yearly report cards do not treat one approved semester as the full-year average', async () => {
+  const memory = new InMemorySupabase();
+  const storage = await import('../src/server/storage.ts');
+  storage.installTestSupabaseClient(memory);
+  await storage.initializeStorage();
+  const db = storage.db;
+  const school = db.createSchool({
+    name: 'Incomplete Year Results', code: 'INCOMPLETE', address: '', city: '', phone: '', email: 'incomplete@example.test', currency: 'ETB',
+    academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const klass = db.createClass({ schoolId: school.id, name: 'Grade 8', gradeLevel: 8, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
+  const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
+  const student = db.createStudent({
+    schoolId: school.id, studentId: 'INCOMPLETE-001', firstName: 'Amina', middleName: '', lastName: 'Test', gender: 'female',
+    admissionDate: '2026-01-01', fatherPhone: '', classId: klass.id, status: 'active'
+  } as any);
+  await memory.from('class_subjects').insert([{
+    id: 'incomplete-class-subject', school_id: school.id, class_id: klass.id,
+    subject_id: subject.id, teacher_id: 'teacher-profile-incomplete', periods_per_week: 3,
+    small_exam_enabled: true, big_exam_enabled: true, is_active: true
+  }]);
+  const submitted = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+    studentId: student.id,
+    assessmentScores: { 'test-1': 8, 'test-2': 8, 'test-3': 8, 'test-4': 8, 'final-exam': 48 },
+    status: 'submitted'
+  }], 'teacher-incomplete');
+  await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-incomplete');
+  db.approveMarks(school.id, submitted.map(mark => mark.id), 'admin-incomplete');
+  await db.flush();
+
+  const yearly = await db.getClassYearlyRankings(school.id, klass.id);
+  assert.equal(yearly[0].subjectResults.length, 1);
+  assert.equal(yearly[0].subjectResults[0].sem1Percentage, 80);
+  assert.equal(yearly[0].subjectResults[0].sem2Percentage, null);
+  assert.equal(yearly[0].subjectResults[0].yearlyPercentage, null);
+  assert.equal(yearly[0].yearlyPercentage, 0);
+  assert.equal(yearly[0].isPass, false);
+});
