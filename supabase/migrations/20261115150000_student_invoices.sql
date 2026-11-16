@@ -126,6 +126,90 @@ BEGIN
   SELECT p_school_id || ':' || p_academic_year, p_school_id, p_academic_year,
     COALESCE(MAX(substring(invoice.invoice_number FROM '([0-9]+)
 
+
+CREATE OR REPLACE FUNCTION public.schoolos_apply_student_invoice_payment(
+  p_invoice_id VARCHAR,
+  p_school_id VARCHAR,
+  p_amount NUMERIC,
+  p_payment_method VARCHAR,
+  p_recorded_by VARCHAR,
+  p_notes TEXT DEFAULT NULL,
+  p_idempotency_key VARCHAR DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  invoice_row public.student_invoices%ROWTYPE;
+  payment_row public.fee_payments%ROWTYPE;
+  receipt_seq BIGINT;
+  school_code VARCHAR;
+  invoice_fee_type VARCHAR;
+  invoice_fee_structure_id VARCHAR;
+  new_paid NUMERIC(12,2);
+  new_balance NUMERIC(12,2);
+  new_status VARCHAR(20);
+BEGIN
+  IF p_amount IS NULL OR p_amount <= 0 OR round(p_amount,2) <> p_amount
+    OR p_payment_method NOT IN ('Cash','Bank Transfer','Mobile Money')
+    OR p_recorded_by IS NULL OR btrim(p_recorded_by) = '' THEN
+    RAISE EXCEPTION 'Enter a valid positive payment and payment method.';
+  END IF;
+
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO payment_row FROM public.fee_payments
+      WHERE school_id = p_school_id AND idempotency_key = p_idempotency_key;
+    IF FOUND THEN
+      SELECT * INTO invoice_row FROM public.student_invoices
+        WHERE id = p_invoice_id AND school_id = p_school_id;
+      RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',true);
+    END IF;
+  END IF;
+
+  SELECT * INTO invoice_row FROM public.student_invoices
+    WHERE id = p_invoice_id AND school_id = p_school_id FOR UPDATE;
+  IF NOT FOUND OR invoice_row.status = 'void' THEN RAISE EXCEPTION 'Invoice not found or void.'; END IF;
+  IF p_amount > invoice_row.balance_due THEN RAISE EXCEPTION 'Payment exceeds the invoice balance.'; END IF;
+
+  SELECT fee_type, fee_structure_id INTO invoice_fee_type, invoice_fee_structure_id
+    FROM public.student_invoice_items
+    WHERE invoice_id = invoice_row.id AND school_id = p_school_id
+    ORDER BY created_at, id LIMIT 1;
+  IF invoice_fee_type IS NULL THEN RAISE EXCEPTION 'Invoice has no billable items.'; END IF;
+
+  SELECT code INTO school_code FROM public.schools WHERE id = p_school_id;
+  receipt_seq := public.schoolos_next_fee_receipt(p_school_id, invoice_row.academic_year);
+  new_paid := invoice_row.amount_paid + p_amount;
+  new_balance := invoice_row.total_amount - new_paid;
+  new_status := CASE WHEN new_balance = 0 THEN 'paid' ELSE 'partially_paid' END;
+
+  INSERT INTO public.fee_payments (
+    id, school_id, student_id, receipt_number, academic_year, month, fee_type,
+    fee_structure_id, idempotency_key, amount_due, amount_paid, remaining_amount,
+    payment_method, status, date, recorded_by, notes, idempotency_keys, invoice_id
+  ) VALUES (
+    'fee-' || gen_random_uuid()::text, p_school_id, invoice_row.student_id,
+    'REC-' || COALESCE(school_code,'SCH') || '-' || split_part(invoice_row.academic_year,'-',1) || '-' || lpad(receipt_seq::text,4,'0'),
+    invoice_row.academic_year, invoice_row.billing_period, invoice_fee_type,
+    invoice_fee_structure_id, p_idempotency_key, p_amount, p_amount, 0,
+    p_payment_method, 'paid', CURRENT_DATE, p_recorded_by, NULLIF(left(COALESCE(p_notes,''),1000),''),
+    CASE WHEN p_idempotency_key IS NULL THEN ARRAY[]::TEXT[] ELSE ARRAY[p_idempotency_key] END,
+    invoice_row.id
+  ) RETURNING * INTO payment_row;
+
+  UPDATE public.student_invoices SET amount_paid = new_paid, balance_due = new_balance,
+    status = new_status, updated_at = NOW()
+    WHERE id = invoice_row.id AND school_id = p_school_id
+    RETURNING * INTO invoice_row;
+
+  RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',false);
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 )::BIGINT), 0) + 1
   FROM public.student_invoices invoice
