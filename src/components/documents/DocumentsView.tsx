@@ -62,9 +62,12 @@ export const DocumentsView: React.FC = () => {
   const [previewMissing,setPreviewMissing] = useState<string[]>([]);
   const [previewStudent,setPreviewStudent] = useState('');
   const [message,setMessage] = useState('');
-  const savedSnapshot = useRef({title:'',html:''});
+  const savedSnapshot = useRef({title:'',html:'',direction:'ltr' as const,pageSize:'A4' as const,margins:20});
+  const draftRef = useRef({title,html,direction,pageSize,margins});
+  draftRef.current = {title,html,direction,pageSize,margins};
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
 
   const loadDocuments = useCallback(async () => {
     setLoading(true);
@@ -88,36 +91,69 @@ export const DocumentsView: React.FC = () => {
   useEffect(() => { void ApiClient.getClasses().then(setClasses).catch(()=>setClasses([])); },[]);
 
   const markDirty = useCallback((nextTitle: string, nextHtml: string, nextDirection = direction, nextPageSize = pageSize, nextMargins = margins) => {
-    dirtyRef.current = nextTitle !== savedSnapshot.current.title || nextHtml !== savedSnapshot.current.html || nextDirection !== (selected?.direction || 'ltr') || nextPageSize !== (selected?.pageSize || 'A4') || nextMargins !== (selected?.pageMargins || 20);
+    const normalizedTitle = nextTitle.trim() || 'Dukumenti aan cinwaan lahayn';
+    dirtyRef.current = normalizedTitle !== savedSnapshot.current.title
+      || nextHtml !== savedSnapshot.current.html
+      || nextDirection !== savedSnapshot.current.direction
+      || nextPageSize !== savedSnapshot.current.pageSize
+      || nextMargins !== savedSnapshot.current.margins;
     setSaveState(dirtyRef.current ? 'unsaved' : 'saved');
-  },[direction,pageSize,margins,selected]);
+  },[direction,pageSize,margins]);
 
   const saveNow = useCallback(async () => {
-    if (!selected || !dirtyRef.current || savingRef.current) return;
-    const nextTitle = title.trim() || 'Dukumenti aan cinwaan lahayn';
-    const nextHtml = html;
+    if (!selected) return;
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+      if (dirtyRef.current) await saveNow();
+      return;
+    }
+    if (!dirtyRef.current) return;
+
+    const targetId = selected.id;
+    const draft = draftRef.current;
+    const snapshot = {
+      title: draft.title.trim() || 'Dukumenti aan cinwaan lahayn',
+      html: draft.html,
+      direction: draft.direction,
+      pageSize: draft.pageSize,
+      margins: draft.margins
+    };
     const patch: Record<string,unknown> = {};
-    if (nextTitle !== savedSnapshot.current.title) patch.title = nextTitle;
-    if (nextHtml !== savedSnapshot.current.html) patch.contentHtml = nextHtml;
-    if (direction !== (selected.direction || 'ltr')) patch.direction = direction;
-    if (pageSize !== (selected.pageSize || 'A4')) patch.pageSize = pageSize;
-    if (margins !== (selected.pageMargins || 20)) patch.pageMargins = margins;
+    if (snapshot.title !== savedSnapshot.current.title) patch.title = snapshot.title;
+    if (snapshot.html !== savedSnapshot.current.html) patch.contentHtml = snapshot.html;
+    if (snapshot.direction !== savedSnapshot.current.direction) patch.direction = snapshot.direction;
+    if (snapshot.pageSize !== savedSnapshot.current.pageSize) patch.pageSize = snapshot.pageSize;
+    if (snapshot.margins !== savedSnapshot.current.margins) patch.pageMargins = snapshot.margins;
     if (!Object.keys(patch).length) { dirtyRef.current = false; setSaveState('saved'); return; }
+
     savingRef.current = true;
     setSaveState('saving');
-    try {
-      const updated = await ApiClient.updateDocument(selected.id,patch) as DocumentRow;
-      savedSnapshot.current = {title:nextTitle,html:nextHtml};
-      dirtyRef.current = false;
-      setTitle(nextTitle);
-      setSelected(current => current ? {...current,...updated} : current);
-      setSaveState('saved');
-      setDocuments(current => current.map(item => item.id === selected.id ? {...item,...updated} : item));
-    } catch (error) {
-      setSaveState('error');
-      setMessage(error instanceof Error ? error.message : 'Kaydintu way fashilantay.');
-    } finally { savingRef.current = false; }
-  },[selected,title,html,direction,pageSize,margins]);
+    const operation = (async () => {
+      try {
+        const updated = await ApiClient.updateDocument(targetId,patch) as DocumentRow;
+        savedSnapshot.current = snapshot;
+        const latest = draftRef.current;
+        const latestTitle = latest.title.trim() || 'Dukumenti aan cinwaan lahayn';
+        dirtyRef.current = latestTitle !== snapshot.title
+          || latest.html !== snapshot.html
+          || latest.direction !== snapshot.direction
+          || latest.pageSize !== snapshot.pageSize
+          || latest.margins !== snapshot.margins;
+        setTitle(current => current === draft.title ? snapshot.title : current);
+        setSelected(current => current?.id === targetId ? {...current,...updated} : current);
+        setSaveState(dirtyRef.current ? 'unsaved' : 'saved');
+        setDocuments(current => current.map(item => item.id === targetId ? {...item,...updated} : item));
+      } catch (error) {
+        setSaveState('error');
+        setMessage(error instanceof Error ? error.message : 'Kaydintu way fashilantay.');
+      } finally {
+        savingRef.current = false;
+        savePromiseRef.current = null;
+      }
+    })();
+    savePromiseRef.current = operation;
+    await operation;
+  },[selected]);
 
   useEffect(() => {
     if (!selected || !dirtyRef.current) return;
@@ -136,7 +172,13 @@ export const DocumentsView: React.FC = () => {
   },[]);
 
   const openDocument = async (item: DocumentRow) => {
-    if (dirtyRef.current) await saveNow();
+    if (dirtyRef.current || savePromiseRef.current) {
+      await saveNow();
+      if (dirtyRef.current) {
+        setMessage('Isbeddellada lama kaydin. Fadlan mar kale kaydi ka hor intaadan dukumenti kale furin.');
+        return;
+      }
+    }
     try {
       const full = await ApiClient.getDocument(item.id) as DocumentRow;
       setSelected(full);
@@ -146,7 +188,10 @@ export const DocumentsView: React.FC = () => {
       setPageSize(full.pageSize || 'A4');
       setMargins(full.pageMargins || 20);
       setStatus(full.status || 'draft');
-      savedSnapshot.current = {title:full.title,html:full.contentHtml || ''};
+      savedSnapshot.current = {
+        title:full.title,html:full.contentHtml || '',direction:full.direction || 'ltr',
+        pageSize:full.pageSize || 'A4',margins:full.pageMargins || 20
+      };
       dirtyRef.current = false;
       setSaveState('saved');
       setMessage('');
