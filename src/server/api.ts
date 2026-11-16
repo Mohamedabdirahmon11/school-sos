@@ -7706,9 +7706,13 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
     if (!template) { res.status(404).json({ error: 'Template-ka lama helin dugsigan.' }); return; }
     templateId = template.id;
   }
+  const verificationToken=randomUUID();
+  const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
   const { data, error } = await client.from('school_documents').insert({
     school_id: school.id, title, document_type: documentType, status: 'draft', template_id:templateId,
-    content_html: contentHtml, page_size: pageSize, direction, page_margins: pageMargins,
+    content_html: sanitizeDocumentHtml(contentHtml+verificationBlock), page_size: pageSize, direction, page_margins: pageMargins,
+    serial_number:serialNumber, verification_token:verificationToken,
     created_by: user.id, updated_by: user.id
   }).select('*').single();
   if (error || !data) { res.status(503).json({ error: 'Dukumentiga lama abuuri karin.' }); return; }
@@ -7775,11 +7779,15 @@ apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, re
   const { data: original, error: readError } = await client.from('school_documents').select('*')
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if (readError || !original) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  const verificationToken=randomUUID();
+  const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
   const { data, error } = await client.from('school_documents').insert({
     school_id:school.id, title:(original.title + ' — nuqul').slice(0,180), document_type:original.document_type,
-    status:'draft', content_html:original.content_html, page_size:original.page_size, direction:original.direction,
+    status:'draft', content_html:sanitizeDocumentHtml(original.content_html+verificationBlock), page_size:original.page_size, direction:original.direction,
     page_margins:original.page_margins, template_id:original.template_id, student_id:original.student_id,
-    class_id:original.class_id, created_by:user.id, updated_by:user.id
+    class_id:original.class_id, serial_number:serialNumber, verification_token:verificationToken,
+    created_by:user.id, updated_by:user.id
   }).select('*').single();
   if (error || !data) { res.status(503).json({ error: 'Nuqulka dukumentiga lama samayn karin.' }); return; }
   res.status(201).json(documentClientRow(data,true));
