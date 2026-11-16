@@ -5809,7 +5809,7 @@ const payrollAmounts = (items: unknown): { lines: Array<{ label: string; amount:
   if (!Number.isFinite(total) || total > 9999999999.99) return null;
   return { lines, total };
 };
-type PayrollEmployee = { id: string; staffId: string; userId: string; name: string; monthlySalary: number; roleTitle: string };
+type PayrollEmployee = { id: string; staffId: string; userId?: string; name: string; monthlySalary: number; roleTitle: string };
 const getPayrollEmployees = async (schoolId: string): Promise<PayrollEmployee[]> => {
   const [teachers, staffRows, admins] = await Promise.all([
     db.getTeachers(schoolId), db.getStaffMembers(schoolId),
@@ -5818,13 +5818,13 @@ const getPayrollEmployees = async (schoolId: string): Promise<PayrollEmployee[]>
   const employees: PayrollEmployee[] = [];
   const seenUsers = new Set<string>();
   for (const teacher of teachers) {
-    if (teacher.status !== 'active' || !teacher.userId || seenUsers.has(teacher.userId)) continue;
+    if (!['active', 'on_leave'].includes(teacher.status) || !teacher.userId || seenUsers.has(teacher.userId)) continue;
     seenUsers.add(teacher.userId);
     employees.push({ id: teacher.id, staffId: teacher.staffId || teacher.id, userId: teacher.userId, name: teacher.fullName, monthlySalary: Number(teacher.monthlySalary) || 0, roleTitle: 'Teacher' });
   }
   for (const member of staffRows) {
-    if (member.status !== 'active' || !member.userId || seenUsers.has(member.userId)) continue;
-    seenUsers.add(member.userId);
+    if (member.status !== 'active' || (member.userId && seenUsers.has(member.userId))) continue;
+    if (member.userId) seenUsers.add(member.userId);
     employees.push({ id: member.id, staffId: member.staffId || member.id, userId: member.userId, name: member.fullName, monthlySalary: Number(member.monthlySalary) || 0, roleTitle: member.roleTitle || 'Staff' });
   }
   for (const admin of admins) {
@@ -5862,8 +5862,9 @@ apiRouter.post('/payroll', requireAuth, requireSchoolContext, requireAccountantO
   for (const selection of selections) {
     const employee = employees.find(item => item.id === selection?.staffId || item.staffId === selection?.staffId);
     if (!employee) { res.status(400).json({ error: 'Every selected employee must be active and belong to this school.' }); return; }
-    if (seen.has(employee.userId) || existing.some(record => record.userId === employee.userId)) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
-    seen.add(employee.userId);
+    const employeeKey = employee.userId || employee.id;
+    if (seen.has(employeeKey) || existing.some(record => record.staffId === employee.id || Boolean(employee.userId && record.userId === employee.userId))) { res.status(409).json({ error: `${employee.name} already has a payroll record for ${month}.` }); return; }
+    seen.add(employeeKey);
     const allowances = payrollAmounts(selection.allowances); const deductions = payrollAmounts(selection.deductions);
     const salary = selection.baseSalary === undefined ? Number(employee.monthlySalary) : Number(selection.baseSalary);
     if (!allowances || !deductions || !Number.isFinite(salary) || salary < 0 || salary > 9999999999.99 || !Number.isFinite(salary + allowances.total - deductions.total) || salary + allowances.total - deductions.total > 9999999999.99 || deductions.total > salary + allowances.total) { res.status(400).json({ error: `Payroll amounts are invalid for ${employee.name}.` }); return; }
