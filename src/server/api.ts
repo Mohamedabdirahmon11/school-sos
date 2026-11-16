@@ -49,6 +49,7 @@ import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSet
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables } from '../lib/documents/variables.ts';
+import { collectPagedItems } from '../lib/documents/paged-query.ts';
 
 export const apiRouter = Router();
 
@@ -8091,23 +8092,22 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   if (typeof body.classId === 'string' && body.classId) {
     classRecord = await db.getClassById(body.classId,school.id);
     if (!classRecord) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
-    // Fetch the complete school-scoped roster in bounded pages. The old single-page
-    // query silently omitted students after the first 100 (including larger classes).
-    let rosterPage = 1;
-    let rosterTotal = 0;
-    do {
-      const roster = await db.queryPage<Student>(
-        'students', { school_id:school.id, class_id:classRecord.id },
-        rosterPage, 100, undefined, '*', 'first_name', true
+    // Fetch every page of this school-scoped class roster. Never silently
+    // truncate class generation at the database page-size boundary.
+    try {
+      students = await collectPagedItems(
+        (page, pageSize) => db.queryPage<Student>(
+          'students', { school_id:school.id, class_id:classRecord!.id },
+          page, pageSize, undefined, '*', 'first_name', true
+        ),
+        { pageSize:100, maxItems:5000 }
       );
-      if (rosterPage === 1) rosterTotal = roster.total;
-      students.push(...roster.items);
-      rosterPage += 1;
-      if (students.length >= 5000) break;
-    } while (students.length < rosterTotal);
-    if (students.length < rosterTotal) {
-      res.status(413).json({ error: 'Fasalkan wuxuu ka badan yahay xadka 5,000 arday ee hal hawl. Kala qaybi fasalka ka hor samaynta dukumentiyada.' });
-      return;
+    } catch (error) {
+      if (error instanceof RangeError) {
+        res.status(413).json({ error: 'Fasalkan wuxuu ka badan yahay xadka 5,000 arday ee hal hawl. Kala qaybi fasalka ka hor samaynta dukumentiyada.' });
+        return;
+      }
+      throw error;
     }
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
     for (const rawId of body.studentIds) {
