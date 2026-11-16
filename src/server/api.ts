@@ -4314,7 +4314,7 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
   const editableFields = [
     'firstName', 'middleName', 'lastName', 'gender', 'admissionDate',
     'dateOfBirth', 'studentPhone', 'fatherPhone', 'fatherName', 'address', 'motherPhone',
-    'classId', 'section', 'status', 'branchId', 'bloodGroup',
+    'classId', 'section', 'status', 'branchId', 'bloodGroup', 'rollNumber',
     'allergies', 'busRouteId', 'documents', 'notes'
   ] as const;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
@@ -4335,6 +4335,12 @@ apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolA
       }
       payload[field] = value.trim();
     }
+  }
+  if (payload.rollNumber !== undefined) {
+    if (typeof payload.rollNumber !== 'string' || payload.rollNumber.trim().length > 20 || /[<>]/.test(payload.rollNumber)) {
+      res.status(400).json({ error: 'Roll number must be 20 characters or fewer.' }); return;
+    }
+    payload.rollNumber = payload.rollNumber.trim();
   }
   if (payload.fatherName !== undefined && (typeof payload.fatherName !== 'string' || payload.fatherName.trim().length > 160)) {
     res.status(400).json({ error: 'Parent / guardian name must be 160 characters or fewer.' }); return;
