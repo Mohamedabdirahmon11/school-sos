@@ -7624,7 +7624,7 @@ apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
   const client=documentServiceClient(res);if(!client)return;
   const {data}=await client.from('school_documents').select('verification_token').eq('verification_token',token).is('deleted_at',null).maybeSingle();
   if(!data){res.status(404).end();return;}
-  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||'').replace(/\/$/,'');
+  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||(`${req.protocol}://${req.get('host')}`)).replace(/\/$/,'');
   const qr=await QRCode.toBuffer(base+'/api/public/document-verification/'+token,{type:'png',errorCorrectionLevel:'M',margin:1,width:240});
   res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=300');res.setHeader('X-Content-Type-Options','nosniff');res.send(qr);
 });
@@ -7632,7 +7632,7 @@ apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
 apiRouter.get('/public/document-verification/:token', async (req,res) => {
   const token=String(req.params.token||'');if(!/^[0-9a-f-]{36}$/i.test(token)){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
   const client=documentServiceClient(res);if(!client)return;
-  const {data:doc}=await client.from('school_documents').select('school_id,document_type,status,created_at,student_id,deleted_at').eq('verification_token',token).maybeSingle();
+  const {data:doc}=await client.from('school_documents').select('school_id,document_type,status,created_at,updated_at,student_id,deleted_at').eq('verification_token',token).maybeSingle();
   if(!doc||doc.deleted_at){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
   const [{data:school},{data:student}]=await Promise.all([
     client.from('schools').select('name').eq('id',doc.school_id).maybeSingle(),
