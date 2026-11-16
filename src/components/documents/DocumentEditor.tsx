@@ -155,6 +155,26 @@ export const DocumentEditor: React.FC<Props> = ({
     emit();
   };
 
+  const alignSelectedImage = (alignment: 'left'|'center'|'right') => {
+    if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
+    selectedImage.style.display = 'block';
+    selectedImage.style.float = 'none';
+    selectedImage.style.marginLeft = alignment === 'left' ? '0' : 'auto';
+    selectedImage.style.marginRight = alignment === 'right' ? '0' : 'auto';
+    if (alignment === 'left') { selectedImage.style.marginLeft = '0'; selectedImage.style.marginRight = 'auto'; }
+    emit();
+  };
+
+  const nudgeSelectedImage = (dx: number, dy: number) => {
+    if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
+    const left = Math.max(-500,Math.min(500,(Number.parseFloat(selectedImage.style.left)||0)+dx));
+    const top = Math.max(-500,Math.min(500,(Number.parseFloat(selectedImage.style.top)||0)+dy));
+    selectedImage.style.position = 'relative';
+    selectedImage.style.left = left + 'px';
+    selectedImage.style.top = top + 'px';
+    emit();
+  };
+
   const changeSelectedImageLayer = (direction: 'front'|'back') => {
     if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
     const current = Number(selectedImage.style.zIndex || 0);
@@ -222,6 +242,13 @@ export const DocumentEditor: React.FC<Props> = ({
     const editor = editorRef.current;
     if (!editor) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (selectedImage && editor.contains(selectedImage) && document.activeElement === selectedImage) {
+        const delta = event.shiftKey ? 10 : 1;
+        if (event.key === 'ArrowLeft') { event.preventDefault(); nudgeSelectedImage(-delta,0); return; }
+        if (event.key === 'ArrowRight') { event.preventDefault(); nudgeSelectedImage(delta,0); return; }
+        if (event.key === 'ArrowUp') { event.preventDefault(); nudgeSelectedImage(0,-delta); return; }
+        if (event.key === 'ArrowDown') { event.preventDefault(); nudgeSelectedImage(0,delta); return; }
+      }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === 's') { event.preventDefault(); onSaveNow(); }
@@ -232,7 +259,7 @@ export const DocumentEditor: React.FC<Props> = ({
     };
     editor.addEventListener('keydown', onKeyDown);
     return () => editor.removeEventListener('keydown', onKeyDown);
-  }, [onSaveNow]);
+  }, [onSaveNow, selectedImage]);
 
   const button = (label: string, title: string, action: () => void) => (
     <button type="button" aria-label={label} title={title} onMouseDown={event => event.preventDefault()} onClick={action}
@@ -290,6 +317,7 @@ export const DocumentEditor: React.FC<Props> = ({
         <select aria-label="Wareeji sawirka la doortay" defaultValue="0" onChange={event => rotateSelectedImage(Number(event.target.value))} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs">
           <option value="0">Wareeg 0°</option><option value="90">Wareeg 90°</option><option value="180">Wareeg 180°</option><option value="-90">Wareeg -90°</option>
         </select>
+        <select aria-label="Hagaajinta sawirka la doortay" defaultValue="center" onChange={event => alignSelectedImage(event.target.value as 'left'|'center'|'right')} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="left">Sawir bidix</option><option value="center">Sawir dhexda</option><option value="right">Sawir midig</option></select>
         {button('Lakab +','Sawirka hore u soo qaad',() => changeSelectedImageLayer('front'))}
         {button('Lakab −','Sawirka gadaal u dhig',() => changeSelectedImageLayer('back'))}
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
@@ -328,7 +356,7 @@ export const DocumentEditor: React.FC<Props> = ({
           </div>
         </header>
         <div ref={editorRef} contentEditable suppressContentEditableWarning role="textbox" aria-label="Meesha qoraalka dukumentiga" aria-multiline="true"
-          dir={direction} onInput={emit} onBlur={emit} onClick={event => { const target = event.target as HTMLElement; const image = target.closest('img') as HTMLImageElement | null; setSelectedImage(image && editorRef.current?.contains(image) ? image : null); }} onPaste={event => {
+          dir={direction} onInput={emit} onBlur={emit} onClick={event => { const target = event.target as HTMLElement; const image = target.closest('img') as HTMLImageElement | null; if (selectedImage && selectedImage !== image) selectedImage.classList.remove('document-image-selected'); if (image && editorRef.current?.contains(image)) { image.classList.add('document-image-selected'); image.tabIndex = 0; image.focus(); setSelectedImage(image); } else setSelectedImage(null); }} onPaste={event => {
             const clipboard = event.clipboardData;
             const pasted = clipboard.getData('text/html');
             if (pasted) {
