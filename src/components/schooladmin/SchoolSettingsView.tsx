@@ -547,8 +547,6 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             <FileText className="w-3.5 h-3.5" />
             Report Card Designer
           </button>
-          <button
-            type="button"
           {user?.role === 'school_admin' && (
             <button type="button" onClick={() => setActiveTab('appearance')}
               className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
@@ -558,6 +556,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               Appearance
             </button>
           )}
+          <button
+            type="button"
             onClick={() => setActiveTab('backup')}
             className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
               activeTab === 'backup' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
