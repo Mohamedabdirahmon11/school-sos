@@ -13,6 +13,7 @@ type Props = {
   onMarginsChange: (value: number) => void;
   school: any;
   onUploadImage: (file: File) => Promise<string>;
+  canUploadImage?: boolean;
 };
 
 export const DocumentEditor: React.FC<Props> = ({
@@ -253,8 +254,8 @@ export const DocumentEditor: React.FC<Props> = ({
         <select aria-label="Ballaca xadka unugga" value={cellBorderWidth} onChange={event => setCellBorderWidth(event.target.value)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="0">Xad la'aan</option><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="4">4 px</option></select>
         <select aria-label="Nooca xadka unugga" value={cellBorderStyle} onChange={event => setCellBorderStyle(event.target.value as typeof cellBorderStyle)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="solid">Joogto</option><option value="dashed">Jajaban</option><option value="dotted">Dhibco</option><option value="double">Laba xariiq</option></select>
         {button('Adeegso xadka','Ku dabaq xadka unugga la doortay',setCellBorder)}
-        {button('Sawir','Geli sawir',() => imageInputRef.current?.click())}
-        <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} />
+        {canUploadImage && <>{button('Sawir','Geli sawir',() => imageInputRef.current?.click())}
+        <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} /></>}
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
           <option value="160px">Sawir yar</option><option value="320px">Sawir dhexe</option><option value="640px">Sawir weyn</option><option value="100%">Buuxa</option>
         </select>
