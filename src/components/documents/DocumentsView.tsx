@@ -3,6 +3,7 @@ import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, Wand
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { DocumentEditor } from './DocumentEditor.tsx';
+import { DocumentFileTools } from './DocumentFileTools.tsx';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import './documents.css';
 
@@ -307,6 +308,7 @@ export const DocumentsView: React.FC = () => {
               <button type="button" onClick={startTemplateFromSelected} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Copy size={14}/> Template ka dhig</button>
             </div>
             <DocumentEditor html={html} onChange={value=>{setHtml(value);markDirty(title,value);}} onSaveNow={saveNow} direction={direction} onDirectionChange={value=>{setDirection(value);markDirty(title,html,value,pageSize,margins);}} pageSize={pageSize} onPageSizeChange={value=>{setPageSize(value);markDirty(title,html,direction,value,margins);}} margins={margins} onMarginsChange={value=>{setMargins(value);markDirty(title,html,direction,pageSize,value);}} school={school} onUploadImage={uploadImage}/>
+            <DocumentFileTools html={html} title={title} onImport={value=>{setHtml(value);markDirty(title,value);}}/>
           </div>}
         </main>
       </div>
