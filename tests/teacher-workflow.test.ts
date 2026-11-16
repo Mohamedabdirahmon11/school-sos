@@ -37,6 +37,15 @@ test('Form Teachers see every student and can complete every subject in their ho
   assert.match(api, /canEditMarks: true/);
 });
 
+test('teacher notices load independently and cannot block core teaching workflows', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const coreLoad = teacher.slice(teacher.indexOf('const initialData = useApi'), teacher.indexOf('const publishedExamSchedulesState'));
+  assert.doesNotMatch(coreLoad, /getNotices/);
+  assert.match(teacher, /const noticesState = useApi\(\(\) => ApiClient\.getNotices\(\)/);
+  assert.match(teacher, /noticesState\.loading/);
+  assert.match(teacher, /noticesState\.error \? <ErrorState error=\{noticesState\.error\} onRetry=\{noticesState\.retry\}/);
+});
+
 test('teacher workspace exposes every teaching task and batch class workflows', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /activeTab === 'dashboard'/);
