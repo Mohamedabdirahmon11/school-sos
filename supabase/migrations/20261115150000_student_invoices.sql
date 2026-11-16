@@ -233,4 +233,44 @@ $$;
 REVOKE ALL ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) TO service_role;
 
+
+CREATE OR REPLACE FUNCTION public.schoolos_sync_student_invoice_void()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  paid_after_void NUMERIC(12,2);
+  balance_after_void NUMERIC(12,2);
+  next_status VARCHAR(20);
+BEGIN
+  IF OLD.voided_at IS NULL AND NEW.voided_at IS NOT NULL AND NEW.invoice_id IS NOT NULL THEN
+    UPDATE public.student_invoices
+    SET amount_paid = GREATEST(0, amount_paid - NEW.amount_paid),
+        balance_due = LEAST(total_amount, balance_due + NEW.amount_paid),
+        updated_at = NOW()
+    WHERE id = NEW.invoice_id AND school_id = NEW.school_id
+    RETURNING amount_paid, balance_due INTO paid_after_void, balance_after_void;
+
+    IF FOUND THEN
+      next_status := CASE
+        WHEN balance_after_void = 0 THEN 'paid'
+        WHEN paid_after_void = 0 AND due_date < CURRENT_DATE THEN 'overdue'
+        WHEN paid_after_void = 0 THEN 'issued'
+        ELSE 'partially_paid'
+      END;
+      UPDATE public.student_invoices SET status = next_status
+      WHERE id = NEW.invoice_id AND school_id = NEW.school_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_student_invoice_void ON public.fee_payments;
+CREATE TRIGGER trg_sync_student_invoice_void
+AFTER UPDATE OF voided_at ON public.fee_payments
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_sync_student_invoice_void();
+
 NOTIFY pgrst, 'reload schema';
