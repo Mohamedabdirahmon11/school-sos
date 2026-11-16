@@ -726,7 +726,7 @@ export interface StaffPayrollRecord {
   schoolId: string;
   teacherId?: string;
   staffId?: string;
-  userId: string;
+  userId?: string;
   staffName?: string;
   payrollMonth: string;
   baseSalary: number;
