@@ -7624,7 +7624,7 @@ apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
   const client=documentServiceClient(res);if(!client)return;
   const {data}=await client.from('school_documents').select('verification_token').eq('verification_token',token).is('deleted_at',null).maybeSingle();
   if(!data){res.status(404).end();return;}
-  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||'').replace(/\\/$/,'');
+  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||'').replace(/\/$/,'');
   const qr=await QRCode.toBuffer(base+'/api/public/document-verification/'+token,{type:'png',errorCorrectionLevel:'M',margin:1,width:240});
   res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=300');res.setHeader('X-Content-Type-Options','nosniff');res.send(qr);
 });
