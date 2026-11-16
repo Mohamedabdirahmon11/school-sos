@@ -7,7 +7,7 @@
  * 4. Personal teaching schedule & notices
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
@@ -44,6 +44,8 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
 }
 
+const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolNotice[], SchoolClass[]] = [[], null, [], [], []];
+
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -55,17 +57,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getNotices(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
-  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || [[], null, [], [], []];
+  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
   const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
   const formTeacherClasses: SchoolClass[] = Array.isArray(formTeacherClassesData) ? formTeacherClassesData : [];
-  const classes: SchoolClass[] = [...new Map([
+  const classes: SchoolClass[] = useMemo(() => [...new Map([
     ...teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class] as [string, SchoolClass]),
     ...formTeacherClasses.map(klass => [klass.id, klass] as [string, SchoolClass])
-  ]).values()];
+  ]).values()], [teacherAssignments, formTeacherClasses]);
   const subjects: Subject[] = [...new Map(teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
   const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
@@ -99,16 +101,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const visibleStudents = students.filter(student =>
     `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
   );
-  const [formClassStudentCounts, setFormClassStudentCounts] = useState<Record<string, number>>({});
-  const [formClassStudentTotal, setFormClassStudentTotal] = useState(0);
+  const [assignedClassStudentCounts, setAssignedClassStudentCounts] = useState<Record<string, number>>({});
+  const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== 'dashboard' || !formTeacherClasses.length) { setFormClassStudentCounts({}); setFormClassStudentTotal(0); return; }
-    Promise.all(formTeacherClasses.map(async klass => ({ id: klass.id, count: (await ApiClient.getAllStudents(klass.id)).length })))
-      .then(rows => { if (!cancelled) { setFormClassStudentCounts(Object.fromEntries(rows.map(row => [row.id, row.count]))); setFormClassStudentTotal(rows.reduce((sum, row) => sum + row.count, 0)); } })
-      .catch(() => { if (!cancelled) { setFormClassStudentCounts({}); setFormClassStudentTotal(0); } });
+    if (activeTab !== 'dashboard' || !classes.length) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); return; }
+    Promise.all(classes.map(async klass => ({ id: klass.id, count: (await ApiClient.getAllStudents(klass.id)).length })))
+      .then(rows => { if (!cancelled) { setAssignedClassStudentCounts(Object.fromEntries(rows.map(row => [row.id, row.count]))); setAssignedClassStudentTotal(rows.reduce((sum, row) => sum + row.count, 0)); } })
+      .catch(() => { if (!cancelled) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); } });
     return () => { cancelled = true; };
-  }, [activeTab, formTeacherClasses, school?.id]);
+  }, [activeTab, classes, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesData) ? noticesData : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
@@ -471,7 +473,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Form Teacher responsibility</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Your assigned class</h2>
-              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">{formClassStudentCounts[klass.id] ?? '…'} arday</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
+              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">{assignedClassStudentCounts[klass.id] ?? '…'} arday</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
             </section>
             <section className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching assignments</p>
@@ -480,10 +482,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </section>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasalkaaga</p><p className="mt-2 text-2xl font-black text-slate-900">{formClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta fasallada Form Teacher</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{formTeacherClasses.length}</p></article>
+            <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{assignedClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta ardayda fasalladaada</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size}</p></article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Maaddooyinka aad dhigto</p><p className="mt-2 text-2xl font-black text-slate-900">{subjects.length}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jadwalka dugsiga</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Waqtiyada oo dhan</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.filter(isMyTimetableSlot).length}</p><p className="mt-1 text-[10px] text-slate-500">Casharrada toddobaadka</p></article>
           </div>
         </section>
       )}
