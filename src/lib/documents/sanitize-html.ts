@@ -2,7 +2,7 @@ const ALLOWED_TAGS = new Set(['p','div','span','br','hr','h1','h2','h3','h4','h5
 const BLOCKED_BLOCKS = /<(script|style|iframe|object|embed|svg|math|form|input|video|audio|canvas|template|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
 const VOID_TAGS = new Set(['br','hr','img']);
 
-function safeStyle(value: string): string {
+function safeStyle(value: string, allowPositionedField = false): string {
   const allowed = new Set(['color','background-color','font-size','font-family','font-weight','font-style','text-decoration','text-align','line-height','direction','width','height','max-width','border','border-color','border-width','border-style','vertical-align','padding','margin','transform','transform-origin','z-index','position','left','top','float','margin-left','margin-right']);
   return value.split(';').map((part) => {
     const index = part.indexOf(':');
@@ -13,7 +13,7 @@ function safeStyle(value: string): string {
     if (name === 'transform' && !/^rotate\(-?(?:\d{1,3})deg\)$/i.test(content)) return '';
     if (name === 'transform-origin' && !/^(center|top|bottom|left|right|center center)$/i.test(content)) return '';
     if (name === 'z-index' && !/^-?\d{1,2}$/.test(content)) return '';
-    if (name === 'position' && content !== 'relative') return '';
+    if (name === 'position' && content !== 'relative' && !(allowPositionedField && content === 'absolute')) return '';
     if (['left','top'].includes(name) && !/^-?\d{1,3}px$/.test(content)) return '';
     if (name === 'float' && !/^(left|right|none)$/.test(content)) return '';
     if (['margin-left','margin-right'].includes(name) && !/^(auto|0|-?\d{1,3}(?:px|%))$/.test(content)) return '';
@@ -42,6 +42,7 @@ export function sanitizeDocumentHtml(input: unknown): string {
     if (!ALLOWED_TAGS.has(tag)) return '';
     if (whole.startsWith('</')) return VOID_TAGS.has(tag) ? '' : '</' + tag + '>';
     const attrs: string[] = [];
+    const allowPositionedField = /data-document-field\\s*=\\s*(["']true["']|true)/i.test(rawAttrs) && /class\\s*=\\s*(["'][^"']*document-positioned-field[^"']*["'])/i.test(rawAttrs);
     const matcher = /([a-zA-Z_:][a-zA-Z0-9:._-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/g;
     let match: RegExpExecArray | null;
     while ((match = matcher.exec(rawAttrs))) {
@@ -49,7 +50,7 @@ export function sanitizeDocumentHtml(input: unknown): string {
       const value = match[2] ?? match[3] ?? match[4] ?? '';
       if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction') continue;
       if (name === 'style') {
-        const style = safeStyle(value);
+        const style = safeStyle(value, allowPositionedField);
         if (style) attrs.push('style="' + style.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '"');
       } else if (name === 'href' && tag === 'a') {
         const url = safeUrl(value);
@@ -61,8 +62,12 @@ export function sanitizeDocumentHtml(input: unknown): string {
         if (name === 'dir' && !/^(ltr|rtl|auto)$/i.test(value)) continue;
         if (['colspan','rowspan'].includes(name) && !/^[1-9]\d?$/.test(value)) continue;
         if (name === 'size' && !/^[1-7]$/.test(value)) continue;
-        if (name === 'class' && value !== 'document-page-break') continue;
+        if (name === 'class' && !['document-page-break','document-positioned-field','document-field-drag-handle'].includes(value)) continue;
         if (name === 'data-page-break' && value !== 'true') continue;
+        if (name === 'data-document-field' && value !== 'true') continue;
+        if (name === 'data-document-locked' && !/^(true|false)$/.test(value)) continue;
+        if (name === 'contenteditable' && !/^(true|false)$/.test(value)) continue;
+        if (name === 'tabindex' && !/^-?1|0$/.test(value)) continue;
         if (['width','height'].includes(name) && !/^\d{1,4}(?:px|%)?$/.test(value)) continue;
         attrs.push(name + '="' + value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '"');
       }
