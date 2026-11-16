@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ApiClient } from '../../services/api.ts';
@@ -29,6 +29,7 @@ export const StudentInvoicesView: React.FC = () => {
   const [paying, setPaying] = useState<any>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState<'Cash' | 'Bank Transfer' | 'Mobile Money'>('Cash');
+  const paymentKeyRef = useRef<string | null>(null);
 
   const studentName = (id: string) => {
     const student = students.find((item: any) => item.id === id);
@@ -67,13 +68,14 @@ export const StudentInvoicesView: React.FC = () => {
     if (!paying || isReadOnly) return;
     setBusy(true);
     try {
-      const key = globalThis.crypto?.randomUUID?.() || `invpay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      paymentKeyRef.current ||= globalThis.crypto?.randomUUID?.() || `invpay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const result = await ApiClient.payStudentInvoice(paying.id, {
-        amount: Number(payAmount), paymentMethod: payMethod, idempotencyKey: key
+        amount: Number(payAmount), paymentMethod: payMethod, idempotencyKey: paymentKeyRef.current
       });
       setNotice(`Payment received. Receipt ${result.payment.receiptNumber}.`);
       setPaying(null);
       setPayAmount('');
+      paymentKeyRef.current = null;
       await load.retry();
     } catch (error: any) {
       setNotice(error.message || 'Payment could not be recorded.');
@@ -119,7 +121,7 @@ export const StudentInvoicesView: React.FC = () => {
               <td className="p-3"><span className={`rounded-full px-2 py-1 text-[11px] font-bold ${badge}`}>{shownStatus.replace('_',' ')}</span></td>
               <td className="p-3"><div className="flex justify-end gap-2">
                 <button type="button" title="Download PDF" onClick={()=>void ApiClient.downloadStudentInvoicePdf(invoice.id)} className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-100"><Download size={15}/></button>
-                {Number(invoice.balance_due)>0&&['school_admin','accountant','super_admin'].includes(user?.role||'')&&<button type="button" onClick={()=>{setPaying(invoice);setPayAmount(String(invoice.balance_due));}} disabled={isReadOnly} className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><Wallet size={14}/> Pay</button>}
+                {Number(invoice.balance_due)>0&&['school_admin','accountant','super_admin'].includes(user?.role||'')&&<button type="button" onClick={()=>{paymentKeyRef.current=null;setPaying(invoice);setPayAmount(String(invoice.balance_due));}} disabled={isReadOnly} className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><Wallet size={14}/> Pay</button>}
               </div></td>
             </tr>;
           })}</tbody>
