@@ -238,8 +238,13 @@ test('teacher portal provides personal timetable first and a deliberate school-w
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /timetableScope, setTimetableScope/);
   assert.match(teacher, /timetable\.filter\(isMyTimetableSlot\)/);
+  assert.match(teacher, /assignment\.teacherId === slot\.teacherId/);
+  assert.match(teacher, /Filter timetable by day/);
+  assert.match(teacher, /All days/);
   assert.match(teacher, /My lessons/);
   assert.match(teacher, /Full school timetable/);
+  const client = read('../src/services/api.ts');
+  assert.match(client, /params\.append\('scope', 'school'\)/);
 });
 
 test('teacher workflows provide mobile student cards, searchable registers, and touch-sized attendance and mark inputs', () => {
