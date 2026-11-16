@@ -546,6 +546,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     setModuleError(null);
     let assigned = 0;
     const failures: string[] = [];
+    const failedStudentIds: string[] = [];
     for (const studentId of selectedBusStudentIds) {
       try {
         const assignment = await ApiClient.setBusAssignment(studentId, assignmentRouteId);
@@ -554,12 +555,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       } catch (err: any) {
         const student = students.find(row => row.id === studentId);
         const name = student ? `${student.firstName} ${student.lastName}`.trim() : studentId;
+        failedStudentIds.push(studentId);
         failures.push(`${name}: ${err.message || 'could not be assigned'}`);
       }
     }
     if (assigned > 0) {
       setNotice(`${assigned} student(s) assigned. The route's monthly fee is saved for each student.`);
-      setSelectedBusStudentIds([]);
+      setSelectedBusStudentIds(failedStudentIds);
     }
     if (failures.length) setModuleError(`Some students were not assigned: ${failures.join('; ')}`);
   };
