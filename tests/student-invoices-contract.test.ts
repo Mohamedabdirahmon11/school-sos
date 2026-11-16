@@ -61,6 +61,8 @@ test('invoice schema enforces tenant uniqueness, balanced totals and row-level s
   assert.match(migration, /CHECK \(balance_due = total_amount - amount_paid\)/);
   assert.match(migration, /ALTER TABLE student_invoices ENABLE ROW LEVEL SECURITY/);
   assert.match(migration, /ALTER TABLE student_invoice_items ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE student_invoices, student_invoice_items TO authenticated/);
+  assert.match(migration, /GRANT ALL ON TABLE student_invoices, student_invoice_items TO service_role/);
   assert.match(migration, /auth_school_id\(\)/);
   assert.match(migration, /auth_can_access_student\(invoice\.student_id\)/);
   assert.match(migration, /CREATE TRIGGER trg_sync_student_invoice_void/);
