@@ -58,8 +58,8 @@ export const LoginView: React.FC = () => {
         email,
         phone,
         schoolCode,
-        pin: email.trim().includes('@') ? pin : (password || pin),
-        password
+        pin,
+        password: activeTab === 'super_admin' ? password : undefined
       });
       if (result.requirePasswordChange && result.challengeToken) {
         setBootstrapToken(result.challengeToken);
