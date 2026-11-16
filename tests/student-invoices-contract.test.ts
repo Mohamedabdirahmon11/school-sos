@@ -102,3 +102,12 @@ test('generated invoices include every applicable fee by default, including bus 
   assert.doesNotMatch(view, /includeAnnual, setIncludeAnnual|includeOneTime, setIncludeOneTime/);
   assert.match(view, /saved bus fee for active bus assignments are included/);
 });
+
+test('retrying invoice generation repairs a missing bus fee on an existing invoice only once', () => {
+  const source = route('post', '/student-invoices/generate');
+  assert.match(source, /repairExistingBusFee/);
+  assert.match(source, /schoolos_add_missing_student_invoice_bus_fee/);
+  assert.match(source, /return \{ duplicate: true, busFeeAdded: await repairExistingBusFee\(student\) \}/);
+  assert.match(source, /busFeesAdded/);
+  assert.match(source, /assignment\.studentId === student\.id && assignment\.active/);
+});
