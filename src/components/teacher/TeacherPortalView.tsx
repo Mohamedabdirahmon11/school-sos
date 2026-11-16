@@ -44,6 +44,8 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
 }
 
+const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolNotice[], SchoolClass[]] = [[], null, [], [], []];
+
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -55,7 +57,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getNotices(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
-  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || [[], null, [], [], []];
+  const [assignmentsData, examConfigData, timetableData, noticesData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
   const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
   const [selectedClassId, setSelectedClassId] = useState('');
