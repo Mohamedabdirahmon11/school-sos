@@ -6285,6 +6285,8 @@ apiRouter.post('/student-invoices/:id/pay', requireAuth, requireSchoolContext, r
   const method=req.body?.paymentMethod||'Cash';
   const notes=typeof req.body?.notes==='string'?req.body.notes.trim().slice(0,1000):null;
   const idempotencyKey=typeof req.body?.idempotencyKey==='string'?req.body.idempotencyKey.trim():null;
+  const confirmedReceived=req.body?.confirmedReceived===true;
+  if(!confirmedReceived){res.status(400).json({error:'The school must confirm that the payment was received before recording it.'});return;}
   if(!Number.isFinite(amount)||amount<=0||amount>9999999999.99||Math.round(amount*100)!==amount*100||!['Cash','Bank Transfer','Mobile Money'].includes(method)||idempotencyKey&&idempotencyKey.length>128){
     res.status(400).json({error:'Enter a valid payment amount, method and retry key.'});return;
   }
