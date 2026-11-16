@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import QRCode from 'qrcode';
 import { z } from 'zod';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { db } from './storage.ts';
@@ -48,7 +49,10 @@ import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupPr
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
-import { replaceDocumentVariables } from '../lib/documents/variables.ts';
+import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
+import { collectPagedItems } from '../lib/documents/paged-query.ts';
+import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
+import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 
 export const apiRouter = Router();
 
@@ -7781,13 +7785,14 @@ function documentClientRow(row: any, includeContent = false) {
     updatedAt: row.updated_at, createdAt: row.created_at, deletedAt: row.deleted_at,
     studentId: row.student_id, classId: row.class_id, templateId: row.template_id,
     pageSize: row.page_size, direction: row.direction, pageMargins: row.page_margins,
-    lockedAt: row.locked_at || null, lockedBy: row.locked_by || null, lockReason: row.lock_reason || null
+    lockedAt: row.locked_at || null, lockedBy: row.locked_by || null, lockReason: row.lock_reason || null,
+    serialNumber: row.serial_number || null, verificationToken: row.verification_token || null
   };
   if (includeContent) result.contentHtml = row.content_html || '';
   return result;
 }
 function documentTemplateClientRow(row: any) {
-  return { id: row.id, title: row.title, documentType: row.document_type, contentHtml: row.content_html, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, documentType: row.document_type, contentHtml: row.content_html, updatedAt: row.updated_at, deletedAt: row.deleted_at || null };
 }
 function documentServiceClient(res: Response) {
   if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
@@ -7814,12 +7819,12 @@ apiRouter.get('/documents/images', requireAuth, requireSchoolContext, requireSch
 });
 
 apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin,
-  express.raw({ type: ['image/png','image/jpeg','image/webp'], limit: '1572864' }),
+  express.raw({ type: ['image/png','image/jpeg','image/webp'], limit: '10485760' }),
   async (req, res) => {
     const school = (req as any).school as School;
     const bytes = Buffer.isBuffer(req.body) ? req.body : null;
     const detected = bytes ? detectSchoolLogoImage(bytes, String(req.headers['content-type'] || '')) : null;
-    if (!bytes || !detected) { res.status(400).json({ error: 'Sawir PNG, JPEG ama WebP ah oo ka yar 1.5 MB geli.' }); return; }
+    if (!bytes || !detected) { res.status(400).json({ error: 'Sawir PNG, JPEG ama WebP ah oo ka yar 10 MB geli.' }); return; }
     const storageClient = documentServiceClient(res);
     if (!storageClient) return;
     const objectPath = school.id + '/documents/' + randomUUID() + '.' + detected.extension;
@@ -7827,9 +7832,47 @@ apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSc
       contentType: detected.contentType, cacheControl: '300', upsert: false
     });
     if (error) { res.status(502).json({ error: 'Sawirka dukumentiga lama kaydin karin.' }); return; }
+    const audit = await storageClient.from('school_document_audit_events').insert({
+      school_id:school.id, actor_user_id:(req as any).user.id, action:'artwork_uploaded',
+      details:{ objectPath, contentType:detected.contentType, sizeBytes:bytes.length }
+    });
+    if (audit.error) {
+      await storageClient.storage.from(DOCUMENT_IMAGE_BUCKET).remove([objectPath]);
+      res.status(503).json({ error: 'Diiwaanka gelinta sawirka lama kaydin karin.' }); return;
+    }
     res.status(201).json({ url: '/api/documents/images?path=' + encodeURIComponent(objectPath) });
   }
 );
+
+// Public verification reveals only validity, school, student name, document type and issue date.
+apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
+  const rate=documentVerificationRateLimiter.consume('qr:'+String(req.ip||req.socket.remoteAddress||'unknown'));
+  if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfterSeconds));res.setHeader('Cache-Control','no-store');res.status(429).json({error:'Codsiyo badan ayaa la diray. Mar kale isku day goor dambe.'});return;}
+  const token=String(req.params.token||''); if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)){res.status(404).end();return;}
+  const client=documentServiceClient(res);if(!client)return;
+  const {data}=await client.from('school_documents').select('verification_token').eq('verification_token',token).is('deleted_at',null).maybeSingle();
+  if(!data){res.status(404).end();return;}
+  const base=(process.env.APP_BASE_URL||process.env.PUBLIC_APP_URL||(`${req.protocol}://${req.get('host')}`)).replace(/\/$/,'');
+  const qr=await QRCode.toBuffer(base+'/api/public/document-verification/'+token,{type:'png',errorCorrectionLevel:'M',margin:1,width:240});
+  res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=300');res.setHeader('X-Content-Type-Options','nosniff');res.send(qr);
+});
+
+apiRouter.get('/public/document-verification/:token', async (req,res) => {
+  const rate=documentVerificationRateLimiter.consume('page:'+String(req.ip||req.socket.remoteAddress||'unknown'));
+  if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfterSeconds));res.setHeader('Cache-Control','no-store');res.status(429).type('html').send('<h1>Too many requests</h1><p>Please try again later.</p>');return;}
+  const token=String(req.params.token||'');if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
+  const client=documentServiceClient(res);if(!client)return;
+  const {data:doc}=await client.from('school_documents').select('school_id,document_type,status,created_at,updated_at,student_id,deleted_at').eq('verification_token',token).maybeSingle();
+  if(!doc||doc.deleted_at){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
+  const [{data:school},{data:student}]=await Promise.all([
+    client.from('schools').select('name').eq('id',doc.school_id).maybeSingle(),
+    doc.student_id?client.from('students').select('first_name,middle_name,last_name').eq('school_id',doc.school_id).eq('id',doc.student_id).maybeSingle():Promise.resolve({data:null})
+  ]);
+  const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+  const valid=doc.status==='final';const studentName=student?[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' '):'';
+  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
+  res.status(200).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document verification</title><main style="font:16px system-ui;max-width:620px;margin:48px auto;padding:24px;border:1px solid #ddd;border-radius:16px"><h1 style="color:'+(valid?'#087443':'#b42318')+'">'+(valid?'Valid document':'Invalid document')+'</h1><p><b>School:</b> '+esc(school?.name)+'</p><p><b>Student:</b> '+esc(studentName||'—')+'</p><p><b>Document type:</b> '+esc(doc.document_type)+'</p><p><b>Issue date:</b> '+esc(new Date(doc.status==='final'?doc.updated_at:doc.created_at).toISOString().slice(0,10))+'</p><p>This page confirms document status only.</p></main></html>');
+});
 
 apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
@@ -7881,7 +7924,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const title = typeof body.title === 'string' ? body.title.trim().slice(0,180) : '';
   const documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
-  const pageSize = ['A4','A5','Letter'].includes(body.pageSize) ? body.pageSize : 'A4';
+  const pageSize = ['A4','A5','Letter','CR80'].includes(body.pageSize) ? body.pageSize : 'A4';
   let templateId: string | null = null;
   const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
   const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
@@ -7893,9 +7936,13 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
     if (!template) { res.status(404).json({ error: 'Template-ka lama helin dugsigan.' }); return; }
     templateId = template.id;
   }
+  const verificationToken=randomUUID();
+  const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
   const { data, error } = await client.from('school_documents').insert({
     school_id: school.id, title, document_type: documentType, status: 'draft', template_id:templateId,
-    content_html: contentHtml, page_size: pageSize, direction, page_margins: pageMargins,
+    content_html: sanitizeDocumentHtml(contentHtml+verificationBlock), page_size: pageSize, direction, page_margins: pageMargins,
+    serial_number:serialNumber, verification_token:verificationToken,
     created_by: user.id, updated_by: user.id
   }).select('*').single();
   if (error || !data) { res.status(503).json({ error: 'Dukumentiga lama abuuri karin.' }); return; }
@@ -7923,13 +7970,25 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
   if (body.status === 'final') { updates.status = 'final'; updates.locked_at = new Date().toISOString(); updates.locked_by = user.id; updates.lock_reason = 'Final document'; }
   else if (body.status === 'draft') { updates.status = 'draft'; }
-  if (['A4','A5','Letter'].includes(body.pageSize)) updates.page_size = body.pageSize;
+  if (['A4','A5','Letter','CR80'].includes(body.pageSize)) updates.page_size = body.pageSize;
   if (['ltr','rtl'].includes(body.direction)) updates.direction = body.direction;
   if (Number.isInteger(body.pageMargins)) updates.page_margins = Math.min(40,Math.max(5,body.pageMargins));
   const { data, error } = await client.from('school_documents').update(updates)
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin ama lama kaydin karin.' }); return; }
+  if(body.status==='final') await client.from('school_document_audit_events').insert({school_id:school.id,document_id:data.id,actor_user_id:user.id,action:'document_issued',details:{serialNumber:data.serial_number||null,title:data.title}});
   res.json(documentClientRow(data,true));
+});
+
+apiRouter.post('/documents/:id/download-audit', requireAuth, requireSchoolContext, async (req,res)=>{
+  const school=(req as any).school as School;const user=(req as any).user as User;
+  const client=documentServiceClient(res);if(!client)return;
+  const {data:document}=await client.from('school_documents').select('id,title,serial_number').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if(!document){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
+  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}
+  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
+  if(error){res.status(503).json({error:'Diiwaanka download-ka lama kaydin karin.'});return;}
+  res.json({success:true});
 });
 
 apiRouter.delete('/documents/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -7962,11 +8021,15 @@ apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, re
   const { data: original, error: readError } = await client.from('school_documents').select('*')
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if (readError || !original) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  const verificationToken=randomUUID();
+  const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
   const { data, error } = await client.from('school_documents').insert({
     school_id:school.id, title:(original.title + ' — nuqul').slice(0,180), document_type:original.document_type,
-    status:'draft', content_html:original.content_html, page_size:original.page_size, direction:original.direction,
+    status:'draft', content_html:sanitizeDocumentHtml(original.content_html+verificationBlock), page_size:original.page_size, direction:original.direction,
     page_margins:original.page_margins, template_id:original.template_id, student_id:original.student_id,
-    class_id:original.class_id, created_by:user.id, updated_by:user.id
+    class_id:original.class_id, serial_number:serialNumber, verification_token:verificationToken,
+    created_by:user.id, updated_by:user.id
   }).select('*').single();
   if (error || !data) { res.status(503).json({ error: 'Nuqulka dukumentiga lama samayn karin.' }); return; }
   res.status(201).json(documentClientRow(data,true));
@@ -8172,8 +8235,10 @@ apiRouter.get('/document-templates', requireAuth, requireSchoolContext, requireS
   const school = (req as any).school as School;
   const client = documentServiceClient(res);
   if (!client) return;
-  const { data, error } = await client.from('school_document_templates').select('id,title,document_type,content_html,updated_at')
-    .eq('school_id',school.id).is('deleted_at',null).order('updated_at',{ascending:false}).limit(100);
+  let templateQuery = client.from('school_document_templates').select('id,title,document_type,content_html,updated_at,deleted_at')
+    .eq('school_id',school.id);
+  if (req.query.includeArchived !== 'true') templateQuery = templateQuery.is('deleted_at',null);
+  const { data, error } = await templateQuery.order('updated_at',{ascending:false}).limit(100);
   if (error) { res.status(503).json({ error: 'Templates-ka lama soo dejin karin.' }); return; }
   res.json((data || []).map(documentTemplateClientRow));
 });
@@ -8223,6 +8288,19 @@ apiRouter.delete('/document-templates/:id', requireAuth, requireSchoolContext, r
   res.json({ success:true });
 });
 
+
+apiRouter.post('/document-templates/:id/restore', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('school_document_templates')
+    .update({ deleted_at:null, deleted_by:null, updated_by:user.id, updated_at:new Date().toISOString() })
+    .eq('school_id',school.id).eq('id',req.params.id).not('deleted_at','is',null).select('id').maybeSingle();
+  if (error || !data) { res.status(404).json({ error: 'Template-ka kaydsan lama soo celin karin.' }); return; }
+  res.json({ success:true });
+});
+
 apiRouter.post('/document-templates/:id/duplicate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -8266,8 +8344,23 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
   }
   if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
   const klass = await db.getClassById(student.classId,school.id);
-  const teacherName = klass?.classTeacherId
-    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
+  const teacher = klass?.classTeacherId
+    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0]
+    : null;
+  const teacherName = teacher?.fullName || '';
+  const annualDocument = /annual|sanad-dugsiyeedka/i.test(templateHtml);
+  const marks = klass ? await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester) : [];
+  const academic = summarizeDocumentAcademicMarks(marks,student.id,school.gradingScale);
+  const payments = templateHtml.includes('{fee_balance}') ? await db.getFeePayments(school.id,student.id) : [];
+  const feeBalance = payments.filter(payment=>!payment.voidedAt).reduce((sum,payment)=>sum + Number(payment.remainingAmount || 0),0);
+  const attendanceRecords = templateHtml.includes('{attendance}') ? await db.getStudentAttendanceHistory(school.id,student.id) : [];
+  const attendanceStart = annualDocument ? school.terms?.semester1Start : school.currentSemester === 'Semester 1' ? school.terms?.semester1Start : school.terms?.semester2Start;
+  const attendanceEnd = annualDocument ? school.terms?.semester2End : school.currentSemester === 'Semester 1' ? school.terms?.semester1End : school.terms?.semester2End;
+  const attendance = attendanceStart && attendanceEnd
+    ? attendanceRecords.filter(record=>record.date >= attendanceStart && record.date <= attendanceEnd)
+    : attendanceRecords;
+  const attendancePercent = attendance.length
+    ? ((attendance.filter(record=>record.status==='present'||record.status==='late').length / attendance.length) * 100).toFixed(1) + '%'
     : '';
   let date = '';
   try { date = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
@@ -8277,7 +8370,12 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
     student_id:student.studentId,
     class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
     parent_name:student.fatherName || '', date, school_name:school.name || '',
-    teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+    teacher_name:teacherName, staff_name:teacherName, staff_id:teacher?.staffId || '',
+    term:school.currentSemester || '', academic_year:school.academicYear || '',
+    total_marks:academic.totalMarks, average:academic.average, grade:academic.grade,
+    rank:academic.rank, teacher_comment:academic.teacherComment,
+    fee_balance:templateHtml.includes('{fee_balance}') ? formatMoney(feeBalance,school.currency) : '',
+    attendance:attendancePercent
   });
   res.setHeader('Cache-Control','private, no-store');
   res.json({ html:sanitizeDocumentHtml(replaced.html), missing:replaced.missing, studentName:[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim() });
@@ -8308,7 +8406,23 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   if (typeof body.classId === 'string' && body.classId) {
     classRecord = await db.getClassById(body.classId,school.id);
     if (!classRecord) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
-    students = (await db.queryPage<Student>('students',{school_id:school.id,class_id:classRecord.id},1,100,undefined,'*','first_name',true)).items;
+    // Fetch every page of this school-scoped class roster. Never silently
+    // truncate class generation at the database page-size boundary.
+    try {
+      students = await collectPagedItems(
+        (page, pageSize) => db.queryPage<Student>(
+          'students', { school_id:school.id, class_id:classRecord!.id },
+          page, pageSize, undefined, '*', 'first_name', true
+        ),
+        { pageSize:100, maxItems:5000 }
+      );
+    } catch (error) {
+      if (error instanceof RangeError) {
+        res.status(413).json({ error: 'Fasalkan wuxuu ka badan yahay xadka 5,000 arday ee hal hawl. Kala qaybi fasalka ka hor samaynta dukumentiyada.' });
+        return;
+      }
+      throw error;
+    }
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
     for (const rawId of body.studentIds) {
       if (typeof rawId !== 'string') continue;
@@ -8326,29 +8440,95 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   let today = '';
   try { today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   catch { today = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
-  const teacherName = classRecord?.classTeacherId
-    ? (await db.queryPage<any>('teachers',{school_id:school.id,id:classRecord.classTeacherId},1,1,undefined,'id,full_name')).items[0]?.fullName || ''
-    : '';
+  const classesById = new Map<string,SchoolClass>();
+  if (classRecord) classesById.set(classRecord.id,classRecord);
+  for (const classId of new Set(students.map(student=>student.classId))) {
+    if (!classesById.has(classId)) {
+      const klass = await db.getClassById(classId,school.id);
+      if (klass) classesById.set(classId,klass);
+    }
+  }
+  const marksByClass = new Map<string,any[]>();
+  const teacherByClass = new Map<string,{name:string;staffId:string}>();
+  for (const klass of classesById.values()) {
+    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester));
+    if (klass.classTeacherId) {
+      const teacher = (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0];
+      teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
+    }
+  }
+  const feeBalanceByStudent = new Map<string,number>();
+  if (templateHtml.includes('{fee_balance}')) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const payments = await collectPagedItems(
+      (page,pageSize) => db.queryPage<any>('fee_payments',{school_id:school.id,student_id:studentIds},page,pageSize,undefined,'id,student_id,remaining_amount,voided_at'),
+      { pageSize:100, maxItems:50000 }
+    );
+    for (const payment of payments) {
+      if (payment.voidedAt) continue;
+      feeBalanceByStudent.set(payment.studentId,(feeBalanceByStudent.get(payment.studentId)||0) + Number(payment.remainingAmount || 0));
+    }
+  }
+  const attendanceByStudent = new Map<string,{present:number;total:number}>();
+  if (templateHtml.includes('{attendance}')) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const records = await collectPagedItems(
+      (page,pageSize) => db.queryPage<any>('attendance_records',{school_id:school.id,student_id:studentIds},page,pageSize,undefined,'id,student_id,status'),
+      { pageSize:100, maxItems:50000 }
+    );
+    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+    const attendanceStart = annualDocument ? school.terms?.semester1Start : school.currentSemester === 'Semester 1' ? school.terms?.semester1Start : school.terms?.semester2Start;
+    const attendanceEnd = annualDocument ? school.terms?.semester2End : school.currentSemester === 'Semester 1' ? school.terms?.semester1End : school.terms?.semester2End;
+    for (const record of records) {
+      if (attendanceStart && attendanceEnd && (record.date < attendanceStart || record.date > attendanceEnd)) continue;
+      const summary = attendanceByStudent.get(record.studentId) || {present:0,total:0};
+      summary.total += 1;
+      if (record.status==='present'||record.status==='late') summary.present += 1;
+      attendanceByStudent.set(record.studentId,summary);
+    }
+  }
   const rows: Record<string,unknown>[] = [];
   const warnings: Array<{studentName:string;missing:string[]}> = [];
   for (const student of students) {
-    const klass = classRecord || await db.getClassById(student.classId,school.id);
+    const klass = classesById.get(student.classId) || classRecord;
     const studentName = [student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ').trim();
+    const teacher = klass ? teacherByClass.get(klass.id) : undefined;
+    const academic = summarizeDocumentAcademicMarks(klass ? marksByClass.get(klass.id) || [] : [],student.id,school.gradingScale);
+    const attendance = attendanceByStudent.get(student.id);
+    const attendancePercent = attendance && attendance.total
+      ? ((attendance.present / attendance.total) * 100).toFixed(1) + '%'
+      : '';
+    const feeBalance = feeBalanceByStudent.get(student.id) || 0;
     const values = {
       student_name:studentName, student_id:student.studentId,
       class:klass ? [klass.name,klass.section].filter(Boolean).join(' ') : '',
       parent_name:student.fatherName || '', date:today, school_name:school.name || '',
-      teacher_name:teacherName, term:school.currentSemester || '', academic_year:school.academicYear || ''
+      teacher_name:teacher?.name || '', staff_name:teacher?.name || '', staff_id:teacher?.staffId || '',
+      term:school.currentSemester || '', academic_year:school.academicYear || '',
+      total_marks:academic.totalMarks, average:academic.average, grade:academic.grade,
+      rank:academic.rank, teacher_comment:academic.teacherComment,
+      fee_balance:templateHtml.includes('{fee_balance}') ? formatMoney(feeBalance,school.currency) : '',
+      attendance:attendancePercent
     };
     const replaced = replaceDocumentVariables(templateHtml,values);
     const safeHtml = sanitizeDocumentHtml(replaced.html);
     if (replaced.missing.length) warnings.push({studentName:studentName || student.studentId,missing:replaced.missing});
     const generatedTitle = titleTemplate.replace(/\{([a-z][a-z0-9_]*)\}/gi,(_match:string,key:string) => String((values as any)[key] || '')) + ' — ' + (studentName || student.studentId);
+    const verificationToken=randomUUID();
+    const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
+    const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
     rows.push({
       school_id:school.id, title:generatedTitle.slice(0,180), document_type:documentType, status:'draft',
-      content_html:safeHtml, page_size:'A4', direction:'ltr', page_margins:20,
-      student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id
+      content_html:sanitizeDocumentHtml(safeHtml+verificationBlock), page_size:'A4', direction:'ltr', page_margins:20,
+      student_id:student.id, class_id:student.classId, template_id:templateDbId, created_by:user.id, updated_by:user.id,
+      serial_number:serialNumber, verification_token:verificationToken
     });
+  }
+  if (requiresDocumentGenerationConfirmation(warnings, body.confirmMissing === true)) {
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({ requiresConfirmation:true, documents:[], warnings });
+    return;
   }
   const { data, error } = await client.from('school_documents').insert(rows).select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins');
   if (error || !data) { res.status(503).json({ error: 'Dukumentiyada ardayda lama kaydin karin.' }); return; }

@@ -89,3 +89,192 @@ Updated: 2026-11-11
 - Added history restore, explicit school-role and user-specific sharing, audit log, final/manual lock and unlock, and private student attachment upload/download/soft-delete flows.
 - School-wide grants are limited to Teacher and Accountant; Parent/Student grants require a specific same-school user. Version history/audit are read-only to authenticated users; lock enforcement is in API and database trigger.
 - Phase 3 and its follow-up hardening migrations are applied to `school management 3`; see the Phase 1 status above for database and runtime verification.
+
+
+## Documents & Designer — specification audit (2026-11-15)
+
+Branch: `feature/documents-designer-finish` (based on current `main`). This audit is based on the existing Documents implementation, the Phase 1–3 migrations, and the current Documents tests. It does not claim browser or live authenticated tenant tests.
+
+### Initial checklist
+
+| Spec item | Initial status | Evidence / gap |
+|---|---|---|
+| A. Somali template library (all requested letters, certificates, ID cards, report cards, receipts, admit cards, class/attendance lists, timetable) | PARTIAL | Existing UI has six built-in templates (transfer, certificate, parent, teacher, clearance, report summary) and school-owned editable templates. The requested complete catalogue, certificate variants, front/back ID cards, full report cards, receipts/admit cards/class/attendance sheets are not present as built-ins. |
+| B. Five certificate / four ID / four letter / four report designs; school-brand styling; custom PNG/JPG/PDF backgrounds, page picker, DPI/file validation, metadata stripping, private storage | MISSING | Existing image upload supports PNG/JPEG/WebP only with a 1.5 MB cap. No evidence of the requested design catalogue, PDF.js page picker, DPI warning, metadata stripping, or full custom-background workflow. |
+| C. Visual drag-and-drop designer and all field/layer/editing controls | PARTIAL | Existing editor is contentEditable with text formatting, tables, image insertion, page breaks, RTL/LTR, A4/A5/Letter, and margins. It is not a positioned canvas designer and lacks field objects, drag/resize/rotate/align/snap/guides, nudge, zoom, lock/layers, duplicate/copy/paste, undo/redo, QR/barcode/signature/stamp/marks fields, CR80/custom mm, bleed/safe area, and sample-data preview. |
+| D. Complete variables, school-timezone date, ETB amounts, escaped text, missing-data warnings | PARTIAL | Existing variable replacement escapes text and reports missing/unknown variables; current set is limited to student, parent, class, school, teacher, term, year and date. Marks, grade, rank, attendance, staff, serial and ETB variables are not implemented. |
+| E. Single/selected/class batch PDF, ID-card A4 sheets/crop marks, ZIP, DOCX letters, embedded Somali/Arabic fonts, progress/cancel, serial + verification QR/public verify, duplicate linkage, issue log | PARTIAL | Existing generation supports one student or a whole class and class roster pagination; DOCX import/export exists. No complete PDF-per-student/ZIP/ID-sheet pipeline, serial/QR verification flow, public verify endpoint, issue log, or cancellable batch progress was found. Arabic font embedding is explicitly a remaining release gap. |
+| F. Template thumbnails, duplicate/edit/archive/restore; immutable issued snapshots; Draft/Final reopen flow | PARTIAL | Existing template list supports create/edit/duplicate/delete; document soft-delete/restore, version history and locking are implemented. Template thumbnail/archive-restore lifecycle and immutable issued-document/template-version binding need completion/verification. |
+| G. Required permission keys, teacher own-class scope, RLS/indexes/buckets, sanitization, PDF validation/limits, complete audit actions | PARTIAL | Existing RLS, school scoping, indexes, private image/attachment buckets, HTML allow-list sanitization, escaped variable text, version/audit triggers and lock enforcement exist. Named permission keys `templates_manage`, `documents_generate`, `documents_issue`, teacher own-class generation coverage, custom PDF/image validation, and upload/edit/generate/download/void/reopen audit completeness are not established. |
+| H. Query performance, on-open body fetch, 1.5s serialized autosave, font/asset cache, render stability | PARTIAL | Existing list queries are metadata-oriented, body is fetched on open, and autosave is debounced/serialized at about 1.5 seconds. Font/asset caching and full render/request profiling remain unverified. |
+
+### Work performed in this branch
+- Created the requested feature branch from the current `main`; no commits have been made to `main`.
+- No migrations were added or applied. No production database or existing records were changed.
+- The initial audit is recorded above; the post-change checklist remains the same until implementation commits are added.
+
+### Verification constraints and attempts
+- The execution container did not contain a Git checkout. `git remote -v` was attempted from the initial working directory and returned “not a git repository”.
+- A shallow clone of the exact canonical URL `https://github.com/Mohamedabdirahmon11/school-sos.git` was attempted; it failed before checkout because the container could not resolve `github.com` (DNS/network unavailable). Thus there is no local working tree in which to install dependencies, start the app, or run Playwright/PDF rendering.
+- GitHub connector access was used to inspect `PROJECT_STATE.md`, recent commits, Documents source files, migrations, and tests, and to create the isolated feature branch. Remote CI can still be triggered by the draft PR, but it cannot replace the requested local desktop/mobile and PDF-image visual checks.
+- No screenshot, generated PDF, Playwright result, authenticated cross-school test, or real upload round-trip is claimed by this audit.
+
+### Post-change checklist
+- A: PARTIAL — unchanged; complete catalogue and specialized templates remain.
+- B: MISSING — unchanged; multi-design library and custom background pipeline remain.
+- C: PARTIAL — unchanged; positioned visual designer remains.
+- D: PARTIAL — unchanged; academic, staff, serial and ETB variables remain.
+- E: PARTIAL — unchanged; complete PDF/ZIP/QR/verification/issue pipeline remains.
+- F: PARTIAL — unchanged; template archive/restore and issued-version immutability need completion.
+- G: PARTIAL — unchanged; named permissions, teacher own-class policy proof, PDF validation and complete audit coverage remain.
+- H: PARTIAL — unchanged; font/asset caching and performance profiling remain.
+
+
+## Documents Designer continuation — 2026-11-16
+
+### Changes made on `feature/documents-designer-finish`
+- Expanded the local built-in Somali template catalogue from six entries to 44 entries covering transfer/replacement/admission/withdrawal letters, parent notices, discipline and absence notices, fee reminders, teacher appointment/experience/leave/recommendation, exam results, certificate types and visual variants, student/teacher/staff ID examples, term/annual report layouts, payment receipts, exam admit cards, class lists, attendance sheets and exam timetable layouts. Built-ins can be duplicated into a school-owned editable template using the existing flow.
+- Corrected a malformed paragraph in one sports certificate template.
+- Fixed a real class-generation truncation defect: the API previously fetched only the first 100 students. It now collects the complete school-scoped class roster in bounded pages and returns HTTP 413 instead of silently truncating classes above 5,000 students.
+- Added `src/lib/documents/paged-query.ts`, a bounded generic pagination helper, and `tests/documents-paged-query.test.ts` with cases for 40 students, 245 students across three pages, over-limit rejection, and an incomplete-page failure.
+- No schema changes or migrations were needed for these changes because the new built-in templates intentionally reuse the existing allowed document-type values. No database was modified.
+
+### Checklist update
+- A. Template catalogue: **DONE for catalogue coverage**; every named template family now has a built-in entry. Specialized dynamic table rendering and per-template real-data validation remain tracked under C/D/E.
+- B. Built-in design choices: **PARTIAL**; the catalogue now contains at least five certificate layouts, four ID examples, four letter layouts and four report layouts. Custom PNG/JPG/PDF background upload, PDF.js page selection, DPI validation, metadata stripping and full per-card front/back composition remain missing.
+- C. Visual designer: **PARTIAL**; existing rich-text editor remains, but the positioned canvas and field/layer operations are still absent.
+- D. Variables: **PARTIAL**; escaped text and missing-variable warnings remain. New template examples include academic/financial tokens that are not yet populated by the API, so they intentionally appear in the missing-data warning until their data sources are implemented.
+- E. Generation/export/verification: **PARTIAL**; whole-class generation now paginates past 100 and has a tested 5,000-student safety ceiling. Serial/QR verification, public verify endpoint, per-student PDF/ZIP export, batch progress/cancel and embedded Arabic font are still missing.
+- F. Management: **PARTIAL**; existing template duplicate/edit and document version/lock flows remain. Template archive/restore and immutable issued-template snapshots still need completion.
+- G. Security: **PARTIAL**; existing school scoping and sanitizer remain. Explicit permission keys, teacher-owned-class generation, strict custom background PDF validation, and complete audit event coverage still need work.
+- H. Performance: **PARTIAL**; on-open content fetch and debounced autosave remain. Font/asset caching and profiling are not verified.
+
+### Verification status for this continuation
+- GitHub file writes succeeded on the feature branch; each source file was re-fetched before update and updated by its current blob SHA.
+- Added pagination tests are committed but **not executed**. Local `git remote -v` was attempted from `/` and failed with `fatal: not a git repository`; a fresh shallow clone of the exact repository URL again failed with `Could not resolve host: github.com`.
+- No local TypeScript check, full test suite, Playwright desktop/mobile run, PDF generation/render inspection, authenticated two-school RLS test, or real Storage round-trip has been run in this environment. No passing result is claimed.
+- No migrations were added or applied; production Supabase and existing records remain untouched.
+
+
+### Follow-up hardening and CI verification — 2026-11-16
+- Extracted school-brand styling into `src/lib/documents/brand-color.ts`. Built-in templates now use the school's saved six-digit hex brand color for accents when documents are created, previewed and generated. If the brand color is too light for readable text on white, the helper keeps the brand color for accents and uses dark slate for text.
+- Added `tests/documents-brand-color.test.ts` for valid colors, low-contrast colors and invalid-color fallback.
+- GitHub Actions run **43828702045** completed successfully for the feature branch: `npm run typecheck:ci` PASS; full test suite **371 tests / 371 pass / 0 fail**; route parity audit PASS; RLS source audit PASS (static source audit covering 66 declared tables); production Vite build PASS.
+- The CI RLS audit is static source inspection, not an authenticated live Supabase cross-school read/write test. CI does not perform the requested Playwright desktop/mobile run or PDF-to-PNG visual inspection.
+- New source files in this continuation: `src/lib/documents/paged-query.ts`, `src/lib/documents/brand-color.ts`; new tests: `tests/documents-paged-query.test.ts`, `tests/documents-brand-color.test.ts`.
+- Local desktop/mobile browser journeys, visual inspection of every generated template/design, real upload/download, live authenticated tenant isolation, PDF embedded Arabic font verification, and batch cancellation remain unverified due the local checkout/network limitation.
+
+
+### Document variable resolution follow-up — 2026-11-16
+- Added `src/lib/documents/academic-variables.ts` to summarize only approved student marks, compute total marks/average/grade, calculate deterministic class rank and choose the latest non-empty teacher remark.
+- Document preview/generation now resolves `total_marks`, `average`, `grade`, `rank`, `teacher_comment`, `staff_name`, `staff_id`, `fee_balance` and `attendance`. Fee balance sums non-voided remaining fee amounts and uses the school's configured currency (ETB fallback). Attendance counts present/late records in the selected semester when school term dates exist; annual report templates use both semesters. If term dates are not configured, attendance falls back to the student's available attendance history.
+- Updated the editor variable picker and template help text to expose the newly supported variables.
+- Added three unit tests for approved-mark aggregation, ignoring draft marks and deterministic class ranking.
+- Latest GitHub Actions run **43829647841** completed successfully after the variable and term-scope changes: TypeScript checks PASS, full test suite PASS (**374 tests, 0 failures**), route parity PASS, static RLS source audit PASS, and production build PASS.
+- Still unresolved variable/data fields include payment transaction amount, persistent document serial number, and QR verification; these need the issuing/verification data model and are not replaced with invented values.
+
+- Final documentation-sync CI run **43829834131** also completed successfully on the latest branch head: **374/374 tests, 0 failures**, TypeScript checks, route parity, static RLS source audit (66 declared tables), and production build all PASS.
+
+
+### Template archive/restore continuation — 2026-11-16
+- Added an explicit archived-template view to the school-scoped Documents template manager. Existing soft-delete fields are reused: archiving sets `deleted_at/deleted_by`; the archived list is only returned when the authenticated school admin requests `includeArchived=true`.
+- Added an authenticated, school-scoped restore endpoint that clears the archive markers and updates the actor/timestamp. The UI disables editing/selection for archived templates and offers a Restore action. The existing database unique active-title index remains authoritative; restoring a name that has since been reused returns a safe failure rather than creating duplicate active names.
+- Updated the API client and template manager. No migration or production database change was needed.
+- GitHub Actions run **43832180602** completed successfully on commit `1baf955a9cad27a98623a96e0a6e917672a16bff`: TypeScript checks PASS, test suite PASS, route parity PASS, static RLS source audit PASS, production build PASS.
+- This is a completed part of template lifecycle management, not completion of the entire Designer specification. Immutable issued-template snapshots, visual canvas/layer tools, custom artwork/PDF backgrounds, PDF/ZIP/QR issuance, named permissions and live browser/tenant/storage checks remain open.
+- Follow-up review caught and fixed the template response mapper so archived timestamps are returned to the UI; without this field, the archive view could not distinguish archived rows. The correction is committed as `1a3701ef30e4459bcc0f758d0ad0d90fda301b6b` and awaits its own CI result.
+- After exposing `deletedAt` in the template API mapper, latest GitHub Actions run **43832651841** completed successfully on commit `e2f6fb6d944e243b49790c6c07bc222b8d420d0b`: TypeScript checks, test suite, route parity, static RLS source audit, and production build all PASS.
+
+
+## Documents Designer continuation — missing-data generation gate (2026-11-16)
+- Fixed a release-critical generation flow defect: previously, the API inserted all generated student documents and only then returned missing-variable warnings. The UI therefore warned after persistence, contrary to the requirement that missing data be shown before generation.
+- Added `requiresDocumentGenerationConfirmation` in `src/lib/documents/variables.ts`; its unit coverage verifies that missing fields require confirmation, complete data does not, and an explicit confirmation permits the batch.
+- The generation API now performs the full school-scoped batch resolution first and, when any student has missing values and `confirmMissing` is not true, returns `requiresConfirmation: true`, the affected-student warnings, and an empty documents list without inserting rows.
+- The Documents UI now displays a Somali confirmation dialog describing affected students and missing fields. Cancel leaves the database unchanged; confirm retries the same request with `confirmMissing: true`. Unresolved variable tokens continue to be removed by the escaped plain-text substitution helper rather than being emitted literally.
+- Changed files: `src/lib/documents/variables.ts`, `tests/documents-variables.test.ts`, `src/server/api.ts`, `src/components/documents/DocumentsView.tsx`. No migration or production database change.
+- GitHub source re-fetch confirms the API guard, UI confirmation path and test import are present on the feature branch. The test suite and browser flow have **not yet been executed** in a local checkout. The commit-triggered workflow lookup returned no run; do not treat prior CI success as validation of this new change.
+- Branch comparison at this point: feature branch is 35 commits ahead of main and 1 commit behind; the behind commit is the current main-line student-invoice work. Reconcile the branch with current main before PR merge, without force-pushing or modifying main directly.
+
+
+### Missing-data confirmation gate — CI verification (2026-11-16)
+- The generation safeguard is now covered by the feature-branch CI run **43833993320** on commit `dcc5ab71e5742ab9d9611b1ffa5f70b29f554255`.
+- Actual GitHub Actions job `Typecheck, tests, and production build` completed with conclusion `success`. Log output: `npm run typecheck:ci` PASS; `npm test`: **380 tests, 380 pass, 0 fail**; `npm run audit:routes` PASS; `npm run audit:rls` PASS (static source audit); `npm run build` PASS.
+- This run verifies the added missing-data helper test and TypeScript/build compatibility. It does not verify browser confirmation behavior, PDF rendering, real Supabase writes, or authenticated cross-school isolation.
+- The PR remains Draft because the remaining visual designer, custom artwork/PDF background pipeline, serial/QR public verification, batch PDF/ZIP, named permission enforcement and visual/live-tenant checks are still not complete.
+
+
+### Document verification implementation (2026-11-16)
+- Added additive migration `20261116120000_document_verification.sql` with unique per-document serial numbers and opaque UUID verification tokens; existing documents receive generated identifiers without changing their content.
+- Newly generated student documents receive a serial number, verification URL, and QR image reference.
+- Added a public verification HTML page and QR PNG endpoint. The page exposes only validity, school name, student name, document type, and issue date; deleted/missing documents return not found and draft documents are marked invalid.
+- Extended the document HTML sanitizer to allow only the exact UUID-scoped QR image route; added regression tests for accepted and rejected verification URLs.
+- Migration is additive and has not been applied to production. GitHub Actions CI must pass before this work is considered verified. Public URL generation uses `APP_BASE_URL` or `PUBLIC_APP_URL` when configured; otherwise it uses a relative same-origin path.
+
+- Follow-up: the private document artwork image upload cap is now 10 MB in the API, editor validation, and a new additive bucket migration. PDF artwork/page picking, PDF.js rendering, DPI inspection, and metadata stripping remain outstanding.
+- Serial/QR verification is now added to manually created, duplicated, and bulk-generated documents. Verification tokens are opaque UUIDs; the public page marks only Final documents valid and exposes the limited verification fields. The QR endpoint builds an absolute same-origin URL from configured APP_BASE_URL/PUBLIC_APP_URL or the request host.
+
+- Added a CR80 (85.6 × 54 mm) document page preset in the editor and print stylesheet, with additive DB constraints for current documents and their version snapshots. This is a single-card page preset only; A4 multi-card imposition/front-back sheet export is still outstanding.
+
+- Artwork follow-up: image uploads now warn when dimensions fall below an approximate 200 DPI target for A4/A5/Letter/CR80, reject images above 40 MP, and re-encode images in-browser before upload to strip EXIF/embedded metadata. This applies to PNG/JPEG/WebP; PDF backgrounds/page selection still need PDF.js work.
+
+- Audit follow-up: finalizing a document now records a `document_issued` event; using Print/PDF records a `document_download_requested` event after server-side school/permission checks. The UI blocks printing if the audit request cannot be recorded.
+
+- Latest GitHub Actions run for the current implementation set: `SchoolOS CI` run 43837423264 PASS — TypeScript checks, 383/383 tests, route parity audit, RLS source audit, and production build. This validates the current branch head before this documentation-only note; it does not replace browser/visual or live Supabase verification.
+
+
+### Public verification abuse protection — 2026-11-16
+- Added a bounded in-process rate limiter to both public document verification and QR image endpoints: 120 requests per client IP per 15-minute window, with HTTP 429 and Retry-After on excess requests.
+- The limiter bounds its key map and prunes expired entries to prevent unbounded memory growth.
+- Added deterministic unit tests for threshold behavior, expiry/reset, and key-map bounds.
+- Files: `src/lib/documents/verification-rate-limit.ts`, `src/server/api.ts`, `tests/documents-verification-rate-limit.test.ts`.
+- Limitation: this is per Node process; deployments with multiple app instances need a shared Redis/database limiter for a globally consistent quota. It is an additional abuse barrier, not a substitute for edge/WAF rate limiting.
+- CI run **43839661548** was triggered for this commit and is currently in progress; do not mark this change verified until it completes.
+
+
+### Verification endpoint hardening — 2026-11-16
+- Public verification routes and the HTML sanitizer now accept only canonical versioned UUID token syntax, preventing malformed UUID-shaped input from reaching the database UUID comparison.
+- Added a regression test for malformed 36-character tokens.
+- The prior rate-limit implementation commit passed GitHub Actions run **43839661548**: TypeScript, **386/386 tests**, route parity, static RLS audit, and production build all succeeded.
+- The canonical UUID hardening is newer than that CI run and is awaiting its own workflow result.
+
+
+### Latest CI result and merge blocker — 2026-11-16
+- PR workflow **43839972369** failed at TypeScript checks before tests/audits/build could run.
+- The reported syntax errors are all in `src/components/schooladmin/StudentInvoicesView.tsx` (around lines 156–175), which is a main-side file and is not among the feature branch's changed files. Do not modify that unrelated invoice page as part of the Documents task.
+- Current comparison: feature branch is 75 commits ahead and **7 commits behind** `main`; the histories have diverged. Reconciliation is required before merge, but should be done only after inspecting the seven main-only commits and resolving the existing main-side typecheck blocker without overwriting unrelated work.
+- The earlier run **43839661548** remains a valid pass for the rate-limiter commit (386/386 tests); it does not cover the newer canonical UUID hardening.
+- PR #181 remains Draft and unmerged. No production migration has been applied.
+
+
+### Documents editor interaction and audit follow-up — 2026-11-16
+- The rich-text editor now supports selecting an inserted image, changing its width (existing), rotating it by 0/90/180/-90 degrees, moving it forward/backward in a bounded layer stack, aligning it left/center/right, and nudging it with arrow keys (Shift = 10 px). Image positioning is clamped to ±500 px.
+- The sanitizer now permits only bounded rotation, relative positioning, small z-index values, safe offsets and simple alignment styles; unsupported transforms/absolute positioning/large offsets are stripped. Added sanitizer tests for accepted and rejected styles.
+- Selected-image outline is editor-only and removed from print output.
+- Successful private artwork uploads now create an artwork_uploaded audit event containing only object path, MIME type and byte size. If audit insertion fails, the just-uploaded object is removed and the API returns an error instead of silently losing the audit trail.
+- A CI run on the prior image-controls commit caught one sanitizer edge case (margin-right:0); the validator was corrected to allow the zero value. TypeScript had passed in that run; the full suite then failed only on this assertion. The latest upload-audit commit is awaiting a fresh CI result.
+- This is a richer image editing workflow, not a complete positioned canvas designer: freeform drag handles, text/QR/barcode/signature/stamp fields, guides/snapping, copy/paste and layer locking are still not implemented.
+- PDF backgrounds/PDF.js page selection, batch PDF/ZIP export, multi-card A4 imposition/crop marks, embedded Arabic font output, browser/PDF visual inspection and live authenticated cross-school tests remain release gates.
+
+
+### Production Documents migration and verification — 2026-11-16
+- Applied five additive migrations to Supabase project school management 3 (Frankfurt): document serial/verification columns and backfill, private artwork 10 MB limit, CR80 constraints, template audit trigger, and the INSERT-trigger guard.
+- Supabase migration history versions are 20261116095518, 20261116095523, 20261116095529, 20261116095534, and 20261116095746. Repository migration filenames were aligned to these exact versions so future migration pushes do not replay already-applied SQL.
+- Live SQL verification confirms serial_number and verification_token are NOT NULL; the existing document has both values; no duplicate serials; private artwork bucket is 10,485,760 bytes with PNG/JPEG/WebP; both page-size constraints include CR80; template audit trigger is enabled and invoker-security (not SECURITY DEFINER).
+- Ran a production smoke test that inserted a temporary template, confirmed template_created and template_deleted audit events, and removed the temporary template and its test audit rows in the same SQL block. It left no test rows behind.
+- GitHub Actions run 43844538623 passed on the migration filename + trigger guard head: TypeScript PASS, 389/389 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
+- Supabase Security Advisor continues to show an existing no-policy notice for public.school_student_id_sequences and leaked-password protection disabled. Performance Advisor shows five unindexed foreign keys in invoice-related tables and unused-index notices. These are not Documents migration regressions and were not modified here.
+- Still outstanding from the full original Documents specification: PDF backgrounds/PDF.js page picker, full freeform canvas/field controls and guides, PDF/ZIP batch exports and A4 ID-card imposition/crop marks, embedded Arabic font output, explicit permission-key/teacher class-scope enforcement, immutable issued-template version binding, and browser/PDF visual plus live cross-school tests. Do not represent these as complete.
+
+
+### Positioned field editor controls — 2026-11-16
+- Added positioned text fields for student name/ID, class, school and date variables. Fields have a dedicated drag handle, bounded absolute placement, 10 px snap-to-grid (toggleable), optional grid guides, keyboard nudge (Alt+Arrow; Shift = 10 px), rotation, layer ordering, lock toggle, and CSS resize handles.
+- Fields are explicitly marked in stored HTML. The shared sanitizer permits absolute positioning only when both the positioned-field marker and approved field class are present; arbitrary absolute-positioned HTML is stripped. Only approved data attributes, classes and bounded transform/offset values survive sanitization.
+- Added regression tests for positioned-field sanitization and invalid positioning.
+- GitHub Actions run 43845093679 passed on commit e058abbbe7971b6f3b9352ffda4e8cc4eb155fc9: TypeScript PASS, 391/391 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
+- Image editing also supports width, rotate, alignment, bounded layer order and arrow-key nudging; artwork upload audit is recorded transactionally with cleanup on audit failure.
+- This is a functional positioned-field layer within the existing rich-text editor, not yet the full requested design suite. Copy/paste/duplicate, arbitrary object types (QR/barcode/signature/stamp), PDF background/PDF.js page selection, PDF/ZIP batch exports, A4 multi-ID sheets/crop marks, embedded Arabic font export, and real browser/PDF visual checks remain open.
+
+
+### Positioned field duplication — 2026-11-16
+- Added a toolbar action and Ctrl/Cmd+D shortcut to duplicate the selected positioned field, offsetting the copy and assigning a higher layer order. Native clipboard copy/paste remains available in the contenteditable surface.
+- Latest CI run 43845390251 passed after the positioned field and duplicate changes: TypeScript PASS, 391/391 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
