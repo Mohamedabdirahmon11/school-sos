@@ -72,7 +72,7 @@ test('accountant payroll runs are unique per staff and month, progress through a
   const nonLoginPayroll = await fetch(`${baseUrl}/payroll`, { method: 'POST', headers: accountantHeaders, body: JSON.stringify({ month: '2026-11', staff: [{ staffId: nonLoginStaff.id, baseSalary: 500, allowances: [], deductions: [] }] }) });
   assert.equal(nonLoginPayroll.status, 201, await nonLoginPayroll.clone().text());
   const [nonLoginRecord] = await nonLoginPayroll.json() as any[];
-  assert.equal(nonLoginRecord.userId, null); assert.equal(nonLoginRecord.balanceDue, 500);
+  assert.ok(!nonLoginRecord.userId); assert.equal(nonLoginRecord.balanceDue, 500);
 
   const approve = await fetch(`${baseUrl}/payroll/${record.id}/approve`, { method: 'POST', headers: accountantHeaders });
   assert.equal(approve.status, 200); assert.equal((await approve.json() as any).status, 'approved');
