@@ -52,6 +52,11 @@ test('invoice generation uses only active students and respects class/grade fee 
 test('invoice payment uses an atomic database RPC and returns a linked receipt', () => {
   const source = route('post', '/student-invoices/:id/pay');
   assert.match(source, /schoolos_apply_student_invoice_payment/);
+  assert.match(source, /confirmedReceived=req\.body\?\.confirmedReceived===true/);
+  assert.match(source, /school must confirm that the payment was received/);
+  assert.match(view, /Only use this form after the school has actually received the money/);
+  assert.match(view, /I confirm that the school has received this payment or verified the transfer/);
+  assert.doesNotMatch(view, /Stripe|PayPal|checkout session/i);
   assert.match(source, /p_idempotency_key:idempotencyKey/);
   assert.match(source, /STUDENT_INVOICE_PAYMENT_RECORDED/);
   assert.match(migration, /invoice_id VARCHAR\(64\)[\s\S]{0,100}REFERENCES student_invoices\(id\)/);
