@@ -247,10 +247,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           </div>
         </section>)}
 
-      </nav>
-
-      </nav>
-
         <div className="mt-5 border-t border-white/10 pt-3">
           <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
             <Languages size={15} aria-hidden="true" />
@@ -270,6 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           </button>
 
         </div>
+      </nav>
 
       {school?.sidebarTheme?.showUserCard !== false && <div className={`shrink-0 border-t border-white/10 bg-black/10 px-3 py-3`}>
         <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
