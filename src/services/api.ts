@@ -1406,8 +1406,12 @@ export class ApiClient {
     return result;
   }
 
-  public static async getMessages(params?: any) {
-    return this.request<any[]>(`/messages${this.pageQuery(params)}`);
+  public static async getMessages(params?: { page?: number; pageSize?: number; contactId?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.contactId) query.set('contactId', params.contactId);
+    return this.request<any[]>(`/messages?${query.toString()}`);
   }
 
   public static async getMessageContacts() {
