@@ -287,7 +287,7 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_report_cards' && (
               <ReportCardsView />
             )}
-            {activeView === 'sch_documents' && ['school_admin','super_admin'].includes(user.role) && (
+            {activeView === 'sch_documents' && ['school_admin','super_admin','teacher','accountant'].includes(user.role) && (
               <DocumentsView />
             )}
             {activeView === 'sch_admissions' && (
