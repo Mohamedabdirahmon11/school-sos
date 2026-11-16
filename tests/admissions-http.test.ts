@@ -502,7 +502,7 @@ test('concurrent attendance submissions converge on one daily row without automa
 });
 
 
-test('teacher can be created with a strong password when no PIN is supplied', async () => {
+test('teacher password-only account creation is rejected because teachers use ID and PIN', async () => {
   const response = await fetch(`${baseUrl}/teachers`, {
     method: 'POST', headers,
     body: JSON.stringify({
@@ -511,14 +511,8 @@ test('teacher can be created with a strong password when no PIN is supplied', as
       qualification: 'B.Ed'
     })
   });
-  assert.equal(response.status, 201, await response.clone().text());
-  const teacher = await response.json();
-  assert.match(teacher.staffId, /^T\d{3,}$/);
-  assert.equal(teacher.initialPin, '');
-  const account = await storage.db.getUserById(teacher.userId, school.id);
-  const { verifyPassword } = await import('../src/server/auth-security.ts');
-  assert.ok(account?.passwordHash && verifyPassword('TeacherPass905', account.passwordHash));
-  assert.equal(account?.pin, undefined);
+  assert.equal(response.status, 400, await response.clone().text());
+  assert.match((await response.json()).error, /PIN-only sign-in/);
 });
 
 test('teacher IDs are simple alphanumeric and teacher profile updates and PIN resets persist', async () => {
