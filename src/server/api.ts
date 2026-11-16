@@ -7623,7 +7623,7 @@ apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSc
 apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
   const rate=documentVerificationRateLimiter.consume('qr:'+String(req.ip||req.socket.remoteAddress||'unknown'));
   if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfterSeconds));res.setHeader('Cache-Control','no-store');res.status(429).json({error:'Codsiyo badan ayaa la diray. Mar kale isku day goor dambe.'});return;}
-  const token=String(req.params.token||''); if(!/^[0-9a-f-]{36}$/i.test(token)){res.status(404).end();return;}
+  const token=String(req.params.token||''); if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)){res.status(404).end();return;}
   const client=documentServiceClient(res);if(!client)return;
   const {data}=await client.from('school_documents').select('verification_token').eq('verification_token',token).is('deleted_at',null).maybeSingle();
   if(!data){res.status(404).end();return;}
@@ -7635,7 +7635,7 @@ apiRouter.get('/public/document-verification/:token/qr', async (req,res) => {
 apiRouter.get('/public/document-verification/:token', async (req,res) => {
   const rate=documentVerificationRateLimiter.consume('page:'+String(req.ip||req.socket.remoteAddress||'unknown'));
   if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfterSeconds));res.setHeader('Cache-Control','no-store');res.status(429).type('html').send('<h1>Too many requests</h1><p>Please try again later.</p>');return;}
-  const token=String(req.params.token||'');if(!/^[0-9a-f-]{36}$/i.test(token)){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
+  const token=String(req.params.token||'');if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
   const client=documentServiceClient(res);if(!client)return;
   const {data:doc}=await client.from('school_documents').select('school_id,document_type,status,created_at,updated_at,student_id,deleted_at').eq('verification_token',token).maybeSingle();
   if(!doc||doc.deleted_at){res.status(404).type('html').send('<h1>Document not found</h1>');return;}
