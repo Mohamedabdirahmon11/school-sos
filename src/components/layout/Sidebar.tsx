@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('t_dashboard', t('dashboard'), LayoutDashboard), item('t_timetable', t('timetable'), CalendarDays),
       item('t_students', t('students'), GraduationCap), item('t_attendance', t('attendance'), CalendarCheck),
       item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', t('assignments'), FileCheck2), item('t_notices', noticeLabel, BellRing),
+      item('t_assignments', t('assignments'), FileCheck2), item('sch_documents', 'Dukumentiyada', FileText), item('t_notices', noticeLabel, BellRing),
       item('t_messages', t('messages'), MessageSquare), item('t_payslips', t('payroll_payslip'), Wallet)
     ] }];
     if (role === 'parent') return [{ title: 'Family', items: [
@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       item('st_messages', t('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
-      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard)] },
+      { title: 'Workspace', items: [item('acc_dashboard', t('dashboard'), LayoutDashboard), item('sch_documents', 'Dukumentiyada', FileText)] },
       { title: 'Daily operations', items: [
         { ...item('sch_fees', t('fees_payments'), CreditCard), permission: 'fees_manage' },
         { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },
