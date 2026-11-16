@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 className={`group relative flex min-h-11 w-full items-center gap-3 rounded-xl ${isCollapsed ? "justify-center px-2" : "px-3"} text-left text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`} style={active ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
-                <span aria-hidden="true" className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r ${active ? "" : "hidden"}`} style={active ? { backgroundColor: "var(--brand-color)" } : undefined}/>
+                <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--brand-color)" } : undefined}/>
                 <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-teal-100/65 group-hover:text-teal-100"}`} style={active ? { color: "var(--brand-foreground)" } : undefined}/>
                 <span className={`min-w-0 flex-1 truncate ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
                 {active && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCollapsed ? "hidden" : ""}`} style={{ backgroundColor: "var(--brand-foreground)" }}/>}
