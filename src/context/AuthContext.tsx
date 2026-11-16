@@ -158,9 +158,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const configuredColor = activeSchool?.brandColor || DEFAULT_BRAND_COLOR;
     const brandColor = /^#[0-9a-f]{6}$/i.test(configuredColor) ? configuredColor : DEFAULT_BRAND_COLOR;
-    document.documentElement.style.setProperty('--brand-color', brandColor);
-    document.documentElement.style.setProperty('--brand-foreground', getBrandForeground(brandColor));
-  }, [activeSchool?.id, activeSchool?.brandColor]);
+    const root = document.documentElement;
+    root.style.setProperty('--brand-color', brandColor);
+    root.style.setProperty('--brand-foreground', getBrandForeground(brandColor));
+
+    const theme = activeSchool?.sidebarTheme;
+    const presets: Record<string, string> = {
+      light: '#f8fafc',
+      dark: '#102c2a',
+      brand: '#102c2a',
+      gradient: 'linear-gradient(160deg, #102c2a 0%, #164e63 55%, #0f766e 100%)',
+      glass: 'rgba(15, 23, 42, 0.94)',
+      soft: '#eaf2f1'
+    };
+    const safeHex = (value: string | undefined, fallback: string) =>
+      value && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+    root.style.setProperty('--sidebar-background', theme ? (presets[theme.preset] || safeHex(theme.backgroundColor, '#102c2a')) : '#102c2a');
+    root.style.setProperty('--sidebar-text', safeHex(theme?.textColor, '#ffffff'));
+    root.style.setProperty('--sidebar-accent', safeHex(theme?.accentColor, brandColor));
+    root.style.setProperty('--sidebar-accent-foreground', getBrandForeground(safeHex(theme?.accentColor, brandColor)));
+    root.style.setProperty('--sidebar-width', `${Math.min(320, Math.max(240, theme?.width || 260))}px`);
+    root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
+    root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
+  }, [activeSchool?.id, activeSchool?.brandColor, activeSchool?.sidebarTheme]);
 
   useEffect(() => {
     if (activeSchool?.language && !ApiClient.hasLanguagePreference()) {

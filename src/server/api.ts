@@ -7732,6 +7732,10 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
     res.status(400).json({ error: error instanceof Error ? error.message : 'School settings are invalid.' });
     return;
   }
+  if (updates.sidebarTheme && user.role !== 'school_admin') {
+    res.status(403).json({ error: 'Only the School Admin can update sidebar appearance.' });
+    return;
+  }
   if (!Object.keys(updates).length) {
     res.status(400).json({ error: 'Provide at least one school setting to update.' });
     return;

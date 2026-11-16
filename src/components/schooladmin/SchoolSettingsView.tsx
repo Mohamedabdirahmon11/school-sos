@@ -14,6 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
+import { SidebarAppearanceSettings } from './SidebarAppearanceSettings.tsx';
 import {
   Building2,
   Palette,
@@ -78,9 +79,9 @@ const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPe
 const periodLengthForFinish = (start: string, finish: string, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
   Math.round((timeToMinutes(finish) - timeToMinutes(start) - (periods > breakAfterPeriod ? breakMinutes : 0)) / periods);
 
-export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' }> = ({ initialTab = 'identity' }) => {
-  const { school, isReadOnly, t, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup'>(initialTab);
+export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance' }> = ({ initialTab = 'identity' }) => {
+  const { school, user, isReadOnly, t, refreshUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance'>(initialTab);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -546,6 +547,15 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             <FileText className="w-3.5 h-3.5" />
             Report Card Designer
           </button>
+          {user?.role === 'school_admin' && (
+            <button type="button" onClick={() => setActiveTab('appearance')}
+              className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
+                activeTab === 'appearance' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
+              }`}>
+              <Palette className="w-3.5 h-3.5" />
+              Appearance
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab('backup')}
@@ -572,6 +582,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           <span>{error}</span>
         </div>
       )}
+
+      {activeTab === 'appearance' && user?.role === 'school_admin' && <SidebarAppearanceSettings />}
 
       {/* TAB 1: IDENTITY & BRANDING */}
       {activeTab === 'identity' && (

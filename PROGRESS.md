@@ -1,3 +1,14 @@
+## School sidebar navigation and appearance — in progress (2026-11-16)
+
+- IMPLEMENTED ON `feature/sidebar-theme`: The sidebar has its own English-default language preference (independent of school-wide app language) and can switch menu labels to Somali or Amharic; the preference is remembered per user. Existing menu permission filtering and route IDs are preserved.
+- IMPLEMENTED: searchable grouped navigation, desktop collapse/expand with per-user localStorage persistence, mobile drawer close-on-navigation, user profile/logout footer, tooltips for collapsed items, and responsive 260px/72px desktop widths.
+- IMPLEMENTED: School Admin-only Appearance tab with six presets plus Custom, live preview, custom background/text/accent colors, 12 accent swatches, active-item style, radius, density, icon style, group-label visibility, width, default collapsed state, font size, and logo/school-name/user-card visibility.
+- IMPLEMENTED: school-wide theme JSONB field, strict server-side Zod validation, 4.5:1 WCAG AA text/background contrast enforcement, allowlisted CSS-variable mapping, and existing school-settings audit logging. The theme is shared through the school record; each user's collapse preference remains personal.
+- ADDED: additive migration `20261116120000_school_sidebar_theme.sql` and validator regression tests for safe colors, enum values, width bounds, and contrast.
+- SECURITY/DEPLOYMENT: migration is committed to this feature branch only and has NOT been applied to Supabase production. Existing `/school/settings` route remains guarded by School Admin/Super Admin and school context; appearance UI is shown only to School Admin.
+- VERIFIED: GitHub Actions run 43880562110 passed TypeScript, all 393/393 tests, route parity audit, RLS source audit, and production build. No test failures. Browser screenshots at desktop/tablet/mobile, visual review, and live multi-user propagation remain unverified because no browser session/preview URL is available.
+- REMAINING FROM THE FULL ORIGINAL BRIEF: Arabic/RTL is not currently an enabled app language; nested navigation is not present in the current route model; visual browser screenshots and live cross-school runtime checks remain outstanding. Migration is not applied to production.
+
 ## School Admin directory and academic setup follow-up (2026-11-12)
 
 - IN REVIEW — PR #90: simple per-school student IDs (S001, S002, ...); School Admin student list uses 50 rows per page, supports an explicit whole-class A–Z mode only in the School Admin directory, and Parents & Contacts has a class filter and 50-row pagination. Attendance and other class screens retain normal pagination. Teacher Portal student roster is restricted to the teacher's Form Teacher class. Existing student IDs are not rewritten.

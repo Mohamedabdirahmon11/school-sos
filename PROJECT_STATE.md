@@ -2,6 +2,14 @@
 
 Updated: 2026-11-11
 
+## Sidebar navigation and appearance — in progress (2026-11-16)
+
+- Feature branch: `feature/sidebar-theme`; no changes have been merged to `main`.
+- Navigation defaults to English independently of the app language and exposes English/Somali/Amharic menu-label choices, remembered per user. Sidebar includes searchable grouped role navigation, remembered per-user collapse state, mobile drawer behavior, and profile/logout controls.
+- School Admin Appearance settings persist a validated theme JSON object on the school row, so the selected theme is shared with users of that school. Existing school-settings authorization and audit logging are reused.
+- Additive migration: `20261116120000_school_sidebar_theme.sql`. It has not been applied to production.
+- GitHub Actions run 43880562110 passed TypeScript, 393/393 tests, route parity, RLS source audit, and production build. Browser visuals and live cross-tenant runtime checks remain outstanding; the migration is not applied to production. See `PROGRESS.md` for exact scope.
+
 ## Next
 - Complete the Teacher workspace and faculty-management review in PR #82. Work only on gaps not already completed: audit and polish all teacher workflows (overview, timetable, attendance, class-wide exam marks and Form Teacher approval, homework/submissions, notices, direct messages, and teacher payslips/navigation); verify school-scoped data and role permissions; add only necessary additive Supabase migrations; and run CI plus desktop/mobile browser journeys. Do not repeat the completed Accountant work or the Teacher UI changes already present in PR #82.
 

@@ -306,6 +306,13 @@ export class ApiClient {
     });
   }
 
+  public static async updateSchoolSettings(settings: Partial<School>) {
+    return this.request<School>('/school/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+  }
+
   // Super Admin
   public static async getSettings() {
     return this.request<SuperAdminSettings>('/superadmin/settings');
