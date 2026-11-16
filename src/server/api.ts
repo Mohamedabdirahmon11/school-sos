@@ -7633,14 +7633,14 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) 
     .order('updated_at', { ascending: false })
     .limit(100);
   if (!hasDocumentAdminAccess(user)) query = query.in('id',allowedGrants.map(grant=>grant.document_id));
-  if (req.query.includeDeleted !== 'true') query = query.is('deleted_at', null);
+  if (!hasDocumentAdminAccess(user) || req.query.includeDeleted !== 'true') query = query.is('deleted_at', null);
   if (typeof req.query.search === 'string' && req.query.search.trim()) query = query.ilike('title', '%' + req.query.search.trim().slice(0,80) + '%');
   if (typeof req.query.type === 'string' && DOCUMENT_TYPES.has(req.query.type)) query = query.eq('document_type', req.query.type);
   if (typeof req.query.status === 'string' && ['draft','final'].includes(req.query.status)) query = query.eq('status', req.query.status);
   const { data, error } = await query;
   if (error) { res.status(503).json({ error: 'Liiska dukumentiyada lama soo dejin karin.' }); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json((data || []).map(row => ({...documentClientRow(row),canEdit:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_edit)})));
+  res.json((data || []).map(row => ({...documentClientRow(row),canEdit:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_edit),canDownload:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_download)})));
 });
 
 apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, res) => {
@@ -7653,7 +7653,7 @@ apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
   if (!await hasDocumentGrant(client,school.id,user,data.id,'view')) { res.status(403).json({error:'Ma lihid ogolaanshaha dukumentigan.'}); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json({...documentClientRow(data, true),canEdit:await hasDocumentGrant(client,school.id,user,data.id,'edit')});
+  res.json({...documentClientRow(data, true),canEdit:await hasDocumentGrant(client,school.id,user,data.id,'edit'),canDownload:await hasDocumentGrant(client,school.id,user,data.id,'download')});
 });
 
 apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -7774,6 +7774,8 @@ apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, 
   const roles=new Set(['teacher','accountant','parent','student']);
   if(Boolean(targetUserId)===Boolean(targetRole) || (targetRole && !roles.has(targetRole))){res.status(400).json({error:'Dooro hal user ID ama hal role oo sax ah.'});return;}
   const client=documentServiceClient(res);if(!client)return;
+  const {data:document}=await client.from('school_documents').select('id').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if(!document){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
   if(targetUserId){
     const {data:target}=await client.from('users').select('id,role').eq('school_id',school.id).eq('id',targetUserId).maybeSingle();
     if(!target){res.status(404).json({error:'User-kan kuma jiro dugsigan.'});return;}
