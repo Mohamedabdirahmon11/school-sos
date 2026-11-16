@@ -15,9 +15,6 @@ const makeBuiltin = (id:string, title:string, documentType:DocType, contentHtml:
   id, title, documentType, isBuiltin:true, contentHtml
 });
 
-const pageHeading = (title:string, subtitle:string) =>
-  '<div style="text-align:center;border-bottom:3px solid #0f766e;padding-bottom:12px;margin-bottom:18px"><h1 style="color:#0f766e;font-size:26px;margin:0">' + title + '</h1><p style="font-size:12px;margin:6px 0 0">{school_name}</p><p style="font-size:10px;margin:3px 0 0">' + subtitle + '</p></div>';
-
 const BUILTIN_TEMPLATES: TemplateRow[] = [
   makeBuiltin('builtin-transfer','Warqadda ka sii dhaafidda ardayga','transfer_letter',
     '<h2 style="text-align:center">WARQADDA KA SII DAAFIDDA ARDAYGA</h2><p>Taariikh: {date}</p><p>Ku: Cidda ay khusayso</p><p>Waxaan caddeynaynaa in <strong>{student_name}</strong>, aqoonsiga <strong>{student_id}</strong>, uu wax ka bartay fasalka <strong>{class}</strong> ee {school_name}.</p><p>Waalidka/masuulka: {parent_name}</p><p>Sanad-dugsiyeedka: {academic_year}</p><p>Fadlan ardayga u fududeeya sii wadashada waxbarashadiisa.</p><p>Mahadsanidiin.</p><p>Maamulaha dugsiga: __________________</p>'),
@@ -68,7 +65,7 @@ const BUILTIN_TEMPLATES: TemplateRow[] = [
   makeBuiltin('builtin-certificate-honor','Shahaadada ardayga sharafta leh','certificate',
     '<div style="text-align:center;border:4px double #92400e;padding:24px"><h1 style="color:#92400e">ARDAYGA SHARAFTA LEH</h1><h1>{student_name}</h1><p>Waxaa lagu aqoonsaday dadaal, anshax iyo waxqabad sare.</p><p>Fasal: {class} · Kaalin: {rank}</p><p>{school_name} · {date}</p><p>Saxiix: __________</p></div>'),
   makeBuiltin('builtin-certificate-sports','Shahaadada ciyaaraha','certificate',
-    '<h1 style="text-align:center">SHAHAADADA CIYAARAHA</h1><h2 style="text-align:center">{student_name}</h2><p style="text-align:center">Waxaa lagu maamuusayaa ka-qaybgal iyo waxqabad ciyaareed.</p><p style="text-align:center}>Nooca ciyaarta: __________________</p><p style="text-align:center">{school_name} · {date}</p><p style="text-align:center">Saxiix: __________</p>'),
+    '<h1 style="text-align:center">SHAHAADADA CIYAARAHA</h1><h2 style="text-align:center">{student_name}</h2><p style="text-align:center">Waxaa lagu maamuusayaa ka-qaybgal iyo waxqabad ciyaareed.</p><p style="text-align:center">Nooca ciyaarta: __________________</p><p style="text-align:center">{school_name} · {date}</p><p style="text-align:center">Saxiix: __________</p>'),
   makeBuiltin('builtin-certificate-quran','Shahaadada xifdiga Qur’aanka','certificate',
     '<h1 style="text-align:center">شهادة حفظ القرآن الكريم</h1><h2 style="text-align:center">{student_name}</h2><p style="text-align:center">Waxaa lagu guddoonsiinayaa shahaadadan xifdiga Qur’aanka Kariimka ah.</p><p style="text-align:center">Qaybta / Juz: __________________</p><p style="text-align:center">{school_name} · {date}</p><p style="text-align:center">Macallinka: __________</p>'),
   makeBuiltin('builtin-certificate-participation','Shahaadada ka-qaybgalka','certificate',
