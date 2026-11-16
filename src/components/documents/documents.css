@@ -44,3 +44,6 @@
   .document-page-break { break-after:page; page-break-after:always; border:0 !important; height:0 !important; margin:0 !important; }
   .document-editable,.document-editable * { print-color-adjust:exact !important; -webkit-print-color-adjust:exact !important; }
 }
+
+.document-editable img.document-image-selected { outline:2px solid #0f766e; outline-offset:2px; cursor:move; }
+@media print { .document-editable img.document-image-selected { outline:none !important; } }
