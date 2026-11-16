@@ -42,9 +42,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     if (role === 'teacher') {
       return [
         { id: 't_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 't_students', label: t('students'), icon: GraduationCap },
-        { id: 't_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 't_exam_results', label: 'Exam Results', icon: FileSpreadsheet }
+        { id: 't_timetable', label: t('timetable'), icon: CalendarCheck },
+        { id: 't_attendance', label: t('attendance'), icon: GraduationCap },
+        { id: 't_grades', label: 'Exam Marks', icon: FileSpreadsheet }
       ];
     }
     if (role === 'parent') {
