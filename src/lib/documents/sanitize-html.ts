@@ -3,13 +3,16 @@ const BLOCKED_BLOCKS = /<(script|style|iframe|object|embed|svg|math|form|input|v
 const VOID_TAGS = new Set(['br','hr','img']);
 
 function safeStyle(value: string): string {
-  const allowed = new Set(['color','background-color','font-size','font-family','font-weight','font-style','text-decoration','text-align','line-height','direction','width','height','max-width','border','border-color','border-width','border-style','vertical-align','padding','margin']);
+  const allowed = new Set(['color','background-color','font-size','font-family','font-weight','font-style','text-decoration','text-align','line-height','direction','width','height','max-width','border','border-color','border-width','border-style','vertical-align','padding','margin','transform','transform-origin','z-index']);
   return value.split(';').map((part) => {
     const index = part.indexOf(':');
     if (index < 1) return '';
     const name = part.slice(0,index).trim().toLowerCase();
     const content = part.slice(index+1).trim();
     if (!allowed.has(name) || !content || /url\s*\(|expression|javascript:|@import|[<>\\]/i.test(content)) return '';
+    if (name === 'transform' && !/^rotate\(-?(?:\d{1,3})deg\)$/i.test(content)) return '';
+    if (name === 'transform-origin' && !/^(center|top|bottom|left|right|center center)$/i.test(content)) return '';
+    if (name === 'z-index' && !/^-?\d{1,2}$/.test(content)) return '';
     if (name === 'font-size' && !/^(?:\d{1,2}(?:\.\d+)?)(?:px|pt|em|rem|%)$/i.test(content)) return '';
     if (name === 'text-align' && !/^(left|right|center|justify|start|end)$/i.test(content)) return '';
     if (name === 'direction' && !/^(ltr|rtl)$/i.test(content)) return '';
