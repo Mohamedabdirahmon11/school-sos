@@ -75,12 +75,12 @@ test('new school administrator temporary PINs are hashed and changed on first si
 });
 
 
-test('Super Admin, School Admin, and Accountant share one staff login and resolve dashboard role from the account', () => {
+test('Super Admin uses email/password separately while School Admin and Accountant use staff ID/PIN', () => {
   const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-  assert.match(apiSource, /const sharedAdminLogin = requestedRole === 'school_admin'\s*&& \(normalizedRole === 'super_admin' \|\| normalizedRole === 'school_admin' \|\| normalizedRole === 'accountant'\)/);
-  assert.doesNotMatch(apiSource, /const sharedAdminLogin[\s\S]{0,180}identifier\.includes\('@'\)/);
+  assert.match(apiSource, /const sharedAdminLogin = requestedRole === 'school_admin'\s*&& \(normalizedRole === 'school_admin' \|\| normalizedRole === 'accountant'\)/);
+  assert.doesNotMatch(apiSource, /normalizedRole === 'super_admin' \|\| normalizedRole === 'school_admin'/);
   const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
-  assert.match(loginSource, /Super Admin, School Admin, and Accountant use this same sign-in/);
+  assert.match(loginSource, /School Admin, Accountant, and Teacher sign in with their school-issued ID and PIN\. Super Admin uses email and password/);
 });
 
 
