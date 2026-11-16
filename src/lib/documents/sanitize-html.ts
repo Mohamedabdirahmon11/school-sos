@@ -19,7 +19,7 @@ function safeStyle(value: string): string {
 
 function safeUrl(value: string, image = false): string {
   const trimmed = value.trim();
-  if (image) return /^\/api\/(?:documents\/images\?path=[A-Za-z0-9%._/-]+|public\/document-verification\/[0-9a-f-]{36}\/qr)$/i.test(trimmed) ? trimmed : '';
+  if (image) return /^\/api\/(?:documents\/images\?path=[A-Za-z0-9%._/-]+|public\/document-verification\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/qr)$/i.test(trimmed) ? trimmed : '';
   if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) return trimmed;
   return '';
