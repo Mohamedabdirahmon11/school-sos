@@ -62,7 +62,7 @@ export const DocumentsView: React.FC = () => {
   const [previewMissing,setPreviewMissing] = useState<string[]>([]);
   const [previewStudent,setPreviewStudent] = useState('');
   const [message,setMessage] = useState('');
-  const savedSnapshot = useRef({title:'',html:'',direction:'ltr' as const,pageSize:'A4' as const,margins:20});
+  const savedSnapshot = useRef<{title:string;html:string;direction:'ltr'|'rtl';pageSize:'A4'|'A5'|'Letter';margins:number}>({title:'',html:'',direction:'ltr',pageSize:'A4',margins:20});
   const draftRef = useRef({title,html,direction,pageSize,margins});
   draftRef.current = {title,html,direction,pageSize,margins};
   const dirtyRef = useRef(false);
