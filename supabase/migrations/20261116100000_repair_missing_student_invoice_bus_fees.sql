@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_add_missing_student_invoice_bus_fee(
   p_fee_amount NUMERIC
 ) RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 DECLARE
