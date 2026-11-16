@@ -7753,7 +7753,21 @@ apiRouter.put('/school/settings', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const user = (req as any).user as User;
   let updates: Partial<School>;
   try {
-    updates = sanitizeSchoolSettings(req.body);
+    // A legacy/invalid WhatsApp number must not block an unrelated partial
+    // settings update (for example, saving the sidebar theme). If a client
+    // submits the unchanged stored number alongside other fields, leave that
+    // legacy value untouched and validate WhatsApp only when it is changed.
+    const settingsInput = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+      ? { ...req.body }
+      : req.body;
+    if (settingsInput && typeof settingsInput === 'object' && 'whatsappPhone' in settingsInput) {
+      const submittedPhone = (settingsInput as Record<string, unknown>).whatsappPhone;
+      const storedPhone = school.whatsappPhone;
+      if (submittedPhone === storedPhone || (submittedPhone === '' && !storedPhone)) {
+        delete (settingsInput as Record<string, unknown>).whatsappPhone;
+      }
+    }
+    updates = sanitizeSchoolSettings(settingsInput);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'School settings are invalid.' });
     return;
