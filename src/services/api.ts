@@ -1010,6 +1010,11 @@ export class ApiClient {
       body: JSON.stringify(data)
     });
   }
+  public static async updateTransportRoute(routeId: string, data: any) {
+    return this.request<any>(`/school/transport/${encodeURIComponent(routeId)}`, {
+      method: 'PATCH', body: JSON.stringify(data)
+    });
+  }
 
   public static async getInventoryItems() {
     return this.request<any[]>('/inventory');
