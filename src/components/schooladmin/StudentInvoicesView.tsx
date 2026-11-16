@@ -65,7 +65,7 @@ export const StudentInvoicesView: React.FC = () => {
         classId, billingPeriod: period.trim(), dueDate,
       });
       setLastReceiptId(null);
-      setNotice(`Created ${result.generatedCount} invoices. ${result.skippedExisting} duplicates and ${result.skippedNoFees} students without configured fees were skipped.`);
+      setNotice(`Created ${result.generatedCount} invoices. Added missing bus fees to ${result.busFeesAdded || 0} existing invoices. ${result.skippedExisting} duplicates and ${result.skippedNoFees} students without configured fees were skipped.`);
       setShowGenerate(false);
       await load.retry();
     } catch (error: any) {
