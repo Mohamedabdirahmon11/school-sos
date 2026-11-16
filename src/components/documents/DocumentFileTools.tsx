@@ -6,7 +6,7 @@ import { docxBlobToHtml, htmlToDocxBlob } from '../../lib/documents/docx.ts';
 import { escapeSpreadsheetHtml, rowsToCsv } from '../../lib/documents/spreadsheet.ts';
 
 type Props = { html:string; title:string; onImport:(html:string)=>void };
-const tableHtml=(rows:unknown[][])=>'<table><tbody>'+rows.map((row,index)=>'<tr>'+row.map(cell=>index===0?'<th>'+escapeSpreadsheetHtml(cell)+'</th>':'<td>'+escapeHtml(cell)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p><br></p>';
+const tableHtml=(rows:unknown[][])=>'<table><tbody>'+rows.map((row,index)=>'<tr>'+row.map(cell=>index===0?'<th>'+escapeSpreadsheetHtml(cell)+'</th>':'<td>'+escapeSpreadsheetHtml(cell)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p><br></p>';
 const download=(blob:Blob,name:string)=>{const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();URL.revokeObjectURL(url);};
 const baseName=(title:string)=>title.trim().replace(/[^a-z0-9_-]+/gi,'-').replace(/^-|-$/g,'').slice(0,60)||'school-document';
 
@@ -26,7 +26,7 @@ export const DocumentFileTools:React.FC<Props>=({html,title,onImport})=>{
         const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
         imported=workbook.SheetNames.map(name=>{
           const rows=XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name],{header:1,raw:false,defval:''});
-          return '<h2>'+escapeHtml(name)+'</h2>'+tableHtml(rows);
+          return '<h2>'+escapeSpreadsheetHtml(name)+'</h2>'+tableHtml(rows);
         }).join('');
       }else throw new Error('Fayl noocan ah lama taageero. Dooro DOCX, XLSX ama CSV.');
       if(!imported.trim())throw new Error('Faylka wax xog ah kuma jirto.');
