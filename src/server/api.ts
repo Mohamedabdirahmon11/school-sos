@@ -812,7 +812,7 @@ async function syncLinkedSupabaseAuthCredentials(
 }
 
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
-  if (!isSupabaseConfigured || !user.email || user.authUserId || !['super_admin', 'school_admin', 'accountant'].includes(user.role)) return;
+  if (!isSupabaseConfigured || !user.email || user.authUserId || user.role !== 'super_admin') return;
 
   const adminClient = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false }
