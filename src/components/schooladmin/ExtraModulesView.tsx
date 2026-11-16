@@ -50,7 +50,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [driverStaffId, setDriverStaffId] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [busAssignments, setBusAssignments] = useState<any[]>([]);
-  const [assignmentStudentId, setAssignmentStudentId] = useState('');
+  const [selectedBusStudentIds, setSelectedBusStudentIds] = useState<string[]>([]);
+  const [busStudentSearch, setBusStudentSearch] = useState('');
   const [assignmentRouteId, setAssignmentRouteId] = useState('');
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
@@ -256,7 +257,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
       setDriverStaffs(driverRows);
       setStudents(studentRows);
       setBusAssignments(assignmentRows);
-      setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current && student.status === 'active') ? current : studentRows.find((student: any) => student.status === 'active')?.id || '');
+      setSelectedBusStudentIds(current => current.filter(id => studentRows.some((student: any) => student.id === id && student.status === 'active')));
       setAssignmentRouteId(current => routeRows.some((route: any) => route.id === current) ? current : routeRows[0]?.id || '');
     }).catch((err: any) => {
       if (!cancelled) setModuleError(err.message || 'Unable to load transport records.');
@@ -541,14 +542,26 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   };
 
   const handleAssignBus = async () => {
-    if (isReadOnly || !assignmentStudentId || !assignmentRouteId) return;
-    try {
-      const assignment = await ApiClient.setBusAssignment(assignmentStudentId, assignmentRouteId);
-      setBusAssignments(current => [...current.filter(item => item.studentId !== assignment.studentId), assignment]);
-      setNotice('Student assigned to the bus route. The configured route fee will be used for bus charges.');
-    } catch (err: any) {
-      setModuleError(err.message || 'Bus assignment failed.');
+    if (isReadOnly || selectedBusStudentIds.length === 0 || !assignmentRouteId) return;
+    setModuleError(null);
+    let assigned = 0;
+    const failures: string[] = [];
+    for (const studentId of selectedBusStudentIds) {
+      try {
+        const assignment = await ApiClient.setBusAssignment(studentId, assignmentRouteId);
+        setBusAssignments(current => [...current.filter(item => item.studentId !== assignment.studentId), assignment]);
+        assigned += 1;
+      } catch (err: any) {
+        const student = students.find(row => row.id === studentId);
+        const name = student ? `${student.firstName} ${student.lastName}`.trim() : studentId;
+        failures.push(`${name}: ${err.message || 'could not be assigned'}`);
+      }
     }
+    if (assigned > 0) {
+      setNotice(`${assigned} student(s) assigned. The route's monthly fee is saved for each student.`);
+      setSelectedBusStudentIds([]);
+    }
+    if (failures.length) setModuleError(`Some students were not assigned: ${failures.join('; ')}`);
   };
 
   return (
@@ -792,19 +805,59 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           {renderModulePagination(routesPage, 'routes')}
           <section className="border-t border-[#E2E8F0] pt-4 space-y-3">
             <h3 className="text-xs font-bold text-[#132A29]">Bus students</h3>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <select value={assignmentStudentId} onChange={e => setAssignmentStudentId(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
-                <option value="">Select student</option>
-                {students.filter(student => student.status === 'active').map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
-              </select>
-              <select value={assignmentRouteId} onChange={e => setAssignmentRouteId(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
-                <option value="">Select route</option>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <input
+                type="search"
+                value={busStudentSearch}
+                onChange={e => setBusStudentSearch(e.target.value)}
+                placeholder="Search students by name or ID"
+                className="min-w-0 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
+              />
+              <select value={assignmentRouteId} onChange={e => setAssignmentRouteId(e.target.value)} className="min-w-0 px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg">
+                <option value="">Choose bus route</option>
                 {routes.filter(route => route.active !== false).map(route => {
-                  const occupied = busAssignments.filter(item => item.routeId === route.id && item.active !== false && item.studentId !== assignmentStudentId).length;
+                  const occupied = busAssignments.filter(item => item.routeId === route.id && item.active !== false).length;
                   return <option key={route.id} value={route.id}>{route.name} · {occupied}/{route.capacity || 40}</option>;
                 })}
               </select>
-              <button type="button" onClick={handleAssignBus} disabled={isReadOnly || !assignmentStudentId || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">Assign</button>
+              <button type="button" onClick={handleAssignBus} disabled={isReadOnly || selectedBusStudentIds.length === 0 || !assignmentRouteId} className="px-3 py-2 text-xs bg-[#0F766E] text-white rounded-lg disabled:opacity-50">
+                Assign {selectedBusStudentIds.length || ''} selected
+              </button>
+            </div>
+            <div className="rounded-lg border border-[#E2E8F0] overflow-hidden">
+              <div className="flex items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#64748B]">
+                <span>Select students ({students.filter(student => student.status === 'active').length} active)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const visibleIds = students.filter(student => student.status === 'active' && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).map(student => student.id);
+                    setSelectedBusStudentIds(current => visibleIds.every(id => current.includes(id))
+                      ? current.filter(id => !visibleIds.includes(id))
+                      : [...new Set([...current, ...visibleIds])]);
+                  }}
+                  className="font-semibold text-teal-700"
+                >
+                  {students.filter(student => student.status === 'active' && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).length > 0 && students.filter(student => student.status === 'active' && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).every(student => selectedBusStudentIds.includes(student.id)) ? 'Clear visible selection' : 'Select all shown'}
+                </button>
+              </div>
+              <div className="max-h-52 overflow-y-auto divide-y divide-[#F1F5F9]">
+                {students.filter(student => student.status === 'active' && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).map(student => (
+                  <label key={student.id} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F8FAFC] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedBusStudentIds.includes(student.id)}
+                      onChange={e => setSelectedBusStudentIds(current => e.target.checked ? [...new Set([...current, student.id])] : current.filter(id => id !== student.id))}
+                      disabled={isReadOnly}
+                      className="rounded border-[#CBD5E1]"
+                    />
+                    <span className="font-medium text-[#132A29]">{student.firstName} {student.middleName ? `${student.middleName} ` : ''}{student.lastName}</span>
+                    <span className="ml-auto text-[10px] text-[#64748B]">{student.studentId}</span>
+                  </label>
+                ))}
+                {students.filter(student => student.status === 'active' && `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''} ${student.studentId || ''}`.toLowerCase().includes(busStudentSearch.trim().toLowerCase())).length === 0 && (
+                  <p className="px-3 py-4 text-center text-xs text-[#64748B]">No active students match your search.</p>
+                )}
+              </div>
             </div>
             {assignmentsPage.rows.map(item => {
               const student = students.find(row => row.id === item.studentId);
