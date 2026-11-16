@@ -6323,7 +6323,7 @@ apiRouter.post('/student-invoices/generate', requireAuth, requireSchoolContext, 
   const batchSize=10;
   for(let offset=0;offset<prepared.length;offset+=batchSize){
     const batch=prepared.slice(offset,offset+batchSize);
-    const outcomes=await Promise.all(batch.map(async ({student,lines,subtotal})=>{
+    const outcomes: Array<{ duplicate?: boolean; busFeeAdded?: boolean; invoice?: any }> = await Promise.all(batch.map(async ({student,lines,subtotal})=>{
       const {data:sequence,error:sequenceError}=await client.rpc('schoolos_next_student_invoice',{p_school_id:school.id,p_academic_year:school.academicYear});
       if(sequenceError)throw new Error('Invoice number allocation failed.');
       const seq=Number(sequence);
