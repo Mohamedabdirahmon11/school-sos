@@ -43,7 +43,8 @@ test('teacher notices load independently and cannot block core teaching workflow
   assert.doesNotMatch(coreLoad, /getNotices/);
   assert.match(teacher, /const noticesState = useApi\(\(\) => ApiClient\.getNotices\(\)/);
   assert.match(teacher, /noticesState\.loading/);
-  assert.match(teacher, /noticesState\.error \? <ErrorState error=\{noticesState\.error\} onRetry=\{noticesState\.retry\}/);
+  assert.match(teacher, /noticesState\.error \?/);
+  assert.match(teacher, /<ErrorState error=\{noticesState\.error\} onRetry=\{noticesState\.retry\} \/>/);
 });
 
 test('teacher workspace exposes every teaching task and batch class workflows', () => {
