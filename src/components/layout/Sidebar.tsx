@@ -246,33 +246,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
             })}
           </div>
         </section>)}
-        {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: "var(--sidebar-text)" }} className={`mt-5 flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
+
+        <div className="mt-5 border-t border-white/10 pt-3">
+          <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
+            <Languages size={15} aria-hidden="true" />
+            <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
+            <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
+              style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
+              <option value="en" className="text-slate-900">English</option>
+              <option value="so" className="text-slate-900">Soomaali</option>
+              <option value="am" className="text-slate-900">አማርኛ</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
+            style={{ color: "var(--sidebar-text)" }}
+            className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
+            <LogOut size={15} aria-hidden="true" />
+            <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
+          </button>
+
+        </div>
+      </nav>
+
+      {school?.sidebarTheme?.showUserCard !== false && <div className={`shrink-0 border-t border-white/10 bg-black/10 px-3 py-3`}>
+        <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
           <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
           <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
             <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
             <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
           </div>
-        </div>}
-      </nav>
-
-      <div className="shrink-0 border-t border-white/10 bg-black/10 px-3 py-3">
-        <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
-          <Languages size={15} aria-hidden="true" />
-          <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
-          <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
-            style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
-            <option value="en" className="text-slate-900">English</option>
-            <option value="so" className="text-slate-900">Soomaali</option>
-            <option value="am" className="text-slate-900">አማርኛ</option>
-          </select>
-        </label>
-        <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
-          style={{ color: "var(--sidebar-text)" }}
-          className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <LogOut size={15} aria-hidden="true" />
-          <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
-        </button>
-      </div>
+        </div>
+      </div>}
 
     </aside>
   </>;
