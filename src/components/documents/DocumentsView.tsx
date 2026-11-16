@@ -124,7 +124,7 @@ function applySchoolBrandColor(html:string, rawColor?:string) {
   const contrastOnWhite = 1.05 / (luminance + 0.05);
   const textColor = contrastOnWhite >= 4.5 ? color : '#0F172A';
   return String(html || '')
-    .replace(/color:\\s*#0f766e/gi, 'color:' + textColor)
+    .replace(/color:\s*#0f766e/gi, 'color:' + textColor)
     .replace(/#0f766e/gi, color);
 }
 
