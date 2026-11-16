@@ -29,6 +29,10 @@ export const DocumentEditor: React.FC<Props> = ({
   const [cellBorderWidth, setCellBorderWidth] = useState('1');
   const [cellBorderStyle, setCellBorderStyle] = useState<'solid'|'dashed'|'dotted'|'double'>('solid');
   const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
+  const [selectedField, setSelectedField] = useState<HTMLElement | null>(null);
+  const [showGuides, setShowGuides] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const fieldDragRef = useRef<{field:HTMLElement;pointerId:number;startX:number;startY:number;left:number;top:number}|null>(null);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -148,6 +152,36 @@ export const DocumentEditor: React.FC<Props> = ({
     emit();
   };
 
+  const insertPositionedField = (token: string) => {
+    if (!token) return;
+    command('insertHTML','<div class="document-positioned-field" data-document-field="true" data-document-locked="false" tabindex="0" style="position:absolute;left:20px;top:20px;width:190px;z-index:1"><span class="document-field-drag-handle" contenteditable="false" title="Jiidi si aad u dhaqaajiso">⋮⋮</span>'+token+'</div>');
+  };
+
+  const nudgeSelectedField = (dx:number,dy:number) => {
+    if (!selectedField || !editorRef.current?.contains(selectedField)) return;
+    const snap = (value:number) => snapToGrid ? Math.round(value/10)*10 : value;
+    const left = Math.max(-500,Math.min(500,snap((Number.parseFloat(selectedField.style.left)||0)+dx)));
+    const top = Math.max(-500,Math.min(500,snap((Number.parseFloat(selectedField.style.top)||0)+dy)));
+    selectedField.style.left = left+'px'; selectedField.style.top = top+'px'; emit();
+  };
+
+  const rotateSelectedField = (degrees:number) => {
+    if (!selectedField || !editorRef.current?.contains(selectedField)) return;
+    selectedField.style.transform = 'rotate('+Math.max(-180,Math.min(180,degrees))+'deg)';
+    selectedField.style.transformOrigin = 'center center'; emit();
+  };
+
+  const changeSelectedFieldLayer = (direction:'front'|'back') => {
+    if (!selectedField || !editorRef.current?.contains(selectedField)) return;
+    const current=Number(selectedField.style.zIndex||0);
+    selectedField.style.zIndex=String(Math.max(-10,Math.min(10,current+(direction==='front'?1:-1)))); emit();
+  };
+
+  const toggleSelectedFieldLock = () => {
+    if (!selectedField || !editorRef.current?.contains(selectedField)) return;
+    selectedField.dataset.documentLocked=selectedField.dataset.documentLocked==='true'?'false':'true'; emit();
+  };
+
   const rotateSelectedImage = (degrees: number) => {
     if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
     selectedImage.style.transform = 'rotate(' + Math.max(-180,Math.min(180,degrees)) + 'deg)';
@@ -242,6 +276,13 @@ export const DocumentEditor: React.FC<Props> = ({
     const editor = editorRef.current;
     if (!editor) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (selectedField && editor.contains(selectedField) && document.activeElement === selectedField && event.altKey) {
+        const delta = event.shiftKey ? 10 : 1;
+        if (event.key === 'ArrowLeft') { event.preventDefault(); nudgeSelectedField(-delta,0); return; }
+        if (event.key === 'ArrowRight') { event.preventDefault(); nudgeSelectedField(delta,0); return; }
+        if (event.key === 'ArrowUp') { event.preventDefault(); nudgeSelectedField(0,-delta); return; }
+        if (event.key === 'ArrowDown') { event.preventDefault(); nudgeSelectedField(0,delta); return; }
+      }
       if (selectedImage && editor.contains(selectedImage) && document.activeElement === selectedImage) {
         const delta = event.shiftKey ? 10 : 1;
         if (event.key === 'ArrowLeft') { event.preventDefault(); nudgeSelectedImage(-delta,0); return; }
@@ -259,7 +300,7 @@ export const DocumentEditor: React.FC<Props> = ({
     };
     editor.addEventListener('keydown', onKeyDown);
     return () => editor.removeEventListener('keydown', onKeyDown);
-  }, [onSaveNow, selectedImage]);
+  }, [onSaveNow, selectedImage, selectedField, snapToGrid]);
 
   const button = (label: string, title: string, action: () => void) => (
     <button type="button" aria-label={label} title={title} onMouseDown={event => event.preventDefault()} onClick={action}
@@ -272,6 +313,7 @@ export const DocumentEditor: React.FC<Props> = ({
     <section className="documents-editor-shell min-w-0">
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
         <select aria-label="Geli doorsoome" defaultValue="" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" onChange={event => { if (event.target.value) command('insertText',event.target.value); event.target.value=''; }}><option value="">Doorsoome…</option><option value="{student_name}">Magaca ardayga</option><option value="{student_id}">Aqoonsiga ardayga</option><option value="{class}">Fasalka</option><option value="{parent_name}">Magaca waalidka</option><option value="{date}">Taariikhda</option><option value="{school_name}">Magaca dugsiga</option><option value="{teacher_name}">Magaca macallinka</option><option value="{term}">Xilli-dugsiyeedka</option><option value="{academic_year}">Sanad-dugsiyeedka</option><option value="{total_marks}">Wadarta dhibcaha</option><option value="{average}">Celceliska</option><option value="{grade}">Darajada</option><option value="{rank}">Kaalinta fasalka</option><option value="{attendance}">Xaadirinta</option><option value="{teacher_comment}">Faallada macallinka</option><option value="{fee_balance}">Haraaga lacagta (ETB)</option><option value="{staff_name}">Magaca shaqaalaha</option><option value="{staff_id}">Aqoonsiga shaqaalaha</option></select>
+         <select aria-label="Geli meel qoraal la dhaqaajin karo" defaultValue="" onChange={event=>{if(event.target.value)insertPositionedField(event.target.value);event.target.value='';}} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="">Field la dhaqaajin karo…</option><option value="{student_name}">Magaca ardayga (field)</option><option value="{student_id}">ID ardayga (field)</option><option value="{class}">Fasalka (field)</option><option value="{school_name}">Dugsiga (field)</option><option value="{date}">Taariikh (field)</option></select>
         {button('B','Qoraal madow',() => command('bold'))}
         {button('I','Qoraal jiifa',() => command('italic'))}
         {button('U','Hoosta xarriiq',() => command('underline'))}
@@ -320,6 +362,12 @@ export const DocumentEditor: React.FC<Props> = ({
         <select aria-label="Hagaajinta sawirka la doortay" defaultValue="center" onChange={event => alignSelectedImage(event.target.value as 'left'|'center'|'right')} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="left">Sawir bidix</option><option value="center">Sawir dhexda</option><option value="right">Sawir midig</option></select>
         {button('Lakab +','Sawirka hore u soo qaad',() => changeSelectedImageLayer('front'))}
         {button('Lakab −','Sawirka gadaal u dhig',() => changeSelectedImageLayer('back'))}
+        <select aria-label="Wareeji field-ka la doortay" defaultValue="0" onChange={event=>rotateSelectedField(Number(event.target.value))} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="0">Field 0°</option><option value="90">Field 90°</option><option value="180">Field 180°</option><option value="-90">Field -90°</option></select>
+        {button('Field hore','Field-ka hore u soo qaad',()=>changeSelectedFieldLayer('front'))}
+        {button('Field gadaal','Field-ka gadaal u dhig',()=>changeSelectedFieldLayer('back'))}
+        {button('Quful/Fur','Quful ama fur field-ka',toggleSelectedFieldLock)}
+        {button(showGuides?'Qari guides':'Tus guides','Tus ama qari hagayaasha canvas-ka',()=>setShowGuides(value=>!value))}
+        <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs"><input type="checkbox" checked={snapToGrid} onChange={event=>setSnapToGrid(event.target.checked)}/> Snap 10px</label>
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
           <option value="160px">Sawir yar</option><option value="320px">Sawir dhexe</option><option value="640px">Sawir weyn</option><option value="100%">Buuxa</option>
         </select>
@@ -356,7 +404,7 @@ export const DocumentEditor: React.FC<Props> = ({
           </div>
         </header>
         <div ref={editorRef} contentEditable suppressContentEditableWarning role="textbox" aria-label="Meesha qoraalka dukumentiga" aria-multiline="true"
-          dir={direction} onInput={emit} onBlur={emit} onClick={event => { const target = event.target as HTMLElement; const image = target.closest('img') as HTMLImageElement | null; if (selectedImage && selectedImage !== image) selectedImage.classList.remove('document-image-selected'); if (image && editorRef.current?.contains(image)) { image.classList.add('document-image-selected'); image.tabIndex = 0; image.focus(); setSelectedImage(image); } else setSelectedImage(null); }} onPaste={event => {
+          dir={direction} onInput={emit} onBlur={emit} onClick={event => { const target = event.target as HTMLElement; const image = target.closest('img') as HTMLImageElement | null; if (selectedImage && selectedImage !== image) selectedImage.classList.remove('document-image-selected'); if (image && editorRef.current?.contains(image)) { image.classList.add('document-image-selected'); image.tabIndex = 0; image.focus(); setSelectedImage(image); } else setSelectedImage(null); const field=target.closest('[data-document-field="true"]') as HTMLElement|null; if(selectedField&&selectedField!==field)selectedField.classList.remove('document-positioned-field-selected'); if(field&&editorRef.current?.contains(field)){field.classList.add('document-positioned-field-selected');setSelectedField(field);setSelectedImage(null);}else setSelectedField(null); }} onPointerDown={event=>{const handle=(event.target as HTMLElement).closest('.document-field-drag-handle');const field=handle?.closest('[data-document-field="true"]') as HTMLElement|null;if(!field||field.dataset.documentLocked==='true')return;event.preventDefault();const rect=field.getBoundingClientRect();fieldDragRef.current={field,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,left:Number.parseFloat(field.style.left)||rect.left,top:Number.parseFloat(field.style.top)||rect.top};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);setSelectedField(field);field.classList.add('document-positioned-field-selected');}} onPointerMove={event=>{const drag=fieldDragRef.current;if(!drag||drag.pointerId!==event.pointerId)return;const snap=(value:number)=>snapToGrid?Math.round(value/10)*10:value;drag.field.style.left=Math.max(-500,Math.min(500,snap(drag.left+event.clientX-drag.startX)))+'px';drag.field.style.top=Math.max(-500,Math.min(500,snap(drag.top+event.clientY-drag.startY)))+'px';}} onPointerUp={event=>{if(fieldDragRef.current?.pointerId===event.pointerId){fieldDragRef.current=null;emit();}}} onPointerCancel={()=>{fieldDragRef.current=null;emit();}} onPaste={event => {
             const clipboard = event.clipboardData;
             const pasted = clipboard.getData('text/html');
             if (pasted) {
@@ -364,7 +412,7 @@ export const DocumentEditor: React.FC<Props> = ({
               command('insertHTML',sanitizeDocumentHtml(pasted));
             }
           }}
-          className="document-editable min-h-[620px] outline-none text-slate-900"
+          className={"document-editable min-h-[620px] outline-none text-slate-900"+(showGuides?" document-show-guides":"")}
           style={{ direction, unicodeBidi:'plaintext', fontFamily:'"Noto Naskh Arabic", "Amiri", "Arial", serif', lineHeight:1.65 }} />
         <footer className="document-page-footer mt-8 border-t border-slate-200 pt-2 text-center text-[10px] text-slate-500">
           {school?.receiptFooter || ''}
