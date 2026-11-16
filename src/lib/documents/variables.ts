@@ -18,3 +18,11 @@ export function replaceDocumentVariables(template: string, values: DocumentVaria
   });
   return { html, missing: [...missing].sort() };
 }
+
+/** A batch with missing values must be explicitly confirmed before any rows are persisted. */
+export function requiresDocumentGenerationConfirmation(
+  warnings: Array<{ missing?: string[] }>,
+  confirmed: boolean
+): boolean {
+  return !confirmed && warnings.some(warning => Array.isArray(warning.missing) && warning.missing.length > 0);
+}
