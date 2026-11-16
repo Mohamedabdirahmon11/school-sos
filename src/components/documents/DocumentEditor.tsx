@@ -23,6 +23,9 @@ export const DocumentEditor: React.FC<Props> = ({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [activeCellColor, setActiveCellColor] = useState('#ffffff');
+  const [cellBorderColor, setCellBorderColor] = useState('#94a3b8');
+  const [cellBorderWidth, setCellBorderWidth] = useState('1');
+  const [cellBorderStyle, setCellBorderStyle] = useState<'solid'|'dashed'|'dotted'|'double'>('solid');
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -99,10 +102,31 @@ export const DocumentEditor: React.FC<Props> = ({
   const mergeRight = () => {
     const cell = selectedCell();
     const next = cell?.nextElementSibling as HTMLTableCellElement | null;
-    if (!cell || !next) return;
+    if (!cell || !next || cell.rowSpan !== 1 || next.rowSpan !== 1) return;
     cell.colSpan = Math.max(1, cell.colSpan) + Math.max(1, next.colSpan);
-    cell.innerHTML += ' ' + next.innerHTML;
+    cell.innerHTML += '<br>' + next.innerHTML;
     next.remove();
+    emit();
+  };
+
+  const mergeDown = () => {
+    const cell = selectedCell();
+    const row = cell?.parentElement as HTMLTableRowElement | null;
+    const table = row?.closest('table');
+    if (!cell || !row || !table || cell.colSpan !== 1 || cell.rowSpan !== 1) return;
+    const nextRow = row.nextElementSibling as HTMLTableRowElement | null;
+    const next = nextRow?.cells[cell.cellIndex] || null;
+    if (!next || next.colSpan !== 1 || next.rowSpan !== 1) return;
+    cell.rowSpan = 2;
+    cell.innerHTML += '<br>' + next.innerHTML;
+    next.remove();
+    emit();
+  };
+
+  const setCellBorder = () => {
+    const cell = selectedCell();
+    if (!cell) return;
+    cell.style.border = `${cellBorderWidth}px ${cellBorderStyle} ${cellBorderColor}`;
     emit();
   };
 
@@ -214,8 +238,13 @@ export const DocumentEditor: React.FC<Props> = ({
         {button('Sadar −','Ka saar sadarka la doortay',removeRow)}
         {button('Tiir +','Ku dar tiir jadwalka',addColumn)}
         {button('Tiir −','Ka saar tiirka la doortay',removeColumn)}
-        {button('Isku dar','Isku dar unugga xiga',mergeRight)}
+        {button('Isku dar →','Isku dar unugga midigta',mergeRight)}
+        {button('Isku dar ↓','Isku dar unugga hoose',mergeDown)}
         <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Midabka unugga <input aria-label="Midabka unugga jadwalka" type="color" value={activeCellColor} className="h-6 w-7" onChange={event => { setActiveCellColor(event.target.value); setCellColor(event.target.value); }} /></label>
+        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs">Xadka <input aria-label="Midabka xadka unugga" type="color" value={cellBorderColor} className="h-6 w-7" onChange={event => setCellBorderColor(event.target.value)} /></label>
+        <select aria-label="Ballaca xadka unugga" value={cellBorderWidth} onChange={event => setCellBorderWidth(event.target.value)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="0">Xad la'aan</option><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="4">4 px</option></select>
+        <select aria-label="Nooca xadka unugga" value={cellBorderStyle} onChange={event => setCellBorderStyle(event.target.value as typeof cellBorderStyle)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"><option value="solid">Joogto</option><option value="dashed">Jajaban</option><option value="dotted">Dhibco</option><option value="double">Laba xariiq</option></select>
+        {button('Adeegso xadka','Ku dabaq xadka unugga la doortay',setCellBorder)}
         {button('Sawir','Geli sawir',() => imageInputRef.current?.click())}
         <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} />
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
