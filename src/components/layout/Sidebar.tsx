@@ -208,25 +208,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside style={{ background: 'var(--sidebar-background, #102c2a)', color: 'var(--sidebar-text, #ffffff)' }} className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[276px] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside style={{ background: 'var(--sidebar-background, #102c2a)', color: 'var(--sidebar-text, #ffffff)' }} className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,276px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,260px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className={`relative flex h-[96px] shrink-0 flex-col items-center justify-center gap-1 border-b border-white/10 ${isCollapsed ? 'px-2' : 'px-5'}`}>
         {school?.sidebarTheme?.showLogo !== false && <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--sidebar-accent)', color: 'var(--sidebar-accent-foreground)' } : undefined}>
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>}
         {school?.sidebarTheme?.showSchoolName !== false && <div className={`min-w-0 max-w-full text-center ${isCollapsed ? 'md:hidden' : ''}`}>
           <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : 'School workspace')}</div>
-          {school && <div className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em] text-teal-200/70">{school.code}</div>}
+          {school && <div style={{ color: "var(--sidebar-text)", opacity: 0.62 }} className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em]">{school.code}</div>}
         </div>}
-        <button onClick={onCloseMobile} aria-label="Close menu" className="absolute right-2 top-2 rounded-lg p-2 text-teal-100/70 hover:bg-white/10 md:hidden"><ChevronRight size={18}/></button>
+        <button onClick={onCloseMobile} aria-label="Close menu" style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
       <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
-        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!isCollapsed} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 text-teal-100/70 hover:bg-white/10 md:flex">
+        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!isCollapsed} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} style={{ color: "var(--sidebar-text)" }} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 hover:bg-black/10 md:flex">
           {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
         </button>
-        {!isCollapsed && <label className="mb-3 flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/10 px-3 text-teal-100/70">
+        {!isCollapsed && <label style={{ color: "var(--sidebar-text)" }} className="mb-3 flex min-h-10 items-center gap-2 rounded-xl border border-current/10 bg-black/10 px-3">
           <Search size={15} aria-hidden="true" />
-          <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder="Search menu" aria-label="Search navigation menu" className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-teal-100/45" />
+          <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder="Search menu" aria-label="Search navigation menu" style={{ color: "var(--sidebar-text)" }} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-50" />
         </label>}
         {visibleGroups.map(group => <section key={group.title}>
           {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
@@ -266,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
         </button>
         {school?.sidebarTheme?.showUserCard !== false && <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl bg-black/10 px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-teal-100"><UserCircle2 size={18} aria-hidden="true" /></span>
+          <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
           <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
             <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
             <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
