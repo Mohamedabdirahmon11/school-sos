@@ -4,7 +4,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { Download, FileText, Plus, Search, Wallet, X, SlidersHorizontal, Users } from 'lucide-react';
+import { Download, FileText, Plus, Search, Wallet, X, Users } from 'lucide-react';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentPeriod = () => new Date().toISOString().slice(0, 7);
