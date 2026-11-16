@@ -7601,12 +7601,12 @@ apiRouter.get('/documents/images', requireAuth, requireSchoolContext, requireSch
 });
 
 apiRouter.post('/documents/images', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin,
-  express.raw({ type: ['image/png','image/jpeg','image/webp'], limit: '1572864' }),
+  express.raw({ type: ['image/png','image/jpeg','image/webp'], limit: '10485760' }),
   async (req, res) => {
     const school = (req as any).school as School;
     const bytes = Buffer.isBuffer(req.body) ? req.body : null;
     const detected = bytes ? detectSchoolLogoImage(bytes, String(req.headers['content-type'] || '')) : null;
-    if (!bytes || !detected) { res.status(400).json({ error: 'Sawir PNG, JPEG ama WebP ah oo ka yar 1.5 MB geli.' }); return; }
+    if (!bytes || !detected) { res.status(400).json({ error: 'Sawir PNG, JPEG ama WebP ah oo ka yar 10 MB geli.' }); return; }
     const storageClient = documentServiceClient(res);
     if (!storageClient) return;
     const objectPath = school.id + '/documents/' + randomUUID() + '.' + detected.extension;
