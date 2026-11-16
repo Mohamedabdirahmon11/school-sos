@@ -638,6 +638,77 @@ export class ApiClient {
     return this.request<{ success: boolean }>('/timetable/unavailability', { method: 'PUT', body: JSON.stringify(input) });
   }
 
+  // Documents
+  public static async getDocuments(params: { search?: string; type?: string; status?: string; includeDeleted?: boolean } = {}) {
+    const query = new URLSearchParams();
+    if (params.search?.trim()) query.set('search', params.search.trim());
+    if (params.type && params.type !== 'all') query.set('type', params.type);
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.includeDeleted) query.set('includeDeleted', 'true');
+    return this.request<any[]>('/documents' + (query.toString() ? '?' + query.toString() : ''));
+  }
+
+  public static async getDocument(id: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}`);
+  }
+
+  public static async createDocument(input: Record<string, unknown>) {
+    return this.request<any>('/documents', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async updateDocument(id: string, input: Record<string, unknown>) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
+  }
+
+  public static async deleteDocument(id: string) {
+    return this.request<{success:boolean}>(`/documents/${encodeURIComponent(id)}`, { method:'DELETE' });
+  }
+
+  public static async restoreDocument(id: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/restore`, { method:'POST' });
+  }
+
+  public static async duplicateDocument(id: string) {
+    return this.request<any>(`/documents/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
+  }
+
+  public static async getDocumentTemplates() {
+    return this.request<any[]>('/document-templates');
+  }
+
+  public static async createDocumentTemplate(input: Record<string, unknown>) {
+    return this.request<any>('/document-templates', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async duplicateDocumentTemplate(id: string) {
+    return this.request<any>(`/document-templates/${encodeURIComponent(id)}/duplicate`, { method:'POST' });
+  }
+
+  public static async updateDocumentTemplate(id: string, input: Record<string, unknown>) {
+    return this.request<any>(`/document-templates/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
+  }
+
+  public static async deleteDocumentTemplate(id: string) {
+    return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}`, { method:'DELETE' });
+  }
+
+  public static async previewDocumentGeneration(input: Record<string, unknown>) {
+    return this.request<any>('/documents/preview', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async generateDocuments(input: Record<string, unknown>) {
+    return this.request<any>('/documents/generate', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async uploadDocumentImage(file: File): Promise<{url:string}> {
+    const response = await fetch('/api/documents/images', {
+      method:'POST', credentials:'include', headers:{'Content-Type':file.type}, body:file
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'Sawirka lama gelin karin.');
+    return body;
+  }
+
   // Students & Teachers
   public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string, allClass = false) {
     const params = new URLSearchParams();
