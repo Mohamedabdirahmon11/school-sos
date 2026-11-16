@@ -165,8 +165,15 @@ export const LoginView: React.FC = () => {
           )}
 
           {!parentStudentMode && (
+            <div className="mb-4 flex items-center justify-center gap-3 text-xs">
+              <button type="button" onClick={() => { setActiveTab('school_admin'); setEmail(''); setPin(''); setPassword(''); setError(null); }} className={activeTab !== 'super_admin' ? 'font-semibold text-[#0F766E] underline' : 'text-[#64748B]'}>Staff ID + PIN</button>
+              <span className="text-slate-300">|</span>
+              <button type="button" onClick={() => { setActiveTab('super_admin'); setEmail(''); setPin(''); setPassword(''); setError(null); }} className={activeTab === 'super_admin' ? 'font-semibold text-[#0F766E] underline' : 'text-[#64748B]'}>Super Admin</button>
+            </div>
+          )}
+          {!parentStudentMode && (
             <p className="mb-4 text-center text-xs text-[#64748B]">
-              Super Admin, School Admin, and Accountant use this same sign-in. Teachers use this same sign-in with their school-issued Teacher ID. SchoolOS opens the correct dashboard automatically.
+              School Admin, Accountant, and Teacher sign in with their school-issued ID and PIN. Super Admin uses email and password.
             </p>
           )}
 
@@ -207,40 +214,32 @@ export const LoginView: React.FC = () => {
               </>
             )}
 
-            {/* SCHOOL ADMIN / TEACHER / ACCOUNTANT FORM */}
+            {/* STAFF FORM: School Admin, Accountant and Teacher use ID + PIN */}
             {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Super Admin email, School ID / Admin ID, Teacher ID, or Accountant email / phone</label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="Super Admin email, School / Admin / Teacher ID, or Accountant email / phone"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <label className="block text-xs font-medium text-[#334155]">School Admin ID / Accountant ID / Teacher ID</label>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="username"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="Enter your staff ID"
+                    className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                  />
                 </div>
-
                 <div>
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#334155]">PIN (School Admin / Teacher) or password (Super Admin / Accountant)</label>
-                    <span className="text-[11px] text-[#64748B] text-right max-w-[62%]">
-                      Use your account password or the temporary PIN issued by your Super Admin or School Admin.
-                    </span>
-                  </div>
-                  <div className="mt-1">
-                    <PasswordInput
-                      label="password"
-                      required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="Enter your PIN or password"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <label className="block text-xs font-medium text-[#334155]">4–6 digit PIN</label>
+                  <PasswordInput
+                    label="PIN"
+                    required
+                    value={pin}
+                    onChange={e => setPin(e.target.value.replace(/\\D/g, '').slice(0, 6))}
+                    placeholder="Enter your PIN"
+                    autoComplete="current-password"
+                    className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
+                  />
                 </div>
               </>
             )}
