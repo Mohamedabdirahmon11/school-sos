@@ -244,6 +244,7 @@ DECLARE
   paid_after_void NUMERIC(12,2);
   balance_after_void NUMERIC(12,2);
   next_status VARCHAR(20);
+  invoice_due_date DATE;
 BEGIN
   IF OLD.voided_at IS NULL AND NEW.voided_at IS NOT NULL AND NEW.invoice_id IS NOT NULL THEN
     UPDATE public.student_invoices
@@ -251,12 +252,12 @@ BEGIN
         balance_due = LEAST(total_amount, balance_due + NEW.amount_paid),
         updated_at = NOW()
     WHERE id = NEW.invoice_id AND school_id = NEW.school_id
-    RETURNING amount_paid, balance_due INTO paid_after_void, balance_after_void;
+    RETURNING amount_paid, balance_due, due_date INTO paid_after_void, balance_after_void, invoice_due_date;
 
     IF FOUND THEN
       next_status := CASE
         WHEN balance_after_void = 0 THEN 'paid'
-        WHEN paid_after_void = 0 AND due_date < CURRENT_DATE THEN 'overdue'
+        WHEN paid_after_void = 0 AND invoice_due_date < CURRENT_DATE THEN 'overdue'
         WHEN paid_after_void = 0 THEN 'issued'
         ELSE 'partially_paid'
       END;
@@ -272,5 +273,6 @@ DROP TRIGGER IF EXISTS trg_sync_student_invoice_void ON public.fee_payments;
 CREATE TRIGGER trg_sync_student_invoice_void
 AFTER UPDATE OF voided_at ON public.fee_payments
 FOR EACH ROW EXECUTE FUNCTION public.schoolos_sync_student_invoice_void();
+REVOKE ALL ON FUNCTION public.schoolos_sync_student_invoice_void() FROM PUBLIC, anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
