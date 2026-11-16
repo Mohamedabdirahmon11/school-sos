@@ -755,6 +755,10 @@ export class ApiClient {
     return this.request<any>('/documents/preview', { method:'POST', body:JSON.stringify(input) });
   }
 
+  public static async recordDocumentDownload(id:string) {
+    return this.request<{success:boolean}>(`/documents/${encodeURIComponent(id)}/download-audit`,{method:'POST'});
+  }
+
   public static async generateDocuments(input: Record<string, unknown>) {
     return this.request<any>('/documents/generate', { method:'POST', body:JSON.stringify(input) });
   }
