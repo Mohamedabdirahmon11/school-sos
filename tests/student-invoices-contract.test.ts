@@ -98,7 +98,7 @@ test('generated invoices include every applicable fee by default, including bus 
   assert.match(source, /body\.includeOneTimeFees!==false/);
   assert.match(source, /assignment\.studentId===student\.id&&assignment\.active/);
   assert.match(source, /fee_type:'bus',[\s\S]{0,180}unit_amount:Number\(bus\.feeAmount\)/);
-  assert.match(view, /const \[includeAnnual, setIncludeAnnual\] = useState\(true\)/);
-  assert.match(view, /const \[includeOneTime, setIncludeOneTime\] = useState\(true\)/);
+  assert.doesNotMatch(view, /includeAnnualRegistration:|includeOneTimeFees:/);
+  assert.doesNotMatch(view, /includeAnnual, setIncludeAnnual|includeOneTime, setIncludeOneTime/);
   assert.match(view, /saved bus fee for active bus assignments are included/);
 });
