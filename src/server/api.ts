@@ -7811,6 +7811,20 @@ apiRouter.patch('/school/transport/:routeId', requireAuth, requireSchoolContext,
     res.status(400).json({ error: error?.message || 'Transport route could not be updated.' });
   }
 });
+apiRouter.post('/bus/assignments/bulk', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
+  const school = (req as any).school;
+  const studentIds = Array.isArray(req.body?.studentIds) ? req.body.studentIds.filter((id: unknown): id is string => typeof id === 'string') : [];
+  const routeId = typeof req.body?.routeId === 'string' ? req.body.routeId : '';
+  if (!studentIds.length || studentIds.length > 500 || !routeId) {
+    res.status(400).json({ error: 'Choose between 1 and 500 students and one bus route.' });
+    return;
+  }
+  try {
+    res.json(await db.setBusAssignmentsBulk(school.id, studentIds, routeId));
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Bus assignments could not be saved.' });
+  }
+});
 apiRouter.get('/bus/assignments', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('transport_manage'), async (req, res) => {
   const school = (req as any).school;
   res.json(await db.getBusAssignments(school.id));
