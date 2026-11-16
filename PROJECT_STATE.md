@@ -209,3 +209,6 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Added a public verification HTML page and QR PNG endpoint. The page exposes only validity, school name, student name, document type, and issue date; deleted/missing documents return not found and draft documents are marked invalid.
 - Extended the document HTML sanitizer to allow only the exact UUID-scoped QR image route; added regression tests for accepted and rejected verification URLs.
 - Migration is additive and has not been applied to production. GitHub Actions CI must pass before this work is considered verified. Public URL generation uses `APP_BASE_URL` or `PUBLIC_APP_URL` when configured; otherwise it uses a relative same-origin path.
+
+- Follow-up: the private document artwork image upload cap is now 10 MB in the API, editor validation, and a new additive bucket migration. PDF artwork/page picking, PDF.js rendering, DPI inspection, and metadata stripping remain outstanding.
+- Serial/QR verification is now added to manually created, duplicated, and bulk-generated documents. Verification tokens are opaque UUIDs; the public page marks only Final documents valid and exposes the limited verification fields. The QR endpoint builds an absolute same-origin URL from configured APP_BASE_URL/PUBLIC_APP_URL or the request host.
