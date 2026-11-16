@@ -187,6 +187,21 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
   assert.match(teacher, /mark\.bigExamMarks/);
 });
 
+test('Form Teacher exam register includes every active class subject while subject teachers stay within assigned subjects', () => {
+  const api = read('../src/server/api.ts');
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const routeStart = api.indexOf("apiRouter.get('/teacher/subject-assignments'");
+  const routeEnd = api.indexOf("apiRouter.post('/subjects'", routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  assert.ok(route.includes("queryAllRows('class_subjects', { school_id: school.id, class_id: formTeacherClasses.map"));
+  assert.ok(route.includes("isFormTeacherClass: true"));
+  assert.ok(route.includes("isFormTeacher: true"));
+  assert.match(teacher, /const gradeSubjects: Subject\[\] = isFormTeacher \? allClassSubjects : editableClassSubjects/);
+  assert.match(teacher, /const allClassSubjects = uniqueSubjects\(classAssignments\)/);
+  assert.match(teacher, /const editableClassSubjects = uniqueSubjects\(classAssignments\.filter\(\(assignment: any\) => !assignment\.isFormTeacher \|\| assignment\.canEditMarks === true\)\)/);
+  assert.match(teacher, /const examRegisterRows = useMemo/);
+});
+
 test('teacher dashboard shows Form Teacher class and assigned teaching subjects without duplicate task shortcuts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /EMPTY_TEACHER_DATA/);
