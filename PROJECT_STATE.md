@@ -264,3 +264,12 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - GitHub Actions run 43844538623 passed on the migration filename + trigger guard head: TypeScript PASS, 389/389 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
 - Supabase Security Advisor continues to show an existing no-policy notice for public.school_student_id_sequences and leaked-password protection disabled. Performance Advisor shows five unindexed foreign keys in invoice-related tables and unused-index notices. These are not Documents migration regressions and were not modified here.
 - Still outstanding from the full original Documents specification: PDF backgrounds/PDF.js page picker, full freeform canvas/field controls and guides, PDF/ZIP batch exports and A4 ID-card imposition/crop marks, embedded Arabic font output, explicit permission-key/teacher class-scope enforcement, immutable issued-template version binding, and browser/PDF visual plus live cross-school tests. Do not represent these as complete.
+
+
+### Positioned field editor controls — 2026-11-16
+- Added positioned text fields for student name/ID, class, school and date variables. Fields have a dedicated drag handle, bounded absolute placement, 10 px snap-to-grid (toggleable), optional grid guides, keyboard nudge (Alt+Arrow; Shift = 10 px), rotation, layer ordering, lock toggle, and CSS resize handles.
+- Fields are explicitly marked in stored HTML. The shared sanitizer permits absolute positioning only when both the positioned-field marker and approved field class are present; arbitrary absolute-positioned HTML is stripped. Only approved data attributes, classes and bounded transform/offset values survive sanitization.
+- Added regression tests for positioned-field sanitization and invalid positioning.
+- GitHub Actions run 43845093679 passed on commit e058abbbe7971b6f3b9352ffda4e8cc4eb155fc9: TypeScript PASS, 391/391 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
+- Image editing also supports width, rotate, alignment, bounded layer order and arrow-key nudging; artwork upload audit is recorded transactionally with cleanup on audit failure.
+- This is a functional positioned-field layer within the existing rich-text editor, not yet the full requested design suite. Copy/paste/duplicate, arbitrary object types (QR/barcode/signature/stamp), PDF background/PDF.js page selection, PDF/ZIP batch exports, A4 multi-ID sheets/crop marks, embedded Arabic font export, and real browser/PDF visual checks remain open.
