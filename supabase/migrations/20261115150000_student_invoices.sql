@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS student_invoice_items (
   quantity NUMERIC(10,2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
   unit_amount NUMERIC(12,2) NOT NULL CHECK (unit_amount >= 0),
   line_total NUMERIC(12,2) NOT NULL CHECK (line_total >= 0),
+  cadence VARCHAR(20) NOT NULL DEFAULT 'monthly' CHECK (cadence IN ('monthly','annual','one_time')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (line_total = quantity * unit_amount)
 );
@@ -140,6 +141,129 @@ $$;
 
 REVOKE ALL ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) TO service_role;
+
+
+CREATE OR REPLACE FUNCTION public.schoolos_create_student_invoice(
+  p_invoice JSONB,
+  p_items JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  school_key VARCHAR(64);
+  student_key VARCHAR(64);
+  academic_key VARCHAR(20);
+  billing_key VARCHAR(80);
+  invoice_key VARCHAR(64);
+  expected_total NUMERIC(12,2);
+  invoice_row public.student_invoices%ROWTYPE;
+BEGIN
+  IF jsonb_typeof(p_invoice) <> 'object' OR jsonb_typeof(p_items) <> 'array'
+    OR jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'A valid invoice and at least one invoice item are required.';
+  END IF;
+
+  school_key := p_invoice->>'school_id';
+  student_key := p_invoice->>'student_id';
+  academic_key := p_invoice->>'academic_year';
+  billing_key := p_invoice->>'billing_period';
+  invoice_key := p_invoice->>'id';
+
+  IF school_key IS NULL OR student_key IS NULL OR academic_key IS NULL
+    OR billing_key IS NULL OR invoice_key IS NULL THEN
+    RAISE EXCEPTION 'Invoice school, student, academic year, period and ID are required.';
+  END IF;
+
+  -- Serialize billing for one student/year so parallel requests cannot bill
+  -- annual or one-time fee structures twice in different billing periods.
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    school_key || ':' || student_key || ':' || academic_key, 0
+  ));
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.students
+    WHERE id = student_key AND school_id = school_key AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Active student was not found in this school.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.student_invoices
+    WHERE school_id = school_key AND student_id = student_key
+      AND academic_year = academic_key AND billing_period = billing_key
+  ) THEN
+    RETURN jsonb_build_object('duplicate', true);
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_to_recordset(p_items) AS requested(
+      fee_structure_id VARCHAR(64), fee_type VARCHAR(40), cadence VARCHAR(20)
+    )
+    JOIN public.student_invoice_items previous_item
+      ON previous_item.school_id = school_key
+      AND previous_item.fee_structure_id = requested.fee_structure_id
+    JOIN public.student_invoices previous_invoice
+      ON previous_invoice.id = previous_item.invoice_id
+      AND previous_invoice.school_id = school_key
+      AND previous_invoice.student_id = student_key
+    WHERE requested.fee_structure_id IS NOT NULL
+      AND (
+        (requested.fee_type = 'annual_registration'
+          AND previous_invoice.academic_year = academic_key
+          AND previous_item.fee_type = 'annual_registration')
+        OR (requested.fee_type = 'custom' AND requested.cadence = 'annual'
+          AND previous_invoice.academic_year = academic_key
+          AND previous_item.fee_type = 'custom' AND previous_item.cadence = 'annual')
+        OR (requested.fee_type = 'custom' AND requested.cadence = 'one_time'
+          AND previous_item.fee_type = 'custom' AND previous_item.cadence = 'one_time')
+      )
+  ) THEN
+    RAISE EXCEPTION 'An annual or one-time fee on this invoice has already been billed to this student.';
+  END IF;
+
+  SELECT COALESCE(SUM((item->>'line_total')::NUMERIC),0)
+    INTO expected_total FROM jsonb_array_elements(p_items) item;
+  IF expected_total <= 0 OR round(expected_total,2) <> expected_total
+    OR (p_invoice->>'total_amount')::NUMERIC <> expected_total
+    OR (p_invoice->>'subtotal')::NUMERIC <> expected_total
+    OR COALESCE((p_invoice->>'discount_amount')::NUMERIC,0) <> 0 THEN
+    RAISE EXCEPTION 'Invoice totals do not match the supplied invoice items.';
+  END IF;
+
+  INSERT INTO public.student_invoices (
+    id,school_id,student_id,invoice_number,academic_year,billing_period,
+    issue_date,due_date,currency,subtotal,discount_amount,total_amount,
+    amount_paid,balance_due,status,created_by
+  ) VALUES (
+    invoice_key,school_key,student_key,p_invoice->>'invoice_number',academic_key,billing_key,
+    (p_invoice->>'issue_date')::DATE,(p_invoice->>'due_date')::DATE,
+    COALESCE(NULLIF(p_invoice->>'currency',''),'ETB'),expected_total,0,expected_total,
+    0,expected_total,'issued',NULLIF(p_invoice->>'created_by','')
+  ) RETURNING * INTO invoice_row;
+
+  INSERT INTO public.student_invoice_items (
+    id,school_id,invoice_id,fee_structure_id,fee_type,description,
+    quantity,unit_amount,line_total,cadence
+  )
+  SELECT
+    'invitem-' || gen_random_uuid()::TEXT,school_key,invoice_key,
+    item.fee_structure_id,item.fee_type,item.description,
+    item.quantity,item.unit_amount,item.line_total,item.cadence
+  FROM jsonb_to_recordset(p_items) AS item(
+    fee_structure_id VARCHAR(64),fee_type VARCHAR(40),description VARCHAR(240),
+    quantity NUMERIC(10,2),unit_amount NUMERIC(12,2),line_total NUMERIC(12,2),
+    cadence VARCHAR(20)
+  );
+
+  RETURN jsonb_build_object('duplicate',false,'invoice',to_jsonb(invoice_row));
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.schoolos_create_student_invoice(JSONB,JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_create_student_invoice(JSONB,JSONB) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.schoolos_apply_student_invoice_payment(
   p_invoice_id VARCHAR,
