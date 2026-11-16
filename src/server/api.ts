@@ -7864,7 +7864,26 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   if (typeof body.classId === 'string' && body.classId) {
     classRecord = await db.getClassById(body.classId,school.id);
     if (!classRecord) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
-    students = (await db.queryPage<Student>('students',{school_id:school.id,class_id:classRecord.id},1,100,undefined,'*','first_name',true)).items;
+    // Load every student in the selected class; queryPage intentionally caps each request at 100 rows.
+    // Keep the page size bounded while avoiding the old silent 100-student truncation.
+    let studentPage = 1;
+    let studentTotal = 0;
+    do {
+      const result = await db.queryPage<Student>(
+        'students',
+        { school_id:school.id, class_id:classRecord.id },
+        studentPage,
+        100,
+        undefined,
+        '*',
+        'first_name',
+        true
+      );
+      students.push(...result.items);
+      studentTotal = result.total;
+      studentPage += 1;
+      if (!result.items.length) break;
+    } while (students.length < studentTotal);
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
     for (const rawId of body.studentIds) {
       if (typeof rawId !== 'string') continue;
