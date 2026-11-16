@@ -71,3 +71,9 @@ Updated: 2026-11-11
 - Remaining Phase 1 release gates: add a self-hosted Arabic font asset and verify it is embedded/rendered in PDF; run desktop/mobile browser journeys; verify real print pagination/header/footer behavior; test private image upload/download against the bucket; and perform authenticated cross-school RLS isolation tests in a non-production Supabase environment.
 - Migration 20261116090000_school_documents_phase1.sql remains unapplied. No production database or existing records were changed.
 - Phase 2 has a separate open Draft PR #175; Phase 3 (history, expanded permissions, audit log, student attachments, final-document locking) has not started. Follow the user's phase-by-phase approval rule and do not start the next phase until they say "next".
+
+
+## Documents module — Phase 2 implementation (2026-11-16)
+- Added browser-side DOCX import/export and CSV/XLS/XLSX import/export. Spreadsheet files import into editable HTML tables; XLSX export creates one worksheet per table, and CSV export includes a UTF-8 BOM.
+- Spreadsheet import escapes cell HTML and CSV export protects against formula injection. Existing SheetJS dependency is reused; no new package dependency or database migration is added.
+- Imported content remains in the editor until the user saves. Real-file browser round-trip fixtures and desktop/mobile verification remain release checks.
