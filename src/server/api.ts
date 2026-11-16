@@ -7772,7 +7772,7 @@ apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, 
   const body=req.body||{};
   const targetUserId=typeof body.userId==='string'?body.userId.trim():'';
   const targetRole=typeof body.role==='string'?body.role:'';
-  const roles=new Set(['teacher','accountant','parent','student']);
+  const roles=new Set(['teacher','accountant']);
   if(Boolean(targetUserId)===Boolean(targetRole) || (targetRole && !roles.has(targetRole))){res.status(400).json({error:'Dooro hal user ID ama hal role oo sax ah.'});return;}
   const client=documentServiceClient(res);if(!client)return;
   const {data:document}=await client.from('school_documents').select('id').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
@@ -7780,6 +7780,7 @@ apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, 
   if(targetUserId){
     const {data:target}=await client.from('users').select('id,role').eq('school_id',school.id).eq('id',targetUserId).maybeSingle();
     if(!target){res.status(404).json({error:'User-kan kuma jiro dugsigan.'});return;}
+    if(!['teacher','accountant','parent','student'].includes(target.role)){res.status(400).json({error:'Role-kan looma oggola dukumenti wadaagis.'});return;}
   }
   const canView=body.canView!==false,canEdit=body.canEdit===true,canDownload=body.canDownload===true;
   if((canEdit||canDownload)&&!canView){res.status(400).json({error:'Wax-ka-beddelka iyo download-ku waxay u baahan yihiin ogolaanshaha akhriska.'});return;}
