@@ -129,7 +129,7 @@ export const TeachersView: React.FC = () => {
     e.preventDefault();
     const name = fullName.trim();
     if (!name || isCreatingTeacher) return;
-    if (!teacherPin.trim() && !teacherPassword) { setNotice('Set either a 4–6 digit PIN or a strong password for teacher sign-in.'); return; }
+    if (!/^\\d{4,6}$/.test(teacherPin.trim())) { setNotice('A 4–6 digit Teacher PIN is required.'); return; }
 
     setIsCreatingTeacher(true);
     try {
@@ -158,7 +158,7 @@ export const TeachersView: React.FC = () => {
       setSelectedClassIds([]);
       setSelectedSubjectIds([]);
       setSelectedFormTeacherClassId('');
-      setInitialPassword([`Teacher ID: ${(created as any).staffId}`, teacherPin.trim() ? `Initial PIN: ${teacherPin.trim()}` : '', teacherPassword ? `Password: ${teacherPassword}` : ''].filter(Boolean).join('\n'));
+      setInitialPassword([`Teacher ID: ${(created as any).staffId}`, `Initial PIN: ${teacherPin.trim()}`].join('\n'));
       setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
       window.setTimeout(() => setNotice(null), 4500);
