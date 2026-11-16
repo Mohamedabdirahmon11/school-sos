@@ -6370,7 +6370,7 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   if (!payment) { res.status(404).json({ error: 'Receipt not found.' }); return; }
   const user = (req as any).user as User;
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'fees_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view receipts.' }); return; }
-  if (!['accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
+  if (!['school_admin', 'accountant', 'super_admin'].includes(user.role) && !(await canAccessStudentRecord(user, payment.studentId))) { res.status(403).json({ error: 'You do not have access to this student fee record.' }); return; }
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
