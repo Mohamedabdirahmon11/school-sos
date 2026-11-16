@@ -5897,7 +5897,7 @@ apiRouter.post('/payroll/:id/pay', requireAuth, requireSchoolContext, requireAcc
   const paymentDate = typeof req.body?.paymentDate === 'string' ? req.body.paymentDate : new Date().toISOString().slice(0, 10);
   const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().slice(0, 120) : '';
   const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 500) : '';
-  if (!Number.isFinite(amount) || amount <= 0 || amount > remaining || !['cash', 'bank_transfer', 'mobile_money', 'other'].includes(paymentMethod) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(paymentDate) || Number.isNaN(Date.parse(paymentDate)) || new Date(paymentDate + 'T00:00:00.000Z').toISOString().slice(0, 10) !== paymentDate) {
+  if (!Number.isFinite(amount) || amount <= 0 || amount > remaining || !['cash', 'bank_transfer', 'mobile_money', 'other'].includes(paymentMethod) || !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate) || Number.isNaN(Date.parse(paymentDate)) || new Date(paymentDate + 'T00:00:00.000Z').toISOString().slice(0, 10) !== paymentDate) {
     res.status(400).json({ error: 'Enter a valid payment amount, payment method, and date. The amount cannot exceed the outstanding balance.' }); return;
   }
   const paidAmount = Number((Number(record.paidAmount || 0) + amount).toFixed(2));
