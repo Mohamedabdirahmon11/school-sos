@@ -172,3 +172,5 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Added three unit tests for approved-mark aggregation, ignoring draft marks and deterministic class ranking.
 - Latest GitHub Actions run **43829647841** completed successfully after the variable and term-scope changes: TypeScript checks PASS, full test suite PASS (**374 tests, 0 failures**), route parity PASS, static RLS source audit PASS, and production build PASS.
 - Still unresolved variable/data fields include payment transaction amount, persistent document serial number, and QR verification; these need the issuing/verification data model and are not replaced with invented values.
+
+- Final documentation-sync CI run **43829834131** also completed successfully on the latest branch head: **374/374 tests, 0 failures**, TypeScript checks, route parity, static RLS source audit (66 declared tables), and production build all PASS.
