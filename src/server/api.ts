@@ -7791,6 +7791,7 @@ apiRouter.post('/documents/:id/permissions', requireAuth, requireSchoolContext, 
     can_view:canView,can_edit:canEdit,can_download:canDownload,created_by:user.id
   }).select('id,user_id,role,can_view,can_edit,can_download,created_at').single();
   if(error||!data){res.status(503).json({error:'Ogolaanshaha lama kaydin karin.'});return;}
+  await client.from('school_document_audit_events').insert({school_id:school.id,document_id:req.params.id,actor_user_id:user.id,action:'permission_granted',details:{permissionId:data.id,userId:data.user_id,role:data.role,canView:data.can_view,canEdit:data.can_edit,canDownload:data.can_download}});
   res.status(201).json({id:data.id,userId:data.user_id,role:data.role,canView:data.can_view,canEdit:data.can_edit,canDownload:data.can_download,createdAt:data.created_at});
 });
 
@@ -7800,6 +7801,7 @@ apiRouter.delete('/documents/:id/permissions/:permissionId', requireAuth, requir
   const {data,error}=await client.from('school_document_permissions').delete().eq('school_id',school.id)
     .eq('document_id',req.params.id).eq('id',req.params.permissionId).select('id').maybeSingle();
   if(error||!data){res.status(404).json({error:'Ogolaanshaha lama helin.'});return;}
+  await client.from('school_document_audit_events').insert({school_id:school.id,document_id:req.params.id,actor_user_id:(req as any).user.id,action:'permission_revoked',details:{permissionId:req.params.permissionId}});
   res.json({success:true});
 });
 
