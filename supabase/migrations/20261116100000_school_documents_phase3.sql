@@ -123,7 +123,6 @@ BEGIN
     IF NEW.locked_at IS NOT NULL AND (
       NEW.title IS DISTINCT FROM OLD.title OR
       NEW.document_type IS DISTINCT FROM OLD.document_type OR
-      NEW.status IS DISTINCT FROM OLD.status OR
       NEW.content_html IS DISTINCT FROM OLD.content_html OR
       NEW.page_size IS DISTINCT FROM OLD.page_size OR
       NEW.direction IS DISTINCT FROM OLD.direction OR
