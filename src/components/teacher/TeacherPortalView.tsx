@@ -80,11 +80,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const examConfig = examConfigData as ExamConfig | null;
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
   const [timetableScope, setTimetableScope] = useState<'mine' | 'school'>('mine');
+  const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
+  // Timetable slots use the teacher record ID, while the signed-in user has a
+  // separate account ID. Match the exact assigned teacher ID; never infer by name.
   const isMyTimetableSlot = (slot: TimetableSlot) =>
-    teacherAssignments.some((assignment: any) => !assignment.isFormTeacher && assignment.classId === slot.classId && assignment.subjectId === slot.subjectId)
-    || String((slot as any).teacherName || '').trim().toLowerCase() === String(user?.fullName || '').trim().toLowerCase();
-  const visibleTimetable = timetableScope === 'mine' ? timetable.filter(isMyTimetableSlot) : timetable;
+    Boolean(slot.teacherId) && teacherAssignments.some((assignment: any) =>
+      !assignment.isFormTeacher &&
+      assignment.teacherId === slot.teacherId &&
+      assignment.classId === slot.classId &&
+      assignment.subjectId === slot.subjectId
+    );
+  const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const visibleTimetable = (timetableScope === 'mine' ? timetable.filter(isMyTimetableSlot) : timetable)
+    .filter(slot => timetableDay === 'all' || slot.dayOfWeek === timetableDay)
+    .slice()
+    .sort((a, b) => timetableDays.indexOf(a.dayOfWeek) - timetableDays.indexOf(b.dayOfWeek) || a.periodNumber - b.periodNumber);
   const visibleStudents = students.filter(student =>
     `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
   );
@@ -480,18 +491,26 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="mt-1 text-xs text-slate-500">Start with your own lessons; switch to the school view when needed.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Timetable scope">
-                <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => setTimetableScope('mine')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
-                <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => setTimetableScope('school')} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Timetable scope">
+                  <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => { setTimetableScope('mine'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
+                  <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => { setTimetableScope('school'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
+                </div>
+                <select aria-label="Filter timetable by day" value={timetableDay} onChange={event => setTimetableDay(event.target.value as typeof timetableDay)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                  <option value="all">All days</option>
+                  {timetableDays.map(day => <option key={day} value={day}>{day}</option>)}
+                </select>
               </div>
-              <span aria-label={`${timetable.length} school periods available`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} periods</span>
+              <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
           {visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
-              {timetableScope === 'mine' && timetable.length > 0
-                ? 'No lessons could be matched to your teacher account. Switch to School to review the full timetable, or ask the administrator to verify your timetable assignments.'
-                : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
+              {timetableDay !== 'all'
+                ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`
+                : timetableScope === 'mine' && timetable.length > 0
+                  ? 'No lessons are assigned to your teacher profile yet. Ask the administrator to confirm your subject and timetable assignments.'
+                  : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
