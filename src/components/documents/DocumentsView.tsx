@@ -10,7 +10,7 @@ import './documents.css';
 
 type DocType = 'transfer_letter'|'certificate'|'parent_letter'|'teacher_letter'|'student_clearance'|'report_summary'|'other';
 type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null; canEdit?:boolean; canDownload?:boolean };
-type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean };
+type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean; deletedAt?:string|null };
 
 const makeBuiltin = (id:string, title:string, documentType:DocType, contentHtml:string): TemplateRow => ({
   id, title, documentType, isBuiltin:true, contentHtml
@@ -123,6 +123,7 @@ export const DocumentsView: React.FC = () => {
   const isAdmin = ['school_admin','super_admin'].includes(user?.role || '');
   const [documents,setDocuments] = useState<DocumentRow[]>([]);
   const [templates,setTemplates] = useState<TemplateRow[]>(BUILTIN_TEMPLATES);
+  const [showArchivedTemplates,setShowArchivedTemplates] = useState(false);
   const [selected,setSelected] = useState<DocumentRow|null>(null);
   const [title,setTitle] = useState('');
   const [html,setHtml] = useState('');
@@ -180,10 +181,10 @@ export const DocumentsView: React.FC = () => {
 
   const loadTemplates = useCallback(async () => {
     try {
-      const saved = await ApiClient.getDocumentTemplates() as TemplateRow[];
+      const saved = await ApiClient.getDocumentTemplates(showArchivedTemplates) as TemplateRow[];
       setTemplates([...BUILTIN_TEMPLATES,...saved]);
     } catch { setTemplates(BUILTIN_TEMPLATES); }
-  },[]);
+  },[showArchivedTemplates]);
 
   useEffect(() => { void loadDocuments(); },[loadDocuments]);
   useEffect(() => { if(isAdmin) void loadTemplates(); },[loadTemplates,isAdmin]);
@@ -294,7 +295,7 @@ export const DocumentsView: React.FC = () => {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Dukumentiga lama soo celin karin.'); }
   };
 
-  const selectedTemplate = useMemo(() => templates.find(item => item.id === templateId) || BUILTIN_TEMPLATES[0],[templates,templateId]);
+  const selectedTemplate = useMemo(() => templates.find(item => item.id === templateId && !item.deletedAt) || templates.find(item => !item.deletedAt) || BUILTIN_TEMPLATES[0],[templates,templateId]);
   const saveTemplate = async () => {
     if (!templateTitle.trim() || !templateHtml.trim()) return;
     try {
@@ -318,9 +319,17 @@ export const DocumentsView: React.FC = () => {
   };
 
   const deleteTemplate = async (id:string) => {
-    if (!window.confirm('Ma hubtaa inaad template-kan tirtirayso?')) return;
+    if (!window.confirm('Template-kan ma u raraysaa kaydka? Waad soo celin kartaa mar dambe.')) return;
     try { await ApiClient.deleteDocumentTemplate(id); await loadTemplates(); if (editingTemplateId===id) setEditingTemplateId(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Template-ka lama tirtiri karin.'); }
+  };
+
+  const restoreTemplate = async (id:string) => {
+    try {
+      await ApiClient.restoreDocumentTemplate(id);
+      await loadTemplates();
+      setMessage('Template-ka waa laga soo celiyey kaydka.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Template-ka lama soo celin karin.'); }
   };
 
   const previewGeneration = async () => {
@@ -375,7 +384,7 @@ export const DocumentsView: React.FC = () => {
       {message && <div role="status" className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"><span>{message}</span><button type="button" aria-label="Xir fariinta" onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
       {isAdmin && showTemplates && <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-2">
-        <div><h2 className="mb-3 font-bold text-slate-900">Dooro template</h2><div className="space-y-2">{templates.map(template=><div key={template.id} className={'flex items-center justify-between gap-2 rounded-lg border p-2 ' + (template.id===templateId?'border-teal-500 bg-teal-50':'border-slate-200')}><button type="button" onClick={()=>setTemplateId(template.id)} className="min-w-0 flex-1 text-left text-sm font-medium text-slate-800">{template.title}<span className="block text-xs text-slate-500">{TYPE_LABELS[template.documentType]}</span></button><>{!template.isBuiltin && <button type="button" aria-label="Wax ka beddel template" onClick={()=>{setEditingTemplateId(template.id);setTemplateTitle(template.title);setTemplateHtml(template.contentHtml);setTemplateType(template.documentType);}} className="rounded-md px-2 py-1 text-xs text-teal-700 hover:bg-teal-50">Wax ka beddel</button>}{!template.isBuiltin && <button type="button" aria-label="Tirtir template" onClick={()=>void deleteTemplate(template.id)} className="rounded-md p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={14}/></button>}<button type="button" aria-label="Nuqul ka samee template" title="Nuqul ka samee" onClick={()=>void duplicateTemplate(template)} className="rounded-md p-2 hover:bg-slate-100"><Copy size={15}/></button></></div>)}</div><button type="button" onClick={()=>void createDocument(selectedTemplate)} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Ka samee dukumenti</button></div>
+        <div><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Dooro template</h2><button type="button" onClick={()=>setShowArchivedTemplates(value=>!value)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">{showArchivedTemplates?'Qari kuwa kaydsan':'Tus kuwa kaydsan'}</button></div><div className="space-y-2">{templates.map(template=><div key={template.id} className={'flex items-center justify-between gap-2 rounded-lg border p-2 ' + (template.id===templateId?'border-teal-500 bg-teal-50':'border-slate-200')}><button type="button" disabled={!!template.deletedAt} onClick={()=>setTemplateId(template.id)} className="min-w-0 flex-1 text-left text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-60">{template.title}<span className="block text-xs text-slate-500">{TYPE_LABELS[template.documentType]}{template.deletedAt?' · Kaydsan':''}</span></button><>{!template.isBuiltin && !template.deletedAt && <><button type="button" aria-label="Wax ka beddel template" onClick={()=>{setEditingTemplateId(template.id);setTemplateTitle(template.title);setTemplateHtml(template.contentHtml);setTemplateType(template.documentType);}} className="rounded-md px-2 py-1 text-xs text-teal-700 hover:bg-teal-50">Wax ka beddel</button><button type="button" aria-label="Kaydi template" onClick={()=>void deleteTemplate(template.id)} className="rounded-md p-2 text-rose-600 hover:bg-rose-50" title="U rar kaydka"><Trash2 size={14}/></button><button type="button" aria-label="Nuqul ka samee template" title="Nuqul ka samee" onClick={()=>void duplicateTemplate(template)} className="rounded-md p-2 hover:bg-slate-100"><Copy size={15}/></button></>}{!template.isBuiltin && template.deletedAt && <button type="button" aria-label="Soo celi template" onClick={()=>void restoreTemplate(template.id)} className="rounded-md px-2 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50">Soo celi</button>}</></div>)}</div><button type="button" disabled={!!selectedTemplate.deletedAt} onClick={()=>void createDocument(selectedTemplate)} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Ka samee dukumenti</button></div>
         <div><h2 className="mb-3 font-bold text-slate-900">{editingTemplateId?'Wax ka beddel template':'Samee template cusub'}</h2><label className="mb-2 block text-xs font-semibold text-slate-600">Magaca template-ka<input value={templateTitle} onChange={event=>setTemplateTitle(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label><label className="mb-2 block text-xs font-semibold text-slate-600">Nooca<select value={templateType} onChange={event=>setTemplateType(event.target.value as DocType)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm">{Object.entries(TYPE_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label className="block text-xs font-semibold text-slate-600">Qoraalka template-ka<textarea rows={7} value={templateHtml} onChange={event=>setTemplateHtml(event.target.value)} placeholder="<p>Magaca ardayga: {student_name}</p>" className="mt-1 w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" /></label><p className="mt-1 text-xs text-slate-500">Doorsoomayaal: {'{student_name}'} · {'{student_id}'} · {'{class}'} · {'{parent_name}'} · {'{date}'} · {'{school_name}'} · {'{teacher_name}'} · {'{term}'} · {'{academic_year}'} · {'{total_marks}'} · {'{average}'} · {'{grade}'} · {'{rank}'} · {'{attendance}'} · {'{teacher_comment}'} · {'{fee_balance}'} · {'{staff_name}'} · {'{staff_id}'}</p><button type="button" onClick={()=>void saveTemplate()} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Kaydi template-ka</button></div>
       </section>}
 
