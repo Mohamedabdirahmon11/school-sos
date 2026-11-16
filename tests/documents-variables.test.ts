@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { replaceDocumentVariables } from '../src/lib/documents/variables.ts';
+import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../src/lib/documents/variables.ts';
 
 test('document variables are inserted as escaped plain text', () => {
   const result = replaceDocumentVariables('<p>{student_name}</p>', { student_name:'Asha <script>alert(1)</script> & Ali' });
@@ -16,7 +16,6 @@ test('missing and unknown variables are reported and never left as braces', () =
 
 
 test('document generation requires explicit confirmation when any student has missing values', () => {
-  const { requiresDocumentGenerationConfirmation } = require('../src/lib/documents/variables.ts') as typeof import('../src/lib/documents/variables.ts');
   assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:['parent_name']}], false), true);
   assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:[]}], false), false);
   assert.equal(requiresDocumentGenerationConfirmation([{studentName:'Asha',missing:['parent_name']}], true), false);
