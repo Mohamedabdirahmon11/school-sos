@@ -28,6 +28,7 @@ export const DocumentEditor: React.FC<Props> = ({
   const [cellBorderColor, setCellBorderColor] = useState('#94a3b8');
   const [cellBorderWidth, setCellBorderWidth] = useState('1');
   const [cellBorderStyle, setCellBorderStyle] = useState<'solid'|'dashed'|'dotted'|'double'>('solid');
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -144,6 +145,21 @@ export const DocumentEditor: React.FC<Props> = ({
     const cell = selectedCell();
     if (!cell) return;
     cell.style.backgroundColor = color;
+    emit();
+  };
+
+  const rotateSelectedImage = (degrees: number) => {
+    if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
+    selectedImage.style.transform = 'rotate(' + Math.max(-180,Math.min(180,degrees)) + 'deg)';
+    selectedImage.style.transformOrigin = 'center center';
+    emit();
+  };
+
+  const changeSelectedImageLayer = (direction: 'front'|'back') => {
+    if (!selectedImage || !editorRef.current?.contains(selectedImage)) return;
+    const current = Number(selectedImage.style.zIndex || 0);
+    selectedImage.style.zIndex = String(Math.max(-10,Math.min(10,current + (direction === 'front' ? 1 : -1))));
+    selectedImage.style.position = 'relative';
     emit();
   };
 
@@ -271,6 +287,11 @@ export const DocumentEditor: React.FC<Props> = ({
         {button('Adeegso xadka','Ku dabaq xadka unugga la doortay',setCellBorder)}
         {canUploadImage && <>{button('Sawir','Geli sawir',() => imageInputRef.current?.click())}
         <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => void uploadImage(event.target.files?.[0])} /></>}
+        <select aria-label="Wareeji sawirka la doortay" defaultValue="0" onChange={event => rotateSelectedImage(Number(event.target.value))} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs">
+          <option value="0">Wareeg 0°</option><option value="90">Wareeg 90°</option><option value="180">Wareeg 180°</option><option value="-90">Wareeg -90°</option>
+        </select>
+        {button('Lakab +','Sawirka hore u soo qaad',() => changeSelectedImageLayer('front'))}
+        {button('Lakab −','Sawirka gadaal u dhig',() => changeSelectedImageLayer('back'))}
         <select aria-label="Ballaca sawirka" className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue="320px" onChange={event => setImageWidth(event.target.value)}>
           <option value="160px">Sawir yar</option><option value="320px">Sawir dhexe</option><option value="640px">Sawir weyn</option><option value="100%">Buuxa</option>
         </select>
@@ -307,7 +328,7 @@ export const DocumentEditor: React.FC<Props> = ({
           </div>
         </header>
         <div ref={editorRef} contentEditable suppressContentEditableWarning role="textbox" aria-label="Meesha qoraalka dukumentiga" aria-multiline="true"
-          dir={direction} onInput={emit} onBlur={emit} onPaste={event => {
+          dir={direction} onInput={emit} onBlur={emit} onClick={event => { const target = event.target as HTMLElement; const image = target.closest('img') as HTMLImageElement | null; setSelectedImage(image && editorRef.current?.contains(image) ? image : null); }} onPaste={event => {
             const clipboard = event.clipboardData;
             const pasted = clipboard.getData('text/html');
             if (pasted) {
