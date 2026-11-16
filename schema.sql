@@ -6491,10 +6491,10 @@ ALTER TABLE public.school_document_audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_document_attachments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS school_document_versions_admin_all ON public.school_document_versions;
-CREATE POLICY school_document_versions_admin_all ON public.school_document_versions
-  FOR ALL TO authenticated
-  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'))
-  WITH CHECK (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
+DROP POLICY IF EXISTS school_document_versions_admin_read ON public.school_document_versions;
+CREATE POLICY school_document_versions_admin_read ON public.school_document_versions
+  FOR SELECT TO authenticated
+  USING (private.auth_user_role() = 'super_admin' OR (school_id = private.auth_school_id() AND private.auth_user_role() = 'school_admin'));
 
 DROP POLICY IF EXISTS school_document_permissions_admin_all ON public.school_document_permissions;
 CREATE POLICY school_document_permissions_admin_all ON public.school_document_permissions
@@ -6543,7 +6543,6 @@ BEGIN
     IF NEW.locked_at IS NULL AND (
       NEW.title IS DISTINCT FROM OLD.title OR
       NEW.document_type IS DISTINCT FROM OLD.document_type OR
-      NEW.status IS DISTINCT FROM OLD.status OR
       NEW.content_html IS DISTINCT FROM OLD.content_html OR
       NEW.page_size IS DISTINCT FROM OLD.page_size OR
       NEW.direction IS DISTINCT FROM OLD.direction OR
