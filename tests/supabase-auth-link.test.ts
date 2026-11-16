@@ -22,14 +22,16 @@ test('legacy account migration requires a verified stored password', () => {
   const migration = staffRoute.indexOf('linkLegacyLoginToSupabaseAuth(user, password)');
   const session = staffRoute.indexOf('await issueSessionCookie(res, user, req)');
   assert.ok(failedPassword >= 0 && migration > failedPassword && session > migration);
-  assert.ok(staffRoute.includes('verifiedLegacyPassword = verifyPassword(legacyCredential, user.passwordHash)'));
-  assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role))"));
-  assert.ok(staffRoute.includes("['school_admin', 'teacher'].includes(user.role) && verifyPin"));
+  assert.ok(staffRoute.includes('verifiedLegacyPassword = verifyPassword(password, user.passwordHash)'));
+  assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin')"));
+  assert.ok(staffRoute.includes("if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin')"));
+  assert.ok(staffRoute.includes("['school_admin', 'teacher', 'accountant'].includes(user.role)"));
+  assert.ok(staffRoute.includes("user.role === 'super_admin'"));
   assert.equal(staffRoute.slice(migration - 100, migration + 160).includes('verifyPin'), false);
 });
 
 test('migration creates a new Auth identity and keeps the SchoolOS row link consistent', () => {
-  assert.ok(helper.includes("!['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
+  assert.ok(helper.includes("user.role !== 'super_admin'"));
   assert.ok(helper.includes('auth.admin.createUser'));
   assert.ok(helper.includes('email_confirm: true'));
   assert.ok(helper.includes(".is('auth_user_id', null)"));
@@ -45,8 +47,8 @@ test('teachers always keep school-issued Teacher ID and PIN authentication', () 
   const routeStart = api.indexOf("apiRouter.post('/auth/login'");
   const routeEnd = api.indexOf("apiRouter.post('/auth/logout'", routeStart);
   const route = api.slice(routeStart, routeEnd);
-  assert.ok(route.includes("['super_admin', 'school_admin', 'accountant'].includes(user.role)"));
-  assert.ok(route.includes("['school_admin', 'teacher'].includes(user.role) && verifyPin"));
+  assert.ok(route.includes("user.role === 'super_admin'"));
+  assert.ok(route.includes("['school_admin', 'teacher', 'accountant'].includes(user.role)"));
 });
 
 test('student and parent PIN login remains separate from Supabase Auth migration', () => {

@@ -36,7 +36,7 @@ export const TeachersView: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [teacherPin, setTeacherPin] = useState('');
-  const [teacherPassword, setTeacherPassword] = useState('');
+
   const [joinedDate, setJoinedDate] = useState(new Date().toISOString().slice(0, 10));
   const [gender, setGender] = useState<'male' | 'female'>('male');
     const [qualification, setQualification] = useState('B.Ed / B.Sc');
@@ -129,7 +129,7 @@ export const TeachersView: React.FC = () => {
     e.preventDefault();
     const name = fullName.trim();
     if (!name || isCreatingTeacher) return;
-    if (!teacherPin.trim() && !teacherPassword) { setNotice('Set either a 4–6 digit PIN or a strong password for teacher sign-in.'); return; }
+    if (!/^\d{4,6}$/.test(teacherPin.trim())) { setNotice('A 4–6 digit Teacher PIN is required.'); return; }
 
     setIsCreatingTeacher(true);
     try {
@@ -138,7 +138,6 @@ export const TeachersView: React.FC = () => {
         phone: phone.trim(),
         address: address.trim(),
         pin: teacherPin.trim() || undefined,
-        password: teacherPassword,
         joinedDate,
         gender,
         qualification: qualification.trim(),
@@ -153,12 +152,11 @@ export const TeachersView: React.FC = () => {
       setPhone('');
       setAddress('');
       setTeacherPin('');
-      setTeacherPassword('');
       setJoinedDate(new Date().toISOString().slice(0, 10));
       setSelectedClassIds([]);
       setSelectedSubjectIds([]);
       setSelectedFormTeacherClassId('');
-      setInitialPassword([`Teacher ID: ${(created as any).staffId}`, teacherPin.trim() ? `Initial PIN: ${teacherPin.trim()}` : '', teacherPassword ? `Password: ${teacherPassword}` : ''].filter(Boolean).join('\n'));
+      setInitialPassword([`Teacher ID: ${(created as any).staffId}`, `Initial PIN: ${teacherPin.trim()}`].join('\n'));
       setNotice(`Teacher ${name} appointed successfully.`);
       await fetchData();
       window.setTimeout(() => setNotice(null), 4500);
@@ -349,14 +347,10 @@ export const TeachersView: React.FC = () => {
               </div>
 
               <div>
-                  <label className="block font-medium text-[#334155]">Login PIN (optional)</label>
-                  <input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
+                  <label className="block font-medium text-[#334155]">Teacher PIN (required)</label>
+                  <input type="password" required inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={e => setTeacherPin(e.target.value.replace(/\D/g, '').slice(0, 6))} minLength={4} maxLength={6} pattern="[0-9]{4,6}" placeholder="4–6 digits" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 font-mono" />
               </div>
-              <div>
-                <label className="block font-medium text-[#334155]">Password (optional)</label>
-                <input type="password" autoComplete="new-password" value={teacherPassword} onChange={e => setTeacherPassword(e.target.value)} minLength={teacherPassword ? 8 : undefined} placeholder="Optional: 8+ characters, uppercase, lowercase and number" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
-              </div>
-              <p className="text-[10px] text-slate-500">Provide at least one sign-in method: a 4–6 digit PIN or a strong password.</p>
+              <p className="text-[10px] text-slate-500">Teachers sign in using their school-issued Teacher ID and 4–6 digit PIN. Password login is disabled.</p>
               <div>
                 <label className="block font-medium text-[#334155]">Address (optional)</label>
                 <input value={address} onChange={e => setAddress(e.target.value)} maxLength={250} placeholder="Teacher address" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />

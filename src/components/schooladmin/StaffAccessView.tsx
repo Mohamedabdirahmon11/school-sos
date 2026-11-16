@@ -40,6 +40,7 @@ export const StaffAccessView: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [roleTitle, setRoleTitle] = useState('Accountant');
   const [email, setEmail] = useState('');
+  const [staffPin, setStaffPin] = useState('');
   const [staffId, setStaffId] = useState('');
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('500');
@@ -92,7 +93,7 @@ export const StaffAccessView: React.FC = () => {
         });
         setMessage('Staff profile and permissions updated successfully.');
       } else {
-        const created = await ApiClient.request<StaffMember & { initialPassword?: string }>('/school/staff', {
+        const created = await ApiClient.request<StaffMember & { initialPin?: string }>('/school/staff', {
           method: 'POST',
           body: JSON.stringify({
             fullName,
@@ -102,11 +103,12 @@ export const StaffAccessView: React.FC = () => {
             phone,
             monthlySalary: parseFloat(salary) || 0,
             permissions: selectedPermissions,
+            pin: staffPin,
             createLogin
           })
         });
-        if (created.initialPassword) {
-          window.alert(`Sign-in account created for ${created.email}.\nTemporary password (shown once):\n${created.initialPassword}\nThe staff member must change it after signing in.`);
+        if (created.initialPin) {
+          window.alert(`Accountant sign-in created.\nStaff ID: ${created.staffId}\nInitial PIN (shown once): ${created.initialPin}\nShare it securely with the staff member.`);
         }
         setMessage(createLogin ? `Staff sign-in account created for ${fullName} (${created.staffId}).` : `Staff record created for ${fullName} (${created.staffId}) without login access.`);
       }
@@ -115,6 +117,7 @@ export const StaffAccessView: React.FC = () => {
       setEditingStaff(null);
       setFullName('');
       setEmail('');
+      setStaffPin('');
       setStaffId('');
       setPhone('');
       setCreateLogin(true);
@@ -124,19 +127,19 @@ export const StaffAccessView: React.FC = () => {
     }
   };
 
-  const handleResetStaffPassword = async (staff: StaffMember) => {
+  const handleResetStaffPin = async (staff: StaffMember) => {
     if (!staff.userId) {
       setError('This staff record is not linked to a sign-in account.');
       return;
     }
-    if (!confirm(`Generate a temporary password for ${staff.fullName}? They must change it at next sign-in.`)) return;
+    if (!confirm(`Generate a new PIN for ${staff.fullName}? It will be shown once.`)) return;
     setError(null);
     try {
-      const result = await ApiClient.resetUserPassword(staff.userId);
-      window.alert(`Temporary password for ${staff.fullName}:\n\n${result.temporaryPassword}\n\nThis is shown once. The user must change it at next sign-in.`);
-      setMessage(`Temporary password generated for ${staff.fullName}.`);
+      const result = await ApiClient.request<{ newPin: string; staff: { staffId: string; fullName: string } }>(`/school/staff/${staff.id}/reset-pin`, { method: 'POST' });
+      window.alert(`Staff ID: ${result.staff.staffId}\nNew PIN: ${result.newPin}\nShare it securely.`);
+      setMessage(`New PIN generated for ${staff.fullName}.`);
     } catch (err: any) {
-      setError(err.message || 'Could not reset this staff password.');
+      setError(err.message || 'Could not reset this staff PIN.');
     }
   };
 
@@ -275,8 +278,8 @@ export const StaffAccessView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {st.userId && <button type="button" onClick={() => handleResetStaffPassword(st)} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
-                          <KeyRound className="w-3 h-3" /><span>Reset password</span>
+                        {st.userId && <button type="button" onClick={() => handleResetStaffPin(st)} className="px-2.5 py-1 text-xs text-[#0F766E] bg-teal-50 hover:bg-teal-100 font-semibold rounded flex items-center gap-1">
+                          <KeyRound className="w-3 h-3" /><span>Reset PIN</span>
                         </button>}
                         <button
                           onClick={() => openEditModal(st)}
@@ -352,14 +355,14 @@ export const StaffAccessView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Email (Login ID)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Contact Email (optional)</label>
                   <input
                     type="email"
-                    required={createLogin}
+                    required={false}
                     disabled={!createLogin}
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder={createLogin ? "staff@school.so" : "Not needed for drivers"}
+                    placeholder="Optional contact email"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-400 focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                   />
                 </div>
@@ -375,6 +378,7 @@ export const StaffAccessView: React.FC = () => {
                 </div>
               </div>
 
+              {createLogin && !editingStaff && <div><label className="block text-xs font-medium text-slate-700 mb-1">Initial Accountant PIN (4–6 digits)</label><input type="password" inputMode="numeric" maxLength={6} required value={staffPin} onChange={e => setStaffPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 4–6 digit PIN" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg" /></div>}
               <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} disabled={!!editingStaff || roleTitle === 'Driver'} /> Create a system login for this staff member</label>
               {!createLogin && <p className="text-[11px] text-slate-500">This person is recorded in Staff & Access only. No username, password or separate portal is created.</p>}
 

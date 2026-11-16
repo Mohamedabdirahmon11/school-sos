@@ -13,7 +13,7 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
   const route = api.slice(routeStart, routeEnd);
   assert.ok(route.includes("const submittedPin = typeof pin === 'string' ? pin.trim() : ''"));
   assert.ok(route.includes('verifyPin(submittedPin'));
-  assert.ok(route.includes("!user.pin && verifyPassword(submittedPin, user.passwordHash)"));
+  assert.ok(route.includes("!user.pin && /^\\d{4,6}$/.test(submittedPin) && verifyPassword(submittedPin, user.passwordHash)"));
   assert.ok(route.includes("db.updateUser(user.id, { pin: hashPin(submittedPin) })"));
   assert.ok(route.includes('await db.flush()'));
   assert.ok(storage.includes('const school = await this.getSchoolById(normalizedStaffId)'));
@@ -22,9 +22,9 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
 });
 
 test('shared login sends email passwords and ID-based PINs to the correct credential fields', () => {
-  assert.ok(loginView.includes("pin: email.trim().includes('@') ? pin : (password || pin)"));
-  assert.ok(loginView.includes('Super Admin email, School ID / Admin ID, Teacher ID, or Accountant email / phone'));
-  assert.ok(loginView.includes('PIN (School Admin / Teacher) or password (Super Admin / Accountant)'));
+  assert.ok(loginView.includes('pin,') && loginView.includes("password: activeTab === 'super_admin' ? password : undefined"));
+  assert.ok(loginView.includes('Enter your staff ID'));
+  assert.ok(loginView.includes('4–6 digit PIN'));
   assert.ok(loginView.includes('Set your School Admin PIN'));
   assert.ok(loginView.includes('handleBootstrapPinChange'));
 });
@@ -44,7 +44,7 @@ test('School Admin profile and forced credential screens use PINs instead of pas
   const apiSource = read('../src/server/api.ts');
   const profileSource = read('../src/components/common/ProfileModal.tsx');
   const forcedSource = read('../src/components/auth/ForcePasswordChangeModal.tsx');
-  assert.ok(apiSource.includes("user.role === 'school_admin' && newPassword"));
+  assert.ok(apiSource.includes("['school_admin', 'teacher', 'accountant'].includes(user.role) && newPassword"));
   assert.ok(apiSource.includes('verifyPin(currentPin.trim()'));
   assert.ok(apiSource.includes('pin: hashPin(newPin)'));
   assert.ok(profileSource.includes('Change School Admin PIN'));

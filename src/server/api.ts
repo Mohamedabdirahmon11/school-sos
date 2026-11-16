@@ -812,7 +812,7 @@ async function syncLinkedSupabaseAuthCredentials(
 }
 
 async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Promise<void> {
-  if (!isSupabaseConfigured || !user.email || user.authUserId || !['super_admin', 'school_admin', 'accountant'].includes(user.role)) return;
+  if (!isSupabaseConfigured || !user.email || user.authUserId || user.role !== 'super_admin') return;
 
   const adminClient = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false }
@@ -1122,10 +1122,10 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // B. SUPER ADMIN, SCHOOL ADMIN, TEACHER, ACCOUNTANT
-  // Teachers use their school-issued staff ID and either password or PIN.
+  // Staff accounts use their school-issued ID and PIN. Super Admin alone uses email and password.
   const identifier = typeof email === 'string' ? email.trim() : '';
-  if (!identifier || (!password && !pin)) {
-    res.status(400).json({ error: requestedRole === 'teacher' ? 'Teacher ID and PIN are required.' : 'Email, School ID, or staff ID and password/PIN are required.' });
+  if (!identifier || (requestedRole === 'super_admin' ? !password : !pin)) {
+    res.status(400).json({ error: requestedRole === 'super_admin' ? 'Super Admin email and password are required.' : 'Staff ID and PIN are required.' });
     return;
   }
   if (requestedRole === 'teacher' && !validStaffId(normalizeStaffId(identifier))) {
@@ -1164,7 +1164,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // The shared staff sign-in resolves Super Admin, School Admin, and Accountant
   // from the matched account while keeping a single staff login form.
   const sharedAdminLogin = requestedRole === 'school_admin'
-    && (normalizedRole === 'super_admin' || normalizedRole === 'school_admin' || normalizedRole === 'accountant');
+    && (normalizedRole === 'school_admin' || normalizedRole === 'accountant');
   // Teachers may use their school-issued staff ID on the same form. Require an
   // exact match with the account's stored staff ID before accepting this role.
   const sharedTeacherLogin = requestedRole === 'school_admin'
@@ -1195,9 +1195,9 @@ apiRouter.post('/auth/login', async (req, res) => {
   // School Admin and Teacher accounts may authenticate with their issued PIN.
   // Legacy School Admin onboarding PINs are checked against their password hash
   // until the account receives a dedicated PIN hash or rotates credentials.
-  if (submittedPin && ['school_admin', 'teacher'].includes(user.role)) {
-    const legacySchoolAdminPinValid = !authUserId && user.role === 'school_admin'
-      && !user.pin && verifyPassword(submittedPin, user.passwordHash);
+  if (submittedPin && ['school_admin', 'teacher', 'accountant'].includes(user.role)) {
+    const legacySchoolAdminPinValid = user.role === 'school_admin'
+      && !user.pin && /^\d{4,6}$/.test(submittedPin) && verifyPassword(submittedPin, user.passwordHash);
     if (legacySchoolAdminPinValid) {
       // Upgrade existing School Admin accounts in place so their PIN continues
       // working even after the first-login password-change flow updates passwordHash.
@@ -1213,7 +1213,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       isPasswordValid = verifyPin(submittedPin, String(user.pin || (user as any).pinHash || ''));
     }
   }
-  if (!isPasswordValid && authUserId) {
+  if (!isPasswordValid && user.role === 'super_admin' && authUserId) {
     if (isSupabaseConfigured && user.email) {
       try {
         // Use an isolated server-side client so password sign-in cannot mutate the
@@ -1230,11 +1230,11 @@ apiRouter.post('/auth/login', async (req, res) => {
         isPasswordValid = false;
       }
     }
-  } else if (!isPasswordValid) {
-    const legacyCredential = password || submittedPin;
-    verifiedLegacyPassword = verifyPassword(legacyCredential, user.passwordHash);
-    isPasswordValid = verifiedLegacyPassword
-      || (['school_admin', 'teacher'].includes(user.role) && verifyPin(legacyCredential, String(user.pin || (user as any).pinHash || '')));
+  } else if (!isPasswordValid && user.role === 'super_admin') {
+    // Super Admin alone retains email + password authentication, including
+    // accounts not yet linked to Supabase Auth. Staff accounts are PIN-only.
+    verifiedLegacyPassword = verifyPassword(password, user.passwordHash);
+    isPasswordValid = verifiedLegacyPassword;
   }
   if (!isPasswordValid) {
     const lockResult = await db.handleFailedLogin(user.id);
@@ -1280,7 +1280,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   // Only a verified legacy password (never a teacher PIN) can create a
   // Supabase Auth identity. Teacher ID/PIN and student/parent PIN logins retain
   // their existing sign-in flow.
-  if (!authUserId && verifiedLegacyPassword && ['super_admin', 'school_admin', 'accountant'].includes(user.role)) {
+  if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin') {
     await linkLegacyLoginToSupabaseAuth(user, password);
   }
 
@@ -1506,18 +1506,18 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (typeof fullName !== 'string' || fullName.trim().length < 2) { res.status(400).json({ error: 'Full name must contain at least two characters.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid email address.' }); return; }
-  if (user.role === 'school_admin' && newPassword) {
-    res.status(400).json({ error: 'School Admin credentials use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
+  if (['school_admin', 'teacher', 'accountant'].includes(user.role) && newPassword) {
+    res.status(400).json({ error: 'Staff accounts use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
   }
-  if (user.role !== 'school_admin' && newPin) {
-    res.status(400).json({ error: 'PIN changes are only available for School Admin accounts.' }); return;
+  if (!['school_admin', 'teacher', 'accountant'].includes(user.role) && newPin) {
+    res.status(400).json({ error: 'PIN changes are only available for staff accounts.' }); return;
   }
   if (newPin !== undefined && newPin !== '') {
     if (typeof newPin !== 'string' || !/^\d{4,6}$/.test(newPin)) {
       res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' }); return;
     }
     const currentPinValid = typeof currentPin === 'string'
-      && (verifyPin(currentPin.trim(), String(user.pin || '')) || (!user.pin && verifyPassword(currentPin.trim(), user.passwordHash)));
+      && (verifyPin(currentPin.trim(), String(user.pin || '')) || (!user.pin && /^\d{4,6}$/.test(currentPin.trim()) && verifyPassword(currentPin.trim(), user.passwordHash)));
     if (!currentPinValid) { res.status(400).json({ error: 'Current PIN is incorrect.' }); return; }
     if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
       res.status(400).json({ error: 'Choose a new PIN that is different from your current PIN.' }); return;
@@ -1550,7 +1550,7 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
   if (newPassword) db.logAudit({ action: 'PASSWORD_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'User changed their password from profile settings and synchronized linked authentication.', severity: 'info' });
-  if (newPin) db.logAudit({ action: 'PIN_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'School Admin changed their PIN from profile settings.', severity: 'info' });
+  if (newPin) db.logAudit({ action: 'PIN_CHANGED', category: 'auth', schoolId: user.schoolId, userId: user.id, userName: updated.fullName, userRole: user.role, details: 'Staff member changed their sign-in PIN from profile settings.', severity: 'info' });
   await db.flush();
   res.json(sanitizeUser(updated));
 });
@@ -4638,9 +4638,9 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!fullName || fullName.length > 120) { res.status(400).json({ error: 'Teacher full name is required and must be at most 120 characters.' }); return; }
   if (!['male', 'female'].includes(gender)) { res.status(400).json({ error: 'Gender must be male or female.' }); return; }
   if (address.length > 250) { res.status(400).json({ error: 'Teacher address must be at most 250 characters.' }); return; }
-  if (!initialPin && !initialPassword) { res.status(400).json({ error: 'Set either a 4–6 digit Teacher PIN or a strong password.' }); return; }
+  if (!initialPin) { res.status(400).json({ error: 'A 4–6 digit Teacher PIN is required. Teacher accounts use PIN-only sign-in.' }); return; }
   if (initialPin && !/^\d{4,6}$/.test(initialPin)) { res.status(400).json({ error: 'Teacher PIN must contain 4–6 digits.' }); return; }
-  if (initialPassword && passwordPolicyError(initialPassword)) { res.status(400).json({ error: passwordPolicyError(initialPassword) }); return; }
+  if (initialPassword) { res.status(400).json({ error: 'Teacher accounts use PIN-only sign-in. Do not send a password.' }); return; }
   const parsedJoinedDate = new Date(`${joinedDate}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedDate) || Number.isNaN(parsedJoinedDate.getTime()) || parsedJoinedDate.toISOString().slice(0, 10) !== joinedDate) { res.status(400).json({ error: 'Joining date must be a real date in YYYY-MM-DD format.' }); return; }
   if (body.phone !== undefined && (typeof body.phone !== 'string' || phone.length > 30 || (phone && !validImportPhone(phone)))) { res.status(400).json({ error: 'Teacher phone must be a valid international phone number.' }); return; }
@@ -4677,7 +4677,7 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 
   const account = db.createUser({
     schoolId: school.id, role: 'teacher', staffId, fullName, phone,
-    passwordHash: initialPassword ? hashPassword(initialPassword) : randomBytes(32).toString('base64url'), pin: initialPin || undefined,
+    passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin),
     mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
     assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
   });
@@ -4717,24 +4717,40 @@ apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requ
 apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { fullName, roleTitle, email, phone, monthlySalary, permissions } = req.body || {};
+  const initialPin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
   const createLogin = req.body?.createLogin !== false;
-  if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && (typeof email !== 'string' || !email.trim()))) { res.status(400).json({ error: 'Full name and role title are required; login email is required only when creating login access.' }); return; }
+  if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && !/^\d{4,6}$/.test(initialPin))) { res.status(400).json({ error: 'Full name and role title are required; a 4–6 digit PIN is required only when creating login access.' }); return; }
   if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && permissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
   if (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const cleanEmail = createLogin ? email.trim().toLowerCase() : '';
-  if (createLogin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid sign-in email.' }); return; }
-  if (createLogin && await db.findUserForLogin(cleanEmail)) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
+  const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid contact email.' }); return; }
+  if (cleanEmail && await db.findUserForLogin(cleanEmail)) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   const existingStaff = await db.getStaffMembers(school.id);
   const staffId = normalizeStaffId(req.body?.staffId) || await nextSchoolStaffId(school);
   if (!validStaffId(staffId)) { res.status(400).json({ error: 'Staff ID must be 3–40 characters and use only letters, numbers, dots, underscores, or hyphens.' }); return; }
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
-  const temporaryPassword = createLogin ? String(randomInt(100000, 1_000_000)) : undefined;
-  const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(temporaryPassword!), mustChangePassword: true, isBlocked: false, failedLoginAttempts: 0 }) : null;
+  const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin), mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0 }) : null;
   const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? permissions : [], status: 'active', ...(account ? { userId: account.id } : {}) });
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
-  res.status(201).json({ ...staff, ...(temporaryPassword ? { initialPassword: temporaryPassword } : {}) });
+  res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
+apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const actor = (req as any).user as User;
+  const staff = (await db.getStaffMembers(school.id)).find(item => item.id === req.params.id);
+  if (!staff?.userId) { res.status(404).json({ error: 'Staff login was not found in this school.' }); return; }
+  const accounts = await db.getUsers(school.id, 'accountant');
+  const account = accounts.find(item => item.id === staff.userId && item.schoolId === school.id);
+  if (!account) { res.status(404).json({ error: 'Accountant login was not found in this school.' }); return; }
+  const newPin = String(randomInt(1000, 10000));
+  const updated = db.updateUser(account.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null } as any);
+  if (!updated) { res.status(404).json({ error: 'Staff PIN could not be updated.' }); return; }
+  db.logAudit({ action: 'ACCOUNTANT_PIN_RESET', category: 'security', schoolId: school.id, schoolName: school.name, userId: actor.id, userName: actor.fullName, userRole: actor.role, details: 'Reset sign-in PIN for staff ID ' + staff.staffId + '.', severity: 'warning' });
+  await db.flush();
+  res.json({ success: true, newPin, staff: { id: staff.id, staffId: staff.staffId, fullName: staff.fullName } });
+});
+
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { fullName, roleTitle, email, phone, monthlySalary, permissions, status } = req.body || {};
