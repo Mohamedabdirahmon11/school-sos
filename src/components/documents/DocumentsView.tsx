@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, WandSparkles, Files, LayoutTemplate } from 'lucide-react';
+import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, WandSparkles, Files, LayoutTemplate, History, ShieldCheck, Lock, Unlock, Paperclip, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { DocumentEditor } from './DocumentEditor.tsx';
@@ -8,7 +8,7 @@ import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import './documents.css';
 
 type DocType = 'transfer_letter'|'certificate'|'parent_letter'|'teacher_letter'|'student_clearance'|'report_summary'|'other';
-type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string };
+type DocumentRow = { id:string; title:string; documentType:DocType; status:'draft'|'final'; updatedAt:string; deletedAt?:string|null; studentId?:string|null; pageSize?:'A4'|'A5'|'Letter'; direction?:'ltr'|'rtl'; pageMargins?:number; contentHtml?:string; lockedAt?:string|null; lockReason?:string|null };
 type TemplateRow = { id:string; title:string; documentType:DocType; contentHtml:string; isBuiltin?:boolean };
 
 const BUILTIN_TEMPLATES: TemplateRow[] = [
@@ -63,6 +63,12 @@ export const DocumentsView: React.FC = () => {
   const [previewMissing,setPreviewMissing] = useState<string[]>([]);
   const [previewStudent,setPreviewStudent] = useState('');
   const [message,setMessage] = useState('');
+  const [versions,setVersions] = useState<any[]>([]);
+  const [auditEvents,setAuditEvents] = useState<any[]>([]);
+  const [attachments,setAttachments] = useState<any[]>([]);
+  const [showHistory,setShowHistory] = useState(false);
+  const [showAudit,setShowAudit] = useState(false);
+  const [attachmentBusy,setAttachmentBusy] = useState(false);
   const savedSnapshot = useRef({title:'',html:''});
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
@@ -151,6 +157,10 @@ export const DocumentsView: React.FC = () => {
       dirtyRef.current = false;
       setSaveState('saved');
       setMessage('');
+      void ApiClient.getDocumentVersions(full.id).then(setVersions).catch(()=>setVersions([]));
+      void ApiClient.getDocumentAudit(full.id).then(setAuditEvents).catch(()=>setAuditEvents([]));
+      if (full.studentId) void ApiClient.getStudentDocumentAttachments(full.studentId).then(setAttachments).catch(()=>setAttachments([]));
+      else setAttachments([]);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Dukumentiga lama furi karin.'); }
   };
 
@@ -304,11 +314,23 @@ export const DocumentsView: React.FC = () => {
               <select aria-label="Xaaladda dukumentiga" value={status} onChange={async event=>{const next=event.target.value as 'draft'|'final';setStatus(next);await ApiClient.updateDocument(selected.id,{status:next});await loadDocuments();}} className="min-h-10 rounded-lg border border-slate-200 px-2 text-xs"><option value="draft">Qabyo</option><option value="final">Dhammaad</option></select>
               <span className="min-w-16 text-xs text-slate-500" role="status">{saveState==='saving'?'Waa la kaydinayaa…':saveState==='error'?'Kaydintu way fashilantay':saveState==='unsaved'?'Isbeddel lama kaydin':'Waa kaydsan yahay'}</span>
               <button type="button" onClick={()=>void saveNow()} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Save size={14}/> Kaydi</button>
+
+              <button type="button" onClick={()=>{setShowHistory(value=>!value);setShowAudit(false);void ApiClient.getDocumentVersions(selected.id).then(setVersions).catch(error=>setMessage(error.message));}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><History size={14}/> Taariikh</button>
+              <button type="button" onClick={()=>{setShowAudit(value=>!value);setShowHistory(false);void ApiClient.getDocumentAudit(selected.id).then(setAuditEvents).catch(error=>setMessage(error.message));}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><ShieldCheck size={14}/> Audit</button>
+              {selected.lockedAt || status==='final' ? <button type="button" onClick={async()=>{try{const result=await ApiClient.unlockDocument(selected.id);setSelected(result);setStatus('draft');await loadDocuments();setMessage('Dukumentiga waa la furay.');}catch(error){setMessage(error instanceof Error?error.message:'Dukumentiga lama furi karin.');}}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-800"><Unlock size={14}/> Fur</button> : <button type="button" onClick={async()=>{try{await saveNow();const result=await ApiClient.lockDocument(selected.id,'Manually locked');setSelected(result);await loadDocuments();setMessage('Dukumentiga waa la xiray.');}catch(error){setMessage(error instanceof Error?error.message:'Dukumentiga lama xiri karin.');}}} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Lock size={14}/> Xir</button>}
+
               <button type="button" onClick={()=>window.print()} className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white"><Printer size={14}/> Daabac / PDF</button>
               <button type="button" onClick={startTemplateFromSelected} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Copy size={14}/> Template ka dhig</button>
             </div>
-            <DocumentEditor html={html} onChange={value=>{setHtml(value);markDirty(title,value);}} onSaveNow={saveNow} direction={direction} onDirectionChange={value=>{setDirection(value);markDirty(title,html,value,pageSize,margins);}} pageSize={pageSize} onPageSizeChange={value=>{setPageSize(value);markDirty(title,html,direction,value,margins);}} margins={margins} onMarginsChange={value=>{setMargins(value);markDirty(title,html,direction,pageSize,value);}} school={school} onUploadImage={uploadImage}/>
-            <DocumentFileTools html={html} title={title} onImport={value=>{setHtml(value);markDirty(title,value);}}/>
+
+            {showHistory && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><History size={16}/> Taariikhda versions</h3>{versions.length===0?<p className="text-sm text-slate-500">Weli version hore ma jiro.</p>:<div className="max-h-64 space-y-2 overflow-auto">{versions.map(version=><div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-2"><div><p className="text-sm font-semibold">Version {version.versionNumber} · {version.title}</p><p className="text-xs text-slate-500">{localDate(version.createdAt,school?.timezone)} · {version.status==='final'?'Final':'Qabyo'}</p></div><button type="button" disabled={Boolean(selected.lockedAt)||status==='final'} onClick={async()=>{if(!window.confirm('Ma soo celinaysaa version-kan? Isbeddelka hadda jira wuxuu noqonayaa version cusub.'))return;try{const result=await ApiClient.restoreDocumentVersion(selected.id,version.id);setSelected(result);setTitle(result.title);setHtml(result.contentHtml||'');setStatus(result.status);savedSnapshot.current={title:result.title,html:result.contentHtml||''};dirtyRef.current=false;setSaveState('saved');setVersions(await ApiClient.getDocumentVersions(selected.id));await loadDocuments();setMessage('Version-ka waa la soo celiyey.');}catch(error){setMessage(error instanceof Error?error.message:'Version-ka lama soo celin karin.');}}} className="rounded-lg border border-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-800 disabled:opacity-40">Soo celi</button></div>)}</div>}</section>}
+            {showAudit && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><ShieldCheck size={16}/> Audit log</h3>{auditEvents.length===0?<p className="text-sm text-slate-500">Audit event ma jiro.</p>:<div className="max-h-64 space-y-2 overflow-auto">{auditEvents.map(event=><div key={event.id} className="rounded-lg border border-slate-100 p-2"><p className="text-sm font-semibold">{event.action}</p><p className="text-xs text-slate-500">{localDate(event.createdAt,school?.timezone)} · {event.actorUserId||'System'}</p></div>)}</div>}</section>}
+            {selected.studentId && <section className="rounded-xl border border-slate-200 bg-white p-3"><h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800"><Paperclip size={16}/> Lifaaqyada ardayga</h3><div className="mb-3 flex flex-wrap items-center gap-2"><label className="cursor-pointer rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">{attachmentBusy?'Waa la soo gelinayaa…':'Ku dar PDF / sawir'}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={attachmentBusy} className="hidden" onChange={async event=>{const file=event.target.files?.[0];if(!file)return;setAttachmentBusy(true);try{await ApiClient.uploadStudentDocumentAttachment(selected.studentId!,file);setAttachments(await ApiClient.getStudentDocumentAttachments(selected.studentId!));setMessage('Lifaaqa waa la kaydiyey.');}catch(error){setMessage(error instanceof Error?error.message:'Lifaaqa lama soo gelin karin.');}finally{setAttachmentBusy(false);event.target.value='';}}}/></label><span className="text-xs text-slate-500">PDF, JPG, PNG ama WebP · ugu badnaan 10 MB</span></div>{attachments.length===0?<p className="text-sm text-slate-500">Ardaygani weli lifaaq ma leh.</p>:<div className="space-y-2">{attachments.map(file=><div key={file.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{file.fileName}</p><p className="text-xs text-slate-500">{Math.ceil(file.fileSize/1024)} KB · {localDate(file.createdAt,school?.timezone)}</p></div><div className="flex gap-1"><a href={ApiClient.studentDocumentAttachmentDownloadUrl(selected.studentId!,file.id)} className="rounded p-2 text-teal-700" aria-label="Soo dejiso lifaaqa"><Download size={15}/></a><button type="button" onClick={async()=>{if(!window.confirm('Ma tirtiraysaa lifaaqan?'))return;try{await ApiClient.deleteStudentDocumentAttachment(selected.studentId!,file.id);setAttachments(await ApiClient.getStudentDocumentAttachments(selected.studentId!));}catch(error){setMessage(error instanceof Error?error.message:'Lifaaqa lama tirtiri karin.');}}} className="rounded p-2 text-rose-600" aria-label="Tirtir lifaaqa"><Trash2 size={15}/></button></div></div>)}</div>}</section>}
+            {selected.lockedAt || status==='final' ? <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><p className="flex items-center gap-2 font-bold"><Lock size={16}/> Dukumentigan waa la xiray</p><p className="mt-1">Wax ka beddelka waa la xannibay. Riix “Fur” si aad ugu celiso qabyo una sii waddo tafatirka.</p>{selected.lockReason && <p className="mt-1 text-xs">Sabab: {selected.lockReason}</p>}</div> : <>
+              <DocumentEditor html={html} onChange={value=>{setHtml(value);markDirty(title,value);}} onSaveNow={saveNow} direction={direction} onDirectionChange={value=>{setDirection(value);markDirty(title,html,value,pageSize,margins);}} pageSize={pageSize} onPageSizeChange={value=>{setPageSize(value);markDirty(title,html,direction,value,margins);}} margins={margins} onMarginsChange={value=>{setMargins(value);markDirty(title,html,direction,pageSize,value);}} school={school} onUploadImage={uploadImage}/>
+              <DocumentFileTools html={html} title={title} onImport={value=>{setHtml(value);markDirty(title,value);}}/>
+            </>}
+
           </div>}
         </main>
       </div>
