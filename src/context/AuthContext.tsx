@@ -26,6 +26,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const DEFAULT_BRAND_COLOR = "#0F766E";
+
+function getBrandForeground(color: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return "#FFFFFF";
+  const channels = [0, 2, 4].map(offset => parseInt(match[1].slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  const darkContrast = (luminance + 0.05) / 0.05;
+  return whiteContrast >= darkContrast ? "#FFFFFF" : "#111827";
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [school, setSchool] = useState<School | null>(null);
@@ -143,8 +156,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isReadOnly = !activeSchool?.subscription || activeSchool.subscription.status === 'read_only';
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--brand-color', activeSchool?.brandColor || '#0F766E');
-  }, [activeSchool?.brandColor]);
+    const configuredColor = activeSchool?.brandColor || DEFAULT_BRAND_COLOR;
+    const brandColor = /^#[0-9a-f]{6}$/i.test(configuredColor) ? configuredColor : DEFAULT_BRAND_COLOR;
+    document.documentElement.style.setProperty('--brand-color', brandColor);
+    document.documentElement.style.setProperty('--brand-foreground', getBrandForeground(brandColor));
+  }, [activeSchool?.id, activeSchool?.brandColor]);
 
   useEffect(() => {
     if (activeSchool?.language && !ApiClient.hasLanguagePreference()) {
