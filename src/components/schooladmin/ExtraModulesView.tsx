@@ -957,10 +957,10 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       <p className="text-sm font-semibold text-slate-900">{fullName || "Unnamed student"}</p>
                       <p className="mt-0.5 text-[11px] text-slate-500">{student.studentId || student.id} · {className}</p>
                     </div>
-                    {assignment && currentRoute ? (
+                    {assignment ? (
                       <div className="min-w-[170px]">
-                        <p className="text-xs font-semibold text-teal-800">{currentRoute.name}</p>
-                        <p className="mt-0.5 text-[11px] text-slate-500">{currentRoute.vehicleNumber || "Vehicle not set"} · {formatMoney(assignment.feeAmount, school?.currency)} / month</p>
+                        <p className="text-xs font-semibold text-teal-800">{currentRoute?.name || "Route unavailable"}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-500">{currentRoute?.vehicleNumber || "Vehicle not set"} · {formatMoney(assignment.feeAmount, school?.currency)} / month</p>
                       </div>
                     ) : (
                       <div className="min-w-[170px]">
