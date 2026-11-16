@@ -162,7 +162,7 @@ DECLARE
   new_status VARCHAR(20);
 BEGIN
   IF p_amount IS NULL OR p_amount <= 0 OR round(p_amount,2) <> p_amount
-    OR p_payment_method NOT IN ('Cash','Bank Transfer','Mobile Money')
+    OR p_payment_method IS NULL OR p_payment_method NOT IN ('Cash','Bank Transfer','Mobile Money')
     OR p_recorded_by IS NULL OR btrim(p_recorded_by) = '' THEN
     RAISE EXCEPTION 'Enter a valid positive payment and payment method.';
   END IF;
