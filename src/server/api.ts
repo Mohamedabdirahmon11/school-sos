@@ -7607,7 +7607,7 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, requireSchoolAdmi
   const client = documentServiceClient(res);
   if (!client) return;
   let query = client.from('school_documents')
-    .select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins')
+    .select('id,title,document_type,status,updated_at,created_at,deleted_at,student_id,class_id,template_id,page_size,direction,page_margins,locked_at,locked_by,lock_reason')
     .eq('school_id', school.id)
     .order('updated_at', { ascending: false })
     .limit(100);
@@ -7668,10 +7668,10 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchool
   const body = req.body || {};
   const client = documentServiceClient(res);
   if (!client) return;
-  const { data: current, error: currentError } = await client.from('school_documents').select('id,locked_at')
+  const { data: current, error: currentError } = await client.from('school_documents').select('id,locked_at,status')
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if (currentError || !current) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
-  if (current.locked_at) { res.status(423).json({ error: 'Dukumentigan waa la xiray. Marka hore fur si aad wax uga beddesho.', code: 'DOCUMENT_LOCKED' }); return; }
+  if (current.locked_at || current.status === 'final') { res.status(423).json({ error: 'Dukumentigan waa la xiray ama waa final. Marka hore fur si aad wax uga beddesho.', code: 'DOCUMENT_LOCKED' }); return; }
   const updates: Record<string,unknown> = { updated_by:user.id, updated_at:new Date().toISOString() };
   if (typeof body.title === 'string') {
     const title = body.title.trim().slice(0,180);
@@ -7684,8 +7684,6 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, requireSchool
   if (['A4','A5','Letter'].includes(body.pageSize)) updates.page_size = body.pageSize;
   if (['ltr','rtl'].includes(body.direction)) updates.direction = body.direction;
   if (Number.isInteger(body.pageMargins)) updates.page_margins = Math.min(40,Math.max(5,body.pageMargins));
-  const client = documentServiceClient(res);
-  if (!client) return;
   const { data, error } = await client.from('school_documents').update(updates)
     .eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).select('*').maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin ama lama kaydin karin.' }); return; }
@@ -7793,7 +7791,7 @@ apiRouter.post('/documents/:id/unlock', requireAuth, requireSchoolContext, requi
   const client = documentServiceClient(res);
   if (!client) return;
   const { data, error } = await client.from('school_documents').update({
-    locked_at:null, locked_by:null, lock_reason:null, updated_by:user.id, updated_at:new Date().toISOString()
+    locked_at:null, locked_by:null, lock_reason:null, status:'draft', updated_by:user.id, updated_at:new Date().toISOString()
   }).eq('school_id',school.id).eq('id',req.params.id).not('locked_at','is',null).select('*').maybeSingle();
   if (error || !data) { res.status(409).json({ error:'Dukumentiga lama helin ama ma xirna.' }); return; }
   res.json(documentClientRow(data,true));
@@ -7833,7 +7831,7 @@ apiRouter.post('/students/:studentId/document-attachments', requireAuth, require
     const validImage=bytes && mime!=='application/pdf' ? Boolean(detectSchoolLogoImage(bytes,mime)) : false;
     const validPdf=Boolean(bytes && mime==='application/pdf' && bytes.subarray(0,5).toString('ascii')==='%PDF-');
     if(!bytes || (!validImage && !validPdf)){res.status(400).json({error:'Geli PDF ama sawir JPEG, PNG ama WebP sax ah oo ka yar 10 MB.'});return;}
-    const rawName=decodeURIComponent(String(req.headers['x-file-name']||'lifaaq')).replace(/[\\/\\0-\\x1f\\x7f]/g,' ').trim();
+    let rawName=String(req.headers['x-file-name']||'lifaaq'); try { rawName=decodeURIComponent(rawName); } catch { rawName='lifaaq'; } rawName=rawName.replace(/[\\/\\0-\\x1f\\x7f]/g,' ').trim();
     const fileName=(rawName.split(/[\\/]/).pop()||'lifaaq').slice(0,180);
     const extension=mime==='application/pdf'?'pdf':mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp';
     const client=documentServiceClient(res);if(!client)return;
