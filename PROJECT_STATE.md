@@ -174,3 +174,11 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Still unresolved variable/data fields include payment transaction amount, persistent document serial number, and QR verification; these need the issuing/verification data model and are not replaced with invented values.
 
 - Final documentation-sync CI run **43829834131** also completed successfully on the latest branch head: **374/374 tests, 0 failures**, TypeScript checks, route parity, static RLS source audit (66 declared tables), and production build all PASS.
+
+
+### Template archive/restore continuation — 2026-11-16
+- Added an explicit archived-template view to the school-scoped Documents template manager. Existing soft-delete fields are reused: archiving sets `deleted_at/deleted_by`; the archived list is only returned when the authenticated school admin requests `includeArchived=true`.
+- Added an authenticated, school-scoped restore endpoint that clears the archive markers and updates the actor/timestamp. The UI disables editing/selection for archived templates and offers a Restore action. The existing database unique active-title index remains authoritative; restoring a name that has since been reused returns a safe failure rather than creating duplicate active names.
+- Updated the API client and template manager. No migration or production database change was needed.
+- GitHub Actions run **43832180602** completed successfully on commit `1baf955a9cad27a98623a96e0a6e917672a16bff`: TypeScript checks PASS, test suite PASS, route parity PASS, static RLS source audit PASS, production build PASS.
+- This is a completed part of template lifecycle management, not completion of the entire Designer specification. Immutable issued-template snapshots, visual canvas/layer tools, custom artwork/PDF backgrounds, PDF/ZIP/QR issuance, named permissions and live browser/tenant/storage checks remain open.
