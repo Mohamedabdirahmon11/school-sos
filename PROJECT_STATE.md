@@ -128,3 +128,29 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - F: PARTIAL — unchanged; template archive/restore and issued-version immutability need completion.
 - G: PARTIAL — unchanged; named permissions, teacher own-class policy proof, PDF validation and complete audit coverage remain.
 - H: PARTIAL — unchanged; font/asset caching and performance profiling remain.
+
+
+## Documents Designer continuation — 2026-11-16
+
+### Changes made on `feature/documents-designer-finish`
+- Expanded the local built-in Somali template catalogue from six entries to 42 entries covering transfer/replacement/admission/withdrawal letters, parent notices, discipline and absence notices, fee reminders, teacher appointment/experience/leave/recommendation, exam results, certificate types and visual variants, student/teacher/staff ID examples, term/annual report layouts, payment receipts, exam admit cards, class lists, attendance sheets and exam timetable layouts. Built-ins can be duplicated into a school-owned editable template using the existing flow.
+- Corrected a malformed paragraph in one sports certificate template.
+- Fixed a real class-generation truncation defect: the API previously fetched only the first 100 students. It now collects the complete school-scoped class roster in bounded pages and returns HTTP 413 instead of silently truncating classes above 5,000 students.
+- Added `src/lib/documents/paged-query.ts`, a bounded generic pagination helper, and `tests/documents-paged-query.test.ts` with cases for 40 students, 245 students across three pages, over-limit rejection, and an incomplete-page failure.
+- No schema changes or migrations were needed for these changes because the new built-in templates intentionally reuse the existing allowed document-type values. No database was modified.
+
+### Checklist update
+- A. Template catalogue: **DONE for catalogue coverage**; every named template family now has a built-in entry. Specialized dynamic table rendering and per-template real-data validation remain tracked under C/D/E.
+- B. Built-in design choices: **PARTIAL**; the catalogue now contains at least five certificate layouts, four ID examples, four letter layouts and four report layouts. Custom PNG/JPG/PDF background upload, PDF.js page selection, DPI validation, metadata stripping and full per-card front/back composition remain missing.
+- C. Visual designer: **PARTIAL**; existing rich-text editor remains, but the positioned canvas and field/layer operations are still absent.
+- D. Variables: **PARTIAL**; escaped text and missing-variable warnings remain. New template examples include academic/financial tokens that are not yet populated by the API, so they intentionally appear in the missing-data warning until their data sources are implemented.
+- E. Generation/export/verification: **PARTIAL**; whole-class generation now paginates past 100 and has a tested 5,000-student safety ceiling. Serial/QR verification, public verify endpoint, per-student PDF/ZIP export, batch progress/cancel and embedded Arabic font are still missing.
+- F. Management: **PARTIAL**; existing template duplicate/edit and document version/lock flows remain. Template archive/restore and immutable issued-template snapshots still need completion.
+- G. Security: **PARTIAL**; existing school scoping and sanitizer remain. Explicit permission keys, teacher-owned-class generation, strict custom background PDF validation, and complete audit event coverage still need work.
+- H. Performance: **PARTIAL**; on-open content fetch and debounced autosave remain. Font/asset caching and profiling are not verified.
+
+### Verification status for this continuation
+- GitHub file writes succeeded on the feature branch; each source file was re-fetched before update and updated by its current blob SHA.
+- Added pagination tests are committed but **not executed**. Local `git remote -v` was attempted from `/` and failed with `fatal: not a git repository`; a fresh shallow clone of the exact repository URL again failed with `Could not resolve host: github.com`.
+- No local TypeScript check, full test suite, Playwright desktop/mobile run, PDF generation/render inspection, authenticated two-school RLS test, or real Storage round-trip has been run in this environment. No passing result is claimed.
+- No migrations were added or applied; production Supabase and existing records remain untouched.
