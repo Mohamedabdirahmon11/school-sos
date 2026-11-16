@@ -113,7 +113,7 @@ RETURNS BIGINT
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE allocated_value BIGINT;
 BEGIN
   IF p_school_id IS NULL OR btrim(p_school_id) = ''
@@ -124,8 +124,18 @@ BEGIN
     id, school_id, academic_year, next_value
   )
   SELECT p_school_id || ':' || p_academic_year, p_school_id, p_academic_year,
-    COALESCE(MAX(substring(invoice.invoice_number FROM '([0-9]+)
+    COALESCE(MAX(substring(invoice.invoice_number FROM '([0-9]+)$')::BIGINT), 0) + 1
+  FROM public.student_invoices invoice
+  WHERE invoice.school_id = p_school_id AND invoice.academic_year = p_academic_year
+  ON CONFLICT (school_id, academic_year)
+  DO UPDATE SET next_value = GREATEST(current_sequence.next_value + 1, EXCLUDED.next_value)
+  RETURNING next_value INTO allocated_value;
+  RETURN allocated_value;
+END;
+$$;
 
+REVOKE ALL ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.schoolos_apply_student_invoice_payment(
   p_invoice_id VARCHAR,
@@ -139,7 +149,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_apply_student_invoice_payment(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   invoice_row public.student_invoices%ROWTYPE;
   payment_row public.fee_payments%ROWTYPE;
@@ -205,23 +215,9 @@ BEGIN
 
   RETURN jsonb_build_object('invoice',to_jsonb(invoice_row),'payment',to_jsonb(payment_row),'replayed',false);
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_apply_student_invoice_payment(VARCHAR,VARCHAR,NUMERIC,VARCHAR,VARCHAR,TEXT,VARCHAR) TO service_role;
-
-NOTIFY pgrst, 'reload schema';
-)::BIGINT), 0) + 1
-  FROM public.student_invoices invoice
-  WHERE invoice.school_id = p_school_id AND invoice.academic_year = p_academic_year
-  ON CONFLICT (school_id, academic_year)
-  DO UPDATE SET next_value = GREATEST(current_sequence.next_value + 1, EXCLUDED.next_value)
-  RETURNING next_value INTO allocated_value;
-  RETURN allocated_value;
-END;
-$;
-
-REVOKE ALL ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.schoolos_next_student_invoice(VARCHAR, VARCHAR) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
