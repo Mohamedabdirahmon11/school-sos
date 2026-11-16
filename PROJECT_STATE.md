@@ -273,3 +273,8 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - GitHub Actions run 43845093679 passed on commit e058abbbe7971b6f3b9352ffda4e8cc4eb155fc9: TypeScript PASS, 391/391 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
 - Image editing also supports width, rotate, alignment, bounded layer order and arrow-key nudging; artwork upload audit is recorded transactionally with cleanup on audit failure.
 - This is a functional positioned-field layer within the existing rich-text editor, not yet the full requested design suite. Copy/paste/duplicate, arbitrary object types (QR/barcode/signature/stamp), PDF background/PDF.js page selection, PDF/ZIP batch exports, A4 multi-ID sheets/crop marks, embedded Arabic font export, and real browser/PDF visual checks remain open.
+
+
+### Positioned field duplication — 2026-11-16
+- Added a toolbar action and Ctrl/Cmd+D shortcut to duplicate the selected positioned field, offsetting the copy and assigning a higher layer order. Native clipboard copy/paste remains available in the contenteditable surface.
+- Latest CI run 43845390251 passed after the positioned field and duplicate changes: TypeScript PASS, 391/391 tests PASS, route parity PASS, static RLS source audit PASS, production build PASS.
