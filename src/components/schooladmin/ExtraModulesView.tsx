@@ -46,6 +46,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
 
   // Transport State
   const [routes, setRoutes] = useState<any[]>([]);
+  const [driverStaffs, setDriverStaffs] = useState<Array<{ id: string; staffId: string; fullName: string; phone: string }>>([]);
+  const [driverStaffId, setDriverStaffId] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [busAssignments, setBusAssignments] = useState<any[]>([]);
   const [assignmentStudentId, setAssignmentStudentId] = useState('');
@@ -246,10 +248,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     Promise.all([
       ApiClient.getTransportRoutes(school.id),
       ApiClient.getAllStudents(undefined, undefined),
-      ApiClient.getBusAssignments()
-    ]).then(([routeRows, studentRows, assignmentRows]) => {
+      ApiClient.getBusAssignments(),
+      ApiClient.getTransportDrivers()
+    ]).then(([routeRows, studentRows, assignmentRows, driverRows]) => {
       if (cancelled) return;
       setRoutes(routeRows);
+      setDriverStaffs(driverRows);
       setStudents(studentRows);
       setBusAssignments(assignmentRows);
       setAssignmentStudentId(current => studentRows.some((student: any) => student.id === current && student.status === 'active') ? current : studentRows.find((student: any) => student.status === 'active')?.id || '');
@@ -496,13 +500,13 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   };
 
   const resetRouteForm = () => {
-    setEditingRouteId(null); setRouteName(''); setRouteStops(''); setDriverName('');
+    setEditingRouteId(null); setDriverStaffId(''); setRouteName(''); setRouteStops(''); setDriverName('');
     setVehicleNumber(''); setDriverPhone(''); setRouteFee(25); setRouteCapacity(40);
   };
 
   const openRouteEditor = (route: any) => {
     if (isReadOnly) return;
-    setEditingRouteId(route.id); setRouteName(route.name || '');
+    setEditingRouteId(route.id); setDriverStaffId(driverStaffs.find(driver => driver.fullName === route.driverName && driver.phone === route.driverPhone)?.id || ''); setRouteName(route.name || '');
     setRouteStops(Array.isArray(route.stops) ? route.stops.join('\n') : '');
     setDriverName(route.driverName || ''); setVehicleNumber(route.vehicleNumber || '');
     setDriverPhone(route.driverPhone || ''); setRouteFee(Number(route.feeAmount || 0));
@@ -512,7 +516,8 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !school || !routeName.trim() || !driverName.trim()) return;
-    const payload = { name: routeName.trim(), routeNumber: vehicleNumber.trim(), vehicleNumber: vehicleNumber.trim(), driverName: driverName.trim(), driverPhone: driverPhone.trim(), feeAmount: routeFee, capacity: routeCapacity, stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean) };
+    const selectedDriver = driverStaffs.find(driver => driver.id === driverStaffId);
+    const payload = { name: routeName.trim(), routeNumber: vehicleNumber.trim(), vehicleNumber: vehicleNumber.trim(), driverName: selectedDriver?.fullName || driverName.trim(), driverPhone: selectedDriver?.phone || driverPhone.trim(), feeAmount: routeFee, capacity: routeCapacity, stops: routeStops.split(/[\r\n,]+/).map(stop => stop.trim()).filter(Boolean) };
     try {
       if (editingRouteId) {
         const updated = await ApiClient.updateTransportRoute(editingRouteId, payload);
@@ -1157,11 +1162,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   />
                 </div>
                 <div>
-                  <label className="block font-medium">Driver Phone</label>
+                  <label className="block font-medium">Driver Phone (from Staff)</label>
                   <input
                     type="tel"
                     maxLength={50}
                     value={driverPhone}
+                    readOnly={!!driverStaffId}
                     onChange={e => setDriverPhone(e.target.value)}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                   />
@@ -1182,14 +1188,17 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium">Driver Name</label>
-                  <input
-                    type="text"
+                  <label className="block font-medium">Driver (Staff Member)</label>
+                  <select
                     required
-                    value={driverName}
-                    onChange={e => setDriverName(e.target.value)}
+                    value={driverStaffId}
+                    onChange={e => { setDriverStaffId(e.target.value); const driver = driverStaffs.find(item => item.id === e.target.value); if (driver) { setDriverName(driver.fullName); setDriverPhone(driver.phone || ''); } }}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
-                  />
+                  >
+                    <option value="">Select a driver from Staff</option>
+                    {driverStaffs.map(driver => <option key={driver.id} value={driver.id}>{driver.fullName} ({driver.staffId})</option>)}
+                  </select>
+                  {driverStaffs.length === 0 && <p className="mt-1 text-[10px] text-amber-700">Add a Driver first in Staff & Access. Drivers do not need a login account.</p>}
                 </div>
                 <div>
                   <label className="block font-medium">Monthly Bus Fee ({school?.currency || 'ETB'})</label>
