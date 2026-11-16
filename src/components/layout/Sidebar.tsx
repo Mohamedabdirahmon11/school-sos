@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { translations, LanguageCode, TranslationDict } from '../../lib/translations.ts';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
@@ -22,9 +23,14 @@ type NavItem = { id: string; label: string; icon: React.ComponentType<{ classNam
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
-  const { user, school, t, inspectedSchool, language, setLanguage, logout } = useAuth();
+  const { user, school, inspectedSchool, logout } = useAuth();
   const role = user?.role || 'school_admin';
   const [menuSearch, setMenuSearch] = useState('');
+  const [menuLanguage, setMenuLanguage] = useState<LanguageCode>(() => {
+    if (typeof window === 'undefined') return 'en';
+    const saved = window.localStorage.getItem('schoolos:menu-language:guest');
+    return saved === 'so' || saved === 'am' ? saved : 'en';
+  });
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
@@ -60,7 +66,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'School workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ' },
     'Log out': { so: 'Ka bax', am: 'ውጣ' }
   };
-  const menuText = (value: string) => language === 'en' ? value : menuTranslations[value]?.[language] || value;
+  const menuText = (value: string) => menuLanguage === 'en' ? value : menuTranslations[value]?.[menuLanguage] || value;
+  const menuT = (key: keyof TranslationDict) => translations[menuLanguage]?.[key] || translations.en[key] || String(key);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(`schoolos:menu-language:${user?.id || 'guest'}`);
+    setMenuLanguage(saved === 'so' || saved === 'am' ? saved : 'en');
+  }, [user?.id]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
@@ -85,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     };
   }, [user?.id, school?.id, unreadState.retry]);
 
-  const noticeLabel = unread ? `${t('notice_board')} · ${unread > 99 ? '99+' : unread}` : t('notice_board');
+  const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : t('notice_board');
   const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label: menuText(label), icon });
   const groups: NavGroup[] = (() => {
     if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform', items: [
@@ -223,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         <label style={{ color: 'var(--sidebar-text)' }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
           <Languages size={15} aria-hidden="true" />
           <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
-          <select aria-label="Navigation language" value={language} onChange={event => setLanguage(event.target.value as 'en' | 'so' | 'am')}
+          <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || 'guest'}`, next); }}
             className={`min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none ${isCollapsed ? "md:hidden" : ""}`}>
             <option value="en" className="text-slate-900">English</option>
             <option value="so" className="text-slate-900">Soomaali</option>
