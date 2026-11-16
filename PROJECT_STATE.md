@@ -214,3 +214,5 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Serial/QR verification is now added to manually created, duplicated, and bulk-generated documents. Verification tokens are opaque UUIDs; the public page marks only Final documents valid and exposes the limited verification fields. The QR endpoint builds an absolute same-origin URL from configured APP_BASE_URL/PUBLIC_APP_URL or the request host.
 
 - Added a CR80 (85.6 × 54 mm) document page preset in the editor and print stylesheet, with additive DB constraints for current documents and their version snapshots. This is a single-card page preset only; A4 multi-card imposition/front-back sheet export is still outstanding.
+
+- Artwork follow-up: image uploads now warn when dimensions fall below an approximate 200 DPI target for A4/A5/Letter/CR80, reject images above 40 MP, and re-encode images in-browser before upload to strip EXIF/embedded metadata. This applies to PNG/JPEG/WebP; PDF backgrounds/page selection still need PDF.js work.
