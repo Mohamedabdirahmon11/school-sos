@@ -90,3 +90,14 @@ test('invoice screen reuses a retry key after uncertain payment responses and ex
   assert.match(view, /ApiClient\.downloadStudentInvoicePdf\(invoice\.id\)/);
   assert.match(view, /type="month"/);
 });
+
+test('generated invoices include every applicable fee by default, including bus snapshots', () => {
+  const source = route('post', '/student-invoices/generate');
+  assert.match(source, /body\.includeAnnualRegistration!==false/);
+  assert.match(source, /body\.includeOneTimeFees!==false/);
+  assert.match(source, /assignment\.studentId===student\.id&&assignment\.active/);
+  assert.match(source, /fee_type:'bus',[\s\S]{0,180}unit_amount:Number\(bus\.feeAmount\)/);
+  assert.match(view, /const \[includeAnnual, setIncludeAnnual\] = useState\(true\)/);
+  assert.match(view, /const \[includeOneTime, setIncludeOneTime\] = useState\(true\)/);
+  assert.match(view, /saved bus fee for active bus assignments are included/);
+});
