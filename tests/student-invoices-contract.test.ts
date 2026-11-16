@@ -28,6 +28,9 @@ test('student invoice endpoints are authenticated, school-scoped and permission-
   assert.match(route('post', '/student-invoices/:id/pay'), /requireSchoolAdminOrStaffPermission\('fees_manage'\)/);
   assert.match(route('get', '/student-invoices/:id/items'), /fees_manage/);
   assert.match(route('get', '/student-invoices/:id/pdf'), /fees_manage/);
+  const listRoute = route('get', '/student-invoices');
+  assert.match(listRoute, /user\.role === 'parent' \|\| user\.role === 'student'/);
+  assert.match(listRoute, /query\.in\('student_id',linkedIds\)/);
 });
 
 test('invoice generation uses only active students and respects class/grade fee targeting', () => {
