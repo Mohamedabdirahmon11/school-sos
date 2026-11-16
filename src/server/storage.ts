@@ -2762,10 +2762,11 @@ class StorageEngine {
         const m2 = s2.find(m => m.subjectId === sub.id);
         const p1 = m1 ? m1.percentage : null;
         const p2 = m2 ? m2.percentage : null;
-        let yearlyP = null;
-        if (p1 !== null && p2 !== null) yearlyP = Math.round(((p1 + p2) / 2) * 100) / 100;
-        else if (p1 !== null) yearlyP = p1;
-        else if (p2 !== null) yearlyP = p2;
+        // A yearly subject average is valid only when both semester results
+        // have been approved. Never present a single semester as the full-year average.
+        const yearlyP = p1 !== null && p2 !== null
+          ? Math.round(((p1 + p2) / 2) * 100) / 100
+          : null;
 
         const markDetails = (mark: StudentMark | undefined) => mark ? {
           smallExamMarks: mark.smallExamMarks,
