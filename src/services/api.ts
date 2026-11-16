@@ -1058,6 +1058,12 @@ export class ApiClient {
     return this.request<{ success: boolean }>(`/bus/assignments/${studentId}`, { method: 'DELETE' });
   }
 
+  public static async assignBusStudentsBulk(studentIds: string[], routeId: string) {
+    return this.request<{ assignments: any[]; failures: Array<{ studentId: string; studentName?: string; error: string }> }>('/bus/assignments/bulk', {
+      method: 'POST', body: JSON.stringify({ studentIds, routeId })
+    });
+  }
+
   // Attendance: Taken once per day
   public static async getDailyAttendance(classId: string, date: string) {
     return this.request<AttendanceRecord[]>(`/attendance?classId=${classId}&date=${date}`);
