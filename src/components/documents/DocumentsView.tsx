@@ -341,15 +341,31 @@ export const DocumentsView: React.FC = () => {
 
   const generate = async () => {
     setGenerating(true); setGenerateWarnings([]);
+    const input = {
+      templateHtml:applySchoolBrandColor(selectedTemplate.contentHtml,school?.brandColor),
+      templateId:selectedTemplate.isBuiltin ? undefined : selectedTemplate.id,
+      title:selectedTemplate.title,
+      documentType:selectedTemplate.documentType,
+      classId:classId || undefined,
+      studentIds:studentId ? [studentId] : undefined
+    };
     try {
-      const result = await ApiClient.generateDocuments({
-        templateHtml:applySchoolBrandColor(selectedTemplate.contentHtml,school?.brandColor),
-        templateId:selectedTemplate.isBuiltin ? undefined : selectedTemplate.id,
-        title:selectedTemplate.title,
-        documentType:selectedTemplate.documentType,
-        classId:classId || undefined,
-        studentIds:studentId ? [studentId] : undefined
-      }) as {documents:DocumentRow[];warnings:any[]};
+      let result = await ApiClient.generateDocuments(input) as {documents:DocumentRow[];warnings:any[];requiresConfirmation?:boolean};
+      if (result.requiresConfirmation) {
+        const warnings = result.warnings || [];
+        setGenerateWarnings(warnings);
+        const affected = warnings.length;
+        const missing = [...new Set(warnings.flatMap(warning => warning.missing || []))];
+        const proceed = window.confirm(
+          'Xog ayaa ka maqan ' + affected + ' arday. Dukumentiyada weli lama kaydin. Xogta maqan: ' +
+          missing.join(', ') + '. Ma sii wadaysaa adigoo og in meelahaas ay madhnaan doonaan?'
+        );
+        if (!proceed) {
+          setMessage('Samaynta waa la joojiyey; wax dukumenti ah lama kaydin.');
+          return;
+        }
+        result = await ApiClient.generateDocuments({...input,confirmMissing:true}) as {documents:DocumentRow[];warnings:any[];requiresConfirmation?:boolean};
+      }
       setGenerateWarnings(result.warnings || []);
       setMessage('Waxaa la sameeyey ' + (result.documents?.length || 0) + ' dukumenti.');
       setShowGenerate((result.warnings || []).length > 0);
