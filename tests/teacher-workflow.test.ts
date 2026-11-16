@@ -53,7 +53,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /EXAM RESULTS — READ ONLY/);
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
-  assert.match(teacher, /school periods/);
+  assert.match(teacher, /lessons/);
   assert.match(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
   assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
@@ -109,14 +109,26 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
   assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
   assert.match(payroll, /ApiClient\.getMyPayslips\(\)/);
-  assert.match(payroll, /ApiClient\.downloadPayslipPdf\(record\.id\)/);
+  assert.match(payroll, /ApiClient\.downloadPayslipPdf\(recordId\)/);
+  assert.match(payroll, /Preparing PDF/);
   assert.match(payroll, /setError\(reason instanceof Error/);
+  assert.match(messages, /selectedContact \? 'hidden md:flex'/);
+  assert.match(messages, /Back to contacts/);
+  assert.match(messages, /hasInitializedContact/);
+  assert.match(messages, /contactId: selectedContact\?\.id/);
+  const client = read('../src/services/api.ts');
+  assert.match(client, /query\.set\('contactId', params\.contactId\)/);
+  const api = read('../src/server/api.ts');
+  assert.match(api, /and\(or\(sender_id\.eq\.\$\{user\.id\},recipient_id\.eq\.\$\{user\.id\}\),or\(sender_id\.eq\.\$\{contactId\},recipient_id\.eq\.\$\{contactId\}\)\)/);
 });
 
 
 test('teacher class switching clears stale student data and loads only the active workflow data', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /setStudents\(\[\]\);[\s\S]*setIsLoadingClassData\(true\)/);
+  assert.match(teacher, /if \(needsAttendance && !formTeacherClasses\.some/);
+  assert.match(teacher, /if \(needsStudents && !classes\.some/);
+  assert.match(teacher, /Your teaching class/);
   assert.match(teacher, /const needsAttendance = activeTab === 'attendance'/);
   assert.match(teacher, /const needsGrades = activeTab === 'grades'/);
   assert.match(teacher, /needsAttendance\s*\? ApiClient\.getDailyAttendance/);
@@ -238,8 +250,13 @@ test('teacher portal provides personal timetable first and a deliberate school-w
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /timetableScope, setTimetableScope/);
   assert.match(teacher, /timetable\.filter\(isMyTimetableSlot\)/);
+  assert.match(teacher, /assignment\.teacherId === slot\.teacherId/);
+  assert.match(teacher, /Filter timetable by day/);
+  assert.match(teacher, /All days/);
   assert.match(teacher, /My lessons/);
   assert.match(teacher, /Full school timetable/);
+  const client = read('../src/services/api.ts');
+  assert.match(client, /params\.append\('scope', 'school'\)/);
 });
 
 test('teacher workflows provide mobile student cards, searchable registers, and touch-sized attendance and mark inputs', () => {

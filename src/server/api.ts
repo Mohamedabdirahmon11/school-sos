@@ -6912,6 +6912,17 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
 apiRouter.get('/messages', requireAuth, requireSchoolContext, (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  const contactId = typeof req.query.contactId === 'string' ? req.query.contactId : '';
+  if (contactId) {
+    void sendDatabasePage(
+      req,
+      res,
+      'direct_messages',
+      { school_id: school.id },
+      `and(or(sender_id.eq.${user.id},recipient_id.eq.${user.id}),or(sender_id.eq.${contactId},recipient_id.eq.${contactId}))`
+    );
+    return;
+  }
   void sendDatabasePage(req, res, 'direct_messages', { school_id: school.id }, 'sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id);
 });
 

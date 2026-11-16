@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { DirectMessage, User } from '../../types/index.ts';
 import { ApiClient } from '../../services/api.ts';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { 
   MessageSquare, 
+  ArrowLeft,
   Send, 
   Search, 
   User as UserIcon, 
@@ -28,6 +29,7 @@ export const MessagesView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasInitializedContact = useRef(false);
 
   const fetchData = async () => {
     if (!school || !user) { setLoading(false); return; }
@@ -35,7 +37,7 @@ export const MessagesView: React.FC = () => {
     setError(null);
     try {
       const [msgData, uData] = await Promise.all([
-        ApiClient.getMessages({ page, pageSize: 20 }),
+        ApiClient.getMessages({ page, pageSize: 20, contactId: selectedContact?.id }),
         ApiClient.getMessageContacts()
       ]);
 
@@ -44,7 +46,10 @@ export const MessagesView: React.FC = () => {
 
       const permittedContacts = uData as User[];
       setContacts(permittedContacts);
-      if (!permittedContacts.some((contact: User) => contact.id === selectedContact?.id)) {
+      if (!hasInitializedContact.current) {
+        hasInitializedContact.current = true;
+        setSelectedContact(permittedContacts[0] || null);
+      } else if (selectedContact && !permittedContacts.some((contact: User) => contact.id === selectedContact.id)) {
         setSelectedContact(permittedContacts[0] || null);
       }
     } catch (err) {
@@ -57,7 +62,7 @@ export const MessagesView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [school, user, page]);
+  }, [school, user, page, selectedContact?.id]);
 
   useEffect(() => {
     if (!selectedContact || !user) return;
@@ -125,7 +130,7 @@ export const MessagesView: React.FC = () => {
 
       <div className={isTeacher ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg md:flex-row" : "flex-1 bg-white rounded-xl border border-[#E2E8F0] overflow-hidden flex flex-col md:flex-row shadow-xs"}>
         {/* Contact List */}
-        <div className="w-full md:w-80 min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
+        <div className={`w-full md:w-80 min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/50 ${isTeacher && selectedContact ? 'hidden md:flex' : ''}`}>
           <div className="p-3 border-b border-slate-200 bg-white">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -171,12 +176,13 @@ export const MessagesView: React.FC = () => {
         </div>
 
         {/* Message Thread */}
-        <div className="flex-1 flex flex-col bg-white">
+        <div className={`min-h-0 flex-1 flex flex-col bg-white ${isTeacher && !selectedContact ? 'hidden md:flex' : ''}`}>
           {selectedContact ? (
             <>
               {/* Thread Header */}
               <div className="p-3 border-b border-slate-200 flex items-center justify-between bg-white">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  {isTeacher && <button type="button" onClick={() => setSelectedContact(null)} aria-label="Back to contacts" className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 md:hidden"><ArrowLeft className="h-4 w-4" /><span className="sr-only">All contacts</span></button>}
                   <div className="w-8 h-8 rounded-full bg-teal-100 text-[#0F766E] flex items-center justify-center font-bold text-xs uppercase">
                     {selectedContact.fullName.charAt(0)}
                   </div>
