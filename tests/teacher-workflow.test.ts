@@ -232,3 +232,34 @@ test('teaching-class authorization avoids subject queries for the assigned Form 
   assert.ok(helper.includes("'teachers.user_id': user.id"));
   assert.ok(!helper.includes("queryPage('teachers'"));
 });
+
+
+test('teacher portal provides personal timetable first and a deliberate school-wide switch', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /timetableScope, setTimetableScope/);
+  assert.match(teacher, /timetable\.filter\(isMyTimetableSlot\)/);
+  assert.match(teacher, /My lessons/);
+  assert.match(teacher, /Full school timetable/);
+});
+
+test('teacher workflows provide mobile student cards, searchable registers, and touch-sized attendance and mark inputs', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /visibleStudents/);
+  assert.match(teacher, /Search attendance students/);
+  assert.match(teacher, /md:hidden/);
+  assert.match(teacher, /min-h-11 rounded-lg/);
+  assert.match(teacher, /Search students for marks/);
+  assert.match(teacher, /Search student name or ID/);
+});
+
+test('teacher mobile quick navigation prioritizes daily teaching actions while the full menu retains other sections', () => {
+  const mobile = read('../src/components/layout/MobileBottomNav.tsx');
+  const sidebar = read('../src/components/layout/Sidebar.tsx');
+  assert.match(mobile, /id: 't_timetable'/);
+  assert.match(mobile, /id: 't_attendance'/);
+  assert.match(mobile, /id: 't_grades'/);
+  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.match(sidebar, /item\('t_assignments'/);
+  assert.match(sidebar, /item\('t_messages'/);
+  assert.match(sidebar, /item\('t_payslips'/);
+});
