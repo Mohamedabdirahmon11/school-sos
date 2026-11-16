@@ -726,8 +726,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{students.length} students</span>
                 </div>
                 {subjectComponents.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No assessment components are configured for this exam type. Ask School Admin to configure the exam.</p> : (
-                  <div className="overflow-x-auto">
-                    <>
+                  <>
                     <div className="mb-3 px-3 pt-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students for marks" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
                     <div className="space-y-3 p-3 md:hidden">
                       {visibleStudents.map(student => {

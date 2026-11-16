@@ -155,8 +155,8 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
   const sidebar = read('../src/components/layout/Sidebar.tsx');
   const mobileNav = read('../src/components/layout/MobileBottomNav.tsx');
   const app = read('../src/App.tsx');
-  assert.match(mobileNav, /id: 't_students'/);
-  assert.match(mobileNav, /id: 't_exam_results'/);
+  assert.match(mobileNav, /id: 't_timetable'/);
+  assert.match(mobileNav, /id: 't_grades'/);
   assert.match(sidebar, /item\('t_students'/);
   assert.match(sidebar, /item\('t_grades'/);
   assert.match(sidebar, /item\('t_exam_results'/);
