@@ -259,7 +259,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
       case 'certificate':
         return renderCertificate({schoolName,title:name,studentName:nameOf,body:certificateBody,rankOrTotal:'',date:certificateDate});
       case 'student_id_cards':
-        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:students.map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||''}))});
+        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:students.map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||'',photoUrl:item.documents?.find(document=>/\.(?:png|jpe?g|webp)$/i.test(document.name)&&document.url.startsWith('/api/documents/images?path='))?.url}))});
       case 'official_letter':
         return renderOfficialLetter({schoolName,date:certificateDate,recipient,subject:letterSubject,paragraphs:letterBody.split(/\n+/).filter(Boolean),signatory:'Maamulka dugsiga'});
       case 'fee_receipt':{
