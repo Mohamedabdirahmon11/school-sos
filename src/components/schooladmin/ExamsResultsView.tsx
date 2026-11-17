@@ -1129,6 +1129,7 @@ export const ExamsResultsView: React.FC = () => {
           selectedSemester={selectedSemester}
           onSemesterChange={setSelectedSemester}
           examConfig={examConfig}
+          classDataLoading={isLoading}
         />
       )}
 
