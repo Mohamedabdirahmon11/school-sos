@@ -2638,6 +2638,8 @@ class StorageEngine {
     const submittedChanges: any[] = [];
     const auditValues = (mark: StudentMark) => ({
       assessmentScores: mark.assessmentScores ? { ...mark.assessmentScores } : null,
+      schemeVersion: mark.schemeVersion || 1,
+      schemeSnapshot: mark.schemeSnapshot ? mark.schemeSnapshot.map(component => ({ ...component })) : null,
       smallExamMarks: mark.smallExamMarks,
       bigExamMarks: mark.bigExamMarks,
       totalMarks: mark.totalMarks,
