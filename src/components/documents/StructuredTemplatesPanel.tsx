@@ -347,6 +347,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const cycleAttendance=(studentId:string,date:string)=>{
     setAttendance(current=>{
       const existing=current.find(item=>item.studentId===studentId&&item.date===date);
+      if(existing?.locked){setMessage('Diiwaankan waa cudur-daar; lama beddeli karo xaashidan.');return current;}
       const nextStatus:AttendanceEntry['status']=!existing||existing.status===''?'J':existing.status==='J'?'M':'';
       if(existing?.status&&nextStatus==='')setMessage('Unmarking wuxuu ka dhigaa unmarked gudaha xaashidan; API-ga hadda jira ma tirtirayo diiwaankii hore.');
       const next=current.filter(item=>!(item.studentId===studentId&&item.date===date));
