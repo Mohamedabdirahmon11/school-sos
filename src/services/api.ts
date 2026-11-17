@@ -1197,7 +1197,7 @@ export class ApiClient {
   }
 
   public static async publishExamResults(classId: string, semester: string) {
-    return this.request<{ success: boolean; publishedCount: number; publishedAt: string | null; alreadyPublished?: boolean }>('/exams/publish', {
+    return this.request<{ success: boolean; publishedCount: number; publishedAt: string | null; alreadyPublished?: boolean; notificationCreated?: boolean }>('/exams/publish', {
       method: 'POST',
       body: JSON.stringify({ classId, semester })
     });
