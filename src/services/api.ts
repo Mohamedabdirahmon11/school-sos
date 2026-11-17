@@ -55,12 +55,16 @@ export class ApiClient {
     URL.revokeObjectURL(url);
   }
 
-  public static downloadReportCardPdf(studentId: string) {
-    return this.downloadPdf(`/report-cards/${encodeURIComponent(studentId)}/pdf`, `report-card-${studentId}.pdf`);
+  public static downloadReportCardPdf(studentId: string, semester?: 'Semester 1' | 'Semester 2') {
+    const suffix = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const period = semester ? semester.toLowerCase().replace(/ /g, '-') : 'annual';
+    return this.downloadPdf(`/report-cards/${encodeURIComponent(studentId)}/pdf${suffix}`, `report-card-${studentId}-${period}.pdf`);
   }
 
-  public static downloadClassReportCardsPdf(classId: string) {
-    return this.downloadPdf(`/report-cards/classes/${encodeURIComponent(classId)}/pdf`, `class-report-cards-${classId}.pdf`);
+  public static downloadClassReportCardsPdf(classId: string, semester?: 'Semester 1' | 'Semester 2') {
+    const suffix = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const period = semester ? semester.toLowerCase().replace(/ /g, '-') : 'annual';
+    return this.downloadPdf(`/report-cards/classes/${encodeURIComponent(classId)}/pdf${suffix}`, `class-report-cards-${classId}-${period}.pdf`);
   }
 
   public static downloadReceiptPdf(paymentId: string) {
