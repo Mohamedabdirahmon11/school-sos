@@ -60,6 +60,7 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   const rankings = await db.getClassYearlyRankings(school.id, source.id);
   assert.deepEqual(rankings.map(row => row.yearlyRank), [1, 2, 3, 4]);
   assert.deepEqual(rankings.map(row => row.isPass), [true, true, true, false]);
+  assert.equal(rankings.every(row => row.annualComplete), true);
   const undersizedTarget = db.createClass({ schoolId: school.id, name: 'Small Grade 2', gradeLevel: 2, section: 'B', roomNumber: '', capacity: 2, monthlyFee: 0 });
   const payload = rankings.map((row, index) => ({
     studentId: row.student.id, classFromId: source.id, classToId: index < 3 ? target.id : source.id,
@@ -163,8 +164,13 @@ test('yearly report cards do not treat one approved semester as the full-year av
   assert.equal(yearly[0].subjectResults[0].sem1Percentage, 80);
   assert.equal(yearly[0].subjectResults[0].sem2Percentage, null);
   assert.equal(yearly[0].subjectResults[0].yearlyPercentage, null);
-  assert.equal(yearly[0].yearlyPercentage, 0);
+  assert.equal(yearly[0].annualComplete, false);
+  assert.equal(yearly[0].yearlyPercentage, 0, 'incomplete annual totals remain non-publishable and are not presented as a result');
+  assert.equal(yearly[0].yearlyRank, 0, 'incomplete annual results must not receive a rank');
   assert.equal(yearly[0].isPass, false);
+  await assert.rejects(() => db.confirmYearEndPromotions(school.id, klass.id, 3, [{
+    studentId: student.id, classFromId: klass.id, yearlyPercentage: 0, yearlyRank: 0, decision: 'repeated'
+  }], 'admin-incomplete'), /both semesters/);
 });
 
 test('school admin can choose five 10-mark tests and the final exam adjusts to 50', async () => {
