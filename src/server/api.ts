@@ -5511,7 +5511,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 
   try {
-    const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id);
+    const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id, user.fullName, user.role);
     res.json({ success: true, count: saved.length, marks: saved });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid marks.' });
@@ -5529,7 +5529,7 @@ apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requir
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
   if (klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the Form Teacher assigned to this class can forward its results.' }); return; }
   try {
-    const result = await db.forwardClassMarks(school.id, classId, semester, user.id);
+    const result = await db.forwardClassMarks(school.id, classId, semester, user.id, user.fullName);
     res.json({ success: true, forwardedCount: result.count });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Class marks could not be forwarded.' });
@@ -5554,7 +5554,7 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
   // Hydrate the selected rows before the synchronous storage update; otherwise
   // marks created before a server restart may be absent from the in-memory cache.
   await queryAllRows('student_marks', { school_id: school.id, id: uniqueMarkIds }, 'id');
-  const approved = db.approveMarks(school.id, uniqueMarkIds, user.id);
+  const approved = db.approveMarks(school.id, uniqueMarkIds, user.id, user.fullName, user.role);
   await db.flush();
   res.json({ success: true, approvedCount: approved.length });
 });
