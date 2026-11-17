@@ -251,7 +251,7 @@ test('submitted marks can be returned with an audit reason and only complete app
   assert.equal(returned[0].status, 'draft');
   assert.equal(returned[0].correctionReason, 'Please verify the final exam score against the signed script.');
   assert.equal(returned[0].returnedBy, 'admin-publish');
-  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_RETURNED_FOR_CORRECTION' && String(row.details).includes('signed script')), true);
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_RETURNED_FOR_CORRECTION' && JSON.stringify(row.details).includes('signed script')), true);
 
   const resubmitted = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
     studentId: student.id, assessmentScores: { ...assessmentScores, 'final-exam': 49 }, status: 'submitted'
