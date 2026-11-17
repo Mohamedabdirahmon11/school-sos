@@ -6483,6 +6483,7 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   const [rankings, design, klass] = await Promise.all([db.getClassYearlyRankings(school.id, student.classId), db.getReportCardDesign(school.id), db.getClassById(student.classId, school.id)]);
   const result = rankings.find(row => row.student.id === student.id);
   if (!result) { res.status(404).json({ error: 'Student report card not found.' }); return; }
+  if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
   const pages = [buildReportCardPdfPage({
     school,
     design,
@@ -6499,6 +6500,7 @@ apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAd
   if (!klass) { res.status(404).json({ error: 'Class not found.' }); return; }
   const [rankings, design] = await Promise.all([db.getClassYearlyRankings(school.id, klass.id), db.getReportCardDesign(school.id)]);
   if (!rankings.length) { res.status(404).json({ error: 'No students were found in this class.' }); return; }
+  if (rankings.some(result => !result.annualComplete)) { res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return; }
   const pages = rankings.map(result => buildReportCardPdfPage({
     school,
     design,

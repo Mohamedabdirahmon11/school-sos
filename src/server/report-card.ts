@@ -76,6 +76,7 @@ interface ReportCardResult {
     yearlyPercentage: number | null;
     maxMarks: { small: number; big: number; total: number };
   }>;
+  annualComplete: boolean;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -94,6 +95,7 @@ function imageAsset(dataUrl: string | undefined, x: number, y: number, width: nu
 }
 
 export function buildReportCardPdfPage({ school, design, className, result, totalStudents }: ReportCardPdfContext): PdfPage {
+  if (!result.annualComplete) throw new Error('Annual report cards require approved marks for every assigned subject in both semesters.');
   const blocks = design.visibleBlocks || { rank: true, teacherRemarks: true, adminRemarks: true, percentage: true, signatures: true, stamp: true };
   const lines = [
     school.name,

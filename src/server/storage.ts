@@ -2764,7 +2764,10 @@ class StorageEngine {
     const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
     const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
     const config = await this.getExamConfig(schoolId);
-    const subjects = await this.getSubjects(schoolId);
+    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' });
+    const expectedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const expectedSubjectIdSet = new Set(expectedSubjectIds);
+    const subjects = (await this.getSubjects(schoolId)).filter(subject => expectedSubjectIdSet.has(subject.id));
 
     const yearlyResults = students.map(student => {
       const s1 = sem1Marks.filter(m => m.studentId === student.id);
@@ -2805,16 +2808,19 @@ class StorageEngine {
         };
       }).filter(sr => sr.sem1Percentage !== null || sr.sem2Percentage !== null);
 
-      const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter(p => p !== null) as number[];
-      const yearlyAvg = validPercentages.length > 0 
-        ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100 
+      const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
+        s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
+      );
+      const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
+      const yearlyAvg = annualComplete && validPercentages.length === expectedSubjectIds.length
+        ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100
         : 0;
-
-      const isPass = yearlyAvg >= (config.passMarkPercentage || 50);
+      const isPass = annualComplete && yearlyAvg >= (config.passMarkPercentage || 50);
 
       return {
         student,
         subjectResults,
+        annualComplete,
         yearlyPercentage: yearlyAvg,
         isPass,
         yearlyRank: 0,
@@ -2822,12 +2828,27 @@ class StorageEngine {
       };
     });
 
-    yearlyResults.sort((a, b) => b.yearlyPercentage - a.yearlyPercentage);
+    yearlyResults.sort((a, b) => Number(b.annualComplete) - Number(a.annualComplete) || b.yearlyPercentage - a.yearlyPercentage);
 
-    yearlyResults.forEach((yr, idx) => {
-      yr.yearlyRank = idx + 1;
-      yr.isTopThree = idx < 3 && yr.yearlyPercentage > 0;
-    });
+    let completedRank = 0;
+    let previousPercentage: number | null = null;
+    let previousRank = 0;
+    for (const result of yearlyResults) {
+      if (!result.annualComplete) {
+        result.yearlyRank = 0;
+        result.isTopThree = false;
+        continue;
+      }
+      completedRank += 1;
+      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) {
+        result.yearlyRank = previousRank;
+      } else {
+        result.yearlyRank = completedRank;
+        previousRank = completedRank;
+        previousPercentage = result.yearlyPercentage;
+      }
+      result.isTopThree = result.yearlyRank > 0 && result.yearlyRank <= 3;
+    }
 
     return yearlyResults;
   }
@@ -2850,7 +2871,10 @@ class StorageEngine {
     const sourceClass = await this.getClassById(classId, schoolId);
     if (!sourceClass || sourceClass.isArchived) throw new Error('Promotion source class was not found or is archived in this school.');
     const rankings = await this.getClassYearlyRankings(schoolId, classId);
-    const rankByStudent = new Map(rankings.map((row, index) => [row.student.id, { ...row, rank: index + 1 }]));
+    if (rankings.some(row => !row.annualComplete)) {
+      throw new Error('Annual results cannot be finalized until every enrolled student has approved marks for every assigned subject in both semesters.');
+    }
+    const rankByStudent = new Map(rankings.map(row => [row.student.id, { ...row, rank: row.yearlyRank }]));
     if (new Set(promotions.map(row => row.studentId)).size !== promotions.length || promotions.length !== rankings.length) {
       throw new Error('Confirmations must include each student in the selected class exactly once.');
     }
