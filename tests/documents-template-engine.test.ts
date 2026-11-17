@@ -21,10 +21,6 @@ test('ABS and LB do not contribute to totals', () => {
   assert.equal(sumMarks([87, 'ABS', 'LB', 0]), 87);
 });
 
-function awaitlessSum() {
-  return [87, 'ABS', 'LB', 0].reduce((sum, value) => typeof value === 'number' ? sum + value : sum, 0);
-}
-
 test('percentage pass thresholds recalculate from subject count', () => {
   assert.equal(passThreshold(subjects, { mode: 'percent', percent: 40 }), 280);
   assert.equal(passThreshold(subjects.slice(0, 6), { mode: 'percent', percent: 40 }), 240);
@@ -81,4 +77,5 @@ test('template JSON export/import round-trips without changing the config', () =
     showLogo: true, showQr: true, showSummary: true, showFooter: true, zebra: true, fontSize: 11, rowHeight: 28
   };
   assert.deepEqual(importTemplateConfig(exportTemplateConfig(config)), config);
+  assert.throws(() => importTemplateConfig(JSON.stringify({ ...config, passRule:{mode:'percent',percent:140} })), /Template config-ku ma saxna/);
 });
