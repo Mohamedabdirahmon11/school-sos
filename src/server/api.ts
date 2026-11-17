@@ -53,6 +53,7 @@ import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
+import { validateTemplateConfig, type TemplateConfig, type TemplateKind } from '../lib/documents/template-engine.ts';
 
 export const apiRouter = Router();
 
@@ -8582,6 +8583,66 @@ apiRouter.post('/document-templates/:id/duplicate', requireAuth, requireSchoolCo
   res.status(201).json(documentTemplateClientRow(data));
 });
 
+
+apiRouter.get('/structured-document-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('document_templates')
+    .select('id,school_id,type,name,config,is_builtin,version,created_by,updated_by,updated_at')
+    .eq('school_id',school.id).order('updated_at',{ascending:false}).limit(100);
+  if (error) { res.status(503).json({ error:'Qaababka dukumentiga lama soo dejin karin.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/structured-document-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const config = body.config as TemplateConfig;
+  if (!name || name.length > 160 || !validateTemplateConfig(config) || body.type !== config.kind) {
+    res.status(400).json({ error:'Magaca iyo dejinta template-ka ma saxna.' }); return;
+  }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('document_templates').insert({
+    school_id:school.id, type:config.kind, name, config, is_builtin:false, version:1,
+    created_by:user.id, updated_by:user.id
+  }).select('id,type,name,config,is_builtin,version,updated_at').single();
+  if (error || !data) { res.status(409).json({ error:'Template-ka lama kaydin karin. Hubi inuusan magac isku mid ah jirin.' }); return; }
+  res.status(201).json(data);
+});
+
+apiRouter.put('/structured-document-templates/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const config = body.config as TemplateConfig;
+  if (!name || name.length > 160 || !validateTemplateConfig(config) || body.type !== config.kind) {
+    res.status(400).json({ error:'Magaca iyo dejinta template-ka ma saxna.' }); return;
+  }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('document_templates').update({
+    name, type:config.kind, config, version:client.rpc ? undefined : undefined,
+    updated_by:user.id, updated_at:new Date().toISOString()
+  }).eq('school_id',school.id).eq('id',req.params.id)
+    .select('id,type,name,config,is_builtin,version,updated_at').maybeSingle();
+  if (error || !data) { res.status(404).json({ error:'Template-ka lama helin ama lama cusboonaysiin karin.' }); return; }
+  res.json(data);
+});
+
+apiRouter.delete('/structured-document-templates/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('document_templates').delete()
+    .eq('school_id',school.id).eq('id',req.params.id).select('id').maybeSingle();
+  if (error || !data) { res.status(404).json({ error:'Template-ka lama tirtiri karin.' }); return; }
+  res.json({ success:true });
+});
 
 apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
