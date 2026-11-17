@@ -391,7 +391,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     if(!canManageTemplates)return;
     setBusy(true);
     try{
-      const payload={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}};
+      const payload:Record<string,unknown>={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}};
       if(editingTemplateId)await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,payload);
       else await ApiClient.createStructuredDocumentTemplate(payload);
       setEditingTemplateId(null);
