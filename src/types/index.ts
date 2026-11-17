@@ -377,6 +377,11 @@ export interface StudentMark {
   submittedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
+  correctionReason?: string | null;
+  returnedBy?: string | null;
+  returnedAt?: string | null;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
 }
 
 export interface PromotionRecord {
