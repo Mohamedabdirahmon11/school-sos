@@ -260,6 +260,9 @@ test('submitted marks can be returned with an audit reason and only complete app
     studentId: student.id, assessmentScores: { ...assessmentScores, 'final-exam': 49 }, status: 'submitted'
   }], 'teacher-publish');
   assert.equal(resubmitted[0].correctionReason, null);
+  const editAudit = memory.rows('audit_logs').find(row => row.action === 'MARKS_EDITED');
+  assert.ok(JSON.stringify(editAudit?.details).includes('oldValues'));
+  assert.ok(JSON.stringify(editAudit?.details).includes('newValues'));
   await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-publish');
   db.approveMarks(school.id, [resubmitted[0].id], 'admin-publish', 'Academic Admin', 'school_admin');
   await db.flush();
