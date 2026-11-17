@@ -26,11 +26,16 @@ const DAYS = ['Isniin','Talaado','Arbaco','Khamiis','Jimce','Sabti'];
 const DEFAULT_SUBJECTS: TemplateSubject[] = [{ id:'subject-1', name:'Maaddada 1', maxMark:100 }];
 
 function defaultConfig(kind:TemplateKind, accentColor:string):TemplateConfig {
+  const logoKinds:TemplateKind[]=['exam_result_list','individual_report_card','certificate','student_id_cards','official_letter','fee_receipt'];
+  const qrKinds:TemplateKind[]=['exam_result_list','individual_report_card','certificate','student_id_cards'];
+  const tableKinds:TemplateKind[]=['exam_result_list','individual_report_card','attendance_sheet','fee_receipt','class_timetable','class_list'];
   return {
     version:1, kind, title:TEMPLATE_OPTIONS.find(item=>item.kind===kind)?.label || 'Template',
     direction:'rtl', accentColor:/^#[0-9a-fA-F]{6}$/.test(accentColor)?accentColor:'#176b5b',
     rowsPerPage:20, subjects:DEFAULT_SUBJECTS, passRule:{mode:'percent',percent:40},
-    showLogo:true, showQr:true, showSummary:true, showFooter:true, zebra:true, fontSize:11, rowHeight:28
+    showLogo:logoKinds.includes(kind), showQr:qrKinds.includes(kind),
+    showSummary:kind==='exam_result_list', showFooter:!['certificate','student_id_cards'].includes(kind),
+    zebra:tableKinds.includes(kind), fontSize:11, rowHeight:28
   };
 }
 
@@ -108,7 +113,10 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
     }catch{}
   }
   if(config.showLogo&&safeLogo){
-    output=output.replace('<div style="font-size:19pt;font-weight:700;','<img src="' + escapePlainText(safeLogo) + '" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;');
+    const paperLogo='<img src="' + escapePlainText(safeLogo) + '" alt="" style="display:block;width:20mm;height:14mm;object-fit:contain;margin:0 auto 5px"/>';
+    output=output.replace(/(<div style="border-bottom:3px solid [^>]+>)/, '$1' + paperLogo);
+    const cardLogo='<img src="' + escapePlainText(safeLogo) + '" alt="" style="display:block;width:14mm;height:9mm;object-fit:contain;background-color:#fff;padding:1mm;margin:0 auto 2mm"/>';
+    output=output.replace(/(<div style="background-color:[^"]+;color:#fff;text-align:center;padding:3mm;font-weight:700">)/g, '$1' + cardLogo);
   }
   return output;
 }
@@ -532,7 +540,13 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
             <label className="text-xs">Cabbirka farta<input type="number" min={8} max={24} value={config.fontSize} onChange={event=>updateConfig({fontSize:Math.max(8,Math.min(24,Number(event.target.value)||11))})} className="mt-1 min-h-9 w-full rounded border px-2"/></label>
             <label className="text-xs">Dhererka safka<input type="number" min={18} max={64} value={config.rowHeight} onChange={event=>updateConfig({rowHeight:Math.max(18,Math.min(64,Number(event.target.value)||28))})} className="mt-1 min-h-9 w-full rounded border px-2"/></label>
           </div>
-          <div className="mt-3 flex flex-wrap gap-3 text-xs">{(['showLogo','showQr','showSummary','showFooter','zebra'] as const).map(key=><label key={key} className="flex items-center gap-1"><input type="checkbox" checked={config[key]} onChange={event=>updateConfig({[key]:event.target.checked} as Partial<TemplateConfig>)}/>{({showLogo:'Logo',showQr:'QR',showSummary:'Soo koobid',showFooter:'Footer',zebra:'Safaf kala midab'})[key]}</label>)}</div>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs">{(['showLogo','showQr','showSummary','showFooter','zebra'] as const).filter(key=>{
+            if(key==='showLogo')return ['exam_result_list','individual_report_card','certificate','student_id_cards','official_letter','fee_receipt'].includes(kind);
+            if(key==='showQr')return ['exam_result_list','individual_report_card','certificate','student_id_cards'].includes(kind);
+            if(key==='showSummary')return kind==='exam_result_list';
+            if(key==='zebra')return ['exam_result_list','individual_report_card','attendance_sheet','fee_receipt','class_timetable','class_list'].includes(kind);
+            return !['certificate','student_id_cards'].includes(kind);
+          }).map(key=><label key={key} className="flex items-center gap-1"><input type="checkbox" checked={config[key]} onChange={event=>updateConfig({[key]:event.target.checked} as Partial<TemplateConfig>)}/>{({showLogo:'Logo dugsi',showQr:'QR xaqiijin',showSummary:'Soo koobid natiijo',showFooter:'Footer',zebra:'Safaf kala midab'})[key]}</label>)}</div>
           {(kind==='exam_result_list'||kind==='individual_report_card')&&<div className="mt-3 space-y-2"><div className="flex items-center justify-between"><strong className="text-xs">Maaddooyinka</strong><button type="button" onClick={addSubject} disabled={config.subjects.length>=12} className="rounded border px-2 py-1 text-xs disabled:opacity-40"><Plus size={12} className="inline"/> Ku dar</button></div>{config.subjects.map(subject=><div key={subject.id} className="flex gap-2"><input value={subject.name} onChange={event=>updateSubject(subject.id,{name:event.target.value})} className="min-w-0 flex-1 rounded border px-2 py-1 text-xs"/><input type="number" min={1} max={100} value={subject.maxMark} onChange={event=>updateSubject(subject.id,{maxMark:Math.max(1,Math.min(100,Number(event.target.value)||100))})} className="w-16 rounded border px-2 py-1 text-xs"/><button type="button" onClick={()=>moveSubject(subject.id,-1)} aria-label="Kor u qaad maaddada" className="rounded px-1 text-slate-500">↑</button><button type="button" onClick={()=>moveSubject(subject.id,1)} aria-label="Hoos u dhig maaddada" className="rounded px-1 text-slate-500">↓</button><button type="button" onClick={()=>deleteSubject(subject.id)} aria-label="Tirtir maaddada" className="rounded p-1 text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
         </details>
         <div className="flex flex-wrap gap-2">
