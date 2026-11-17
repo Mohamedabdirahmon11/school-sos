@@ -8246,6 +8246,18 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
   const pageSize = ['A4','A5','Letter','CR80'].includes(body.pageSize) ? body.pageSize : 'A4';
   let templateId: string | null = null;
+  let studentId: string | null = null;
+  let classId: string | null = null;
+  if(typeof body.studentId==='string'&&body.studentId){
+    const {data:student}=await client.from('students').select('id').eq('school_id',school.id).eq('id',body.studentId).maybeSingle();
+    if(!student){res.status(404).json({error:'Ardayga laguma helin dugsigan.'});return;}
+    studentId=student.id;
+  }
+  if(typeof body.classId==='string'&&body.classId){
+    const {data:klass}=await client.from('classes').select('id').eq('school_id',school.id).eq('id',body.classId).maybeSingle();
+    if(!klass){res.status(404).json({error:'Fasalka laguma helin dugsigan.'});return;}
+    classId=klass.id;
+  }
   const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
   const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
   if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga waa waajib.' }); return; }
