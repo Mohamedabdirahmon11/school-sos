@@ -6569,43 +6569,112 @@ apiRouter.put('/report-card/design', requireAuth, requireSchoolAdminOrSuperAdmin
   }
 });
 
+const prepareSemesterReportCardResult = (
+  result: any,
+  semester: 'Semester 1' | 'Semester 2',
+  rank: number,
+  passMark: number
+) => {
+  const selectedMarks = result.subjectResults.map((row: any) => semester === 'Semester 1' ? row.sem1Marks : row.sem2Marks);
+  const semesterComplete = selectedMarks.length > 0 && selectedMarks.every(Boolean);
+  const semesterPublished = semesterComplete && selectedMarks.every((mark: any) => Boolean(mark?.publishedAt));
+  const percentages = selectedMarks.filter(Boolean).map((mark: any) => Number(mark.percentage) || 0);
+  const semesterPercentage = percentages.length
+    ? Math.round((percentages.reduce((sum: number, value: number) => sum + value, 0) / percentages.length) * 100) / 100
+    : 0;
+  return {
+    ...result,
+    semesterComplete,
+    semesterPublished,
+    semesterPercentage,
+    semesterRank: rank,
+    semesterIsPass: semesterComplete && semesterPercentage >= passMark
+  };
+};
+
 apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
+  const semester = typeof req.query.semester === 'string' ? req.query.semester : '';
+  if (semester && !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Semester must be Semester 1 or Semester 2.' }); return;
+  }
   const student = await db.getStudentById(req.params.studentId, school.id);
   if (!student || !await canAccessStudentRecord(user, student.id)) { res.status(404).json({ error: 'Student report card not found.' }); return; }
-  const [rankings, design, klass] = await Promise.all([db.getClassYearlyRankings(school.id, student.classId), db.getReportCardDesign(school.id), db.getClassById(student.classId, school.id)]);
+  const [rankings, design, klass, config] = await Promise.all([
+    db.getClassYearlyRankings(school.id, student.classId),
+    db.getReportCardDesign(school.id),
+    db.getClassById(student.classId, school.id),
+    db.getExamConfig(school.id)
+  ]);
   const result = rankings.find(row => row.student.id === student.id);
   if (!result) { res.status(404).json({ error: 'Student report card not found.' }); return; }
-  if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
-  if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
-    res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
+  const isSemester = Boolean(semester);
+  let pdfResult: any = result;
+  let totalStudents = rankings.length;
+  if (isSemester) {
+    const semesterRankings = await db.getClassSemesterRankings(school.id, student.classId, semester as 'Semester 1' | 'Semester 2');
+    const rank = semesterRankings.find(row => row.student.id === student.id)?.rank || 0;
+    pdfResult = prepareSemesterReportCardResult(result, semester as 'Semester 1' | 'Semester 2', rank, config.passMarkPercentage || 50);
+    totalStudents = semesterRankings.length;
+    if (!pdfResult.semesterComplete) { res.status(409).json({ error: `${semester} report card requires approved marks for every assigned subject.` }); return; }
+    if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !pdfResult.semesterPublished) {
+      res.status(409).json({ error: `${semester} results have not been published by the School Admin yet.` }); return;
+    }
+  } else {
+    if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
+    if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
+      res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
+    }
   }
+  const period = isSemester ? semester as 'Semester 1' | 'Semester 2' : 'Annual';
   const pages = [buildReportCardPdfPage({
     school,
     design,
     className: `${klass?.name || ''} ${klass?.section || ''}`.trim(),
-    result,
-    totalStudents: rankings.length
+    result: pdfResult,
+    totalStudents,
+    period
   })];
-  sendPdf(res, `report-card-${student.studentId}`, pages);
+  sendPdf(res, `report-card-${student.studentId}-${period.toLowerCase().replace(/ /g, '-')}`, pages);
 });
 
 apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
+  const semester = typeof req.query.semester === 'string' ? req.query.semester : '';
+  if (semester && !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Semester must be Semester 1 or Semester 2.' }); return;
+  }
   const klass = await db.getClassById(req.params.classId, school.id);
   if (!klass) { res.status(404).json({ error: 'Class not found.' }); return; }
-  const [rankings, design] = await Promise.all([db.getClassYearlyRankings(school.id, klass.id), db.getReportCardDesign(school.id)]);
+  const [rankings, design, config] = await Promise.all([
+    db.getClassYearlyRankings(school.id, klass.id),
+    db.getReportCardDesign(school.id),
+    db.getExamConfig(school.id)
+  ]);
   if (!rankings.length) { res.status(404).json({ error: 'No students were found in this class.' }); return; }
-  if (rankings.some(result => !result.annualComplete)) { res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return; }
-  const pages = rankings.map(result => buildReportCardPdfPage({
+  let reportResults: any[] = rankings;
+  let totalStudents = rankings.length;
+  let period: 'Annual' | 'Semester 1' | 'Semester 2' = 'Annual';
+  if (semester) {
+    period = semester as 'Semester 1' | 'Semester 2';
+    const semesterRankings = await db.getClassSemesterRankings(school.id, klass.id, period);
+    const rankByStudent = new Map(semesterRankings.map(row => [row.student.id, row.rank]));
+    reportResults = rankings.map(result => prepareSemesterReportCardResult(result, period as 'Semester 1' | 'Semester 2', rankByStudent.get(result.student.id) || 0, config.passMarkPercentage || 50));
+    totalStudents = semesterRankings.length;
+    if (reportResults.some(result => !result.semesterComplete)) { res.status(409).json({ error: `Class ${period} report cards are not ready. Every enrolled student needs approved marks for every assigned subject.` }); return; }
+  } else if (rankings.some(result => !result.annualComplete)) {
+    res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return;
+  }
+  const pages = reportResults.map(result => buildReportCardPdfPage({
     school,
     design,
     className: `${klass.name} ${klass.section}`.trim(),
     result,
-    totalStudents: rankings.length
+    totalStudents,
+    period
   }));
-  sendPdf(res, `report-cards-${klass.name}-${klass.section}`, pages);
+  sendPdf(res, `report-cards-${klass.name}-${klass.section}-${period.toLowerCase().replace(/ /g, '-')}`, pages);
 });
 
 apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoolContext, async (req, res) => {
