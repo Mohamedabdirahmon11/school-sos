@@ -142,6 +142,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [attendance,setAttendance]=useState<AttendanceEntry[]>([]);
   const [attendanceDirtyDates,setAttendanceDirtyDates]=useState<string[]>([]);
   const [timetable,setTimetable]=useState<TimetableSlot[]>([]);
+  const [timetableCells,setTimetableCells]=useState<Record<string,Record<string,string>>>({});
+  const [periodEdits,setPeriodEdits]=useState<Record<string,{start:string;end:string}>>({});
   const [payments,setPayments]=useState<FeePayment[]>([]);
   const [month,setMonth]=useState(new Date().getMonth()+1);
   const [year,setYear]=useState(new Date().getFullYear());
@@ -165,6 +167,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
   const selectedClass=useMemo(()=>classes.find(item=>item.id===classId),[classes,classId]);
   const attendanceDays=useMemo(()=>monthDays(year,month,schoolWeekendDays(calendar),schoolHolidayDates(calendar,year,month)),[year,month,calendar]);
+  const periodNumbers=useMemo(()=>{const values=Object.keys(periodEdits).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);return values.length?values:[1,2,3,4,5,6];},[periodEdits]);
   const canSaveAttendance=userRole==='teacher'&&Boolean(selectedClass&&selectedClass.classTeacherId===userId);
 
   const loadSavedTemplates=useCallback(async()=>{
@@ -188,6 +191,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     setTerm1Marks([]);
     setTerm2Marks([]);
     setTimetable([]);
+    setTimetableCells({});
+    setPeriodEdits({});
     if(userRole==='teacher'){
       ApiClient.getAllStudents(classId,undefined,100).then(roster=>{
         if(!active)return;
@@ -213,6 +218,16 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
       setTerm1Marks(firstMarks.filter(approved));
       setTerm2Marks(secondMarks.filter(approved));
       setTimetable(slots);
+      const nextCells:Record<string,Record<string,string>>={};
+      const nextPeriods:Record<string,{start:string;end:string}>={};
+      for(const slot of slots){
+        const day=String(slot.dayOfWeek||'').toLowerCase();
+        const dayLabel=day.includes('mon')||day==='1'?'Isniin':day.includes('tue')||day==='2'?'Talaado':day.includes('wed')||day==='3'?'Arbaco':day.includes('thu')||day==='4'?'Khamiis':day.includes('fri')||day==='5'?'Jimce':'Sabti';
+        (nextCells[dayLabel] ||= {})[String(slot.periodNumber)]=slot.subjectName||slot.subjectId;
+        nextPeriods[String(slot.periodNumber)]={start:slot.startTime||'',end:slot.endTime||''};
+      }
+      setTimetableCells(nextCells);
+      setPeriodEdits(nextPeriods);
     }).catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta fasalka lama soo dejin karin.');})
       .finally(()=>{if(active)setBusy(false);});
     return ()=>{active=false;};
@@ -306,14 +321,14 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return latest?renderFeeReceipt({schoolName,receiptNumber:latest.receiptNumber,date:latest.date,student:{id:student?.studentId||'',name:nameOf,className:selectedClass?.name||'',parentName:student?.fatherName||''},items:feeItems,currency:'ETB',receivedBy:receiptReceivedBy}):'';
       }
       case 'class_timetable':{
-        const periods=[...new Set(timetable.map(slot=>slot.periodNumber))].sort((a,b)=>a-b).map(period=>{const slot=timetable.find(item=>item.periodNumber===period);return {label:String(period),start:slot?.startTime||'',end:slot?.endTime||''};});
-        return renderClassTimetable({schoolName,className:selectedClass?.name||'',days:DAYS,periods,cells:slotsByDay});
+        const periods=periodNumbers.map(period=>({label:String(period),start:periodEdits[String(period)]?.start||'',end:periodEdits[String(period)]?.end||''}));
+        return renderClassTimetable({schoolName,className:selectedClass?.name||'',days:DAYS,periods,cells:timetableCells});
       }
       case 'class_list':
         return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
-  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems]);
+  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells]);
 
   const cycleAttendance=(studentId:string,date:string)=>{
     setAttendance(current=>{
@@ -435,7 +450,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         {kind==='certificate'&&<><label className="block text-xs font-semibold text-slate-600">Qoraalka shahaadada<textarea rows={3} value={certificateBody} onChange={event=>setCertificateBody(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label><label className="block text-xs font-semibold text-slate-600">Darajo / Wadar<input value={certificateRankOrTotal} onChange={event=>setCertificateRankOrTotal(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2"/></label><label className="block text-xs font-semibold text-slate-600">Saxiixayaasha{certificateSignatories.map((value,index)=><input key={index} value={value} onChange={event=>setCertificateSignatories(items=>items.map((item,i)=>i===index?event.target.value:item))} className="mt-1 min-h-9 w-full rounded-lg border border-slate-300 px-2"/>)}<button type="button" onClick={()=>setCertificateSignatories(items=>[...items,'Saxiixaha'])} className="mt-1 rounded border px-2 py-1 text-xs">+ Saxiixe</button></label><label className="block text-xs font-semibold text-slate-600">Taariikh<input type="date" value={certificateDate} onChange={event=>setCertificateDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2"/></label></>}
         {kind==='individual_report_card'&&<><label className="block text-xs font-semibold text-slate-600">Faallada macallinka<textarea rows={2} value={reportComment} onChange={event=>setReportComment(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label>{reportSignatories.map((value,index)=><label key={index} className="block text-xs font-semibold text-slate-600">Saxiixe {index+1}<input value={value} onChange={event=>setReportSignatories(items=>items.map((item,i)=>i===index?event.target.value:item))} className="mt-1 min-h-9 w-full rounded border px-2"/></label>)}</>}
          {kind==='fee_receipt'&&<div className="space-y-2 rounded-lg border p-2"><div className="flex items-center justify-between"><strong className="text-xs">Qaybaha rasiidka</strong><button type="button" onClick={()=>setFeeItems(items=>[...items,{description:'Lacag-bixin',amount:0}])} className="rounded border px-2 py-1 text-xs">+ Ku dar</button></div>{feeItems.map((item,index)=><div key={index} className="flex gap-2"><input value={item.description} onChange={event=>setFeeItems(items=>items.map((value,i)=>i===index?{...value,description:event.target.value}:value))} className="min-w-0 flex-1 rounded border px-2 py-1 text-xs"/><input type="number" min={0} value={item.amount} onChange={event=>setFeeItems(items=>items.map((value,i)=>i===index?{...value,amount:Math.max(0,Number(event.target.value)||0)}:value))} className="w-24 rounded border px-2 py-1 text-xs"/><button type="button" onClick={()=>setFeeItems(items=>items.filter((_,i)=>i!==index))} aria-label="Ka saar qaybta" className="text-rose-600">×</button></div>)}<label className="block text-xs">Qofka lacagta qabtay<input value={receiptReceivedBy} onChange={event=>setReceiptReceivedBy(event.target.value)} className="mt-1 min-h-9 w-full rounded border px-2"/></label><p className="text-[11px] text-slate-500">Isbeddelladani waxay saameeyaan dukumentiga oo keliya; ma beddelaan diiwaanka lacag-bixinta.</p></div>}
-         {kind==='official_letter'&&<><label className="block text-xs font-semibold text-slate-600">Ku<input value={recipient} onChange={event=>setRecipient(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Ujeeddo<input value={letterSubject} onChange={event=>setLetterSubject(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Qoraalka<textarea rows={4} value={letterBody} onChange={event=>setLetterBody(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label></>}
+         {kind==='class_timetable'&&<div className="space-y-2 rounded-lg border p-2"><div className="flex items-center justify-between"><strong className="text-xs">Waqtiyada iyo casharrada</strong><button type="button" onClick={()=>setPeriodEdits(current=>({...current,[String(Math.max(0,...Object.keys(current).map(Number).filter(Number.isFinite))+1)]:{start:'',end:''}}))} className="rounded border px-2 py-1 text-xs">+ Ku dar cashar</button></div><div className="overflow-x-auto"><table className="min-w-max text-xs"><thead><tr><th className="p-1">Maalin</th>{periodNumbers.map(period=><th key={period} className="p-1">Cashar {period}<div className="flex gap-1"><input type="time" aria-label={`Bilowga casharka ${period}`} value={periodEdits[String(period)]?.start||''} onChange={event=>setPeriodEdits(current=>({...current,[String(period)]:{...current[String(period)],start:event.target.value}}))} className="w-24 rounded border px-1"/><input type="time" aria-label={`Dhammaadka casharka ${period}`} value={periodEdits[String(period)]?.end||''} onChange={event=>setPeriodEdits(current=>({...current,[String(period)]:{...current[String(period)],end:event.target.value}}))} className="w-24 rounded border px-1"/><button type="button" onClick={()=>{setPeriodEdits(current=>{const next={...current};delete next[String(period)];return next;});setTimetableCells(current=>Object.fromEntries(Object.entries(current).map(([day,slots])=>{const next={...slots};delete next[String(period)];return [day,next];})));}} aria-label={`Tirtir casharka ${period}`} className="text-rose-600">×</button></div></th>)}</tr></thead><tbody>{DAYS.map(day=><tr key={day}><th className="p-1 text-right">{day}</th>{periodNumbers.map(period=><td key={period} className="p-1"><input value={timetableCells[day]?.[String(period)]||''} onChange={event=>setTimetableCells(current=>({...current,[day]:{...current[day],[String(period)]:event.target.value}}))} aria-label={`${day}, cashar ${period}`} className="w-28 rounded border px-2 py-1"/></td>)}</tr>)}</tbody></table></div></div>}{kind==='official_letter'&&<><label className="block text-xs font-semibold text-slate-600">Ku<input value={recipient} onChange={event=>setRecipient(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Ujeeddo<input value={letterSubject} onChange={event=>setLetterSubject(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Qoraalka<textarea rows={4} value={letterBody} onChange={event=>setLetterBody(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label></>}
         <details className="rounded-xl border border-slate-200 p-3">
           <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700"><ChevronDown size={16}/> Dejinta naqshadda</summary>
           <div className="mt-3 grid grid-cols-2 gap-2">
