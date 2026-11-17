@@ -2704,7 +2704,7 @@ class StorageEngine {
     return results;
   }
 
-  public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string): Promise<{ count: number }> {
+  public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string, forwardedByName = 'Class Form Teacher'): Promise<{ count: number }> {
     const [assignments, students, marks] = await Promise.all([
       this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' }),
       this.queryRows<Student>('students', { school_id: schoolId, class_id: classId }),
@@ -2735,7 +2735,7 @@ class StorageEngine {
     }
     this.logAudit({
       action: 'CLASS_MARKS_FORWARDED_TO_ADMIN', category: 'academics', schoolId,
-      userId: forwardedBy, userName: 'Class Form Teacher', userRole: 'teacher',
+      userId: forwardedBy, userName: forwardedByName, userRole: 'teacher',
       details: JSON.stringify({
         classId, semester, changedMarks: forwarded.map(mark => ({
           markId: mark.id, studentId: mark.studentId, subjectId: mark.subjectId,
