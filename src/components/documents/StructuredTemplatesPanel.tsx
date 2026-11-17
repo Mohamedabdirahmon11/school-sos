@@ -413,7 +413,23 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     setMessage('Template-ka waa la furay.');
   };
 
-  const reset=()=>{const next=defaultConfig(kind,accentColor);setConfig(next);setName(next.title);setEditingTemplateId(null);setMessage('Dejintii caadiga ahayd waa la soo celiyey.');};
+  const reset=async()=>{
+    const next=defaultConfig(kind,accentColor);
+    setConfig(next);setName(next.title);
+    if(editingTemplateId&&canManageTemplates){
+      setBusy(true);
+      try{
+        await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,{type:kind,name:next.title,config:next});
+        setEditingTemplateId(null);
+        await loadSavedTemplates();
+        setMessage('Template-kii la kaydiyey waxaa lagu soo celiyey dejintii caadiga ahayd.');
+      }catch(error){setMessage(error instanceof Error?error.message:'Template-ka default laguma celin karin.');}
+      finally{setBusy(false);}
+    }else{
+      setEditingTemplateId(null);
+      setMessage('Dejintii caadiga ahayd waa la soo celiyey.');
+    }
+  };
   const removeSaved=async(id:string)=>{
     if(!canManageTemplates)return;
     try{await ApiClient.deleteStructuredDocumentTemplate(id);await loadSavedTemplates();}
@@ -485,7 +501,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={()=>void previewHtml()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>}
-          <button type="button" onClick={reset} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
+          <button type="button" onClick={()=>void reset()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>}
         </div>
         {canManageTemplates&&savedTemplates.length>0&&<div className="rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-bold">Template-yadayda</h3>{savedTemplates.map(template=><div key={template.id} className="flex items-center gap-2 border-t py-2 text-xs"><button type="button" onClick={()=>loadTemplate(template)} className="min-w-0 flex-1 truncate text-left">{template.name}</button><button type="button" onClick={()=>void removeSaved(template.id)} aria-label="Tirtir template" className="text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
