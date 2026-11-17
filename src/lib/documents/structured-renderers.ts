@@ -119,7 +119,10 @@ ${body}
 
 function table(headers: string[], rows: string[][]): string {
   const head = headers.map(value => `<th style="border:1px solid #64748b;padding:5px;background-color:#e8f0ee">${text(value)}</th>`).join('');
-  const body = rows.map((row, index) => `<tr style="background-color:${index % 2 ? '#f5f8f7' : '#fff'}">${row.map(value => `<td style="border:1px solid #94a3b8;padding:5px">${text(value)}</td>`).join('')}</tr>`).join('');
+  const body = rows.map((row, index) => {
+    const totalRow=row[0]?.trim().toUpperCase()==='WADARTA';
+    return `<tr style="background-color:${totalRow?'#e8f0ee':index % 2 ? '#f5f8f7' : '#fff'};font-weight:${totalRow?'700':'400'}">${row.map(value => `<td style="border:1px solid #94a3b8;padding:5px">${text(value)}</td>`).join('')}</tr>`;
+  }).join('');
   return `<table style="width:100%"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -175,8 +178,17 @@ export function renderAttendanceSheet(data: AttendanceSheetData): string[] {
 
 export function renderCertificate(data: CertificateData): string {
   const signatures = (data.signatories || ['Maamulaha', 'Macallinka']).map(name => `<td style="width:50%;padding:18px 3% 0;text-align:center;vertical-align:bottom"><p style="border-top:1px solid #475569;padding-top:6px">${text(name)}</p></td>`).join('');
-  const body = `<div style="border:8px double #b7791f;height:170mm;padding:24mm 14mm;text-align:center"><p>Waxaa halkan lagu caddeynayaa in</p><h2 style="font-size:24pt">${text(data.studentName)}</h2><p style="font-size:13pt;line-height:1.8">${text(data.body)}</p><p>${text(data.rankOrTotal || '')}</p><p>Taariikh: ${text(data.date)}</p><table style="width:100%"><tr>${signatures}</tr></table></div>`;
-  return paper(data.title, body, data.schoolName, '#b7791f');
+  const body = `<div style="border:7px double #b7791f;min-height:170mm;padding:18mm 14mm;text-align:center;background-color:#fffdf7">
+<p style="font-size:10pt;letter-spacing:2px;color:#956b1f;font-weight:700">SHAHAADADA RASMIGA AH</p>
+<div style="width:32mm;border-top:1px solid #b7791f;margin:8mm auto"></div>
+<p style="font-size:13pt">Waxaa halkan lagu caddeynayaa in</p>
+<h2 style="font-size:27pt;color:#7c5a1c;margin:12mm 0 8mm">${text(data.studentName)}</h2>
+<p style="font-size:13pt;line-height:1.9;margin:0 8mm">${text(data.body)}</p>
+<p style="font-size:12pt;font-weight:700;margin-top:8mm">${text(data.rankOrTotal || '')}</p>
+<p style="margin-top:8mm">Taariikh: ${text(data.date)}</p>
+<table style="width:100%;margin-top:18mm"><tr>${signatures}</tr></table>
+</div>`;
+  return paper(data.title, body, data.schoolName, '#b7791f', '');
 }
 
 export function renderStudentIdCards(data: StudentIdSheetData): string {
