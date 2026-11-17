@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
+import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
 import { 
   SchoolClass, 
   Subject, 
@@ -792,7 +793,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
             <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. Small Exam and Big Exam scores are saved together in the student's subject record.</p></div>
-            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+            <div className="flex flex-wrap gap-2">
+              <TeacherMarkEntryPrint
+                schoolName={school?.name || 'School'}
+                className={classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'}
+                section={classes.find(klass => klass.id === selectedClassId)?.section || ''}
+                academicYear={classes.find(klass => klass.id === selectedClassId)?.academicYear || school?.academicYear || ''}
+                semester={semester}
+                teacherName={user?.fullName || 'Teacher'}
+                students={students}
+                subjects={gradeSubjects}
+                components={assessmentComponents}
+              />
+              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2" role="group" aria-label="Exam type">
