@@ -2361,12 +2361,9 @@ class StorageEngine {
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
     if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
     const previousConfig = this.data.examConfigs[idx];
-    const schemeChanged = Boolean(updates.assessmentComponents)
-      && JSON.stringify(updates.assessmentComponents) !== JSON.stringify(previousConfig.assessmentComponents);
     const nextConfig: ExamConfig = {
       ...previousConfig,
       ...updates,
-      schemeVersion: schemeChanged ? (previousConfig.schemeVersion || 1) + 1 : (previousConfig.schemeVersion || 1),
       updatedAt: new Date().toISOString()
     };
     // Keep legacy two-number API callers working by translating their
@@ -2381,6 +2378,9 @@ class StorageEngine {
         { id: 'legacy-big', name: nextConfig.bigExamName, maxMarks: nextConfig.bigExamMax, category: 'final', order: 2 }
       ];
     }
+    // Increment after compatibility conversion so legacy maximum updates are versioned too.
+    const schemeChanged = JSON.stringify(nextConfig.assessmentComponents) !== JSON.stringify(previousConfig.assessmentComponents);
+    nextConfig.schemeVersion = schemeChanged ? (previousConfig.schemeVersion || 1) + 1 : (previousConfig.schemeVersion || 1);
     this.data.examConfigs[idx] = nextConfig;
     this.save();
     await this.flush();
@@ -2562,8 +2562,8 @@ class StorageEngine {
     submittedByRole: UserRole = 'teacher'
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
-    const config = await this.getExamConfig(schoolId);
     const klass = await this.getClassById(classId, schoolId);
+    const config = await this.getExamConfig(schoolId, klass?.academicYear);
     const academicYear = klass?.academicYear || config.academicYear;
     const components = config.assessmentComponents || [];
     const continuousComponents = components.filter(component => component.category === 'continuous');
