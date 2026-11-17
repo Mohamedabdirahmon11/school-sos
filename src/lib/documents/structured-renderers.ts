@@ -107,7 +107,7 @@ function text(value: unknown): string {
 
 function paper(title: string, body: string, schoolName: string, accentColor = '#176b5b', footer = 'SchoolOS'): string {
   const safeAccent = /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#176b5b';
-  return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;font-size:11pt;direction:rtl">
+  return `<div style="width:170mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;font-size:11pt;direction:rtl">
 <div style="border-bottom:3px solid ${safeAccent};padding-bottom:8px;margin-bottom:16px;text-align:center">
 <div style="font-size:19pt;font-weight:700;color:${safeAccent}">${text(schoolName)}</div>
 </div><h1 style="font-size:16pt;text-align:center;margin:14px 0">${text(title)}</h1>
@@ -194,7 +194,7 @@ export function renderStudentIdCards(data: StudentIdSheetData): string {
       while(cells.length<2)cells.push('<td style="width:50%;height:61mm"></td>');
       return `<tr>${cells.join('')}</tr>`;
     }).join('');
-    return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;direction:rtl"><h2 style="text-align:center">${text(data.schoolName)} · KAARKA AQOONSIGA ARDAYGA</h2><table style="width:100%">${rows}</table><p style="text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></div>`;
+    return `<div style="width:170mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;direction:rtl"><h2 style="text-align:center">${text(data.schoolName)} · KAARKA AQOONSIGA ARDAYGA</h2><table style="width:100%">${rows}</table><p style="text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></div>`;
   }).join('<div style="page-break-after:always"></div>');
 }
 
