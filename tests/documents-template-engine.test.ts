@@ -127,3 +127,12 @@ test('structured document API enforces school and family scope', () => {
   const documentUpdate=api.slice(api.indexOf("apiRouter.put('/documents/:id'"),api.indexOf("apiRouter.post('/documents/:id/download-audit'"));
   assert.match(documentUpdate,/user\.role==='parent'\|\|user\.role==='student'/);
 });
+
+test('excused attendance does not count as present or absent', () => {
+  const entries=[
+    {studentId:'1',date:'2026-11-16',status:'J' as const},
+    {studentId:'1',date:'2026-11-17',status:'M' as const},
+    {studentId:'1',date:'2026-11-18',status:'' as const,locked:true}
+  ];
+  assert.deepEqual(countAttendance(entries,'1'),{present:1,absent:1});
+});
