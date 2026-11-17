@@ -168,6 +168,18 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [preview,setPreview]=useState('');
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
+  const [studentSearch,setStudentSearch]=useState('');
+  const [sortBy,setSortBy]=useState<'name'|'id'|'total'>('name');
+  const filteredStudents=useMemo(()=>students.filter(student=>studentName(student).toLowerCase().includes(studentSearch.toLowerCase())||student.studentId.toLowerCase().includes(studentSearch.toLowerCase())),[students,studentSearch]);
+  const sortedStudents=useMemo(()=>[...students].sort((a,b)=>{
+    if(sortBy==='id')return a.studentId.localeCompare(b.studentId,undefined,{numeric:true});
+    if(sortBy==='total'){
+      const marks=examSemester==='Semester 1'?term1Marks:term2Marks;
+      const total=(student:Student)=>config.subjects.reduce((sum,subject)=>sum+Number(marks.find(mark=>mark.studentId===student.id&&mark.subjectId===subject.id)?.totalMarks||0),0);
+      return total(b)-total(a);
+    }
+    return studentName(a).localeCompare(studentName(b));
+  }),[students,sortBy,examSemester,term1Marks,term2Marks,config.subjects]);
   const selectedClass=useMemo(()=>classes.find(item=>item.id===classId),[classes,classId]);
   const attendanceDays=useMemo(()=>monthDays(year,month,schoolWeekendDays(calendar),schoolHolidayDates(calendar,year,month)),[year,month,calendar]);
   const periodNumbers=useMemo(()=>{const values=Object.keys(periodEdits).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);return values.length?values:[1,2,3,4,5,6];},[periodEdits]);
