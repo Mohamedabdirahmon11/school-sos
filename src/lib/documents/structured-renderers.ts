@@ -35,6 +35,7 @@ export interface ReportCardData {
   rank?: string | number;
   outcome?: StudentOutcome;
   comment?: string;
+  signatories?: string[];
 }
 
 export interface AttendanceSheetData {
