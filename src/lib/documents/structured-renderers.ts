@@ -107,19 +107,19 @@ function text(value: unknown): string {
 
 function paper(title: string, body: string, schoolName: string, accentColor = '#176b5b', footer = 'SchoolOS'): string {
   const safeAccent = /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#176b5b';
-  return `<article class="schoolos-a4" style="box-sizing:border-box;width:190mm;min-height:277mm;margin:0 auto;padding:10mm;background:#fff;color:#17212b;font-family:Arial,sans-serif;font-size:11pt;direction:rtl">
-<header style="border-bottom:3px solid ${safeAccent};padding-bottom:8px;margin-bottom:16px;text-align:center">
+  return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;font-size:11pt;direction:rtl">
+<div style="border-bottom:3px solid ${safeAccent};padding-bottom:8px;margin-bottom:16px;text-align:center">
 <div style="font-size:19pt;font-weight:700;color:${safeAccent}">${text(schoolName)}</div>
-</header><h1 style="font-size:16pt;text-align:center;margin:14px 0">${text(title)}</h1>
+</div><h1 style="font-size:16pt;text-align:center;margin:14px 0">${text(title)}</h1>
 ${body}
-<footer style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">${text(footer)}</footer>
-</article>`;
+<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">${text(footer)}</p>
+</div>`;
 }
 
 function table(headers: string[], rows: string[][]): string {
-  const head = headers.map(value => `<th style="border:1px solid #64748b;padding:5px;background:#e8f0ee">${text(value)}</th>`).join('');
-  const body = rows.map((row, index) => `<tr style="background:${index % 2 ? '#f5f8f7' : '#fff'}">${row.map(value => `<td style="border:1px solid #94a3b8;padding:5px">${text(value)}</td>`).join('')}</tr>`).join('');
-  return `<table style="width:100%;border-collapse:collapse;table-layout:auto"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  const head = headers.map(value => `<th style="border:1px solid #64748b;padding:5px;background-color:#e8f0ee">${text(value)}</th>`).join('');
+  const body = rows.map((row, index) => `<tr style="background-color:${index % 2 ? '#f5f8f7' : '#fff'}">${row.map(value => `<td style="border:1px solid #94a3b8;padding:5px">${text(value)}</td>`).join('')}</tr>`).join('');
+  return `<table style="width:100%"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 export function renderExamResultList(data: ExamResultData): string {
@@ -139,7 +139,7 @@ export function renderExamResultList(data: ExamResultData): string {
       String(sumMarks(data.subjects.map(subject=>student.marks[subject.id]??'LB'))),student.outcome
     ]);
     return paper('GO’AANKA IMTIXAANKA',header+`<p style="font-weight:700;text-align:center">Xadka gudbidda: ${threshold} dhibco</p>`+table(headers,rows)+`<p style="font-weight:700">${text(summary)}</p>`+qr+`<p style="text-align:left">Bogga ${page.page} / ${page.pageCount}</p>`,data.schoolName);
-  }).join('<div style="break-after:page;page-break-after:always"></div>');
+  }).join('<div style="page-break-after:always"></div>');
 }
 
 export function renderIndividualReportCard(data: ReportCardData): string {
@@ -172,20 +172,29 @@ export function renderAttendanceSheet(data: AttendanceSheetData): string[] {
 }
 
 export function renderCertificate(data: CertificateData): string {
-  const signatures = (data.signatories || ['Maamulaha', 'Macallinka']).map(name => `<div style="display:inline-block;width:42%;margin:18px 3% 0;text-align:center;border-top:1px solid #475569;padding-top:6px">${text(name)}</div>`).join('');
-  const body = `<section style="border:8px double #b7791f;min-height:170mm;padding:24mm 14mm;text-align:center"><p>Waxaa halkan lagu caddeynayaa in</p><h2 style="font-size:24pt">${text(data.studentName)}</h2><p style="font-size:13pt;line-height:1.8">${text(data.body)}</p><p>${text(data.rankOrTotal || '')}</p><p>Taariikh: ${text(data.date)}</p><div>${signatures}</div></section>`;
+  const signatures = (data.signatories || ['Maamulaha', 'Macallinka']).map(name => `<td style="width:50%;padding:18px 3% 0;text-align:center;vertical-align:bottom"><p style="border-top:1px solid #475569;padding-top:6px">${text(name)}</p></td>`).join('');
+  const body = `<div style="border:8px double #b7791f;height:170mm;padding:24mm 14mm;text-align:center"><p>Waxaa halkan lagu caddeynayaa in</p><h2 style="font-size:24pt">${text(data.studentName)}</h2><p style="font-size:13pt;line-height:1.8">${text(data.body)}</p><p>${text(data.rankOrTotal || '')}</p><p>Taariikh: ${text(data.date)}</p><table style="width:100%"><tr>${signatures}</tr></table></div>`;
   return paper(data.title, body, data.schoolName, '#b7791f');
 }
 
 export function renderStudentIdCards(data: StudentIdSheetData): string {
   const pages=Math.max(1,Math.ceil(data.cards.length/8));
   return Array.from({length:pages},(_,pageIndex)=>{
-    const cards=data.cards.slice(pageIndex*8,(pageIndex+1)*8).map(card=>`<section style="height:83mm;border:1px solid #64748b;border-radius:8px;overflow:hidden;break-inside:avoid;background:#fff">
-<div style="height:12mm;background:${/^#[0-9a-fA-F]{6}$/.test(data.accentColor || '') ? data.accentColor : '#176b5b'};color:#fff;text-align:center;padding:3mm;font-weight:700">${text(data.schoolName)}<br/>KAARKA AQOONSIGA ARDAYGA</div>
-<div style="display:flex;gap:5mm;padding:5mm;align-items:center">${card.photoUrl && /^https:\/\//i.test(card.photoUrl) ? `<img src="${text(card.photoUrl)}" alt="" style="width:24mm;height:30mm;object-fit:cover;border:1px solid #94a3b8"/>` : '<div style="width:24mm;height:30mm;border:1px solid #94a3b8"></div>'}
-<div><strong>${text(card.name)}</strong><p>ID: ${text(card.id)}</p><p>Fasal: ${text(card.className)}</p><p>Sanad: ${text(data.year)}</p></div></div></section>`).join('');
-    return `<article class="schoolos-a4" style="box-sizing:border-box;width:190mm;min-height:277mm;margin:0 auto;padding:10mm;display:grid;grid-template-columns:1fr 1fr;gap:5mm;background:#fff;color:#17212b;font-family:Arial,sans-serif">${cards}<p style="grid-column:1/-1;text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></article>`;
-  }).join('<div style="break-after:page;page-break-after:always"></div>');
+    const pageCards=data.cards.slice(pageIndex*8,(pageIndex+1)*8);
+    const rows=Array.from({length:4},(_,rowIndex)=>{
+      const cells=pageCards.slice(rowIndex*2,rowIndex*2+2).map(card=>{
+        const photoPath=card.photoUrl?.startsWith('/api/documents/images?path=') ? card.photoUrl.split('path=')[1] : '';
+        const safePhoto=photoPath && /^[A-Za-z0-9%._/-]+$/.test(photoPath) ? `<img src="/api/documents/images?path=${text(photoPath)}" alt="" style="width:24mm;height:30mm;border:1px solid #94a3b8"/>` : '<div style="width:24mm;height:30mm;border:1px solid #94a3b8"></div>';
+        return `<td style="width:50%;height:61mm;border:1px solid #64748b;padding:2mm;vertical-align:top">
+<div style="background-color:${/^#[0-9a-fA-F]{6}$/.test(data.accentColor || '') ? data.accentColor : '#176b5b'};color:#fff;text-align:center;padding:3mm;font-weight:700">${text(data.schoolName)}<br/>KAARKA AQOONSIGA ARDAYGA</div>
+<table style="width:100%"><tr><td style="width:28mm;vertical-align:top">${safePhoto}</td><td style="vertical-align:top"><strong>${text(card.name)}</strong><p>ID: ${text(card.id)}</p><p>Fasal: ${text(card.className)}</p><p>Sanad: ${text(data.year)}</p></td></tr></table>
+</td>`;
+      });
+      while(cells.length<2)cells.push('<td style="width:50%;height:61mm"></td>');
+      return `<tr>${cells.join('')}</tr>`;
+    }).join('');
+    return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif"><h2 style="text-align:center">${text(data.schoolName)} · KAARKA AQOONSIGA ARDAYGA</h2><table style="width:100%">${rows}</table><p style="text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></div>`;
+  }).join('<div style="page-break-after:always"></div>');
 }
 
 export function renderOfficialLetter(data: OfficialLetterData): string {
