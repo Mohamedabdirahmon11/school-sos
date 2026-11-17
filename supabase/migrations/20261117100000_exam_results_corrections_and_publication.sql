@@ -18,6 +18,9 @@ CREATE INDEX IF NOT EXISTS student_marks_parent_published_idx
   ON public.student_marks (school_id, student_id, semester, published_at)
   WHERE status = 'approved' AND published_at IS NOT NULL;
 
+CREATE INDEX IF NOT EXISTS student_marks_class_year_semester_subject_idx
+  ON public.student_marks (school_id, class_id, academic_year, semester, subject_id);
+
 -- Direct Data API reads must obey the same publication gate as the parent portal API.
 -- This is restrictive so it ANDs with the existing permissive school-tenant policy.
 ALTER POLICY marks_role_read ON public.student_marks
