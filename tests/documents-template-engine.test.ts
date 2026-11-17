@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  countAttendance, escapePlainText, exportTemplateConfig, hasPassed, importTemplateConfig,
+  countAttendance, escapePlainText, exportTemplateConfig, hasPassed, importTemplateConfig, sumMarks,
   maximumMarks, monthDays, paginate, parseMark, passThreshold, removeSubjectAndMarks,
   summarizeOutcomes, type TemplateConfig, type TemplateSubject
 } from '../src/lib/documents/template-engine.ts';
@@ -18,7 +18,7 @@ test('marks accept numbers, ABS and LB, and reject invalid or out-of-range value
 
 test('ABS and LB do not contribute to totals', () => {
   assert.equal(maximumMarks(subjects), 700);
-  assert.equal((awaitlessSum()), 87);
+  assert.equal(sumMarks([87, 'ABS', 'LB', 0]), 87);
 });
 
 function awaitlessSum() {
