@@ -98,15 +98,15 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
   if(!config.showQr)output=output.replace(/<p style="text-align:left;font-size:8pt">QR \/ Aqoonsiga xaqiijinta:.*?<\/p>/g,'');
   if(config.showQr&&verificationId){
     const qrMarkup=qrDataUrl
-      ? \`<p style="text-align:left;font-size:8pt"><img src="\${escapePlainText(qrDataUrl)}" alt="QR" style="width:24mm;height:24mm"/> <br/>Aqoonsiga xaqiijinta: \${escapePlainText(verificationId)}</p>\`
-      : \`<p style="text-align:left;font-size:8pt">Aqoonsiga xaqiijinta: \${escapePlainText(verificationId)}</p>\`;
-    const original=\`<p style="text-align:left;font-size:8pt">QR / Aqoonsiga xaqiijinta: \${verificationId}</p>\`;
+      ? '<p style="text-align:left;font-size:8pt"><img src="' + escapePlainText(qrDataUrl) + '" alt="QR" style="width:24mm;height:24mm"/> <br/>Aqoonsiga xaqiijinta: ' + escapePlainText(verificationId) + '</p>'
+      : '<p style="text-align:left;font-size:8pt">Aqoonsiga xaqiijinta: ' + escapePlainText(verificationId) + '</p>';
+    const original='<p style="text-align:left;font-size:8pt">QR / Aqoonsiga xaqiijinta: ' + verificationId + '</p>';
     output=output.includes(original)?output.replace(original,qrMarkup):output+qrMarkup;
   }
   if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
-  output=output.replaceAll('font-size:11pt',\`font-size:\${Math.max(8,Math.min(24,config.fontSize))}pt\`);
-  output=output.replaceAll('padding:5px',\`padding:\${Math.max(2,Math.min(12,Math.round(config.rowHeight/6)))}px\`);
-  output=output.replaceAll('direction:rtl',\`direction:\${config.direction}\`);
+  output=output.replaceAll('font-size:11pt','font-size:' + Math.max(8,Math.min(24,config.fontSize)) + 'pt');
+  output=output.replaceAll('padding:5px','padding:' + Math.max(2,Math.min(12,Math.round(config.rowHeight/6))) + 'px');
+  output=output.replaceAll('direction:rtl','direction:' + config.direction);
   let safeLogo='';
   if(logoUrl?.startsWith('/api/documents/images?path=')&&/^[A-Za-z0-9%._/-]+$/.test(logoUrl.split('path=')[1]||''))safeLogo=logoUrl;
   if(logoUrl?.startsWith('https://')){
@@ -116,7 +116,7 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
     }catch{}
   }
   if(config.showLogo&&safeLogo){
-    output=output.replace('<div style="font-size:19pt;font-weight:700;',\`<img src="\${escapePlainText(safeLogo)}" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;\`);
+    output=output.replace('<div style="font-size:19pt;font-weight:700;','<img src="' + escapePlainText(safeLogo) + '" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;');
   }
   return output;
 }
