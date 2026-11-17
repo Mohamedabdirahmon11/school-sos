@@ -176,6 +176,11 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     if(!classId)return;
     let active=true;
     setBusy(true);
+    setStudents([]);
+    setAttendance([]);
+    setTerm1Marks([]);
+    setTerm2Marks([]);
+    setTimetable([]);
     if(userRole==='teacher'){
       ApiClient.getAllStudents(classId,undefined,100).then(roster=>{
         if(!active)return;
@@ -210,6 +215,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     if(!classId)return;
     let active=true;
     setAttendanceDirtyDates([]);
+    setAttendance([]);
     ApiClient.getAttendanceMonth(classId,year,month).then(result=>{if(active)setAttendance(result);})
       .catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta xaadirinta lama soo dejin karin.');});
     return ()=>{active=false;};
@@ -261,8 +267,9 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage,qrVerificationId:config.showQr?verificationId:undefined});
       }
       case 'individual_report_card':{
-        const finalTotal=subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0);
-        const finalAverage=subjectsWithMarks.length?finalTotal/subjectsWithMarks.length:0;
+        const finalValues=subjectsWithMarks.filter(item=>item.final!==null).map(item=>Number(item.final));
+        const finalTotal=finalValues.reduce((sum,value)=>sum+value,0);
+        const finalAverage=finalValues.length?finalTotal/finalValues.length:0;
         const finalOutcome=finalTotal>=passThreshold(activeSubjects,config.passRule)?'Gudub':'Aan Gudbin';
         const ranked=students.map(item=>{
           const values=activeSubjects.map(subject=>{
@@ -305,6 +312,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     setAttendance(current=>{
       const existing=current.find(item=>item.studentId===studentId&&item.date===date);
       const nextStatus:AttendanceEntry['status']=!existing||existing.status===''?'J':existing.status==='J'?'M':'';
+      if(existing?.status&&nextStatus==='')setMessage('Unmarking wuxuu ka dhigaa unmarked gudaha xaashidan; API-ga hadda jira ma tirtirayo diiwaankii hore.');
       const next=current.filter(item=>!(item.studentId===studentId&&item.date===date));
       return [...next,{studentId,date,status:nextStatus}];
     });
