@@ -6614,6 +6614,11 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   let totalStudents = rankings.length;
   if (isSemester) {
     const semesterRankings = await db.getClassSemesterRankings(school.id, student.classId, semester as 'Semester 1' | 'Semester 2');
+    const expectedSubjectIds = result.subjectResults.map(row => row.subject.id);
+    const classSemesterComplete = semesterRankings.length > 0 && semesterRankings.every(row =>
+      expectedSubjectIds.every(subjectId => row.marks.some(mark => mark.subjectId === subjectId))
+    );
+    if (!classSemesterComplete) { res.status(409).json({ error: `Class ${semester} rankings are not final. Every student must have approved marks for every assigned subject.` }); return; }
     const rank = semesterRankings.find(row => row.student.id === student.id)?.rank || 0;
     pdfResult = prepareSemesterReportCardResult(result, semester as 'Semester 1' | 'Semester 2', rank, config.passMarkPercentage || 50);
     totalStudents = semesterRankings.length;
@@ -6622,6 +6627,7 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
       res.status(409).json({ error: `${semester} results have not been published by the School Admin yet.` }); return;
     }
   } else {
+    if (rankings.some(row => !row.annualComplete)) { res.status(409).json({ error: 'Annual class rankings are not final. Every student must have approved marks for every assigned subject in both semesters.' }); return; }
     if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
     if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
       res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
