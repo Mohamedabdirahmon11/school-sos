@@ -17,6 +17,7 @@ import { buildResultsCsv } from '../../lib/results-csv.ts';
 import { ExamTimetablePrint, formatSomaliExamDate, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 // The date picker now uses Somali weekday labels instead of weekday: 'long'.
 import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
+import { AcademicResultsWorkspace } from './AcademicResultsWorkspace.tsx';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -30,7 +31,8 @@ import {
   Printer, 
   Download,
   AlertCircle,
-  CalendarDays
+  CalendarDays,
+  TrendingUp
 } from 'lucide-react';
 
 
@@ -480,7 +482,7 @@ export const ExamsResultsView: React.FC = () => {
   const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('entry_approval');
+  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('overview');
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
@@ -602,6 +604,7 @@ export const ExamsResultsView: React.FC = () => {
   // Load the complete class results matrix: all class subjects and all enrolled students.
   const loadClassData = async () => {
     if (!selectedClassId) return;
+    setIsLoading(true);
     setLoadError(null);
     try {
       const [stdList, existingMarks, classDetails] = await Promise.all([
@@ -623,6 +626,8 @@ export const ExamsResultsView: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setLoadError(err?.message || 'Unable to load the complete class results.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1030,7 +1035,29 @@ export const ExamsResultsView: React.FC = () => {
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-[#edf4f1] p-1.5 rounded-2xl text-sm">
+        <div className="flex flex-wrap items-center gap-1 bg-[#edf4f1] p-1.5 rounded-2xl text-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${activeTab === 'overview' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
+          >
+            Academic Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('results_explorer')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${activeTab === 'results_explorer' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
+          >
+            Results Explorer
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('analytics')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${activeTab === 'analytics' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            Performance Analytics
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('entry_approval')}
@@ -1087,6 +1114,23 @@ export const ExamsResultsView: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
           <span>{notice}</span>
         </div>
+      )}
+
+      {(activeTab === 'overview' || activeTab === 'results_explorer' || activeTab === 'analytics') && (
+        <AcademicResultsWorkspace
+          mode={activeTab === 'results_explorer' ? 'explorer' : activeTab}
+          classes={classes}
+          subjects={subjects}
+          students={students}
+          marks={marks}
+          classSubjectRows={classSubjectRows}
+          selectedClassId={selectedClassId}
+          onClassChange={setSelectedClassId}
+          selectedSemester={selectedSemester}
+          onSemesterChange={setSelectedSemester}
+          examConfig={examConfig}
+          classDataLoading={isLoading}
+        />
       )}
 
       {/* TAB 1: MARK ENTRY & APPROVAL */}
