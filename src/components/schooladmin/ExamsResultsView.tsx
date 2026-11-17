@@ -982,7 +982,7 @@ export const ExamsResultsView: React.FC = () => {
   };
 
   const downloadResultsCsv = (kind: 'semester' | 'yearly') => {
-    const rows = kind === 'semester' ? semRankings : yearlyRankings;
+    const rows = kind === 'semester' ? semRankings : yearlyRankings.filter(row => row.annualComplete);
     const className = classes.find(item => item.id === selectedClassId)?.name || 'class';
     const csv = buildResultsCsv(kind, rows, percentage => getGradeLabel(percentage, school?.gradingScale), examConfig?.passMarkPercentage || 50);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -1343,14 +1343,14 @@ export const ExamsResultsView: React.FC = () => {
                         {yr.student.firstName} {yr.student.middleName} {yr.student.lastName}
                       </td>
                       <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">
-                        {yr.yearlyPercentage}%
+                        {yr.annualComplete ? `${yr.yearlyPercentage}%` : 'Pending'}
                       </td>
-                      <td className="py-3 px-4 text-center font-semibold">{getGradeLabel(yr.yearlyPercentage, school?.gradingScale)}</td>
+                      <td className="py-3 px-4 text-center font-semibold">{yr.annualComplete ? getGradeLabel(yr.yearlyPercentage, school?.gradingScale) : '—'}</td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          yr.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                          !yr.annualComplete ? 'bg-amber-50 text-amber-800' : yr.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                         }`}>
-                          {yr.isPass ? 'Promote Candidate' : 'Repeat Required'}
+                          {!yr.annualComplete ? 'Awaiting both semesters' : yr.isPass ? 'Promote Candidate' : 'Repeat Required'}
                         </span>
                       </td>
                     </tr>
