@@ -137,7 +137,7 @@ const schoolSettingsSchema = z.object({
   sidebarTheme: sidebarThemeSchema.optional(),
   logoUrl: z.string().optional(),
   currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),
-  language: z.enum(['en', 'so'], 'Language must be English or Somali.').optional(),
+  language: z.enum(['en', 'so', 'am', 'ar'], 'Choose English, Somali, Amharic, or Arabic.').optional(),
   timezone: z.string().trim().min(1, 'Timezone is required.').max(100, 'Timezone must be 100 characters or fewer.').refine(isValidTimeZone, 'Timezone must be a valid IANA timezone.').optional(),
   academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.').refine(value => {
     const [start, end] = value.split('-').map(Number);
@@ -220,17 +220,17 @@ export function sanitizeBranchInput(body: unknown, partial = false): Partial<Bra
 const examAssessmentComponentSchema = z.object({
   id: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(100),
-  maxMarks: z.number().positive().max(1000),
+  maxMarks: z.number().int().min(1).max(100),
   category: z.enum(['continuous', 'final']),
-  order: z.number().int().min(1).max(20)
+  order: z.number().int().min(1).max(6)
 });
 
 const examConfigSchema = z.object({
   smallExamName: z.string().trim().min(1, 'Continuous assessment name is required.').max(100).optional(),
-  smallExamMax: z.number().min(1).max(1000).optional(),
+  smallExamMax: z.number().min(0).max(1000).optional(),
   bigExamName: z.string().trim().min(1, 'Final examination name is required.').max(100).optional(),
-  bigExamMax: z.number().min(1).max(1000).optional(),
-  assessmentComponents: z.array(examAssessmentComponentSchema).min(1).max(20).optional(),
+  bigExamMax: z.number().min(0).max(1000).optional(),
+  assessmentComponents: z.array(examAssessmentComponentSchema).min(1).max(6).optional(),
   passMarkPercentage: z.number().min(0, 'Pass mark must be between 0 and 100.').max(100).optional()
 }).superRefine((value, context) => {
   if (!value.assessmentComponents) return;
@@ -240,9 +240,12 @@ const examConfigSchema = z.object({
   if (new Set(orders).size !== orders.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component order values must be unique.' });
   const continuousTotal = value.assessmentComponents.filter(item => item.category === 'continuous').reduce((sum, item) => sum + item.maxMarks, 0);
   const finalTotal = value.assessmentComponents.filter(item => item.category === 'final').reduce((sum, item) => sum + item.maxMarks, 0);
-  if (continuousTotal <= 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Add at least one continuous assessment component.' });
-  if (finalTotal <= 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Add at least one final examination component.' });
-  if (continuousTotal + finalTotal > 1000) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'The combined maximum mark cannot exceed 1,000.' });
+  const total = continuousTotal + finalTotal;
+  if (total !== 100) context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['assessmentComponents'],
+    message: `Wadarta waa inay noqotaa 100 (hadda ${total})`
+  });
 });
 export function sanitizeExamConfigSettings(body: unknown): Partial<ExamConfig> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Exam configuration payload must be an object.');

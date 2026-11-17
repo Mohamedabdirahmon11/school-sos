@@ -123,9 +123,29 @@ test('school-defined four small tests and one final exam calculate a 100-mark re
   assert.equal(saved[0].bigExamMarks, 50);
   assert.equal(saved[0].totalMarks, 80);
   assert.equal(saved[0].percentage, 80);
+  assert.equal(saved[0].schemeVersion, 1);
+  assert.deepEqual(saved[0].schemeSnapshot, config.assessmentComponents);
   assert.deepEqual(saved[0].assessmentScores, { 'test-1': 9, 'test-2': 8, 'test-3': 7, 'test-4': 6, 'final-exam': 50 });
   await db.flush();
   assert.deepEqual(memory.rows('student_marks')[0].assessment_scores, { 'test-1': 9, 'test-2': 8, 'test-3': 7, 'test-4': 6, 'final-exam': 50 });
+  assert.equal(memory.rows('student_marks')[0].scheme_version, 1);
+  assert.deepEqual(memory.rows('student_marks')[0].scheme_snapshot, config.assessmentComponents);
+
+  const nextScheme = [
+    { id: 'coursework', name: 'Coursework', maxMarks: 40, category: 'continuous' as const, order: 1 },
+    { id: 'final-v2', name: 'Final Examination', maxMarks: 60, category: 'final' as const, order: 2 }
+  ];
+  const revised = await db.updateExamConfig(school.id, { assessmentComponents: nextScheme });
+  assert.equal(revised.schemeVersion, 2);
+  const preserved = await db.getMarks(school.id, klass.id, subject.id, 'Semester 1');
+  assert.equal(preserved[0].schemeVersion, 1);
+  assert.deepEqual(preserved[0].schemeSnapshot, config.assessmentComponents);
+  await assert.rejects(
+    () => db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+      studentId: student.id, assessmentScores: { coursework: 30, 'final-v2': 50 }, status: 'draft'
+    }], 'teacher-1'),
+    /entered under scheme version 1/
+  );
 });
 
 test('yearly report cards do not treat one approved semester as the full-year average', async () => {
@@ -194,6 +214,8 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
   const saved = await db.updateExamConfig(school.id, { assessmentComponents: fiveTestPlan });
   assert.equal(saved.assessmentComponents.filter(item => item.category === 'continuous').length, 5);
   assert.equal(saved.assessmentComponents.find(item => item.category === 'final')?.maxMarks, 50);
+  assert.equal(saved.smallExamMax, 50);
+  assert.equal(saved.bigExamMax, 50);
   assert.equal(saved.assessmentComponents.reduce((sum, item) => sum + item.maxMarks, 0), 100);
 
   await assert.rejects(
@@ -201,7 +223,7 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
       ...fiveTestPlan.slice(0, 5),
       { id: 'invalid-final', name: 'Final Examination', maxMarks: 60, category: 'final' as const, order: 6 }
     ] }),
-    /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
+    /Wadarta waa inay noqotaa 100/
   );
   await assert.rejects(
     () => db.updateExamConfig(school.id, { assessmentComponents: [
@@ -211,7 +233,7 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
       })),
       { id: 'six-test-final', name: 'Final Examination', maxMarks: 40, category: 'final' as const, order: 7 }
     ] }),
-    /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
+    /between 1 and 6 assessment components/
   );
 });
 

@@ -2313,6 +2313,7 @@ class StorageEngine {
           { id: 'test-4', name: 'Test 4', maxMarks: 10, category: 'continuous', order: 4 },
           { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 5 }
         ],
+        schemeVersion: 1,
         passMarkPercentage: 50,
         updatedAt: new Date().toISOString()
       };
@@ -2342,30 +2343,45 @@ class StorageEngine {
     const nextSmallMax = updates.smallExamMax ?? conf.smallExamMax;
     const nextBigMax = updates.bigExamMax ?? conf.bigExamMax;
     const nextPassMark = updates.passMarkPercentage ?? conf.passMarkPercentage;
-    if (![nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0) || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
+    const validMaximums = updates.assessmentComponents
+      ? [nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value >= 0) && nextSmallMax + nextBigMax > 0
+      : [nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0);
+    if (!validMaximums || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
       throw new Error('Exam maximum marks must be positive numbers and pass mark must be between 0 and 100.');
     }
+    if (!updates.assessmentComponents && nextSmallMax + nextBigMax !== 100) {
+      throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${nextSmallMax + nextBigMax})`);
+    }
     if (updates.assessmentComponents) {
-      const continuous = updates.assessmentComponents.filter(component => component.category === 'continuous');
-      const finals = updates.assessmentComponents.filter(component => component.category === 'final');
-      const expectedFinalMax = continuous.length === 4 ? 60 : continuous.length === 5 ? 50 : -1;
-      const validPlan = (continuous.length === 4 || continuous.length === 5)
-        && continuous.every(component => Number(component.maxMarks) === 10)
-        && finals.length === 1
-        && Number(finals[0].maxMarks) === expectedFinalMax
-        && updates.assessmentComponents.length === continuous.length + 1
-        && updates.assessmentComponents.every(component => Number.isFinite(Number(component.maxMarks)) && Number(component.maxMarks) > 0);
-      if (!validPlan) {
-        throw new Error('Each semester must use either four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final (100 marks total).');
+      const components = updates.assessmentComponents;
+      const total = components.reduce((sum, component) => sum + Number(component.maxMarks), 0);
+      const ids = components.map(component => component.id);
+      const orders = components.map(component => component.order);
+      if (components.length < 1 || components.length > 6) {
+        throw new Error('Use between 1 and 6 assessment components.');
       }
+      if (!components.every(component => Number.isInteger(component.maxMarks) && component.maxMarks >= 1 && component.maxMarks <= 100)
+        || new Set(ids).size !== ids.length || new Set(orders).size !== orders.length) {
+        throw new Error('Assessment components need unique IDs and positions, with whole-number maximums from 1 to 100.');
+      }
+      if (total !== 100) throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${total})`);
     }
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
     if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');
+    const previousConfig = this.data.examConfigs[idx];
     const nextConfig: ExamConfig = {
-      ...this.data.examConfigs[idx],
+      ...previousConfig,
       ...updates,
       updatedAt: new Date().toISOString()
     };
+    if (updates.assessmentComponents) {
+      nextConfig.smallExamMax = updates.assessmentComponents
+        .filter(component => component.category === 'continuous')
+        .reduce((sum, component) => sum + component.maxMarks, 0);
+      nextConfig.bigExamMax = updates.assessmentComponents
+        .filter(component => component.category === 'final')
+        .reduce((sum, component) => sum + component.maxMarks, 0);
+    }
     // Keep legacy two-number API callers working by translating their
     // maximums into a two-component assessment plan. The new Admin UI sends
     // assessmentComponents directly and therefore retains its full structure.
@@ -2378,6 +2394,9 @@ class StorageEngine {
         { id: 'legacy-big', name: nextConfig.bigExamName, maxMarks: nextConfig.bigExamMax, category: 'final', order: 2 }
       ];
     }
+    // Increment after compatibility conversion so legacy maximum updates are versioned too.
+    const schemeChanged = JSON.stringify(nextConfig.assessmentComponents) !== JSON.stringify(previousConfig.assessmentComponents);
+    nextConfig.schemeVersion = schemeChanged ? (previousConfig.schemeVersion || 1) + 1 : (previousConfig.schemeVersion || 1);
     this.data.examConfigs[idx] = nextConfig;
     this.save();
     await this.flush();
@@ -2559,8 +2578,8 @@ class StorageEngine {
     submittedByRole: UserRole = 'teacher'
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
-    const config = await this.getExamConfig(schoolId);
     const klass = await this.getClassById(classId, schoolId);
+    const config = await this.getExamConfig(schoolId, klass?.academicYear);
     const academicYear = klass?.academicYear || config.academicYear;
     const components = config.assessmentComponents || [];
     const continuousComponents = components.filter(component => component.category === 'continuous');
@@ -2619,6 +2638,8 @@ class StorageEngine {
     const submittedChanges: any[] = [];
     const auditValues = (mark: StudentMark) => ({
       assessmentScores: mark.assessmentScores ? { ...mark.assessmentScores } : null,
+      schemeVersion: mark.schemeVersion || 1,
+      schemeSnapshot: mark.schemeSnapshot ? mark.schemeSnapshot.map(component => ({ ...component })) : null,
       smallExamMarks: mark.smallExamMarks,
       bigExamMarks: mark.bigExamMarks,
       totalMarks: mark.totalMarks,
@@ -2637,8 +2658,14 @@ class StorageEngine {
       );
 
       if (existingIdx >= 0) {
+        // A saved mark remains bound to the scheme version under which it was
+        // entered. Never reinterpret an old draft against a newer school scheme.
+        const existingSchemeVersion = this.data.marks[existingIdx].schemeVersion || 1;
+        if (existingSchemeVersion !== (config.schemeVersion || 1)) {
+          throw new Error(`This mark was entered under scheme version ${existingSchemeVersion}. It must be reviewed before editing under version ${config.schemeVersion || 1}.`);
+        }
         // Submitted rows remain immutable; teachers can keep saving drafts as
-        // the four continuous tests and final exam happen during the semester.
+        // assessment components are completed during the semester.
         if (this.data.marks[existingIdx].status !== 'draft') continue;
         const previous = this.data.marks[existingIdx];
         const oldValues = auditValues(previous);
@@ -2670,6 +2697,8 @@ class StorageEngine {
           academicYear,
           semester,
           assessmentScores: mark.assessmentScores,
+          schemeVersion: config.schemeVersion || 1,
+          schemeSnapshot: components.map(component => ({ ...component })),
           smallExamMarks: mark.smallExamMarks,
           bigExamMarks: mark.bigExamMarks,
           totalMarks: mark.totalMarks,

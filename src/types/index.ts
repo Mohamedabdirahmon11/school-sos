@@ -43,7 +43,7 @@ export interface SchoolBranch {
   createdAt: string;
 }
 
-export type SchoolLanguage = 'en' | 'so';
+export type SchoolLanguage = 'en' | 'so' | 'am' | 'ar';
 export type SchoolCurrency = 'ETB' | 'USD' | 'SOS';
 
 export interface GradingBand {
@@ -348,6 +348,8 @@ export interface ExamConfig {
   bigExamName: string;
   bigExamMax: number;
   assessmentComponents: ExamAssessmentComponent[];
+  /** Monotonically increasing school/year mark-scheme revision. */
+  schemeVersion?: number;
   passMarkPercentage: number;
   updatedAt: string;
 }
@@ -369,6 +371,9 @@ export interface StudentMark {
   bigExamMarks: number;
   /** Per-assessment raw scores keyed by ExamAssessmentComponent.id. */
   assessmentScores?: Record<string, number>;
+  /** Immutable scheme revision and component snapshot used when these marks were entered. */
+  schemeVersion?: number;
+  schemeSnapshot?: ExamAssessmentComponent[];
   totalMarks: number; // small + big
   percentage: number; // (total / (smallMax + bigMax)) * 100
   status: MarkStatus;

@@ -124,7 +124,7 @@ export class ApiClient {
     // Cookie cleared on server side via logout endpoint
   }
 
-  public static getLanguage(): 'en' | 'so' | 'am' {
+  public static getLanguage(): 'en' | 'so' | 'am' | 'ar' {
     return (localStorage.getItem(LANG_KEY) as any) || 'en';
   }
 
@@ -132,7 +132,7 @@ export class ApiClient {
     return Boolean(localStorage.getItem(LANG_KEY));
   }
 
-  public static setLanguage(lang: 'en' | 'so' | 'am') {
+  public static setLanguage(lang: 'en' | 'so' | 'am' | 'ar') {
     localStorage.setItem(LANG_KEY, lang);
   }
 
@@ -403,7 +403,7 @@ export class ApiClient {
   public static async updateSchoolDetails(id: string, details: {
     name: string; email: string; address: string; city: string; country: string; region: string;
     schoolType: 'primary' | 'secondary' | 'combined'; phone: string;
-    whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so';
+    whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so' | 'am' | 'ar';
   }) {
     return this.request<School>(`/superadmin/schools/${encodeURIComponent(id)}`, {
       method: 'PATCH',

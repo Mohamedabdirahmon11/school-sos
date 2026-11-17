@@ -569,6 +569,7 @@ CREATE TABLE IF NOT EXISTS exam_configs (
     {"id":"test-4","name":"Test 4","maxMarks":10,"category":"continuous","order":4},
     {"id":"final-exam","name":"Final Examination","maxMarks":60,"category":"final","order":5}
   ]'::jsonb,
+  scheme_version INTEGER NOT NULL DEFAULT 1 CHECK (scheme_version > 0),
   pass_mark_percentage NUMERIC(5, 2) NOT NULL DEFAULT 50.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -587,6 +588,8 @@ CREATE TABLE IF NOT EXISTS student_marks (
   small_exam_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
   big_exam_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
   assessment_scores JSONB NOT NULL DEFAULT '{}'::jsonb,
+  scheme_version INTEGER NOT NULL DEFAULT 1 CHECK (scheme_version > 0),
+  scheme_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
   total_marks NUMERIC(5, 2) NOT NULL DEFAULT 0,
   percentage NUMERIC(5, 2) NOT NULL DEFAULT 0,
   status mark_status_enum NOT NULL DEFAULT 'draft',

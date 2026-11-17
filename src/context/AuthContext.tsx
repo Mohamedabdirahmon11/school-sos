@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, School, UserRole } from '../types/index.ts';
 import { ApiClient } from '../services/api.ts';
-import { translations, LanguageCode, TranslationDict } from '../lib/translations.ts';
+import { translations, LanguageCode, TranslationDict, getLanguageDirection } from '../lib/translations.ts';
 import { clearPendingPinSlips } from '../lib/bulk-pin-results.ts';
 
 interface AuthContextType {
@@ -82,6 +82,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (savedLang) setLanguageState(savedLang);
     refreshUser();
   }, [refreshUser]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.lang = language;
+    root.dir = getLanguageDirection(language);
+  }, [language]);
 
   useEffect(() => {
     const handleUnauthorized = (event: Event) => {

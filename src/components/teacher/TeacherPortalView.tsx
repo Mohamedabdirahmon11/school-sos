@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
+import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
 import { 
   SchoolClass, 
   Subject, 
@@ -451,10 +452,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
-  const smallMax = examConfig?.smallExamMax || 40;
-  const bigMax = examConfig?.bigExamMax || 60;
+  const smallMax = examConfig?.smallExamMax ?? 40;
+  const bigMax = examConfig?.bigExamMax ?? 60;
   const combinedMax = smallMax + bigMax;
   const assessmentComponents = examConfig?.assessmentComponents || [];
+
+  useEffect(() => {
+    if (smallMax <= 0 && bigMax > 0) setExamType('big');
+    else if (bigMax <= 0 && smallMax > 0) setExamType('small');
+  }, [smallMax, bigMax]);
   const examRegisterRows = useMemo(() => {
     const components = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
     const rows = visibleStudents.map(student => {
@@ -792,12 +798,25 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
             <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. Small Exam and Big Exam scores are saved together in the student's subject record.</p></div>
-            {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+            <div className="flex flex-wrap gap-2">
+              <TeacherMarkEntryPrint
+                schoolName={school?.name || 'School'}
+                className={classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'}
+                section={classes.find(klass => klass.id === selectedClassId)?.section || ''}
+                academicYear={classes.find(klass => klass.id === selectedClassId)?.academicYear || school?.academicYear || ''}
+                semester={semester}
+                teacherName={user?.fullName || 'Teacher'}
+                students={students}
+                subjects={gradeSubjects}
+                components={assessmentComponents}
+              />
+              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2" role="group" aria-label="Exam type">
-            <button type="button" aria-pressed={examType === 'small'} onClick={() => setExamType('small')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'small' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.smallExamName || 'Small Exam'} · {smallMax} marks</button>
-            <button type="button" aria-pressed={examType === 'big'} onClick={() => setExamType('big')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'big' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.bigExamName || 'Big Exam'} · {bigMax} marks</button>
+            {smallMax > 0 && <button type="button" aria-pressed={examType === 'small'} onClick={() => setExamType('small')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'small' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.smallExamName || 'Small Exam'} · {smallMax} marks</button>}
+            {bigMax > 0 && <button type="button" aria-pressed={examType === 'big'} onClick={() => setExamType('big')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'big' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.bigExamName || 'Big Exam'} · {bigMax} marks</button>}
           </div>
 
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : (

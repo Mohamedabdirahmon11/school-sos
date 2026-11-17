@@ -638,20 +638,36 @@ export const ExamsResultsView: React.FC = () => {
     void loadClassData();
   }, [selectedClassId, selectedSemester, activeTab]);
 
+  // Apply a familiar school scheme without replacing the editable component list.
+  const applyExamSchemePreset = (preset: 'four-tests' | 'forty-sixty') => {
+    const components: ExamAssessmentComponent[] = preset === 'four-tests'
+      ? [
+          { id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 },
+          { id: 'test-2', name: 'Test 2', maxMarks: 10, category: 'continuous', order: 2 },
+          { id: 'test-3', name: 'Test 3', maxMarks: 10, category: 'continuous', order: 3 },
+          { id: 'test-4', name: 'Test 4', maxMarks: 10, category: 'continuous', order: 4 },
+          { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 5 }
+        ]
+      : [
+          { id: 'continuous-assessment', name: 'Continuous Assessment', maxMarks: 40, category: 'continuous', order: 1 },
+          { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final', order: 2 }
+        ];
+    setAssessmentComponents(components);
+  };
+
   // Save Exam Config
   const handleSaveConfig = async () => {
     if (isReadOnly) return;
-    const continuous = assessmentComponents.filter(component => component.category === 'continuous');
-    const finals = assessmentComponents.filter(component => component.category === 'final');
-    const validPlan = (continuous.length === 4 || continuous.length === 5)
-      && continuous.every(component => Number(component.maxMarks) === 10)
-      && finals.length === 1
-      && Number(finals[0].maxMarks) === (continuous.length === 4 ? 60 : 50)
-      && continuousMax + finalMax === 100;
+    const total = assessmentComponents.reduce((sum, component) => sum + Number(component.maxMarks || 0), 0);
+    const validPlan = assessmentComponents.length >= 1 && assessmentComponents.length <= 6
+      && assessmentComponents.every(component => component.name.trim() && Number.isInteger(Number(component.maxMarks)) && component.maxMarks >= 1 && component.maxMarks <= 100)
+      && total === 100;
     if (!validPlan) {
-      setNotice('Choose 4 or 5 continuous tests (10 marks each) and one final exam (60 or 50 marks) so each semester totals exactly 100.');
+      setNotice(`Wadarta waa inay noqotaa 100 (hadda ${total})`);
       return;
     }
+    const schemeChanged = JSON.stringify(assessmentComponents) !== JSON.stringify(examConfig?.assessmentComponents || []);
+    if (schemeChanged && !window.confirm('Fiiro gaar ah: haddii dhibco hore jiraan, waxay sii haynayaan qaabkii lagu geliyey; qaabka cusub wuxuu noqonayaa version cusub. Ma sii wadeysaa?')) return;
     setIsSaving(true);
     try {
       const updated = await ApiClient.updateExamConfig({
@@ -1653,38 +1669,15 @@ export const ExamsResultsView: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
             <h2 className="text-base font-bold text-[#132A29]">School Exam Structure</h2>
-            <p className="mt-1 text-sm text-[#71817d]">The school administrator chooses whether each semester has four or five small tests. The system adjusts the final exam so the semester always totals 100 marks.</p>
+            <p className="mt-1 text-sm text-[#71817d]">Build a school-wide mark scheme with 1–6 parts. Every part has an editable name and whole-number maximum; all parts must total exactly 100.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">Current scheme version: v{examConfig?.schemeVersion || 1}</p>
           </div>
 
-          <label className="block max-w-sm text-xs font-semibold text-[#334155]">Number of small tests per semester
-            <select
-              value={assessmentComponents.filter(component => component.category === 'continuous').length === 5 ? '5' : '4'}
-              onChange={event => {
-                const count = Number(event.target.value);
-                setAssessmentComponents(rows => {
-                  const currentContinuous = rows.filter(component => component.category === 'continuous');
-                  const currentFinal = rows.find(component => component.category === 'final');
-                  const tests = Array.from({ length: count }, (_, index) => ({
-                    ...(currentContinuous[index] || { id: `test-${index + 1}`, name: `Test ${index + 1}`, maxMarks: 10, category: 'continuous' as const, order: index + 1 }),
-                    maxMarks: 10,
-                    category: 'continuous' as const,
-                    order: index + 1
-                  }));
-                  const final = {
-                    ...(currentFinal || { id: 'final-exam', name: 'Final Examination', maxMarks: 60, category: 'final' as const, order: count + 1 }),
-                    maxMarks: count === 4 ? 60 : 50,
-                    category: 'final' as const,
-                    order: count + 1
-                  };
-                  return [...tests, final];
-                });
-              }}
-              className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2"
-            >
-              <option value="4">4 small tests × 10 + final exam 60 = 100</option>
-              <option value="5">5 small tests × 10 + final exam 50 = 100</option>
-            </select>
-          </label>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => applyExamSchemePreset('four-tests')} className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900">Preset: 10 + 10 + 10 + 10 + 60</button>
+            <button type="button" onClick={() => applyExamSchemePreset('forty-sixty')} className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900">Preset: 40 + 60</button>
+            <button type="button" onClick={() => setAssessmentComponents(rows => rows.length >= 6 ? rows : [...rows, { id: `part-${Date.now()}`, name: `Part ${rows.length + 1}`, maxMarks: 1, category: 'continuous', order: rows.length + 1 }])} disabled={assessmentComponents.length >= 6} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-40">+ Add custom part</button>
+          </div>
 
           <div className="space-y-3">
             {assessmentComponents.map((component, index) => (
@@ -1693,7 +1686,7 @@ export const ExamsResultsView: React.FC = () => {
                   <input value={component.name} maxLength={100} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, name: event.target.value } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal" />
                 </label>
                 <label className="text-xs font-semibold text-[#475569]">Maximum marks
-                  <input type="number" min={0.5} max={1000} step={0.5} value={component.maxMarks} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, maxMarks: Math.max(0.5, Number(event.target.value) || 0.5) } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono font-normal" />
+                  <input type="number" min={1} max={100} step={1} value={component.maxMarks} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, maxMarks: Math.max(1, Math.min(100, Math.floor(Number(event.target.value) || 1))) } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-mono font-normal" />
                 </label>
                 <label className="text-xs font-semibold text-[#475569]">Assessment group
                   <select value={component.category} onChange={event => setAssessmentComponents(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, category: event.target.value as 'continuous' | 'final' } : row))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 font-normal">
@@ -1701,16 +1694,16 @@ export const ExamsResultsView: React.FC = () => {
                     <option value="final">Final / major exam</option>
                   </select>
                 </label>
-                <button type="button" onClick={() => setAssessmentComponents(rows => rows.filter(row => row.id !== component.id).map((row, rowIndex) => ({ ...row, order: rowIndex + 1 })))} disabled={assessmentComponents.length <= 2} aria-label={`Remove ${component.name}`} className="mt-5 h-9 rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-40">×</button>
+                <button type="button" onClick={() => setAssessmentComponents(rows => rows.filter(row => row.id !== component.id).map((row, rowIndex) => ({ ...row, order: rowIndex + 1 })))} disabled={assessmentComponents.length <= 1} aria-label={`Remove ${component.name}`} className="mt-5 h-9 rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-40">×</button>
               </div>
             ))}
-            <p className="text-xs text-slate-500">Assessment count and maximum marks are controlled by the school administrator above. Each semester is exactly 100 marks.</p>
+            <p className="text-xs text-slate-500">Use 1–6 parts. Maximum marks must be whole numbers from 1 to 100. Current total: <strong>{assessmentComponents.reduce((sum, component) => sum + Number(component.maxMarks || 0), 0)}/100</strong>.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 rounded-xl bg-teal-50 p-4 text-xs sm:grid-cols-3">
             <div><span className="text-teal-800">Continuous total</span><strong className="mt-1 block text-lg text-teal-950">{continuousMax} marks</strong></div>
             <div><span className="text-teal-800">Final exam total</span><strong className="mt-1 block text-lg text-teal-950">{finalMax} marks</strong></div>
-            <div><span className="text-teal-800">Combined maximum</span><strong className="mt-1 block text-lg text-teal-950">{maxCombined} marks</strong></div>
+            <div><span className="text-teal-800">Combined maximum</span><strong className="mt-1 block text-lg text-teal-950">{assessmentComponents.reduce((sum, component) => sum + Number(component.maxMarks || 0), 0)} / 100 marks</strong></div>
           </div>
 
           <div>
