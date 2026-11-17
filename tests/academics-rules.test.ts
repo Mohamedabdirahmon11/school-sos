@@ -194,6 +194,8 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
   const saved = await db.updateExamConfig(school.id, { assessmentComponents: fiveTestPlan });
   assert.equal(saved.assessmentComponents.filter(item => item.category === 'continuous').length, 5);
   assert.equal(saved.assessmentComponents.find(item => item.category === 'final')?.maxMarks, 50);
+  assert.equal(saved.smallExamMax, 50);
+  assert.equal(saved.bigExamMax, 50);
   assert.equal(saved.assessmentComponents.reduce((sum, item) => sum + item.maxMarks, 0), 100);
 
   await assert.rejects(

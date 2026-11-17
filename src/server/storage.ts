@@ -2372,6 +2372,14 @@ class StorageEngine {
       ...updates,
       updatedAt: new Date().toISOString()
     };
+    if (updates.assessmentComponents) {
+      nextConfig.smallExamMax = updates.assessmentComponents
+        .filter(component => component.category === 'continuous')
+        .reduce((sum, component) => sum + component.maxMarks, 0);
+      nextConfig.bigExamMax = updates.assessmentComponents
+        .filter(component => component.category === 'final')
+        .reduce((sum, component) => sum + component.maxMarks, 0);
+    }
     // Keep legacy two-number API callers working by translating their
     // maximums into a two-component assessment plan. The new Admin UI sends
     // assessmentComponents directly and therefore retains its full structure.
