@@ -21,7 +21,7 @@ test('School Admin mark approval is persisted before the response', () => {
   const start = api.indexOf("apiRouter.post('/exams/approve'");
   const end = api.indexOf('// Semester 1 Results & Ranking', start);
   const route = api.slice(start, end);
-  assert.match(route, /db\.approveMarks\(school\.id, uniqueMarkIds, user\.id\);\s*await db\.flush\(\);\s*res\.json/);
+  assert.match(route, /db\.approveMarks\(school\.id, uniqueMarkIds, user\.id, user\.fullName, user\.role\);\s*await db\.flush\(\);\s*res\.json/);
 });
 
 test('School Admin exam results matrix loads every subject for the selected class', () => {
