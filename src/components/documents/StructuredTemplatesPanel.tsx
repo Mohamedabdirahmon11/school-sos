@@ -336,7 +336,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     try{
       for(const date of ready){
         const records=students.map(student=>({studentId:student.id,status:attendance.find(item=>item.studentId===student.id&&item.date===date)?.status==='J'?'present':'absent'}));
-        await ApiClient.recordDailyAttendance(classId,date,records);
+        await ApiClient.recordDailyAttendance(classId,date,records,'document_template');
       }
       const refreshed=await ApiClient.getAttendanceMonth(classId,year,month);
       setAttendance(refreshed);
