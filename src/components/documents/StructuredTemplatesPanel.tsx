@@ -152,6 +152,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [recipient,setRecipient]=useState('Cidda ay khusayso');
   const [letterSubject,setLetterSubject]=useState('');
   const [letterBody,setLetterBody]=useState('');
+  const [letterSignatory,setLetterSignatory]=useState('Maamulka dugsiga');
   const [certificateBody,setCertificateBody]=useState('Waxaa lagu maamuusayaa dadaal, akhlaaq iyo guul waxbarasho.');
   const [certificateRankOrTotal,setCertificateRankOrTotal]=useState('');
   const [certificateSignatories,setCertificateSignatories]=useState(['Maamulaha','Macallinka']);
@@ -328,7 +329,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
-  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells]);
+  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,letterSignatory,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells]);
 
   const cycleAttendance=(studentId:string,date:string)=>{
     setAttendance(current=>{
