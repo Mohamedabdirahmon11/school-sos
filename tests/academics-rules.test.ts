@@ -241,8 +241,11 @@ test('submitted marks can be returned with an audit reason and only complete app
   const assessmentScores = { 'test-1': 8, 'test-2': 8, 'test-3': 8, 'test-4': 8, 'final-exam': 48 };
   const first = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
     studentId: student.id, assessmentScores, status: 'submitted'
-  }], 'teacher-publish');
+  }], 'teacher-publish', 'Subject Teacher', 'teacher');
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_CREATED'), true);
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_SUBMITTED'), true);
   await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-publish');
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'CLASS_MARKS_FORWARDED_TO_ADMIN'), true);
 
   const returned = await db.returnMarksForCorrection(
     school.id, [first[0].id], 'admin-publish', 'Please verify the final exam score against the signed script.', 'Academic Admin', 'school_admin'
@@ -258,8 +261,11 @@ test('submitted marks can be returned with an audit reason and only complete app
   }], 'teacher-publish');
   assert.equal(resubmitted[0].correctionReason, null);
   await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-publish');
-  db.approveMarks(school.id, [resubmitted[0].id], 'admin-publish');
+  db.approveMarks(school.id, [resubmitted[0].id], 'admin-publish', 'Academic Admin', 'school_admin');
   await db.flush();
+  const approvalAudit = memory.rows('audit_logs').find(row => row.action === 'MARKS_APPROVED');
+  assert.ok(JSON.stringify(approvalAudit?.details).includes('form_teacher_submitted'));
+  assert.ok(JSON.stringify(approvalAudit?.details).includes('approved'));
 
   await assert.rejects(
     () => db.publishClassSemesterResults(school.id, klass.id, 'Semester 2', 'admin-publish', 'Academic Admin', 'school_admin'),
