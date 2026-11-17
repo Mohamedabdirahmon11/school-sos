@@ -5602,27 +5602,48 @@ apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoo
     const publication = await db.publishClassSemesterResults(
       school.id, classId, semester, user.id, user.fullName, user.role
     );
-    if (publication.publishedCount > 0) {
-      const publishDate = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
-      db.createNotice({
-        title: `Exam results published · ${semester}`,
-        content: `Approved ${semester} examination results for ${klass.name} · Section ${klass.section || 'Main'} are now available in the Parent Portal. Sign in to view your child's published results.`,
-        audience: 'class',
-        classId,
-        isPinned: false,
-        publishDate,
+    const noticeTitle = `Exam results published · ${semester}`;
+    let notificationCreated = false;
+    try {
+      const existingNotices = await db.queryRows<any>('school_notices', { school_id: school.id, class_id: classId, title: noticeTitle });
+      if (existingNotices.length) {
+        notificationCreated = true;
+      } else {
+        const publishDate = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+        db.createNotice({
+          title: noticeTitle,
+          content: `Approved ${semester} examination results for ${klass.name} · Section ${klass.section || 'Main'} are now available in the Parent Portal. Sign in to view your child's published results.`,
+          audience: 'class',
+          classId,
+          isPinned: false,
+          publishDate,
+          schoolId: school.id,
+          authorName: user.fullName,
+          authorRole: user.role,
+          isActive: true
+        });
+        await db.flush();
+        notificationCreated = true;
+      }
+    } catch (notificationError) {
+      db.logAudit({
+        action: 'MARKS_PUBLISH_NOTIFICATION_FAILED',
+        category: 'academics',
         schoolId: school.id,
-        authorName: user.fullName,
-        authorRole: user.role,
-        isActive: true
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        details: JSON.stringify({ classId, semester, message: notificationError instanceof Error ? notificationError.message : 'Notice creation failed.' }),
+        severity: 'warning'
       });
-      await db.flush();
+      await db.flush().catch(() => undefined);
     }
     res.json({
       success: true,
       publishedCount: publication.publishedCount,
       publishedAt: publication.publishedAt,
-      alreadyPublished: publication.publishedCount === 0
+      alreadyPublished: publication.publishedCount === 0,
+      notificationCreated
     });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be published.' });
