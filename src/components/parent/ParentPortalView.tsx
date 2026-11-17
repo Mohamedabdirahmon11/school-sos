@@ -81,7 +81,7 @@ export const ParentPortalView: React.FC = () => {
   const payments = childData?.payments || [];
   const balance = payments.reduce((sum: number, payment: any) => sum + (payment.remainingAmount || 0), 0);
   const publishedMarks: any[] = Array.isArray(childData?.marks) ? childData.marks : [];
-  const hasBothPublishedSemesters = publishedMarks.some(mark => mark.semester === 'Semester 1') && publishedMarks.some(mark => mark.semester === 'Semester 2');
+  const hasBothPublishedSemesters = publishedMarks.some(first => first.semester === 'Semester 1' && publishedMarks.some(second => second.semester === 'Semester 2' && second.academicYear === first.academicYear));
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
