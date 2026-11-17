@@ -1118,7 +1118,7 @@ export const ExamsResultsView: React.FC = () => {
 
       {(activeTab === 'overview' || activeTab === 'results_explorer' || activeTab === 'analytics') && (
         <AcademicResultsWorkspace
-          mode={activeTab}
+          mode={activeTab === 'results_explorer' ? 'explorer' : activeTab}
           classes={classes}
           subjects={subjects}
           students={students}
