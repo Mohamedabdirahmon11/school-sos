@@ -402,7 +402,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
     if(!canManageTemplates)return;
     setBusy(true);
     try{
-      const payload:Record<string,unknown>={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}};
+      const payload:{type:string;name:string;config:Record<string,unknown>}={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title} as Record<string,unknown>};
       if(editingTemplateId)await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,payload);
       else await ApiClient.createStructuredDocumentTemplate(payload);
       setEditingTemplateId(null);
@@ -428,7 +428,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
     if(editingTemplateId&&canManageTemplates){
       setBusy(true);
       try{
-        await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,{type:kind,name:next.title,config:next});
+        await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,{type:kind,name:next.title,config:next as unknown as Record<string,unknown>});
         setEditingTemplateId(null);
         await loadSavedTemplates();
         setMessage('Template-kii la kaydiyey waxaa lagu soo celiyey dejintii caadiga ahayd.');
@@ -454,12 +454,12 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
       rows=[['ID','Magaca',...config.subjects.map(subject=>subject.name),'Wadar','Xaalad'],...sortedStudents.map(student=>{
         const values=config.subjects.map(subject=>marks.find(mark=>mark.studentId===student.id&&mark.subjectId===subject.id)?.totalMarks);
         const hasAny=values.some(value=>value!==undefined&&value!==null);
-        const total=sumMarks(values);
+        const total=sumMarks(values.filter((value):value is number=>typeof value==='number'));
         const outcome=outcomeOverrides[student.id]||( !hasAny?'Maqan':total>=passThreshold(config.subjects,config.passRule)?'Gudub':'Aan Gudbin');
         return [student.studentId,studentName(student),...values.map(value=>value===undefined||value===null?'':String(value)),String(total),outcome];
       })];
     }else if(kind==='attendance_sheet'){
-      rows=[['ID','Magaca',...attendanceDays.map(day=>day.day),'J','M'],...sortedStudents.map(student=>{
+      rows=[['ID','Magaca',...attendanceDays.map(day=>String(day.day)),'J','M'],...sortedStudents.map(student=>{
         const marks=attendanceDays.map(day=>attendance.find(entry=>entry.studentId===student.id&&entry.date===day.date)?.locked?'C':attendance.find(entry=>entry.studentId===student.id&&entry.date===day.date)?.status||'');
         const counts=countAttendance(attendance,student.id);
         return [student.studentId,studentName(student),...marks,String(counts.present),String(counts.absent)];

@@ -78,7 +78,7 @@ export function parseMark(input: unknown, maxMark = 100): MarkParseResult {
     if (EXCEPTION_MARKS.has(normalized as MarkException)) {
       return { valid: true, value: normalized as MarkException };
     }
-    if (!normalized || !/^(?:\\d+(?:\\.\\d+)?|\\.\\d+)$/.test(normalized)) {
+    if (!normalized || !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) {
       return { valid: false, message: 'Geli dhibco sax ah, ABS ama LB.' };
     }
     input = Number(normalized);
