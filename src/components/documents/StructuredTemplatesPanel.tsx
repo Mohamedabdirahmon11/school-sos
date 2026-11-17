@@ -152,6 +152,15 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
     if(!classId)return;
     let active=true;
     setBusy(true);
+    if(userRole==='teacher'){
+      ApiClient.getAllStudents(classId,undefined,100).then(roster=>{
+        if(!active)return;
+        setStudents(roster);
+        setStudentId(current=>roster.some(student=>student.id===current)?current:roster[0]?.id||'');
+      }).catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Liiska ardayda fasalka lama soo dejin karin.');})
+        .finally(()=>{if(active)setBusy(false);});
+      return ()=>{active=false;};
+    }
     Promise.all([
       ApiClient.getAllStudents(classId,undefined,100),
       ApiClient.getClassDetails(classId,{page:1,pageSize:100}),
@@ -171,7 +180,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
     }).catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta fasalka lama soo dejin karin.');})
       .finally(()=>{if(active)setBusy(false);});
     return ()=>{active=false;};
-  },[classId]);
+  },[classId,userRole]);
 
   useEffect(()=>{
     if(!classId)return;
