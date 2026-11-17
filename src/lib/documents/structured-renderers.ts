@@ -180,7 +180,7 @@ export function renderCertificate(data: CertificateData): string {
 
 export function renderStudentIdCards(data: StudentIdSheetData): string {
   const cards = data.cards.slice(0, 8).map(card => `<section style="height:83mm;border:1px solid #64748b;border-radius:8px;overflow:hidden;break-inside:avoid;background:#fff">
-<div style="height:12mm;background:${/^#[0-9a-fA-F]{6}$/.test(data.accentColor || '') ? data.accentColor : '#176b5b'};color:#fff;text-align:center;padding:3mm;font-weight:700">${text(data.schoolName)}</div>
+<div style="height:12mm;background:${/^#[0-9a-fA-F]{6}$/.test(data.accentColor || '') ? data.accentColor : '#176b5b'};color:#fff;text-align:center;padding:3mm;font-weight:700">${text(data.schoolName)}<br/>KAARKA AQOONSIGA ARDAYGA</div>
 <div style="display:flex;gap:5mm;padding:5mm;align-items:center">${card.photoUrl && /^https:\/\//i.test(card.photoUrl) ? `<img src="${text(card.photoUrl)}" alt="" style="width:24mm;height:30mm;object-fit:cover;border:1px solid #94a3b8"/>` : '<div style="width:24mm;height:30mm;border:1px solid #94a3b8"></div>'}
 <div><strong>${text(card.name)}</strong><p>ID: ${text(card.id)}</p><p>Fasal: ${text(card.className)}</p><p>Sanad: ${text(data.year)}</p></div></div></section>`).join('');
   return `<article class="schoolos-a4" style="width:190mm;margin:0 auto;padding:10mm;display:grid;grid-template-columns:1fr 1fr;gap:5mm;background:#fff;color:#17212b;font-family:Arial,sans-serif">${cards}</article>`;
