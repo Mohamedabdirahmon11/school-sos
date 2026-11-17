@@ -168,8 +168,6 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [preview,setPreview]=useState('');
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
-  const [studentSearch,setStudentSearch]=useState('');
-  const [sortBy,setSortBy]=useState<'name'|'id'|'total'>('name');
   const filteredStudents=useMemo(()=>students.filter(student=>studentName(student).toLowerCase().includes(studentSearch.toLowerCase())||student.studentId.toLowerCase().includes(studentSearch.toLowerCase())),[students,studentSearch]);
   const sortedStudents=useMemo(()=>[...students].sort((a,b)=>{
     if(sortBy==='id')return a.studentId.localeCompare(b.studentId,undefined,{numeric:true});
