@@ -88,6 +88,7 @@ BEGIN
    AND sm.student_id = s.id
    AND sm.subject_id = cs.subject_id
    AND sm.semester = p_semester
+   AND sm.academic_year = v_class.academic_year
   WHERE s.school_id = p_school_id
     AND s.class_id = p_class_id
     AND cs.school_id = p_school_id
@@ -105,6 +106,7 @@ BEGIN
   WHERE school_id = p_school_id
     AND class_id = p_class_id
     AND semester = p_semester
+    AND academic_year = v_class.academic_year
     AND status = 'approved'
     AND published_at IS NULL;
 
