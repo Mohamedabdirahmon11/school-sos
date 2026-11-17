@@ -345,14 +345,11 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   },[kind,selectedStudent,students,sortedStudents,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,letterSignatory,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells,outcomeOverrides]);
 
   const cycleAttendance=(studentId:string,date:string)=>{
-    setAttendance(current=>{
-      const existing=current.find(item=>item.studentId===studentId&&item.date===date);
-      if(existing?.locked){setMessage('Diiwaankan waa cudur-daar; lama beddeli karo xaashidan.');return current;}
-      const nextStatus:AttendanceEntry['status']=!existing||existing.status===''?'J':existing.status==='J'?'M':'';
-      if(existing?.status&&nextStatus==='')setMessage('Unmarking wuxuu ka dhigaa unmarked gudaha xaashidan; API-ga hadda jira ma tirtirayo diiwaankii hore.');
-      const next=current.filter(item=>!(item.studentId===studentId&&item.date===date));
-      return [...next,{studentId,date,status:nextStatus}];
-    });
+    const existing=attendance.find(item=>item.studentId===studentId&&item.date===date);
+    if(existing?.locked){setMessage('Diiwaankan waa cudur-daar; lama beddeli karo xaashidan.');return;}
+    const nextStatus:AttendanceEntry['status']=!existing||existing.status===''?'J':existing.status==='J'?'M':'';
+    if(existing?.status&&nextStatus==='')setMessage('Unmarking wuxuu ka dhigaa unmarked gudaha xaashidan; API-ga hadda jira ma tirtirayo diiwaankii hore.');
+    setAttendance(current=>[...current.filter(item=>!(item.studentId===studentId&&item.date===date)),{studentId,date,status:nextStatus}]);
     setAttendanceDirtyDates(current=>current.includes(date)?current:[...current,date]);
   };
 
