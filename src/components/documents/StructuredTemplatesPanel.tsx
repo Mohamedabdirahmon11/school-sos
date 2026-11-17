@@ -8,7 +8,7 @@ import {
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
   renderStudentIdCards
 } from '../../lib/documents/structured-renderers.ts';
-import { passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
+import { monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
 
 const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
   { kind:'exam_result_list', label:'Go’aanka imtixaanka' },
@@ -95,14 +95,17 @@ export interface StructuredTemplatesPanelProps {
   accentColor:string;
   gradingScale?:GradingBand[];
   calendar?:SchoolSetupData['calendar'];
+  userRole?:string;
+  userId?:string;
+  canManageTemplates?:boolean;
   onCreated:(document:unknown)=>void;
   onClose:()=>void;
 }
 
-export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[],calendar,onCreated,onClose}:StructuredTemplatesPanelProps) {
-  const [kind,setKind]=useState<TemplateKind>('exam_result_list');
+export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[],calendar,userRole='school_admin',userId='',canManageTemplates=true,onCreated,onClose}:StructuredTemplatesPanelProps) {
+  const [kind,setKind]=useState<TemplateKind>(userRole==='teacher'?'attendance_sheet':'exam_result_list');
   const [name,setName]=useState('Go’aanka imtixaanka');
-  const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig('exam_result_list',accentColor));
+  const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig(userRole==='teacher'?'attendance_sheet':'exam_result_list',accentColor));
   const [savedTemplates,setSavedTemplates]=useState<any[]>([]);
   const [editingTemplateId,setEditingTemplateId]=useState<string|null>(null);
   const [classes,setClasses]=useState<SchoolClass[]>([]);
@@ -113,6 +116,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   const [term1Marks,setTerm1Marks]=useState<StudentMark[]>([]);
   const [term2Marks,setTerm2Marks]=useState<StudentMark[]>([]);
   const [attendance,setAttendance]=useState<AttendanceEntry[]>([]);
+  const [attendanceDirtyDates,setAttendanceDirtyDates]=useState<string[]>([]);
   const [timetable,setTimetable]=useState<TimetableSlot[]>([]);
   const [payments,setPayments]=useState<FeePayment[]>([]);
   const [month,setMonth]=useState(new Date().getMonth()+1);
@@ -129,16 +133,20 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
   const selectedClass=useMemo(()=>classes.find(item=>item.id===classId),[classes,classId]);
+  const attendanceDays=useMemo(()=>monthDays(year,month,schoolWeekendDays(calendar),schoolHolidayDates(calendar,year,month)),[year,month,calendar]);
+  const canSaveAttendance=userRole==='teacher'&&Boolean(selectedClass&&selectedClass.classTeacherId===userId);
 
   const loadSavedTemplates=useCallback(async()=>{
+    if(!canManageTemplates)return;
     try { setSavedTemplates(await ApiClient.getStructuredDocumentTemplates()); }
     catch(error) { setMessage(error instanceof Error?error.message:'Template-yada lama soo dejin karin.'); }
-  },[]);
+  },[canManageTemplates]);
 
   useEffect(()=>{
-    void ApiClient.getClasses().then(result=>{setClasses(result);if(result[0])setClassId(result[0].id);}).catch(()=>setClasses([]));
-    void loadSavedTemplates();
-  },[loadSavedTemplates]);
+    const classesRequest=userRole==='teacher'?ApiClient.getMyFormTeacherClasses():ApiClient.getClasses();
+    void classesRequest.then(result=>{setClasses(result);if(result[0])setClassId(result[0].id);}).catch(()=>setClasses([]));
+    if(canManageTemplates)void loadSavedTemplates();
+  },[loadSavedTemplates,userRole,canManageTemplates]);
 
   useEffect(()=>{
     if(!classId)return;
@@ -180,7 +188,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
     return ()=>{active=false;};
   },[selectedStudent?.id]);
 
-  const changeKind=(nextKind:TemplateKind)=>{const next=defaultConfig(nextKind,accentColor);setKind(nextKind);setName(next.title);setConfig(next);setEditingTemplateId(null);setPreview('');};
+  const changeKind=(nextKind:TemplateKind)=>{if(!canManageTemplates&&nextKind!=='attendance_sheet')return;const next=defaultConfig(nextKind,accentColor);setKind(nextKind);setName(next.title);setConfig(next);setEditingTemplateId(null);setPreview('');};
 
   const updateConfig=(patch:Partial<TemplateConfig>)=>setConfig(current=>({...current,...patch}));
 
@@ -258,7 +266,38 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
     }
   },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar]);
 
+  const cycleAttendance=(studentId:string,date:string)=>{
+    setAttendance(current=>{
+      const existing=current.find(item=>item.studentId===studentId&&item.date===date);
+      const nextStatus:AttendanceEntry['status']=!existing||existing.status===''?'J':existing.status==='J'?'M':'';
+      const next=current.filter(item=>!(item.studentId===studentId&&item.date===date));
+      return [...next,{studentId,date,status:nextStatus}];
+    });
+    setAttendanceDirtyDates(current=>current.includes(date)?current:[...current,date]);
+  };
+
+  const saveAttendance=async()=>{
+    if(!canSaveAttendance||!classId){setMessage('Kaliya Form Teacher-ka fasalka ayaa kaydin kara xaadirinta.');return;}
+    const changed=attendanceDirtyDates;
+    if(!changed.length){setMessage('Ma jiraan isbeddello xaadirin ah oo la kaydinayo.');return;}
+    const ready=changed.filter(date=>students.length>0&&students.every(student=>['J','M'].includes(attendance.find(item=>item.studentId===student.id&&item.date===date)?.status||'')));
+    if(!ready.length){setMessage('Maalin kasta oo la kaydinayo waa in arday kasta loo calaamadeeyaa J ama M. Unmarked dates lama gudbinayo.');return;}
+    setBusy(true);
+    try{
+      for(const date of ready){
+        const records=students.map(student=>({studentId:student.id,status:attendance.find(item=>item.studentId===student.id&&item.date===date)?.status==='J'?'present':'absent'}));
+        await ApiClient.recordDailyAttendance(classId,date,records);
+      }
+      const refreshed=await ApiClient.getAttendanceMonth(classId,year,month);
+      setAttendance(refreshed);
+      setAttendanceDirtyDates(current=>current.filter(date=>!ready.includes(date)));
+      setMessage(ready.length===changed.length?'Xaadirinta waa la kaydiyey.':`Waxaa la kaydiyey ${ready.length} maalmood; ${changed.length-ready.length} maalmood wali xog buuxda ma laha.`);
+    }catch(error){setMessage(error instanceof Error?error.message:'Kaydinta xaadirinta way fashilantay.');}
+    finally{setBusy(false);}
+  };
+
   const createDocument=async()=>{
+    if(!canManageTemplates){setMessage('Macallinku wuxuu daabici karaa xaadirinta, balse ma abuuri karo dukumenti rasmi ah.');return;}
     const html=buildHtml();
     if(!html){setMessage(kind==='fee_receipt'?'Ardaygan weli ma laha rasiid lacag-bixin.':'Xog ku filan lagama helin fasalka ama ardayga la doortay.');return;}
     setBusy(true);
@@ -270,6 +309,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   };
 
   const saveAsMyTemplate=async()=>{
+    if(!canManageTemplates)return;
     setBusy(true);
     try{
       const payload={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}};
@@ -294,6 +334,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
 
   const reset=()=>{const next=defaultConfig(kind,accentColor);setConfig(next);setName(next.title);setEditingTemplateId(null);setMessage('Dejintii caadiga ahayd waa la soo celiyey.');};
   const removeSaved=async(id:string)=>{
+    if(!canManageTemplates)return;
     try{await ApiClient.deleteStructuredDocumentTemplate(id);await loadSavedTemplates();}
     catch(error){setMessage(error instanceof Error?error.message:'Template-ka lama tirtiri karin.');}
   };
@@ -308,7 +349,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   const updateSubject=(id:string,patch:Partial<TemplateSubject>)=>{const next=config.subjects.map(subject=>subject.id===id?{...subject,...patch}:subject);updateConfig({subjects:next});setSubjects(next);};
   const deleteSubject=(id:string)=>{const next=config.subjects.filter(subject=>subject.id!==id);const safe=next.length?next:DEFAULT_SUBJECTS;updateConfig({subjects:safe});setSubjects(safe);setTerm1Marks(current=>current.filter(mark=>mark.subjectId!==id));setTerm2Marks(current=>current.filter(mark=>mark.subjectId!==id));};
 
-  return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" dir="rtl">
+  return <section className="structured-template-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" dir="rtl">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><BookOpen size={20}/> Qaababka dukumentiyada A4</h2><p className="mt-1 text-xs text-slate-500">Sagaalka template waxay ka akhristaan xogta fasalka, natiijooyinka, xaadirinta, jadwalka iyo lacag-bixinta.</p></div>
       <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Xir</button>
@@ -317,7 +358,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-slate-600">Nooca template-ka
-          <select value={kind} onChange={event=>changeKind(event.target.value as TemplateKind)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">{TEMPLATE_OPTIONS.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select>
+          <select value={kind} disabled={!canManageTemplates} onChange={event=>changeKind(event.target.value as TemplateKind)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">{TEMPLATE_OPTIONS.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select>
         </label>
         <label className="block text-xs font-semibold text-slate-600">Magaca template-ka
           <input value={name} onChange={event=>setName(event.target.value)} maxLength={160} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"/>
@@ -347,16 +388,19 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
         </details>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={previewHtml} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
-          <button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>
+          {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>}
           <button type="button" onClick={reset} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
-          <button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>
+          {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>}
         </div>
-        {savedTemplates.length>0&&<div className="rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-bold">Template-yadayda</h3>{savedTemplates.map(template=><div key={template.id} className="flex items-center gap-2 border-t py-2 text-xs"><button type="button" onClick={()=>loadTemplate(template)} className="min-w-0 flex-1 truncate text-left">{template.name}</button><button type="button" onClick={()=>void removeSaved(template.id)} aria-label="Tirtir template" className="text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
+        {canManageTemplates&&savedTemplates.length>0&&<div className="rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-bold">Template-yadayda</h3>{savedTemplates.map(template=><div key={template.id} className="flex items-center gap-2 border-t py-2 text-xs"><button type="button" onClick={()=>loadTemplate(template)} className="min-w-0 flex-1 truncate text-left">{template.name}</button><button type="button" onClick={()=>void removeSaved(template.id)} aria-label="Tirtir template" className="text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
+        {kind==='attendance_sheet'&&canSaveAttendance&&<button type="button" disabled={busy||!attendanceDirtyDates.length} onClick={()=>void saveAttendance()} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Kaydi xaadirinta ({attendanceDirtyDates.length})</button>}
+        {kind==='attendance_sheet'&&!canManageTemplates&&!canSaveAttendance&&<p className="text-xs text-amber-700">Fasalkan kuma tihid Form Teacher; xaadirinta waad daabici kartaa balse ma kaydin kartid.</p>}
         {busy&&<p className="text-xs text-slate-500">Waa la shaqaynayaa…</p>}
       </div>
       <div className="min-w-0">
-        <div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Warqadda A4</h3><span className="text-xs text-slate-500">{students.length} arday · {subjects.length} maaddo</span></div>
-        {preview?<div className="max-h-[75vh] overflow-auto rounded-lg border border-slate-200 bg-slate-100 p-3"><div className="mx-auto min-h-[297mm] w-full max-w-[210mm] bg-white p-4 shadow" dangerouslySetInnerHTML={{__html:sanitizeDocumentHtml(preview)}}/></div>:<div className="flex min-h-[480px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500"><div><Printer size={28} className="mx-auto mb-2"/><p>Riix Horudhac si aad u aragto qaabka la buuxiyey.</p><p className="mt-1 text-xs">{busy?'Xogta fasalka ayaa la soo dejinayaa…':'Xogta la doortay ayaa halkan ka muuqan doonta.'}</p></div></div>}
+        <div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Warqadda A4</h3><span className="text-xs text-slate-500">{students.length} arday · {subjects.length} maaddo</span>{preview&&<button type="button" onClick={()=>window.print()} className="rounded border px-2 py-1 text-xs"><Printer size={13} className="inline"/> Daabac</button>}</div>
+        {kind==='attendance_sheet'&&<div className="mb-3 overflow-x-auto rounded-lg border border-slate-200"><table className="min-w-max border-collapse text-xs"><thead><tr><th className="sticky right-0 bg-slate-100 p-2">Ardayga</th>{attendanceDays.map(day=><th key={day.date} className={`min-w-8 border p-1 ${day.isWeekend||day.isHoliday?'bg-slate-200 text-slate-500':'bg-slate-100'}`} title={day.isHoliday?'Fasax':day.isWeekend?'Maalin fasax':''}>{day.day}</th>)}</tr></thead><tbody>{students.map(student=><tr key={student.id}><th className="sticky right-0 max-w-44 truncate border bg-white p-2 text-right">{studentName(student)}</th>{attendanceDays.map(day=>{const status=attendance.find(item=>item.studentId===student.id&&item.date===day.date)?.status||'';const disabled=day.isWeekend||day.isHoliday;return <td key={day.date} className="border p-0 text-center"><button type="button" disabled={disabled} onClick={()=>cycleAttendance(student.id,day.date)} aria-label={`${studentName(student)} ${day.date}: ${status||'madhan'}`} className={`h-8 w-8 font-bold ${disabled?'bg-slate-100 text-slate-400':status==='J'?'bg-emerald-50 text-emerald-700':status==='M'?'bg-rose-50 text-rose-700':'bg-white text-slate-400'}`}>{disabled?'—':status||'·'}</button></td>})}</tr>)}</tbody></table></div>}
+        {preview?<div className="structured-template-print max-h-[75vh] overflow-auto rounded-lg border border-slate-200 bg-slate-100 p-3"><div className="mx-auto min-h-[297mm] w-full max-w-[210mm] bg-white p-4 shadow" dangerouslySetInnerHTML={{__html:sanitizeDocumentHtml(preview)}}/></div>:<div className="flex min-h-[480px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500"><div><Printer size={28} className="mx-auto mb-2"/><p>Riix Horudhac si aad u aragto qaabka la buuxiyey.</p><p className="mt-1 text-xs">{busy?'Xogta fasalka ayaa la soo dejinayaa…':'Xogta la doortay ayaa halkan ka muuqan doonta.'}</p></div></div>}
       </div>
     </div>
   </section>;
