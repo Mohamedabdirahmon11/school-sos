@@ -20,8 +20,9 @@ export interface MarkParseResult {
 }
 
 export interface PassRule {
-  mode: 'percent' | 'fixed';
+  mode: 'percent' | 'average' | 'fixed';
   percent?: number;
+  average?: number;
   fixedTotal?: number;
 }
 
@@ -98,7 +99,9 @@ export function maximumMarks(subjects: readonly Pick<TemplateSubject, 'maxMark'>
 export function passThreshold(subjects: readonly Pick<TemplateSubject, 'maxMark'>[], rule: PassRule): number {
   const maximum = maximumMarks(subjects);
   if (rule.mode === 'fixed') return Math.max(0, Math.min(maximum, Number(rule.fixedTotal) || 0));
-  const percent = Math.max(0, Math.min(100, Number(rule.percent ?? 40) || 0));
+  const percent = rule.mode === 'average'
+    ? Math.max(0, Math.min(100, Number(rule.average ?? 40) || 0))
+    : Math.max(0, Math.min(100, Number(rule.percent ?? 40) || 0));
   return Math.ceil(maximum * percent / 100);
 }
 
@@ -172,8 +175,9 @@ export function validateTemplateConfig(value: unknown): value is TemplateConfig 
     && Number.isInteger(config.rowsPerPage) && (config.rowsPerPage as number) >= 5 && (config.rowsPerPage as number) <= 25
     && Array.isArray(config.subjects) && config.subjects.length >= 1 && config.subjects.length <= 12
     && config.subjects.every(subject => subject && typeof subject.id === 'string' && typeof subject.name === 'string' && subject.name.length <= 80 && Number.isFinite(subject.maxMark) && subject.maxMark > 0 && subject.maxMark <= 100)
-    && !!config.passRule && ['percent', 'fixed'].includes(config.passRule.mode)
+    && !!config.passRule && ['percent', 'average', 'fixed'].includes(config.passRule.mode)
     && (config.passRule.mode !== 'percent' || (Number.isFinite(config.passRule.percent ?? 40) && Number(config.passRule.percent ?? 40) >= 0 && Number(config.passRule.percent ?? 40) <= 100))
+    && (config.passRule.mode !== 'average' || (Number.isFinite(config.passRule.average ?? 40) && Number(config.passRule.average ?? 40) >= 0 && Number(config.passRule.average ?? 40) <= 100))
     && (config.passRule.mode !== 'fixed' || (Number.isFinite(config.passRule.fixedTotal) && Number(config.passRule.fixedTotal) >= 0))
     && Number.isFinite(config.fontSize) && config.fontSize >= 8 && config.fontSize <= 24
     && Number.isFinite(config.rowHeight) && config.rowHeight >= 18 && config.rowHeight <= 64
