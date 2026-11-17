@@ -8218,7 +8218,7 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) 
   const { data, error } = await query;
   if (error) { res.status(503).json({ error: 'Liiska dukumentiyada lama soo dejin karin.' }); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json((data || []).map(row => ({...documentClientRow(row),canEdit:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_edit),canDownload:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_download)})));
+  res.json((data || []).map(row => ({...documentClientRow(row),canEdit:hasDocumentAdminAccess(user)||(!isFamilyUser&&allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_edit)),canDownload:hasDocumentAdminAccess(user)||allowedGrants.some(grant=>grant.document_id===row.id&&grant.can_download)})));
 });
 
 apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, res) => {
@@ -8232,7 +8232,7 @@ apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   if (!await familyDocumentAllowed(school.id,user,data)) { res.status(404).json({error:'Dukumentiga lama helin.'}); return; }
   if (!await hasDocumentGrant(client,school.id,user,data.id,'view')) { res.status(403).json({error:'Ma lihid ogolaanshaha dukumentigan.'}); return; }
   res.setHeader('Cache-Control','private, no-store');
-  res.json({...documentClientRow(data, true),canEdit:await hasDocumentGrant(client,school.id,user,data.id,'edit'),canDownload:await hasDocumentGrant(client,school.id,user,data.id,'download')});
+  res.json({...documentClientRow(data, true),canEdit:user.role==='parent'||user.role==='student'?false:await hasDocumentGrant(client,school.id,user,data.id,'edit'),canDownload:await hasDocumentGrant(client,school.id,user,data.id,'download')});
 });
 
 apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
