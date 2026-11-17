@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle, BarChart3, BookOpen, ChevronLeft, ChevronRight, ClipboardList,
-  Download, Filter, RefreshCw, Search, TrendingUp, Users
+  Download, Filter, Search, TrendingUp, Users
 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -152,7 +152,6 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
     return rows;
   }, [activeSubjects, subjects, approvedMarks, examConfig?.passMarkPercentage]);
 
-  const classRankings = classComparisons.find(row => row.classId === selectedClassId);
   const currentAverage = average(approvedMarks.map(mark => Number(mark.percentage) || 0));
   const passCount = approvedMarks.filter(mark => Number(mark.percentage) >= (examConfig?.passMarkPercentage || 50)).length;
   const failCount = approvedMarks.length - passCount;
