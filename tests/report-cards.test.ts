@@ -196,3 +196,46 @@ test('report card design sanitizer rejects invalid templates, colors, blocks, an
   assert.throws(() => sanitizeReportCardDesign({ signatureImageUrl: 'data:image/svg+xml;base64,AAAA' }), /signatureImageUrl/);
   assert.throws(() => sanitizeReportCardDesign([] as any), /must be an object/);
 });
+
+
+test('semester report card can be generated independently before the other semester is complete', () => {
+  const semesterResult = {
+    ...result,
+    annualComplete: false,
+    semesterComplete: true,
+    semesterPublished: true,
+    semesterPercentage: 90,
+    semesterRank: 2,
+    semesterIsPass: true,
+    subjectResults: result.subjectResults.map(row => ({
+      ...row,
+      sem1Marks: { smallExamMarks: 10, bigExamMarks: 40, totalMarks: 50, percentage: row.subject.id === 'subject-math' ? 100 : 80, publishedAt: '2026-11-17T00:00:00.000Z' },
+      sem1Percentage: row.subject.id === 'subject-math' ? 100 : 80,
+      sem2Marks: null,
+      sem2Percentage: null,
+      yearlyPercentage: null
+    }))
+  };
+  const page = buildReportCardPdfPage({ school, design, className: 'Grade 10 A', result: semesterResult, totalStudents: 24, period: 'Semester 1' });
+  const text = page.lines.join('\n');
+  assert.ok(text.includes('Report period: Semester 1'));
+  assert.ok(text.includes('Semester 1 class rank: #2 of 24'));
+  assert.ok(text.includes('SUBJECT | SEMESTER 1 MARKS | SEMESTER 1 % | GRADE'));
+  assert.ok(text.includes('Mathematics (MATH)'));
+  assert.ok(text.includes('Biology (BIO)'));
+  assert.ok(text.includes('Semester 1 average: 90%'));
+  assert.ok(text.includes('Result: PASS'));
+  assert.ok(!text.includes('SEMESTER 2 MARKS'));
+  assert.ok(!text.includes('YEARLY %'));
+});
+
+test('semester report card rejects missing approved subject marks', () => {
+  assert.throws(
+    () => buildReportCardPdfPage({
+      school, design, className: 'Grade 10 A',
+      result: { ...result, annualComplete: false, semesterComplete: false },
+      totalStudents: 24, period: 'Semester 2'
+    }),
+    /Semester 2 report cards require approved marks/
+  );
+});
