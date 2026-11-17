@@ -264,7 +264,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
           const threshold=passThreshold(activeSubjects,config.passRule);
           return {id:item.studentId,name:studentName(item),marks:rowMarks,outcome:!hasAnyMark?'Maqan' as const:total>=threshold?'Gudub' as const:'Aan Gudbin' as const};
         });
-        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage,qrVerificationId:config.showQr?verificationId:undefined});
+        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
       }
       case 'individual_report_card':{
         const finalValues=subjectsWithMarks.filter(item=>item.final!==null).map(item=>Number(item.final));
