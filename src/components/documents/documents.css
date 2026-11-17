@@ -62,3 +62,12 @@
 .documents-view .documents-admin-details section{margin-top:10px}
 @media(max-width:1023px){.documents-view .grid.min-w-0.gap-4{grid-template-columns:minmax(0,1fr)}.documents-view aside>div:last-child{max-height:300px!important;overflow-y:auto}}
 @media(max-width:640px){.documents-view .grid.min-w-0.gap-4{gap:12px}.documents-view .documents-paper{min-height:0!important}.documents-view .documents-toolbar-main{overflow-x:auto;flex-wrap:nowrap}.documents-view .documents-toolbar-main button{min-width:38px}.documents-admin-details{padding:10px}}
+
+
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body:has(.structured-template-print) * { visibility: hidden !important; }
+  .structured-template-print, .structured-template-print * { visibility: visible !important; }
+  .structured-template-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-height: none !important; overflow: visible !important; border: 0 !important; padding: 0 !important; background: #fff !important; }
+  .structured-template-panel { border: 0 !important; padding: 0 !important; box-shadow: none !important; }
+}
