@@ -6600,6 +6600,8 @@ CREATE INDEX IF NOT EXISTS idx_student_document_attachments_student_id ON public
 CREATE INDEX IF NOT EXISTS idx_student_document_attachments_uploaded_by ON public.student_document_attachments(uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_student_document_attachments_deleted_by ON public.student_document_attachments(deleted_by);
 
+
+
 -- BEGIN: structured document templates (migration 20261117070000_document_templates_config.sql)
 -- Structured A4 template configurations. Existing school_documents and
 -- school_document_templates remain unchanged; this table stores typed layouts.
@@ -6674,6 +6676,8 @@ DECLARE
   actor_key VARCHAR(64);
   template_name TEXT;
   template_type VARCHAR(40);
+  old_name TEXT;
+  old_type VARCHAR(40);
   old_config JSONB;
   new_config JSONB;
   event_action VARCHAR(50);
@@ -6684,6 +6688,8 @@ BEGIN
     actor_key := COALESCE(OLD.updated_by, OLD.created_by);
     template_name := OLD.name;
     template_type := OLD.type;
+    old_name := OLD.name;
+    old_type := OLD.type;
     old_config := OLD.config;
     event_action := 'structured_template_deleted';
   ELSIF TG_OP = 'INSERT' THEN
@@ -6700,6 +6706,8 @@ BEGIN
     actor_key := COALESCE(NEW.updated_by, NEW.created_by, OLD.updated_by, OLD.created_by);
     template_name := NEW.name;
     template_type := NEW.type;
+    old_name := OLD.name;
+    old_type := OLD.type;
     old_config := OLD.config;
     new_config := NEW.config;
     event_action := 'structured_template_updated';
@@ -6713,6 +6721,10 @@ BEGIN
        'templateId', template_key,
        'type', template_type,
        'name', template_name,
+       'oldType', old_type,
+       'oldName', old_name,
+       'newType', CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE template_type END,
+       'newName', CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE template_name END,
        'oldConfig', old_config,
        'newConfig', new_config
      ));
@@ -6726,6 +6738,7 @@ DROP TRIGGER IF EXISTS schoolos_structured_template_audit ON public.document_tem
 CREATE TRIGGER schoolos_structured_template_audit
   AFTER INSERT OR UPDATE OR DELETE ON public.document_templates
   FOR EACH ROW EXECUTE FUNCTION public.schoolos_structured_template_audit();
+
 
 
 -- END: structured document templates
