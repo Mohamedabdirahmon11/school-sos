@@ -4875,6 +4875,34 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
+apiRouter.get('/attendance/month', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const year = Number(req.query.year);
+  const month = Number(req.query.month);
+  if (!classId || !Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+    res.status(400).json({ error:'Fasal, sanad iyo bil sax ah ayaa loo baahan yahay.' }); return;
+  }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) {
+    res.status(403).json({ error:'Akoonka shaqaalaha ma laha rukhsadda xaadirinta.' }); return;
+  }
+  if (!await canAccessTeachingClass(req, res, classId)) return;
+  const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+  const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0,10);
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('attendance_records')
+    .select('student_id,date,status')
+    .eq('school_id',school.id).eq('class_id',classId)
+    .gte('date',startDate).lte('date',endDate).order('date',{ascending:true}).limit(5000);
+  if (error) { res.status(503).json({ error:'Xogta xaadirinta bishan lama soo dejin karin.' }); return; }
+  res.json((data || []).map((row:any) => ({
+    studentId:String(row.student_id), date:String(row.date),
+    status:row.status === 'present' || row.status === 'late' ? 'J' : row.status === 'absent' ? 'M' : ''
+  })));
+});
+
 apiRouter.get('/attendance/school/absences', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const date = typeof req.query.date === 'string' ? req.query.date : '';
