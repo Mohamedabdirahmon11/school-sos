@@ -2343,8 +2343,14 @@ class StorageEngine {
     const nextSmallMax = updates.smallExamMax ?? conf.smallExamMax;
     const nextBigMax = updates.bigExamMax ?? conf.bigExamMax;
     const nextPassMark = updates.passMarkPercentage ?? conf.passMarkPercentage;
-    if (![nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value >= 0) || nextSmallMax + nextBigMax <= 0 || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
-      throw new Error('Exam maximum marks must be non-negative with a positive total, and pass mark must be between 0 and 100.');
+    const validMaximums = updates.assessmentComponents
+      ? [nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value >= 0) && nextSmallMax + nextBigMax > 0
+      : [nextSmallMax, nextBigMax].every(value => Number.isFinite(value) && value > 0);
+    if (!validMaximums || !Number.isFinite(nextPassMark) || nextPassMark < 0 || nextPassMark > 100) {
+      throw new Error('Exam maximum marks must be positive numbers and pass mark must be between 0 and 100.');
+    }
+    if (!updates.assessmentComponents && nextSmallMax + nextBigMax !== 100) {
+      throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${nextSmallMax + nextBigMax})`);
     }
     if (updates.assessmentComponents) {
       const components = updates.assessmentComponents;

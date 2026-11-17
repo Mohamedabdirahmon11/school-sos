@@ -123,8 +123,8 @@ test('exam mark scheme supports the one-part and six-part custom boundaries', ()
     { id: 'p5', name: 'Part 5', maxMarks: 20, category: 'final', order: 5 },
     { id: 'p6', name: 'Part 6', maxMarks: 30, category: 'final', order: 6 }
   ] });
-  assert.equal(sixParts.smallExamMax, 50);
-  assert.equal(sixParts.bigExamMax, 50);
+  assert.equal(sixParts.smallExamMax, 35);
+  assert.equal(sixParts.bigExamMax, 65);
 });
 
 
