@@ -93,24 +93,30 @@ function gradeForMark(value:number,maxMark:number,scale:GradingBand[]):string {
 
 function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:string,verificationId?:string,qrDataUrl?:string):string {
   let output=html;
-  if(!config.showFooter)output=output.replace(/<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">[\\s\\S]*?<\\/p>/g,'');
-  if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:[\\s\\S]*?<\\/p>/g,'');
-  if(!config.showQr)output=output.replace(/<p style="text-align:left;font-size:8pt">QR \/ Aqoonsiga xaqiijinta:[\\s\\S]*?<\\/p>/g,'');
-  if(config.showQr&&verificationId&&qrDataUrl){
-    const qrMarkup=`<p style="text-align:left;font-size:8pt"><img src="${escapePlainText(qrDataUrl)}" alt="QR" style="width:24mm;height:24mm"/> <br/>Aqoonsiga xaqiijinta: ${escapePlainText(verificationId)}</p>`;
-    const original=new RegExp('<p style="text-align:left;font-size:8pt">QR \\/ Aqoonsiga xaqiijinta: '+verificationId+'<\\/p>');
-    output=original.test(output)?output.replace(original,qrMarkup):output+qrMarkup;
+  if(!config.showFooter)output=output.replace(/<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">SchoolOS<\/p>/g,'');
+  if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:.*?<\/p>/g,'');
+  if(!config.showQr)output=output.replace(/<p style="text-align:left;font-size:8pt">QR \/ Aqoonsiga xaqiijinta:.*?<\/p>/g,'');
+  if(config.showQr&&verificationId){
+    const qrMarkup=qrDataUrl
+      ? \`<p style="text-align:left;font-size:8pt"><img src="\${escapePlainText(qrDataUrl)}" alt="QR" style="width:24mm;height:24mm"/> <br/>Aqoonsiga xaqiijinta: \${escapePlainText(verificationId)}</p>\`
+      : \`<p style="text-align:left;font-size:8pt">Aqoonsiga xaqiijinta: \${escapePlainText(verificationId)}</p>\`;
+    const original=\`<p style="text-align:left;font-size:8pt">QR / Aqoonsiga xaqiijinta: \${verificationId}</p>\`;
+    output=output.includes(original)?output.replace(original,qrMarkup):output+qrMarkup;
   }
   if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
-  output=output.replaceAll('font-size:11pt',`font-size:${Math.max(8,Math.min(24,config.fontSize))}pt`);
-  output=output.replaceAll('padding:5px',`padding:${Math.max(2,Math.min(12,Math.round(config.rowHeight/6)))}px`);
-  output=output.replaceAll('direction:rtl',`direction:${config.direction}`);
-  const safeLogo=logoUrl&&/^\\/api\\/documents\\/images\\?path=[A-Za-z0-9%._/-]+$/i.test(logoUrl)?logoUrl:'';
-  if(config.showLogo&&safeLogo){
-    output=output.replace('<div style="font-size:19pt;font-weight:700;',`<img src="${escapePlainText(safeLogo)}" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;`);
+  output=output.replaceAll('font-size:11pt',\`font-size:\${Math.max(8,Math.min(24,config.fontSize))}pt\`);
+  output=output.replaceAll('padding:5px',\`padding:\${Math.max(2,Math.min(12,Math.round(config.rowHeight/6)))}px\`);
+  output=output.replaceAll('direction:rtl',\`direction:\${config.direction}\`);
+  let safeLogo='';
+  if(logoUrl?.startsWith('/api/documents/images?path=')&&/^[A-Za-z0-9%._/-]+$/.test(logoUrl.split('path=')[1]||''))safeLogo=logoUrl;
+  if(logoUrl?.startsWith('https://')){
+    try{
+      const parsed=new URL(logoUrl);
+      if(/^[a-z0-9]{20}\.supabase\.co$/i.test(parsed.hostname)&&/^\/storage\/v1\/object\/public\/school-logos\/[A-Za-z0-9._/-]+$/i.test(parsed.pathname)&&!parsed.search&&!parsed.hash)safeLogo=logoUrl;
+    }catch{}
   }
-  if(config.showQr&&verificationId&&!output.includes('Aqoonsiga xaqiijinta:')){
-    output=output.replace('</div>',`<p style="text-align:left;font-size:8pt">Aqoonsiga xaqiijinta: ${escapePlainText(verificationId)}</p></div>`);
+  if(config.showLogo&&safeLogo){
+    output=output.replace('<div style="font-size:19pt;font-weight:700;',\`<img src="\${escapePlainText(safeLogo)}" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;\`);
   }
   return output;
 }
