@@ -51,3 +51,13 @@ test('exam result layout uses configured pass threshold and outcome counts', () 
   assert.match(html, /Gudub: 1/);
   assert.match(html, /Aan Gudbin: 1/);
 });
+
+test('exam results and ID cards continue across A4 pages', () => {
+  const students=Array.from({length:25},(_,index)=>({id:String(index+1),name:'Arday '+index,marks:{m:50},outcome:'Gudub' as const}));
+  const results=renderExamResultList({schoolName:'School',examTitle:'Exam',academicYear:'2026',subjects:[{id:'m',name:'Xisaab',maxMark:100}],students,passRule:{mode:'percent',percent:40},rowsPerPage:20});
+  const cards=renderStudentIdCards({schoolName:'School',year:'2026',cards:students.map(student=>({id:student.id,name:student.name,className:'KG'}))});
+  assert.match(results,/Bogga 1 \/ 2/);
+  assert.match(results,/Bogga 2 \/ 2/);
+  assert.match(cards,/Bogga 1 \/ 4/);
+  assert.match(cards,/Bogga 4 \/ 4/);
+});
