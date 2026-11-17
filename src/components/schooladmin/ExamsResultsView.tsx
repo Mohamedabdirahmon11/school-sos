@@ -1230,7 +1230,7 @@ export const ExamsResultsView: React.FC = () => {
                     <td className="whitespace-nowrap px-3 py-2"><strong>{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-500">{student.studentId}</span></td>
                     {selectedClassSubjects.map(subject => {
                       const mark = marks.find(item => item.studentId === student.id && item.subjectId === subject.id);
-                      const status = mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'submitted' ? 'Waiting Fomester' : mark?.status === 'approved' ? 'Approved' : mark?.status === 'draft' ? 'Draft' : 'Missing';
+                      const status = mark?.status === 'form_teacher_submitted' ? 'To Admin' : mark?.status === 'submitted' ? 'Waiting Fomester' : mark?.status === 'approved' ? (mark.publishedAt ? 'Published' : 'Approved') : mark?.status === 'draft' && mark.correctionReason ? 'Returned for correction' : mark?.status === 'draft' ? 'Draft' : 'Missing';
                       return <React.Fragment key={subject.id}>
                         {assessmentComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{mark?.assessmentScores?.[component.id] ?? '—'}</td>)}
                         <td className="border-l px-2 py-2 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td>
