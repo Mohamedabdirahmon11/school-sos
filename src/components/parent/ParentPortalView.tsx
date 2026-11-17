@@ -41,10 +41,14 @@ export const ParentPortalView: React.FC = () => {
     [currentChild?.id, currentChild?.classId, school?.id],
     Boolean(currentChild)
   );
+  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
   const timetable = Array.isArray(timetableState.data) ? timetableState.data : [];
   const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules(currentChild.classId) : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const childData = childState.data;
+  const resultNotices = (Array.isArray(noticesState.data) ? noticesState.data : [])
+    .filter((notice: any) => notice.classId === currentChild.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
+    .slice(0, 3);
 
   const handleSelectChild = (idx: number) => {
     setSelectedChildIndex(idx);
@@ -96,6 +100,13 @@ export const ParentPortalView: React.FC = () => {
         </div>
       </div>
 
+      {resultNotices.length > 0 && (
+        <section aria-label="Published exam results notifications" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-950">
+          <div className="flex items-center gap-2 font-bold"><BellRing className="h-4 w-4" /> New exam results are available</div>
+          {resultNotices.map((notice: any) => <div key={notice.id} className="mt-2 border-t border-emerald-100 pt-2"><p className="font-semibold">{notice.title}</p><p className="mt-1 text-emerald-800">{notice.content}</p><p className="mt-1 text-[10px] text-emerald-700">{notice.publishDate}</p></div>)}
+        </section>
+      )}
+
       {/* Child Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
@@ -139,7 +150,7 @@ export const ParentPortalView: React.FC = () => {
           <div className="space-y-2">
             {(Array.isArray(childData?.marks) ? childData.marks : []).length ? childData?.marks?.map((mark: any) => (
               <div key={mark.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex justify-between"><span>{mark.subjectId} · {mark.semester}</span><span className="font-mono font-bold">{Number(mark.percentage).toFixed(1)}%</span></div>
-            )) : <p className="text-[#64748B]">No approved results are available.</p>}
+            )) : <p className="text-[#64748B]">No published results are available yet. The School Admin will publish the approved results here.</p>}
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs">
