@@ -1103,10 +1103,10 @@ export class ApiClient {
     return this.request<Array<AttendanceRecord & { student: Student; className: string }>>(`/attendance/school/absences?date=${encodeURIComponent(date)}`);
   }
 
-  public static async recordDailyAttendance(classId: string, date: string, records: any[]) {
+  public static async recordDailyAttendance(classId: string, date: string, records: any[], source: 'document_template' | 'attendance_module' = 'attendance_module') {
     return this.request<{ success: boolean; count: number; records: AttendanceRecord[] }>('/attendance', {
       method: 'POST',
-      body: JSON.stringify({ classId, date, records })
+      body: JSON.stringify({ classId, date, records, source })
     });
   }
 
