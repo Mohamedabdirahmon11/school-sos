@@ -70,6 +70,9 @@ DECLARE
   template_key UUID;
   actor_key VARCHAR(64);
   template_name TEXT;
+  template_type VARCHAR(40);
+  old_config JSONB;
+  new_config JSONB;
   event_action VARCHAR(50);
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -77,24 +80,39 @@ BEGIN
     template_key := OLD.id;
     actor_key := COALESCE(OLD.updated_by, OLD.created_by);
     template_name := OLD.name;
+    template_type := OLD.type;
+    old_config := OLD.config;
     event_action := 'structured_template_deleted';
+  ELSIF TG_OP = 'INSERT' THEN
+    school_key := NEW.school_id;
+    template_key := NEW.id;
+    actor_key := COALESCE(NEW.updated_by, NEW.created_by);
+    template_name := NEW.name;
+    template_type := NEW.type;
+    new_config := NEW.config;
+    event_action := 'structured_template_created';
   ELSE
     school_key := NEW.school_id;
     template_key := NEW.id;
     actor_key := COALESCE(NEW.updated_by, NEW.created_by, OLD.updated_by, OLD.created_by);
     template_name := NEW.name;
-    IF TG_OP = 'INSERT' THEN
-      event_action := 'structured_template_created';
-    ELSE
-      event_action := 'structured_template_updated';
-    END IF;
+    template_type := NEW.type;
+    old_config := OLD.config;
+    new_config := NEW.config;
+    event_action := 'structured_template_updated';
   END IF;
 
   INSERT INTO public.school_document_audit_events
     (school_id, document_id, actor_user_id, action, details)
   VALUES
     (school_key, NULL, actor_key, event_action,
-     jsonb_build_object('templateId', template_key, 'type', COALESCE(NEW.type, OLD.type), 'name', template_name));
+     jsonb_build_object(
+       'templateId', template_key,
+       'type', template_type,
+       'name', template_name,
+       'oldConfig', old_config,
+       'newConfig', new_config
+     ));
 
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
