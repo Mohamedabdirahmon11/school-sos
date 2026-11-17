@@ -3,13 +3,12 @@ import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2
 import { ApiClient } from '../../services/api.ts';
 import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
-import { escapePlainText } from '../../lib/documents/template-engine.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
   renderStudentIdCards
 } from '../../lib/documents/structured-renderers.ts';
-import { monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
+import { escapePlainText, monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
 
 const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
   { kind:'exam_result_list', label:'Go’aanka imtixaanka' },
@@ -102,7 +101,6 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
   output=output.replaceAll('direction:rtl',`direction:${config.direction}`);
   const safeLogo=logoUrl&&/^\\/api\\/documents\\/images\\?path=[A-Za-z0-9%._/-]+$/i.test(logoUrl)?logoUrl:'';
   if(config.showLogo&&safeLogo){
-    output=output.replace('<div style="border-bottom:3px',`<div style="border-bottom:3px`);
     output=output.replace('<div style="font-size:19pt;font-weight:700;',`<img src="${escapePlainText(safeLogo)}" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;`);
   }
   if(config.showQr&&verificationId&&!output.includes('Aqoonsiga xaqiijinta:')){
@@ -144,6 +142,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [month,setMonth]=useState(new Date().getMonth()+1);
   const [year,setYear]=useState(new Date().getFullYear());
   const [examTitle,setExamTitle]=useState('Imtixaanka dhammaadka xilli-dugsiyeedka');
+  const [examSemester,setExamSemester]=useState<'Semester 1'|'Semester 2'>('Semester 1');
   const [recipient,setRecipient]=useState('Cidda ay khusayso');
   const [letterSubject,setLetterSubject]=useState('');
   const [letterBody,setLetterBody]=useState('');
@@ -228,6 +227,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const buildHtml=useCallback(()=>{
     const student=selectedStudent;
     const activeSubjects=config.subjects;
+    const examMarks=examSemester==='Semester 1'?term1Marks:term2Marks;
     const nameOf=student?studentName(student):'';
     const first=student?term1Marks.filter(mark=>mark.studentId===student.id):[];
     const second=student?term2Marks.filter(mark=>mark.studentId===student.id):[];
@@ -248,7 +248,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         const examStudents=students.map(item=>{
           const rowMarks:Record<string,number>={};
           for(const subject of activeSubjects){
-            const mark=term1Marks.find(entry=>entry.studentId===item.id&&entry.subjectId===subject.id);
+            const mark=examMarks.find(entry=>entry.studentId===item.id&&entry.subjectId===subject.id);
             if(mark)rowMarks[subject.id]=Number(mark.totalMarks);
           }
           const total=activeSubjects.reduce((sum,subject)=>sum+(rowMarks[subject.id]||0),0);
@@ -297,7 +297,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
-  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar]);
+  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar]);
 
   const cycleAttendance=(studentId:string,date:string)=>{
     setAttendance(current=>{
@@ -405,7 +405,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
           </label>
         </div>
         {(kind==='attendance_sheet')&&<div className="grid grid-cols-2 gap-2"><label className="text-xs font-semibold text-slate-600">Bil<input type="number" min={1} max={12} value={month} onChange={event=>setMonth(Number(event.target.value))} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2"/></label><label className="text-xs font-semibold text-slate-600">Sanad<input type="number" min={2000} max={2100} value={year} onChange={event=>setYear(Number(event.target.value))} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2"/></label></div>}
-        {kind==='exam_result_list'&&<label className="block text-xs font-semibold text-slate-600">Cinwaanka imtixaanka<input value={examTitle} onChange={event=>setExamTitle(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label>}
+        {kind==='exam_result_list'&&<><label className="block text-xs font-semibold text-slate-600">Xilli-dugsiyeedka<select value={examSemester} onChange={event=>setExamSemester(event.target.value as 'Semester 1'|'Semester 2')} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option></select></label><label className="block text-xs font-semibold text-slate-600">Cinwaanka imtixaanka<input value={examTitle} onChange={event=>setExamTitle(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label></>}
         {kind==='certificate'&&<><label className="block text-xs font-semibold text-slate-600">Qoraalka shahaadada<textarea rows={3} value={certificateBody} onChange={event=>setCertificateBody(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label><label className="block text-xs font-semibold text-slate-600">Taariikh<input type="date" value={certificateDate} onChange={event=>setCertificateDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2"/></label></>}
         {kind==='official_letter'&&<><label className="block text-xs font-semibold text-slate-600">Ku<input value={recipient} onChange={event=>setRecipient(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Ujeeddo<input value={letterSubject} onChange={event=>setLetterSubject(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3"/></label><label className="block text-xs font-semibold text-slate-600">Qoraalka<textarea rows={4} value={letterBody} onChange={event=>setLetterBody(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label></>}
         <details className="rounded-xl border border-slate-200 p-3">
