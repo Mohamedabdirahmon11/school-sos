@@ -95,6 +95,7 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
   if(!config.showFooter)output=output.replace(/<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">SchoolOS<\/p>/g,'');
   if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:.*?<\/p>/g,'');
   if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
+  if(/^#[0-9a-fA-F]{6}$/.test(config.accentColor))output=output.replaceAll('#176b5b',config.accentColor);
   output=output.replaceAll('font-size:11pt','font-size:' + Math.max(8,Math.min(24,config.fontSize)) + 'pt');
   output=output.replaceAll('padding:5px','padding:' + Math.max(2,Math.min(12,Math.round(config.rowHeight/6))) + 'px');
   output=output.replaceAll('direction:rtl','direction:' + config.direction);
