@@ -194,7 +194,7 @@ export function renderStudentIdCards(data: StudentIdSheetData): string {
       while(cells.length<2)cells.push('<td style="width:50%;height:61mm"></td>');
       return `<tr>${cells.join('')}</tr>`;
     }).join('');
-    return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif"><h2 style="text-align:center">${text(data.schoolName)} · KAARKA AQOONSIGA ARDAYGA</h2><table style="width:100%">${rows}</table><p style="text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></div>`;
+    return `<div style="width:190mm;margin:0 auto;padding:10mm;background-color:#fff;color:#17212b;font-family:Arial,sans-serif;direction:rtl"><h2 style="text-align:center">${text(data.schoolName)} · KAARKA AQOONSIGA ARDAYGA</h2><table style="width:100%">${rows}</table><p style="text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></div>`;
   }).join('<div style="page-break-after:always"></div>');
 }
 
