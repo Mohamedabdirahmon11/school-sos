@@ -79,3 +79,9 @@ test('template JSON export/import round-trips without changing the config', () =
   assert.deepEqual(importTemplateConfig(exportTemplateConfig(config)), config);
   assert.throws(() => importTemplateConfig(JSON.stringify({ ...config, passRule:{mode:'percent',percent:140} })), /Template config-ku ma saxna/);
 });
+
+test('Ethiopian school calendar default treats Sunday, not Saturday, as weekly holiday', () => {
+  const days = monthDays(2026, 11);
+  assert.equal(days.find(day=>day.date==='2026-11-01')?.isWeekend,true);
+  assert.equal(days.find(day=>day.date==='2026-11-07')?.isWeekend,false);
+});
