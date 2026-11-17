@@ -8082,10 +8082,12 @@ async function hasDocumentGrant(client: any, schoolId: string, user: User, docum
 }
 async function familyDocumentStudentIds(schoolId:string,user:User):Promise<string[]> {
   if(user.role!=='parent'&&user.role!=='student')return [];
-  const schoolStudents=await db.getStudents(schoolId);
-  if(user.role==='student')return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
-  const phones=new Set([user.phone,user.parentPhone].filter((value):value is string=>Boolean(value)));
-  return schoolStudents.filter(student=>user.linkedStudentIds?.includes(student.id)||phones.has(student.fatherPhone||'')||phones.has(student.motherPhone||'')).map(student=>student.id);
+  try{
+    const schoolStudents=await db.getStudents(schoolId);
+    if(user.role==='student')return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
+    const phones=new Set([user.phone,user.parentPhone].filter((value):value is string=>Boolean(value)));
+    return schoolStudents.filter(student=>user.linkedStudentIds?.includes(student.id)||phones.has(student.fatherPhone||'')||phones.has(student.motherPhone||'')).map(student=>student.id);
+  }catch{return []}
 }
 async function familyDocumentAllowed(schoolId:string,user:User,document:any):Promise<boolean> {
   if(user.role!=='parent'&&user.role!=='student')return true;
