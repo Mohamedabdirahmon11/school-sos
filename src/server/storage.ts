@@ -2627,6 +2627,11 @@ class StorageEngine {
         this.data.marks[existingIdx].teacherRemarks = mark.teacherRemarks;
         this.data.marks[existingIdx].submittedBy = submittedBy;
         this.data.marks[existingIdx].submittedAt = now;
+        this.data.marks[existingIdx].correctionReason = null;
+        this.data.marks[existingIdx].returnedBy = null;
+        this.data.marks[existingIdx].returnedAt = null;
+        this.data.marks[existingIdx].publishedAt = null;
+        this.data.marks[existingIdx].publishedBy = null;
         results.push(this.data.marks[existingIdx]);
       } else {
         const newMark: StudentMark = {
@@ -2645,7 +2650,12 @@ class StorageEngine {
           status: mark.status,
           teacherRemarks: mark.teacherRemarks,
           submittedBy,
-          submittedAt: now
+          submittedAt: now,
+          correctionReason: null,
+          returnedBy: null,
+          returnedAt: null,
+          publishedAt: null,
+          publishedBy: null
         };
         this.data.marks.push(newMark);
         results.push(newMark);
@@ -2726,6 +2736,97 @@ class StorageEngine {
     return approved;
   }
 
+  public async returnMarksForCorrection(
+    schoolId: string,
+    markIds: string[],
+    returnedBy: string,
+    reason: string,
+    returnedByName: string,
+    returnedByRole: string
+  ): Promise<StudentMark[]> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam marks storage is unavailable.');
+    const existing = await this.queryRows<StudentMark>('student_marks', { school_id: schoolId, id: markIds });
+    if (existing.length !== markIds.length || existing.some(mark => mark.status !== 'form_teacher_submitted')) {
+      throw new Error('Only marks submitted by the Form Teacher can be returned. Refresh the class results and try again.');
+    }
+    const now = new Date().toISOString();
+    const { data, error } = await client.from('student_marks')
+      .update({
+        status: 'draft',
+        correction_reason: reason,
+        returned_by: returnedBy,
+        returned_at: now,
+        approved_by: null,
+        approved_at: null,
+        published_at: null,
+        published_by: null
+      })
+      .eq('school_id', schoolId)
+      .in('id', markIds)
+      .eq('status', 'form_teacher_submitted')
+      .select('*');
+    this.recordQuery('student_marks', 'return-marks-for-correction', performance.now());
+    if (error) throw new Error(error.message || 'Marks could not be returned for correction.');
+    const returned = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    if (returned.length !== markIds.length) throw new Error('Some marks changed while the correction request was being processed. Refresh and retry.');
+    for (const row of returned) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+      this.logAudit({
+        action: 'MARKS_RETURNED_FOR_CORRECTION',
+        category: 'academics',
+        schoolId,
+        userId: returnedBy,
+        userName: returnedByName,
+        userRole: returnedByRole,
+        details: JSON.stringify({ markId: row.id, studentId: row.studentId, subjectId: row.subjectId, semester: row.semester, oldStatus: 'form_teacher_submitted', newStatus: 'draft', reason }),
+        severity: 'warning'
+      });
+    }
+    await this.flush();
+    return returned;
+  }
+
+  public async publishClassSemesterResults(
+    schoolId: string,
+    classId: string,
+    semester: 'Semester 1' | 'Semester 2',
+    publishedBy: string,
+    publishedByName: string,
+    publishedByRole: string
+  ): Promise<{ publishedCount: number; publishedAt: string | null }> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Exam result publishing is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('schoolos_publish_exam_results', {
+      p_school_id: schoolId,
+      p_class_id: classId,
+      p_semester: semester,
+      p_published_by: publishedBy
+    });
+    this.recordQuery('rpc:schoolos_publish_exam_results', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Exam results could not be published.');
+    const payload = Array.isArray(data) ? data[0] : data;
+    const publishedCount = Number(payload?.published_count || 0);
+    const publishedAt = typeof payload?.published_at === 'string' ? payload.published_at : null;
+    if (publishedCount > 0) {
+      await this.getMarks(schoolId, classId, undefined, semester);
+      this.logAudit({
+        action: 'MARKS_PUBLISHED_TO_PARENTS',
+        category: 'academics',
+        schoolId,
+        userId: publishedBy,
+        userName: publishedByName,
+        userRole: publishedByRole,
+        details: JSON.stringify({ classId, semester, publishedCount, publishedAt }),
+        severity: 'info'
+      });
+      await this.flush();
+    }
+    return { publishedCount, publishedAt };
+  }
+
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
@@ -2790,7 +2891,8 @@ class StorageEngine {
           bigExamMarks: mark.bigExamMarks,
           totalMarks: mark.totalMarks,
           percentage: mark.percentage,
-          status: mark.status
+          status: mark.status,
+          publishedAt: mark.publishedAt || null
         } : null;
 
         return {
@@ -2811,6 +2913,10 @@ class StorageEngine {
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
       );
+      const annualPublished = annualComplete && expectedSubjectIds.every(subjectId =>
+        Boolean(s1.find(mark => mark.subjectId === subjectId)?.publishedAt) &&
+        Boolean(s2.find(mark => mark.subjectId === subjectId)?.publishedAt)
+      );
       const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
       const yearlyAvg = annualComplete && validPercentages.length === expectedSubjectIds.length
         ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100
@@ -2821,6 +2927,7 @@ class StorageEngine {
         student,
         subjectResults,
         annualComplete,
+        annualPublished,
         yearlyPercentage: yearlyAvg,
         isPass,
         yearlyRank: 0,
