@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExamAssessmentComponent, SchoolClass, Student, Subject } from '../../types/index.ts';
+import { ExamAssessmentComponent, Student, Subject } from '../../types/index.ts';
 
 interface TeacherMarkEntryPrintProps {
   schoolName: string;
