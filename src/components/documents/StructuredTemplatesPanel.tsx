@@ -96,8 +96,8 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
   if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:.*?<\/p>/g,'');
   if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
   if(/^#[0-9a-fA-F]{6}$/.test(config.accentColor))output=output.replaceAll('#176b5b',config.accentColor);
-  output=output.replaceAll('font-size:11pt','font-size:' + Math.max(8,Math.min(24,config.fontSize)) + 'pt');
-  output=output.replaceAll('padding:5px','padding:' + Math.max(2,Math.min(12,Math.round(config.rowHeight/6))) + 'px');
+  output=output.replaceAll('font-size:11pt','font-size:' + Math.max(8,Math.min(24,config.fontSize??11)) + 'pt');
+  output=output.replaceAll('padding:5px','padding:' + Math.max(2,Math.min(12,Math.round((config.rowHeight??28)/6))) + 'px');
   output=output.replaceAll('direction:rtl','direction:' + config.direction);
   let safeLogo='';
   if(logoUrl?.startsWith('/api/documents/images?path=')&&/^[A-Za-z0-9%._/-]+$/.test(logoUrl.split('path=')[1]||''))safeLogo=logoUrl;
