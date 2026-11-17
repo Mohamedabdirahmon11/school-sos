@@ -113,10 +113,19 @@ function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:st
   return output;
 }
 
+function dateInTimezone(timezone?:string):string {
+  try{
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:timezone||'Africa/Addis_Ababa',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const get=(type:string)=>parts.find(part=>part.type===type)?.value||'';
+    return get('year')+'-'+get('month')+'-'+get('day');
+  }catch{return new Date().toISOString().slice(0,10);}
+}
+
 export interface StructuredTemplatesPanelProps {
   schoolName:string;
   accentColor:string;
   logoUrl?:string;
+  schoolTimezone?:string;
   gradingScale?:GradingBand[];
   calendar?:SchoolSetupData['calendar'];
   userRole?:string;
@@ -126,7 +135,7 @@ export interface StructuredTemplatesPanelProps {
   onClose:()=>void;
 }
 
-export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,gradingScale=[],calendar,userRole='school_admin',userId='',canManageTemplates=true,onCreated,onClose}:StructuredTemplatesPanelProps) {
+export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolTimezone,gradingScale=[],calendar,userRole='school_admin',userId='',canManageTemplates=true,onCreated,onClose}:StructuredTemplatesPanelProps) {
   const [kind,setKind]=useState<TemplateKind>(userRole==='teacher'?'attendance_sheet':'exam_result_list');
   const [name,setName]=useState('Go’aanka imtixaanka');
   const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig(userRole==='teacher'?'attendance_sheet':'exam_result_list',accentColor));
@@ -148,8 +157,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [timetableCells,setTimetableCells]=useState<Record<string,Record<string,string>>>({});
   const [periodEdits,setPeriodEdits]=useState<Record<string,{start:string;end:string}>>({});
   const [payments,setPayments]=useState<FeePayment[]>([]);
-  const [month,setMonth]=useState(new Date().getMonth()+1);
-  const [year,setYear]=useState(new Date().getFullYear());
+  const [month,setMonth]=useState(()=>Number(dateInTimezone(schoolTimezone).slice(5,7)));
+  const [year,setYear]=useState(()=>Number(dateInTimezone(schoolTimezone).slice(0,4)));
   const [examTitle,setExamTitle]=useState('Imtixaanka dhammaadka xilli-dugsiyeedka');
   const [examSemester,setExamSemester]=useState<'Semester 1'|'Semester 2'>('Semester 1');
   const [recipient,setRecipient]=useState('Cidda ay khusayso');
@@ -163,10 +172,12 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [receiptReceivedBy,setReceiptReceivedBy]=useState('Qasnajiga');
   const [reportComment,setReportComment]=useState('');
   const [feeItems,setFeeItems]=useState<Array<{description:string;amount:number}>>([]);
-  const [certificateDate,setCertificateDate]=useState(new Date().toISOString().slice(0,10));
+  const [certificateDate,setCertificateDate]=useState(()=>dateInTimezone(schoolTimezone));
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
   const [preview,setPreview]=useState('');
+
+  useEffect(()=>{const today=dateInTimezone(schoolTimezone);setYear(Number(today.slice(0,4)));setMonth(Number(today.slice(5,7)));setCertificateDate(today);},[schoolTimezone]);
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
   const filteredStudents=useMemo(()=>students.filter(student=>studentName(student).toLowerCase().includes(studentSearch.toLowerCase())||student.studentId.toLowerCase().includes(studentSearch.toLowerCase())),[students,studentSearch]);
