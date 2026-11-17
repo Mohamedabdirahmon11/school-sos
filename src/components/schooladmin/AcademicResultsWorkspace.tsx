@@ -49,7 +49,7 @@ function displayName(student?: Student): string {
 
 export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> = ({
   mode, classes, subjects, students, marks, classSubjectRows, selectedClassId,
-  onClassChange, selectedSemester, onSemesterChange, examConfig
+  onClassChange, selectedSemester, onSemesterChange, examConfig, classDataLoading
 }) => {
   const { school } = useAuth();
   const [schoolStudentCount, setSchoolStudentCount] = useState(0);
