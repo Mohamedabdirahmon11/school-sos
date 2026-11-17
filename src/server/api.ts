@@ -8080,6 +8080,19 @@ async function hasDocumentGrant(client: any, schoolId: string, user: User, docum
   const field=permission==='view'?'can_view':permission==='edit'?'can_edit':'can_download';
   return data.some((grant:any)=>grant[field]===true);
 }
+async function familyDocumentStudentIds(schoolId:string,user:User):Promise<string[]> {
+  if(user.role!=='parent'&&user.role!=='student')return [];
+  const schoolStudents=await db.getStudents(schoolId);
+  if(user.role==='student')return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
+  const phones=new Set([user.phone,user.parentPhone].filter((value):value is string=>Boolean(value)));
+  return schoolStudents.filter(student=>user.linkedStudentIds?.includes(student.id)||phones.has(student.fatherPhone||'')||phones.has(student.motherPhone||'')).map(student=>student.id);
+}
+async function familyDocumentAllowed(schoolId:string,user:User,document:any):Promise<boolean> {
+  if(user.role!=='parent'&&user.role!=='student')return true;
+  if(document.status!=='final'||!document.student_id)return false;
+  const linkedIds=await familyDocumentStudentIds(schoolId,user);
+  return linkedIds.includes(String(document.student_id));
+}
 function documentClientRow(row: any, includeContent = false) {
   const result: Record<string, any> = {
     id: row.id, title: row.title, documentType: row.document_type, status: row.status,
@@ -8180,6 +8193,9 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) 
   const user = (req as any).user as User;
   const client = documentServiceClient(res);
   if (!client) return;
+  const isFamilyUser=user.role==='parent'||user.role==='student';
+  const familyStudentIds=isFamilyUser?await familyDocumentStudentIds(school.id,user):[];
+  if(isFamilyUser&&!familyStudentIds.length){res.setHeader('Cache-Control','private, no-store');res.json([]);return;}
   let allowedGrants: any[] = [];
   if (!hasDocumentAdminAccess(user)) {
     const {data:grants,error:grantError}=await client.from('school_document_permissions').select('document_id,can_edit')
@@ -8194,6 +8210,7 @@ apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) 
     .order('updated_at', { ascending: false })
     .limit(100);
   if (!hasDocumentAdminAccess(user)) query = query.in('id',allowedGrants.map(grant=>grant.document_id));
+  if(isFamilyUser)query=query.eq('status','final').in('student_id',familyStudentIds);
   if (!hasDocumentAdminAccess(user) || req.query.includeDeleted !== 'true') query = query.is('deleted_at', null);
   if (typeof req.query.search === 'string' && req.query.search.trim()) query = query.ilike('title', '%' + req.query.search.trim().slice(0,80) + '%');
   if (typeof req.query.type === 'string' && DOCUMENT_TYPES.has(req.query.type)) query = query.eq('document_type', req.query.type);
@@ -8212,6 +8229,7 @@ apiRouter.get('/documents/:id', requireAuth, requireSchoolContext, async (req, r
   const { data, error } = await client.from('school_documents').select('*')
     .eq('school_id', school.id).eq('id', req.params.id).is('deleted_at', null).maybeSingle();
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama helin.' }); return; }
+  if (!await familyDocumentAllowed(school.id,user,data)) { res.status(404).json({error:'Dukumentiga lama helin.'}); return; }
   if (!await hasDocumentGrant(client,school.id,user,data.id,'view')) { res.status(403).json({error:'Ma lihid ogolaanshaha dukumentigan.'}); return; }
   res.setHeader('Cache-Control','private, no-store');
   res.json({...documentClientRow(data, true),canEdit:await hasDocumentGrant(client,school.id,user,data.id,'edit'),canDownload:await hasDocumentGrant(client,school.id,user,data.id,'download')});
@@ -8254,6 +8272,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
 apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
+  if(user.role==='parent'||user.role==='student'){res.status(403).json({error:'Waalidiinta iyo ardaydu ma beddeli karaan dukumentiyada.'});return;}
   const body = req.body || {};
   const client = documentServiceClient(res);
   if (!client) return;
@@ -8285,8 +8304,8 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
 apiRouter.post('/documents/:id/download-audit', requireAuth, requireSchoolContext, async (req,res)=>{
   const school=(req as any).school as School;const user=(req as any).user as User;
   const client=documentServiceClient(res);if(!client)return;
-  const {data:document}=await client.from('school_documents').select('id,title,serial_number').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
-  if(!document){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
+  const {data:document}=await client.from('school_documents').select('id,title,serial_number,student_id,status').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
+  if(!document||!await familyDocumentAllowed(school.id,user,document)){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
   if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}
   const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
   if(error){res.status(503).json({error:'Diiwaanka download-ka lama kaydin karin.'});return;}
