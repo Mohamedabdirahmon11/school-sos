@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Check, ChevronDown, Copy, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import type { FeePayment, SchoolClass, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
@@ -8,7 +8,7 @@ import {
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
   renderStudentIdCards
 } from '../../lib/documents/structured-renderers.ts';
-import type { AttendanceEntry, TemplateConfig, TemplateKind, TemplateSubject } from '../../lib/documents/template-engine.ts';
+import { passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
 
 const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
   { kind:'exam_result_list', label:'Go’aanka imtixaanka' },
@@ -61,6 +61,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
   const [name,setName]=useState('Go’aanka imtixaanka');
   const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig('exam_result_list',accentColor));
   const [savedTemplates,setSavedTemplates]=useState<any[]>([]);
+  const [editingTemplateId,setEditingTemplateId]=useState<string|null>(null);
   const [classes,setClasses]=useState<SchoolClass[]>([]);
   const [classId,setClassId]=useState('');
   const [students,setStudents]=useState<Student[]>([]);
@@ -105,9 +106,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
       ApiClient.getClassDetails(classId,{page:1,pageSize:100}),
       ApiClient.getMarks(classId,undefined,'Semester 1'),
       ApiClient.getMarks(classId,undefined,'Semester 2'),
-      ApiClient.getAttendanceMonth(classId,year,month),
       ApiClient.getTimetable(classId)
-    ]).then(([roster,details,firstMarks,secondMarks,monthAttendance,slots])=>{
+    ]).then(([roster,details,firstMarks,secondMarks,slots])=>{
       if(!active)return;
       setStudents(roster);
       setStudentId(current=>roster.some(student=>student.id===current)?current:roster[0]?.id||'');
@@ -116,10 +116,17 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
       setConfig(current=>({...current,subjects:classSubjects.length?classSubjects:DEFAULT_SUBJECTS}));
       setTerm1Marks(firstMarks.filter(approved));
       setTerm2Marks(secondMarks.filter(approved));
-      setAttendance(monthAttendance);
       setTimetable(slots);
     }).catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta fasalka lama soo dejin karin.');})
       .finally(()=>{if(active)setBusy(false);});
+    return ()=>{active=false;};
+  },[classId]);
+
+  useEffect(()=>{
+    if(!classId)return;
+    let active=true;
+    ApiClient.getAttendanceMonth(classId,year,month).then(result=>{if(active)setAttendance(result);})
+      .catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta xaadirinta lama soo dejin karin.');});
     return ()=>{active=false;};
   },[classId,month,year]);
 
@@ -130,7 +137,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
     return ()=>{active=false;};
   },[selectedStudent?.id]);
 
-  useEffect(()=>{setConfig(current=>({...current,kind,title:TEMPLATE_OPTIONS.find(item=>item.kind===kind)?.label||current.title}));setName(TEMPLATE_OPTIONS.find(item=>item.kind===kind)?.label||'Template');setPreview('');},[kind]);
+  const changeKind=(nextKind:TemplateKind)=>{const next=defaultConfig(nextKind,accentColor);setKind(nextKind);setName(next.title);setConfig(next);setEditingTemplateId(null);setPreview('');};
 
   const updateConfig=(patch:Partial<TemplateConfig>)=>setConfig(current=>({...current,...patch}));
 
@@ -160,15 +167,19 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
             if(mark)rowMarks[subject.id]=Number(mark.totalMarks);
           }
           const total=subjects.reduce((sum,subject)=>sum+(rowMarks[subject.id]||0),0);
-          const threshold=subjects.reduce((sum,subject)=>sum+subject.maxMark,0)*(Number(config.passRule.percent??40)/100);
-          return {id:item.studentId,name:studentName(item),marks:rowMarks,outcome:total>=threshold?'Gudub':'Aan Gudbin' as const};
+          const hasAnyMark=Object.keys(rowMarks).length>0;
+          const threshold=passThreshold(subjects,config.passRule);
+          return {id:item.studentId,name:studentName(item),marks:rowMarks,outcome:!hasAnyMark?'Maqan' as const:total>=threshold?'Gudub' as const:'Aan Gudbin' as const};
         });
         return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
       }
       case 'individual_report_card':
-        return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:subjectsWithMarks,total:subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0),average:subjectsWithMarks.length?subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0)/subjectsWithMarks.length:0,outcome:'Aan Gudbin'}):'';
+        const finalTotal=subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0);
+        const finalAverage=subjectsWithMarks.length?finalTotal/subjectsWithMarks.length:0;
+        const finalOutcome=finalTotal>=passThreshold(subjects,config.passRule)?'Gudub':'Aan Gudbin';
+        return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:subjectsWithMarks,total:finalTotal,average:finalAverage,outcome:finalOutcome}):'';
       case 'attendance_sheet':
-        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,rowsPerPage:config.rowsPerPage})[0];
+        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       case 'certificate':
         return renderCertificate({schoolName,title:name,studentName:nameOf,body:certificateBody,rankOrTotal:'',date:certificateDate});
       case 'student_id_cards':
@@ -176,15 +187,15 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
       case 'official_letter':
         return renderOfficialLetter({schoolName,date:certificateDate,recipient,subject:letterSubject,paragraphs:letterBody.split(/\n+/).filter(Boolean),signatory:'Maamulka dugsiga'});
       case 'fee_receipt':{
-        const latest=payments[0];
-        return latest?renderFeeReceipt({schoolName,receiptNumber:latest.receiptNumber,date:latest.date,student:{id:student?.studentId||'',name:nameOf,className:selectedClass?.name||'',parentName:student?.fatherName||''},items:payments.map(payment=>({description:payment.feeType,amount:payment.amountPaid})),currency:'ETB',receivedBy:latest.recordedBy||''}):'';
+        const latest=payments.find(payment=>!payment.voidedAt);
+        return latest?renderFeeReceipt({schoolName,receiptNumber:latest.receiptNumber,date:latest.date,student:{id:student?.studentId||'',name:nameOf,className:selectedClass?.name||'',parentName:student?.fatherName||''},items:[{description:latest.feeType,amount:latest.amountPaid}],currency:'ETB',receivedBy:latest.recordedBy||''}):'';
       }
       case 'class_timetable':{
         const periods=[...new Set(timetable.map(slot=>slot.periodNumber))].sort((a,b)=>a-b).map(period=>{const slot=timetable.find(item=>item.periodNumber===period);return {label:String(period),start:slot?.startTime||'',end:slot?.endTime||''};});
         return renderClassTimetable({schoolName,className:selectedClass?.name||'',days:DAYS,periods,cells:slotsByDay});
       }
       case 'class_list':
-        return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage})[0];
+        return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
   },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name]);
@@ -203,7 +214,10 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
   const saveAsMyTemplate=async()=>{
     setBusy(true);
     try{
-      await ApiClient.createStructuredDocumentTemplate({type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}});
+      const payload={type:kind,name:name.trim()||config.title,config:{...config,title:name.trim()||config.title}};
+      if(editingTemplateId)await ApiClient.updateStructuredDocumentTemplate(editingTemplateId,payload);
+      else await ApiClient.createStructuredDocumentTemplate(payload);
+      setEditingTemplateId(null);
       await loadSavedTemplates();
       setMessage('Template-kaaga waa la kaydiyey.');
     }catch(error){setMessage(error instanceof Error?error.message:'Template-ka lama kaydin karin.');}
@@ -213,12 +227,13 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
   const loadTemplate=(template:any)=>{
     if(!template?.config)return;
     setKind(template.type);
+    setEditingTemplateId(template.id);
     setName(template.name);
     setConfig(template.config as TemplateConfig);
     setMessage('Template-ka waa la furay.');
   };
 
-  const reset=()=>{const next=defaultConfig(kind,accentColor);setConfig(next);setName(next.title);setMessage('Dejintii caadiga ahayd waa la soo celiyey.');};
+  const reset=()=>{const next=defaultConfig(kind,accentColor);setConfig(next);setName(next.title);setEditingTemplateId(null);setMessage('Dejintii caadiga ahayd waa la soo celiyey.');};
   const removeSaved=async(id:string)=>{
     try{await ApiClient.deleteStructuredDocumentTemplate(id);await loadSavedTemplates();}
     catch(error){setMessage(error instanceof Error?error.message:'Template-ka lama tirtiri karin.');}
@@ -243,7 +258,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-slate-600">Nooca template-ka
-          <select value={kind} onChange={event=>setKind(event.target.value as TemplateKind)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">{TEMPLATE_OPTIONS.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select>
+          <select value={kind} onChange={event=>changeKind(event.target.value as TemplateKind)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">{TEMPLATE_OPTIONS.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select>
         </label>
         <label className="block text-xs font-semibold text-slate-600">Magaca template-ka
           <input value={name} onChange={event=>setName(event.target.value)} maxLength={160} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"/>
@@ -273,7 +288,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
         </details>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={previewHtml} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
-          <button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> Kaydi template-kayga</button>
+          <button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>
           <button type="button" onClick={reset} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
           <button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>
         </div>
