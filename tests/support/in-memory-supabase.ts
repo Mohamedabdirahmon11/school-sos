@@ -238,10 +238,12 @@ export class InMemorySupabase {
       );
       if (!students.length) return { data: null, error: { message: 'The class has no enrolled students.' } };
       if (!assignments.length) return { data: null, error: { message: 'The class has no active subject assignments.' } };
+      const academicYear = String(klass.academic_year ?? klass.academicYear ?? '');
       const marks = this.rows('student_marks').filter(row =>
         String(row.school_id ?? row.schoolId) === schoolId &&
         String(row.class_id ?? row.classId) === classId &&
-        String(row.semester) === semester
+        String(row.semester) === semester &&
+        String(row.academic_year ?? row.academicYear) === academicYear
       );
       const missing = students.flatMap(student => assignments.filter(assignment => {
         const mark = marks.find(row =>
