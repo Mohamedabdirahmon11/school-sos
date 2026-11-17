@@ -5006,7 +5006,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     .filter((change:any)=>change.oldStatus!==change.newStatus);
   const saved = await db.recordDailyAttendance(school.id, normalizedClassId, date, normalizedRecords, user.id);
   if(changes.length){
-    db.logAudit({action:'ATTENDANCE_UPDATED',category:'attendance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:JSON.stringify({classId:normalizedClassId,date,source:source==='document_template'?'document_template':'attendance_module',changes}),severity:'info'});
+    db.logAudit({action:'ATTENDANCE_UPDATED',category:'academics',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:JSON.stringify({classId:normalizedClassId,date,source:source==='document_template'?'document_template':'attendance_module',changes}),severity:'info'});
   }
   res.json({ success: true, count: saved.length, records: saved });
 });
@@ -8247,6 +8247,8 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const hideVerificationQr = typeof body.contentHtml === 'string' && body.contentHtml.includes('<!--SCHOOLOS_HIDE_QR-->');
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
   const pageSize = ['A4','A5','Letter','CR80'].includes(body.pageSize) ? body.pageSize : 'A4';
+  const client = documentServiceClient(res);
+  if (!client) return;
   let templateId: string | null = null;
   let studentId: string | null = null;
   let classId: string | null = null;
@@ -8263,8 +8265,6 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const direction = body.direction === 'rtl' ? 'rtl' : 'ltr';
   const pageMargins = Number.isInteger(body.pageMargins) ? Math.min(40,Math.max(5,body.pageMargins)) : 20;
   if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga waa waajib.' }); return; }
-  const client = documentServiceClient(res);
-  if (!client) return;
   if (typeof body.templateId === 'string') {
     const { data: template } = await client.from('school_document_templates').select('id').eq('school_id',school.id).eq('id',body.templateId).is('deleted_at',null).maybeSingle();
     if (!template) { res.status(404).json({ error: 'Template-ka lama helin dugsigan.' }); return; }
