@@ -89,7 +89,7 @@ export function parseMark(input: unknown, maxMark = 100): MarkParseResult {
 }
 
 export function sumMarks(values: readonly MarkValue[]): number {
-  return values.reduce((sum, value) => typeof value === 'number' && Number.isFinite(value) ? sum + value : sum, 0);
+  return values.reduce<number>((sum, value) => typeof value === 'number' && Number.isFinite(value) ? sum + value : sum, 0);
 }
 
 export function maximumMarks(subjects: readonly Pick<TemplateSubject, 'maxMark'>[]): number {
@@ -179,8 +179,8 @@ export function validateTemplateConfig(value: unknown): value is TemplateConfig 
     && (config.passRule.mode !== 'percent' || (Number.isFinite(config.passRule.percent ?? 40) && Number(config.passRule.percent ?? 40) >= 0 && Number(config.passRule.percent ?? 40) <= 100))
     && (config.passRule.mode !== 'average' || (Number.isFinite(config.passRule.average ?? 40) && Number(config.passRule.average ?? 40) >= 0 && Number(config.passRule.average ?? 40) <= 100))
     && (config.passRule.mode !== 'fixed' || (Number.isFinite(config.passRule.fixedTotal) && Number(config.passRule.fixedTotal) >= 0))
-    && Number.isFinite(config.fontSize) && config.fontSize >= 8 && config.fontSize <= 24
-    && Number.isFinite(config.rowHeight) && config.rowHeight >= 18 && config.rowHeight <= 64
+    && Number.isFinite(config.fontSize ?? 11) && Number(config.fontSize ?? 11) >= 8 && Number(config.fontSize ?? 11) <= 24
+    && Number.isFinite(config.rowHeight ?? 28) && Number(config.rowHeight ?? 28) >= 18 && Number(config.rowHeight ?? 28) <= 64
     && typeof config.showLogo === 'boolean' && typeof config.showQr === 'boolean'
     && typeof config.showSummary === 'boolean' && typeof config.showFooter === 'boolean'
     && typeof config.zebra === 'boolean';
