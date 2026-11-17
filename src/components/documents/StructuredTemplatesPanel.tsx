@@ -136,6 +136,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [classId,setClassId]=useState('');
   const [students,setStudents]=useState<Student[]>([]);
   const [studentId,setStudentId]=useState('');
+  const [studentSearch,setStudentSearch]=useState('');
+  const [sortBy,setSortBy]=useState<'name'|'id'|'total'>('name');
   const [subjects,setSubjects]=useState<TemplateSubject[]>(DEFAULT_SUBJECTS);
   const [term1Marks,setTerm1Marks]=useState<StudentMark[]>([]);
   const [term2Marks,setTerm2Marks]=useState<StudentMark[]>([]);
@@ -310,11 +312,11 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:gradedSubjects,total:finalTotal,average:finalAverage,grade:gradeForMark(finalAverage,100,gradingScale),rank:rank>0?rank:'—',outcome:finalOutcome,comment:reportComment,signatories:reportSignatories}):'';
       }
       case 'attendance_sheet':
-        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,weekendDays:schoolWeekendDays(calendar),holidays:schoolHolidayDates(calendar,year,month),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
+        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:sortedStudents.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,weekendDays:schoolWeekendDays(calendar),holidays:schoolHolidayDates(calendar,year,month),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       case 'certificate':
         return renderCertificate({schoolName,title:name,studentName:nameOf,body:certificateBody,rankOrTotal:certificateRankOrTotal,date:certificateDate,signatories:certificateSignatories});
       case 'student_id_cards':
-        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:students.map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||'',photoUrl:item.documents?.find(document=>/\.(?:png|jpe?g|webp)$/i.test(document.name)&&document.url.startsWith('/api/documents/images?path='))?.url}))});
+        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:sortedStudents.map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||'',photoUrl:item.documents?.find(document=>/\.(?:png|jpe?g|webp)$/i.test(document.name)&&document.url.startsWith('/api/documents/images?path='))?.url}))});
       case 'official_letter':
         return renderOfficialLetter({schoolName,date:certificateDate,recipient,subject:letterSubject,paragraphs:letterBody.split(/\n+/).filter(Boolean),signatory:'Maamulka dugsiga'});
       case 'fee_receipt':{
@@ -329,7 +331,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
-  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,letterSignatory,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells]);
+  },[kind,selectedStudent,students,sortedStudents,subjects,term1Marks,term2Marks,examSemester,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,letterSignatory,name,gradingScale,calendar,reportComment,certificateRankOrTotal,certificateSignatories,reportSignatories,receiptReceivedBy,feeItems,periodNumbers,periodEdits,timetableCells]);
 
   const cycleAttendance=(studentId:string,date:string)=>{
     setAttendance(current=>{
