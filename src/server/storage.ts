@@ -2751,6 +2751,7 @@ class StorageEngine {
       throw new Error('Only marks submitted by the Form Teacher can be returned. Refresh the class results and try again.');
     }
     const now = new Date().toISOString();
+    const startedAt = performance.now();
     const { data, error } = await client.from('student_marks')
       .update({
         status: 'draft',
@@ -2766,7 +2767,7 @@ class StorageEngine {
       .in('id', markIds)
       .eq('status', 'form_teacher_submitted')
       .select('*');
-    this.recordQuery('student_marks', 'return-marks-for-correction', performance.now());
+    this.recordQuery('student_marks', 'return-marks-for-correction', startedAt);
     if (error) throw new Error(error.message || 'Marks could not be returned for correction.');
     const returned = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
     if (returned.length !== markIds.length) throw new Error('Some marks changed while the correction request was being processed. Refresh and retry.');
