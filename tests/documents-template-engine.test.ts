@@ -102,3 +102,9 @@ test('average pass rule uses the configured class-average percentage', () => {
   const subjects=Array.from({length:7},(_,index)=>({id:String(index),name:'Subject '+index,maxMark:100}));
   assert.equal(passThreshold(subjects,{mode:'average',average:40}),280);
 });
+
+test('fixed-total pass rule respects the configured total', () => {
+  assert.equal(passThreshold(subjects,{mode:'fixed',fixedTotal:280}),280);
+  assert.equal(hasPassed(279,subjects,{mode:'fixed',fixedTotal:280}),false);
+  assert.equal(hasPassed(280,subjects,{mode:'fixed',fixedTotal:280}),true);
+});
