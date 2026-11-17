@@ -143,10 +143,11 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
 
   const buildHtml=useCallback(()=>{
     const student=selectedStudent;
+    const activeSubjects=config.subjects;
     const nameOf=student?studentName(student):'';
     const first=student?term1Marks.filter(mark=>mark.studentId===student.id):[];
     const second=student?term2Marks.filter(mark=>mark.studentId===student.id):[];
-    const subjectsWithMarks=subjects.map(subject=>{
+    const subjectsWithMarks=activeSubjects.map(subject=>{
       const m1=first.find(mark=>mark.subjectId===subject.id);
       const m2=second.find(mark=>mark.subjectId===subject.id);
       const final=m1&&m2?(Number(m1.totalMarks)+Number(m2.totalMarks))/2:null;
@@ -162,28 +163,28 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
       case 'exam_result_list':{
         const examStudents=students.map(item=>{
           const rowMarks:Record<string,number>={};
-          for(const subject of subjects){
+          for(const subject of activeSubjects){
             const mark=term1Marks.find(entry=>entry.studentId===item.id&&entry.subjectId===subject.id);
             if(mark)rowMarks[subject.id]=Number(mark.totalMarks);
           }
-          const total=subjects.reduce((sum,subject)=>sum+(rowMarks[subject.id]||0),0);
+          const total=activeSubjects.reduce((sum,subject)=>sum+(rowMarks[subject.id]||0),0);
           const hasAnyMark=Object.keys(rowMarks).length>0;
-          const threshold=passThreshold(subjects,config.passRule);
+          const threshold=passThreshold(activeSubjects,config.passRule);
           return {id:item.studentId,name:studentName(item),marks:rowMarks,outcome:!hasAnyMark?'Maqan' as const:total>=threshold?'Gudub' as const:'Aan Gudbin' as const};
         });
-        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
+        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
       }
       case 'individual_report_card':
         const finalTotal=subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0);
         const finalAverage=subjectsWithMarks.length?finalTotal/subjectsWithMarks.length:0;
-        const finalOutcome=finalTotal>=passThreshold(subjects,config.passRule)?'Gudub':'Aan Gudbin';
+        const finalOutcome=finalTotal>=passThreshold(activeSubjects,config.passRule)?'Gudub':'Aan Gudbin';
         return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:subjectsWithMarks,total:finalTotal,average:finalAverage,outcome:finalOutcome}):'';
       case 'attendance_sheet':
         return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       case 'certificate':
         return renderCertificate({schoolName,title:name,studentName:nameOf,body:certificateBody,rankOrTotal:'',date:certificateDate});
       case 'student_id_cards':
-        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:students.slice(0,8).map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||''}))});
+        return renderStudentIdCards({schoolName,year:String(year),accentColor:config.accentColor,cards:students.map(item=>({id:item.studentId,name:studentName(item),className:selectedClass?.name||''}))});
       case 'official_letter':
         return renderOfficialLetter({schoolName,date:certificateDate,recipient,subject:letterSubject,paragraphs:letterBody.split(/\n+/).filter(Boolean),signatory:'Maamulka dugsiga'});
       case 'fee_receipt':{
@@ -230,6 +231,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
     setEditingTemplateId(template.id);
     setName(template.name);
     setConfig(template.config as TemplateConfig);
+    setSubjects((template.config as TemplateConfig).subjects);
     setMessage('Template-ka waa la furay.');
   };
 
@@ -245,9 +247,9 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
     if(!html)setMessage('Xogta template-kan weli kuma filna horudhac.');
   };
 
-  const addSubject=()=>updateConfig({subjects:[...config.subjects,{id:`subject-${Date.now()}`,name:`Maaddo ${config.subjects.length+1}`,maxMark:100}].slice(0,12)});
-  const updateSubject=(id:string,patch:Partial<TemplateSubject>)=>updateConfig({subjects:config.subjects.map(subject=>subject.id===id?{...subject,...patch}:subject)});
-  const deleteSubject=(id:string)=>updateConfig({subjects:config.subjects.filter(subject=>subject.id!==id).length?config.subjects.filter(subject=>subject.id!==id):DEFAULT_SUBJECTS});
+  const addSubject=()=>{const next=[...config.subjects,{id:`subject-${Date.now()}`,name:`Maaddo ${config.subjects.length+1}`,maxMark:100}].slice(0,12);updateConfig({subjects:next});setSubjects(next);};
+  const updateSubject=(id:string,patch:Partial<TemplateSubject>)=>{const next=config.subjects.map(subject=>subject.id===id?{...subject,...patch}:subject);updateConfig({subjects:next});setSubjects(next);};
+  const deleteSubject=(id:string)=>{const next=config.subjects.filter(subject=>subject.id!==id);const safe=next.length?next:DEFAULT_SUBJECTS;updateConfig({subjects:safe});setSubjects(safe);setTerm1Marks(current=>current.filter(mark=>mark.subjectId!==id));setTerm2Marks(current=>current.filter(mark=>mark.subjectId!==id));};
 
   return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" dir="rtl">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
