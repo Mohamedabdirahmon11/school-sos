@@ -126,21 +126,20 @@ export function renderExamResultList(data: ExamResultData): string {
   const threshold = passThreshold(data.subjects, data.passRule);
   const outcomes = summarizeOutcomes(data.students.map(student => student.outcome));
   const pageSize = Math.max(5, Math.min(25, data.rowsPerPage ?? 20));
-  const page = paginate(data.students, data.page ?? 1, pageSize);
+  const pageCount = Math.max(1, Math.ceil(data.students.length / pageSize));
   const headers = ['Lr.', 'Aqoonsi', 'Magaca ardayga', ...data.subjects.map(subject => subject.name), 'Wadar', 'Xaalad'];
-  const rows = page.items.map((student, index) => [
-    String((page.page - 1) * page.pageSize + index + 1), student.id, student.name,
-    ...data.subjects.map(subject => {
-      const mark = student.marks[subject.id];
-      return mark === undefined ? '—' : String(mark);
-    }),
-    String(sumMarks(data.subjects.map(subject => student.marks[subject.id] ?? 'LB'))),
-    student.outcome
-  ]);
   const summary = `Wadar Arday: ${outcomes.total} · Gudub: ${outcomes.passed} · Aan Gudbin: ${outcomes.failed} · Maqan: ${outcomes.absent} · Laga Baabiyey: ${outcomes.exempted}`;
   const header = `<p style="text-align:center">${text(data.ministryName || 'Jamhuuriyadda Federaalka')}<br/>${text(data.examinationOffice || 'Xafiiska Imtixaanaadka')}</p><p style="text-align:center">${text(data.examTitle)} · ${text(data.academicYear)}</p>`;
   const qr = data.qrVerificationId ? `<p style="text-align:left;font-size:8pt">QR / Aqoonsiga xaqiijinta: ${text(data.qrVerificationId)}</p>` : '';
-  return paper('GO’AANKA IMTIXAANKA', header + `<p style="font-weight:700;text-align:center">Xadka gudbidda: ${threshold} dhibco</p>` + table(headers, rows) + `<p style="font-weight:700">${text(summary)}</p>` + qr + `<p style="text-align:left">Bogga ${page.page} / ${page.pageCount}</p>`, data.schoolName);
+  return Array.from({length:pageCount},(_,pageIndex)=>{
+    const page = paginate(data.students,pageIndex+1,pageSize);
+    const rows = page.items.map((student,index)=>[
+      String((page.page-1)*page.pageSize+index+1),student.id,student.name,
+      ...data.subjects.map(subject=>{const mark=student.marks[subject.id];return mark===undefined?'—':String(mark);}),
+      String(sumMarks(data.subjects.map(subject=>student.marks[subject.id]??'LB'))),student.outcome
+    ]);
+    return paper('GO’AANKA IMTIXAANKA',header+`<p style="font-weight:700;text-align:center">Xadka gudbidda: ${threshold} dhibco</p>`+table(headers,rows)+`<p style="font-weight:700">${text(summary)}</p>`+qr+`<p style="text-align:left">Bogga ${page.page} / ${page.pageCount}</p>`,data.schoolName);
+  }).join('<div style="break-after:page;page-break-after:always"></div>');
 }
 
 export function renderIndividualReportCard(data: ReportCardData): string {
@@ -179,11 +178,14 @@ export function renderCertificate(data: CertificateData): string {
 }
 
 export function renderStudentIdCards(data: StudentIdSheetData): string {
-  const cards = data.cards.slice(0, 8).map(card => `<section style="height:83mm;border:1px solid #64748b;border-radius:8px;overflow:hidden;break-inside:avoid;background:#fff">
+  const pages=Math.max(1,Math.ceil(data.cards.length/8));
+  return Array.from({length:pages},(_,pageIndex)=>{
+    const cards=data.cards.slice(pageIndex*8,(pageIndex+1)*8).map(card=>`<section style="height:83mm;border:1px solid #64748b;border-radius:8px;overflow:hidden;break-inside:avoid;background:#fff">
 <div style="height:12mm;background:${/^#[0-9a-fA-F]{6}$/.test(data.accentColor || '') ? data.accentColor : '#176b5b'};color:#fff;text-align:center;padding:3mm;font-weight:700">${text(data.schoolName)}<br/>KAARKA AQOONSIGA ARDAYGA</div>
 <div style="display:flex;gap:5mm;padding:5mm;align-items:center">${card.photoUrl && /^https:\/\//i.test(card.photoUrl) ? `<img src="${text(card.photoUrl)}" alt="" style="width:24mm;height:30mm;object-fit:cover;border:1px solid #94a3b8"/>` : '<div style="width:24mm;height:30mm;border:1px solid #94a3b8"></div>'}
 <div><strong>${text(card.name)}</strong><p>ID: ${text(card.id)}</p><p>Fasal: ${text(card.className)}</p><p>Sanad: ${text(data.year)}</p></div></div></section>`).join('');
-  return `<article class="schoolos-a4" style="width:190mm;margin:0 auto;padding:10mm;display:grid;grid-template-columns:1fr 1fr;gap:5mm;background:#fff;color:#17212b;font-family:Arial,sans-serif">${cards}</article>`;
+    return `<article class="schoolos-a4" style="box-sizing:border-box;width:190mm;min-height:277mm;margin:0 auto;padding:10mm;display:grid;grid-template-columns:1fr 1fr;gap:5mm;background:#fff;color:#17212b;font-family:Arial,sans-serif">${cards}<p style="grid-column:1/-1;text-align:left;font-size:8pt">Bogga ${pageIndex+1} / ${pages}</p></article>`;
+  }).join('<div style="break-after:page;page-break-after:always"></div>');
 }
 
 export function renderOfficialLetter(data: OfficialLetterData): string {
