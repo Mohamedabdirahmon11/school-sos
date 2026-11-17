@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
+import * as QRCode from 'qrcode';
 import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import {
@@ -90,11 +91,16 @@ function gradeForMark(value:number,maxMark:number,scale:GradingBand[]):string {
   return [...scale].sort((a,b)=>b.minPercentage-a.minPercentage).find(band=>percentage>=band.minPercentage)?.label||'';
 }
 
-function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:string,verificationId?:string):string {
+function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:string,verificationId?:string,qrDataUrl?:string):string {
   let output=html;
   if(!config.showFooter)output=output.replace(/<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">[\\s\\S]*?<\\/p>/g,'');
   if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:[\\s\\S]*?<\\/p>/g,'');
   if(!config.showQr)output=output.replace(/<p style="text-align:left;font-size:8pt">QR \/ Aqoonsiga xaqiijinta:[\\s\\S]*?<\\/p>/g,'');
+  if(config.showQr&&verificationId&&qrDataUrl){
+    const qrMarkup=`<p style="text-align:left;font-size:8pt"><img src="${escapePlainText(qrDataUrl)}" alt="QR" style="width:24mm;height:24mm"/> <br/>Aqoonsiga xaqiijinta: ${escapePlainText(verificationId)}</p>`;
+    const original=new RegExp('<p style="text-align:left;font-size:8pt">QR \\/ Aqoonsiga xaqiijinta: '+verificationId+'<\\/p>');
+    output=original.test(output)?output.replace(original,qrMarkup):output+qrMarkup;
+  }
   if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
   output=output.replaceAll('font-size:11pt',`font-size:${Math.max(8,Math.min(24,config.fontSize))}pt`);
   output=output.replaceAll('padding:5px',`padding:${Math.max(2,Math.min(12,Math.round(config.rowHeight/6)))}px`);
@@ -152,6 +158,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
   const [message,setMessage]=useState('');
   const [preview,setPreview]=useState('');
   const [verificationId]=useState(()=>crypto.randomUUID());
+  const [qrDataUrl,setQrDataUrl]=useState('');
+  useEffect(()=>{let active=true;void QRCode.toDataURL(verificationId,{width:128,margin:1,errorCorrectionLevel:'M'}).then(url=>{if(active)setQrDataUrl(url);}).catch(()=>setQrDataUrl(''));return()=>{active=false;};},[verificationId]);
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
   const selectedClass=useMemo(()=>classes.find(item=>item.id===classId),[classes,classId]);
@@ -331,7 +339,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
 
   const createDocument=async()=>{
     if(!canManageTemplates){setMessage('Macallinku wuxuu daabici karaa xaadirinta, balse ma abuuri karo dukumenti rasmi ah.');return;}
-    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId);
+    const generatedQr=config.showQr?(qrDataUrl||await QRCode.toDataURL(verificationId,{width:128,margin:1,errorCorrectionLevel:'M'})):'';
+    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId,generatedQr);
     if(!html){setMessage(kind==='fee_receipt'?'Ardaygan weli ma laha rasiid lacag-bixin.':'Xog ku filan lagama helin fasalka ama ardayga la doortay.');return;}
     setBusy(true);
     try{
@@ -372,8 +381,9 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     catch(error){setMessage(error instanceof Error?error.message:'Template-ka lama tirtiri karin.');}
   };
 
-  const previewHtml=()=>{
-    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId);
+  const previewHtml=async()=>{
+    const generatedQr=config.showQr?(qrDataUrl||await QRCode.toDataURL(verificationId,{width:128,margin:1,errorCorrectionLevel:'M'})):'';
+    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId,generatedQr);
     setPreview(html);
     if(!html)setMessage('Xogta template-kan weli kuma filna horudhac.');
   };
@@ -421,7 +431,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
           {(kind==='exam_result_list'||kind==='individual_report_card')&&<div className="mt-3 space-y-2"><div className="flex items-center justify-between"><strong className="text-xs">Maaddooyinka</strong><button type="button" onClick={addSubject} disabled={config.subjects.length>=12} className="rounded border px-2 py-1 text-xs disabled:opacity-40"><Plus size={12} className="inline"/> Ku dar</button></div>{config.subjects.map(subject=><div key={subject.id} className="flex gap-2"><input value={subject.name} onChange={event=>updateSubject(subject.id,{name:event.target.value})} className="min-w-0 flex-1 rounded border px-2 py-1 text-xs"/><input type="number" min={1} max={100} value={subject.maxMark} onChange={event=>updateSubject(subject.id,{maxMark:Math.max(1,Math.min(100,Number(event.target.value)||100))})} className="w-16 rounded border px-2 py-1 text-xs"/><button type="button" onClick={()=>deleteSubject(subject.id)} aria-label="Tirtir maaddada" className="rounded p-1 text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
         </details>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={previewHtml} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
+          <button type="button" onClick={()=>void previewHtml()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>}
           <button type="button" onClick={reset} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>}
