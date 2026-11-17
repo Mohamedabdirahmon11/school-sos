@@ -38,6 +38,7 @@ export interface AttendanceEntry {
   studentId: string;
   date: string;
   status: 'J' | 'M' | '';
+  locked?: boolean;
 }
 
 export interface TemplateSubject {
