@@ -2548,7 +2548,9 @@ class StorageEngine {
     subjectId: string,
     semester: 'Semester 1' | 'Semester 2',
     marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, number>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
-    submittedBy: string
+    submittedBy: string,
+    submittedByName = 'Teacher',
+    submittedByRole = 'teacher'
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
     const config = await this.getExamConfig(schoolId);
@@ -2604,6 +2606,18 @@ class StorageEngine {
     });
     const now = new Date().toISOString();
     const results: StudentMark[] = [];
+    const createdChanges: any[] = [];
+    const editedChanges: any[] = [];
+    const submittedChanges: any[] = [];
+    const auditValues = (mark: StudentMark) => ({
+      assessmentScores: mark.assessmentScores ? { ...mark.assessmentScores } : null,
+      smallExamMarks: mark.smallExamMarks,
+      bigExamMarks: mark.bigExamMarks,
+      totalMarks: mark.totalMarks,
+      percentage: mark.percentage,
+      status: mark.status,
+      teacherRemarks: mark.teacherRemarks || null
+    });
 
     for (const mark of normalized) {
       const existingIdx = this.data.marks.findIndex(existing =>
@@ -2618,6 +2632,8 @@ class StorageEngine {
         // Submitted rows remain immutable; teachers can keep saving drafts as
         // the four continuous tests and final exam happen during the semester.
         if (this.data.marks[existingIdx].status !== 'draft') continue;
+        const previous = this.data.marks[existingIdx];
+        const oldValues = auditValues(previous);
         this.data.marks[existingIdx].assessmentScores = mark.assessmentScores;
         this.data.marks[existingIdx].smallExamMarks = mark.smallExamMarks;
         this.data.marks[existingIdx].bigExamMarks = mark.bigExamMarks;
@@ -2632,7 +2648,10 @@ class StorageEngine {
         this.data.marks[existingIdx].returnedAt = null;
         this.data.marks[existingIdx].publishedAt = null;
         this.data.marks[existingIdx].publishedBy = null;
-        results.push(this.data.marks[existingIdx]);
+        const updated = this.data.marks[existingIdx];
+        editedChanges.push({ markId: updated.id, studentId: updated.studentId, oldValues, newValues: auditValues(updated) });
+        if (mark.status === 'submitted') submittedChanges.push({ markId: updated.id, studentId: updated.studentId, oldStatus: oldValues.status, newStatus: 'submitted' });
+        results.push(updated);
       } else {
         const newMark: StudentMark = {
           id: `mrk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -2658,10 +2677,28 @@ class StorageEngine {
           publishedBy: null
         };
         this.data.marks.push(newMark);
+        const newValues = auditValues(newMark);
+        createdChanges.push({ markId: newMark.id, studentId: newMark.studentId, oldValues: null, newValues });
+        if (mark.status === 'submitted') submittedChanges.push({ markId: newMark.id, studentId: newMark.studentId, oldStatus: null, newStatus: 'submitted' });
         results.push(newMark);
       }
     }
 
+    if (createdChanges.length) this.logAudit({
+      action: 'MARKS_CREATED', category: 'academics', schoolId, userId: submittedBy,
+      userName: submittedByName, userRole: submittedByRole,
+      details: JSON.stringify({ classId, subjectId, semester, changes: createdChanges }), severity: 'info'
+    });
+    if (editedChanges.length) this.logAudit({
+      action: 'MARKS_EDITED', category: 'academics', schoolId, userId: submittedBy,
+      userName: submittedByName, userRole: submittedByRole,
+      details: JSON.stringify({ classId, subjectId, semester, changes: editedChanges }), severity: 'info'
+    });
+    if (submittedChanges.length) this.logAudit({
+      action: 'MARKS_SUBMITTED', category: 'academics', schoolId, userId: submittedBy,
+      userName: submittedByName, userRole: submittedByRole,
+      details: JSON.stringify({ classId, subjectId, semester, changes: submittedChanges }), severity: 'info'
+    });
     this.save();
     await this.flush();
     return results;
@@ -2698,15 +2735,23 @@ class StorageEngine {
     }
     this.logAudit({
       action: 'CLASS_MARKS_FORWARDED_TO_ADMIN', category: 'academics', schoolId,
-      userId: forwardedBy, userName: 'Class Fomester', userRole: 'teacher',
-      details: `Forwarded ${forwarded.length} student-subject mark records for class ${classId} (${semester}) to the School Administrator.`,
+      userId: forwardedBy, userName: 'Class Form Teacher', userRole: 'teacher',
+      details: JSON.stringify({
+        classId, semester, changedMarks: forwarded.map(mark => ({
+          markId: mark.id, studentId: mark.studentId, subjectId: mark.subjectId,
+          oldStatus: 'submitted', newStatus: 'form_teacher_submitted'
+        }))
+      }),
       severity: 'info'
     });
     await this.flush();
     return { count: forwarded.length };
   }
 
-  public approveMarks(schoolId: string, markIds: string[], approvedBy: string): StudentMark[] {
+  public approveMarks(
+    schoolId: string, markIds: string[], approvedBy: string,
+    approvedByName = 'School Administrator', approvedByRole = 'school_admin'
+  ): StudentMark[] {
     const now = new Date().toISOString();
     const approved: StudentMark[] = [];
 
@@ -2726,9 +2771,14 @@ class StorageEngine {
         category: 'academics',
         schoolId,
         userId: approvedBy,
-        userName: 'School Administrator',
-        userRole: 'school_admin',
-        details: `Approved examination marks for ${approved.length} student subject records.`,
+        userName: approvedByName,
+        userRole: approvedByRole,
+        details: JSON.stringify({
+          changedMarks: approved.map(mark => ({
+            markId: mark.id, studentId: mark.studentId, subjectId: mark.subjectId, semester: mark.semester,
+            oldStatus: 'form_teacher_submitted', newStatus: 'approved', approvedBy, approvedAt: now
+          }))
+        }),
         severity: 'info'
       });
       this.save();
