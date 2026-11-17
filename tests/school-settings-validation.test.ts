@@ -105,3 +105,23 @@ test('exam mark scheme rejects fractional marks, duplicate IDs, and more than si
     category: index === 6 ? 'final' : 'continuous', order: index + 1
   })) }));
 });
+
+
+test('exam mark scheme supports the one-part and six-part custom boundaries', () => {
+  const onePart = sanitizeExamConfigSettings({ assessmentComponents: [
+    { id: 'overall', name: 'Overall Assessment', maxMarks: 100, category: 'continuous', order: 1 }
+  ] });
+  assert.equal(onePart.smallExamMax, 100);
+  assert.equal(onePart.bigExamMax, 0);
+
+  const sixParts = sanitizeExamConfigSettings({ assessmentComponents: [
+    { id: 'p1', name: 'Part 1', maxMarks: 10, category: 'continuous', order: 1 },
+    { id: 'p2', name: 'Part 2', maxMarks: 10, category: 'continuous', order: 2 },
+    { id: 'p3', name: 'Part 3', maxMarks: 15, category: 'continuous', order: 3 },
+    { id: 'p4', name: 'Part 4', maxMarks: 15, category: 'final', order: 4 },
+    { id: 'p5', name: 'Part 5', maxMarks: 20, category: 'final', order: 5 },
+    { id: 'p6', name: 'Part 6', maxMarks: 30, category: 'final', order: 6 }
+  ] });
+  assert.equal(sixParts.smallExamMax, 50);
+  assert.equal(sixParts.bigExamMax, 50);
+});
