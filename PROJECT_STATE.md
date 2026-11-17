@@ -1,3 +1,12 @@
+# Documents templates cleanup — in progress (2026-11-17)
+
+- Branch: `feature/document-templates-cleanup`; main was not modified.
+- Removed the legacy built-in HTML template catalogue and its separate legacy template-management/archive UI from Documents.
+- Removed the legacy bulk-generation flow that depended on those old templates. The Documents workspace, saved documents, editor, history, audit, permissions, attachments, and blank-document creation remain intact.
+- The only template entry point shown in Documents is now `Qaababka A4`, backed by `StructuredTemplatesPanel`, whose options are the nine templates specified in the approved Documents prompt.
+- No stored document/template rows, database tables, or migrations were deleted or modified.
+- Automated typecheck/tests/build and browser/print checks have not been run in this environment; CI verification is still required before merge.
+
 # SchoolOS Project State
 
 Updated: 2026-11-11
