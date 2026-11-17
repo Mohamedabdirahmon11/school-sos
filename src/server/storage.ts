@@ -2888,8 +2888,13 @@ class StorageEngine {
 
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
-    const students = await this.getStudents(schoolId, classId);
-    const marks = (await this.getMarks(schoolId, classId, undefined, semester)).filter(mark => mark.status === 'approved');
+    const [students, assignments] = await Promise.all([
+      this.getStudents(schoolId, classId),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' })
+    ]);
+    const activeSubjectIds = new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean));
+    const marks = (await this.getMarks(schoolId, classId, undefined, semester))
+      .filter(mark => mark.status === 'approved' && activeSubjectIds.has(mark.subjectId));
 
     const rankings = students.map(student => {
       const studentMarks = marks.filter(m => m.studentId === student.id);
