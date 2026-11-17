@@ -4946,7 +4946,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(403).json({ error: 'Only the assigned class teacher can submit daily attendance. School administrators can review absences and contact parents.' });
     return;
   }
-  const { classId, date, records } = req.body;
+  const { classId, date, records, source } = req.body;
 
   if (typeof classId !== 'string' || !classId.trim() || typeof date !== 'string' || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
     res.status(400).json({ error: 'A class, a valid date, and 1–2,000 student records are required.' });
@@ -5000,7 +5000,14 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
     return;
   }
+  const previous = await db.getAttendance(school.id, normalizedClassId, date);
+  const previousByStudent = new Map((previous || []).map((record:any)=>[String(record.studentId),record.status]));
+  const changes = normalizedRecords.map((record:any)=>({studentId:record.studentId,oldStatus:previousByStudent.get(record.studentId)||null,newStatus:record.status}))
+    .filter((change:any)=>change.oldStatus!==change.newStatus);
   const saved = await db.recordDailyAttendance(school.id, normalizedClassId, date, normalizedRecords, user.id);
+  if(changes.length){
+    db.logAudit({action:'ATTENDANCE_UPDATED',category:'attendance',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:JSON.stringify({classId:normalizedClassId,date,source:source==='document_template'?'document_template':'attendance_module',changes}),severity:'info'});
+  }
   res.json({ success: true, count: saved.length, records: saved });
 });
 
