@@ -63,6 +63,7 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'student' | 'highest' | 'subject'>('student');
   const [page, setPage] = useState(1);
+  const [academicYearFilter, setAcademicYearFilter] = useState(school?.academicYear || '');
 
   useEffect(() => {
     if (mode === 'explorer') return;
@@ -121,9 +122,24 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
 
   useEffect(() => { setPage(1); }, [search, subjectFilter, statusFilter, sortBy, selectedClassId, selectedSemester]);
 
+  const availableAcademicYears = useMemo(() => [...new Set([
+    ...classes.map(klass => klass.academicYear),
+    ...marks.map(mark => mark.academicYear),
+    school?.academicYear
+  ].filter((year): year is string => Boolean(year)))].sort((a, b) => b.localeCompare(a)), [classes, marks, school?.academicYear]);
+  useEffect(() => {
+    if (!academicYearFilter && availableAcademicYears.length) setAcademicYearFilter(availableAcademicYears[0]);
+  }, [academicYearFilter, availableAcademicYears]);
+  const yearFilteredClasses = classes.filter(klass => !academicYearFilter || klass.academicYear === academicYearFilter);
+  useEffect(() => {
+    if (yearFilteredClasses.length && !yearFilteredClasses.some(klass => klass.id === selectedClassId)) {
+      onClassChange(yearFilteredClasses[0].id);
+    }
+  }, [academicYearFilter, classes, selectedClassId]);
+  const yearFilteredMarks = marks.filter(mark => !academicYearFilter || mark.academicYear === academicYearFilter);
   const studentById = useMemo(() => new Map(students.map(student => [student.id, student])), [students]);
   const subjectById = useMemo(() => new Map(subjects.map(subject => [subject.id, subject])), [subjects]);
-  const approvedMarks = useMemo(() => marks.filter(mark => mark.status === 'approved'), [marks]);
+  const approvedMarks = useMemo(() => yearFilteredMarks.filter(mark => mark.status === 'approved'), [yearFilteredMarks]);
   const activeSubjects = useMemo(() => classSubjectRows.filter(row => row.subject).map(row => row.subject as Subject), [classSubjectRows]);
   const subjectStats = useMemo(() => {
     const rows = (activeSubjects.length ? activeSubjects : subjects).map(subject => {
@@ -139,12 +155,13 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
   const failCount = approvedMarks.length - passCount;
   const passRate = approvedMarks.length ? Math.round(passCount / approvedMarks.length * 100) : 0;
   const failRate = approvedMarks.length ? 100 - passRate : 0;
-  const otherSemesterAverage = average(otherSemesterMarks.filter(mark => mark.status === 'approved').map(mark => Number(mark.percentage) || 0));
+  const otherSemesterApproved = otherSemesterMarks.filter(mark => mark.status === 'approved' && (!academicYearFilter || mark.academicYear === academicYearFilter));
+  const otherSemesterAverage = average(otherSemesterApproved.map(mark => Number(mark.percentage) || 0));
   const selectedClass = classes.find(klass => klass.id === selectedClassId);
 
   const filteredMarks = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    const rows = marks.filter(mark => {
+    const rows = yearFilteredMarks.filter(mark => {
       const student = studentById.get(mark.studentId);
       const subject = subjectById.get(mark.subjectId);
       const searchMatch = !normalized || [
@@ -160,7 +177,7 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
       return displayName(studentById.get(a.studentId)).localeCompare(displayName(studentById.get(b.studentId)));
     });
     return rows;
-  }, [marks, search, subjectFilter, statusFilter, sortBy, studentById, subjectById]);
+  }, [yearFilteredMarks, search, subjectFilter, statusFilter, sortBy, studentById, subjectById]);
 
   const totalPages = Math.max(1, Math.ceil(filteredMarks.length / PAGE_SIZE));
   const visibleMarks = filteredMarks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -197,8 +214,12 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
           <p className="mt-1 text-[11px] font-semibold text-[#0F766E]">Academic year: {school?.academicYear || examConfig?.academicYear || 'Not configured'} · {selectedClass ? `${selectedClass.name} / ${selectedClass.section || 'Main'}` : 'Select a class'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <select value={academicYearFilter} onChange={event => setAcademicYearFilter(event.target.value)} className="min-h-10 rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs">
+            <option value="">All academic years</option>
+            {availableAcademicYears.map(year => <option key={year} value={year}>{year}</option>)}
+          </select>
           <select value={selectedClassId} onChange={event => onClassChange(event.target.value)} className="min-h-10 rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs">
-            {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name} · {klass.section || 'Main'}</option>)}
+            {yearFilteredClasses.map(klass => <option key={klass.id} value={klass.id}>{klass.name} · {klass.section || 'Main'}</option>)}
           </select>
           <select value={selectedSemester} onChange={event => onSemesterChange(event.target.value as Semester)} className="min-h-10 rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs">
             <option value="Semester 1">Semester 1</option>
@@ -258,7 +279,7 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
         <>
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <MetricCard icon={<Users className="h-4 w-4" />} label="School students" value={overviewLoading ? '…' : schoolStudentCount.toLocaleString()} detail={`${students.length} in selected class`} />
-            <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Exam schedules" value={overviewLoading ? '…' : examSchedules.length.toLocaleString()} detail={`${examSchedules.filter(row => row.status === 'published').length} published`} />
+            <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Exam schedules" value={overviewLoading ? '…' : examSchedules.filter(row => !academicYearFilter || row.academicYear === academicYearFilter).length.toLocaleString()} detail={`${examSchedules.filter(row => row.status === 'published' && (!academicYearFilter || row.academicYear === academicYearFilter)).length} published`} />
             <MetricCard icon={<BookOpen className="h-4 w-4" />} label="Classes / subjects" value={`${classes.length} / ${subjects.length}`} detail={`${activeSubjects.length} assigned to this class`} />
             <MetricCard icon={<TrendingUp className="h-4 w-4" />} label="Class average" value={approvedMarks.length ? `${currentAverage}%` : '—'} detail={`${approvedMarks.length} approved subject marks`} />
           </div>
@@ -276,7 +297,7 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"><h3 className="text-sm font-bold text-[#132A29]">Semester comparison</h3><p className="mt-1 text-[11px] text-[#64748B]">Approved subject-mark averages for the selected class</p><div className="mt-4 grid grid-cols-2 gap-3"><SemesterMetric label={selectedSemester} value={currentAverage} count={approvedMarks.length} /><SemesterMetric label={otherSemester} value={otherSemesterAverage} count={otherSemesterMarks.filter(mark => mark.status === 'approved').length} /></div></section>
-            <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"><h3 className="text-sm font-bold text-[#132A29]">Class performance comparison</h3><p className="mt-1 text-[11px] text-[#64748B]">School classes · {selectedSemester} · approved rankings</p>{overviewLoading ? <EmptyPanel text="Loading class comparisons…" /> : classComparisons.length ? <div className="mt-3 space-y-3">{classComparisons.slice(0, 8).map(row => <div key={row.classId}><div className="mb-1 flex items-center justify-between gap-3 text-[11px]"><span className="font-semibold text-[#334155]">{row.className}</span><span className="font-mono font-bold text-[#0F766E]">{row.studentsWithMarks ? `${row.average}%` : 'No marks'}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#E9F0EF]"><div className="h-full rounded-full bg-[#2A8C82]" style={{ width: `${Math.max(0, Math.min(100, row.average))}%` }} /></div></div>)}</div> : <EmptyPanel text="No class rankings are available yet." />}</section>
+            <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"><h3 className="text-sm font-bold text-[#132A29]">Class performance comparison</h3><p className="mt-1 text-[11px] text-[#64748B]">{academicYearFilter || 'All years'} · {selectedSemester} · approved rankings</p>{overviewLoading ? <EmptyPanel text="Loading class comparisons…" /> : classComparisons.some(row => yearFilteredClasses.some(klass => klass.id === row.classId)) ? <div className="mt-3 space-y-3">{classComparisons.filter(row => yearFilteredClasses.some(klass => klass.id === row.classId)).slice(0, 8).map(row => <div key={row.classId}><div className="mb-1 flex items-center justify-between gap-3 text-[11px]"><span className="font-semibold text-[#334155]">{row.className}</span><span className="font-mono font-bold text-[#0F766E]">{row.studentsWithMarks ? `${row.average}%` : 'No marks'}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#E9F0EF]"><div className="h-full rounded-full bg-[#2A8C82]" style={{ width: `${Math.max(0, Math.min(100, row.average))}%` }} /></div></div>)}</div> : <EmptyPanel text="No class rankings are available yet." />}</section>
           </div>
 
           {mode === 'analytics' && <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"><div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[#0F766E]" /><h3 className="text-sm font-bold text-[#132A29]">Students needing academic support</h3></div><p className="mt-1 text-[11px] text-[#64748B]">Students with approved marks below the configured pass percentage in this class.</p>{approvedMarks.length ? <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">{students.filter(student => { const own = approvedMarks.filter(mark => mark.studentId === student.id); return own.length > 0 && average(own.map(mark => Number(mark.percentage) || 0)) < (examConfig?.passMarkPercentage || 50); }).slice(0, 12).map(student => { const own = approvedMarks.filter(mark => mark.studentId === student.id); return <div key={student.id} className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/50 p-3"><div><p className="text-xs font-semibold text-[#334155]">{displayName(student)}</p><p className="mt-0.5 text-[10px] text-[#64748B]">{student.studentId}</p></div><span className="text-sm font-bold text-amber-800">{average(own.map(mark => Number(mark.percentage) || 0))}%</span></div>; })}</div> : <EmptyPanel text="Academic support indicators appear after approved marks are available." />}</section>}
