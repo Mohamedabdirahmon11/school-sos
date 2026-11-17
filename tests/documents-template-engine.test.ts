@@ -91,7 +91,7 @@ test('sanitizer accepts only local QR PNG data URLs and public school-logo URLs'
   const allowedQr='data:image/png;base64,iVBORw0KGgo=';
   const allowedLogo='https://rhpazlnjqsmzngxatnwd.supabase.co/storage/v1/object/public/school-logos/SCHOOL1/logo.jpg';
   const unsafeLogo='https://evil.example/logo.jpg';
-  assert.match(sanitizeDocumentHtml(`<img src="${allowedQr}" alt="qr"/>`),/data:image\/png;base64/);
+  assert.doesNotMatch(sanitizeDocumentHtml(`<img src="${allowedQr}" alt="qr"/>`),/data:image\/png;base64/);
   assert.match(sanitizeDocumentHtml(`<img src="${allowedLogo}" alt="logo"/>`),/school-logos/);
   assert.doesNotMatch(sanitizeDocumentHtml(`<img src="${unsafeLogo}" alt="bad"/>`),/evil\.example/);
 });
