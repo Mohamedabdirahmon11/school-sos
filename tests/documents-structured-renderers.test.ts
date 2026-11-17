@@ -43,6 +43,9 @@ test('attendance and class-list outputs paginate into separate A4 sheets', () =>
   assert.equal(attendance.length, 2);
   assert.equal(classList.length, 2);
   assert.match(attendance[0], /Bogga 1 \/ 2/);
+  assert.match(attendance[1], /Bogga 2 \/ 2/);
+  assert.match(classList[0], /Magaca/);
+  assert.match(classList[1], /Magaca/);
   assert.match(classList[1], /Bogga 2 \/ 2/);
 });
 
