@@ -778,6 +778,18 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
           </div>
 
+          {classMarks.some(mark => Boolean(mark.correctionReason) && gradeSubjects.some(subject => subject.id === mark.subjectId)) && (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+              <p className="font-bold">School Admin returned marks for correction</p>
+              <p className="mt-1 text-amber-800">Review the reason below, correct the affected subject marks, then submit them again for Form Teacher review.</p>
+              <div className="mt-2 space-y-2">
+                {[...new Map(classMarks.filter(mark => mark.correctionReason && gradeSubjects.some(subject => subject.id === mark.subjectId)).map(mark => [`${mark.subjectId}:${mark.correctionReason}`, mark])).values()].map(mark => (
+                  <p key={mark.id} className="rounded-lg border border-amber-100 bg-white px-3 py-2"><strong>{gradeSubjects.find(subject => subject.id === mark.subjectId)?.name || 'Subject'}:</strong> {mark.correctionReason} {mark.returnedAt ? <span className="block pt-1 text-[10px] text-slate-500">Returned {new Date(mark.returnedAt).toLocaleString()}</span> : null}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
             <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. Small Exam and Big Exam scores are saved together in the student's subject record.</p></div>
             {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}

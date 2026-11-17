@@ -1189,6 +1189,20 @@ export class ApiClient {
     });
   }
 
+  public static async returnMarksForCorrection(markIds: string[], reason: string) {
+    return this.request<{ success: boolean; returnedCount: number }>('/exams/return', {
+      method: 'POST',
+      body: JSON.stringify({ markIds, reason })
+    });
+  }
+
+  public static async publishExamResults(classId: string, semester: string) {
+    return this.request<{ success: boolean; publishedCount: number; publishedAt: string | null; alreadyPublished?: boolean; notificationCreated?: boolean }>('/exams/publish', {
+      method: 'POST',
+      body: JSON.stringify({ classId, semester })
+    });
+  }
+
   public static async getSemesterRankings(classId: string, semester: string = 'Semester 1') {
     return this.request<any[]>(`/exams/rankings/semester?classId=${classId}&semester=${encodeURIComponent(semester)}`);
   }

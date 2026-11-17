@@ -5381,6 +5381,9 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       return;
     }
     let marks = await db.getStudentMarks(school.id, studentId as string);
+    if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
+      marks = marks.filter(mark => Boolean(mark.publishedAt));
+    }
     if (normalizeRole(user.role) === 'teacher') {
       const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       const teacher = teacherPage.items[0] as any;
@@ -5508,7 +5511,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 
   try {
-    const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id);
+    const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id, user.fullName, user.role);
     res.json({ success: true, count: saved.length, marks: saved });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid marks.' });
@@ -5526,7 +5529,7 @@ apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requir
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
   if (klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the Form Teacher assigned to this class can forward its results.' }); return; }
   try {
-    const result = await db.forwardClassMarks(school.id, classId, semester, user.id);
+    const result = await db.forwardClassMarks(school.id, classId, semester, user.id, user.fullName);
     res.json({ success: true, forwardedCount: result.count });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Class marks could not be forwarded.' });
@@ -5551,9 +5554,100 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
   // Hydrate the selected rows before the synchronous storage update; otherwise
   // marks created before a server restart may be absent from the in-memory cache.
   await queryAllRows('student_marks', { school_id: school.id, id: uniqueMarkIds }, 'id');
-  const approved = db.approveMarks(school.id, uniqueMarkIds, user.id);
+  const approved = db.approveMarks(school.id, uniqueMarkIds, user.id, user.fullName, user.role);
   await db.flush();
   res.json({ success: true, approvedCount: approved.length });
+});
+
+apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const markIds = req.body?.markIds;
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!Array.isArray(markIds) || markIds.length < 1 || markIds.length > 2000 ||
+      markIds.some((id: unknown) => typeof id !== 'string' || !id.trim()) ||
+      !reason || reason.length > 1000) {
+    res.status(400).json({ error: 'Provide 1–2,000 mark IDs and a correction reason of 1–1,000 characters.' });
+    return;
+  }
+  const uniqueMarkIds = [...new Set(markIds as string[])];
+  if (uniqueMarkIds.length !== markIds.length) {
+    res.status(400).json({ error: 'Duplicate mark IDs are not allowed.' });
+    return;
+  }
+  try {
+    await queryAllRows('student_marks', { school_id: school.id, id: uniqueMarkIds }, 'id');
+    const returned = await db.returnMarksForCorrection(school.id, uniqueMarkIds, user.id, reason, user.fullName, user.role);
+    res.json({ success: true, returnedCount: returned.length });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Marks could not be returned for correction.' });
+  }
+});
+
+apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class and valid semester before publishing results.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  try {
+    const publication = await db.publishClassSemesterResults(
+      school.id, classId, semester, user.id, user.fullName, user.role
+    );
+    const noticeTitle = `Exam results published · ${semester}`;
+    let notificationCreated = false;
+    try {
+      const existingNotices = (await db.getNotices(school.id)).filter(notice => notice.classId === classId && notice.title === noticeTitle && notice.isActive !== false);
+      if (existingNotices.length) {
+        notificationCreated = true;
+      } else {
+        const publishDate = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+        db.createNotice({
+          title: noticeTitle,
+          content: `Approved ${semester} examination results for ${klass.name} · Section ${klass.section || 'Main'} are now available in the Parent Portal. Sign in to view your child's published results.`,
+          audience: 'class',
+          classId,
+          isPinned: false,
+          publishDate,
+          schoolId: school.id,
+          authorName: user.fullName,
+          authorRole: user.role,
+          isActive: true
+        });
+        await db.flush();
+        notificationCreated = true;
+      }
+    } catch (notificationError) {
+      db.logAudit({
+        action: 'MARKS_PUBLISH_NOTIFICATION_FAILED',
+        category: 'academics',
+        schoolId: school.id,
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        details: JSON.stringify({ classId, semester, message: notificationError instanceof Error ? notificationError.message : 'Notice creation failed.' }),
+        severity: 'warning'
+      });
+      await db.flush().catch(() => undefined);
+    }
+    res.json({
+      success: true,
+      publishedCount: publication.publishedCount,
+      publishedAt: publication.publishedAt,
+      alreadyPublished: publication.publishedCount === 0,
+      notificationCreated
+    });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be published.' });
+  }
 });
 
 // Semester 1 Results & Ranking (Highlight Top 3)
@@ -6484,6 +6578,9 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   const result = rankings.find(row => row.student.id === student.id);
   if (!result) { res.status(404).json({ error: 'Student report card not found.' }); return; }
   if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
+  if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
+    res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
+  }
   const pages = [buildReportCardPdfPage({
     school,
     design,

@@ -23,6 +23,8 @@ import {
 export const ParentPortalView: React.FC = () => {
   const { user, school, t } = useAuth();
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
+  const [reportCardDownloading, setReportCardDownloading] = useState(false);
+  const [reportCardDownloadError, setReportCardDownloadError] = useState('');
   const childrenState = useApi(async () => {
     const all = await ApiClient.getSchoolStudents({ schoolId: school?.id, page: 1, pageSize: 100 });
     return (Array.isArray(all) ? all : []).filter(s =>
@@ -41,13 +43,31 @@ export const ParentPortalView: React.FC = () => {
     [currentChild?.id, currentChild?.classId, school?.id],
     Boolean(currentChild)
   );
+  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
   const timetable = Array.isArray(timetableState.data) ? timetableState.data : [];
   const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules(currentChild.classId) : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const childData = childState.data;
+  const resultNotices = (Array.isArray(noticesState.data) ? noticesState.data : [])
+    .filter((notice: any) => notice.classId === currentChild?.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
+    .slice(0, 3);
 
   const handleSelectChild = (idx: number) => {
     setSelectedChildIndex(idx);
+    setReportCardDownloadError('');
+  };
+
+  const handleDownloadAnnualReportCard = async () => {
+    if (!currentChild || reportCardDownloading) return;
+    setReportCardDownloading(true);
+    setReportCardDownloadError('');
+    try {
+      await ApiClient.downloadReportCardPdf(currentChild.id);
+    } catch (error) {
+      setReportCardDownloadError(error instanceof Error ? error.message : 'Annual report card is not available yet.');
+    } finally {
+      setReportCardDownloading(false);
+    }
   };
 
   if (childrenState.loading) return <div className="p-6 space-y-3" aria-label="Loading parent portal"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div>;
@@ -60,6 +80,8 @@ export const ParentPortalView: React.FC = () => {
   const attendancePercentage = attendanceRecords.length ? Math.round((presentCount / attendanceRecords.length) * 100) : 0;
   const payments = childData?.payments || [];
   const balance = payments.reduce((sum: number, payment: any) => sum + (payment.remainingAmount || 0), 0);
+  const publishedMarks: any[] = Array.isArray(childData?.marks) ? childData.marks : [];
+  const hasBothPublishedSemesters = publishedMarks.some(first => first.semester === 'Semester 1' && publishedMarks.some(second => second.semester === 'Semester 2' && second.academicYear === first.academicYear));
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -95,6 +117,13 @@ export const ParentPortalView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {resultNotices.length > 0 && (
+        <section aria-label="Published exam results notifications" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-950">
+          <div className="flex items-center gap-2 font-bold"><BellRing className="h-4 w-4" /> New exam results are available</div>
+          {resultNotices.map((notice: any) => <div key={notice.id} className="mt-2 border-t border-emerald-100 pt-2"><p className="font-semibold">{notice.title}</p><p className="mt-1 text-emerald-800">{notice.content}</p><p className="mt-1 text-[10px] text-emerald-700">{notice.publishDate}</p></div>)}
+        </section>
+      )}
 
       {/* Child Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -132,14 +161,18 @@ export const ParentPortalView: React.FC = () => {
       {/* Academic Results & Fee Invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2"><FileSpreadsheet className="w-4 h-4 text-[#0F766E]" /><span>{currentChild.firstName}'s Exam Performance</span></h2>
-            <button onClick={() => window.print()} className="px-2.5 py-1 text-xs text-[#0F766E] bg-[#F0FDFA] rounded border border-[#CCFBF1] flex items-center gap-1"><Printer className="w-3.5 h-3.5" /><span>Print Card</span></button>
+            <div className="flex gap-2">
+              <button type="button" onClick={handleDownloadAnnualReportCard} disabled={!hasBothPublishedSemesters || reportCardDownloading} className="rounded border border-[#0F766E] bg-[#0F766E] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40"><Download className="mr-1 inline h-3.5 w-3.5" />{reportCardDownloading ? 'Preparing PDF…' : 'Download Annual PDF'}</button>
+              <button type="button" onClick={() => window.print()} className="flex items-center gap-1 rounded border border-[#CCFBF1] bg-[#F0FDFA] px-2.5 py-1 text-xs text-[#0F766E]"><Printer className="h-3.5 w-3.5" /><span>Print Card</span></button>
+            </div>
           </div>
+          {reportCardDownloadError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-[11px] text-rose-700">{reportCardDownloadError}</p>}
           <div className="space-y-2">
             {(Array.isArray(childData?.marks) ? childData.marks : []).length ? childData?.marks?.map((mark: any) => (
               <div key={mark.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex justify-between"><span>{mark.subjectId} · {mark.semester}</span><span className="font-mono font-bold">{Number(mark.percentage).toFixed(1)}%</span></div>
-            )) : <p className="text-[#64748B]">No approved results are available.</p>}
+            )) : <p className="text-[#64748B]">No published results are available yet. The School Admin will publish the approved results here.</p>}
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs">
