@@ -1093,6 +1093,12 @@ export class ApiClient {
     return this.request<AttendanceRecord[]>(`/attendance?classId=${classId}&date=${date}`);
   }
 
+  public static async getAttendanceMonth(classId: string, year: number, month: number) {
+    return this.request<Array<{ studentId:string; date:string; status:'J'|'M'|'' }>>(
+      `/attendance/month?classId=${encodeURIComponent(classId)}&year=${year}&month=${month}`
+    );
+  }
+
   public static async getSchoolDailyAbsences(date: string) {
     return this.request<Array<AttendanceRecord & { student: Student; className: string }>>(`/attendance/school/absences?date=${encodeURIComponent(date)}`);
   }
