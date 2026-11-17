@@ -3,6 +3,7 @@ import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2
 import { ApiClient } from '../../services/api.ts';
 import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
+import { escapePlainText } from '../../lib/documents/template-engine.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
@@ -90,9 +91,30 @@ function gradeForMark(value:number,maxMark:number,scale:GradingBand[]):string {
   return [...scale].sort((a,b)=>b.minPercentage-a.minPercentage).find(band=>percentage>=band.minPercentage)?.label||'';
 }
 
+function applyTemplatePresentation(html:string,config:TemplateConfig,logoUrl?:string,verificationId?:string):string {
+  let output=html;
+  if(!config.showFooter)output=output.replace(/<p style="border-top:1px solid #94a3b8;margin-top:20px;padding-top:6px;text-align:center;font-size:8pt;color:#64748b">[\\s\\S]*?<\\/p>/g,'');
+  if(!config.showSummary)output=output.replace(/<p style="font-weight:700">Wadar Arday:[\\s\\S]*?<\\/p>/g,'');
+  if(!config.showQr)output=output.replace(/<p style="text-align:left;font-size:8pt">QR \/ Aqoonsiga xaqiijinta:[\\s\\S]*?<\\/p>/g,'');
+  if(!config.zebra)output=output.replaceAll('background-color:#f5f8f7','background-color:#fff');
+  output=output.replaceAll('font-size:11pt',`font-size:${Math.max(8,Math.min(24,config.fontSize))}pt`);
+  output=output.replaceAll('padding:5px',`padding:${Math.max(2,Math.min(12,Math.round(config.rowHeight/6)))}px`);
+  output=output.replaceAll('direction:rtl',`direction:${config.direction}`);
+  const safeLogo=logoUrl&&/^\\/api\\/documents\\/images\\?path=[A-Za-z0-9%._/-]+$/i.test(logoUrl)?logoUrl:'';
+  if(config.showLogo&&safeLogo){
+    output=output.replace('<div style="border-bottom:3px',`<div style="border-bottom:3px`);
+    output=output.replace('<div style="font-size:19pt;font-weight:700;',`<img src="${escapePlainText(safeLogo)}" alt="" style="width:24mm;height:18mm"/> <div style="font-size:19pt;font-weight:700;`);
+  }
+  if(config.showQr&&verificationId&&!output.includes('Aqoonsiga xaqiijinta:')){
+    output=output.replace('</div>',`<p style="text-align:left;font-size:8pt">Aqoonsiga xaqiijinta: ${escapePlainText(verificationId)}</p></div>`);
+  }
+  return output;
+}
+
 export interface StructuredTemplatesPanelProps {
   schoolName:string;
   accentColor:string;
+  logoUrl?:string;
   gradingScale?:GradingBand[];
   calendar?:SchoolSetupData['calendar'];
   userRole?:string;
@@ -102,7 +124,7 @@ export interface StructuredTemplatesPanelProps {
   onClose:()=>void;
 }
 
-export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[],calendar,userRole='school_admin',userId='',canManageTemplates=true,onCreated,onClose}:StructuredTemplatesPanelProps) {
+export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,gradingScale=[],calendar,userRole='school_admin',userId='',canManageTemplates=true,onCreated,onClose}:StructuredTemplatesPanelProps) {
   const [kind,setKind]=useState<TemplateKind>(userRole==='teacher'?'attendance_sheet':'exam_result_list');
   const [name,setName]=useState('Go’aanka imtixaanka');
   const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig(userRole==='teacher'?'attendance_sheet':'exam_result_list',accentColor));
@@ -130,6 +152,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
   const [preview,setPreview]=useState('');
+  const [verificationId]=useState(()=>crypto.randomUUID());
 
   const selectedStudent=useMemo(()=>students.find(student=>student.id===studentId)||students[0],[students,studentId]);
   const selectedClass=useMemo(()=>classes.find(item=>item.id===classId),[classes,classId]);
@@ -233,7 +256,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
           const threshold=passThreshold(activeSubjects,config.passRule);
           return {id:item.studentId,name:studentName(item),marks:rowMarks,outcome:!hasAnyMark?'Maqan' as const:total>=threshold?'Gudub' as const:'Aan Gudbin' as const};
         });
-        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
+        return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage,qrVerificationId:config.showQr?verificationId:undefined});
       }
       case 'individual_report_card':{
         const finalTotal=subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0);
@@ -308,7 +331,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
 
   const createDocument=async()=>{
     if(!canManageTemplates){setMessage('Macallinku wuxuu daabici karaa xaadirinta, balse ma abuuri karo dukumenti rasmi ah.');return;}
-    const html=buildHtml();
+    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId);
     if(!html){setMessage(kind==='fee_receipt'?'Ardaygan weli ma laha rasiid lacag-bixin.':'Xog ku filan lagama helin fasalka ama ardayga la doortay.');return;}
     setBusy(true);
     try{
@@ -350,7 +373,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   };
 
   const previewHtml=()=>{
-    const html=buildHtml();
+    const html=applyTemplatePresentation(buildHtml(),config,logoUrl,verificationId);
     setPreview(html);
     if(!html)setMessage('Xogta template-kan weli kuma filna horudhac.');
   };
@@ -388,6 +411,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
         <details className="rounded-xl border border-slate-200 p-3">
           <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700"><ChevronDown size={16}/> Dejinta naqshadda</summary>
           <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="text-xs">Jihada<select value={config.direction} onChange={event=>updateConfig({direction:event.target.value as 'ltr'|'rtl'})} className="mt-1 h-9 w-full rounded border px-2"><option value="rtl">Midig ilaa bidix</option><option value="ltr">Bidix ilaa midig</option></select></label>
             <label className="text-xs">Midabka<input type="color" value={config.accentColor} onChange={event=>updateConfig({accentColor:event.target.value})} className="mt-1 h-9 w-full rounded border"/></label>
             <label className="text-xs">Safafka bogga<input type="number" min={5} max={25} value={config.rowsPerPage} onChange={event=>updateConfig({rowsPerPage:Math.max(5,Math.min(25,Number(event.target.value)||20))})} className="mt-1 min-h-9 w-full rounded border px-2"/></label>
             <label className="text-xs">Xadka gudbidda (%)<input type="number" min={0} max={100} value={config.passRule.percent??40} onChange={event=>updateConfig({passRule:{mode:'percent',percent:Math.max(0,Math.min(100,Number(event.target.value)||0))}})} className="mt-1 min-h-9 w-full rounded border px-2"/></label>
