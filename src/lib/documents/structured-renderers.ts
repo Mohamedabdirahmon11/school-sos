@@ -146,7 +146,8 @@ export function renderIndividualReportCard(data: ReportCardData): string {
   const rows = data.subjects.map(subject => [subject.name, subject.term1 == null ? '—' : String(subject.term1), subject.term2 == null ? '—' : String(subject.term2), subject.final == null ? '—' : String(subject.final), subject.grade || '—']);
   const details = `<p>Arday: <strong>${text(data.student.name)}</strong> · ID: ${text(data.student.id)}</p><p>Fasal: ${text(data.student.className)} · Sanad: ${text(data.student.academicYear)}</p>`;
   const totals = `<p>Wadar: ${text(data.total ?? '—')} · Celcelis: ${text(data.average ?? '—')} · Darajo: ${text(data.grade ?? '—')} · Kaalin: ${text(data.rank ?? '—')}</p><p>Xaalad: ${text(data.outcome ?? '—')}</p><p>Faallo: ${text(data.comment ?? '')}</p>`;
-  return paper('WARQADDA NATIIJADA ARDAYGA', details + table(['Maaddada', 'Term 1', 'Term 2', 'Final', 'Grade'], rows) + totals + '<p>Macallinka: __________________ · Maamulaha: __________________ · Waalidka: __________________</p>', data.schoolName);
+  const signatures=(data.signatories||['Macallinka','Maamulaha','Waalidka']).map(name=>`<td style="width:33%;padding-top:18px;text-align:center"><p style="border-top:1px solid #475569;padding-top:5px">${text(name)}</p></td>`).join('');
+  return paper('WARQADDA NATIIJADA ARDAYGA', details + table(['Maaddada', 'Term 1', 'Term 2', 'Final', 'Grade'], rows) + totals + `<table style="width:100%"><tr>${signatures}</tr></table>`, data.schoolName);
 }
 
 export function renderAttendanceSheet(data: AttendanceSheetData): string[] {
