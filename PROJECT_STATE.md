@@ -296,3 +296,38 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - Live verification: the migration is recorded as applied; all five columns and both indexes exist; only `service_role` can execute the publication RPC; the parent/student restrictive RLS policy requires `status='approved'` and `published_at IS NOT NULL`. A negative publication test correctly rejected a class with 93 missing/unapproved subject results. No marks were inserted or changed; the live `student_marks` table currently has 0 rows and the project has 85 students.
 - PR #213 and #214 CI passed TypeScript, tests, route parity, RLS source audit, and production build. Live authenticated parent/teacher journeys and PDF download still need test accounts/data; no deployment is claimed.
 - Remaining Exam & Results scope: semester-specific report-card PDFs, attendance context/eligibility, full student academic-history profile, certificates/awards, XLSX marks import/export and preview, report-card version history, and real desktop/tablet/mobile browser verification. Do not mark the overall overhaul complete until these are implemented and tested.
+
+
+## Documents structured A4 templates — PR #216 (in progress)
+- Branch: `feature/document-templates`; draft PR: https://github.com/Mohamedabdirahmon11/school-sos/pull/216. No changes to `main`; PR is not merged.
+- Added typed calculation helpers for marks, ABS/LB totals, percentage/fixed pass thresholds, status summaries, month-day generation, J/M attendance counts, pagination, safe text escaping, subject removal, and validated JSON config.
+- Added nine Somali A4 HTML renderers and a Documents workspace A4 template panel. The panel currently loads the selected class roster, approved Semester 1/2 marks, month attendance, timetable slots, and selected-student fee payments using existing school-scoped API methods.
+- Added `GET /attendance/month` for one class/month, guarded by existing staff and class-access checks. This endpoint is read-only.
+- Added `public.document_templates` via migration `20261117070000_document_templates_config.sql`, with school/type/name indexes, RLS, server-only table access, and structured-template audit events. Added server CRUD routes and API client methods.
+- Added unit test files for template engine and structured renderers. **Tests have not yet been executed in a local runtime.** CI and browser validation are still release gates.
+- Live Supabase inspection (read-only) confirmed the intended project `school management 3` is ACTIVE_HEALTHY and already contains the existing school-scoped document tables, classes, students, attendance records, student marks, timetable slots, and fee payments. No live SQL was executed and no migration was applied.
+- Remaining before this work can be considered complete: fix any CI/type/test failures; sync the new table into the canonical schema snapshot if one exists; add interactive attendance-cell editing and save through the Form Teacher attendance API; fully wire logo/QR/footer/zebra/font/row-height settings; generate an actual QR image; compute report-card grades/ranks and verify mark calculations; implement undo/redo and accessible keyboard navigation; enforce/test role-specific Teacher/Form Teacher/Parent/Student visibility; add RLS tests; run Playwright at 1280/768/390 in LTR/RTL; capture and inspect all nine template screenshots and print page counts; update this PR with actual CI output and honest screenshots/unverified items.
+- The new migration remains **unapplied**. Do not apply it to production as part of this PR.
+
+
+## Structured Documents templates — in progress (2026-11-16)
+
+- Feature branch: `feature/document-templates`; pull request #216 is open and has not been merged to `main`.
+- Added the school-scoped `document_templates` table in a new migration, RLS policies, service-role-only grants, create/update/delete API validation, and audit-trigger records with old/new template names, types, and configs. Synced the migration into root `schema.sql`. No production migration was applied.
+- Added nine Somali A4 template renderers: exam result list, individual report card, attendance sheet, certificate, student ID cards (8 per page), official letter, fee receipt, class timetable, and class list. Renderers use the shared HTML sanitizer's supported tags/styles and A4 page breaks.
+- Connected class/student lists, approved semester marks, grading scale, school logo URL (restricted to the existing public `school-logos` Supabase bucket), school calendar holidays, attendance, timetable, and latest fee payment through existing app APIs.
+- Added percentage, average-percentage, and fixed-total pass rules; 1–12 subject configuration, subject reorder, rows/page, font/row-height, zebra, footer, summary, logo, QR visibility, and RTL/LTR presentation controls.
+- Added a Form Teacher monthly attendance grid limited to assigned classes. J/M cell changes are saved via the existing daily-attendance API. Attendance writes now log actor, source, date, and old/new statuses through the existing audit logger.
+- Structured documents now store validated `student_id` and `class_id` references. Parent/student document lists and direct reads are limited to final documents tied to their linked student(s); family roles cannot edit documents.
+- Existing document creation generates the verification token and QR through the existing server route. The template's QR toggle is respected without embedding arbitrary data URLs.
+- Added unit/source-guard tests for mark parsing, thresholds, pagination, A4 sanitization, QR/logo URL allow-listing, school scoping, and family document guards. The latest CI run must still be checked before merge.
+
+### Remaining / not yet verified
+
+- Full Playwright role matrix and 1280/768/390 LTR/RTL visual screenshots for all nine templates have not been run or inspected.
+- Real PostgreSQL RLS cross-school/permission/Parent/Student integration tests have not been executed; the added security tests inspect source guards. The migration remains unapplied to production.
+- Full app build/lint/test status is pending the latest GitHub Actions run. No local checkout/browser runtime was available in this work session.
+- Teacher subject-specific mark editing, ABS/LB mark entry from the document UI, search/filter across the printed tables, and explicit 20-step undo/redo verification remain unimplemented or unverified.
+- Clearing a previously saved attendance mark to blank cannot delete the old record through the existing attendance API; the UI warns that blank only affects the current sheet and does not clear the stored mark.
+- Ethiopian-calendar national holiday conversion is not implemented; Gregorian national holidays and configured school-holiday date ranges are included.
+- QR verification is generated by the existing document-creation endpoint after saving; the unsaved HTML preview does not show the final QR block.

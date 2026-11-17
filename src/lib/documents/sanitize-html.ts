@@ -3,7 +3,7 @@ const BLOCKED_BLOCKS = /<(script|style|iframe|object|embed|svg|math|form|input|v
 const VOID_TAGS = new Set(['br','hr','img']);
 
 function safeStyle(value: string, allowPositionedField = false): string {
-  const allowed = new Set(['color','background-color','font-size','font-family','font-weight','font-style','text-decoration','text-align','line-height','direction','width','height','max-width','border','border-color','border-width','border-style','vertical-align','padding','margin','transform','transform-origin','z-index','position','left','top','float','margin-left','margin-right']);
+  const allowed = new Set(['color','background-color','font-size','font-family','font-weight','font-style','text-decoration','text-align','line-height','direction','width','height','max-width','border','border-color','border-width','border-style','vertical-align','padding','margin','transform','transform-origin','z-index','position','left','top','float','margin-left','margin-right','page-break-after']);
   return value.split(';').map((part) => {
     const index = part.indexOf(':');
     if (index < 1) return '';
@@ -16,6 +16,7 @@ function safeStyle(value: string, allowPositionedField = false): string {
     if (name === 'position' && content !== 'relative' && !(allowPositionedField && content === 'absolute')) return '';
     if (['left','top'].includes(name) && !/^-?\d{1,3}px$/.test(content)) return '';
     if (name === 'float' && !/^(left|right|none)$/.test(content)) return '';
+    if (name === 'page-break-after' && !/^(auto|always|page)$/.test(content)) return '';
     if (['margin-left','margin-right'].includes(name) && !/^(auto|0|-?\d{1,3}(?:px|%))$/.test(content)) return '';
     if (name === 'font-size' && !/^(?:\d{1,2}(?:\.\d+)?)(?:px|pt|em|rem|%)$/i.test(content)) return '';
     if (name === 'text-align' && !/^(left|right|center|justify|start|end)$/i.test(content)) return '';
@@ -26,7 +27,7 @@ function safeStyle(value: string, allowPositionedField = false): string {
 
 function safeUrl(value: string, image = false): string {
   const trimmed = value.trim();
-  if (image) return /^\/api\/(?:documents\/images\?path=[A-Za-z0-9%._/-]+|public\/document-verification\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/qr)$/i.test(trimmed) ? trimmed : '';
+  if (image) return (/^\/api\/(?:documents\/images\?path=[A-Za-z0-9%._/-]+|public\/document-verification\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/qr)$/i.test(trimmed) || /^https:\/\/[a-z0-9]{20}\.supabase\.co\/storage\/v1\/object\/public\/school-logos\/[A-Za-z0-9._/-]+$/i.test(trimmed)) ? trimmed : '';
   if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) return trimmed;
   return '';

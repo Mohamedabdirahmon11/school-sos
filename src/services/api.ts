@@ -783,6 +783,22 @@ export class ApiClient {
     return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}/restore`, { method:'POST' });
   }
 
+  public static async getStructuredDocumentTemplates() {
+    return this.request<any[]>('/structured-document-templates');
+  }
+
+  public static async createStructuredDocumentTemplate(input: { type: string; name: string; config: Record<string, unknown> }) {
+    return this.request<any>('/structured-document-templates', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async updateStructuredDocumentTemplate(id: string, input: { type: string; name: string; config: Record<string, unknown> }) {
+    return this.request<any>(`/structured-document-templates/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
+  }
+
+  public static async deleteStructuredDocumentTemplate(id: string) {
+    return this.request<{success:boolean}>(`/structured-document-templates/${encodeURIComponent(id)}`, { method:'DELETE' });
+  }
+
   public static async previewDocumentGeneration(input: Record<string, unknown>) {
     return this.request<any>('/documents/preview', { method:'POST', body:JSON.stringify(input) });
   }
@@ -1077,14 +1093,20 @@ export class ApiClient {
     return this.request<AttendanceRecord[]>(`/attendance?classId=${classId}&date=${date}`);
   }
 
+  public static async getAttendanceMonth(classId: string, year: number, month: number) {
+    return this.request<Array<{ studentId:string; date:string; status:'J'|'M'|'' }>>(
+      `/attendance/month?classId=${encodeURIComponent(classId)}&year=${year}&month=${month}`
+    );
+  }
+
   public static async getSchoolDailyAbsences(date: string) {
     return this.request<Array<AttendanceRecord & { student: Student; className: string }>>(`/attendance/school/absences?date=${encodeURIComponent(date)}`);
   }
 
-  public static async recordDailyAttendance(classId: string, date: string, records: any[]) {
+  public static async recordDailyAttendance(classId: string, date: string, records: any[], source: 'document_template' | 'attendance_module' = 'attendance_module') {
     return this.request<{ success: boolean; count: number; records: AttendanceRecord[] }>('/attendance', {
       method: 'POST',
-      body: JSON.stringify({ classId, date, records })
+      body: JSON.stringify({ classId, date, records, source })
     });
   }
 
