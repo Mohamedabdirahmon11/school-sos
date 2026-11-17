@@ -667,7 +667,7 @@ export const ExamsResultsView: React.FC = () => {
       return;
     }
     const schemeChanged = JSON.stringify(assessmentComponents) !== JSON.stringify(examConfig?.assessmentComponents || []);
-    if (schemeChanged && marks.length > 0 && !window.confirm('Fiiro gaar ah: dhibco hore ayaa jira. Beddelidda qaabka waxay abuureysaa nooc cusub; dhibcihii hore waxay sii haynayaan qaabkii lagu geliyey. Ma sii wadeysaa?')) return;
+    if (schemeChanged && !window.confirm('Fiiro gaar ah: haddii dhibco hore jiraan, waxay sii haynayaan qaabkii lagu geliyey; qaabka cusub wuxuu noqonayaa version cusub. Ma sii wadeysaa?')) return;
     setIsSaving(true);
     try {
       const updated = await ApiClient.updateExamConfig({
