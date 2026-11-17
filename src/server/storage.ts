@@ -2357,12 +2357,14 @@ class StorageEngine {
       const total = components.reduce((sum, component) => sum + Number(component.maxMarks), 0);
       const ids = components.map(component => component.id);
       const orders = components.map(component => component.order);
-      const validPlan = components.length >= 1 && components.length <= 6
-        && components.every(component => Number.isInteger(component.maxMarks) && component.maxMarks >= 1 && component.maxMarks <= 100)
-        && new Set(ids).size === ids.length
-        && new Set(orders).size === orders.length
-        && total === 100;
-      if (!validPlan) throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${total}); isticmaal 1 ilaa 6 qaybood oo tiro dhan ah.`);
+      if (components.length < 1 || components.length > 6) {
+        throw new Error('Use between 1 and 6 assessment components.');
+      }
+      if (!components.every(component => Number.isInteger(component.maxMarks) && component.maxMarks >= 1 && component.maxMarks <= 100)
+        || new Set(ids).size !== ids.length || new Set(orders).size !== orders.length) {
+        throw new Error('Assessment components need unique IDs and positions, with whole-number maximums from 1 to 100.');
+      }
+      if (total !== 100) throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${total})`);
     }
     const idx = this.data.examConfigs.findIndex(ec => ec.id === conf.id);
     if (idx < 0) throw new Error('Exam configuration could not be loaded for this school and academic year.');

@@ -213,7 +213,7 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
       })),
       { id: 'six-test-final', name: 'Final Examination', maxMarks: 40, category: 'final' as const, order: 7 }
     ] }),
-    /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
+    /between 1 and 6 assessment components/
   );
 });
 
