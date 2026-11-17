@@ -87,11 +87,13 @@ test('Ethiopian school calendar default treats Sunday, not Saturday, as weekly h
   assert.equal(days.find(day=>day.date==='2026-11-07')?.isWeekend,false);
 });
 
-test('sanitizer accepts only local QR PNG data URLs and public school-logo URLs', () => {
+test('sanitizer rejects embedded data URLs but allows verified QR route and school-logo URLs', () => {
   const allowedQr='data:image/png;base64,iVBORw0KGgo=';
   const allowedLogo='https://rhpazlnjqsmzngxatnwd.supabase.co/storage/v1/object/public/school-logos/SCHOOL1/logo.jpg';
+  const verifiedQr='/api/public/document-verification/123e4567-e89b-42d3-a456-426614174000/qr';
   const unsafeLogo='https://evil.example/logo.jpg';
   assert.doesNotMatch(sanitizeDocumentHtml(`<img src="${allowedQr}" alt="qr"/>`),/data:image\/png;base64/);
+  assert.match(sanitizeDocumentHtml(`<img src="${verifiedQr}" alt="qr"/>`),/public\/document-verification/);
   assert.match(sanitizeDocumentHtml(`<img src="${allowedLogo}" alt="logo"/>`),/school-logos/);
   assert.doesNotMatch(sanitizeDocumentHtml(`<img src="${unsafeLogo}" alt="bad"/>`),/evil\.example/);
 });
