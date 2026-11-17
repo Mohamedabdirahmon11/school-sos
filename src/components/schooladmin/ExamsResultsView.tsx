@@ -604,6 +604,7 @@ export const ExamsResultsView: React.FC = () => {
   // Load the complete class results matrix: all class subjects and all enrolled students.
   const loadClassData = async () => {
     if (!selectedClassId) return;
+    setIsLoading(true);
     setLoadError(null);
     try {
       const [stdList, existingMarks, classDetails] = await Promise.all([
@@ -625,6 +626,8 @@ export const ExamsResultsView: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setLoadError(err?.message || 'Unable to load the complete class results.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
