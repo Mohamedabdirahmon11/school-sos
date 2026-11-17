@@ -292,6 +292,7 @@ export const ReportCardsView: React.FC = () => {
   const selectedSemester2Complete = Boolean(selectedStudentResult?.subjectResults.length && selectedStudentResult.subjectResults.every(row => Boolean(row.sem2Marks)));
   const classSemester1Complete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.subjectResults.length > 0 && result.subjectResults.every(row => Boolean(row.sem1Marks)));
   const classSemester2Complete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.subjectResults.length > 0 && result.subjectResults.every(row => Boolean(row.sem2Marks)));
+  const classAnnualComplete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.annualComplete);
   const className = selectedClass ? `${selectedClass.name} (${selectedClass.section})` : 'Class';
   const smallMax = examConfig?.smallExamMax ?? 0;
   const bigMax = examConfig?.bigExamMax ?? 0;
@@ -365,14 +366,14 @@ export const ReportCardsView: React.FC = () => {
           <button
             type="button"
             onClick={() => window.print()}
-            disabled={!selectedStudentResult?.annualComplete}
+            disabled={!classAnnualComplete}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
             Print Student Report Card
           </button>
-          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId, 'Semester 1'))} disabled={!selectedSemester1Complete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Semester 1 PDF</button>
-          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId, 'Semester 2'))} disabled={!selectedSemester2Complete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Semester 2 PDF</button>
+          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId, 'Semester 1'))} disabled={!classSemester1Complete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Semester 1 PDF</button>
+          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId, 'Semester 2'))} disabled={!classSemester2Complete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Semester 2 PDF</button>
           <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId))} disabled={!selectedStudentResult?.annualComplete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Annual PDF</button>
         </div>
       </div>
