@@ -172,7 +172,9 @@ export function validateTemplateConfig(value: unknown): value is TemplateConfig 
     && Number.isInteger(config.rowsPerPage) && (config.rowsPerPage as number) >= 5 && (config.rowsPerPage as number) <= 25
     && Array.isArray(config.subjects) && config.subjects.length >= 1 && config.subjects.length <= 12
     && config.subjects.every(subject => subject && typeof subject.id === 'string' && typeof subject.name === 'string' && subject.name.length <= 80 && Number.isFinite(subject.maxMark) && subject.maxMark > 0 && subject.maxMark <= 100)
-    && !!config.passRule && ['percent', 'fixed'].includes(config.passRule.mode)\n    && (config.passRule.mode !== 'percent' || (Number.isFinite(config.passRule.percent ?? 40) && Number(config.passRule.percent ?? 40) >= 0 && Number(config.passRule.percent ?? 40) <= 100))\n    && (config.passRule.mode !== 'fixed' || (Number.isFinite(config.passRule.fixedTotal) && Number(config.passRule.fixedTotal) >= 0))
+    && !!config.passRule && ['percent', 'fixed'].includes(config.passRule.mode)
+    && (config.passRule.mode !== 'percent' || (Number.isFinite(config.passRule.percent ?? 40) && Number(config.passRule.percent ?? 40) >= 0 && Number(config.passRule.percent ?? 40) <= 100))
+    && (config.passRule.mode !== 'fixed' || (Number.isFinite(config.passRule.fixedTotal) && Number(config.passRule.fixedTotal) >= 0))
     && Number.isFinite(config.fontSize) && config.fontSize >= 8 && config.fontSize <= 24
     && Number.isFinite(config.rowHeight) && config.rowHeight >= 18 && config.rowHeight <= 64
     && typeof config.showLogo === 'boolean' && typeof config.showQr === 'boolean'
