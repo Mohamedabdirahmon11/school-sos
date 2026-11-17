@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { DocumentEditor } from './DocumentEditor.tsx';
 import { DocumentFileTools } from './DocumentFileTools.tsx';
+import { StructuredTemplatesPanel } from './StructuredTemplatesPanel.tsx';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import { applySchoolBrandColor } from '../../lib/documents/brand-color.ts';
 import './documents.css';
@@ -147,6 +148,7 @@ export const DocumentsView: React.FC = () => {
   const [classId,setClassId] = useState('');
   const [studentId,setStudentId] = useState('');
   const [showGenerate,setShowGenerate] = useState(false);
+  const [showStructuredTemplates,setShowStructuredTemplates] = useState(false);
   const [generating,setGenerating] = useState(false);
   const [generateWarnings,setGenerateWarnings] = useState<any[]>([]);
   const [previewHtml,setPreviewHtml] = useState('');
@@ -391,13 +393,14 @@ export const DocumentsView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><div className="flex items-center gap-2"><Files className="h-6 w-6 text-teal-700" /><h1 className="text-2xl font-bold text-slate-900">Dukumentiyada</h1></div><p className="mt-1 text-sm text-slate-500">Qor, habee, samee oo daabac waraaqaha dugsiga.</p></div>
         <div className="flex flex-wrap gap-2">
-          {isAdmin && <><button type="button" onClick={() => setShowGenerate(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50"><WandSparkles size={16}/> U samee arday</button>
+          {isAdmin && <><button type="button" onClick={() => setShowStructuredTemplates(value=>!value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><LayoutTemplate size={16}/> Qaababka A4</button><button type="button" onClick={() => setShowGenerate(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50"><WandSparkles size={16}/> U samee arday</button>
           <button type="button" onClick={() => setShowTemplates(value=>!value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><LayoutTemplate size={16}/> Qaab-dhismeedyo</button>
           <button type="button" onClick={() => void createDocument()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"><Plus size={16}/> Dukumenti cusub</button></>}
         </div>
       </div>
 
       {message && <div role="status" className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"><span>{message}</span><button type="button" aria-label="Xir fariinta" onClick={()=>setMessage('')}><X size={16}/></button></div>}
+      {isAdmin && showStructuredTemplates && <StructuredTemplatesPanel schoolName={school?.name || 'Dugsiga'} accentColor={school?.brandColor || '#176b5b'} onClose={()=>setShowStructuredTemplates(false)} onCreated={async created=>{setShowStructuredTemplates(false);await loadDocuments();await openDocument(created as DocumentRow);}}/>}
 
       {isAdmin && showTemplates && <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-2">
         <div><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Dooro template</h2><button type="button" onClick={()=>setShowArchivedTemplates(value=>!value)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">{showArchivedTemplates?'Qari kuwa kaydsan':'Tus kuwa kaydsan'}</button></div><div className="space-y-2">{templates.map(template=><div key={template.id} className={'flex items-center justify-between gap-2 rounded-lg border p-2 ' + (template.id===templateId?'border-teal-500 bg-teal-50':'border-slate-200')}><button type="button" disabled={!!template.deletedAt} onClick={()=>setTemplateId(template.id)} className="min-w-0 flex-1 text-left text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-60">{template.title}<span className="block text-xs text-slate-500">{TYPE_LABELS[template.documentType]}{template.deletedAt?' · Kaydsan':''}</span></button><>{!template.isBuiltin && !template.deletedAt && <><button type="button" aria-label="Wax ka beddel template" onClick={()=>{setEditingTemplateId(template.id);setTemplateTitle(template.title);setTemplateHtml(template.contentHtml);setTemplateType(template.documentType);}} className="rounded-md px-2 py-1 text-xs text-teal-700 hover:bg-teal-50">Wax ka beddel</button><button type="button" aria-label="Kaydi template" onClick={()=>void deleteTemplate(template.id)} className="rounded-md p-2 text-rose-600 hover:bg-rose-50" title="U rar kaydka"><Trash2 size={14}/></button><button type="button" aria-label="Nuqul ka samee template" title="Nuqul ka samee" onClick={()=>void duplicateTemplate(template)} className="rounded-md p-2 hover:bg-slate-100"><Copy size={15}/></button></>}{!template.isBuiltin && template.deletedAt && <button type="button" aria-label="Soo celi template" onClick={()=>void restoreTemplate(template.id)} className="rounded-md px-2 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50">Soo celi</button>}</></div>)}</div><button type="button" disabled={!!selectedTemplate.deletedAt} onClick={()=>void createDocument(selectedTemplate)} className="mt-3 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Ka samee dukumenti</button></div>
