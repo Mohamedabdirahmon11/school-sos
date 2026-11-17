@@ -8,7 +8,7 @@ import {
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
   renderStudentIdCards
 } from '../../lib/documents/structured-renderers.ts';
-import { escapePlainText, monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject, type StudentOutcome } from '../../lib/documents/template-engine.ts';
+import { countAttendance, escapePlainText, monthDays, passThreshold, sumMarks, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject, type StudentOutcome } from '../../lib/documents/template-engine.ts';
 
 const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
   { kind:'exam_result_list', label:'Go’aanka imtixaanka' },
@@ -445,6 +445,34 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
     catch(error){setMessage(error instanceof Error?error.message:'Template-ka lama tirtiri karin.');}
   };
 
+  const exportCsv=()=>{
+    let rows:string[][]=[];
+    if(kind==='class_list'){
+      rows=[['#','ID','Magaca','Jinsiga','Telefoonka waalidka'],...sortedStudents.map((student,index)=>[String(index+1),student.studentId,studentName(student),student.gender||'',student.fatherPhone||student.motherPhone||''])];
+    }else if(kind==='exam_result_list'){
+      const marks=examSemester==='Semester 1'?term1Marks:term2Marks;
+      rows=[['ID','Magaca',...config.subjects.map(subject=>subject.name),'Wadar','Xaalad'],...sortedStudents.map(student=>{
+        const values=config.subjects.map(subject=>marks.find(mark=>mark.studentId===student.id&&mark.subjectId===subject.id)?.totalMarks);
+        const hasAny=values.some(value=>value!==undefined&&value!==null);
+        const total=sumMarks(values);
+        const outcome=outcomeOverrides[student.id]||( !hasAny?'Maqan':total>=passThreshold(config.subjects,config.passRule)?'Gudub':'Aan Gudbin');
+        return [student.studentId,studentName(student),...values.map(value=>value===undefined||value===null?'':String(value)),String(total),outcome];
+      })];
+    }else if(kind==='attendance_sheet'){
+      rows=[['ID','Magaca',...attendanceDays.map(day=>day.day),'J','M'],...sortedStudents.map(student=>{
+        const marks=attendanceDays.map(day=>attendance.find(entry=>entry.studentId===student.id&&entry.date===day.date)?.locked?'C':attendance.find(entry=>entry.studentId===student.id&&entry.date===day.date)?.status||'');
+        const counts=countAttendance(attendance,student.id);
+        return [student.studentId,studentName(student),...marks,String(counts.present),String(counts.absent)];
+      })];
+    }
+    if(!rows.length)return;
+    const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const link=document.createElement('a');
+    link.href=url;link.download=(name||kind)+'-'+year+'-'+String(month).padStart(2,'0')+'.csv';
+    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  };
+
   const previewHtml=()=>{
     const html=applyTemplatePresentation(buildHtml(),config,logoUrl);
     setPreview(html);
@@ -509,6 +537,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
         </details>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={()=>void previewHtml()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Horudhac</button>
+          {['exam_result_list','attendance_sheet','class_list'].includes(kind)&&<button type="button" onClick={exportCsv} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">CSV</button>}
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void saveAsMyTemplate()} className="inline-flex items-center gap-2 rounded-lg border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={15}/> {editingTemplateId?'Cusboonaysii template':'Kaydi template-kayga'}</button>}
           <button type="button" onClick={()=>void reset()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw size={15}/> Dib u celi</button>
           {canManageTemplates&&<button type="button" disabled={busy} onClick={()=>void createDocument()} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileText size={15}/> Samee dukumenti</button>}
