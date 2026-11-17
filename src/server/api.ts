@@ -53,7 +53,7 @@ import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
-import { validateTemplateConfig, type TemplateConfig, type TemplateKind } from '../lib/documents/template-engine.ts';
+import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/template-engine.ts';
 
 export const apiRouter = Router();
 
@@ -8625,12 +8625,15 @@ apiRouter.put('/structured-document-templates/:id', requireAuth, requireSchoolCo
   }
   const client = documentServiceClient(res);
   if (!client) return;
+  const { data: current, error: readError } = await client.from('document_templates')
+    .select('version').eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if (readError || !current) { res.status(404).json({ error:'Template-ka lama helin.' }); return; }
   const { data, error } = await client.from('document_templates').update({
-    name, type:config.kind, config, version:client.rpc ? undefined : undefined,
+    name, type:config.kind, config, version:Number(current.version || 1) + 1,
     updated_by:user.id, updated_at:new Date().toISOString()
   }).eq('school_id',school.id).eq('id',req.params.id)
     .select('id,type,name,config,is_builtin,version,updated_at').maybeSingle();
-  if (error || !data) { res.status(404).json({ error:'Template-ka lama helin ama lama cusboonaysiin karin.' }); return; }
+  if (error || !data) { res.status(404).json({ error:'Template-ka lama cusboonaysiin karin.' }); return; }
   res.json(data);
 });
 
