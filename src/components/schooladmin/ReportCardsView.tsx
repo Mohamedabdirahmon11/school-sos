@@ -288,8 +288,6 @@ export const ReportCardsView: React.FC = () => {
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const selectedStudentResult = yearlyRankings.find(r => r.student.id === selectedStudentId);
-  const selectedSemester1Complete = Boolean(selectedStudentResult?.subjectResults.length && selectedStudentResult.subjectResults.every(row => Boolean(row.sem1Marks)));
-  const selectedSemester2Complete = Boolean(selectedStudentResult?.subjectResults.length && selectedStudentResult.subjectResults.every(row => Boolean(row.sem2Marks)));
   const classSemester1Complete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.subjectResults.length > 0 && result.subjectResults.every(row => Boolean(row.sem1Marks)));
   const classSemester2Complete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.subjectResults.length > 0 && result.subjectResults.every(row => Boolean(row.sem2Marks)));
   const classAnnualComplete = yearlyRankings.length > 0 && yearlyRankings.every(result => result.annualComplete);
