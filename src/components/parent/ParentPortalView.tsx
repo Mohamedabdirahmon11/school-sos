@@ -49,7 +49,7 @@ export const ParentPortalView: React.FC = () => {
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const childData = childState.data;
   const resultNotices = (Array.isArray(noticesState.data) ? noticesState.data : [])
-    .filter((notice: any) => notice.classId === currentChild.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
+    .filter((notice: any) => notice.classId === currentChild?.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
     .slice(0, 3);
 
   const handleSelectChild = (idx: number) => {
