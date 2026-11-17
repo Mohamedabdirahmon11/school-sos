@@ -18,6 +18,18 @@ CREATE INDEX IF NOT EXISTS student_marks_parent_published_idx
   ON public.student_marks (school_id, student_id, semester, published_at)
   WHERE status = 'approved' AND published_at IS NOT NULL;
 
+-- Direct Data API reads must obey the same publication gate as the parent portal API.
+-- This is restrictive so it ANDs with the existing permissive school-tenant policy.
+ALTER POLICY marks_role_read ON public.student_marks
+USING (
+  private.auth_can_access_class(class_id)
+  AND private.auth_can_access_student(student_id)
+  AND (
+    private.auth_user_role()::text NOT IN ('parent', 'student')
+    OR (status = 'approved' AND published_at IS NOT NULL)
+  )
+);
+
 CREATE OR REPLACE FUNCTION public.schoolos_publish_exam_results(
   p_school_id text,
   p_class_id text,
@@ -26,7 +38,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_publish_exam_results(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $function$
 DECLARE
