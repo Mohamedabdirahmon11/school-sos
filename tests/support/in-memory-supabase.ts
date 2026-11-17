@@ -216,6 +216,53 @@ export class InMemorySupabase {
       else sequenceRows.push({ id: sequenceId, schoolId, academicYear, nextValue });
       return { data: nextValue, error: null };
     }
+    if (name === 'schoolos_publish_exam_results') {
+      const schoolId = String(args?.p_school_id || '');
+      const classId = String(args?.p_class_id || '');
+      const semester = String(args?.p_semester || '');
+      const publisher = String(args?.p_published_by || '');
+      const klass = this.rows('classes').find(row =>
+        String(row.id) === classId &&
+        String(row.school_id ?? row.schoolId) === schoolId &&
+        (row.is_archived ?? row.isArchived) !== true
+      );
+      if (!klass) return { data: null, error: { message: 'The selected class was not found in this school.' } };
+      if (!['Semester 1', 'Semester 2'].includes(semester) || !publisher) return { data: null, error: { message: 'A valid semester and publisher are required.' } };
+      const students = this.rows('students').filter(row =>
+        String(row.school_id ?? row.schoolId) === schoolId && String(row.class_id ?? row.classId) === classId
+      );
+      const assignments = this.rows('class_subjects').filter(row =>
+        String(row.school_id ?? row.schoolId) === schoolId &&
+        String(row.class_id ?? row.classId) === classId &&
+        (row.is_active ?? row.isActive) !== false
+      );
+      if (!students.length) return { data: null, error: { message: 'The class has no enrolled students.' } };
+      if (!assignments.length) return { data: null, error: { message: 'The class has no active subject assignments.' } };
+      const marks = this.rows('student_marks').filter(row =>
+        String(row.school_id ?? row.schoolId) === schoolId &&
+        String(row.class_id ?? row.classId) === classId &&
+        String(row.semester) === semester
+      );
+      const missing = students.flatMap(student => assignments.filter(assignment => {
+        const mark = marks.find(row =>
+          String(row.student_id ?? row.studentId) === String(student.id) &&
+          String(row.subject_id ?? row.subjectId) === String(assignment.subject_id ?? assignment.subjectId)
+        );
+        return !mark || String(mark.status) !== 'approved';
+      }));
+      if (missing.length) return { data: null, error: { message: `Cannot publish results: ${missing.length} student-subject result(s) are missing or not approved.` } };
+      const now = new Date().toISOString();
+      let publishedCount = 0;
+      for (const mark of marks) {
+        if (String(mark.status) !== 'approved' || mark.published_at || mark.publishedAt) continue;
+        mark.published_at = now;
+        mark.publishedAt = now;
+        mark.published_by = publisher;
+        mark.publishedBy = publisher;
+        publishedCount += 1;
+      }
+      return { data: { published_count: publishedCount, published_at: now, class_id: classId, semester }, error: null };
+    }
     if (name === 'schoolos_confirm_year_end_promotions') {
       const schoolId = String(args?.p_school_id || '');
       const classId = String(args?.p_class_id || '');
