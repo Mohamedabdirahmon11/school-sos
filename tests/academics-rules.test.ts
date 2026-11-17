@@ -297,4 +297,14 @@ test('submitted marks can be returned with an audit reason and only complete app
   assert.equal(publishedMarks.length, 2);
   assert.equal(publishedMarks.every(mark => Boolean(mark.publishedAt)), true);
   assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_PUBLISHED_TO_PARENTS'), true);
+
+  await memory.from('student_marks').insert([{
+    id: 'old-academic-year-mark', school_id: school.id, class_id: klass.id,
+    student_id: student.id, subject_id: subject.id, academic_year: '2025-2026',
+    semester: 'Semester 1', status: 'approved', total_marks: 99, percentage: 99,
+    published_at: new Date().toISOString()
+  }]);
+  const classYearMarks = await db.getMarks(school.id, klass.id, subject.id, 'Semester 1');
+  assert.equal(classYearMarks.length, 1, 'class results must not mix marks from another academic year');
+  assert.equal(classYearMarks[0].academicYear, '2026-2027');
 });
