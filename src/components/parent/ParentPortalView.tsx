@@ -57,14 +57,14 @@ export const ParentPortalView: React.FC = () => {
     setReportCardDownloadError('');
   };
 
-  const handleDownloadAnnualReportCard = async () => {
+  const handleDownloadReportCard = async (semester?: 'Semester 1' | 'Semester 2') => {
     if (!currentChild || reportCardDownloading) return;
     setReportCardDownloading(true);
     setReportCardDownloadError('');
     try {
-      await ApiClient.downloadReportCardPdf(currentChild.id);
+      await ApiClient.downloadReportCardPdf(currentChild.id, semester);
     } catch (error) {
-      setReportCardDownloadError(error instanceof Error ? error.message : 'Annual report card is not available yet.');
+      setReportCardDownloadError(error instanceof Error ? error.message : 'Report card PDF is not available yet.');
     } finally {
       setReportCardDownloading(false);
     }
@@ -81,7 +81,10 @@ export const ParentPortalView: React.FC = () => {
   const payments = childData?.payments || [];
   const balance = payments.reduce((sum: number, payment: any) => sum + (payment.remainingAmount || 0), 0);
   const publishedMarks: any[] = Array.isArray(childData?.marks) ? childData.marks : [];
-  const hasBothPublishedSemesters = publishedMarks.some(first => first.semester === 'Semester 1' && publishedMarks.some(second => second.semester === 'Semester 2' && second.academicYear === first.academicYear));
+  const reportAcademicYear = school?.academicYear || [...new Set(publishedMarks.map(mark => mark.academicYear).filter(Boolean))].sort().slice(-1)[0];
+  const hasPublishedSemester1 = publishedMarks.some(mark => mark.semester === 'Semester 1' && (!reportAcademicYear || mark.academicYear === reportAcademicYear));
+  const hasPublishedSemester2 = publishedMarks.some(mark => mark.semester === 'Semester 2' && (!reportAcademicYear || mark.academicYear === reportAcademicYear));
+  const hasBothPublishedSemesters = hasPublishedSemester1 && hasPublishedSemester2;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -164,7 +167,9 @@ export const ParentPortalView: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2"><FileSpreadsheet className="w-4 h-4 text-[#0F766E]" /><span>{currentChild.firstName}'s Exam Performance</span></h2>
             <div className="flex gap-2">
-              <button type="button" onClick={handleDownloadAnnualReportCard} disabled={!hasBothPublishedSemesters || reportCardDownloading} className="rounded border border-[#0F766E] bg-[#0F766E] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40"><Download className="mr-1 inline h-3.5 w-3.5" />{reportCardDownloading ? 'Preparing PDF…' : 'Download Annual PDF'}</button>
+              <button type="button" onClick={() => void handleDownloadReportCard('Semester 1')} disabled={!hasPublishedSemester1 || reportCardDownloading} className="rounded border border-[#CBD5E1] bg-white px-2.5 py-1 text-xs font-semibold text-[#0F766E] disabled:opacity-40">Semester 1 PDF</button>
+              <button type="button" onClick={() => void handleDownloadReportCard('Semester 2')} disabled={!hasPublishedSemester2 || reportCardDownloading} className="rounded border border-[#CBD5E1] bg-white px-2.5 py-1 text-xs font-semibold text-[#0F766E] disabled:opacity-40">Semester 2 PDF</button>
+              <button type="button" onClick={() => void handleDownloadReportCard()} disabled={!hasBothPublishedSemesters || reportCardDownloading} className="rounded border border-[#0F766E] bg-[#0F766E] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40"><Download className="mr-1 inline h-3.5 w-3.5" />{reportCardDownloading ? 'Preparing PDF…' : 'Annual PDF'}</button>
               <button type="button" onClick={() => window.print()} className="flex items-center gap-1 rounded border border-[#CCFBF1] bg-[#F0FDFA] px-2.5 py-1 text-xs text-[#0F766E]"><Printer className="h-3.5 w-3.5" /><span>Print Card</span></button>
             </div>
           </div>
