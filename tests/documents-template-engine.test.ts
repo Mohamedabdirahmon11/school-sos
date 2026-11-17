@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { sanitizeDocumentHtml } from '../src/lib/documents/sanitize-html.ts';
 import {
@@ -107,4 +108,22 @@ test('fixed-total pass rule respects the configured total', () => {
   assert.equal(passThreshold(subjects,{mode:'fixed',fixedTotal:280}),280);
   assert.equal(hasPassed(279,subjects,{mode:'fixed',fixedTotal:280}),false);
   assert.equal(hasPassed(280,subjects,{mode:'fixed',fixedTotal:280}),true);
+});
+
+test('structured document API enforces school and family scope', () => {
+  const migration=readFileSync(new URL('../supabase/migrations/20261117070000_document_templates_config.sql',import.meta.url),'utf8');
+  const api=readFileSync(new URL('../src/server/api.ts',import.meta.url),'utf8');
+  assert.match(migration,/ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration,/school_id = private\.auth_school_id\(\)/);
+  assert.match(migration,/REVOKE ALL ON TABLE public\.document_templates FROM anon, authenticated/);
+  const templateRoutes=api.slice(api.indexOf("apiRouter.get('/structured-document-templates'"),api.indexOf("apiRouter.post('/documents/preview'"));
+  assert.match(templateRoutes,/requireSchoolAdminOrSuperAdmin/);
+  assert.match(templateRoutes,/eq\('school_id',school\.id\)/);
+  const documentList=api.slice(api.indexOf("apiRouter.get('/documents'"),api.indexOf("apiRouter.get('/documents/:id'"));
+  assert.match(documentList,/query\.eq\('status','final'\)\.in\('student_id',familyStudentIds\)/);
+  assert.match(documentList,/familyDocumentStudentIds/);
+  const documentRead=api.slice(api.indexOf("apiRouter.get('/documents/:id'"),api.indexOf("apiRouter.post('/documents'"));
+  assert.match(documentRead,/familyDocumentAllowed/);
+  const documentUpdate=api.slice(api.indexOf("apiRouter.put('/documents/:id'"),api.indexOf("apiRouter.post('/documents/:id/download-audit'"));
+  assert.match(documentUpdate,/user\.role==='parent'\|\|user\.role==='student'/);
 });
