@@ -142,7 +142,7 @@ test('school-defined four small tests and one final exam calculate a 100-mark re
   assert.deepEqual(preserved[0].schemeSnapshot, config.assessmentComponents);
   await assert.rejects(
     () => db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
-      studentId: student.id, assessmentScores: { 'test-1': 9 }, status: 'draft'
+      studentId: student.id, assessmentScores: { coursework: 30, 'final-v2': 50 }, status: 'draft'
     }], 'teacher-1'),
     /entered under scheme version 1/
   );
