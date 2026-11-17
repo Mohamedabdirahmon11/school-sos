@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
-import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
+import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, StudentOutcome, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
@@ -277,7 +277,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
         const finalValues=subjectsWithMarks.filter(item=>item.final!==null).map(item=>Number(item.final));
         const finalTotal=finalValues.reduce((sum,value)=>sum+value,0);
         const finalAverage=finalValues.length?finalTotal/finalValues.length:0;
-        const finalOutcome=finalTotal>=passThreshold(activeSubjects,config.passRule)?'Gudub':'Aan Gudbin';
+        const finalOutcome:StudentOutcome=finalValues.length===0?'Maqan':finalTotal>=passThreshold(activeSubjects,config.passRule)?'Gudub':'Aan Gudbin';
         const ranked=students.map(item=>{
           const values=activeSubjects.map(subject=>{
             const firstMark=term1Marks.find(mark=>mark.studentId===item.id&&mark.subjectId===subject.id);
@@ -289,7 +289,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
           }).filter((value):value is number=>value!==null);
           return {studentId:item.id,average:values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0};
         }).sort((a,b)=>b.average-a.average);
-        const rank=ranked.findIndex(item=>item.studentId===student?.id)+1;
+        const rank=finalValues.length?ranked.findIndex(item=>item.studentId===student?.id)+1:0;
         const gradedSubjects=subjectsWithMarks.map(item=>({...item,grade:item.final==null?'':gradeForMark(item.final,100,gradingScale)}));
         return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:gradedSubjects,total:finalTotal,average:finalAverage,grade:gradeForMark(finalAverage,100,gradingScale),rank:rank>0?rank:'—',outcome:finalOutcome,comment:reportComment,signatories:reportSignatories}):'';
       }
