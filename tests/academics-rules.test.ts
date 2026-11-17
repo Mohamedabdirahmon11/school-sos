@@ -214,3 +214,78 @@ test('school admin can choose five 10-mark tests and the final exam adjusts to 5
     /four 10-mark tests plus one 60-mark final, or five 10-mark tests plus one 50-mark final/
   );
 });
+
+
+test('submitted marks can be returned with an audit reason and only complete approved semesters can be published', async () => {
+  const memory = new InMemorySupabase();
+  const storage = await import('../src/server/storage.ts');
+  storage.installTestSupabaseClient(memory);
+  await storage.initializeStorage();
+  const db = storage.db;
+  const school = db.createSchool({
+    name: 'Result Publication', code: 'PUBRESULT', address: '', city: '', phone: '', email: 'publish@example.test', currency: 'ETB',
+    academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const klass = db.createClass({ schoolId: school.id, name: 'Grade 5', gradeLevel: 5, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
+  const subject = db.createSubject({ schoolId: school.id, name: 'Science', code: 'SCI', category: 'core', isActive: true } as any);
+  const student = db.createStudent({
+    schoolId: school.id, studentId: 'PUB-001', firstName: 'Hodan', middleName: '', lastName: 'Test', gender: 'female',
+    admissionDate: '2026-01-01', fatherPhone: '', classId: klass.id, status: 'active'
+  } as any);
+  await memory.from('class_subjects').insert([{
+    id: 'publish-class-subject', school_id: school.id, class_id: klass.id,
+    subject_id: subject.id, teacher_id: 'teacher-profile-publish', periods_per_week: 3,
+    small_exam_enabled: true, big_exam_enabled: true, is_active: true
+  }]);
+  const assessmentScores = { 'test-1': 8, 'test-2': 8, 'test-3': 8, 'test-4': 8, 'final-exam': 48 };
+  const first = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+    studentId: student.id, assessmentScores, status: 'submitted'
+  }], 'teacher-publish');
+  await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-publish');
+
+  const returned = await db.returnMarksForCorrection(
+    school.id, [first[0].id], 'admin-publish', 'Please verify the final exam score against the signed script.', 'Academic Admin', 'school_admin'
+  );
+  assert.equal(returned.length, 1);
+  assert.equal(returned[0].status, 'draft');
+  assert.equal(returned[0].correctionReason, 'Please verify the final exam score against the signed script.');
+  assert.equal(returned[0].returnedBy, 'admin-publish');
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_RETURNED_FOR_CORRECTION' && String(row.details).includes('signed script')), true);
+
+  const resubmitted = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+    studentId: student.id, assessmentScores: { ...assessmentScores, 'final-exam': 49 }, status: 'submitted'
+  }], 'teacher-publish');
+  assert.equal(resubmitted[0].correctionReason, null);
+  await db.forwardClassMarks(school.id, klass.id, 'Semester 1', 'form-teacher-publish');
+  db.approveMarks(school.id, [resubmitted[0].id], 'admin-publish');
+  await db.flush();
+
+  await assert.rejects(
+    () => db.publishClassSemesterResults(school.id, klass.id, 'Semester 2', 'admin-publish', 'Academic Admin', 'school_admin'),
+    /missing or not approved/
+  );
+
+  const firstPublication = await db.publishClassSemesterResults(school.id, klass.id, 'Semester 1', 'admin-publish', 'Academic Admin', 'school_admin');
+  assert.equal(firstPublication.publishedCount, 1);
+  assert.ok(firstPublication.publishedAt);
+  const duplicatePublication = await db.publishClassSemesterResults(school.id, klass.id, 'Semester 1', 'admin-publish', 'Academic Admin', 'school_admin');
+  assert.equal(duplicatePublication.publishedCount, 0);
+
+  const second = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 2', [{
+    studentId: student.id, assessmentScores, status: 'submitted'
+  }], 'teacher-publish');
+  await db.forwardClassMarks(school.id, klass.id, 'Semester 2', 'form-teacher-publish');
+  db.approveMarks(school.id, [second[0].id], 'admin-publish');
+  await db.flush();
+  const secondPublication = await db.publishClassSemesterResults(school.id, klass.id, 'Semester 2', 'admin-publish', 'Academic Admin', 'school_admin');
+  assert.equal(secondPublication.publishedCount, 1);
+
+  const yearly = await db.getClassYearlyRankings(school.id, klass.id);
+  assert.equal(yearly[0].annualComplete, true);
+  assert.equal(yearly[0].annualPublished, true);
+  const publishedMarks = await db.getStudentMarks(school.id, student.id);
+  assert.equal(publishedMarks.length, 2);
+  assert.equal(publishedMarks.every(mark => Boolean(mark.publishedAt)), true);
+  assert.equal(memory.rows('audit_logs').some(row => row.action === 'MARKS_PUBLISHED_TO_PARENTS'), true);
+});
