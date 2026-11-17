@@ -783,6 +783,22 @@ export class ApiClient {
     return this.request<{success:boolean}>(`/document-templates/${encodeURIComponent(id)}/restore`, { method:'POST' });
   }
 
+  public static async getStructuredDocumentTemplates() {
+    return this.request<any[]>('/structured-document-templates');
+  }
+
+  public static async createStructuredDocumentTemplate(input: { type: string; name: string; config: Record<string, unknown> }) {
+    return this.request<any>('/structured-document-templates', { method:'POST', body:JSON.stringify(input) });
+  }
+
+  public static async updateStructuredDocumentTemplate(id: string, input: { type: string; name: string; config: Record<string, unknown> }) {
+    return this.request<any>(`/structured-document-templates/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(input) });
+  }
+
+  public static async deleteStructuredDocumentTemplate(id: string) {
+    return this.request<{success:boolean}>(`/structured-document-templates/${encodeURIComponent(id)}`, { method:'DELETE' });
+  }
+
   public static async previewDocumentGeneration(input: Record<string, unknown>) {
     return this.request<any>('/documents/preview', { method:'POST', body:JSON.stringify(input) });
   }
