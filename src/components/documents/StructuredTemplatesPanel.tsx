@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
-import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, StudentOutcome, TimetableSlot } from '../../types/index.ts';
+import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
   renderStudentIdCards
 } from '../../lib/documents/structured-renderers.ts';
-import { escapePlainText, monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject } from '../../lib/documents/template-engine.ts';
+import { escapePlainText, monthDays, passThreshold, type AttendanceEntry, type TemplateConfig, type TemplateKind, type TemplateSubject, type StudentOutcome } from '../../lib/documents/template-engine.ts';
 
 const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
   { kind:'exam_result_list', label:'Go’aanka imtixaanka' },
