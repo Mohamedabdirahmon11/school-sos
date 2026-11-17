@@ -51,6 +51,7 @@ import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
+import { monthDays, validateLayoutConfig } from '../lib/documents/template-core.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 
@@ -8023,6 +8024,7 @@ apiRouter.delete('/bus/assignments/:studentId', requireAuth, requireSchoolContex
 
 // Documents module — all reads and writes are explicitly bound to the authenticated school.
 const DOCUMENT_IMAGE_BUCKET = 'school-document-images';
+const LAYOUT_TEMPLATE_TYPES = new Set(['result_list','attendance_sheet']);
 const DOCUMENT_TYPES = new Set(['transfer_letter','certificate','parent_letter','teacher_letter','student_clearance','report_summary','other']);
 function documentsAdminOnly(req: Request, res: Response): boolean {
   const user = (req as any).user as User;
@@ -8137,6 +8139,76 @@ apiRouter.get('/public/document-verification/:token', async (req,res) => {
   const valid=doc.status==='final';const studentName=student?[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' '):'';
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   res.status(200).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document verification</title><main style="font:16px system-ui;max-width:620px;margin:48px auto;padding:24px;border:1px solid #ddd;border-radius:16px"><h1 style="color:'+(valid?'#087443':'#b42318')+'">'+(valid?'Valid document':'Invalid document')+'</h1><p><b>School:</b> '+esc(school?.name)+'</p><p><b>Student:</b> '+esc(studentName||'—')+'</p><p><b>Document type:</b> '+esc(doc.document_type)+'</p><p><b>Issue date:</b> '+esc(new Date(doc.status==='final'?doc.updated_at:doc.created_at).toISOString().slice(0,10))+'</p><p>This page confirms document status only.</p></main></html>');
+});
+
+// Editable layout templates and the auto-filled attendance sheet.
+// Registered before '/documents/:id' so these paths are never read as a document ID.
+apiRouter.get('/documents/layout-templates', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('document_templates').select('id,type,name,config,version,updated_at').eq('school_id', school.id);
+  if (error) { res.status(500).json({ error: 'Template-yada lama soo qaadi karin.' }); return; }
+  res.json((data || []).map((row: any) => ({ id: row.id, type: row.type, name: row.name, config: row.config, version: row.version, updatedAt: row.updated_at })));
+});
+apiRouter.put('/documents/layout-templates/:type', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const type = String(req.params.type);
+  if (!LAYOUT_TEMPLATE_TYPES.has(type)) { res.status(400).json({ error: 'Nooca template-ka ma jiro.' }); return; }
+  const checked = validateLayoutConfig(req.body?.config);
+  if (!checked.ok) { res.status(400).json({ error: checked.error }); return; }
+  const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim().slice(0, 160) : type;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: existing } = await client.from('document_templates').select('id,version').eq('school_id', school.id).eq('type', type).maybeSingle();
+  const result = existing
+    ? await client.from('document_templates').update({ name, config: checked.config, version: existing.version + 1, updated_by: user.id, updated_at: new Date().toISOString() })
+        .eq('school_id', school.id).eq('id', existing.id).select('id,type,name,config,version,updated_at').single()
+    : await client.from('document_templates').insert({ school_id: school.id, type, name, config: checked.config, created_by: user.id, updated_by: user.id })
+        .select('id,type,name,config,version,updated_at').single();
+  if (result.error || !result.data) { res.status(500).json({ error: 'Template-ka lama kaydin karin.' }); return; }
+  const row: any = result.data;
+  res.json({ id: row.id, type: row.type, name: row.name, config: row.config, version: row.version, updatedAt: row.updated_at });
+});
+apiRouter.delete('/documents/layout-templates/:type', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const type = String(req.params.type);
+  if (!LAYOUT_TEMPLATE_TYPES.has(type)) { res.status(400).json({ error: 'Nooca template-ka ma jiro.' }); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  // Stamp the actor first so the audit trigger records who reset the layout.
+  await client.from('document_templates').update({ updated_by: user.id }).eq('school_id', school.id).eq('type', type);
+  const { error } = await client.from('document_templates').delete().eq('school_id', school.id).eq('type', type);
+  if (error) { res.status(500).json({ error: 'Template-ka dib looma celin karin.' }); return; }
+  res.json({ success: true });
+});
+apiRouter.get('/documents/attendance-sheet', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!['school_admin', 'super_admin', 'teacher'].includes(user.role)) { res.status(403).json({ error: 'Warqadda imaanshaha waxaa arki kara maamulka iyo macallinka fasalka.' }); return; }
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+  if (!classId || !monthMatch) { res.status(400).json({ error: 'Fasal iyo bil (YYYY-MM) ayaa loo baahan yahay.' }); return; }
+  if (!await canAccessTeachingClass(req, res, classId)) return;
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass) { res.status(404).json({ error: 'Fasalka lama helin dugsigan.' }); return; }
+  const days = monthDays(Number(monthMatch[1]), Number(monthMatch[2])).map(day => day.iso);
+  const students = await collectPagedItems(
+    (page, pageSize) => db.queryPage<Student>('students', { school_id: school.id, class_id: klass.id, status: 'active' }, page, pageSize, undefined, LIST_QUERY_COLUMNS.students, 'first_name', true),
+    { pageSize: 100, maxItems: 5000 }
+  );
+  const records = await queryAllRows('attendance_records', { school_id: school.id, class_id: klass.id, date: days }, 'student_id,date,status');
+  const byStudent: Record<string, Record<string, string>> = {};
+  for (const record of records) (byStudent[record.studentId] ||= {})[String(record.date).slice(0, 10)] = record.status;
+  res.json({
+    class: { id: klass.id, name: klass.name }, month,
+    students: students.map((student: any) => ({ id: student.id, studentId: student.studentId, rollNumber: student.rollNumber || null,
+      name: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') })),
+    records: byStudent
+  });
 });
 
 apiRouter.get('/documents', requireAuth, requireSchoolContext, async (req, res) => {

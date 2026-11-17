@@ -36,6 +36,7 @@ const ExamsResultsView = React.lazy(() => import('./components/schooladmin/Exams
 const FeesLedgerView = React.lazy(() => import('./components/schooladmin/FeesLedgerView.tsx').then(module => ({ default: module.FeesLedgerView })));
 const StudentInvoicesView = React.lazy(() => import('./components/schooladmin/StudentInvoicesView.tsx').then(module => ({ default: module.StudentInvoicesView })));
 const ReportCardsView = React.lazy(() => import('./components/schooladmin/ReportCardsView.tsx').then(module => ({ default: module.ReportCardsView })));
+const DocumentTemplatesView = React.lazy(() => import('./components/documents/DocumentTemplatesView.tsx').then(module => ({ default: module.DocumentTemplatesView })));
 const DocumentsView = React.lazy(() => import('./components/documents/DocumentsView.tsx').then(module => ({ default: module.DocumentsView })));
 const AdmissionsView = React.lazy(() => import('./components/schooladmin/AdmissionsView.tsx').then(module => ({ default: module.AdmissionsView })));
 const ExtraModulesView = React.lazy(() => import('./components/schooladmin/ExtraModulesView.tsx').then(module => ({ default: module.ExtraModulesView })));
@@ -290,6 +291,9 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'sch_report_cards' && (
               <ReportCardsView />
+            )}
+            {activeView === 'sch_doc_templates' && ['school_admin','super_admin'].includes(user.role) && (
+              <DocumentTemplatesView />
             )}
             {activeView === 'sch_documents' && ['school_admin','super_admin','teacher','accountant','parent','student'].includes(user.role) && (
               <DocumentsView />

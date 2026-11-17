@@ -175,6 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_classes', menuT('classes'), Layers), item('sch_subjects', menuT('subjects'), BookOpen),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
         item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
+        item('sch_doc_templates', 'Document templates', FileSpreadsheet),
         item('sch_promotion', 'Promotion & Alumni', Award)
       ] },
       { title: 'Communication', items: [

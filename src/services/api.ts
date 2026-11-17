@@ -795,6 +795,24 @@ export class ApiClient {
     return this.request<any>('/documents/generate', { method:'POST', body:JSON.stringify(input) });
   }
 
+  public static async getLayoutTemplates() {
+    return this.request<Array<{ id:string; type:string; name:string; config:any; version:number; updatedAt:string }>>('/documents/layout-templates');
+  }
+
+  public static async saveLayoutTemplate(type: string, name: string, config: unknown) {
+    return this.request<any>(`/documents/layout-templates/${encodeURIComponent(type)}`, { method:'PUT', body:JSON.stringify({ name, config }) });
+  }
+
+  public static async resetLayoutTemplate(type: string) {
+    return this.request<{success:boolean}>(`/documents/layout-templates/${encodeURIComponent(type)}`, { method:'DELETE' });
+  }
+
+  public static async getAttendanceSheet(classId: string, month: string) {
+    return this.request<{ class:{id:string;name:string}; month:string; students:Array<{id:string;studentId:string;rollNumber:string|null;name:string}>; records:Record<string,Record<string,string>> }>(
+      `/documents/attendance-sheet?classId=${encodeURIComponent(classId)}&month=${encodeURIComponent(month)}`
+    );
+  }
+
   public static async uploadDocumentImage(file: File): Promise<{url:string}> {
     const response = await fetch('/api/documents/images', {
       method:'POST', credentials:'include', headers:{'Content-Type':file.type}, body:file
