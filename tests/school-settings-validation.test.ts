@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { sanitizeSchoolSettings, sanitizeExamConfigSettings } from '../src/server/school-settings.ts';
+import { getLanguageDirection } from '../src/lib/translations.ts';
 
 test('school class-level settings allow KG alongside numeric grades', () => {
   assert.deepEqual(sanitizeSchoolSettings({ classLevels: [0, 1, 2, 8] }).classLevels, [0, 1, 2, 8]);
@@ -124,4 +125,17 @@ test('exam mark scheme supports the one-part and six-part custom boundaries', ()
   ] });
   assert.equal(sixParts.smallExamMax, 50);
   assert.equal(sixParts.bigExamMax, 50);
+});
+
+
+test('school settings accept Arabic as a default language', () => {
+  assert.equal(sanitizeSchoolSettings({ language: 'ar' }).language, 'ar');
+  assert.equal(sanitizeSchoolSettings({ language: 'am' }).language, 'am');
+});
+
+test('Arabic language switches the application direction to RTL', () => {
+  assert.equal(getLanguageDirection('ar'), 'rtl');
+  assert.equal(getLanguageDirection('en'), 'ltr');
+  assert.equal(getLanguageDirection('so'), 'ltr');
+  assert.equal(getLanguageDirection('am'), 'ltr');
 });

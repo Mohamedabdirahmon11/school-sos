@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand } from '../../types/index.ts';
+import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { SidebarAppearanceSettings } from './SidebarAppearanceSettings.tsx';
@@ -748,11 +748,13 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="block font-semibold text-[#334155] mb-1">{t('settings_language')}</label>
                 <select
                   value={language}
-                  onChange={e => setLanguage(e.target.value as 'en' | 'so')}
+                  onChange={e => setLanguage(e.target.value as SchoolLanguage)}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
                   <option value="en">English (default)</option>
                   <option value="so">Af-Soomaali</option>
+                  <option value="am">አማርኛ</option>
+                  <option value="ar">العربية</option>
                 </select>
                 <p className="text-[11px] text-[#64748B] mt-1">Used when a user has not chosen a language.</p>
               </div>

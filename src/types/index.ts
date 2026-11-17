@@ -43,7 +43,7 @@ export interface SchoolBranch {
   createdAt: string;
 }
 
-export type SchoolLanguage = 'en' | 'so';
+export type SchoolLanguage = 'en' | 'so' | 'am' | 'ar';
 export type SchoolCurrency = 'ETB' | 'USD' | 'SOS';
 
 export interface GradingBand {

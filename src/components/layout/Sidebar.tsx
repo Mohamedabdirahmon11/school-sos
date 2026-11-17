@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   const [menuLanguage, setMenuLanguage] = useState<LanguageCode>(() => {
     if (typeof window === 'undefined') return 'en';
     const saved = window.localStorage.getItem('schoolos:menu-language:guest');
-    return saved === 'so' || saved === 'am' ? saved : 'en';
+    return saved === 'so' || saved === 'am' || saved === 'ar' ? saved : 'en';
   });
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
     root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
   }, [school?.id, school?.sidebarTheme]);
-  const menuTranslations: Record<string, { so: string; am: string }> = {
+  const menuTranslations: Record<string, Partial<Record<Exclude<LanguageCode, 'en'>, string>>> = {
     Platform: { so: 'Madasha Guud', am: 'መድረክ' },
     Teaching: { so: 'Waxbaridda', am: 'ማስተማር' },
     Family: { so: 'Qoyska', am: 'ቤተሰብ' },
@@ -90,14 +90,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Help & Support': { so: 'Caawimaad iyo Taageero', am: 'እገዛ እና ድጋፍ' },
     'Platform workspace': { so: 'Goobta Madasha', am: 'የመድረክ ቦታ' },
     'School workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ' },
-    'Log out': { so: 'Ka bax', am: 'ውጣ' }
+    'Log out': { so: 'Ka bax', am: 'ውጣ', ar: 'تسجيل الخروج' },
+    Platform: { so: 'Madasha Guud', am: 'መድረክ', ar: 'المنصة' },
+    Teaching: { so: 'Waxbaridda', am: 'ማስተማር', ar: 'التدريس' },
+    Family: { so: 'Qoyska', am: 'ቤተሰብ', ar: 'الأسرة' },
+    Workspace: { so: 'Goobta Shaqada', am: 'የሥራ ቦታ', ar: 'مساحة العمل' },
+    Dashboard: { so: 'Bogga Hore', am: 'ዳሽቦርድ', ar: 'لوحة التحكم' },
+    People: { so: 'Dadka', am: 'ሰዎች', ar: 'الأشخاص' },
+    Academics: { so: 'Waxbarashada', am: 'ትምህርት', ar: 'الشؤون الأكاديمية' },
+    Communication: { so: 'Isgaarsiinta', am: 'ግንኙነት', ar: 'التواصل' },
+    Finance: { so: 'Maaliyadda', am: 'ፋይናንስ', ar: 'المالية' },
+    Reports: { so: 'Warbixinnada', am: 'ሪፖርቶች', ar: 'التقارير' },
+    Settings: { so: 'Dejinta', am: 'ቅንብሮች', ar: 'الإعدادات' },
+    'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'درجات الامتحان' },
+    'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'نتائج الامتحانات' },
+    Documents: { so: 'Dukumentiyada', am: 'ሰነዶች', ar: 'المستندات' },
+    'School Settings': { so: 'Dejinta Dugsiga', am: 'የትምህርት ቤት ቅንብሮች', ar: 'إعدادات المدرسة' }
   };
   const menuText = (value: string) => menuLanguage === 'en' ? value : menuTranslations[value]?.[menuLanguage] || value;
   const menuT = (key: keyof TranslationDict) => translations[menuLanguage]?.[key] || translations.en[key] || String(key);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(`schoolos:menu-language:${user?.id || 'guest'}`);
-    setMenuLanguage(saved === 'so' || saved === 'am' ? saved : 'en');
+    setMenuLanguage(saved === 'so' || saved === 'am' || saved === 'ar' ? saved : 'en');
   }, [user?.id]);
 
   useEffect(() => {
@@ -256,6 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
               <option value="en" className="text-slate-900">English</option>
               <option value="so" className="text-slate-900">Soomaali</option>
               <option value="am" className="text-slate-900">አማርኛ</option>
+              <option value="ar" className="text-slate-900">العربية</option>
             </select>
           </label>
           <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}

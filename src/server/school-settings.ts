@@ -137,7 +137,7 @@ const schoolSettingsSchema = z.object({
   sidebarTheme: sidebarThemeSchema.optional(),
   logoUrl: z.string().optional(),
   currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),
-  language: z.enum(['en', 'so'], 'Language must be English or Somali.').optional(),
+  language: z.enum(['en', 'so', 'am', 'ar'], 'Choose English, Somali, Amharic, or Arabic.').optional(),
   timezone: z.string().trim().min(1, 'Timezone is required.').max(100, 'Timezone must be 100 characters or fewer.').refine(isValidTimeZone, 'Timezone must be a valid IANA timezone.').optional(),
   academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.').refine(value => {
     const [start, end] = value.split('-').map(Number);
