@@ -505,6 +505,9 @@ export const ExamsResultsView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [isReturningMarks, setIsReturningMarks] = useState(false);
+  const [isPublishingResults, setIsPublishingResults] = useState(false);
 
   // Exam timetable, room allocation, and seat list state
   const [examSchedules, setExamSchedules] = useState<any[]>([]);
@@ -681,6 +684,39 @@ export const ExamsResultsView: React.FC = () => {
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setNotice(err.message || 'Failed to approve marks.');
+    }
+  };
+
+  const handleReturnMarksForCorrection = async () => {
+    if (isReadOnly || !correctionReason.trim()) return;
+    const pendingIds = marks.filter(mark => mark.status === 'form_teacher_submitted').map(mark => mark.id);
+    if (!pendingIds.length) { setNotice('There are no Form Teacher submissions to return.'); return; }
+    setIsReturningMarks(true);
+    try {
+      const result = await ApiClient.returnMarksForCorrection(pendingIds, correctionReason.trim());
+      setCorrectionReason('');
+      setNotice(`Returned ${result.returnedCount} mark records to teachers for correction. The reason is saved in the audit history.`);
+      await loadClassData();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Marks could not be returned for correction.');
+    } finally {
+      setIsReturningMarks(false);
+    }
+  };
+
+  const handlePublishResultsToParents = async () => {
+    if (isReadOnly) return;
+    setIsPublishingResults(true);
+    try {
+      const result = await ApiClient.publishExamResults(selectedClassId, selectedSemester);
+      setNotice(result.publishedCount > 0
+        ? `Published ${result.publishedCount} approved ${selectedSemester} mark records to parents and created a class notification.`
+        : 'These approved results have already been published to parents.');
+      await loadClassData();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Results could not be published.');
+    } finally {
+      setIsPublishingResults(false);
     }
   };
 
@@ -1017,6 +1053,10 @@ export const ExamsResultsView: React.FC = () => {
   const maxCombined = continuousMax + finalMax;
 
   const groupedExamSchedules = groupExamRoomSessions(examSchedules);
+  const expectedClassMarkCount = students.length * selectedClassSubjects.length;
+  const allClassMarksApproved = expectedClassMarkCount > 0 && marks.length === expectedClassMarkCount && marks.every(mark => mark.status === 'approved');
+  const allClassMarksPublished = allClassMarksApproved && marks.every(mark => Boolean(mark.publishedAt));
+  const pendingClassMarkCount = marks.filter(mark => mark.status === 'form_teacher_submitted').length;
 
   return (
     <div className="exam-management-redesign mx-auto min-w-0 w-full max-w-[1680px] space-y-6">
@@ -1150,12 +1190,22 @@ export const ExamsResultsView: React.FC = () => {
             </label>
             <div className="flex items-end text-xs font-medium text-[#0F766E]">All class subjects and all students load together for review and approval.</div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-900">
-            <div>
-              <strong>Class results:</strong> {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'No class selected'} · {selectedSemester}
-              <p className="mt-1">{selectedClassSubjects.length} subjects · {students.length} students · {marks.filter(mark => mark.status === 'form_teacher_submitted').length} mark rows submitted by Fomester</p>
+          <div className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-900">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <strong>Class results:</strong> {selectedClass ? `${selectedClass.name} · Section ${selectedClass.section}` : 'No class selected'} · {selectedSemester}
+                <p className="mt-1">{selectedClassSubjects.length} subjects · {students.length} students · {pendingClassMarkCount} waiting for admin review · {marks.filter(mark => mark.status === 'approved').length}/{expectedClassMarkCount} approved</p>
+                <p className="mt-1 font-semibold">{allClassMarksPublished ? 'Published to parents' : allClassMarksApproved ? 'Approved · ready to publish' : 'Results are not ready to publish yet'}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={handleApproveAll} disabled={isReadOnly || !pendingClassMarkCount} className="rounded-lg bg-[#0B2B2A] px-3 py-2 font-semibold text-white disabled:opacity-50"><Lock className="mr-1 inline h-3.5 w-3.5"/>Approve & Lock All</button>
+                <button type="button" onClick={handlePublishResultsToParents} disabled={isReadOnly || !allClassMarksApproved || allClassMarksPublished || isPublishingResults} className="rounded-lg bg-emerald-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{isPublishingResults ? 'Publishing…' : allClassMarksPublished ? 'Published to Parents' : 'Publish to Parents'}</button>
+              </div>
             </div>
-            <button type="button" onClick={handleApproveAll} disabled={isReadOnly || !marks.some(mark => mark.status === 'form_teacher_submitted')} className="rounded-lg bg-[#0B2B2A] px-3 py-2 font-semibold text-white disabled:opacity-50"><Lock className="mr-1 inline h-3.5 w-3.5"/>Approve & Lock All</button>
+            {pendingClassMarkCount > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <textarea value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} rows={2} maxLength={1000} placeholder="Explain what the teacher must correct before resubmitting…" className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700" />
+              <button type="button" onClick={handleReturnMarksForCorrection} disabled={isReadOnly || isReturningMarks || !correctionReason.trim()} className="self-stretch rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 disabled:opacity-50">{isReturningMarks ? 'Returning…' : `Return ${pendingClassMarkCount} for correction`}</button>
+            </div>}
           </div>
 
           {/* Mark Scheme Guidance Banner */}
