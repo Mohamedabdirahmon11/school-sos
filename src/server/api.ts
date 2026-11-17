@@ -8217,6 +8217,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   const body = req.body || {};
   const title = typeof body.title === 'string' ? body.title.trim().slice(0,180) : '';
   const documentType = DOCUMENT_TYPES.has(body.documentType) ? body.documentType : 'other';
+  const hideVerificationQr = typeof body.contentHtml === 'string' && body.contentHtml.includes('<!--SCHOOLOS_HIDE_QR-->');
   const contentHtml = sanitizeDocumentHtml(body.contentHtml);
   const pageSize = ['A4','A5','Letter','CR80'].includes(body.pageSize) ? body.pageSize : 'A4';
   let templateId: string | null = null;
@@ -8232,7 +8233,7 @@ apiRouter.post('/documents', requireAuth, requireSchoolContext, requireSchoolAdm
   }
   const verificationToken=randomUUID();
   const serialNumber='DOC-'+new Date().getFullYear()+'-'+randomUUID().replace(/-/g,'').slice(0,10).toUpperCase();
-  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p><img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" /></div>';
+  const verificationBlock='<div style="margin-top:24px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:10px;color:#475569"><p>Document No: '+serialNumber+'</p><p>Verify: /api/public/document-verification/'+verificationToken+'</p>'+(hideVerificationQr?'':'<img src="/api/public/document-verification/'+verificationToken+'/qr" alt="Document verification QR" width="96" height="96" />')+'</div>';
   const { data, error } = await client.from('school_documents').insert({
     school_id: school.id, title, document_type: documentType, status: 'draft', template_id:templateId,
     content_html: sanitizeDocumentHtml(contentHtml+verificationBlock), page_size: pageSize, direction, page_margins: pageMargins,
