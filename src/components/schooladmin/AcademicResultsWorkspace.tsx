@@ -30,6 +30,7 @@ interface AcademicResultsWorkspaceProps {
   selectedSemester: Semester;
   onSemesterChange: (semester: Semester) => void;
   examConfig: ExamConfig | null;
+  classDataLoading: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -236,7 +237,9 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
             </div>
           </div>
           <div className="flex items-center justify-between text-[11px] text-[#64748B]"><span>{filteredMarks.length} result records · {approvedMarks.length} approved in this class and semester</span><span>Page {page} of {totalPages}</span></div>
-          {filteredMarks.length === 0 ? (
+          {classDataLoading ? (
+            <div className="space-y-2 rounded-xl border border-[#E2E8F0] p-4"><div className="h-5 w-1/3 animate-pulse rounded bg-slate-100" /><div className="h-10 animate-pulse rounded bg-slate-100" /><div className="h-10 animate-pulse rounded bg-slate-100" /><div className="h-10 animate-pulse rounded bg-slate-100" /></div>
+          ) : filteredMarks.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-12 text-center"><Filter className="mx-auto h-6 w-6 text-[#94A3B8]" /><p className="mt-2 text-sm font-semibold text-[#334155]">No results match these filters</p><p className="mt-1 text-xs text-[#64748B]">Try another student, subject or approval status.</p></div>
           ) : (
             <>
