@@ -38,7 +38,8 @@ import {
   SchoolEvent,
   DirectMessage,
   CommunicationSettings,
-  CommunicationQueueItem
+  CommunicationQueueItem,
+  UserRole
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
@@ -2555,7 +2556,7 @@ class StorageEngine {
     marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, number>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
     submittedBy: string,
     submittedByName = 'Teacher',
-    submittedByRole = 'teacher'
+    submittedByRole: UserRole = 'teacher'
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
     const config = await this.getExamConfig(schoolId);
@@ -2757,7 +2758,7 @@ class StorageEngine {
 
   public approveMarks(
     schoolId: string, markIds: string[], approvedBy: string,
-    approvedByName = 'School Administrator', approvedByRole = 'school_admin'
+    approvedByName = 'School Administrator', approvedByRole: UserRole = 'school_admin'
   ): StudentMark[] {
     const now = new Date().toISOString();
     const approved: StudentMark[] = [];
@@ -2799,7 +2800,7 @@ class StorageEngine {
     returnedBy: string,
     reason: string,
     returnedByName: string,
-    returnedByRole: string
+    returnedByRole: UserRole
   ): Promise<StudentMark[]> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Exam marks storage is unavailable.');
@@ -2852,7 +2853,7 @@ class StorageEngine {
     semester: 'Semester 1' | 'Semester 2',
     publishedBy: string,
     publishedByName: string,
-    publishedByRole: string
+    publishedByRole: UserRole
   ): Promise<{ publishedCount: number; publishedAt: string | null }> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Exam result publishing is unavailable.');
