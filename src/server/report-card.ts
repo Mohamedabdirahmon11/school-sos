@@ -69,14 +69,19 @@ interface ReportCardResult {
   student: { firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: Array<{
     subject: { name: string; code?: string };
-    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number } | null;
-    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number } | null;
+    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; publishedAt?: string | null } | null;
+    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; publishedAt?: string | null } | null;
     sem1Percentage: number | null;
     sem2Percentage: number | null;
     yearlyPercentage: number | null;
     maxMarks: { small: number; big: number; total: number };
   }>;
   annualComplete: boolean;
+  semesterComplete?: boolean;
+  semesterPublished?: boolean;
+  semesterPercentage?: number;
+  semesterRank?: number;
+  semesterIsPass?: boolean;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -88,42 +93,69 @@ export interface ReportCardPdfContext {
   className: string;
   result: ReportCardResult;
   totalStudents: number;
+  period?: 'Annual' | 'Semester 1' | 'Semester 2';
 }
 
 function imageAsset(dataUrl: string | undefined, x: number, y: number, width: number, height: number): PdfImageAsset | null {
   return isEmbeddableImageSource(dataUrl) ? { dataUrl: dataUrl!, x, y, width, height } : null;
 }
 
-export function buildReportCardPdfPage({ school, design, className, result, totalStudents }: ReportCardPdfContext): PdfPage {
-  if (!result.annualComplete) throw new Error('Annual report cards require approved marks for every assigned subject in both semesters.');
+export function buildReportCardPdfPage({ school, design, className, result, totalStudents, period = 'Annual' }: ReportCardPdfContext): PdfPage {
+  const isAnnual = period === 'Annual';
+  const isSemesterOne = period === 'Semester 1';
+  const complete = isAnnual ? result.annualComplete : Boolean(result.semesterComplete);
+  if (!complete) {
+    throw new Error(isAnnual
+      ? 'Annual report cards require approved marks for every assigned subject in both semesters.'
+      : `${period} report cards require approved marks for every assigned subject in that semester.`);
+  }
   const blocks = design.visibleBlocks || { rank: true, teacherRemarks: true, adminRemarks: true, percentage: true, signatures: true, stamp: true };
+  const reportPercentage = isAnnual ? result.yearlyPercentage : Number(result.semesterPercentage || 0);
+  const reportRank = isAnnual ? result.yearlyRank : Number(result.semesterRank || 0);
+  const isPass = isAnnual ? result.isPass : Boolean(result.semesterIsPass);
+  const title = isAnnual ? (design.titleText || 'Official Academic Achievement Record') : `${design.titleText || 'Official Academic Achievement Record'} · ${period}`;
   const lines = [
     school.name,
     ...(school.reportCardHeader ? [school.reportCardHeader] : []),
-    design.titleText || 'Official Academic Achievement Record',
+    title,
     `Academic Year: ${school.academicYear || 'Current'}`,
+    `Report period: ${period}`,
     `Template: ${design.templateId} | Colors: ${design.primaryColor} / ${design.secondaryColor}`,
     `Student: ${result.student.firstName} ${result.student.middleName || ''} ${result.student.lastName} (${result.student.studentId})`,
     `Class: ${className}`
   ];
-  if (blocks.rank) lines.push(`Class rank: #${result.yearlyRank} of ${totalStudents}`);
-  lines.push('', 'SUBJECT | SEMESTER 1 MARKS | SEMESTER 1 % | SEMESTER 2 MARKS | SEMESTER 2 % | YEARLY % | GRADE');
-  for (const row of result.subjectResults) {
-    lines.push([
-      `${row.subject.name}${row.subject.code ? ` (${row.subject.code})` : ''}`,
-      formatReportCardMark(row.sem1Marks, row.maxMarks),
-      row.sem1Percentage === null ? '-' : `${row.sem1Percentage}%`,
-      formatReportCardMark(row.sem2Marks, row.maxMarks),
-      row.sem2Percentage === null ? '-' : `${row.sem2Percentage}%`,
-      row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
-      gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
-    ].join(' | '));
+  if (blocks.rank) lines.push(`${isAnnual ? 'Yearly class rank' : `${period} class rank`}: #${reportRank} of ${totalStudents}`);
+  if (isAnnual) {
+    lines.push('', 'SUBJECT | SEMESTER 1 MARKS | SEMESTER 1 % | SEMESTER 2 MARKS | SEMESTER 2 % | YEARLY % | GRADE');
+    for (const row of result.subjectResults) {
+      lines.push([
+        `${row.subject.name}${row.subject.code ? ` (${row.subject.code})` : ''}`,
+        formatReportCardMark(row.sem1Marks, row.maxMarks),
+        row.sem1Percentage === null ? '-' : `${row.sem1Percentage}%`,
+        formatReportCardMark(row.sem2Marks, row.maxMarks),
+        row.sem2Percentage === null ? '-' : `${row.sem2Percentage}%`,
+        row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
+        gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
+      ].join(' | '));
+    }
+  } else {
+    lines.push('', `SUBJECT | ${period.toUpperCase()} MARKS | ${period.toUpperCase()} % | GRADE`);
+    for (const row of result.subjectResults) {
+      const mark = isSemesterOne ? row.sem1Marks : row.sem2Marks;
+      const percentage = isSemesterOne ? row.sem1Percentage : row.sem2Percentage;
+      lines.push([
+        `${row.subject.name}${row.subject.code ? ` (${row.subject.code})` : ''}`,
+        formatReportCardMark(mark, row.maxMarks),
+        percentage === null ? '-' : `${percentage}%`,
+        gradeLabelForPercentage(percentage, school.gradingScale)
+      ].join(' | '));
+    }
   }
   lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
-  if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
-  lines.push(`Result: ${result.isPass ? 'PASS' : 'BELOW PASS MARK'}`);
-  if (blocks.teacherRemarks) lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
-  if (blocks.adminRemarks) lines.push(`Administrator remarks: ${adminRemark(result.isPass)}`);
+  if (blocks.percentage) lines.push(`${isAnnual ? 'Yearly' : period} average: ${reportPercentage}% | Grade: ${gradeLabelForPercentage(reportPercentage, school.gradingScale)}`);
+  lines.push(`Result: ${isPass ? 'PASS' : 'BELOW PASS MARK'}`);
+  if (blocks.teacherRemarks) lines.push('', `Teacher remarks: ${teacherRemark(reportPercentage)}`);
+  if (blocks.adminRemarks) lines.push(`Administrator remarks: ${adminRemark(isPass)}`);
   if (blocks.signatures) lines.push('', `Teacher: ${design.signatureTitleLeft || 'Class Teacher'}`, `Administrator: ${design.signatureTitleRight || 'Principal'}`);
   if (blocks.stamp) lines.push('Official School Seal');
   if (school.reportCardFooter) lines.push('', school.reportCardFooter);
