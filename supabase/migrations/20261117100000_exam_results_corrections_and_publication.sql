@@ -38,7 +38,7 @@ BEGIN
   IF coalesce(btrim(p_school_id), '') = ''
      OR coalesce(btrim(p_class_id), '') = ''
      OR coalesce(btrim(p_published_by), '') = ''
-     OR p_semester NOT IN ('Semester 1', 'Semester 2') THEN
+     OR p_semester IS NULL OR p_semester NOT IN ('Semester 1', 'Semester 2') THEN
     RAISE EXCEPTION 'A school, class, publisher and valid semester are required.';
   END IF;
 
