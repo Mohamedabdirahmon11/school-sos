@@ -370,7 +370,9 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,grading
     if(!html){setMessage(kind==='fee_receipt'?'Ardaygan weli ma laha rasiid lacag-bixin.':'Xog ku filan lagama helin fasalka ama ardayga la doortay.');return;}
     setBusy(true);
     try{
-      const created=await ApiClient.createDocument({title:name||TEMPLATE_OPTIONS.find(item=>item.kind===kind)?.label||'Dukumenti',documentType:documentType(kind),contentHtml:html,status:'draft',pageSize:kind==='student_id_cards'?'A4':'A4',direction:config.direction,pageMargins:10});
+      const studentScoped=['individual_report_card','certificate','fee_receipt','official_letter'].includes(kind)?selectedStudent?.id:undefined;
+      const classScoped=['exam_result_list','individual_report_card','attendance_sheet','student_id_cards','class_timetable','class_list'].includes(kind)?classId:undefined;
+      const created=await ApiClient.createDocument({title:name||TEMPLATE_OPTIONS.find(item=>item.kind===kind)?.label||'Dukumenti',documentType:documentType(kind),contentHtml:html,status:'draft',pageSize:'A4',direction:config.direction,pageMargins:10,studentId:studentScoped,classId:classScoped});
       onCreated(created);
     }catch(error){setMessage(error instanceof Error?error.message:'Dukumentiga lama abuuri karin.');}
     finally{setBusy(false);}
