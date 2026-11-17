@@ -2535,7 +2535,12 @@ class StorageEngine {
   }
 
   public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
-    return this.queryRows<StudentMark>('student_marks', { school_id: schoolId, class_id: classId, subject_id: subjectId, semester });
+    const klass = await this.getClassById(classId, schoolId);
+    const academicYear = klass?.academicYear;
+    return this.queryRows<StudentMark>('student_marks', {
+      school_id: schoolId, class_id: classId, subject_id: subjectId, semester,
+      academic_year: academicYear
+    });
   }
 
   public async getStudentMarks(schoolId: string, studentId: string): Promise<StudentMark[]> {
@@ -2554,6 +2559,8 @@ class StorageEngine {
   ): Promise<StudentMark[]> {
     await this.getMarks(schoolId, classId, subjectId, semester);
     const config = await this.getExamConfig(schoolId);
+    const klass = await this.getClassById(classId, schoolId);
+    const academicYear = klass?.academicYear || config.academicYear;
     const components = config.assessmentComponents || [];
     const continuousComponents = components.filter(component => component.category === 'continuous');
     const finalComponents = components.filter(component => component.category === 'final');
@@ -2659,7 +2666,7 @@ class StorageEngine {
           classId,
           subjectId,
           studentId: mark.studentId,
-          academicYear: config.academicYear,
+          academicYear,
           semester,
           assessmentScores: mark.assessmentScores,
           smallExamMarks: mark.smallExamMarks,
