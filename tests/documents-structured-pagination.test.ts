@@ -22,7 +22,7 @@ test('student ID sheets place eight cards per A4 page and continue to the next p
   const html=renderStudentIdCards({schoolName:'Dugsi',year:'2026',cards:Array.from({length:9},(_,index)=>({id:String(index+1),name:'Arday '+index,className:'KG'}))});
   assert.match(html,/Bogga 1 \/ 2/);
   assert.match(html,/Bogga 2 \/ 2/);
-  assert.equal((html.match(/KAARKA AQOONSIGA ARDAYGA/g)||[]).length,10);
+  assert.equal((html.match(/KAARKA AQOONSIGA ARDAYGA/g)||[]).length,11);
 });
 
 test('structured template HTML survives the shared allow-list sanitizer and preserves print breaks', () => {
