@@ -176,6 +176,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
   useEffect(()=>{
     if(!classId)return;
     let active=true;
+    setAttendanceDirtyDates([]);
     ApiClient.getAttendanceMonth(classId,year,month).then(result=>{if(active)setAttendance(result);})
       .catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Xogta xaadirinta lama soo dejin karin.');});
     return ()=>{active=false;};
@@ -395,6 +396,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[]
         {canManageTemplates&&savedTemplates.length>0&&<div className="rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-bold">Template-yadayda</h3>{savedTemplates.map(template=><div key={template.id} className="flex items-center gap-2 border-t py-2 text-xs"><button type="button" onClick={()=>loadTemplate(template)} className="min-w-0 flex-1 truncate text-left">{template.name}</button><button type="button" onClick={()=>void removeSaved(template.id)} aria-label="Tirtir template" className="text-rose-600"><Trash2 size={14}/></button></div>)}</div>}
         {kind==='attendance_sheet'&&canSaveAttendance&&<button type="button" disabled={busy||!attendanceDirtyDates.length} onClick={()=>void saveAttendance()} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Kaydi xaadirinta ({attendanceDirtyDates.length})</button>}
         {kind==='attendance_sheet'&&!canManageTemplates&&!canSaveAttendance&&<p className="text-xs text-amber-700">Fasalkan kuma tihid Form Teacher; xaadirinta waad daabici kartaa balse ma kaydin kartid.</p>}
+        {userRole==='teacher'&&!classes.length&&!busy&&<p className="text-xs text-amber-700">Akoonkan looma qoondeyn fasal Form Teacher ah.</p>}
         {busy&&<p className="text-xs text-slate-500">Waa la shaqaynayaa…</p>}
       </div>
       <div className="min-w-0">
