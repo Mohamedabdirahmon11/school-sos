@@ -31,7 +31,8 @@ import {
   Printer, 
   Download,
   AlertCircle,
-  CalendarDays
+  CalendarDays,
+  TrendingUp
 } from 'lucide-react';
 
 
