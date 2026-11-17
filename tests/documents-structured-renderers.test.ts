@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { sanitizeDocumentHtml } from '../src/lib/documents/sanitize-html.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
   renderExamResultList, renderFeeReceipt, renderIndividualReportCard, renderOfficialLetter,
@@ -60,4 +61,13 @@ test('exam results and ID cards continue across A4 pages', () => {
   assert.match(results,/Bogga 2 \/ 2/);
   assert.match(cards,/Bogga 1 \/ 4/);
   assert.match(cards,/Bogga 4 \/ 4/);
+});
+
+test('A4 layouts survive the shared sanitizer with page-break styles intact', () => {
+  const html=renderStudentIdCards({schoolName:'Dugsi',year:'2026',cards:Array.from({length:9},(_,index)=>({id:String(index),name:'Arday '+index,className:'KG'}))});
+  const safe=sanitizeDocumentHtml(html);
+  assert.match(safe,/page-break-after:always/);
+  assert.match(safe,/<table/);
+  assert.match(safe,/KAARKA AQOONSIGA ARDAYGA/);
+  assert.doesNotMatch(safe,/<article|<section|<script/i);
 });
