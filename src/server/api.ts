@@ -5605,7 +5605,7 @@ apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoo
     const noticeTitle = `Exam results published · ${semester}`;
     let notificationCreated = false;
     try {
-      const existingNotices = await db.queryRows<any>('school_notices', { school_id: school.id, class_id: classId, title: noticeTitle });
+      const existingNotices = (await db.getNotices(school.id)).filter(notice => notice.classId === classId && notice.title === noticeTitle && notice.isActive !== false);
       if (existingNotices.length) {
         notificationCreated = true;
       } else {
