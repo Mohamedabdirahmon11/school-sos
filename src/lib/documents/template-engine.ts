@@ -117,7 +117,7 @@ export function summarizeOutcomes(outcomes: readonly StudentOutcome[]): OutcomeC
   }, { total: 0, passed: 0, failed: 0, absent: 0, exempted: 0 });
 }
 
-export function monthDays(year: number, month: number, weekendDays: readonly number[] = [0, 6], holidays: readonly string[] = []): Array<{ date: string; day: number; isWeekend: boolean; isHoliday: boolean }> {
+export function monthDays(year: number, month: number, weekendDays: readonly number[] = [0], holidays: readonly string[] = []): Array<{ date: string; day: number; isWeekend: boolean; isHoliday: boolean }> {
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
     throw new RangeError('Sanadka ama bisha sax ma aha.');
   }
