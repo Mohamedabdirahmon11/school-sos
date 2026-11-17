@@ -710,8 +710,12 @@ export const ExamsResultsView: React.FC = () => {
     try {
       const result = await ApiClient.publishExamResults(selectedClassId, selectedSemester);
       setNotice(result.publishedCount > 0
-        ? `Published ${result.publishedCount} approved ${selectedSemester} mark records to parents and created a class notification.`
-        : 'These approved results have already been published to parents.');
+        ? result.notificationCreated
+          ? `Published ${result.publishedCount} approved ${selectedSemester} mark records and notified the class parents.`
+          : `Published ${result.publishedCount} approved ${selectedSemester} mark records, but the parent notice could not be created. Check the audit log.`
+        : result.notificationCreated
+          ? 'These approved results have already been published to parents.'
+          : 'Results are already published, but the parent notice is missing. Retry publishing to create the notice.');
       await loadClassData();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Results could not be published.');
