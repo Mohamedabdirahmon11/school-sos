@@ -97,3 +97,8 @@ test('sanitizer rejects embedded data URLs but allows verified QR route and scho
   assert.match(sanitizeDocumentHtml(`<img src="${allowedLogo}" alt="logo"/>`),/school-logos/);
   assert.doesNotMatch(sanitizeDocumentHtml(`<img src="${unsafeLogo}" alt="bad"/>`),/evil\.example/);
 });
+
+test('average pass rule uses the configured class-average percentage', () => {
+  const subjects=Array.from({length:7},(_,index)=>({id:String(index),name:'Subject '+index,maxMark:100}));
+  assert.equal(passThreshold(subjects,{mode:'average',average:40}),280);
+});
