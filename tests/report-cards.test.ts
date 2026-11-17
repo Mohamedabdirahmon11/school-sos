@@ -66,6 +66,7 @@ const result = {
       maxMarks: { small: 10, big: 40, total: 50 }
     }
   ],
+  annualComplete: true,
   yearlyPercentage: 90,
   yearlyRank: 1,
   isPass: true
