@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, FileText, Plus, Printer, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
-import type { FeePayment, SchoolClass, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
+import type { FeePayment, GradingBand, SchoolClass, SchoolSetupData, Student, StudentMark, TimetableSlot } from '../../types/index.ts';
 import { sanitizeDocumentHtml } from '../../lib/documents/sanitize-html.ts';
 import {
   renderAttendanceSheet, renderCertificate, renderClassList, renderClassTimetable,
@@ -49,14 +49,57 @@ function approved(mark:StudentMark):boolean {
   return Boolean(mark.approvedAt || mark.publishedAt);
 }
 
+function weekdayIndex(value:string):number|null {
+  const key=value.trim().toLowerCase();
+  const days:Record<string,number>={sunday:0,sun:0,axad:0,monday:1,mon:1,isniin:1,tuesday:2,tue:2,talaado:2,wednesday:3,wed:3,arbaco:3,thursday:4,thu:4,khamiis:4,friday:5,fri:5,jimce:5,saturday:6,sat:6,sabti:6};
+  return Object.prototype.hasOwnProperty.call(days,key)?days[key]:null;
+}
+
+function schoolWeekendDays(calendar?:SchoolSetupData['calendar']):number[] {
+  if(calendar?.workingDays?.length){
+    const working=new Set(calendar.workingDays.map(weekdayIndex).filter((day):day is number=>day!==null));
+    return [0,1,2,3,4,5,6].filter(day=>!working.has(day));
+  }
+  if(calendar?.weeklyHolidays?.length){
+    return calendar.weeklyHolidays.map(weekdayIndex).filter((day):day is number=>day!==null);
+  }
+  return [0];
+}
+
+function schoolHolidayDates(calendar:SchoolSetupData['calendar']|undefined,year:number,month:number):string[] {
+  const monthPrefix=`${year}-${String(month).padStart(2,'0')}-`;
+  const dates=new Set<string>();
+  for(const holiday of calendar?.nationalHolidays||[]){
+    if(holiday.calendar==='gregorian'&&holiday.date.startsWith(monthPrefix))dates.add(holiday.date);
+  }
+  for(const holiday of calendar?.schoolHolidays||[]){
+    const start=new Date(`${holiday.startDate.slice(0,10)}T00:00:00.000Z`);
+    const end=new Date(`${holiday.endDate.slice(0,10)}T00:00:00.000Z`);
+    if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime()))continue;
+    for(let current=start;current<=end;current=new Date(current.getTime()+86400000)){
+      const date=current.toISOString().slice(0,10);
+      if(date.startsWith(monthPrefix))dates.add(date);
+    }
+  }
+  return [...dates];
+}
+
+function gradeForMark(value:number,maxMark:number,scale:GradingBand[]):string {
+  if(!scale.length||maxMark<=0)return '';
+  const percentage=value/maxMark*100;
+  return [...scale].sort((a,b)=>b.minPercentage-a.minPercentage).find(band=>percentage>=band.minPercentage)?.label||'';
+}
+
 export interface StructuredTemplatesPanelProps {
   schoolName:string;
   accentColor:string;
+  gradingScale?:GradingBand[];
+  calendar?:SchoolSetupData['calendar'];
   onCreated:(document:unknown)=>void;
   onClose:()=>void;
 }
 
-export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClose}:StructuredTemplatesPanelProps) {
+export function StructuredTemplatesPanel({schoolName,accentColor,gradingScale=[],calendar,onCreated,onClose}:StructuredTemplatesPanelProps) {
   const [kind,setKind]=useState<TemplateKind>('exam_result_list');
   const [name,setName]=useState('Go’aanka imtixaanka');
   const [config,setConfig]=useState<TemplateConfig>(()=>defaultConfig('exam_result_list',accentColor));
@@ -174,13 +217,27 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
         });
         return renderExamResultList({schoolName,examTitle,academicYear:selectedClass?.academicYear||String(year),subjects:activeSubjects,students:examStudents,passRule:config.passRule,rowsPerPage:config.rowsPerPage});
       }
-      case 'individual_report_card':
+      case 'individual_report_card':{
         const finalTotal=subjectsWithMarks.reduce((sum,item)=>sum+(item.final||0),0);
         const finalAverage=subjectsWithMarks.length?finalTotal/subjectsWithMarks.length:0;
         const finalOutcome=finalTotal>=passThreshold(activeSubjects,config.passRule)?'Gudub':'Aan Gudbin';
-        return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:subjectsWithMarks,total:finalTotal,average:finalAverage,outcome:finalOutcome}):'';
+        const ranked=students.map(item=>{
+          const values=activeSubjects.map(subject=>{
+            const firstMark=term1Marks.find(mark=>mark.studentId===item.id&&mark.subjectId===subject.id);
+            const secondMark=term2Marks.find(mark=>mark.studentId===item.id&&mark.subjectId===subject.id);
+            if(firstMark&&secondMark)return (Number(firstMark.totalMarks)+Number(secondMark.totalMarks))/2;
+            if(firstMark)return Number(firstMark.totalMarks);
+            if(secondMark)return Number(secondMark.totalMarks);
+            return null;
+          }).filter((value):value is number=>value!==null);
+          return {studentId:item.id,average:values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0};
+        }).sort((a,b)=>b.average-a.average);
+        const rank=ranked.findIndex(item=>item.studentId===student?.id)+1;
+        const gradedSubjects=subjectsWithMarks.map(item=>({...item,grade:item.final==null?'':gradeForMark(item.final,100,gradingScale)}));
+        return student?renderIndividualReportCard({schoolName,student:{id:student.studentId,name:nameOf,className:selectedClass?.name||'',academicYear:selectedClass?.academicYear||String(year)},subjects:gradedSubjects,total:finalTotal,average:finalAverage,grade:gradeForMark(finalAverage,100,gradingScale),rank:rank>0?rank:'—',outcome:finalOutcome}):'';
+      }
       case 'attendance_sheet':
-        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
+        return renderAttendanceSheet({schoolName,className:selectedClass?.name||'',month,year,students:students.map(item=>({id:item.id,name:studentName(item)})),entries:attendance,weekendDays:schoolWeekendDays(calendar),holidays:schoolHolidayDates(calendar,year,month),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       case 'certificate':
         return renderCertificate({schoolName,title:name,studentName:nameOf,body:certificateBody,rankOrTotal:'',date:certificateDate});
       case 'student_id_cards':
@@ -199,7 +256,7 @@ export function StructuredTemplatesPanel({schoolName,accentColor,onCreated,onClo
         return renderClassList({schoolName,className:selectedClass?.name||'',students:students.map(item=>({id:item.studentId,name:studentName(item),gender:item.gender==='male'?'Lab':'Dhedig',parentPhone:item.fatherPhone})),rowsPerPage:config.rowsPerPage}).join('<div style="break-after:page;page-break-after:always"></div>');
       default:return '';
     }
-  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name]);
+  },[kind,selectedStudent,students,subjects,term1Marks,term2Marks,attendance,timetable,payments,selectedClass,schoolName,examTitle,year,month,config,certificateBody,certificateDate,recipient,letterSubject,letterBody,name,gradingScale,calendar]);
 
   const createDocument=async()=>{
     const html=buildHtml();
