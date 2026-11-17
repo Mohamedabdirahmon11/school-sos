@@ -39,6 +39,7 @@ export const DocumentsView: React.FC = () => {
   const [includeDeleted,setIncludeDeleted] = useState(false);
   const [loading,setLoading] = useState(true);
   const [saveState,setSaveState] = useState<'saved'|'saving'|'unsaved'|'error'>('saved');
+  const [showStructuredTemplates,setShowStructuredTemplates] = useState(false);
   const [message,setMessage] = useState('');
   const [versions,setVersions] = useState<any[]>([]);
   const [auditEvents,setAuditEvents] = useState<any[]>([]);
