@@ -63,7 +63,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'grades'/);
   assert.match(teacher, /Class results review/);
   assert.match(teacher, /Enter marks by subject and exam type/);
-  assert.match(teacher, /Student name \/ ID/);
+  assert.match(teacher, /Student \/ Roll No\./);
   assert.match(teacher, /examRegisterRows/);
   assert.match(teacher, /rankExamStudentResults/);
   assert.match(teacher, /allClassMarksSubmitted/);
@@ -335,7 +335,7 @@ test('Form Teacher rankings and class totals stay hidden until every active subj
   const calculations = read('../src/lib/exam-calculations.ts');
   assert.match(teacher, /allClassMarksSubmitted = isFormTeacher/);
   assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted \|\| classAlreadyForwarded\}/);
-  assert.match(teacher, /allClassMarksSubmitted \? row\.total/);
+  assert.match(teacher, /row\.total\.toFixed\(1\).*row\.max/);
   assert.match(teacher, /t\('exam_drafts_autosaved'\)/);
   assert.match(teacher, /row\.student\.rollNumber \|\| row\.student\.studentId/);
   assert.match(calculations, /row\.total !== previousTotal/);
