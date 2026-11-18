@@ -9459,7 +9459,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
       client.from('teacher_subjects').select('teacher_id,subject_id').eq('school_id', school.id).eq('is_active', true)
     ]);
     if ([years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals].some(x => x.error)) throw new Error('Xogta qoondeynta lama soo wada qaadi karin. Hubi migration-ka Step 6.');
-    const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || '');
+    const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || (years.data || [])[0]?.id || '');
     const requestedTerm = typeof req.query.termId === 'string' ? String(req.query.termId) : null;
     const termId = requestedTerm === 'all' ? '' : (requestedTerm || String((terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || ''));
     const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && !x.term_id);
