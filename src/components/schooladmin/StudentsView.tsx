@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
@@ -49,7 +50,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [pinSlip, setPinSlip] = useState<{ studentName: string; studentId: string; pin: string } | null>(null);
   const [studentDetails, setStudentDetails] = useState<any | null>(null);
-  const [activeProfileTab, setActiveProfileTab] = useState<'overview' | 'attendance' | 'results' | 'fees' | 'documents' | 'notes'>('overview');
+  const [activeProfileTab, setActiveProfileTab] = useState<'overview' | 'attendance' | 'results' | 'fees' | 'documents' | 'notes' | 'enrollments' | 'guardians'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -58,6 +59,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [showBulkPinReset, setShowBulkPinReset] = useState(() => getPendingPinSlips(school?.id).length > 0);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [enrollmentRows, setEnrollmentRows] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean}>>([]);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('');
+  const [transferClassId, setTransferClassId] = useState('');
+  const [enrollmentLoading, setEnrollmentLoading] = useState(false);
+  const [enrollmentBusy, setEnrollmentBusy] = useState(false);
+  const [guardianRows, setGuardianRows] = useState<any[]>([]);
+  const [guardianNameInput, setGuardianNameInput] = useState('');
+  const [guardianPhoneInput, setGuardianPhoneInput] = useState('');
+  const [guardianRelation, setGuardianRelation] = useState<'aabo'|'hooyo'|'walaal'|'kale'>('kale');
+  const [guardianPrimary, setGuardianPrimary] = useState(false);
+
+
 
   // Add Student Form State (NO Date of Birth!)
   const [firstName, setFirstName] = useState('');
@@ -85,6 +99,52 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const fetchStudents = studentLoad.retry;
   useEffect(() => { if (classes.length > 0 && !classId) setClassId(classes[0].id); }, [classes, classId]);
   useEffect(() => { setPageInfo((studentRows as any)?.pagination || null); }, [studentRows]);
+  useEffect(() => {
+    if (activeProfileTab !== 'guardians' || !selectedStudent?.id) return;
+    let cancelled = false;
+    ApiClient.getStudentGuardians(selectedStudent.id)
+      .then(rows => { if (!cancelled) setGuardianRows(rows); })
+      .catch((error:any) => { if (!cancelled) setModalError(error?.message || 'Guardian links could not be loaded.'); });
+    return () => { cancelled = true; };
+  }, [activeProfileTab, selectedStudent?.id, school?.id]);
+
+  const handleLinkGuardian = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedStudent || isReadOnly) return;
+    setEnrollmentBusy(true);
+    setModalError(null);
+    try {
+      await ApiClient.linkStudentGuardian(selectedStudent.id, {
+        fullName: guardianNameInput, phone: guardianPhoneInput, relation: guardianRelation, isPrimary: guardianPrimary
+      });
+      setGuardianRows(await ApiClient.getStudentGuardians(selectedStudent.id));
+      setGuardianNameInput('');
+      setGuardianPhoneInput('');
+      setGuardianRelation('kale');
+      setGuardianPrimary(false);
+      setNotice('Guardian linked to student successfully.');
+    } catch (error:any) { setModalError(error?.message || 'Guardian could not be linked.'); }
+    finally { setEnrollmentBusy(false); }
+  };
+
+  useEffect(() => {
+    if (activeProfileTab !== 'enrollments' || !selectedStudent?.id) return;
+    let cancelled = false;
+    setEnrollmentLoading(true);
+    Promise.all([ApiClient.getStudentEnrollments(selectedStudent.id), ApiClient.getAcademicYears()])
+      .then(([history, years]) => {
+        if (cancelled) return;
+        setEnrollmentRows(history);
+        setAcademicYears(years);
+        const current = years.find(year => year.is_current) || years[0];
+        setSelectedAcademicYearId(value => value || current?.id || '');
+        setTransferClassId(value => value || classes[0]?.id || '');
+      })
+      .catch((error: any) => { if (!cancelled) setModalError(error?.message || 'Enrollment history could not be loaded.'); })
+      .finally(() => { if (!cancelled) setEnrollmentLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeProfileTab, selectedStudent?.id, school?.id]);
+
 
   const loadStudentDetails = async (student: any) => {
     setSelectedStudent(student);
@@ -158,6 +218,35 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     } catch (error: any) { setModalError(error?.message || 'Unable to update student information.'); }
   };
 
+  const handleStudentWithdraw = async () => {
+    if (isReadOnly || !selectedStudent || !selectedAcademicYearId) return;
+    if (!confirm(`Withdraw ${selectedStudent.firstName} ${selectedStudent.lastName} from the selected academic year? Their records will be retained.`)) return;
+    setEnrollmentBusy(true);
+    setModalError(null);
+    try {
+      await ApiClient.transferStudent(selectedStudent.id, { academicYearId: selectedAcademicYearId, action: 'withdraw' });
+      setEnrollmentRows(await ApiClient.getStudentEnrollments(selectedStudent.id));
+      await fetchStudents();
+      setNotice('Student withdrawn. Their academic and financial history was retained.');
+    } catch (error:any) { setModalError(error?.message || 'Student withdrawal failed.'); }
+    finally { setEnrollmentBusy(false); }
+  };
+
+  const handleStudentTransfer = async () => {
+    if (isReadOnly || !selectedStudent || !selectedAcademicYearId || !transferClassId) return;
+    setEnrollmentBusy(true);
+    setModalError(null);
+    try {
+      await ApiClient.transferStudent(selectedStudent.id, { academicYearId: selectedAcademicYearId, classId: transferClassId });
+      const history = await ApiClient.getStudentEnrollments(selectedStudent.id);
+      setEnrollmentRows(history);
+      await fetchStudents();
+      setNotice('Student enrollment transferred successfully.');
+    } catch (error: any) {
+      setModalError(error?.message || 'Student transfer failed.');
+    } finally { setEnrollmentBusy(false); }
+  };
+
   const handleResetPin = async () => {
     if (isReadOnly || !selectedStudent) return;
     if (!confirm(`Reset the sign-in PIN for ${selectedStudent.firstName} ${selectedStudent.lastName} and linked parent accounts? The new PIN is shown once.`)) return;
@@ -216,6 +305,42 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
+  const buildStudentExportQuery = () => {
+    const params = new URLSearchParams();
+    if (classFilter) params.set('classId', classFilter);
+    if (branchFilter) params.set('branchId', branchFilter);
+    if (search.trim()) params.set('search', search.trim());
+    if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+    return params.toString();
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const response = await fetch('/api/students/export?' + buildStudentExportQuery(), { credentials: 'include' });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Student Excel export failed.');
+      const csv = await response.text();
+      const workbook = XLSX.read(csv.replace(/^\\uFEFF/, ''), { type: 'string' });
+      XLSX.writeFile(workbook, (school?.code || 'school') + '_students_' + new Date().toISOString().slice(0,10) + '.xlsx');
+      setNotice('Excel file exported with all matching student records.');
+      window.setTimeout(() => setNotice(null), 4000);
+    } catch (error:any) { setNotice(error?.message || 'Student Excel export failed.'); }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const response = await fetch('/api/students/export.pdf?' + buildStudentExportQuery(), { credentials: 'include' });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Student PDF export failed.');
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = (school?.code || 'school') + '_students_' + new Date().toISOString().slice(0,10) + '.pdf';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Student PDF register exported.');
+      window.setTimeout(() => setNotice(null), 4000);
+    } catch (error:any) { setNotice(error?.message || 'Student PDF export failed.'); }
+  };
+
   // The PIN wizard stays mounted while the list reloads so one-time PINs are never lost.
   const pinResetWizard = <BulkStudentPinResetWizard open={showBulkPinReset} schoolId={school?.id} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />;
   if (isLoading) return <><div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>{pinResetWizard}</>;
@@ -235,6 +360,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           >
             <Download className="w-3.5 h-3.5 text-[#0F766E]" />
             <span>Export CSV</span>
+          </button>
+          <button type="button" onClick={handleExportExcel} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[#0F766E]" /><span>Excel</span>
+          </button>
+          <button type="button" onClick={handleExportPDF} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
+            <FileText className="w-3.5 h-3.5 text-[#0F766E]" /><span>PDF</span>
           </button>
           <button
             onClick={() => setShowBulkImport(true)}
@@ -270,6 +401,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <span>{notice}</span>
         </div>
       )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Tirada ardayda</p><p className="mt-1 text-2xl font-bold text-[#102522]">{pageInfo?.total ?? students.length}</p></div>
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Fasallada</p><p className="mt-1 text-2xl font-bold text-[#102522]">{classes.length}</p></div>
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Laamaha</p><p className="mt-1 text-2xl font-bold text-[#102522]">{branches.length}</p></div>
+      </div>
 
       {/* Filter Bar */}
       <div className="rounded-2xl border border-[#dce7e4] bg-white p-4 md:p-5">
@@ -330,7 +467,16 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
             <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{students.length} shown</span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="grid gap-2 p-3 md:hidden">
+            {students.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
+              students.map((student:any) => (
+                <button type="button" key={student.id} onClick={()=>void loadStudentDetails(student)} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
+                  <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
+                  <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || '—'}</span><span>{student.fatherPhone || '—'}</span></div>
+                </button>
+              ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
@@ -424,7 +570,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 { id: 'attendance', label: 'Attendance' },
                 { id: 'results', label: 'Results' },
                 { id: 'documents', label: 'Documents' },
-                { id: 'notes', label: 'Notes' }
+                { id: 'notes', label: 'Notes' },
+                { id: 'enrollments', label: 'Taariikhda Diiwaangelinta' },
+                { id: 'guardians', label: 'Waalidiinta' }
               ].map(t => (
                 <button
                   key={t.id}
@@ -555,6 +703,56 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               <div className="space-y-2 text-xs text-center py-4 text-[#64748B]">
                 <MessageSquare className="w-6 h-6 mx-auto mb-1 opacity-60" />
                 <p>Private faculty notes and behaviour records.</p>
+              </div>
+            )}
+
+            {activeProfileTab === 'guardians' && (
+              <div className="space-y-3 text-xs">
+                {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-rose-700">{modalError}</p>}
+                <p className="font-semibold text-[#132A29]">Waalidiinta ku xiran</p>
+                {guardianRows.length===0 ? <p className="py-2 text-center text-slate-500">Waalid kale weli lama xiriirin.</p> : guardianRows.map((row:any)=>(
+                  <div key={row.guardian_id} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                    <div className="flex justify-between gap-2"><strong>{row.guardians?.full_name || 'Guardian'}</strong>{row.is_primary && <span className="text-emerald-700 font-semibold">Primary</span>}</div>
+                    <p className="mt-1 text-slate-500">{row.guardians?.phone} · {row.relation}</p>
+                  </div>
+                ))}
+                <form onSubmit={handleLinkGuardian} className="border-t border-[#E2E8F0] pt-3 space-y-2">
+                  <p className="font-semibold text-[#132A29]">Ku dar waalid / masuul</p>
+                  <input required maxLength={160} value={guardianNameInput} onChange={e=>setGuardianNameInput(e.target.value)} placeholder="Full name" className="w-full rounded-lg border p-2"/>
+                  <input required maxLength={30} value={guardianPhoneInput} onChange={e=>setGuardianPhoneInput(e.target.value)} placeholder="Phone number" className="w-full rounded-lg border p-2"/>
+                  <select value={guardianRelation} onChange={e=>setGuardianRelation(e.target.value as any)} className="w-full rounded-lg border p-2">
+                    <option value="aabo">Aabo</option><option value="hooyo">Hooyo</option><option value="walaal">Walaal</option><option value="kale">Kale</option>
+                  </select>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={guardianPrimary} onChange={e=>setGuardianPrimary(e.target.checked)}/> Waalidka koowaad</label>
+                  <button type="submit" disabled={isReadOnly || enrollmentBusy} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Ku xiro waalidka'}</button>
+                </form>
+              </div>
+            )}
+
+            {activeProfileTab === 'enrollments' && (
+              <div className="space-y-3 text-xs">
+                {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-rose-700">{modalError}</p>}
+                <p className="font-semibold text-[#132A29]">Taariikhda diiwaangelinta</p>
+                {enrollmentLoading ? <p className="py-3 text-center text-slate-500">Taariikhda waa la soo rarayaa…</p> :
+                  enrollmentRows.length === 0 ? <p className="py-3 text-center text-slate-500">Ardaygan taariikh diiwaangelin ah looma helin.</p> :
+                  enrollmentRows.map((row:any) => (
+                    <div key={row.id} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                      <div className="flex justify-between gap-2"><strong>{row.classes?.name || row.class_id}</strong><span className={row.status === 'active' ? 'font-semibold text-emerald-700' : 'text-slate-500'}>{row.status}</span></div>
+                      <p className="mt-1 text-slate-500">{row.academic_years?.name || row.academic_year_id} · {row.classes?.section || ''}</p>
+                      <p className="text-slate-500">Started {String(row.enrolled_at || '').slice(0,10)} {row.left_at ? '· Ended '+String(row.left_at).slice(0,10) : ''}</p>
+                    </div>
+                  ))}
+                <div className="border-t border-[#E2E8F0] pt-3 space-y-2">
+                  <p className="font-semibold text-[#132A29]">U wareeji fasal kale</p>
+                  <select value={selectedAcademicYearId} onChange={e=>setSelectedAcademicYearId(e.target.value)} className="w-full rounded-lg border p-2">
+                    {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
+                  </select>
+                  <select value={transferClassId} onChange={e=>setTransferClassId(e.target.value)} className="w-full rounded-lg border p-2">
+                    {classes.filter(item=>!item.isArchived && item.id!==selectedStudent.classId).map(item=><option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}
+                  </select>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Wareeji ardayga'}</button>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !selectedAcademicYearId} onClick={()=>void handleStudentWithdraw()} className="w-full rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">Ka saar ardayga (xogta ha sii jirto)</button>
+                </div>
               </div>
             )}
           </div>

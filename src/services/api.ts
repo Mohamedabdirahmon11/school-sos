@@ -934,6 +934,30 @@ export class ApiClient {
     }>>(`/parents/contacts?${query.toString()}`);
   }
 
+  public static async getStudentGuardians(studentId: string) {
+    return this.request<any[]>(`/students/${encodeURIComponent(studentId)}/guardians`);
+  }
+
+  public static async linkStudentGuardian(studentId: string, data: { fullName: string; phone: string; relation: 'aabo' | 'hooyo' | 'walaal' | 'kale'; isPrimary?: boolean }) {
+    return this.request<any>(`/students/${encodeURIComponent(studentId)}/guardians`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+  }
+
+  public static async getStudentEnrollments(studentId: string) {
+    return this.request<any[]>(`/students/${encodeURIComponent(studentId)}/enrollments`);
+  }
+
+  public static async getAcademicYears() {
+    return this.request<Array<{ id: string; name: string; is_current: boolean; start_date: string; end_date: string }>>('/students/academic-years');
+  }
+
+  public static async transferStudent(studentId: string, data: { academicYearId: string; classId?: string; sectionId?: string; rollNumber?: string; action?: 'transfer' | 'withdraw' }) {
+    return this.request<{ success: boolean; enrollmentId: string | null; withdrawn: boolean }>(`/students/${encodeURIComponent(studentId)}/transfer`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+  }
+
   public static async getStudentDetails(id: string, schoolId?: string, includeFinance = false) {
     const student = await this.request<Student>(`/students/${encodeURIComponent(id)}`);
     const payments = includeFinance ? await this.getFeePayments(id, { page: 1, pageSize: 100 }) : [];
@@ -1302,10 +1326,10 @@ export class ApiClient {
     return this.request<any[]>('/promotions/history');
   }
 
-  public static async confirmPromotions(classId: string, topN: number, promotions: any[]) {
-    return this.request<{ success: boolean; count: number }>('/promotions/confirm', {
+  public static async confirmPromotions(classId: string, topN: number, promotions: any[], sourceAcademicYearId?: string, targetAcademicYearId?: string) {
+    return this.request<{ success: boolean; count: number; enrollmentCount?: number }>('/promotions/confirm', {
       method: 'POST',
-      body: JSON.stringify({ classId, topN, promotions })
+      body: JSON.stringify({ classId, topN, promotions, sourceAcademicYearId, targetAcademicYearId })
     });
   }
 

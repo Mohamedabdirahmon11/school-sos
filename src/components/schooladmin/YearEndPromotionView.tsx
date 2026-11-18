@@ -32,6 +32,9 @@ export const YearEndPromotionView: React.FC = () => {
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [topN, setTopN] = useState(3);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
+  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean}>>([]);
+  const [sourceAcademicYearId, setSourceAcademicYearId] = useState('');
+  const [targetAcademicYearId, setTargetAcademicYearId] = useState('');
 
   const [yearlyRankings, setYearlyRankings] = useState<any[]>([]);
   const [decisionMap, setDecisionMap] = useState<Record<string, { decision: 'promoted' | 'repeated'; notes: string; adminOverride: boolean }>>({});
@@ -48,13 +51,19 @@ export const YearEndPromotionView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [clsList, conf, archived] = await Promise.all([
+      const [clsList, conf, archived, years] = await Promise.all([
         ApiClient.getClasses(),
         ApiClient.getExamConfig(),
-        ApiClient.getPromotionHistory()
+        ApiClient.getPromotionHistory(),
+        ApiClient.getAcademicYears()
       ]);
       setClasses(clsList);
       setHistory(archived);
+      setAcademicYears(years);
+      const currentYear = years.find(year => year.is_current) || years[0];
+      const nextYear = years.find(year => year.id !== currentYear?.id && year.start_date > (currentYear?.start_date || ''));
+      setSourceAcademicYearId(value => value || currentYear?.id || '');
+      setTargetAcademicYearId(value => value || nextYear?.id || '');
       if (clsList.length > 0) {
         setSelectedClassId(current => current || clsList[0].id);
         if (clsList.length > 1) setTargetClassId(current => current || clsList[1].id);
@@ -135,6 +144,10 @@ export const YearEndPromotionView: React.FC = () => {
       setError('Please select the Target Class cohort to receive the promoted students.');
       return;
     }
+    if (!sourceAcademicYearId || !targetAcademicYearId || sourceAcademicYearId === targetAcademicYearId) {
+      setError('Select two different academic years before confirming promotions.');
+      return;
+    }
 
     setIsConfirming(true);
     setError(null);
@@ -152,7 +165,7 @@ export const YearEndPromotionView: React.FC = () => {
         adminOverride: decisionMap[r.student.id]?.adminOverride || false
       }));
 
-      await ApiClient.confirmPromotions(selectedClassId, topN, payload);
+      await ApiClient.confirmPromotions(selectedClassId, topN, payload, sourceAcademicYearId, targetAcademicYearId);
       setHistory(await ApiClient.getPromotionHistory());
       const promotedCount = payload.filter(p => p.decision === 'promoted').length;
       const repeatedCount = payload.filter(p => p.decision === 'repeated').length;
@@ -220,6 +233,12 @@ export const YearEndPromotionView: React.FC = () => {
       <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
         <div>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
+            Source Academic Year
+          </label>
+          <select value={sourceAcademicYearId} onChange={e=>setSourceAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
+            {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
+          </select>
+          <label className="block text-xs font-semibold text-[#475569] mb-1">
             Current Class (Completing Academic Year)
           </label>
           <select
@@ -243,6 +262,12 @@ export const YearEndPromotionView: React.FC = () => {
         </div>
 
         <div>
+          <label className="block text-xs font-semibold text-[#475569] mb-1">
+            Target Academic Year
+          </label>
+          <select value={targetAcademicYearId} onChange={e=>setTargetAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
+            {academicYears.filter(year=>year.id!==sourceAcademicYearId).map(year=><option key={year.id} value={year.id}>{year.name}</option>)}
+          </select>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
             Target Class (For Promoted Cohort)
           </label>
