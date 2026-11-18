@@ -4,7 +4,7 @@
 
 -- Academic-year/term tables are supplied by the earlier academic setup step.
 -- Guard these references so baseline schema installs can still apply migrations in order.
-DO $
+DO $step6$
 BEGIN
   IF to_regclass('public.academic_years') IS NOT NULL THEN
     EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_id_uidx ON public.academic_years (id, school_id)';
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
 );
 
 -- Add academic-year/term composite FKs only when the Step 1 tables exist.
-DO $
+DO $step6$
 BEGIN
   IF to_regclass('public.academic_years') IS NOT NULL THEN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teacher_assignments_year_school_fk') THEN
@@ -87,7 +87,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique
     subject_id
   );
 -- Preserve existing Step 4 teacher links as whole-year Step 6 assignments.
-DO $
+DO $step6$
 BEGIN
   IF to_regclass('public.academic_years') IS NOT NULL THEN
     INSERT INTO public.teacher_class_subject_assignments (
