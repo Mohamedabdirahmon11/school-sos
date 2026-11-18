@@ -90,6 +90,15 @@ export interface TranslationDict {
   exam_forward_ready: string;
   exam_term1: string;
   exam_term2: string;
+  exam_form_teacher: string;
+  exam_subjects_and_teachers: string;
+  exam_subject_name: string;
+  exam_subject_code: string;
+  exam_classes_selected: string;
+  exam_unassigned: string;
+  exam_periods_per_week: string;
+  exam_small_exam: string;
+  exam_big_exam: string;
   assignments: string;
   fees_payments: string;
   events_holidays: string;
@@ -396,6 +405,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_forward_ready: 'Class is complete and ready to forward to School Admin.',
     exam_term1: 'Term 1',
     exam_term2: 'Term 2',
+    exam_form_teacher: 'Form Teacher',
+    exam_subjects_and_teachers: 'Subjects and teachers',
+    exam_subject_name: 'Subject name',
+    exam_subject_code: 'Subject code',
+    exam_classes_selected: 'classes selected',
+    exam_unassigned: 'Unassigned',
+    exam_periods_per_week: 'Periods/week',
+    exam_small_exam: 'Small exam',
+    exam_big_exam: 'Big exam',
     assignments: 'Homework & Assignments',
     fees_payments: 'Student Fees & Ledger',
     events_holidays: 'Academic Calendar',
@@ -682,6 +700,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_forward_ready: 'Fasalku wuu dhammaystiran yahay, wuxuuna diyaar u yahay in loo gudbiyo Maamulka.',
     exam_term1: 'Term 1',
     exam_term2: 'Term 2',
+    exam_form_teacher: 'Macallinka fasalka',
+    exam_subjects_and_teachers: 'Maaddooyinka iyo macallimiinta',
+    exam_subject_name: 'Magaca maaddada',
+    exam_subject_code: 'Koodhka maaddada',
+    exam_classes_selected: 'fasal ayaa la doortay',
+    exam_unassigned: 'Lama qoondeyn',
+    exam_periods_per_week: 'Casharro/toddobaad',
+    exam_small_exam: 'Imtixaan yar',
+    exam_big_exam: 'Imtixaan weyn',
     assignments: 'Laylisyada & Shaqo-guri',
     fees_payments: 'Lacagaha & Kharashaadka',
     events_holidays: 'Jadwalka Fasaxyada',
@@ -968,6 +995,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_forward_ready: 'اكتمل الصف وأصبح جاهزاً للإرسال إلى الإدارة.',
     exam_term1: 'الفصل الأول',
     exam_term2: 'الفصل الثاني',
+    exam_form_teacher: 'معلم الصف',
+    exam_subjects_and_teachers: 'المواد والمعلمون',
+    exam_subject_name: 'اسم المادة',
+    exam_subject_code: 'رمز المادة',
+    exam_classes_selected: 'صفوف محددة',
+    exam_unassigned: 'غير معيّن',
+    exam_periods_per_week: 'الحصص/الأسبوع',
+    exam_small_exam: 'اختبار قصير',
+    exam_big_exam: 'اختبار نهائي',
     assignments: 'የቤት ስራዎች',
     fees_payments: 'የተማሪ ክፍያዎች',
     events_holidays: 'የዓመቱ የቀን መቁጠሪያ',
@@ -1234,6 +1270,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_forward_ready: 'ክፍሉ ተጠናቋል እና ለአስተዳደር ለመላክ ዝግጁ ነው።',
     exam_term1: 'ተርም 1',
     exam_term2: 'ተርም 2',
+    exam_form_teacher: 'የክፍል አስተማሪ',
+    exam_subjects_and_teachers: 'ትምህርቶችና መምህራን',
+    exam_subject_name: 'የትምህርት ስም',
+    exam_subject_code: 'የትምህርት ኮድ',
+    exam_classes_selected: 'ክፍሎች ተመርጠዋል',
+    exam_unassigned: 'አልተመደበም',
+    exam_periods_per_week: 'በሳምንት ክፍለ ጊዜዎች',
+    exam_small_exam: 'አነስተኛ ፈተና',
+    exam_big_exam: 'ትልቅ ፈተና',
     assignments: 'الواجبات',
     fees_payments: 'الرسوم والمدفوعات',
     events_holidays: 'الفعاليات والعطلات',
