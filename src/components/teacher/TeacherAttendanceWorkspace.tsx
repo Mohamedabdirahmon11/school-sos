@@ -26,7 +26,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   const [overview, setOverview] = useState<any>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');\n  const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
   const [attendanceDate, setAttendanceDate] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
@@ -60,7 +60,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   const todayLessons = overview?.todayLessons || [];
   const attendanceMode = overview?.settings?.attendanceMode || 'daily';
   const selectedClass = classes.find((item: any) => item.id === selectedClassId);
-  const classSubjects = selectedClass?.subjects || [];
+  const classSubjects = selectedClass?.subjects || [];\n  const assignedSectionIds = [...new Set(classSubjects.map((item: any) => item.sectionId).filter(Boolean))];\n  const availableSections = (selectedClass?.sections || []).filter((section: any) => !assignedSectionIds.length || assignedSectionIds.includes(section.id));
   const lessonOptions = useMemo(() => timetable.filter((item: any) =>
     item.classId === selectedClassId && item.subjectId === selectedSubjectId && item.dayOfWeek === (attendanceDate ? new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(attendanceDate + 'T12:00:00.000Z')) : overview?.weekday)
   ), [timetable, selectedClassId, selectedSubjectId, attendanceDate, overview?.weekday]);
@@ -96,7 +96,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
     const periodId = attendanceMode === 'per_period' ? selectedPeriodId : '';
     if (attendanceMode === 'per_period' && (!subjectId || !periodId)) { setLoadingAttendance(false); return; }
     Promise.all([
-      ApiClient.getAttendanceSession({ classId: selectedClassId, date: attendanceDate, subjectId: subjectId || null, periodId: periodId || null })
+      ApiClient.getAttendanceSession({ classId: selectedClassId, date: attendanceDate, subjectId: subjectId || null, periodId: periodId || null, sectionId: selectedSectionId || null })
     ]).then(([sessionData]) => {
       if (cancelled) return;
       const rosterRows = (sessionData.students || []) as Student[];
@@ -110,7 +110,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
     }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Xaadirinta lama soo dejin karin.'); })
       .finally(() => { if (!cancelled) setLoadingAttendance(false); });
     return () => { cancelled = true; };
-  }, [tab, selectedClassId, attendanceDate, attendanceMode, selectedSubjectId, selectedPeriodId, school?.id]);
+  }, [tab, selectedClassId, attendanceDate, attendanceMode, selectedSubjectId, selectedPeriodId, selectedSectionId, school?.id]);
 
   const openAttendance = (lesson?: any) => {
     if (lesson) {
@@ -138,7 +138,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
         classId: selectedClassId, date: attendanceDate,
         subjectId: attendanceMode === 'per_period' ? selectedSubjectId : null,
         periodId: attendanceMode === 'per_period' ? selectedPeriodId : null,
-        sectionId: attendanceMode === 'per_period' ? activeLesson?.sectionId || null : null,
+        sectionId: selectedSectionId || activeLesson?.sectionId || null,
         records: students.map(student => ({ studentId: student.id, status: marks[student.id]?.status || 'present', note: marks[student.id]?.note || '' }))
       });
       setSession(result.session); setNotice('Xaadirinta si guul leh ayaa loo gudbiyey.'); await loadOverview();
@@ -211,6 +211,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
       <Card className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
         <FormRow label="Fasal"><select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">{classes.map((item: any) => <option key={item.id} value={item.id}>{item.name}{item.section ? ' · ' + item.section : ''}</option>)}</select></FormRow>
         <FormRow label="Taariikh"><input type="date" max={overview?.date} value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" /></FormRow>
+        {availableSections.length > 0 && <FormRow label="Qaybta fasalka"><select value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"><option value="">Dhammaan qaybaha</option>{availableSections.map((section: any) => <option key={section.id} value={section.id}>{section.name}</option>)}</select></FormRow>}
         {attendanceMode === 'per_period' && <>
           <FormRow label="Maaddo"><select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">{classSubjects.map((subject: any) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></FormRow>
           <FormRow label="Cashar"><select value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">{lessonOptions.map((lesson: any) => <option key={lesson.periodId} value={lesson.periodId}>Cashar {lesson.periodNumber} · {lesson.startTime}–{lesson.endTime}</option>)}</select></FormRow>
