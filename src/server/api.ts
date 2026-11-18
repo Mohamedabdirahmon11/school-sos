@@ -4164,10 +4164,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   }
   // Shuffle lesson order so subjects are interleaved instead of being placed
   // in long consecutive blocks (e.g. all Maths, then all English).
-  for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
-  }
+
   const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
   const closingTime = school.setupData?.workingHours?.closingTime;
   const candidates = TIMETABLE_DAYS.flatMap(day =>
@@ -4199,7 +4196,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
         + sameSubjectCount * 35
         + classDayCount * 3
         + periodCount * 1.5
-        + Math.random();
+        + (assignment.occurrence / 1000);
       return { ...candidate, score };
     }).sort((left, right) => left.score - right.score);
     const { day, period } = ranked[0];
@@ -4271,10 +4268,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     for (const assignment of schedulable) {
       for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) lessonQueue.push({ ...assignment, occurrence });
     }
-    for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
-    }
+
     const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
     const closingTime = school.setupData?.workingHours?.closingTime;
     const candidates = TIMETABLE_DAYS.flatMap(day =>
@@ -4306,7 +4300,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
           + (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) * 35
           + (dayLoad.get(day) || 0) * 3
           + (periodLoad.get(period) || 0) * 1.5
-          + Math.random();
+          + (assignment.occurrence / 1000);
         return { ...candidate, score };
       }).sort((left, right) => left.score - right.score);
       const { day, period } = ranked[0];
