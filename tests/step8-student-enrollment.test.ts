@@ -36,7 +36,7 @@ test('Step 8 guardian links store relationship per student and expose profile ac
   assert.match(client, /linkStudentGuardian/);
   assert.match(studentsView, /label: 'Waalidiinta'/);
   assert.match(studentsView, /Ku xiro waalidka/);
-  assert.match(studentsView, /Withdraw student \(keep records\)/);
+  assert.match(studentsView, /Ka saar ardayga \(xogta ha sii jirto\)/);
 });
 
 test('Step 8 deletion refuses to remove students with attendance, marks, finance or enrollment rows', () => {
