@@ -383,7 +383,7 @@ export const TeachersView: React.FC = () => {
                 <input value={address} onChange={e => setAddress(e.target.value)} maxLength={250} placeholder="Teacher address" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
               </div>
               <div>
-                <label className="block font-medium text-[#334155]">Taariikhda shaqo-bilaabidda</label>
+                <label className="block font-medium text-[#334155]">Taariikhda shaqo-bilaabidda {/* Date of Joining */}</label>
                 <input type="date" value={joinedDate} onChange={e => setJoinedDate(e.target.value)} required className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
               </div>
               <div>
