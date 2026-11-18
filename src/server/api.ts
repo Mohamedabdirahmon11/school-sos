@@ -5686,6 +5686,36 @@ apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoo
   }
 });
 
+apiRouter.post('/exams/unpublish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class and valid semester before withdrawing results.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  try {
+    const unpublishedCount = await db.unpublishClassSemesterResults(
+      school.id, classId, semester, user.id, user.fullName, user.role
+    );
+    const noticeTitle = `Exam results published · ${semester}`;
+    const notices = (await db.getNotices(school.id)).filter(notice =>
+      notice.classId === classId && notice.title === noticeTitle && notice.isActive !== false
+    );
+    for (const notice of notices) await db.archiveNotice(notice.id, school.id);
+    await db.flush();
+    res.json({ success: true, unpublishedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be withdrawn.' });
+  }
+});
+
 // Semester 1 Results & Ranking (Highlight Top 3)
 async function canReadClassResults(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
