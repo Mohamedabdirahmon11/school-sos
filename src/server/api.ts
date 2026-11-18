@@ -4064,11 +4064,11 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
     db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || ''), is_active: 'true' }, 1, 100, undefined, 'id,teacher_id'),
     db.getTimetableSettings(school.id),
     db.queryPage('timetable_slots', { school_id: school.id, term_id: termId, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek, period_number: String(period) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
+    teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek }, 1, 100, undefined, 'id,period_number') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 100 })
   ]);
   const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId));
   if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
-  if (unavailable.total) { res.status(409).json({ error: 'This teacher is unavailable for that period.' }); return; }
+  if (unavailable.items.some((item: any) => item.periodNumber == null || Number(item.periodNumber) === period)) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
   const existingClassIds = [...new Set(existing.items.map((slot: any) => slot.classId).filter((id: string) => id !== String(classId)))];
   const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
   const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
