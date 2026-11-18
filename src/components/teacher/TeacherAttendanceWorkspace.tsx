@@ -214,11 +214,20 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
     {tab === 'timetable' && <section className="space-y-3">
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Jadwalkayga toddobaadlaha</h2><Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Daabac / PDF</Button></div>
       {!timetable.length ? <Card><EmptyState><CalendarDays className="mx-auto h-8 w-8" /><p>Jadwal laguu qoondeeyey weli ma jiro.</p></EmptyState></Card> :
-        ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(day => {
-          const rows = timetable.filter((item: any) => item.dayOfWeek === day).sort((a: any,b: any) => a.periodNumber - b.periodNumber);
-          if (!rows.length) return null;
-          return <Card key={day} className="space-y-2 p-3"><h3 className="font-bold">{day === overview?.weekday ? 'Maanta · ' : ''}{day}</h3>{rows.map((lesson: any) => <div key={lesson.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><div><p className="font-semibold">{lesson.subjectName}</p><p className="text-xs text-slate-500">{lesson.className} · {lesson.startTime}–{lesson.endTime}</p></div><Pill>Cashar {lesson.periodNumber}</Pill></div>)}</Card>;
-        })}
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="px-3 py-3 text-xs font-bold">Cashar / Waqti</th>{[{key:'Monday',label:'Isniin'},{key:'Tuesday',label:'Talaado'},{key:'Wednesday',label:'Arbaco'},{key:'Thursday',label:'Khamiis'},{key:'Friday',label:'Jimce'},{key:'Saturday',label:'Sabti'}].map(day => <th key={day.key} className={'px-3 py-3 text-xs font-bold ' + (day.key === overview?.weekday ? 'bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-200' : '')}>{day.label}{day.key === overview?.weekday ? ' · Maanta' : ''}</th>)}</tr></thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{[...new Set(timetable.map((item: any) => item.periodNumber))].sort((a: number,b: number) => a-b).map(period => {
+              const periodLessons = timetable.filter((item: any) => item.periodNumber === period);
+              const first = periodLessons[0];
+              return <tr key={period}><th className="whitespace-nowrap px-3 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">Cashar {period}<span className="mt-1 block font-normal text-slate-400">{first?.startTime}–{first?.endTime}</span></th>
+                {[{key:'Monday',label:'Isniin'},{key:'Tuesday',label:'Talaado'},{key:'Wednesday',label:'Arbaco'},{key:'Thursday',label:'Khamiis'},{key:'Friday',label:'Jimce'},{key:'Saturday',label:'Sabti'}].map(day => {
+                  const lesson = periodLessons.find((item: any) => item.dayOfWeek === day.key);
+                  return <td key={day.key} className={'min-w-32 px-3 py-3 align-top ' + (day.key === overview?.weekday ? 'bg-teal-50/60 dark:bg-teal-950/20' : '')}>{lesson ? <><p className="font-semibold">{lesson.subjectName}</p><p className="mt-1 text-xs text-slate-500">{lesson.className}</p><p className="text-xs text-slate-500">{lesson.startTime}–{lesson.endTime}</p></> : <span className="text-slate-300">—</span>}</td>;
+                })}</tr>;
+            })}</tbody>
+          </table>
+        </div>}
     </section>}
 
     {tab === 'classes' && <section className="space-y-3">
