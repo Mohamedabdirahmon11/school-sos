@@ -169,7 +169,7 @@ AS $$
             AND a.class_id = target_class_id
             AND a.teacher_id = t.id
             AND (target_subject_id IS NULL OR a.subject_id = target_subject_id)
-            AND (a.section_id IS NULL OR target_section_id IS NULL OR a.section_id = target_section_id)
+            AND (a.section_id IS NULL OR a.section_id = target_section_id)
         )
         OR EXISTS (
           SELECT 1
