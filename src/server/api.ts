@@ -3146,7 +3146,7 @@ apiRouter.delete('/classes/:id', requireAuth, requireSchoolContext, async (req, 
 
 const classGroupsClient = () => createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
- const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
+ const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
  if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
 });
 apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
@@ -3156,7 +3156,7 @@ apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, req
  if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
  const unique: string[] = Array.from(new Set<string>((sections as unknown[]).map(value => String(value).trim()).filter(value => value.length > 0)));
  if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
- const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
+ const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
 });
 apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
