@@ -725,7 +725,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm sm:max-w-sm" />
+              <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder={t('exam_search_student')} aria-label={t('exam_search_student')} className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm sm:max-w-sm" />
               <div><h2 className="text-sm font-bold text-slate-900">Students in this class</h2><p className="mt-1 text-[11px] text-slate-500">Students in classes where you teach a subject or serve as Form Teacher are shown.</p></div>
               <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
             </div>
@@ -887,7 +887,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {activeTab === 'grades' && (
         <section className="space-y-4">
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
-            <label className="text-xs font-semibold text-slate-600">Class
+            <label className="text-xs font-semibold text-slate-600">{t('exam_class')}
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
                 {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
               </select>
@@ -898,8 +898,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>{t('exam_save_drafts')}</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{t('exam_submit_marks')}</button>
             </div>
           </div>
 
@@ -941,7 +941,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : (
             <>
 
-              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">{t('exam_enter_component_marks')}</h2><span className="text-[10px] text-slate-500">{t('exam_edit_marks_help')}</span></div>
               {editableClassSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
             const enteredMarksCount = students.reduce((count, student) => {
@@ -960,7 +960,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </div>
                 {subjectComponents.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No assessment components are configured for this exam type. Ask School Admin to configure the exam.</p> : (
                   <>
-                    <div className="mb-3 px-3 pt-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students for marks" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
+                    <div className="mb-3 px-3 pt-3 md:hidden"><input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder={t('exam_search_student')} aria-label={t('exam_search_student')} className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" /></div>
                     <div className="space-y-3 p-3 md:hidden">
                       {visibleStudents.map(student => {
                         const key = `${student.id}:${subject.id}`;
@@ -980,14 +980,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                               inputs[current + (event.key === 'ArrowUp' ? -1 : 1)]?.focus();
                             }} data-mark-entry="true" className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
                           </div>
-                          <label className="mt-3 block text-xs font-semibold text-slate-600">Teacher comment <textarea value={input.remarks} onChange={event => handleStudentRemarkChange(student.id, subject.id, event.target.value)} disabled={!editable} maxLength={1000} rows={2} placeholder="Optional comment for the report card" className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs disabled:bg-slate-100" /></label>
+                          <label className="mt-3 block text-xs font-semibold text-slate-600">{t('exam_teacher_comment')} <textarea value={input.remarks} onChange={event => handleStudentRemarkChange(student.id, subject.id, event.target.value)} disabled={!editable} maxLength={1000} rows={2} placeholder={t('exam_optional_comment')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs disabled:bg-slate-100" /></label>
                           <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
                         </article>;
                       })}
                       {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
                     </div>
                     <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[760px] border-collapse text-xs">
-                      <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th>{subjectComponents.map(component => <th key={component.id} className="border-l px-2 py-3 text-center">{component.name}<span className="block text-[9px] normal-case">Max {component.maxMarks}</span></th>)}<th className="border-l px-3 py-3">Exam total</th><th className="px-3 py-3">Teacher comment</th><th className="px-3 py-3">Status</th></tr></thead>
+                      <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th>{subjectComponents.map(component => <th key={component.id} className="border-l px-2 py-3 text-center">{component.name}<span className="block text-[9px] normal-case">Max {component.maxMarks}</span></th>)}<th className="border-l px-3 py-3">Exam total</th><th className="px-3 py-3" >{t('exam_teacher_comment')}</th><th className="px-3 py-3">Status</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
                         {visibleStudents.map(student => {
                           const key = `${student.id}:${subject.id}`;
@@ -1020,7 +1020,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               })}
             </>
           )}
-          {isFormTeacher && <p className="text-[11px] text-slate-500">Form Teacher can review every active class subject, but can enter marks only for the subject assigned to their teacher profile. The class is forwarded only after every active subject has been submitted.</p>}
+          {isFormTeacher && <p className="text-[11px] text-slate-500">{t('exam_teacher_review_scope')} {t('exam_waiting_for_all_subjects')}</p>}
         </section>
       )}
 
@@ -1033,15 +1033,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 {formTeacherClasses.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
               </select>
             </label>
-            <label className="text-xs font-semibold text-slate-600">Term
+            <label className="text-xs font-semibold text-slate-600">{t('exam_term')}
               <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
-                <option value="Semester 1">Term 1</option><option value="Semester 2">Term 2</option>
+                <option value="Semester 1">{t('exam_term1')}</option><option value="Semester 2">{t('exam_term2')}</option>
               </select>
             </label>
           </div>
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><h2 className="text-sm font-bold text-slate-900">Fasalka · {semester}</h2><p className="mt-1 text-xs text-slate-500">Review all active subjects. Totals, averages and ranks appear only after every subject has been submitted.</p></div>
+              <div><h2 className="text-sm font-bold text-slate-900">{t('exam_class')} · {semester === 'Semester 1' ? t('exam_term1') : t('exam_term2')}</h2><p className="mt-1 text-xs text-slate-500">Review all active subjects. Totals, averages and ranks appear only after every subject has been submitted.</p></div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${allClassMarksSubmitted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{allClassMarksSubmitted ? t('exam_all_active_subjects_submitted') : t('exam_waiting_for_all_subjects')}</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1058,16 +1058,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 });
                 return <span key={subject.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${submitted ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
                   {subject.name} {submitted ? '✓' : '⏳'}
-                  {reopenable && <button type="button" title={`Reopen ${subject.name}`} onClick={() => void handleReopenSubjectMarks(subject.id)} disabled={isReadOnly || isReopeningSubjectId !== null} className="font-bold text-rose-700 disabled:opacity-40">↺</button>}
+                  {reopenable && <button type="button" title={`${t('exam_reopen_subject')}: ${subject.name}`} onClick={() => void handleReopenSubjectMarks(subject.id)} disabled={isReadOnly || isReopeningSubjectId !== null} className="font-bold text-rose-700 disabled:opacity-40">↺</button>}
                 </span>;
               })}
             </div>
           </section>
-          {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading class marks...</div> : (
+          {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">{t('exam_loading_class_marks')}</div> : (
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <div><h2 className="text-sm font-bold text-slate-900">Class results review</h2><p className="mt-1 text-[10px] text-slate-500">{students.length} students · {gradeSubjects.length} active subjects</p></div>
-                <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student..." className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs" />
+                <div><h2 className="text-sm font-bold text-slate-900">{t('exam_class_review')}</h2><p className="mt-1 text-[10px] text-slate-500">{students.length} students · {gradeSubjects.length} active subjects</p></div>
+                <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder={t('exam_search_student')} className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs" />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[850px] border-collapse text-xs">
@@ -1088,10 +1088,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                   </tbody>
                 </table>
               </div>
-              {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
+              {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">{t('exam_no_students')}</p>}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">{allClassMarksSubmitted ? 'Class is complete and ready to forward.' : 'Complete all active subjects before forwarding to School Admin.'}</p>
-                <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted || classAlreadyForwarded} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{classAlreadyForwarded ? 'Sent to Admin · waiting for review' : t('exam_forward_to_admin')}</button>
+                <p className="text-xs text-slate-500">{allClassMarksSubmitted ? t('exam_forward_ready') : 'Complete all active subjects before forwarding to School Admin.'}</p>
+                <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted || classAlreadyForwarded} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{classAlreadyForwarded ? t('exam_sent_to_admin') : t('exam_forward_to_admin')}</button>
               </div>
             </section>
           )}
