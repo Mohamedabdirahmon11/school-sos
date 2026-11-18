@@ -5541,13 +5541,15 @@ async function canTeacherMarkAttendance(
     periodNumber = Number(period.number);
   }
   let assigned = false;
+  let assignmentRows: any[] = [];
   if (currentYear?.id) {
     let query = client.from('teacher_class_subject_assignments').select('id,section_id,subject_id,term_id')
       .eq('school_id', schoolId).eq('academic_year_id', currentYear.id).eq('class_id', classId).eq('teacher_id', teacherId);
     if (subjectId) query = query.eq('subject_id', subjectId);
-    const { data: assignmentRows, error } = await query;
+    const { data, error } = await query;
     if (error) throw new Error('Teacher assignment could not be verified.');
-    assigned = (assignmentRows || []).some((row: any) =>
+    assignmentRows = data || [];
+    assigned = assignmentRows.some((row: any) =>
       (!row.term_id || row.term_id === currentTerm?.id) &&
       (!row.section_id || row.section_id === sectionId)
     );
@@ -5566,9 +5568,10 @@ async function canTeacherMarkAttendance(
     .select('entry_id').eq('school_id', schoolId).eq('substitute_teacher_id', teacherId).eq('substitute_date', date);
   if (substitutionError) throw new Error('Substitute lesson could not be verified.');
   for (const substitution of substitutions || []) {
-    const { data: slot } = await client.from('timetable_slots').select('id,class_id,subject_id,period_number,day_of_week,is_active')
+    const { data: slot } = await client.from('timetable_slots').select('id,class_id,subject_id,section_id,period_number,day_of_week,is_active')
       .eq('id', substitution.entry_id).eq('school_id', schoolId).maybeSingle();
     if (!slot || !slot.is_active || slot.class_id !== classId || slot.day_of_week !== attendanceWeekday(date)) continue;
+    if (slot.section_id && slot.section_id !== sectionId) continue;
     if (subjectId && slot.subject_id !== subjectId) continue;
     if (periodNumber !== null && Number(slot.period_number) !== periodNumber) continue;
     substitute = true; break;
