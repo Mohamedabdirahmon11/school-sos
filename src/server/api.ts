@@ -3183,9 +3183,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
-  // A Form Teacher is responsible for the complete class mark sheet.
-  // Subject teachers retain their own class/subject scope; the Form Teacher
-  // may complete any subject in their homeroom class before forwarding it.
+  // Form Teachers can review the whole class, but marks entry remains limited
+  // to the subject actually assigned to their teacher profile.
   for (const klass of formTeacherClasses) {
     const classSubjects = formTeacherClassAssignments.filter((item: any) => item.classId === klass.id);
     for (const assignment of classSubjects) {
@@ -3209,7 +3208,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         bigExamEnabled: true,
         isFormTeacher: true,
         isFormTeacherClass: true,
-        canEditMarks: true
+        canEditMarks: assignment.teacherId === teacher.id
       });
     }
   }
@@ -5515,10 +5514,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
-    if (!assignment.total && !mayFillFormTeacherSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may enter marks only for the subject assigned to your teacher profile.' });
       return;
     }
   }
