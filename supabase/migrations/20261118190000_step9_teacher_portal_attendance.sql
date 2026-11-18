@@ -206,7 +206,7 @@ $$;
 -- Keep existing student/class RLS aligned with Step 6's canonical assignments.
 CREATE OR REPLACE FUNCTION private.auth_can_access_student(target_student_id varchar)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
-AS $
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.students s
     JOIN public.users u ON u.id = private.auth_user_id()
@@ -241,11 +241,11 @@ AS $
         AND (u.student_id = s.student_id OR u.id = 'usr-student-' || s.id))
     )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION private.auth_can_access_class(target_class_id varchar)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
-AS $
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.classes c
     JOIN public.users u ON u.id = private.auth_user_id()
@@ -275,7 +275,7 @@ AS $
       ))
     )
   );
-$;
+$$;
 
 -- Replace the old tenant-wide ALL policy for attendance with role/assignment checks.
 DROP POLICY IF EXISTS tenant_scope_v2 ON public.attendance_records;
