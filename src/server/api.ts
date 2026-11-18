@@ -5466,10 +5466,9 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
-    res.json(classMarks.filter(mark =>
-      editableSubjectIds.has(mark.subjectId) ||
-      (isFormTeacher && (mark.status === 'submitted' || mark.status === 'form_teacher_submitted'))
-    ));
+    // The assigned Form Teacher has class-wide review scope, including after Admin approval.
+    // Subject teachers remain restricted to their own active class-subject assignments.
+    res.json(isFormTeacher ? classMarks : classMarks.filter(mark => editableSubjectIds.has(mark.subjectId)));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
