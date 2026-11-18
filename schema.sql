@@ -380,6 +380,7 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
   teacher_id VARCHAR(64) NOT NULL,
   subject_id VARCHAR(64) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   UNIQUE (teacher_id, subject_id),
   FOREIGN KEY (teacher_id, school_id) REFERENCES teachers(id, school_id) ON DELETE CASCADE,
   FOREIGN KEY (subject_id, school_id) REFERENCES subjects(id, school_id) ON DELETE CASCADE
