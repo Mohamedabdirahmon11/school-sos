@@ -5993,7 +5993,7 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
     res.status(400).json({ error: 'Dooro taariikho sax ah oo aan ka badnayn 12 bilood.' }); return;
   }
   const client = documentServiceClient(res); if (!client) return;
-  let query = client.from('attendance_records').select('id,class_id,student_id,date,status,subject_id,period_id,note,marked_by')
+  let query = client.from('attendance_records').select('id,class_id,section_id,student_id,date,status,subject_id,period_id,note,marked_by')
     .eq('school_id', school.id).gte('date', startDate).lte('date', endDate);
   if (classId) query = query.eq('class_id', classId);
   if (subjectId) query = query.eq('subject_id', subjectId);
@@ -6003,13 +6003,33 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
   if (normalizeRole(user.role) === 'teacher') {
     const teacher = await getAttendanceTeacher(client, school.id, user.id);
     if (!teacher) { res.status(403).json({ error: 'Macallinka lama helin.' }); return; }
-    const [{ data: assignments }, { data: formClasses }] = await Promise.all([
-      client.from('teacher_class_subject_assignments').select('class_id,subject_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
-      client.from('classes').select('id').eq('school_id', school.id).eq('class_teacher_id', user.id)
+    const [{ data: year }, { data: term }, { data: assignments }, { data: formClasses }, { data: legacyAssignments }] = await Promise.all([
+      client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+      client.from('terms').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+      client.from('teacher_class_subject_assignments').select('class_id,subject_id,section_id,term_id,academic_year_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
+      client.from('classes').select('id').eq('school_id', school.id).eq('class_teacher_id', user.id),
+      client.from('class_subjects').select('class_id,subject_id').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true)
     ]);
-    const allowed = new Set((assignments || []).map((row: any) => row.class_id + ':' + row.subject_id));
-    const allowedClasses = new Set((formClasses || []).map((row: any) => row.id));
-    scopedRows = scopedRows.filter((row: any) => allowed.has(row.class_id + ':' + row.subject_id) || (allowedClasses.has(row.class_id) && !row.subject_id));
+    const currentAssignments = (assignments || []).filter((item: any) =>
+      (!year?.id || item.academic_year_id === year.id) && (!item.term_id || item.term_id === term?.id)
+    );
+    const formClassIds = new Set((formClasses || []).map((row: any) => row.id));
+    const legacySubjectKeys = new Set((legacyAssignments || []).map((row: any) => row.class_id + ':' + row.subject_id));
+    const allowedSections = new Map<string, Set<string>>();
+    const fullSubjectKeys = new Set<string>();
+    for (const item of currentAssignments as any[]) {
+      const key = item.class_id + ':' + item.subject_id;
+      if (!item.section_id) { fullSubjectKeys.add(key); continue; }
+      const sectionSet = allowedSections.get(key) || new Set<string>();
+      sectionSet.add(item.section_id); allowedSections.set(key, sectionSet);
+    }
+    scopedRows = scopedRows.filter((row: any) => {
+      if (row.marked_by === user.id) return true;
+      if (!row.subject_id && formClassIds.has(row.class_id)) return true;
+      const key = row.class_id + ':' + row.subject_id;
+      if (legacySubjectKeys.has(key) || fullSubjectKeys.has(key)) return true;
+      return Boolean(row.section_id && allowedSections.get(key)?.has(row.section_id));
+    });
   } else if (!['school_admin','super_admin','accountant'].includes(normalizeRole(user.role) || '')) {
     res.status(403).json({ error: 'Rukhsad ma lihid.' }); return;
   } else if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) {
