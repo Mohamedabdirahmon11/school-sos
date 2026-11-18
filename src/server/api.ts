@@ -4204,6 +4204,8 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId)), slot];
   try { await db.replaceTimetableForClassTerm(school.id, String(classId), termId, slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSON_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved lesson ' + slot.id + ' for class ' + classId + ', section ' + (effectiveSectionId || 'default') + ', term ' + termId + '.', severity: 'info' });
   res.status(201).json(slot);
 });
 
@@ -4217,6 +4219,8 @@ apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, re
   if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
   const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId));
   try { await db.replaceTimetableForClassTerm(school.id, String(req.params.classId), termId, next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSON_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable lesson for class ' + req.params.classId + ', section ' + (sectionId || 'default') + ', ' + req.params.dayOfWeek + ' period ' + req.params.periodNumber + '.', severity: 'warning' });
   res.json({ success: true });
 });
 
@@ -4250,6 +4254,8 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   if (slots.items[0].classId !== slots.items[1].classId || slots.items[0].termId !== slots.items[1].termId) { res.status(409).json({ error: 'Isku beddelka waxaa lagu samayn karaa casharrada isla fasalka iyo term-ka oo keliya.' }); return; }
   try { await db.swapTimetableSlots(school.id, firstId, secondId); }
   catch (error: any) { res.status(409).json({ error: error.message || 'The swap would create a schedule conflict.' }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSONS_SWAPPED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Swapped timetable lessons ' + firstId + ' and ' + secondId + '.', severity: 'info' });
   res.json({ success: true });
 });
 
