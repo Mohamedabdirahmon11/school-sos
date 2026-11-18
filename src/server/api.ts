@@ -4157,10 +4157,11 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
   const termId = String(req.body?.termId || '');
   const roomId = req.body?.roomId ? String(req.body.roomId) : '';
+  const sectionId = req.body?.sectionId ? String(req.body.sectionId) : '';
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const period = Number(periodNumber);
   if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 8)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (up to eight; Friday has five).' }); return; }
-  const [klass, subject, teacher, assignment, step6Assignments, settings, existing, unavailable, room] = await Promise.all([
+  const [klass, subject, teacher, assignment, step6Assignments, settings, existing, unavailable, room, section] = await Promise.all([
     db.getClassById(String(classId || ''), school.id),
     db.queryPage('subjects', { school_id: school.id, id: String(subjectId || '') }, 1, 1, undefined, 'id'),
     teacherId ? db.queryPage('teachers', { school_id: school.id, id: String(teacherId) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 }),
@@ -4169,17 +4170,18 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
     db.getTimetableSettings(school.id),
     db.queryPage('timetable_slots', { school_id: school.id, term_id: termId, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
     teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek }, 1, 100, undefined, 'id,period_number,shift') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 100 }),
-    roomId ? db.queryPage('rooms', { school_id: school.id, id: roomId }, 1, 1, undefined, 'id,name') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
+    roomId ? db.queryPage('rooms', { school_id: school.id, id: roomId }, 1, 1, undefined, 'id,name') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 }),
+    sectionId ? db.queryPage('class_sections', { school_id: school.id, id: sectionId, legacy_class_id: String(classId || '') }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
   ]);
   const termAssignments = step6Assignments.items.filter((item: any) => !item.termId || item.termId === termId);
   const selectedStep6Assignment = teacherId
     ? termAssignments.find((item: any) =>
       item.teacherId === String(teacherId) &&
-      (!req.body?.sectionId || item.sectionId === String(req.body.sectionId))
+      (!sectionId || item.sectionId === sectionId)
     )
     : undefined;
   const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId)) || Boolean(selectedStep6Assignment);
-  if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment || (roomId && !room.total)) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
+  if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment || (roomId && !room.total) || (sectionId && !section.total)) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
   if (unavailable.items.some((item: any) => Number(item.shift || 1) === (Number(klass.shift) === 2 ? 2 : 1) && (item.periodNumber == null || Number(item.periodNumber) === period))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
   const existingClassIds = [...new Set(existing.items.map((slot: any) => slot.classId).filter((id: string) => id !== String(classId)))];
   const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
@@ -4189,7 +4191,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (teacherId && sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
   const effectiveRoomNumber = String((roomId ? room.items[0]?.name : '') || roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
-  const effectiveSectionId = selectedStep6Assignment?.sectionId || (req.body?.sectionId ? String(req.body.sectionId) : null);
+  const effectiveSectionId = selectedStep6Assignment?.sectionId || sectionId || null;
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
   const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId && item.isLocked === true);
   if (lockedSlot) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan beddelin.' }); return; }
