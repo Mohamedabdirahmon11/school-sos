@@ -46,11 +46,12 @@ The scheme is versioned. Existing mark rows keep their `scheme_version` and `sch
 
 ## Calculation rules
 
-- A subject total is the sum of all configured assessment components, out of 100.
+- A subject total is the sum of all configured assessment components, out of 100. Numeric values may be decimals; `ABS` and `LB` are preserved as explicit component values and contribute zero to the numeric total.
 - A term total is the sum of the entered active-subject totals; the term average is total divided by the number of active subjects with complete marks.
 - Form Teacher class totals and rankings remain hidden until every active subject has been submitted for every enrolled student.
 - Class rank uses the unrounded total; tied totals share the same competition rank (1, 1, 3).
 - A final subject result is the mean of Term 1 and Term 2 subject scores. It is unavailable if either term score is missing. Do not round before calculating the final average.
+- Term 1, Term 2, and final rankings are tie-aware and based on unrounded raw totals. Annual report cards (including per-term ranks, final total/average, subject comments, signatures, logo and stamp) are available only after both terms are published.
 
 ## Security boundaries
 
