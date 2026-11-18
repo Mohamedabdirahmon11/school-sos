@@ -478,7 +478,6 @@ export const TimetableView: React.FC = () => {
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
-            <option value="">All sections</option>
             {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>}
           {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
