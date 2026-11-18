@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.teacher_subjects (
   teacher_id varchar(64) NOT NULL,
   subject_id varchar(64) NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
+  is_active boolean NOT NULL DEFAULT true,
   CONSTRAINT teacher_subjects_teacher_school_fk
     FOREIGN KEY (teacher_id, school_id)
     REFERENCES public.teachers (id, school_id) ON DELETE CASCADE,
@@ -139,14 +140,16 @@ BEGIN
     RAISE EXCEPTION 'Maaddooyinka la doortay waa inay ka tirsanaadaan dugsigan';
   END IF;
 
-  DELETE FROM public.teacher_subjects
+  UPDATE public.teacher_subjects
+  SET is_active = false
   WHERE school_id = p_school_id AND teacher_id = p_teacher_id;
 
   INSERT INTO public.teacher_subjects (school_id, teacher_id, subject_id)
   SELECT p_school_id, p_teacher_id, requested.subject_id
   FROM (
     SELECT DISTINCT unnest(COALESCE(p_subject_ids, ARRAY[]::text[])) AS subject_id
-  ) requested;
+  ) requested
+  ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true;
 
   GET DIAGNOSTICS saved_count = ROW_COUNT;
   RETURN saved_count;
