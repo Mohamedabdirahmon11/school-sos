@@ -1179,7 +1179,7 @@ export const ExamsResultsView: React.FC = () => {
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            Exam Config
+            {t('exam_scheme')}
           </button>
         </div>
       </div>
