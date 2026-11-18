@@ -17,6 +17,7 @@ import {
   AttendanceRecord,
   ExamConfig,
   StudentMark,
+  ExamScoreValue,
   PromotionRecord,
   FeePayment,
   FeeStructureItem,
@@ -2572,7 +2573,7 @@ class StorageEngine {
     classId: string,
     subjectId: string,
     semester: 'Semester 1' | 'Semester 2',
-    marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, number>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
+    marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, ExamScoreValue>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
     submittedBy: string,
     submittedByName = 'Teacher',
     submittedByRole: UserRole = 'teacher'
@@ -2598,7 +2599,7 @@ class StorageEngine {
       return allocated;
     };
     const normalized = marks.map(mark => {
-      let scores: Record<string, number>;
+      let scores: Record<string, ExamScoreValue>;
       if (mark.assessmentScores && typeof mark.assessmentScores === 'object' && !Array.isArray(mark.assessmentScores)) {
         const unknownIds = Object.keys(mark.assessmentScores).filter(id => !components.some(component => component.id === id));
         if (unknownIds.length) throw new Error('One or more assessment components are not configured for this school.');
@@ -2606,8 +2607,8 @@ class StorageEngine {
         for (const component of components) {
           if (!Object.prototype.hasOwnProperty.call(mark.assessmentScores, component.id)) continue;
           const value = mark.assessmentScores[component.id];
-          if (!Number.isFinite(value) || value < 0 || value > component.maxMarks) {
-            throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}.`);
+          if (value !== 'ABS' && value !== 'LB' && (!Number.isFinite(value) || value < 0 || value > component.maxMarks)) {
+            throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}, or use ABS/LB.`);
           }
           scores[component.id] = value;
         }
@@ -2625,8 +2626,8 @@ class StorageEngine {
           ...allocateLegacyTotal(big, finalComponents)
         };
       }
-      const smallExamMarks = continuousComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
-      const bigExamMarks = finalComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
+      const smallExamMarks = continuousComponents.reduce((sum, component) => sum + (typeof scores[component.id] === 'number' ? scores[component.id] as number : 0), 0);
+      const bigExamMarks = finalComponents.reduce((sum, component) => sum + (typeof scores[component.id] === 'number' ? scores[component.id] as number : 0), 0);
       const totalMarks = smallExamMarks + bigExamMarks;
       const percentage = maxTotal > 0 ? Math.round((totalMarks / maxTotal) * 10000) / 100 : 0;
       return { ...mark, assessmentScores: scores, smallExamMarks, bigExamMarks, totalMarks, percentage };
