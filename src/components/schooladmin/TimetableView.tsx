@@ -307,6 +307,7 @@ export const TimetableView: React.FC = () => {
   const openClassPeriodEditor = async (klass: SchoolClass) => {
     setSelectedClassId(klass.id);
     setRoomNumber(klass.roomNumber || '');
+    setRoomId('');
     setDayOfWeek(days[0] || 'Monday');
     setPeriodNumber(1);
     const defaultTimes = periodTime(1, Number(klass.shift) === 2 ? 2 : 1).split(' - ');
