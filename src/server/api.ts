@@ -4046,7 +4046,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
   const [assignments, allSlots, unavailable, settings] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id)
   ]);
@@ -4055,16 +4055,17 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     res.status(400).json({ error: 'Fasalkan maaddooyin/macallimiin jadwal loo qoondeeyay ma leh. Marka hore Subject Assignments ka dooro maaddooyinka, macallimiinta iyo periods per week. Jadwalkii hore waxba lagama beddelin.' });
     return;
   }
-  const existing = allSlots.filter((slot: any) => slot.classId !== classId);
+  const lockedForClass = allSlots.filter((slot: any) => slot.classId === classId && slot.isLocked === true);
+  const existing = allSlots.filter((slot: any) => slot.classId !== classId || slot.isLocked === true);
   const existingClassIds = [...new Set(existing.map((slot: any) => slot.classId))];
   const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
   const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
   const targetShift = Number(klass.shift) === 2 ? 2 : 1;
-  const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+  const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
   const occupied = new Set(sameShiftExisting.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
   const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
-  const generated: TimetableSlot[] = [];
+  const generated: TimetableSlot[] = [...lockedForClass];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
   const dayLoad = new Map<string, number>();
   const periodLoad = new Map<number, number>();
@@ -4158,7 +4159,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const targetIds = new Set(assignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
   // Existing timetables for classes without schedulable assignments remain in place
   // and continue to block teacher/room conflicts in the other classes.
-  let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId));
+  let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId) || slot.isLocked === true);
   const generatedSlots: TimetableSlot[] = [];
   const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
   const skipped: Array<{ classId: string; className: string; reason: string }> = [];
@@ -4172,10 +4173,11 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       continue;
     }
     const targetShift = Number(klass.shift) === 2 ? 2 : 1;
-    const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+    const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
     const occupied = new Set(sameShiftSlots.filter((slot: any) => slot.teacherId).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
     const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
-    const generatedForClass: TimetableSlot[] = [];
+    const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
+    const generatedForClass: TimetableSlot[] = [...lockedForClass];
     const dayLoad = new Map<string, number>();
     const periodLoad = new Map<number, number>();
     const subjectDayLoad = new Map<string, number>();
