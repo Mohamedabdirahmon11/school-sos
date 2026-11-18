@@ -253,10 +253,10 @@ export const TimetableView: React.FC = () => {
       const previewUnfilled = preview.unfilled?.length || 0;
       const previewSkipped = preview.skipped?.length || 0;
       const accepted = window.confirm(
-        `HOR-U-EEGID JADWALKA\\n\\nFasal jadwalkooda la diyaariyey: ${previewClasses}\\nCasharro aan boos helin: ${previewUnfilled}\\nFasallo la dhaafay: ${previewSkipped}\\n\\nJadwalkan ma kaydinaysaa? Casharrada locked-ka ah waa la ilaalinayaa.`
+        `HOR-U-EEGID JADWALKA\n\nFasal jadwalkooda la diyaariyey: ${previewClasses}\\nCasharro aan boos helin: ${previewUnfilled}\\nFasallo la dhaafay: ${previewSkipped}\\n\\nJadwalkan ma kaydinaysaa? Casharrada locked-ka ah waa la ilaalinayaa.`
       );
       if (!accepted) { setNotice('Hor-u-eegidda waa la joojiyey; jadwalkii hore waxba lagama beddelin.'); return; }
-      const result = await ApiClient.generateAllTimetables(false);
+      const result = await ApiClient.generateAllTimetables();
       const generatedIds = new Set(result.generatedClassIds || []);
       setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
       const unfilledCount = result.unfilled.length;
