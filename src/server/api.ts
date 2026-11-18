@@ -614,6 +614,7 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     const klass = await db.getClassById(student.classId, student.schoolId);
     if (klass?.classTeacherId === user.id) return true;
     const yearPage = await db.queryPage('academic_years', { school_id: student.schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
+    const yearId = String((yearPage.items[0] as any)?.id || '');
 
     const assignment = yearId ? await db.queryPage('teacher_class_subject_assignments', {
       school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, academic_year_id: yearId
