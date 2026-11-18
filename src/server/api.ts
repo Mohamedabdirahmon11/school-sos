@@ -5833,7 +5833,6 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
   } else if (!['school_admin','super_admin'].includes(role || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
   let sessionQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
   sessionQuery = periodId ? sessionQuery.eq('period_id', periodId) : sessionQuery.is('period_id', null);
-  sessionQuery = subjectId ? sessionQuery.eq('subject_id', subjectId) : sessionQuery.is('subject_id', null);
   const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }, { data: currentYear }] = await Promise.all([
     sessionQuery.maybeSingle(),
     (() => {
@@ -5848,6 +5847,9 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
     client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle()
   ]);
   if (sessionError || recordsError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
+  if (session && (session.subject_id !== subjectId || session.section_id !== sectionId)) {
+    res.status(409).json({ error: 'Kulankan xaadirin waxaa loo sameeyey cashar ama qayb kale.' }); return;
+  }
   if (sectionId) {
     const { data: section } = await client.from('class_sections').select('legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
     if (!section || section.legacy_class_id !== classId) { res.status(400).json({ error: 'Qaybta fasalka sax ma aha.' }); return; }
@@ -5937,6 +5939,9 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
     if (existingError) { res.status(503).json({ error: 'Xaaladda xaadirinta lama hubin karin.' }); return; }
     const now = new Date(); const editWindowHours = Number(settings?.edit_window_hours ?? 2);
     if (existingSession) {
+      if (existingSession.subject_id !== subjectId || existingSession.section_id !== sectionId) {
+        res.status(409).json({ error: 'Kulankan xaadirin waxaa loo sameeyey cashar ama qayb kale.' }); return;
+      }
       if (existingSession.is_locked || (existingSession.submitted_at && now.getTime() > new Date(existingSession.submitted_at).getTime() + editWindowHours * 3600000)) {
         await client.from('attendance_sessions').update({ is_locked: true, updated_at: now.toISOString() }).eq('id', existingSession.id).eq('school_id', school.id);
         res.status(423).json({ error: 'Xaadirintan waa la xiray. Maamulka dugsiga ayaa dib u furi kara.' }); return;
@@ -5955,6 +5960,7 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
         const { data: raced } = await retry.maybeSingle();
         if (!raced) { res.status(503).json({ error: 'Xaadirinta lama bilaabi karin. Mar kale isku day.' }); return; }
         if (raced.teacher_id !== teacher.id) { res.status(403).json({ error: 'Macallinkii bilaabay kulankan oo keliya ayaa wax ka beddeli kara.' }); return; }
+        if (raced.subject_id !== subjectId || raced.section_id !== sectionId) { res.status(409).json({ error: 'Kulankan xaadirin waxaa loo sameeyey cashar ama qayb kale.' }); return; }
         session = raced;
       } else session = created;
     }
