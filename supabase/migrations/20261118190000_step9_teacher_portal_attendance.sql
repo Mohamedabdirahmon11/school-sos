@@ -51,6 +51,8 @@ INSERT INTO public.attendance_settings (school_id)
 SELECT id FROM public.schools
 ON CONFLICT (school_id) DO NOTHING;
 
+CREATE UNIQUE INDEX IF NOT EXISTS teachers_id_school_uidx ON public.teachers (id, school_id);
+
 CREATE TABLE IF NOT EXISTS public.attendance_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id varchar NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
@@ -144,6 +146,7 @@ AS $$
       AND u.role = 'teacher'
       AND u.school_id = target_school_id
       AND t.status = 'active'
+      AND (target_section_id IS NULL OR EXISTS (SELECT 1 FROM public.class_sections sec WHERE sec.id = target_section_id AND sec.school_id = target_school_id AND sec.legacy_class_id = target_class_id))
       AND (
         (
           target_period_id IS NULL
@@ -272,27 +275,8 @@ CREATE POLICY attendance_sessions_teacher_read ON public.attendance_sessions
     school_id = private.auth_school_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
-CREATE POLICY attendance_sessions_teacher_insert ON public.attendance_sessions
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    school_id = private.auth_school_id()
-    AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
-    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-  );
-CREATE POLICY attendance_sessions_teacher_update ON public.attendance_sessions
-  FOR UPDATE TO authenticated
-  USING (
-    school_id = private.auth_school_id()
-    AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
-    AND is_locked = false
-    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-  )
-  WITH CHECK (
-    school_id = private.auth_school_id()
-    AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
-    AND is_locked = false
-    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-  );
+-- Teacher session writes are performed by the authenticated Express API after
+-- edit-window and lock checks. Direct client writes are intentionally not granted.
 
 CREATE POLICY teacher_attendance_admin_all ON public.teacher_attendance
   FOR ALL TO authenticated
