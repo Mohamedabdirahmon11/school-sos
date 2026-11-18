@@ -2756,8 +2756,11 @@ class StorageEngine {
       school_id: schoolId, class_id: classId, subject_id: subjectId, is_active: 'true'
     });
     if (!assignment.length) throw new Error('The subject is not active in this class.');
-    const rows = await this.getMarks(schoolId, classId, subjectId, semester);
-    if (!rows.length || rows.some(mark => mark.status !== 'submitted' || mark.publishedAt)) {
+    const [rows, students] = await Promise.all([
+      this.getMarks(schoolId, classId, subjectId, semester),
+      this.getStudents(schoolId, classId)
+    ]);
+    if (!rows.length || rows.length !== students.length || rows.some(mark => mark.status !== 'submitted' || mark.publishedAt)) {
       throw new Error('Only a subject submitted to the Form Teacher and not yet forwarded can be reopened.');
     }
     const client = this.testClient || supabase;
