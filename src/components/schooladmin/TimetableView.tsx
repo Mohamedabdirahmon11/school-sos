@@ -44,6 +44,12 @@ export const TimetableView: React.FC = () => {
   const [substitutionSlotId, setSubstitutionSlotId] = useState('');
   const [substituteTeacherId, setSubstituteTeacherId] = useState('');
   const [substitutionReason, setSubstitutionReason] = useState('');
+  const [teacherUnavailability, setTeacherUnavailabilityRows] = useState<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number | null; reason?: string }>>([]);
+  const [availabilityTeacherId, setAvailabilityTeacherId] = useState('');
+  const [availabilityDay, setAvailabilityDay] = useState('Monday');
+  const [availabilityPeriod, setAvailabilityPeriod] = useState('');
+  const [availabilityReason, setAvailabilityReason] = useState('');
+  const [overviewDay, setOverviewDay] = useState('');
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -57,8 +63,13 @@ export const TimetableView: React.FC = () => {
 
   const hasConfiguredWorkingDays = Boolean(school?.setupData?.calendar?.workingDays?.length);
   const days = getSchoolWorkingDays(school?.setupData?.calendar);
+  const visibleDays = viewMode === 'school' ? days.filter(day => day === overviewDay) : days;
   const periods = Array.from({ length: getSchoolPeriodsPerDay(school?.setupData?.workingHours) }, (_value, index) => index + 1);
   const periodsForDay = (day: string) => periods.filter(period => hasConfiguredWorkingDays || day !== 'Friday' || period <= 5);
+  useEffect(() => {
+    setOverviewDay(current => days.includes(current) ? current : (days[0] || 'Monday'));
+    setAvailabilityDay(current => days.includes(current) ? current : (days[0] || 'Monday'));
+  }, [school?.id, days.join('|')]);
 
   useEffect(() => {
     setDayOfWeek((current: string) => days.includes(current) ? current : (days[0] || 'Monday'));
@@ -167,18 +178,20 @@ export const TimetableView: React.FC = () => {
   }, [school?.id, selectedTermId]);
   useEffect(() => {
     if (!school?.id) return;
-    Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions()])
-      .then(([roomRows, substitutionRows]) => {
+    Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions(), ApiClient.getTeacherUnavailability()])
+      .then(([roomRows, substitutionRows, unavailabilityRows]) => {
         setRooms(Array.isArray(roomRows) ? roomRows : []);
         setSubstitutions(Array.isArray(substitutionRows) ? substitutionRows : []);
+        setTeacherUnavailabilityRows(Array.isArray(unavailabilityRows) ? unavailabilityRows : []);
       })
-      .catch(() => setNotice('Qolalka ama macallimiinta beddelka ah lama soo dejin karin.'));
+      .catch(() => setNotice('Qolalka, beddelka ama maqnaanshaha macallimiinta lama soo dejin karin.'));
   }, [school?.id]);
 
   useEffect(() => {
     if (!substitutionSlotId && timetable.length) setSubstitutionSlotId(timetable[0].id);
     if (!substituteTeacherId && teachers.length) setSubstituteTeacherId(teachers[0].id);
-  }, [timetable, teachers, substitutionSlotId, substituteTeacherId]);
+    if (!availabilityTeacherId && teachers.length) setAvailabilityTeacherId(teachers[0].id);
+  }, [timetable, teachers, substitutionSlotId, substituteTeacherId, availabilityTeacherId]);
 
   const handleSaveRoom = async () => {
     try {
@@ -196,6 +209,30 @@ export const TimetableView: React.FC = () => {
       setSubstitutionReason('');
       setNotice('Macallinka beddelka ah waa la diiwaangeliyey; jadwalka joogtada ah isma beddelin.');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Beddelka lama kaydin karin.'); }
+  };
+
+  const handleSaveUnavailability = async () => {
+    if (!availabilityTeacherId) return;
+    try {
+      await ApiClient.setTeacherUnavailability({
+        teacherId: availabilityTeacherId,
+        dayOfWeek: availabilityDay,
+        periodNumber: availabilityPeriod === '' ? null : Number(availabilityPeriod),
+        unavailable: true,
+        reason: availabilityReason.trim()
+      });
+      setTeacherUnavailabilityRows(await ApiClient.getTeacherUnavailability());
+      setAvailabilityReason('');
+      setNotice(availabilityPeriod === '' ? 'Maqnaanshaha maalinta oo dhan waa la kaydiyey.' : 'Maqnaanshaha casharka waa la kaydiyey.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Maqnaanshaha macallinka lama kaydin karin.'); }
+  };
+
+  const handleRemoveUnavailability = async (row: { teacherId: string; dayOfWeek: string; periodNumber: number | null }) => {
+    try {
+      await ApiClient.setTeacherUnavailability({ ...row, unavailable: false });
+      setTeacherUnavailabilityRows(await ApiClient.getTeacherUnavailability());
+      setNotice('Maqnaanshaha waa laga saaray.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Maqnaanshaha lama saari karin.'); }
   };
 
   useEffect(() => {
@@ -448,6 +485,7 @@ export const TimetableView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.roomNumber}) · Shift {c.shift || 1}</option>
             ))}
           </select>
+          {viewMode === 'school' && <select aria-label="Overview day" value={overviewDay} onChange={e => setOverviewDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
           {viewMode === 'room' && <select aria-label="Select room" value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="">Select room</option>
             {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
@@ -531,6 +569,28 @@ export const TimetableView: React.FC = () => {
           <button type="button" onClick={() => void handleSaveSubstitution()} disabled={isReadOnly || !timetable.length || !substituteTeacherId || !substitutionSlotId} className="mt-3 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Diiwaangeli beddelka</button>
           <div className="mt-3 space-y-1">{substitutions.filter(item => item.substituteDate === substitutionDate).map(item => <p key={item.id} className="text-xs text-[#475569]">{teachers.find(teacher => teacher.id === item.substituteTeacherId)?.fullName || item.substituteTeacherId} · {item.reason || 'Beddel macallin'}</p>)}{!substitutions.some(item => item.substituteDate === substitutionDate) && <p className="text-xs text-[#64748B]">Taariikhdan beddel macallin ma jiro.</p>}</div>
         </details>
+      </section>
+      <section className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+        <h2 className="text-sm font-semibold text-[#132A29]">Maqnaanshaha macallimiinta</h2>
+        <p className="mt-1 text-xs text-[#64748B]">Qeex cashar gaar ah ama maalinta oo dhan; auto-generate iyo beddelka macallinku way tixgelinayaan.</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <select aria-label="Teacher unavailable" value={availabilityTeacherId} onChange={e => setAvailabilityTeacherId(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">
+            <option value="">Dooro macallin</option>{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}
+          </select>
+          <select aria-label="Unavailable day" value={availabilityDay} onChange={e => setAvailabilityDay(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>
+          <select aria-label="Unavailable period" value={availabilityPeriod} onChange={e => setAvailabilityPeriod(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">
+            <option value="">Maalinta oo dhan</option>{periodsForDay(availabilityDay).map(period => <option key={period} value={period}>Period {period}</option>)}
+          </select>
+          <input value={availabilityReason} onChange={e => setAvailabilityReason(e.target.value)} placeholder="Sababta (ikhtiyaari)" className="rounded-lg border px-3 py-2 text-xs" />
+          <button type="button" onClick={() => void handleSaveUnavailability()} disabled={isReadOnly || !availabilityTeacherId} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Kaydi maqnaansho</button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {teacherUnavailability.map(row => <span key={row.id} className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+            {teachers.find(teacher => teacher.id === row.teacherId)?.fullName || row.teacherId} · {row.dayOfWeek} · {row.periodNumber == null ? 'Maalinta oo dhan' : 'P' + row.periodNumber} {row.reason ? '· ' + row.reason : ''}
+            {!isReadOnly && <button type="button" onClick={() => void handleRemoveUnavailability(row)} className="font-bold underline">Ka saar</button>}
+          </span>)}
+          {!teacherUnavailability.length && <p className="text-xs text-[#64748B]">Maqnaansho macallin lama diiwaangelin.</p>}
+        </div>
       </section>
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Print timetables">
@@ -630,7 +690,7 @@ export const TimetableView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {days.map(day => (
+                  {visibleDays.map(day => (
                     <tr key={day}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
@@ -756,7 +816,6 @@ export const TimetableView: React.FC = () => {
                 <label className="mt-2 block font-medium text-[#334155]">Room label</label>
                 <input
                   type="text"
-                  required
                   value={roomNumber}
                   onChange={e => setRoomNumber(e.target.value)}
                   placeholder="e.g. Room 201"
