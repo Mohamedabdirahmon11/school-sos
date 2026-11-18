@@ -3763,7 +3763,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
     const classIds = [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
-    const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+    const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
     res.json(await decorateTimetableSlots(school.id, slots.filter((slot: any) => !req.query.dayOfWeek || slot.dayOfWeek === req.query.dayOfWeek))); return;
   } else if (!isSchoolAdmin(user)) { res.status(403).json({ error: 'This role cannot view timetables.' }); return; }
   const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
@@ -4058,8 +4058,9 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const firstId = String(req.body?.firstSlotId || '');
   const secondId = String(req.body?.secondSlotId || '');
   if (!firstId || !secondId || firstId === secondId) { res.status(400).json({ error: 'Choose two different timetable periods to swap.' }); return; }
-  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
   if (slots.items.length !== 2) { res.status(404).json({ error: 'One or both timetable periods were not found in this school.' }); return; }
+  if (slots.items.some((slot: any) => slot.isLocked)) { res.status(409).json({ error: 'Cashar xiran lama beddeli karo. Marka hore fur casharka.' }); return; }
   try { await db.swapTimetableSlots(school.id, firstId, secondId); }
   catch (error: any) { res.status(409).json({ error: error.message || 'The swap would create a schedule conflict.' }); return; }
   res.json({ success: true });
