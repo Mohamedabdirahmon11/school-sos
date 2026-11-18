@@ -203,7 +203,7 @@ BEGIN
     UPDATE public.enrollments SET status='withdrawn', left_at=now()
      WHERE school_id=p_school_id AND student_id=p_student_id AND academic_year_id=p_academic_year_id AND status='active';
     IF NOT FOUND THEN RAISE EXCEPTION 'Student has no active enrollment in the selected academic year.'; END IF;
-    UPDATE public.students SET status='dropped' WHERE id=p_student_id AND school_id=p_school_id;
+    UPDATE public.students SET status='withdrawn' WHERE id=p_student_id AND school_id=p_school_id;
     INSERT INTO public.audit_logs (id,action,category,school_id,school_name,user_id,user_name,user_role,details,severity)
     SELECT 'log-'||gen_random_uuid()::text,'STUDENT_WITHDRAWN','school',p_school_id,sc.name,
       COALESCE(p_actor_id,'system'),'School admin','school_admin',
