@@ -4759,6 +4759,13 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
     if (valid.length !== ids.length) { res.status(400).json({ error: `Every assigned ${table} must belong to this school.` }); return; }
     updates[field] = ids;
   }
+  if (updates.phone !== undefined && String(updates.phone).replace(/\D/g, '')) {
+    const digits = String(updates.phone).replace(/\D/g, '');
+    const existingPhones = await queryAllRows('teachers', { school_id: school.id }, 'id,phone');
+    if (existingPhones.some((item: any) => item.id !== id && item.phone && String(item.phone).replace(/\D/g, '') === digits)) {
+      res.status(409).json({ error: 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.' }); return;
+    }
+  }
   // Direct paged reads do not hydrate the storage cache used by updateTeacher/updateUser.
   // Load this school's teacher and teacher-account rows before applying the scoped update.
   await db.getTeachers(school.id);
@@ -4833,6 +4840,13 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
+  const phoneDigits = phone.replace(/\D/g, '');
+  if (phoneDigits) {
+    const existingPhones = await queryAllRows('teachers', { school_id: school.id }, 'id,phone');
+    if (existingPhones.some((item: any) => item.phone && String(item.phone).replace(/\D/g, '') === phoneDigits)) {
+      res.status(409).json({ error: 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.' }); return;
+    }
+  }
   const staffId = await nextSchoolTeacherId(school);
   const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
   if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
