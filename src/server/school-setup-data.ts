@@ -52,7 +52,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   if (step === 5) {
     const w = data.workingHours;
     const time = (v: unknown) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
-    if (!w || !time(w.openingTime) || !time(w.classStartTime) || !time(w.closingTime) || !time(w.breakStartTime) || !time(w.breakEndTime) || !Number.isInteger(w.periodsPerDay) || w.periodsPerDay < 1 || w.periodsPerDay > 16) return 'Enter valid school times and 1–16 daily periods.';
+    if (!w || !time(w.openingTime) || !time(w.classStartTime) || !time(w.closingTime) || !time(w.breakStartTime) || !time(w.breakEndTime) || !Number.isInteger(w.periodsPerDay) || w.periodsPerDay < 1 || w.periodsPerDay > 8) return 'Enter valid school times and 1–8 daily periods.';
     if (!(w.openingTime <= w.classStartTime && w.classStartTime < w.closingTime && w.breakStartTime < w.breakEndTime && w.breakStartTime >= w.classStartTime && w.breakEndTime < w.closingTime)) return 'School hours and break times are not in the correct order.';
   }
   return null;
