@@ -18,6 +18,8 @@ export const TimetableView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [terms, setTerms] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>([]);
   const [selectedTermId, setSelectedTermId] = useState('');
+  const [sections, setSections] = useState<Array<{ id: string; name: string; sortOrder: number }>>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState('');
   const [copySourceTermId, setCopySourceTermId] = useState('');
   const [draggingSlotId, setDraggingSlotId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
@@ -94,7 +96,7 @@ export const TimetableView: React.FC = () => {
       ApiClient.getClasses(),
       ApiClient.getSubjects(school.id),
       ApiClient.getTeachers(school.id),
-      ApiClient.getTimetable({ termId: selectedTermId || undefined }),
+      ApiClient.getTimetable({ termId: selectedTermId || undefined, sectionId: selectedSectionId || undefined }),
       ApiClient.getTimetableSettings()
     ]);
     const errors: string[] = [];
@@ -174,8 +176,17 @@ export const TimetableView: React.FC = () => {
   }, [school?.id]);
 
   useEffect(() => {
+    if (!selectedClassId) { setSections([]); setSelectedSectionId(''); return; }
+    ApiClient.getTimetableSections(selectedClassId).then(rows => {
+      const available = Array.isArray(rows) ? rows : [];
+      setSections(available);
+      setSelectedSectionId(current => current && available.some(section => section.id === current) ? current : '');
+    }).catch(() => setNotice('Qaybaha fasalka lama soo dejin karin.'));
+  }, [selectedClassId]);
+
+  useEffect(() => {
     fetchData();
-  }, [school?.id, selectedTermId]);
+  }, [school?.id, selectedTermId, selectedSectionId]);
   useEffect(() => {
     if (!school?.id) return;
     Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions(), ApiClient.getTeacherUnavailability()])
@@ -294,7 +305,7 @@ export const TimetableView: React.FC = () => {
     const clash = checkClash(dayOfWeek, periodNumber, teacherId, roomNumber);
     if (clash) { setClashWarning(clash); return; }
     try {
-      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, sectionId: null, roomId: roomId || null, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
+      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, sectionId: selectedSectionId || null, roomId: roomId || null, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
       setTimetable(prev => [...prev.filter(s => !(s.dayOfWeek === dayOfWeek && s.periodNumber === periodNumber && s.classId === selectedClassId)), newSlot]);
       setShowAddModal(false); setClashWarning(null); setNotice('Timetable period saved.');
       setTimeout(() => setNotice(null), 3000);
@@ -466,6 +477,10 @@ export const TimetableView: React.FC = () => {
         </div>}
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            <option value="">All sections</option>
+            {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
+          </select>}
           {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             {terms.map(term => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? ' · Current' : ''}</option>)}
           </select>}
