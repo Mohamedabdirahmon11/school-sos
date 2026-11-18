@@ -2,7 +2,7 @@ import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { Button, Card, Chip, DataTable, EmptyState, FormRow, PageHeader, Pill, Stepper } from './AcademicSetupDesign.tsx';
+import { Button, Card, Chip, Table, EmptyState, FormRow, PageHeader, Pill, Stepper } from './AcademicSetupDesign.tsx';
 
 type AcademicYear = { id:string; name:string; startDate:string; endDate:string; isCurrent:boolean };
 type Term = { id:string; academicYearId:string; name:string; startDate:string; endDate:string; isCurrent:boolean };
@@ -44,7 +44,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
   const refresh = async () => {
     const result = await ApiClient.getAcademicSetup();
     setData({ ...EMPTY, ...result, schoolDays:result.schoolDays?.length ? result.schoolDays : DEFAULT_DAYS });
-    const current = result.academicYears?.find((year:AcademicYear)=>year.isCurrent) || result.academicYears?.[0];
+    const current = result.academicYears?.find((year:AcademicYear)=>year.id===selectedYearId) || result.academicYears?.find((year:AcademicYear)=>year.isCurrent) || result.academicYears?.[0];
     setSelectedYearId(current?.id || '');
   };
 
@@ -147,14 +147,14 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
         <Button variant="primary" type="submit" disabled={saving||isReadOnly}><Save size={15}/>{editingYearId?'Kaydi':'Ku dar'}</Button>
         {editingYearId&&<Button type="button" onClick={()=>{setEditingYearId('');setYearForm(emptyYear);}}>Jooji</Button>}
       </form>
-      {data.academicYears.length===0?<EmptyState>Weli sannad-dugsiyeed lama diiwaangelin.</EmptyState>:<DataTable>
+      {data.academicYears.length===0?<EmptyState>Weli sannad-dugsiyeed lama diiwaangelin.</EmptyState>:<Table>
         <thead><tr><th>Sannadka</th><th>Bilow</th><th>Dhammaad</th><th>Xaalad</th><th>Ficil</th></tr></thead>
         <tbody>{data.academicYears.map(year=><tr key={year.id}>
           <td><button type="button" className="font-semibold text-[var(--as-primary)] underline-offset-2 hover:underline" onClick={()=>setSelectedYearId(year.id)}>{year.name}</button></td>
           <td>{year.startDate}</td><td>{year.endDate}</td><td>{year.isCurrent?<Pill tone="success">Hadda jira</Pill>:<Pill>Caadi</Pill>}</td>
           <td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>{setSelectedYearId(year.id);editYear(year);}}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} aria-label="Tirtir sannadka" onClick={()=>deleteYear(year)}><Trash2 size={15}/></Button></div></td>
         </tr>)}</tbody>
-      </DataTable>}
+      </Table>}
     </Card>
 
     <Card title="B. Xiisadaha sannadka la doortay" subtitle={selectedYear?'Xiisadaha sannadka '+selectedYear.name+'.':'Marka hore samee ama dooro sannad-dugsiyeed.'}>
@@ -169,10 +169,10 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
         <Button variant="primary" type="submit" disabled={saving||isReadOnly}><Plus size={15}/>{editingTermId?'Kaydi':'Ku dar xiisad'}</Button>
         {editingTermId&&<Button type="button" onClick={()=>{setEditingTermId('');setTermForm(emptyTerm);}}>Jooji</Button>}
       </form>}
-      {!selectedYear?<EmptyState>Ma jiro sannad la doortay.</EmptyState>:yearTerms.length===0?<EmptyState>Weli sannadkan xiisado laguma darin.</EmptyState>:<DataTable>
+      {!selectedYear?<EmptyState>Ma jiro sannad la doortay.</EmptyState>:yearTerms.length===0?<EmptyState>Weli sannadkan xiisado laguma darin.</EmptyState>:<Table>
         <thead><tr><th>Xiisadda</th><th>Bilow</th><th>Dhammaad</th><th>Xaalad</th><th>Ficil</th></tr></thead>
         <tbody>{yearTerms.map(term=><tr key={term.id}><td className="font-semibold">{term.name}</td><td>{term.startDate}</td><td>{term.endDate}</td><td>{term.isCurrent?<Pill tone="success">Hadda socota</Pill>:<Pill>Caadi</Pill>}</td><td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>editTerm(term)}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deleteTerm(term)}><Trash2 size={15}/></Button></div></td></tr>)}</tbody>
-      </DataTable>}
+      </Table>}
     </Card>
 
     <Card title="C. Maalmaha shaqada" subtitle="Sabti ilaa Khamiis waa maalmaha shaqada ee caadiga ah; Jimce waa fasax. Waad beddeli kartaa.">
@@ -193,13 +193,13 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
         <Button variant="primary" type="submit" disabled={saving||isReadOnly}><Plus size={15}/>{editingPeriodId?'Kaydi':'Ku dar'}</Button>
         {editingPeriodId&&<Button type="button" onClick={()=>{setEditingPeriodId('');setPeriodForm(emptyPeriod);}}>Jooji</Button>}
       </form>
-      {data.periods.length===0?<EmptyState>Weli xiisado lama diiwaangelin. Ku dar lix xiisadood iyo hal nasasho.</EmptyState>:<DataTable>
+      {data.periods.length===0?<EmptyState>Weli xiisado lama diiwaangelin. Ku dar lix xiisadood iyo hal nasasho.</EmptyState>:<Table>
         <thead><tr><th>#</th><th>Nooca</th><th>Bilow</th><th>Dhammaad</th><th>Ficil</th></tr></thead>
         <tbody>{[...data.periods].sort((a,b)=>a.number-b.number).map((period,index,all)=><tr key={period.id}>
           <td className="font-semibold">{period.number}</td><td><Pill tone={period.type==='break'?'muted':'primary'}>{period.type==='break'?'Nasasho':'Xiisad'}</Pill></td><td>{period.startTime}</td><td>{period.endTime}</td>
           <td><div className="flex gap-1"><Button disabled={saving||isReadOnly||index===0} aria-label="Kor u qaad" onClick={()=>movePeriod(period,-1)}><ChevronUp size={15}/></Button><Button disabled={saving||isReadOnly||index===all.length-1} aria-label="Hoos u dhig" onClick={()=>movePeriod(period,1)}><ChevronDown size={15}/></Button><Button disabled={saving||isReadOnly} onClick={()=>editPeriod(period)}><Pencil size={14}/></Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deletePeriod(period)}><Trash2 size={15}/></Button></div></td>
         </tr>)}</tbody>
-      </DataTable>}
+      </Table>}
       <div className="flex flex-wrap gap-2"><Pill tone="success">{lessonCount} xiisad / maalin</Pill><Pill tone="primary">{lessonCount*workingDays} xiisad / toddobaad</Pill></div>
     </Card>
 
