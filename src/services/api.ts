@@ -696,6 +696,9 @@ export class ApiClient {
     return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
   }
 
+  public static async setTimetableSlotLocked(slotId: string, isLocked: boolean) {
+    return this.request<{ success: boolean; isLocked: boolean }>(`/timetable/${encodeURIComponent(slotId)}/lock`, { method: 'PATCH', body: JSON.stringify({ isLocked }) });
+  }
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
     return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE' });
   }
@@ -714,10 +717,10 @@ export class ApiClient {
 
   public static async getTeacherUnavailability(teacherId?: string) {
     const query = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
-    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>(`/timetable/unavailability${query}`);
+    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number | null; reason?: string }>>(`/timetable/unavailability${query}`);
   }
 
-  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number; unavailable: boolean }) {
+  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number | null; unavailable: boolean; reason?: string }) {
     return this.request<{ success: boolean }>('/timetable/unavailability', { method: 'PUT', body: JSON.stringify(input) });
   }
 
