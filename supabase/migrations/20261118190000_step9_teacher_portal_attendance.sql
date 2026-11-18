@@ -469,7 +469,7 @@ ALTER TABLE public.attendance_audit_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY attendance_settings_admin_all ON public.attendance_settings
   FOR ALL TO authenticated
-  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','super_admin'))
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
   WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
 CREATE POLICY attendance_settings_teacher_read ON public.attendance_settings
   FOR SELECT TO authenticated
@@ -477,7 +477,7 @@ CREATE POLICY attendance_settings_teacher_read ON public.attendance_settings
 
 CREATE POLICY attendance_sessions_admin_all ON public.attendance_sessions
   FOR ALL TO authenticated
-  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','super_admin'))
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
   WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
 CREATE POLICY attendance_sessions_teacher_read ON public.attendance_sessions
   FOR SELECT TO authenticated
@@ -490,7 +490,7 @@ CREATE POLICY attendance_sessions_teacher_read ON public.attendance_sessions
 
 CREATE POLICY teacher_attendance_admin_all ON public.teacher_attendance
   FOR ALL TO authenticated
-  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','super_admin'))
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
   WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
 CREATE POLICY teacher_attendance_self_read ON public.teacher_attendance
   FOR SELECT TO authenticated
@@ -501,7 +501,7 @@ CREATE POLICY teacher_attendance_self_read ON public.teacher_attendance
 
 CREATE POLICY attendance_audit_admin_all ON public.attendance_audit_logs
   FOR ALL TO authenticated
-  USING (school_id = private.auth_school_id() AND private.auth_user_role() IN ('school_admin','super_admin'))
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
   WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
 CREATE POLICY attendance_audit_teacher_read_own ON public.attendance_audit_logs
   FOR SELECT TO authenticated
