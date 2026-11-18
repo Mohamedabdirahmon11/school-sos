@@ -5616,23 +5616,32 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
   ]);
   if (assignmentError) { res.status(503).json({ error: 'Xilsaarista macallinka lama hubin karin.' }); return; }
   const currentAssignments = (assignments || []).filter((row: any) => !row.term_id || !term?.id || row.term_id === term.id);
-  const [{ data: legacyAssignments, error: legacyError }, { data: students, error: studentsError }] = await Promise.all([
+  const [{ data: legacyAssignments, error: legacyError }, { data: enrollments, error: enrollmentError }] = await Promise.all([
     client.from('class_subjects').select('id').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('class_id', classId).eq('is_active', true).limit(1),
-    client.from('students').select(LIST_QUERY_COLUMNS.students).eq('school_id', school.id).eq('class_id', classId).eq('status', 'active')
+    year?.id
+      ? client.from('enrollments').select('student_id,section_id').eq('school_id', school.id).eq('academic_year_id', year.id).eq('class_id', classId).eq('status', 'active')
+      : Promise.resolve({ data: [], error: null })
   ]);
-  if (legacyError || studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+  if (legacyError || enrollmentError) { res.status(503).json({ error: 'Diiwaanka diiwaangelinta ardayda lama soo dejin karin.' }); return; }
   const fullClassAccess = Boolean(formTeacherClass || access.substitute || legacyAssignments?.length || currentAssignments.some((row: any) => !row.section_id));
-  let roster = students || [];
-  if (!fullClassAccess) {
-    const sectionIds = [...new Set(currentAssignments.map((row: any) => row.section_id).filter(Boolean))];
-    if (!sectionIds.length) { res.json([]); return; }
-    const { data: sections, error: sectionError } = await client.from('class_sections').select('id,name')
-      .eq('school_id', school.id).in('id', sectionIds);
-    if (sectionError) { res.status(503).json({ error: 'Qaybaha fasalka lama soo dejin karin.' }); return; }
-    const allowedNames = new Set((sections || []).map((row: any) => String(row.name || '').trim().toLowerCase()));
-    roster = roster.filter((student: any) => allowedNames.has(String(student.section || '').trim().toLowerCase()));
-  }
-  res.json(sanitizeStudents(roster));
+  const enrollmentRows = enrollments || [];
+  const studentIds = [...new Set(enrollmentRows.map((row: any) => row.student_id))];
+  if (!studentIds.length) { res.json([]); return; }
+  const { data: studentRows, error: studentError } = await client.from('students').select(LIST_QUERY_COLUMNS.students)
+    .eq('school_id', school.id).eq('status', 'active').in('id', studentIds);
+  if (studentError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+  const enrollmentByStudent = new Map(enrollmentRows.map((row: any) => [row.student_id, row]));
+  const allowedSectionIds = new Set(currentAssignments.map((row: any) => row.section_id).filter(Boolean));
+  const roster = (studentRows || []).filter((student: any) => {
+    if (fullClassAccess) return true;
+    const enrollment: any = enrollmentByStudent.get(student.id);
+    return Boolean(enrollment?.section_id && allowedSectionIds.has(enrollment.section_id));
+  });
+  res.json(roster.map((student: any) => ({
+    id: student.id, studentId: student.student_id, firstName: student.first_name,
+    middleName: student.middle_name, lastName: student.last_name, gender: student.gender,
+    classId: classId, section: student.section, fatherPhone: student.father_phone, motherPhone: student.mother_phone
+  })));
 });
 
 apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext, async (req, res) => {
