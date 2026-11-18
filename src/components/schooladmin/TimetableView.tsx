@@ -652,7 +652,7 @@ export const TimetableView: React.FC = () => {
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
-                                <span className="mt-1 block text-[9px] text-[#475569]">{teacher?.fullName || teacher?.name || 'Macallin lama qoondeyn'}</span>
+                                <span className="mt-1 block text-[9px] text-[#475569]">{teacher?.fullName || 'Macallin lama qoondeyn'}</span>
                                 <span className="block text-[9px] text-[#64748B]">{registeredRoom?.name || slot.roomNumber || 'Qol lama cayimin'}</span>
                                 {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
                               </div>
