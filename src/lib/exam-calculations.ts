@@ -1,3 +1,5 @@
+export type ExamScoreValue = number | 'ABS' | 'LB';
+
 export interface ExamAssessmentPart {
   id: string;
   name: string;
@@ -21,16 +23,18 @@ export interface ExamStudentResult {
   rank: number | null;
 }
 
-/** Returns null until every configured component has a saved numeric mark. */
+/** ABS and LB are explicit completed entries and contribute zero to the numeric total. */
 export function calculateExamSubjectTotal(
-  scores: Record<string, number | undefined> | null | undefined,
+  scores: Record<string, ExamScoreValue | undefined> | null | undefined,
   parts: readonly ExamAssessmentPart[]
 ): number | null {
   if (!parts.length || !scores) return null;
   let total = 0;
   for (const part of parts) {
     const value = scores[part.id];
-    if (value === undefined || !Number.isFinite(value) || value < 0 || value > part.maxMarks) return null;
+    if (value === undefined) return null;
+    if (value === 'ABS' || value === 'LB') continue;
+    if (!Number.isFinite(value) || value < 0 || value > part.maxMarks) return null;
     total += value;
   }
   return total;
