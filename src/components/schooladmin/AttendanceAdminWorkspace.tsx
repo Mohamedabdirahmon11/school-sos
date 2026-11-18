@@ -4,7 +4,7 @@ import { AttendanceView } from './AttendanceView.tsx';
 import { PageHeader, Card, Button, Pill, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
 import { CalendarCheck, Users, LockKeyhole, UserCheck, RefreshCw } from 'lucide-react';
 
-type Tab = 'students' | 'teachers' | 'register';
+type Tab = 'students' | 'teachers' | 'reports' | 'register';
 const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
 
 export const AttendanceAdminWorkspace: React.FC = () => {
@@ -22,6 +22,14 @@ export const AttendanceAdminWorkspace: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [reportStartDate, setReportStartDate] = useState(todayIso());
+  const [reportEndDate, setReportEndDate] = useState(todayIso());
+  const [reportClassId, setReportClassId] = useState('');
+  const [reportSubjectId, setReportSubjectId] = useState('');
+  const [reportData, setReportData] = useState<any>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportClasses, setReportClasses] = useState<any[]>([]);
+  const [reportSubjects, setReportSubjects] = useState<any[]>([]);
 
   const loadStudents = async () => { setBusy(true); setError(''); try { setDashboard(await ApiClient.getAttendanceDashboard(date)); } catch(e) { setError(e instanceof Error ? e.message : 'Xaadirinta ardayda lama soo dejin karin.'); } finally { setBusy(false); } };
   const loadTeachers = async () => { setBusy(true); setError(''); try { setTeacherData(await ApiClient.getTeacherAttendance(month)); } catch(e) { setError(e instanceof Error ? e.message : 'Xaadirinta macallimiinta lama soo dejin karin.'); } finally { setBusy(false); } };
@@ -33,6 +41,36 @@ export const AttendanceAdminWorkspace: React.FC = () => {
   const absentRows = dashboard?.absentStudents || [];
   const summary = useMemo(() => teacherData?.summary || [], [teacherData]);
 
+  const generateReport = async () => {
+    setReportBusy(true); setError('');
+    try {
+      setReportData(await ApiClient.getAttendanceReport({
+        startDate: reportStartDate, endDate: reportEndDate,
+        classId: reportClassId || undefined, subjectId: reportSubjectId || undefined
+      }));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Warbixinta lama soo dejin karin.'); }
+    finally { setReportBusy(false); }
+  };
+  const exportReport = async () => {
+    setReportBusy(true); setError('');
+    try {
+      await ApiClient.downloadAttendanceReportCsv({
+        startDate: reportStartDate, endDate: reportEndDate,
+        classId: reportClassId || undefined, subjectId: reportSubjectId || undefined
+      });
+    } catch (e) { setError(e instanceof Error ? e.message : 'Faylka warbixinta lama soo dejin karin.'); }
+    finally { setReportBusy(false); }
+  };
+  useEffect(() => {
+    if (tab !== 'reports') return;
+    let cancelled = false;
+    setReportBusy(true);
+    Promise.all([ApiClient.getClasses(), ApiClient.getSubjects()])
+      .then(([classes, subjects]) => { if (!cancelled) { setReportClasses(classes); setReportSubjects(subjects); } })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Liiska fasallada iyo maaddooyinka lama soo dejin karin.'); })
+      .finally(() => { if (!cancelled) setReportBusy(false); });
+    return () => { cancelled = true; };
+  }, [tab]);
   const markTeacher = async () => {
     if (!selectedTeacher || busy) return;
     setBusy(true); setError(''); setMessage('');
@@ -53,8 +91,8 @@ export const AttendanceAdminWorkspace: React.FC = () => {
 
   return <main className="mx-auto w-full max-w-7xl space-y-5 p-3 pb-24 md:p-8">
     <PageHeader title="Maamulka Xaadirinta" subtitle="Xaadirinta ardayda iyo imaanshaha macallimiinta ee dugsiga." />
-    <nav className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-      {([{id:'students',label:'Xaadiris ardayda'},{id:'teachers',label:'Macallimiin imaanshaha'},{id:'register',label:'Diiwaanka'}] as const).map(item =>
+    <nav className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+      {([{id:'students',label:'Xaadiris ardayda'},{id:'teachers',label:'Macallimiin imaanshaha'},{id:'reports',label:'Warbixin'},{id:'register',label:'Diiwaanka'}] as const).map(item =>
         <button key={item.id} onClick={() => setTab(item.id)} className={'min-h-12 rounded-xl px-2 text-xs font-bold sm:text-sm '+(tab===item.id?'bg-teal-700 text-white':'text-slate-600 dark:text-slate-300')}>{item.label}</button>)}
     </nav>
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
@@ -82,6 +120,21 @@ export const AttendanceAdminWorkspace: React.FC = () => {
         <Button disabled={busy||!selectedTeacher} className="min-h-12 md:col-span-2" onClick={()=>void markTeacher()}><UserCheck className="mr-2 h-4 w-4"/>Kaydi imaanshaha macallinka</Button>
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{summary.map((item:any)=><Card key={item.teacher.id} className="space-y-2 p-4"><h3 className="font-bold">{item.teacher.full_name}</h3><div className="grid grid-cols-2 gap-2 text-sm"><p>Jooga: <b>{item.present}</b></p><p>Maqan: <b>{item.absent}</b></p><p>Daahay: <b>{item.late}</b></p><p>Fasax: <b>{item.onLeave}</b></p></div></Card>)}</div>
+    </section>}
+
+    {tab === 'reports' && <section className="space-y-4">
+      <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <FormRow label="Laga bilaabo"><input type="date" value={reportStartDate} onChange={e=>setReportStartDate(e.target.value)} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
+        <FormRow label="Ilaa"><input type="date" value={reportEndDate} onChange={e=>setReportEndDate(e.target.value)} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
+        <FormRow label="Fasal"><select value={reportClassId} onChange={e=>setReportClassId(e.target.value)} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"><option value="">Dhammaan fasallada</option>{reportClasses.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></FormRow>
+        <FormRow label="Maaddo"><select value={reportSubjectId} onChange={e=>setReportSubjectId(e.target.value)} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"><option value="">Dhammaan maaddooyinka</option>{reportSubjects.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></FormRow>
+        <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4"><Button disabled={reportBusy} onClick={()=>void generateReport()}>Samee warbixinta</Button><Button variant="secondary" disabled={reportBusy||!reportData} onClick={()=>void exportReport()}>Excel / CSV</Button><Button variant="secondary" disabled={!reportData} onClick={()=>window.print()}>PDF / Daabac</Button></div>
+      </Card>
+      {reportData && <Card className="space-y-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Warbixinta xaadirinta</h2><Pill>{reportData.totalRecords || 0} diiwaan</Pill></div>
+        {!reportData.summaries?.length ? <EmptyState><Users className="mx-auto h-7 w-7"/><p>Xog xaadirin ah lama helin muddadan.</p></EmptyState> :
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs dark:bg-slate-800"><tr>{['Arday','Fasal','Jooga','Maqan','Daahay','Cudur-daar','%','Maqnaansho xiriir ah'].map(x=><th key={x} className="px-3 py-3">{x}</th>)}</tr></thead><tbody className="divide-y dark:divide-slate-700">{reportData.summaries.map((x:any)=><tr key={x.studentId}><td className="px-3 py-3"><b>{x.studentName}</b><span className="block text-xs text-slate-500">{x.studentId}</span></td><td className="px-3 py-3">{x.className}</td><td className="px-3 py-3">{x.present}</td><td className="px-3 py-3">{x.absent}</td><td className="px-3 py-3">{x.late}</td><td className="px-3 py-3">{x.excused}</td><td className="px-3 py-3">{x.attendancePercentage}%</td><td className="px-3 py-3">{x.absenceStreak}</td></tr>)}</tbody></table></div>}
+      </Card>}
     </section>}
 
     {tab === 'register' && <AttendanceView />}
