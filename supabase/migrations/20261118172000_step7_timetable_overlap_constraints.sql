@@ -4,9 +4,9 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-CREATE OR REPLACE FUNCTION public.timetable_time_seconds(value time without time zone)
+CREATE OR REPLACE FUNCTION public.timetable_time_seconds(value text)
 RETURNS bigint LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
-AS $ SELECT floor(extract(epoch FROM (value - time '00:00')))::bigint $;
+AS $ SELECT floor(extract(epoch FROM (value::time - time '00:00')))::bigint $;
 
 DO $$
 BEGIN
@@ -23,8 +23,8 @@ BEGIN
         teacher_id WITH =,
         day_of_week WITH =,
         int8range(
-          public.timetable_time_seconds(start_time::time),
-          public.timetable_time_seconds(end_time::time),
+          public.timetable_time_seconds(start_time),
+          public.timetable_time_seconds(end_time),
           '[)'
         ) WITH &&
       )
