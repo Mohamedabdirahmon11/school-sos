@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import './classes-step2.css';
-import { Plus, Pencil, Trash2, X, Check, RefreshCw, Sparkles, Layers } from 'lucide-react';
+import { Plus, Pencil, X, Check, RefreshCw, Sparkles, Layers } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PageHeader, Stepper, Card, Button, Chip, Pill, Table, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
@@ -83,9 +83,9 @@ export const ClassesView: React.FC = () => {
                   {editing===row.id ? <div className="ds-rename"><input aria-label="Magaca cusub ee fasalka" value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120}/><Button variant="primary" aria-label="Kaydi magaca" disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)}><Check size={17}/></Button><Button variant="secondary" aria-label="Jooji beddelka" onClick={()=>setEditing(null)}><X size={17}/></Button></div> :
                     <><span className="ds-eyebrow">FASALKA {index+1}</span><h3>{row.name}</h3></>}
                 </div>
-                <div className="ds-section-pills">{row.class_sections?.length ? row.class_sections.map(sec=><Chip key={sec.id} disabled={Boolean(sec.legacy_class_id)} onRemove={!isReadOnly&&!sec.legacy_class_id?()=>void run(()=>ApiClient.deleteClassSection(sec.id),'Qaybta waa la tirtiray.'):undefined}>{sec.name}</Chip>) : <span className="ds-muted">Qaybo weli ma jiraan</span>}</div>
+                <div className="ds-section-pills">{row.class_sections?.length ? row.class_sections.map(sec=><Chip key={sec.id} onRemove={!isReadOnly?()=>void run(()=>ApiClient.deleteClassSection(sec.id),'Qaybta waa la tirtiray.'):undefined}>{sec.name}</Chip>) : <span className="ds-muted">Qaybo weli ma jiraan</span>}</div>
               </div>
-              {!isReadOnly && editing!==row.id && <div className="ds-row-actions"><Button variant="secondary" aria-label={'Beddel magaca '+row.name} onClick={()=>{setEditing(row.id);setEditName(row.name);}}><Pencil size={17}/></Button><Button variant="danger" aria-label={'Tirtir fasalka '+row.name} onClick={()=>removeClass(row)}><Trash2 size={17}/></Button></div>}
+              {!isReadOnly && editing!==row.id && <div className="ds-row-actions"><Button variant="secondary" aria-label={'Beddel magaca '+row.name} onClick={()=>{setEditing(row.id);setEditName(row.name);}}><Pencil size={17}/></Button><Button variant="danger" aria-label={'Tirtir fasalka '+row.name} onClick={()=>removeClass(row)}><X size={17}/></Button></div>}
               {!isReadOnly && <form className="ds-inline-add" onSubmit={e=>{e.preventDefault();const value=sectionDraft[row.id]?.trim();if(value)void run(async()=>{await ApiClient.addClassSection(row.id,value);setSectionDraft(v=>({...v,[row.id]:''}));},'Qaybta waa lagu daray.');}}>
                 <input value={sectionDraft[row.id]||''} onChange={e=>setSectionDraft(v=>({...v,[row.id]:e.target.value}))} placeholder="Qayb cusub (A, B…)" maxLength={80} aria-label={'Qayb cusub oo loogu darayo '+row.name}/>
                 <Button variant="secondary" type="submit" disabled={busy||!sectionDraft[row.id]?.trim()}><Plus size={17}/> Ku dar qayb</Button>
