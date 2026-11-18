@@ -4088,17 +4088,20 @@ apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSupe
     res.status(400).json({ error: 'Dooro cashar, macallin beddel ah, iyo taariikh sax ah.' }); return;
   }
   const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dateValue.getUTCDay()];
-  const entry = await db.queryPage('timetable_slots', { school_id: school.id, id: entryId, is_active: 'true' }, 1, 1, undefined, 'id,school_id,class_id,term_id,day_of_week,period_number');
+  const entry = await db.queryPage('timetable_slots', { school_id: school.id, id: entryId, is_active: 'true' }, 1, 1, undefined, 'id,school_id,class_id,term_id,day_of_week,period_number,start_time,end_time');
   const teacher = await db.queryPage('teachers', { school_id: school.id, id: substituteTeacherId }, 1, 1, undefined, 'id');
   if (!entry.items.length || !teacher.items.length) { res.status(404).json({ error: 'Casharka ama macallinka lagama helin dugsigan.' }); return; }
   const slot = entry.items[0] as any;
   if (slot.dayOfWeek !== weekday) { res.status(400).json({ error: 'Taariikhda la doortay ma waafaqsana maalinta casharka jadwalkiisa.' }); return; }
+  const slotClass = await db.getClassById(slot.classId, school.id);
+  const slotShift = Number(slotClass?.shift) === 2 ? 2 : 1;
   const [busy, unavailable] = await Promise.all([
-    db.queryPage('timetable_slots', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday, period_number: String(slot.periodNumber), is_active: 'true', ...(slot.termId ? { term_id: slot.termId } : {}) }, 1, 100, undefined, 'id'),
-    db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday }, 1, 100, undefined, 'id,period_number')
+    queryAllRows('timetable_slots', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday, is_active: 'true', ...(slot.termId ? { term_id: slot.termId } : {}) }, 'id,start_time,end_time'),
+    queryAllRows('teacher_unavailability', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday }, 'id,period_number,shift')
   ]);
-  if (busy.items.some((item: any) => item.id !== entryId)) { res.status(409).json({ error: 'Macallinkan wuxuu cashar kale leeyahay waqtigan.' }); return; }
-  if (unavailable.items.some((item: any) => item.periodNumber == null || Number(item.periodNumber) === Number(slot.periodNumber))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
+  const overlaps = busy.some((item: any) => item.id !== entryId && String(item.startTime) < String(slot.endTime) && String(item.endTime) > String(slot.startTime));
+  if (overlaps) { res.status(409).json({ error: 'Macallinkan wuxuu cashar kale leeyahay waqtigan.' }); return; }
+  if (unavailable.some((item: any) => Number(item.shift || 1) === slotShift && (item.periodNumber == null || Number(item.periodNumber) === Number(slot.periodNumber)))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
   try {
     const saved = await db.saveTimetableSubstitution(school.id, { entryId, substituteTeacherId, substituteDate, reason: String(req.body?.reason || '').trim(), createdBy: user.id });
     db.logAudit({ action: 'TIMETABLE_SUBSTITUTE_ASSIGNED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Assigned a substitute teacher for timetable entry ' + entryId + ' on ' + substituteDate + '.', severity: 'info' });
