@@ -57,7 +57,7 @@ export const ClassesView: React.FC = () => {
   return <div className="school-design-system classes-step2">
     <div className="classes-content">
       <PageHeader title={tx('classes')} subtitle={tx('subtitle')} />
-      <Stepper activeStep={2} />
+      <Stepper activeStep={2} ariaLabel={tx('stepperLabel')} labels={[tx('stepSchool'),tx('stepClasses'),tx('stepSubjects'),tx('stepTeachers'),tx('stepFinish')]} />
       {notice && <div role="status" aria-live="polite" className={'ds-notice '+(notice.kind==='ok'?'is-success':'is-error')}>{notice.text}</div>}
 
       {!isReadOnly && <div className="classes-create-grid">
@@ -85,7 +85,7 @@ export const ClassesView: React.FC = () => {
                   {editing===row.id ? <div className="ds-rename"><input aria-label={tx('className')} value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120}/><Button variant="primary" aria-label={tx('save')} disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)}><Check size={17}/></Button><Button variant="secondary" aria-label={tx('cancel')} onClick={()=>setEditing(null)}><X size={17}/></Button></div> :
                     <><span className="ds-eyebrow">{tx('classLabel')} {index+1}</span><h3>{row.name}</h3></>}
                 </div>
-                <div className="ds-section-pills">{row.class_sections?.length ? row.class_sections.map(sec=><Chip key={sec.id} onRemove={!isReadOnly?()=>void run(()=>ApiClient.deleteClassSection(sec.id),tx('sectionDeleted')):undefined}>{sec.name}</Chip>) : <span className="ds-muted">{tx('noSections')}</span>}</div>
+                <div className="ds-section-pills">{row.class_sections?.length ? row.class_sections.map(sec=><Chip key={sec.id} removeLabel={tx('removeSection')} onRemove={!isReadOnly?()=>void run(()=>ApiClient.deleteClassSection(sec.id),tx('sectionDeleted')):undefined}>{sec.name}</Chip>) : <span className="ds-muted">{tx('noSections')}</span>}</div>
               </div>
               {!isReadOnly && editing!==row.id && <div className="ds-row-actions"><Button variant="secondary" aria-label={tx('rename')+' '+row.name} onClick={()=>{setEditing(row.id);setEditName(row.name);}}><Pencil size={17}/></Button><Button variant="danger" aria-label={tx('delete')+' '+row.name} onClick={()=>removeClass(row)}><X size={17}/></Button></div>}
               {!isReadOnly && <form className="ds-inline-add" onSubmit={e=>{e.preventDefault();const value=sectionDraft[row.id]?.trim();if(value)void run(async()=>{await ApiClient.addClassSection(row.id,value);setSectionDraft(v=>({...v,[row.id]:''}));},tx('sectionAdded'));}}>
@@ -96,8 +96,8 @@ export const ClassesView: React.FC = () => {
           </Table>
         </Card>
       }
-      <div className="ds-bottom-nav"><Button variant="secondary" onClick={()=>window.history.back()}>{language==='so'?'Hore':language==='am'?'ቀዳሚ':language==='ar'?'السابق':'Back'}</Button><Button variant="primary" disabled>{language==='so'?'Xiga':language==='am'?'ቀጣይ':language==='ar'?'التالي':'Next'}</Button></div>
-      <p className="ds-footer-note"><RefreshCw size={14}/> {language==='so'?'Isbeddellada si toos ah ayaa loo kaydiyaa, waana sii jiri doonaan marka bogga dib loo furo.':language==='am'?'ለውጦች በራስ-ሰር ይቀመጣሉ።':'Changes are saved automatically and remain after you reopen the page.'}</p>
+      <div className="ds-bottom-nav"><Button variant="secondary" onClick={()=>window.history.back()}>{tx('back')}</Button><Button variant="primary" disabled>{tx('next')}</Button></div>
+      <p className="ds-footer-note"><RefreshCw size={14}/> {tx('footerNote')}</p>
     </div>
   </div>;
 };
