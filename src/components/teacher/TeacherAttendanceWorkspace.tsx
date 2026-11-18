@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, CheckCircle2, Clock3, LockKeyhole, Phone, Printer, RefreshCw, Users } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { AttendanceStatus, Student } from '../../types/index.ts';
+import type { AttendanceStatus, Student } from '../../types/index.ts';
 import { PageHeader, Card, Button, Pill, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
 
 type Tab = 'today' | 'timetable' | 'classes' | 'attendance' | 'reports';
@@ -96,10 +96,10 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
     const periodId = attendanceMode === 'per_period' ? selectedPeriodId : '';
     if (attendanceMode === 'per_period' && (!subjectId || !periodId)) { setLoadingAttendance(false); return; }
     Promise.all([
-      ApiClient.getAllStudents(selectedClassId),
       ApiClient.getAttendanceSession({ classId: selectedClassId, date: attendanceDate, subjectId: subjectId || null, periodId: periodId || null })
-    ]).then(([rosterRows, sessionData]) => {
+    ]).then(([sessionData]) => {
       if (cancelled) return;
+      const rosterRows = (sessionData.students || []) as Student[];
       setStudents(rosterRows);
       setSession(sessionData.session);
       const existing = new Map((sessionData.records || []).map((row: any) => [row.student_id, row]));
