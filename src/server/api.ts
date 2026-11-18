@@ -5779,7 +5779,7 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
   let sessionQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
   sessionQuery = periodId ? sessionQuery.eq('period_id', periodId) : sessionQuery.is('period_id', null);
   sessionQuery = subjectId ? sessionQuery.eq('subject_id', subjectId) : sessionQuery.is('subject_id', null);
-  const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }, { data: rosterRows, error: rosterError }] = await Promise.all([
+  const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }, { data: currentYear }] = await Promise.all([
     sessionQuery.maybeSingle(),
     (() => {
       let q = client.from('attendance_records').select('id,student_id,status,note,marked_by,marked_at,updated_at')
@@ -5790,15 +5790,26 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
       return q;
     })(),
     client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle(),
-    client.from('students').select('id,student_id,first_name,middle_name,last_name,section,father_phone,mother_phone').eq('school_id', school.id).eq('class_id', classId).eq('status', 'active')
+    client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle()
   ]);
-  if (sessionError || recordsError || rosterError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
-  let roster = rosterRows || [];
+  if (sessionError || recordsError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
   if (sectionId) {
-    const { data: section } = await client.from('class_sections').select('name,legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
+    const { data: section } = await client.from('class_sections').select('legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
     if (!section || section.legacy_class_id !== classId) { res.status(400).json({ error: 'Qaybta fasalka sax ma aha.' }); return; }
-    roster = roster.filter((student: any) => String(student.section || '').trim().toLowerCase() === String(section.name || '').trim().toLowerCase());
   }
+  const { data: enrollments, error: enrollmentError } = currentYear?.id
+    ? await client.from('enrollments').select('student_id,section_id').eq('school_id', school.id)
+      .eq('academic_year_id', currentYear.id).eq('class_id', classId).eq('status', 'active')
+    : { data: [], error: null };
+  if (enrollmentError) { res.status(503).json({ error: 'Diiwaanka ardayda lama soo dejin karin.' }); return; }
+  const selectedEnrollments = (enrollments || []).filter((row: any) => !sectionId || row.section_id === sectionId);
+  const rosterIds = [...new Set(selectedEnrollments.map((row: any) => row.student_id))];
+  const { data: rosterRows, error: rosterError } = rosterIds.length
+    ? await client.from('students').select('id,student_id,first_name,middle_name,last_name,section,father_phone,mother_phone')
+      .eq('school_id', school.id).eq('status', 'active').in('id', rosterIds)
+    : { data: [], error: null };
+  if (rosterError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+  const roster = rosterRows || [];
   res.json({
     session: session || null, records: records || [],
     students: roster.map((student: any) => ({ id: student.id, studentId: student.student_id, firstName: student.first_name, middleName: student.middle_name, lastName: student.last_name, section: student.section, fatherPhone: student.father_phone, motherPhone: student.mother_phone })),
@@ -5834,19 +5845,23 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
     if (!access.allowed) { res.status(403).json({ error: 'Ma lihid fasax aad xaadirinta fasalkan/casharkan ku qaaddo.' }); return; }
     const { data: klass } = await client.from('classes').select('id,name,section').eq('id', classId).eq('school_id', school.id).maybeSingle();
     if (!klass) { res.status(404).json({ error: 'Fasalka lagama helin dugsigan.' }); return; }
-    const { data: students, error: studentsError } = await client.from('students').select('id,section')
-      .eq('school_id', school.id).eq('class_id', classId).eq('status', 'active');
-    if (studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
-    let sectionName = '';
+    const { data: currentYear } = await client.from('academic_years').select('id')
+      .eq('school_id', school.id).eq('is_current', true).maybeSingle();
+    if (!currentYear?.id) { res.status(400).json({ error: 'Sanad dugsiyeedka hadda jira lama dejin.' }); return; }
+    const { data: enrollments, error: enrollmentError } = await client.from('enrollments').select('student_id,section_id')
+      .eq('school_id', school.id).eq('academic_year_id', currentYear.id).eq('class_id', classId).eq('status', 'active');
+    if (enrollmentError) { res.status(503).json({ error: 'Diiwaanka ardayda lama soo dejin karin.' }); return; }
     if (sectionId) {
-      const { data: section } = await client.from('class_sections').select('name,legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
+      const { data: section } = await client.from('class_sections').select('legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
       if (!section || section.legacy_class_id !== classId) { res.status(400).json({ error: 'Qaybta fasalka sax ma aha.' }); return; }
-      sectionName = String(section.name || '');
     }
-    const selectedStudents = sectionId ? (students || []).filter((student: any) =>
-      String(student.section || '').trim().toLowerCase() === sectionName.trim().toLowerCase()
-    ) : (students || []);
-    const studentIds = new Set(selectedStudents.map((student: any) => String(student.id)));
+    const selectedEnrollments = (enrollments || []).filter((row: any) => !sectionId || row.section_id === sectionId);
+    const enrolledIds = [...new Set(selectedEnrollments.map((row: any) => row.student_id))];
+    const { data: activeStudents, error: studentsError } = enrolledIds.length
+      ? await client.from('students').select('id').eq('school_id', school.id).eq('status', 'active').in('id', enrolledIds)
+      : { data: [], error: null };
+    if (studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+    const studentIds = new Set((activeStudents || []).map((student: any) => String(student.id)));
     const seen = new Set<string>(); const allowedStatuses = new Set(['present','absent','late','excused']);
     for (const row of records) {
       if (!row || typeof row.studentId !== 'string' || !studentIds.has(row.studentId) || seen.has(row.studentId) || !allowedStatuses.has(row.status)) {
