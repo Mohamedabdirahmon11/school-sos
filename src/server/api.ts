@@ -5621,13 +5621,24 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
   } else if (!['school_admin','super_admin'].includes(role || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
   let sessionQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
   sessionQuery = periodId ? sessionQuery.eq('period_id', periodId) : sessionQuery.is('period_id', null);
-  const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }] = await Promise.all([
+  const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }, { data: rosterRows, error: rosterError }] = await Promise.all([
     sessionQuery.maybeSingle(),
     (() => { let q = client.from('attendance_records').select('id,student_id,status,note,marked_by,marked_at,updated_at').eq('school_id', school.id).eq('class_id', classId).eq('date', date); return periodId ? q.eq('period_id', periodId) : q.is('period_id', null); })(),
-    client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle()
+    client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle(),
+    client.from('students').select('id,student_id,first_name,middle_name,last_name,section,father_phone,mother_phone').eq('school_id', school.id).eq('class_id', classId).eq('status', 'active')
   ]);
-  if (sessionError || recordsError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
-  res.json({ session: session || null, records: records || [], settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: settings?.edit_window_hours ?? 2 } });
+  if (sessionError || recordsError || rosterError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
+  let roster = rosterRows || [];
+  if (sectionId) {
+    const { data: section } = await client.from('class_sections').select('name,legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
+    if (!section || section.legacy_class_id !== classId) { res.status(400).json({ error: 'Qaybta fasalka sax ma aha.' }); return; }
+    roster = roster.filter((student: any) => String(student.section || '').trim().toLowerCase() === String(section.name || '').trim().toLowerCase());
+  }
+  res.json({
+    session: session || null, records: records || [],
+    students: roster.map((student: any) => ({ id: student.id, studentId: student.student_id, firstName: student.first_name, middleName: student.middle_name, lastName: student.last_name, section: student.section, fatherPhone: student.father_phone, motherPhone: student.mother_phone })),
+    settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: settings?.edit_window_hours ?? 2 }
+  });
 });
 
 apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
