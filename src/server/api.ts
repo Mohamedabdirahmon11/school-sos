@@ -5659,9 +5659,17 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
   } else if (!['school_admin','super_admin'].includes(role || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
   let sessionQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
   sessionQuery = periodId ? sessionQuery.eq('period_id', periodId) : sessionQuery.is('period_id', null);
+  sessionQuery = subjectId ? sessionQuery.eq('subject_id', subjectId) : sessionQuery.is('subject_id', null);
   const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }, { data: rosterRows, error: rosterError }] = await Promise.all([
     sessionQuery.maybeSingle(),
-    (() => { let q = client.from('attendance_records').select('id,student_id,status,note,marked_by,marked_at,updated_at').eq('school_id', school.id).eq('class_id', classId).eq('date', date); return periodId ? q.eq('period_id', periodId) : q.is('period_id', null); })(),
+    (() => {
+      let q = client.from('attendance_records').select('id,student_id,status,note,marked_by,marked_at,updated_at')
+        .eq('school_id', school.id).eq('class_id', classId).eq('date', date);
+      q = periodId ? q.eq('period_id', periodId) : q.is('period_id', null);
+      q = subjectId ? q.eq('subject_id', subjectId) : q.is('subject_id', null);
+      if (sectionId) q = q.eq('section_id', sectionId);
+      return q;
+    })(),
     client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle(),
     client.from('students').select('id,student_id,first_name,middle_name,last_name,section,father_phone,mother_phone').eq('school_id', school.id).eq('class_id', classId).eq('status', 'active')
   ]);
@@ -5757,6 +5765,7 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
         retry = periodId ? retry.eq('period_id', periodId) : retry.is('period_id', null);
         const { data: raced } = await retry.maybeSingle();
         if (!raced) { res.status(503).json({ error: 'Xaadirinta lama bilaabi karin. Mar kale isku day.' }); return; }
+        if (raced.teacher_id !== teacher.id) { res.status(403).json({ error: 'Macallinkii bilaabay kulankan oo keliya ayaa wax ka beddeli kara.' }); return; }
         session = raced;
       } else session = created;
     }
@@ -5767,7 +5776,8 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
     const markedAt = now.toISOString();
     const payload = records.map((row: any) => {
       const key = periodId ? [school.id, classId, row.studentId, date, periodId].join('\u0000') : [school.id, classId, row.studentId, date].join('\u0000');
-      const id = 'att-' + createHash('sha256').update(key).digest('hex').slice(0, 32);
+      const previous: any = previousByStudent.get(row.studentId);
+      const id = previous?.id || ('att-' + createHash('sha256').update(key).digest('hex').slice(0, 32));
       return {
         id, school_id: school.id, class_id: classId, section_id: sectionId, period_id: periodId,
         subject_id: subjectId, student_id: row.studentId, date, status: row.status,
@@ -5819,9 +5829,16 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
   }).filter(Boolean);
   const present = (records || []).filter((row: any) => ['present','late'].includes(row.status)).length;
   const excused = (records || []).filter((row: any) => row.status === 'excused').length;
-  const denominator = Math.max(0, (students || []).length - excused);
-  const submittedClassIds = new Set((sessions || []).map((row: any) => row.class_id));
-  const classesNotSubmitted = (classes || []).filter((row: any) => !submittedClassIds.has(row.id) && !(records || []).some((record: any) => record.class_id === row.id));
+  const denominator = Math.max(0, (records || []).length - excused);
+  const submittedClassIds = new Set([
+    ...(sessions || []).filter((row: any) => Boolean(row.submitted_at)).map((row: any) => row.class_id),
+    ...(classes || []).filter((klass: any) => {
+      const enrolled = (students || []).filter((student: any) => student.class_id === klass.id).length;
+      const marked = (records || []).filter((record: any) => record.class_id === klass.id).length;
+      return enrolled > 0 && marked >= enrolled;
+    }).map((klass: any) => klass.id)
+  ]);
+  const classesNotSubmitted = (classes || []).filter((row: any) => !submittedClassIds.has(row.id));
   res.json({ date, totalStudents: students?.length || 0, recorded: records?.length || 0,
     attendanceRate: denominator ? Math.round(present * 100 / denominator) : 0, absentCount: absentStudents.length,
     absentStudents, sessions: sessions || [], classesNotSubmitted, classes: classes || [] });
