@@ -134,7 +134,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
 
   const openRoster = async (classId: string) => {
     setRosterClassId(classId); setRoster([]); setRosterLoading(true); setError('');
-    try { setRoster(await ApiClient.getAllStudents(classId)); }
+    try { setRoster(await ApiClient.getTeacherAttendanceStudents(classId)); }
     catch (e) { setError(e instanceof Error ? e.message : 'Liiska ardayda lama soo dejin karin.'); }
     finally { setRosterLoading(false); }
   };
