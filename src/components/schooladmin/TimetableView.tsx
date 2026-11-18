@@ -96,7 +96,7 @@ export const TimetableView: React.FC = () => {
       ApiClient.getClasses(),
       ApiClient.getSubjects(school.id),
       ApiClient.getTeachers(school.id),
-      ApiClient.getTimetable({ termId: selectedTermId || undefined, sectionId: selectedSectionId || undefined }),
+      ApiClient.getTimetable({ termId: selectedTermId || undefined }),
       ApiClient.getTimetableSettings()
     ]);
     const errors: string[] = [];
@@ -186,7 +186,7 @@ export const TimetableView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [school?.id, selectedTermId, selectedSectionId]);
+  }, [school?.id, selectedTermId]);
   useEffect(() => {
     if (!school?.id) return;
     Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions(), ApiClient.getTeacherUnavailability()])
@@ -272,7 +272,7 @@ export const TimetableView: React.FC = () => {
     .map(item => item.subject)
     .filter((item): item is Subject => Boolean(item));
   const requiredPeriods = classSubjectAssignments.reduce((total, item) => total + Number(item.periodsPerWeek || 0), 0);
-  const placedPeriods = timetable.filter(slot => slot.classId === selectedClassId && (!selectedTermId || slot.termId === selectedTermId)).length;
+  const placedPeriods = timetable.filter(slot => slot.classId === selectedClassId && (!selectedTermId || slot.termId === selectedTermId) && (!selectedSectionId || !slot.sectionId || slot.sectionId === selectedSectionId)).length;
   const coveragePercent = requiredPeriods > 0 ? Math.min(100, Math.round((placedPeriods / requiredPeriods) * 100)) : 0;
   const selectedSubjectAssignment = classSubjectAssignments.find(item => item.subject?.id === subjectId);
   const assignedTeachersForSubject = selectedSubjectAssignment?.teacher
@@ -477,7 +477,7 @@ export const TimetableView: React.FC = () => {
         </div>}
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+          {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="">All sections</option>
             {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>}
@@ -658,7 +658,7 @@ export const TimetableView: React.FC = () => {
             <table className="w-full border-collapse text-[7px]">
               <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
               <tbody>{days.map(day => <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
-                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
+                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId));
                 const subject = subjects.find(item => item.id === slot?.subjectId);
                 return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
