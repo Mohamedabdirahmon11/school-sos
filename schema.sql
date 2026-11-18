@@ -425,11 +425,11 @@ CREATE TABLE IF NOT EXISTS timetable_settings (
   shift_count SMALLINT NOT NULL DEFAULT 1 CHECK (shift_count IN (1, 2)),
   first_period_start VARCHAR(5) NOT NULL DEFAULT '08:00',
   period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (period_minutes BETWEEN 20 AND 120),
-  break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 5),
+  break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (break_after_period BETWEEN 1 AND 7),
   break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (break_minutes BETWEEN 0 AND 120),
   shift2_first_period_start VARCHAR(5) NOT NULL DEFAULT '13:00',
   shift2_period_minutes INTEGER NOT NULL DEFAULT 40 CHECK (shift2_period_minutes BETWEEN 20 AND 120),
-  shift2_break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (shift2_break_after_period BETWEEN 1 AND 5),
+  shift2_break_after_period INTEGER NOT NULL DEFAULT 3 CHECK (shift2_break_after_period BETWEEN 1 AND 7),
   shift2_break_minutes INTEGER NOT NULL DEFAULT 20 CHECK (shift2_break_minutes BETWEEN 0 AND 120),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -445,7 +445,7 @@ CREATE TABLE IF NOT EXISTS teacher_unavailability (
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   teacher_id VARCHAR(64) NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
   day_of_week VARCHAR(20) NOT NULL CHECK (day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')),
-  period_number INTEGER NOT NULL CHECK (period_number BETWEEN 1 AND 6),
+  period_number INTEGER NOT NULL CHECK (period_number BETWEEN 1 AND 8),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (school_id, teacher_id, day_of_week, period_number)
 );
