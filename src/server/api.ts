@@ -5723,8 +5723,12 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
   }
   const classRows = classIds.map(classId => {
     const klass: any = classMap.get(classId);
-    const assignedSubjects = currentAssignments.filter((row: any) => row.class_id === classId)
-      .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id }));
+    const assignedSubjects = [
+      ...currentAssignments.filter((row: any) => row.class_id === classId)
+        .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id })),
+      ...(substituteSlots || []).filter((row: any) => row.class_id === classId)
+        .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id, isSubstitute: true }))
+    ];
     const visibleEnrollments = (enrollments || []).filter((row: any) => row.class_id === classId &&
       (fullRosterClassIds.has(classId) || assignedSectionsByClass.get(classId)?.has(row.section_id)));
     const studentCount = new Set(visibleEnrollments.map((row: any) => row.student_id)).size;
