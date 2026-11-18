@@ -26,6 +26,7 @@ const SupportAuditView = React.lazy(() => import('./components/superadmin/Suppor
 const PlatformSettingsView = React.lazy(() => import('./components/superadmin/PlatformSettingsView.tsx').then(module => ({ default: module.PlatformSettingsView })));
 const SchoolDashboard = React.lazy(() => import('./components/schooladmin/SchoolDashboard.tsx').then(module => ({ default: module.SchoolDashboard })));
 const SchoolSetupWizard = React.lazy(() => import('./components/schooladmin/SchoolSetupWizard.tsx').then(module => ({ default: module.SchoolSetupWizard })));
+const AcademicSetupView = React.lazy(() => import('./components/academic-setup/AcademicSetupView.tsx').then(module => ({ default: module.AcademicSetupView })));
 const StudentsView = React.lazy(() => import('./components/schooladmin/StudentsView.tsx').then(module => ({ default: module.StudentsView })));
 const TeachersView = React.lazy(() => import('./components/schooladmin/TeachersView.tsx').then(module => ({ default: module.TeachersView })));
 const ParentsView = React.lazy(() => import('./components/schooladmin/ParentsView.tsx').then(module => ({ default: module.ParentsView })));
@@ -302,9 +303,8 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_admissions' && (
               <AdmissionsView />
             )}
-            {(activeView === 'sch_settings' || activeView === 'sch_setup_academics') && (
-              <SchoolSettingsView key={activeView} initialTab={activeView === 'sch_setup_academics' ? 'academics' : 'identity'} />
-            )}
+            {activeView === 'sch_setup_academics' && <AcademicSetupView onNavigate={handleNavigate} />}
+            {activeView === 'sch_settings' && <SchoolSettingsView key={activeView} initialTab="identity" />}
             {activeView === 'sch_support' && (
               <SchoolSupportView />
             )}

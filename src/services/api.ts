@@ -540,6 +540,44 @@ export class ApiClient {
     });
   }
 
+  // Academic Setup — Step 1
+  public static async getAcademicSetup() {
+    return this.request<{ academicYears:Array<any>; terms:Array<any>; schoolDays:Array<any>; periods:Array<any> }>('/academic-setup');
+  }
+  public static async createAcademicYear(data:any) {
+    return this.request('/academic-years',{method:'POST',body:JSON.stringify(data)});
+  }
+  public static async updateAcademicYear(id:string,data:any) {
+    return this.request(`/academic-years/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)});
+  }
+  public static async deleteAcademicYear(id:string) {
+    return this.request(`/academic-years/${encodeURIComponent(id)}`,{method:'DELETE'});
+  }
+  public static async createAcademicTerm(data:any) {
+    return this.request('/terms',{method:'POST',body:JSON.stringify(data)});
+  }
+  public static async updateAcademicTerm(id:string,data:any) {
+    return this.request(`/terms/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)});
+  }
+  public static async deleteAcademicTerm(id:string) {
+    return this.request(`/terms/${encodeURIComponent(id)}`,{method:'DELETE'});
+  }
+  public static async saveAcademicWorkingDays(days:Array<{dayOfWeek:string;isWorking:boolean}>) {
+    return this.request('/academic-setup/working-days',{method:'PUT',body:JSON.stringify({days})});
+  }
+  public static async createAcademicPeriod(data:any) {
+    return this.request('/periods',{method:'POST',body:JSON.stringify(data)});
+  }
+  public static async updateAcademicPeriod(id:string,data:any) {
+    return this.request(`/periods/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)});
+  }
+  public static async deleteAcademicPeriod(id:string) {
+    return this.request(`/periods/${encodeURIComponent(id)}`,{method:'DELETE'});
+  }
+  public static async reorderAcademicPeriods(ids:string[]) {
+    return this.request('/periods/reorder',{method:'POST',body:JSON.stringify({ids})});
+  }
+
   // Classes, Subjects, Timetable
   public static async getClasses(branchIdOrParams?: any) {
     let branchId = typeof branchIdOrParams === 'string' ? branchIdOrParams : branchIdOrParams?.branchId;

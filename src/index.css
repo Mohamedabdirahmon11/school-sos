@@ -1308,3 +1308,53 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Shared Academic Setup design tokens and reusable component styles. */
+.academic-setup {
+  --as-bg:#f1f3fa; --as-card:#fff; --as-text:#1b2133; --as-muted:#667085; --as-border:#e1e5f0;
+  --as-primary:#4f46e5; --as-secondary:#7c3aed; --as-success:#16a34a; --as-danger:#dc2626; --as-soft:#eef0ff;
+  box-sizing:border-box; width:100%; max-width:100%; min-height:100%; overflow-x:hidden; padding:18px 18px calc(28px + env(safe-area-inset-bottom));
+  background:var(--as-bg); color:var(--as-text); font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark) { :root:not(.light) .academic-setup { --as-bg:#0f1220; --as-card:#181c2e; --as-text:#e9ecf8; --as-muted:#9aa3bd; --as-border:#272d45; --as-primary:#818cf8; --as-secondary:#a78bfa; --as-success:#4ade80; --as-danger:#f87171; --as-soft:#212648; } }
+.dark .academic-setup, .academic-setup.dark { --as-bg:#0f1220; --as-card:#181c2e; --as-text:#e9ecf8; --as-muted:#9aa3bd; --as-border:#272d45; --as-primary:#818cf8; --as-secondary:#a78bfa; --as-success:#4ade80; --as-danger:#f87171; --as-soft:#212648; }
+.academic-setup *, .academic-setup *::before, .academic-setup *::after { box-sizing:border-box; }
+.as-page-header { border-radius:18px; padding:18px; color:#fff; background:linear-gradient(135deg,#4f46e5,#7c3aed); }
+.as-page-header h1 { margin:0; font-size:21px; line-height:1.3; font-weight:750; }
+.as-page-header p { margin:5px 0 0; color:rgba(255,255,255,.88); font-size:13px; }
+.as-stepper-scroll { overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; }
+.as-stepper { display:grid; grid-template-columns:repeat(5,minmax(118px,1fr)); gap:8px; min-width:640px; }
+.as-step { appearance:none; text-align:left; cursor:pointer; font-family:system-ui,sans-serif; display:flex; align-items:center; gap:8px; min-height:54px; padding:8px; border:1px solid var(--as-border); border-radius:12px; background:var(--as-card); color:var(--as-muted); font-size:12px; font-weight:650; }
+.as-step:disabled { cursor:not-allowed; opacity:.72; }\n.as-step.is-active { outline:2px solid var(--as-primary); outline-offset:-2px; color:var(--as-text); }
+.as-step.is-complete .as-step-number { background:var(--as-success); color:#fff; border-color:var(--as-success); }
+.as-step-number { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border:1px solid var(--as-border); border-radius:50%; font-size:12px; font-weight:800; }
+.as-step-label { min-width:0; line-height:1.25; }
+.as-card { min-width:0; padding:14px; border:1px solid var(--as-border); border-radius:16px; background:var(--as-card); display:flex; flex-direction:column; gap:12px; }
+.as-card-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.as-card-heading h2 { margin:0; font-size:16px; line-height:1.35; font-weight:750; }
+.as-card-heading p { margin:3px 0 0; color:var(--as-muted); font-size:12px; }
+.as-button { min-height:40px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border:1px solid transparent; border-radius:10px; font:650 13px/1.2 system-ui,sans-serif; cursor:pointer; transition:filter .15s,opacity .15s; }
+.as-button:disabled { opacity:.45; cursor:not-allowed; }
+.as-button-primary { color:#fff; background:linear-gradient(135deg,var(--as-primary),var(--as-secondary)); }
+.as-button-secondary { color:var(--as-text); background:var(--as-card); border-color:var(--as-border); }
+.as-button-danger { color:var(--as-danger); background:transparent; border-color:var(--as-border); min-width:40px; padding:8px; font-size:18px; }
+.as-chip { min-height:40px; padding:8px 13px; border:1px solid var(--as-border); border-radius:99px; background:var(--as-card); color:var(--as-muted); font-size:13px; font-weight:600; cursor:pointer; }
+.as-chip.is-selected { border-color:var(--as-primary); background:var(--as-soft); color:var(--as-primary); }
+.as-pill { display:inline-flex; align-items:center; border-radius:99px; padding:4px 9px; font-size:11px; font-weight:700; white-space:nowrap; }
+.as-pill-primary { background:var(--as-soft); color:var(--as-primary); }
+.as-pill-success { background:color-mix(in srgb,var(--as-success) 14%,var(--as-card)); color:var(--as-success); }
+.as-pill-muted { background:var(--as-bg); color:var(--as-muted); }
+.as-table-scroll { width:100%; overflow-x:auto; }
+.as-table { width:100%; min-width:620px; border-collapse:collapse; text-align:left; }
+.as-table th,.as-table td { padding:10px 12px; border-bottom:1px solid var(--as-border); font-size:13px; vertical-align:middle; }
+.as-table th { color:var(--as-muted); font-size:11px; font-weight:750; }
+.as-table tr:last-child td { border-bottom:0; }
+.as-empty { padding:26px 12px; text-align:center; color:var(--as-muted); font-size:13px; }
+.as-form-row { display:flex; min-width:0; flex:1 1 170px; flex-direction:column; gap:5px; color:var(--as-muted); font-size:12.5px; font-weight:650; }
+.as-form-row input,.as-form-row select { width:100%; min-width:0; min-height:40px; padding:9px; border:1px solid var(--as-border); border-radius:10px; outline:none; background:var(--as-card); color:var(--as-text); font:400 14px system-ui,sans-serif; }
+.as-form-row input:focus,.as-form-row select:focus { border-color:var(--as-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--as-primary) 18%,transparent); }
+.as-form-row small { color:var(--as-muted); font-size:11px; font-weight:400; }
+.as-message { border:1px solid var(--as-border); border-radius:12px; padding:10px 12px; font-size:13px; }
+.as-message-success { border-color:color-mix(in srgb,var(--as-success) 45%,var(--as-border)); color:var(--as-success); }
+.as-message-error { border-color:color-mix(in srgb,var(--as-danger) 45%,var(--as-border)); color:var(--as-danger); }
+@media(max-width:480px) { .academic-setup { padding:12px 12px calc(22px + env(safe-area-inset-bottom)); } .as-page-header { padding:16px; } .as-card { padding:12px; } }

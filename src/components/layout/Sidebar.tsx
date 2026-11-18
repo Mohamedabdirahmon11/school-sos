@@ -172,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_staff', menuT('staff_access'), ShieldCheck)
       ] },
       { title: 'Academics', items: [
-        item('sch_classes', 'Fasallo', Layers), item('sch_subjects', 'Maaddooyin', BookOpen),
+        item('sch_setup_academics', 'Sannad & Xiisado', CalendarDays), item('sch_classes', 'Fasallo', Layers), item('sch_subjects', 'Maaddooyin', BookOpen),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
         item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
         item('sch_promotion', 'Promotion & Alumni', Award)
