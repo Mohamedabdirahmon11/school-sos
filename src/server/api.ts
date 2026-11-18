@@ -9429,6 +9429,12 @@ async function removeTeacherAssignment(client: any, school: School, user: User, 
   }
   const deleted = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('id', id);
   if (deleted.error) throw new Error('Qoondeynta lama tirtiri karin.');
+  const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', row.academic_year_id).maybeSingle();
+  if (year?.is_current) {
+    const { data: remaining } = await client.from('teacher_class_subject_assignments').select('teacher_id,term_id').eq('school_id', school.id).eq('academic_year_id', row.academic_year_id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+    if (!remaining?.length) await client.from('class_subjects').update({ teacher_id: null }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+    else if (!row.term_id && remaining.some((x: any) => !x.term_id)) await client.from('class_subjects').update({ teacher_id: remaining.find((x: any) => !x.term_id).teacher_id }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+  }
   await teacherAssignmentAudit(client, school.id, user.id, 'deleted', row, null);
 }
 apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (req, res) => {
@@ -9450,7 +9456,9 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     if ([years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals].some(x => x.error)) throw new Error('Xogta qoondeynta lama soo wada qaadi karin. Hubi migration-ka Step 6.');
     const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || '');
     const termId = String(req.query.termId || (terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || '');
-    const current = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && (!termId || !x.term_id || x.term_id === termId));
+    const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && !x.term_id);
+    const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && termId && x.term_id === termId);
+    const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))];
     const cur = curriculum.data || [];
     const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id) && !x.teacher_id)
       .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
@@ -9501,6 +9509,8 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
   const fromId = String(req.body?.fromTeacherId || ''), toId = String(req.body?.toTeacherId || '');
   if (!fromId || !toId || fromId === toId) { res.status(400).json({ error: 'Dooro macallinka hore iyo kan cusub.' }); return; }
   try {
+    const { data: replacement } = await client.from('teachers').select('id,status').eq('school_id', school.id).eq('id', toId).maybeSingle();
+    if (!replacement || String(replacement.status).toLowerCase() !== 'active') throw new Error('Macallinka cusub lagama helin dugsigan ama ma aha mid shaqaynaya.');
     const { data: rows, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('teacher_id', fromId);
     if (error) throw error;
     const ids = Array.isArray(req.body?.assignmentIds) ? req.body.assignmentIds.map(String) : [];
@@ -9517,6 +9527,8 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
         const next = { ...row, teacher_id: toId, qualification_override: !qualified, updated_at: new Date().toISOString() };
         const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
         if (upd.error) throw upd.error;
+        const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', row.academic_year_id).maybeSingle();
+        if (year?.is_current && !row.term_id) await client.from('class_subjects').update({ teacher_id: toId }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama beddeli karin.' }); }
     }
