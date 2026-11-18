@@ -4159,10 +4159,12 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
     roomId ? db.queryPage('rooms', { school_id: school.id, id: roomId }, 1, 1, undefined, 'id,name') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
   ]);
   const termAssignments = step6Assignments.items.filter((item: any) => !item.termId || item.termId === termId);
-  const selectedStep6Assignment = termAssignments.find((item: any) =>
-    (!teacherId || item.teacherId === String(teacherId)) &&
-    (!req.body?.sectionId || item.sectionId === String(req.body.sectionId))
-  ) || termAssignments.find((item: any) => !teacherId || item.teacherId === String(teacherId));
+  const selectedStep6Assignment = teacherId
+    ? termAssignments.find((item: any) =>
+      item.teacherId === String(teacherId) &&
+      (!req.body?.sectionId || item.sectionId === String(req.body.sectionId))
+    )
+    : undefined;
   const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId)) || Boolean(selectedStep6Assignment);
   if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment || (roomId && !room.total)) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
   if (unavailable.items.some((item: any) => Number(item.shift || 1) === (Number(klass.shift) === 2 ? 2 : 1) && (item.periodNumber == null || Number(item.periodNumber) === period))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
