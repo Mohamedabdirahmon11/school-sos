@@ -20,6 +20,8 @@ test('Step 8 migration preserves student identifiers and scopes guardian/enrollm
 
 test('Step 8 enrollment transfers validate school ownership and preserve enrollment history', () => {
   assert.match(migration, /schoolos_transfer_enrollment/);
+  assert.match(migration, /status='withdrawn'/);
+  assert.match(migration, /Target class capacity has been reached/);
   assert.match(migration, /UPDATE public\.enrollments SET status='transferred', left_at=now\(\)/);
   assert.match(migration, /schoolos_promote_enrollments/);
   assert.match(api, /from\('enrollments'\)[\s\S]*?\.eq\('school_id', school\.id\)/);
@@ -34,6 +36,7 @@ test('Step 8 guardian links store relationship per student and expose profile ac
   assert.match(client, /linkStudentGuardian/);
   assert.match(studentsView, /label: 'Guardians'/);
   assert.match(studentsView, /Link guardian/);
+  assert.match(studentsView, /Withdraw student \(keep records\)/);
 });
 
 test('Step 8 deletion refuses to remove students with attendance, marks, finance or enrollment rows', () => {
