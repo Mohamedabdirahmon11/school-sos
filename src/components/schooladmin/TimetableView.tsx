@@ -19,6 +19,7 @@ export const TimetableView: React.FC = () => {
   const [terms, setTerms] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>([]);
   const [selectedTermId, setSelectedTermId] = useState('');
   const [copySourceTermId, setCopySourceTermId] = useState('');
+  const [draggingSlotId, setDraggingSlotId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
   const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -281,6 +282,28 @@ export const TimetableView: React.FC = () => {
       setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la kaydiyey. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyey.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh.` : ''}`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
+    }
+  };
+
+  const handleSwapSlots = async (sourceId: string, target: TimetableSlot) => {
+    const source = timetable.find(slot => slot.id === sourceId);
+    if (!source || source.id === target.id || source.isLocked || target.isLocked) return;
+    if (source.classId !== target.classId || source.termId !== target.termId) {
+      setNotice('Isku beddelku wuxuu ka shaqeeyaa casharrada isla fasalka iyo term-ka.');
+      return;
+    }
+    try {
+      await ApiClient.swapTimetableSlots(source.id, target.id);
+      setTimetable(current => current.map(slot => {
+        if (slot.id === source.id) return { ...slot, dayOfWeek: target.dayOfWeek, periodNumber: target.periodNumber, startTime: target.startTime, endTime: target.endTime };
+        if (slot.id === target.id) return { ...slot, dayOfWeek: source.dayOfWeek, periodNumber: source.periodNumber, startTime: source.startTime, endTime: source.endTime };
+        return slot;
+      }));
+      setNotice('Labada cashar si guul leh ayaa la isku beddelay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Isku beddelka casharrada wuu fashilmay.');
+    } finally {
+      setDraggingSlotId('');
     }
   };
 
@@ -614,7 +637,13 @@ export const TimetableView: React.FC = () => {
                         return (
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
-                              <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
+                              <div
+                                draggable={!isReadOnly && !slot.isLocked}
+                                onDragStart={event => { setDraggingSlotId(slot.id); event.dataTransfer.setData('text/plain', slot.id); }}
+                                onDragEnd={() => setDraggingSlotId('')}
+                                onDragOver={event => { if (draggingSlotId && draggingSlotId !== slot.id) event.preventDefault(); }}
+                                onDrop={event => { event.preventDefault(); const sourceId = event.dataTransfer.getData('text/plain') || draggingSlotId; if (sourceId) void handleSwapSlots(sourceId, slot); }}
+                                className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-grab hover:border-[#0F766E]' : ''} ${draggingSlotId === slot.id ? 'opacity-50' : ''}`}
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
