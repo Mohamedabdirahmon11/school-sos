@@ -202,6 +202,81 @@ AS $$
   );
 $$;
 
+
+-- Keep existing student/class RLS aligned with Step 6's canonical assignments.
+CREATE OR REPLACE FUNCTION private.auth_can_access_student(target_student_id varchar)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $
+  SELECT EXISTS (
+    SELECT 1 FROM public.students s
+    JOIN public.users u ON u.id = private.auth_user_id()
+    WHERE s.id = target_student_id AND (
+      u.role = 'super_admin'
+      OR (u.school_id = s.school_id AND u.role IN ('school_admin','accountant'))
+      OR (u.school_id = s.school_id AND u.role = 'teacher' AND (
+        EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.teacher_class_subject_assignments a
+            ON a.teacher_id = t.id AND a.school_id = t.school_id
+          JOIN public.academic_years ay
+            ON ay.id = a.academic_year_id AND ay.school_id = a.school_id AND ay.is_current = true
+          WHERE t.user_id = u.id AND t.school_id = s.school_id AND a.class_id = s.class_id
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.class_subjects cs ON cs.teacher_id = t.id AND cs.school_id = t.school_id
+          WHERE t.user_id = u.id AND t.school_id = s.school_id
+            AND cs.class_id = s.class_id AND cs.is_active = true
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.classes c
+          WHERE c.id = s.class_id AND c.school_id = s.school_id AND c.class_teacher_id = u.id
+        )
+      ))
+      OR (u.school_id = s.school_id AND u.role = 'parent' AND (
+        s.id = ANY(u.linked_student_ids) OR s.father_phone = u.phone OR s.mother_phone = u.phone
+        OR s.father_phone = u.parent_phone OR s.mother_phone = u.parent_phone
+      ))
+      OR (u.school_id = s.school_id AND u.role = 'student'
+        AND (u.student_id = s.student_id OR u.id = 'usr-student-' || s.id))
+    )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION private.auth_can_access_class(target_class_id varchar)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $
+  SELECT EXISTS (
+    SELECT 1 FROM public.classes c
+    JOIN public.users u ON u.id = private.auth_user_id()
+    WHERE c.id = target_class_id AND (
+      u.role = 'super_admin'
+      OR (u.school_id = c.school_id AND u.role IN ('school_admin','accountant'))
+      OR (u.school_id = c.school_id AND u.role = 'teacher' AND (
+        c.class_teacher_id = u.id
+        OR EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.teacher_class_subject_assignments a
+            ON a.teacher_id = t.id AND a.school_id = t.school_id
+          JOIN public.academic_years ay
+            ON ay.id = a.academic_year_id AND ay.school_id = a.school_id AND ay.is_current = true
+          WHERE t.user_id = u.id AND t.school_id = c.school_id AND a.class_id = c.id
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.class_subjects cs ON cs.teacher_id = t.id AND cs.school_id = t.school_id
+          WHERE t.user_id = u.id AND t.school_id = c.school_id
+            AND cs.class_id = c.id AND cs.is_active = true
+        )
+      ))
+      OR (u.school_id = c.school_id AND u.role IN ('parent','student') AND EXISTS (
+        SELECT 1 FROM public.students s
+        WHERE s.class_id = c.id AND private.auth_can_access_student(s.id)
+      ))
+    )
+  );
+$;
+
 -- Replace the old tenant-wide ALL policy for attendance with role/assignment checks.
 DROP POLICY IF EXISTS tenant_scope_v2 ON public.attendance_records;
 DROP POLICY IF EXISTS attendance_role_read ON public.attendance_records;
@@ -237,6 +312,15 @@ CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.attendance_sessions s
+      WHERE s.school_id = attendance_records.school_id
+        AND s.class_id = attendance_records.class_id
+        AND s.date = attendance_records.date
+        AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
+        AND s.is_locked = false
+    )
   );
 
 CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
@@ -245,6 +329,18 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.attendance_sessions s
+      JOIN public.attendance_settings cfg ON cfg.school_id = s.school_id
+      WHERE s.school_id = attendance_records.school_id
+        AND s.class_id = attendance_records.class_id
+        AND s.date = attendance_records.date
+        AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
+        AND s.is_locked = false
+        AND s.submitted_at IS NOT NULL
+        AND now() <= s.submitted_at + make_interval(hours => cfg.edit_window_hours)
+    )
   )
   WITH CHECK (
     school_id = private.auth_school_id()
@@ -303,6 +399,8 @@ CREATE POLICY attendance_audit_teacher_read_own ON public.attendance_audit_logs
 
 REVOKE ALL ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.auth_can_access_student(varchar) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.auth_can_access_class(varchar) TO authenticated, service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_records TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.attendance_sessions TO authenticated;
