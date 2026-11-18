@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_sessions (
   class_id varchar NOT NULL,
   section_id uuid,
   period_id uuid,
+  subject_id varchar,
   teacher_id varchar NOT NULL,
   submitted_at timestamptz,
   is_locked boolean NOT NULL DEFAULT false,
@@ -73,7 +74,9 @@ CREATE TABLE IF NOT EXISTS public.attendance_sessions (
   CONSTRAINT attendance_sessions_section_fk
     FOREIGN KEY (section_id) REFERENCES public.class_sections(id) ON DELETE RESTRICT,
   CONSTRAINT attendance_sessions_period_fk
-    FOREIGN KEY (period_id) REFERENCES public.periods(id) ON DELETE RESTRICT
+    FOREIGN KEY (period_id) REFERENCES public.periods(id) ON DELETE RESTRICT,
+  CONSTRAINT attendance_sessions_subject_fk
+    FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS attendance_sessions_once_per_class_period_day_uidx
   ON public.attendance_sessions
@@ -126,6 +129,7 @@ CREATE INDEX IF NOT EXISTS attendance_audit_school_changed_idx
 CREATE OR REPLACE FUNCTION private.auth_can_mark_attendance(
   target_school_id varchar,
   target_class_id varchar,
+  target_section_id uuid,
   target_subject_id varchar,
   target_period_id uuid,
   target_date date
@@ -162,7 +166,7 @@ AS $$
             AND a.class_id = target_class_id
             AND a.teacher_id = t.id
             AND (target_subject_id IS NULL OR a.subject_id = target_subject_id)
-            AND (a.section_id IS NULL OR target_section_id_placeholder(a.section_id, target_school_id))
+            AND (a.section_id IS NULL OR target_section_id IS NULL OR a.section_id = target_section_id)
         )
         OR EXISTS (
           SELECT 1
@@ -202,11 +206,14 @@ DROP POLICY IF EXISTS attendance_admin_all ON public.attendance_records;
 DROP POLICY IF EXISTS attendance_teacher_read_assigned ON public.attendance_records;
 DROP POLICY IF EXISTS attendance_teacher_insert_assigned ON public.attendance_records;
 DROP POLICY IF EXISTS attendance_teacher_update_assigned ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_insert ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_update ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_delete ON public.attendance_records;
 
 CREATE POLICY attendance_admin_all ON public.attendance_records
   FOR ALL TO authenticated
   USING (
-    school_id = private.auth_school_id()
+    (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id())
     AND private.auth_user_role() IN ('school_admin', 'super_admin')
   )
   WITH CHECK (
@@ -218,7 +225,7 @@ CREATE POLICY attendance_teacher_read_assigned ON public.attendance_records
   FOR SELECT TO authenticated
   USING (
     school_id = private.auth_school_id()
-    AND private.auth_can_mark_attendance(school_id, class_id, subject_id, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 
 CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
@@ -263,7 +270,7 @@ CREATE POLICY attendance_sessions_teacher_read ON public.attendance_sessions
   FOR SELECT TO authenticated
   USING (
     school_id = private.auth_school_id()
-    AND private.auth_can_mark_attendance(school_id, class_id, NULL, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 CREATE POLICY attendance_sessions_teacher_insert ON public.attendance_sessions
   FOR INSERT TO authenticated
@@ -310,7 +317,7 @@ CREATE POLICY attendance_audit_teacher_read_own ON public.attendance_audit_logs
     AND private.auth_user_role() = 'teacher'
   );
 
-REVOKE ALL ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, varchar, uuid, date) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, varchar, uuid, date) TO authenticated, service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_records TO authenticated;
