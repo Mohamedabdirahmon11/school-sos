@@ -37,6 +37,8 @@ test('Form Teachers review every class subject but enter marks only for their as
   assert.match(api, /if \(!assignment\.total\)/);
   assert.doesNotMatch(api, /mayFillFormTeacherSubject/);
   assert.match(api, /subject assigned to your teacher profile/);
+  assert.match(teacher, /placeholder="0 \/ ABS \/ LB"/);
+  assert.match(storage, /value !== 'ABS' && value !== 'LB'/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
