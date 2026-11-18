@@ -204,7 +204,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
       </div>
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Casharrada maanta</h2><Pill>{overview?.date || ''}</Pill></div>
       {!todayLessons.length ? <Card><EmptyState><CalendarDays className="mx-auto h-8 w-8 text-teal-700" /><p className="font-semibold">Maanta cashar jadwalkaaga kuma jiro.</p><p>Ka eeg jadwalka toddobaadka ama fasallada laguu xilsaaray.</p></EmptyState></Card> :
-        <div className="grid gap-3 sm:grid-cols-2">{todayLessons.map((lesson: any, index: number) => <Card key={lesson.id} className={'space-y-3 p-4 ' + (index === 0 ? 'border-teal-400 ring-1 ring-teal-100 dark:ring-teal-900' : '')}>
+        <div className="grid gap-3 sm:grid-cols-2">{todayLessons.map((lesson: any, index: number) => <Card key={lesson.id} className={'space-y-3 p-4 ' + (lesson.isNextLesson ? 'border-teal-400 ring-1 ring-teal-100 dark:ring-teal-900' : '')}>
           <div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold text-teal-700">{lesson.startTime} – {lesson.endTime}</p><h3 className="mt-1 text-base font-bold">{lesson.subjectName}</h3><p className="text-sm text-slate-500">{lesson.className}</p></div>
             <Pill>{lesson.attendanceTaken ? 'La qaaday' : 'Sugaya'}</Pill></div>
           <Button variant="primary" className="min-h-12 w-full" onClick={() => openAttendance(lesson)}>{lesson.attendanceTaken ? 'Eeg / wax ka beddel' : 'Qaado xaadiris'}</Button>
