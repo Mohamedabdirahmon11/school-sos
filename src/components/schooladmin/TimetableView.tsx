@@ -16,6 +16,8 @@ export const TimetableView: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [terms, setTerms] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>([]);
+  const [selectedTermId, setSelectedTermId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
   const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,7 +79,7 @@ export const TimetableView: React.FC = () => {
       ApiClient.getClasses(),
       ApiClient.getSubjects(school.id),
       ApiClient.getTeachers(school.id),
-      ApiClient.getTimetable(),
+      ApiClient.getTimetable({ termId: selectedTermId || undefined }),
       ApiClient.getTimetableSettings()
     ]);
     const errors: string[] = [];
@@ -146,8 +148,19 @@ export const TimetableView: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!school?.id) return;
+    ApiClient.getTimetableTerms().then(rows => {
+      const available = Array.isArray(rows) ? rows : [];
+      setTerms(available);
+      setSelectedTermId(current => current && available.some(term => term.id === current)
+        ? current
+        : (available.find(term => term.isCurrent)?.id || available[0]?.id || ''));
+    }).catch(() => setNotice('Xilliyada waxbarashada lama soo dejin karin.'));
+  }, [school?.id]);
+
+  useEffect(() => {
     fetchData();
-  }, [school]);
+  }, [school?.id, selectedTermId]);
   useEffect(() => {
     if (!school?.id) return;
     Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions()])
@@ -352,6 +365,9 @@ export const TimetableView: React.FC = () => {
         </div>}
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            {terms.map(term => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? ' · Current' : ''}</option>)}
+          </select>}
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
