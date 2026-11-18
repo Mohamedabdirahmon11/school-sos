@@ -9349,6 +9349,25 @@ async function teacherAssignmentAudit(client: any, schoolId: string, userId: str
   });
   if (error) throw new Error('Diiwaanka isbeddelka lama kaydin karin.');
 }
+async function syncTeacherAssignmentLegacy(client: any, schoolId: string, yearId: string, classId: string, subjectId: string, sectionId: string | null) {
+  const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', schoolId).eq('id', yearId).maybeSingle();
+  if (!year?.is_current) return;
+  const { data: term } = await client.from('terms').select('id').eq('school_id', schoolId).eq('academic_year_id', yearId).eq('is_current', true).maybeSingle();
+  const { data: rows, error } = await client.from('teacher_class_subject_assignments')
+    .select('teacher_id,term_id,section_id').eq('school_id', schoolId).eq('academic_year_id', yearId)
+    .eq('class_id', classId).eq('subject_id', subjectId);
+  if (error) throw new Error('Xiriirka manhajka iyo macallinka lama waafajin karin.');
+  const applicable = (rows || []).filter((row: any) => !row.section_id || row.section_id === sectionId);
+  const effective = (term?.id
+    ? applicable.find((row: any) => row.term_id === term.id && row.section_id === sectionId) ||
+      applicable.find((row: any) => row.term_id === term.id && !row.section_id)
+    : null) ||
+    applicable.find((row: any) => !row.term_id && row.section_id === sectionId) ||
+    applicable.find((row: any) => !row.term_id && !row.section_id);
+  const { error: updateError } = await client.from('class_subjects').update({ teacher_id: effective?.teacher_id || null })
+    .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId);
+  if (updateError) throw new Error('Qoondeynta waa la beddelay, balse macallinka manhajka lama waafajin karin.');
+}
 async function checkTeacherAssignment(client: any, school: School, body: any) {
   const yearId = String(body?.academicYearId || ''), termId = body?.termId ? String(body.termId) : null;
   const classId = String(body?.classId || ''), sectionId = body?.sectionId ? String(body.sectionId) : null;
@@ -9410,15 +9429,7 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
     ? await client.from('teacher_class_subject_assignments').update({ ...payload, updated_at: new Date().toISOString() }).eq('school_id', school.id).eq('id', old.id).select('*').single()
     : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
   if (saved.error || !saved.data) throw new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.');
-  const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', payload.academic_year_id).maybeSingle();
-  let activeTerm = !payload.term_id;
-  if (payload.term_id) {
-    const { data: term } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', payload.term_id).maybeSingle();
-    activeTerm = term?.is_current === true;
-  }
-  if (year?.is_current && activeTerm) {
-    await client.from('class_subjects').update({ teacher_id: payload.teacher_id }).eq('school_id', school.id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
-  }
+  await syncTeacherAssignmentLegacy(client, school.id, payload.academic_year_id, payload.class_id, payload.subject_id, payload.section_id);
   await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
   return { assignment: saved.data, warning: payload.qualification_override ? 'Digniin: macallinku kuma xirna maaddadan.' : null };
 }
@@ -9434,12 +9445,7 @@ async function removeTeacherAssignment(client: any, school: School, user: User, 
   }
   const deleted = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('id', id);
   if (deleted.error) throw new Error('Qoondeynta lama tirtiri karin.');
-  const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', row.academic_year_id).maybeSingle();
-  if (year?.is_current) {
-    const { data: remaining } = await client.from('teacher_class_subject_assignments').select('teacher_id,term_id').eq('school_id', school.id).eq('academic_year_id', row.academic_year_id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
-    if (!remaining?.length) await client.from('class_subjects').update({ teacher_id: null }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
-    else if (!row.term_id && remaining.some((x: any) => !x.term_id)) await client.from('class_subjects').update({ teacher_id: remaining.find((x: any) => !x.term_id).teacher_id }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
-  }
+  await syncTeacherAssignmentLegacy(client, school.id, row.academic_year_id, row.class_id, row.subject_id, row.section_id);
   await teacherAssignmentAudit(client, school.id, user.id, 'deleted', row, null);
 }
 apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (req, res) => {
@@ -9534,10 +9540,7 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
         const next = { ...row, teacher_id: toId, qualification_override: !qualified, updated_at: new Date().toISOString() };
         const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
         if (upd.error) throw upd.error;
-        const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', row.academic_year_id).maybeSingle();
-        let activeTerm = !row.term_id;
-        if (row.term_id) { const { data: term } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', row.term_id).maybeSingle(); activeTerm = term?.is_current === true; }
-        if (year?.is_current && activeTerm) await client.from('class_subjects').update({ teacher_id: toId }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+        await syncTeacherAssignmentLegacy(client, school.id, row.academic_year_id, row.class_id, row.subject_id, row.section_id);
         await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++; if (!qualified) overridden++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama beddeli karin.' }); }
     }
@@ -9579,10 +9582,7 @@ apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSup
         if (exists) { skipped.push({ assignmentId: row.id, reason: 'Qoondeyn hore ayaa meeshaas ka jirta.' }); continue; }
         const inserted = await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
         if (inserted.error) throw inserted.error;
-        const { data: targetYear } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', targetYearId).maybeSingle();
-        let targetIsCurrentTerm = !targetTermId;
-        if (targetTermId) { const { data: targetTerm } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', targetTermId).maybeSingle(); targetIsCurrentTerm = targetTerm?.is_current === true; }
-        if (targetYear?.is_current && targetIsCurrentTerm) await client.from('class_subjects').update({ teacher_id: row.teacher_id }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+        await syncTeacherAssignmentLegacy(client, school.id, targetYearId, row.class_id, row.subject_id, row.section_id);
         await teacherAssignmentAudit(client, school.id, user.id, 'copied', null, inserted.data); copied++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama koobiyeeyn.' }); }
     }
