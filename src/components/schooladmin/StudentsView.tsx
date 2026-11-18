@@ -360,9 +360,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Total students</p><p className="mt-1 text-2xl font-bold text-[#102522]">{pageInfo?.total ?? students.length}</p></div>
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Classes</p><p className="mt-1 text-2xl font-bold text-[#102522]">{classes.length}</p></div>
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Branches</p><p className="mt-1 text-2xl font-bold text-[#102522]">{branches.length}</p></div>
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Tirada ardayda</p><p className="mt-1 text-2xl font-bold text-[#102522]">{pageInfo?.total ?? students.length}</p></div>
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Fasallada</p><p className="mt-1 text-2xl font-bold text-[#102522]">{classes.length}</p></div>
+        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Laamaha</p><p className="mt-1 text-2xl font-bold text-[#102522]">{branches.length}</p></div>
       </div>
 
       {/* Filter Bar */}
@@ -528,8 +528,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 { id: 'results', label: 'Results' },
                 { id: 'documents', label: 'Documents' },
                 { id: 'notes', label: 'Notes' },
-                { id: 'enrollments', label: 'Enrollment history' },
-                { id: 'guardians', label: 'Guardians' }
+                { id: 'enrollments', label: 'Taariikhda Diiwaangelinta' },
+                { id: 'guardians', label: 'Waalidiinta' }
               ].map(t => (
                 <button
                   key={t.id}
@@ -666,22 +666,22 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             {activeProfileTab === 'guardians' && (
               <div className="space-y-3 text-xs">
                 {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-rose-700">{modalError}</p>}
-                <p className="font-semibold text-[#132A29]">Linked guardians</p>
-                {guardianRows.length===0 ? <p className="py-2 text-center text-slate-500">No additional guardian links.</p> : guardianRows.map((row:any)=>(
+                <p className="font-semibold text-[#132A29]">Waalidiinta ku xiran</p>
+                {guardianRows.length===0 ? <p className="py-2 text-center text-slate-500">Waalid kale weli lama xiriirin.</p> : guardianRows.map((row:any)=>(
                   <div key={row.guardian_id} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
                     <div className="flex justify-between gap-2"><strong>{row.guardians?.full_name || 'Guardian'}</strong>{row.is_primary && <span className="text-emerald-700 font-semibold">Primary</span>}</div>
                     <p className="mt-1 text-slate-500">{row.guardians?.phone} · {row.relation}</p>
                   </div>
                 ))}
                 <form onSubmit={handleLinkGuardian} className="border-t border-[#E2E8F0] pt-3 space-y-2">
-                  <p className="font-semibold text-[#132A29]">Add guardian / parent</p>
+                  <p className="font-semibold text-[#132A29]">Ku dar waalid / masuul</p>
                   <input required maxLength={160} value={guardianNameInput} onChange={e=>setGuardianNameInput(e.target.value)} placeholder="Full name" className="w-full rounded-lg border p-2"/>
                   <input required maxLength={30} value={guardianPhoneInput} onChange={e=>setGuardianPhoneInput(e.target.value)} placeholder="Phone number" className="w-full rounded-lg border p-2"/>
                   <select value={guardianRelation} onChange={e=>setGuardianRelation(e.target.value as any)} className="w-full rounded-lg border p-2">
                     <option value="aabo">Aabo</option><option value="hooyo">Hooyo</option><option value="walaal">Walaal</option><option value="kale">Kale</option>
                   </select>
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={guardianPrimary} onChange={e=>setGuardianPrimary(e.target.checked)}/> Primary guardian</label>
-                  <button type="submit" disabled={isReadOnly || enrollmentBusy} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Link guardian'}</button>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={guardianPrimary} onChange={e=>setGuardianPrimary(e.target.checked)}/> Waalidka koowaad</label>
+                  <button type="submit" disabled={isReadOnly || enrollmentBusy} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Ku xiro waalidka'}</button>
                 </form>
               </div>
             )}
@@ -689,9 +689,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             {activeProfileTab === 'enrollments' && (
               <div className="space-y-3 text-xs">
                 {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-rose-700">{modalError}</p>}
-                <p className="font-semibold text-[#132A29]">Enrollment history</p>
-                {enrollmentLoading ? <p className="py-3 text-center text-slate-500">Loading history…</p> :
-                  enrollmentRows.length === 0 ? <p className="py-3 text-center text-slate-500">No enrollment history found for this student.</p> :
+                <p className="font-semibold text-[#132A29]">Taariikhda diiwaangelinta</p>
+                {enrollmentLoading ? <p className="py-3 text-center text-slate-500">Taariikhda waa la soo rarayaa…</p> :
+                  enrollmentRows.length === 0 ? <p className="py-3 text-center text-slate-500">Ardaygan taariikh diiwaangelin ah looma helin.</p> :
                   enrollmentRows.map((row:any) => (
                     <div key={row.id} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
                       <div className="flex justify-between gap-2"><strong>{row.classes?.name || row.class_id}</strong><span className={row.status === 'active' ? 'font-semibold text-emerald-700' : 'text-slate-500'}>{row.status}</span></div>
@@ -700,15 +700,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                     </div>
                   ))}
                 <div className="border-t border-[#E2E8F0] pt-3 space-y-2">
-                  <p className="font-semibold text-[#132A29]">Transfer to another class</p>
+                  <p className="font-semibold text-[#132A29]">U wareeji fasal kale</p>
                   <select value={selectedAcademicYearId} onChange={e=>setSelectedAcademicYearId(e.target.value)} className="w-full rounded-lg border p-2">
                     {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
                   </select>
                   <select value={transferClassId} onChange={e=>setTransferClassId(e.target.value)} className="w-full rounded-lg border p-2">
                     {classes.filter(item=>!item.isArchived && item.id!==selectedStudent.classId).map(item=><option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}
                   </select>
-                  <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Transfer student'}</button>
-                  <button type="button" disabled={isReadOnly || enrollmentBusy || !selectedAcademicYearId} onClick={()=>void handleStudentWithdraw()} className="w-full rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">Withdraw student (keep records)</button>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Wareeji ardayga'}</button>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !selectedAcademicYearId} onClick={()=>void handleStudentWithdraw()} className="w-full rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">Ka saar ardayga (xogta ha sii jirto)</button>
                 </div>
               </div>
             )}
