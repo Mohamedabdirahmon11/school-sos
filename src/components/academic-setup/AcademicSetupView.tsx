@@ -20,6 +20,14 @@ const EMPTY: SetupData = { academicYears:[], terms:[], schoolDays:DEFAULT_DAYS, 
 const emptyYear = { name:'', startDate:'', endDate:'', isCurrent:true };
 const emptyTerm = { name:'', startDate:'', endDate:'', isCurrent:false };
 const emptyPeriod = { number:1, type:'lesson' as const, startTime:'08:00', endTime:'08:40' };
+const nextPeriodForm = (periods:Period[]):PeriodForm => {
+  const last=[...periods].sort((a,b)=>a.number-b.number).at(-1);
+  const start=last?.endTime || '08:00';
+  const [hours,minutes]=start.split(':').map(Number);
+  const finish=(hours*60+minutes+40)%1440;
+  const end=String(Math.floor(finish/60)).padStart(2,'0')+':'+String(finish%60).padStart(2,'0');
+  return {number:(last?.number||0)+1,type:'lesson',startTime:start,endTime:end};
+};
 
 export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = ({ onNavigate }) => {
   const { school, isReadOnly } = useAuth();
@@ -45,6 +53,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
   const refresh = async () => {
     const result = await ApiClient.getAcademicSetup();
     setData({ ...EMPTY, ...result, schoolDays:result.schoolDays?.length ? result.schoolDays : DEFAULT_DAYS });
+    setPeriodForm(nextPeriodForm(result.periods || []));
     const current = result.academicYears?.find((year:AcademicYear)=>year.id===selectedYearId) || result.academicYears?.find((year:AcademicYear)=>year.isCurrent) || result.academicYears?.[0];
     setSelectedYearId(current?.id || '');
   };
@@ -54,6 +63,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
     ApiClient.getAcademicSetup().then(result=>{
       if(!active)return;
       setData({ ...EMPTY, ...result, schoolDays:result.schoolDays?.length ? result.schoolDays : DEFAULT_DAYS });
+      setPeriodForm(nextPeriodForm(result.periods || []));
       const current=result.academicYears?.find((year:AcademicYear)=>year.isCurrent)||result.academicYears?.[0];
       setSelectedYearId(current?.id||'');
     }).catch(err=>{if(active)setError(err instanceof Error?err.message:'Xogta sannadka lama soo rari karin.');})
@@ -109,7 +119,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
     void run(async()=>{
       if(editingPeriodId)await ApiClient.updateAcademicPeriod(editingPeriodId,periodForm);
       else await ApiClient.createAcademicPeriod(periodForm);
-      setEditingPeriodId('');setPeriodForm({...emptyPeriod,number:Math.max(0,...data.periods.map(p=>p.number))+1});
+      setEditingPeriodId('');setPeriodForm(nextPeriodForm(data.periods));
     },editingPeriodId?'Xiisadda waa la cusboonaysiiyey.':'Xiisadda waa la kaydiyey.');
   };
   const editPeriod = (period:Period) => {
