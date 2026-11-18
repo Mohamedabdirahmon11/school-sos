@@ -16,7 +16,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
-import { calculateExamSubjectTotal, rankExamStudentResults, ExamScoreValue } from '../../lib/exam-calculations.ts';
+import { calculateExamSubjectTotal, rankExamStudentResults } from '../../lib/exam-calculations.ts';
 import { 
   SchoolClass, 
   Subject, 
@@ -167,7 +167,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
   const [examType, setExamType] = useState<'small' | 'big'>('small');
-  const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, ExamScoreValue>; remarks: string }>>({});
+  const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number | 'ABS' | 'LB'>; remarks: string }>>({});
   const [marksDraftDirty, setMarksDraftDirty] = useState(false);
   const [isReopeningSubjectId, setIsReopeningSubjectId] = useState<string | null>(null);
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
