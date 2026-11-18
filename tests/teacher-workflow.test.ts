@@ -28,13 +28,15 @@ test('teachers enter exam marks and school administrators only review and approv
   assert.match(api, /form-teacher-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
 
-test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
+test('Form Teachers review every class subject but enter marks only for their assigned subject', () => {
   const api = read('../src/server/api.ts');
   assert.ok(api.includes('formTeacherClassIds = formTeacherClasses.items.map'));
   assert.ok(api.includes("'users.role': 'teacher'"));
   assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
-  assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
-  assert.match(api, /canEditMarks: true/);
+  assert.match(api, /canEditMarks: assignment\.teacherId === teacher\.id/);
+  assert.match(api, /if \(!assignment\.total\)/);
+  assert.doesNotMatch(api, /mayFillFormTeacherSubject/);
+  assert.match(api, /subject assigned to your teacher profile/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
@@ -339,4 +341,19 @@ test('Form Teacher review uses full 100-point subject totals rather than one exa
   assert.match(teacher, /calculateExamSubjectTotal\(scores, assessmentComponents\)/);
   assert.match(teacher, /t\('exam_total'\) \/100/);
   assert.doesNotMatch(teacher.slice(teacher.indexOf('const examRegisterRows'), teacher.indexOf('if (initialData.loading')), /assessmentComponents\.filter\(component => component\.category/);
+});
+
+
+test('Form Teacher class review is a separate read-only workflow with controlled subject reopening', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const api = read('../src/server/api.ts');
+  const storage = read('../src/server/storage.ts');
+  assert.match(teacher, /activeTab === 'exam_results' && isFormTeacher/);
+  assert.match(teacher, /editableClassSubjects\.map\(subject =>/);
+  assert.match(teacher, /handleReopenSubjectMarks/);
+  assert.match(teacher, /!allClassMarksSubmitted/);
+  assert.match(api, /apiRouter\.post\('\/exams\/reopen-subject'/);
+  assert.match(api, /klass\.classTeacherId !== user\.id/);
+  assert.match(storage, /reopenClassSubjectMarks/);
+  assert.match(storage, /mark\.status !== 'submitted'/);
 });
