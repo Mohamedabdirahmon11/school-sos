@@ -3605,6 +3605,16 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
   if (teachers.items.length !== new Set(teacherIds).size) { res.status(400).json({ error: 'One or more teachers do not belong to this school.' }); return; }
   try {
     const capacity = await getClassCurriculumCapacity(school.id);
+    const { data: previousAssignments, error: previousError } = await classGroupsClient().from('class_subjects')
+      .select('class_id,is_active').eq('school_id', school.id).eq('subject_id', subject.id);
+    if (previousError) throw previousError;
+    const requestedClassIds = new Set(classIds);
+    for (const previous of (previousAssignments || []).filter((row: any) => row.is_active !== false && !requestedClassIds.has(row.class_id))) {
+      const dependency = await findCurriculumDependency(school.id, previous.class_id, subject.id);
+      if (dependency) {
+        res.status(409).json({ error: `Maaddadan lagama saari karo fasalka: waxaa hore ugu xiran ${dependency}. Marka hore ka saar xiriirkaas.` }); return;
+      }
+    }
     for (const item of normalized) {
       const currentRows = await readClassCurriculumRows(school.id, item.classId);
       const otherTotal = currentRows.filter((row: any) => row.is_active !== false && row.subject_id !== subject.id)
