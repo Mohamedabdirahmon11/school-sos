@@ -360,3 +360,35 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - `docs/ARCHITECTURE.md` remains absent and must be restored or reconstructed from the actual app architecture before implementation.
 - M1–M5 remain NOT STARTED; no exam implementation or database migration was changed in this commit. Next: inspect the restored demo and current exam APIs/schema, document architecture, then implement the full workflow against this reference.
 - No changes to `main`, no production database writes, and no production migration execution.
+
+
+## Exam workflow rebuild M1–M5 — implementation status (2026-11-18, supersedes earlier blocker notes)
+
+### Source of truth and branch
+- Canonical repository: `Mohamedabdirahmon11/school-sos`.
+- Work branch: `feature/exam-system`; `main` has not been modified.
+- Restored the exact user-provided HTML at `docs/demo/exam-flow-reference.html`.
+- Reconstructed `docs/ARCHITECTURE.md` from the actual React, API, storage, schema, and migration boundaries.
+- `CLAUDE.md` now records the canonical exam workflow, permissions, calculation, and publication rules.
+
+### Milestone status
+- **M1 — DONE (existing model wired as source of truth):** School Admin uses the existing versioned 100-point `exam_configs` scheme and `class_subjects` to activate subjects and assign teachers per class. No duplicate assignment table was introduced.
+- **M2 — DONE (implementation; CI pending):** Teacher marks are limited server-side to assigned subjects; Form Teacher can enter only their assigned subject. Mark entry supports decimals, explicit ABS/LB values, invalid red input feedback, autosave, progress counter, keyboard navigation, A–Z ordering, roll number, teacher comments, submit/lock, and blank mark-sheet print. Existing audit history is retained.
+- **M3 — DONE (implementation; CI pending):** Form Teacher has a separate class review with all active subject statuses, subject reopening before forwarding, per-student subject totals, class totals/averages/ranks only after every active subject is submitted, and a gated forward-to-Admin action.
+- **M4 — PARTIAL (implementation; CI pending):** Admin approval/return/publish remains in the existing Admin workspace; added admin-only unpublish and publication-notice archival. Semester and yearly rankings are tie-aware and based on unrounded raw totals. Report cards now include Term 1/Term 2/final totals and averages, per-term/final ranks, inactive-subject blank rows, per-subject teacher comments, school logo/signatures/stamp, and are gated until both terms are published. QR verification on the report card is not implemented in this workflow.
+- **M5 — PARTIAL (implementation; CI pending):** Added English, Somali, and Arabic exam workflow labels (Amharic also retained); role and server-side assignment guards are enforced; existing RLS policies remain the security boundary. Added regression tests for calculations, tie ranking, inactive subjects, special marks, class review, reopening, unpublish, report-card publication, and translations. Full browser role matrix and live Postgres/RLS integration checks remain unverified.
+
+### Files / behavior changed
+- Added `src/lib/exam-calculations.ts` and `tests/exam-calculations.test.ts`.
+- Updated `src/server/api.ts`, `src/server/storage.ts`, `src/services/api.ts`, and teacher/Admin exam views.
+- Updated report-card calculation/rendering and its tests.
+- Added `docs/ARCHITECTURE.md`; preserved the exact uploaded HTML demo.
+- Added API actions `POST /exams/reopen-subject` (Form Teacher only, before forwarding) and `POST /exams/unpublish` (School Admin/Super Admin only).
+- ABS/LB values are stored in the existing JSONB `assessment_scores` field and count as zero in numeric totals; no new migration is required for these values.
+- No production data writes, no production migrations, and no changes to `main`.
+
+### Verification
+- GitHub Actions has run typecheck and tests on intermediate commits; the latest run for the current head must be checked before considering this work complete.
+- Do not claim browser, visual, or live Postgres verification unless a successful CI job actually ran those checks.
+- Known baseline failures from the task brief must be distinguished from failures introduced by this branch.
+- Remaining work: fix all newly introduced CI failures; run/review final CI; update PR #220 with exact results; keep the PR open/draft until all required checks pass and the remaining M4/M5 gaps are resolved or explicitly listed.
