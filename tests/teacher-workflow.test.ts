@@ -362,3 +362,12 @@ test('Form Teacher class review is a separate read-only workflow with controlled
   assert.match(storage, /reopenClassSubjectMarks/);
   assert.match(storage, /mark\.status !== 'submitted'/);
 });
+
+
+test('only School Admin can approve, return, publish, or withdraw exam results', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /apiRouter\.post\('\/exams\/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/unpublish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+});
