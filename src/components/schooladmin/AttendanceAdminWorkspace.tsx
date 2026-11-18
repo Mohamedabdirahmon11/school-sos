@@ -30,9 +30,22 @@ export const AttendanceAdminWorkspace: React.FC = () => {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportClasses, setReportClasses] = useState<any[]>([]);
   const [reportSubjects, setReportSubjects] = useState<any[]>([]);
+  const [attendanceSettings, setAttendanceSettings] = useState({ attendanceMode: 'daily' as 'daily' | 'per_period', editWindowHours: 2, lateThresholdMinutes: 15 });
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   const loadStudents = async () => { setBusy(true); setError(''); try { setDashboard(await ApiClient.getAttendanceDashboard(date)); } catch(e) { setError(e instanceof Error ? e.message : 'Xaadirinta ardayda lama soo dejin karin.'); } finally { setBusy(false); } };
   const loadTeachers = async () => { setBusy(true); setError(''); try { setTeacherData(await ApiClient.getTeacherAttendance(month)); } catch(e) { setError(e instanceof Error ? e.message : 'Xaadirinta macallimiinta lama soo dejin karin.'); } finally { setBusy(false); } };
+  const loadSettings = async () => {
+    try { setAttendanceSettings(await ApiClient.getAttendanceSettings()); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Dejinta xaadirinta lama soo dejin karin.'); }
+  };
+  const saveSettings = async () => {
+    setSettingsBusy(true); setError(''); setMessage('');
+    try { await ApiClient.updateAttendanceSettings(attendanceSettings); setMessage('Dejinta xaadirinta waa la kaydiyey.'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Dejinta lama kaydin karin.'); }
+    finally { setSettingsBusy(false); }
+  };
+  useEffect(() => { void loadSettings(); }, []);
   useEffect(() => { if (tab === 'students') void loadStudents(); if (tab === 'teachers') void loadTeachers(); }, [tab, date, month]);
 
   const teacherOptions = teacherData?.teachers || [];
@@ -103,6 +116,15 @@ export const AttendanceAdminWorkspace: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[['Heerka xaadirinta', (dashboard?.attendanceRate ?? 0)+'%'],['Ardayda guud',dashboard?.totalStudents ?? 0],['La diiwaangeliyey',dashboard?.recorded ?? 0],['Maqan',dashboard?.absentCount ?? 0]].map(([label,value])=><Card key={String(label)} className="p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></Card>)}
       </div>
+      <Card className="space-y-3 p-4">
+        <h2 className="font-bold">Dejinta xaadirinta dugsiga</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <FormRow label="Habka xaadirinta"><select value={attendanceSettings.attendanceMode} onChange={e=>setAttendanceSettings(old=>({...old,attendanceMode:e.target.value as 'daily'|'per_period'}))} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"><option value="daily">Maalinle</option><option value="per_period">Cashar kasta</option></select></FormRow>
+          <FormRow label="Saacadaha wax-ka-beddelka"><input type="number" min="0" max="168" value={attendanceSettings.editWindowHours} onChange={e=>setAttendanceSettings(old=>({...old,editWindowHours:Number(e.target.value)}))} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
+          <FormRow label="Xadka daahitaanka (daqiiqo)"><input type="number" min="0" max="240" value={attendanceSettings.lateThresholdMinutes} onChange={e=>setAttendanceSettings(old=>({...old,lateThresholdMinutes:Number(e.target.value)}))} className="min-h-11 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
+        </div>
+        <Button disabled={settingsBusy} onClick={()=>void saveSettings()}>{settingsBusy ? 'Waa la kaydinayaa…' : 'Kaydi dejinta'}</Button>
+      </Card>
       <Card className="space-y-3 p-4"><h2 className="font-bold">Ardayda maqan</h2>{busy&&!dashboard?<p className="text-sm text-slate-500">Waa la soo dejinayaa…</p>:!absentRows.length?<EmptyState><CalendarCheck className="mx-auto h-7 w-7"/><p>Arday maqan lama diiwaangelin maanta.</p></EmptyState>:<div className="divide-y dark:divide-slate-700">{absentRows.map((row:any)=><div key={row.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-semibold">{row.student?.first_name} {row.student?.last_name}</p><p className="text-xs text-slate-500">{row.className} · {row.student?.student_id}</p></div><Pill>Maqan</Pill></div>)}</div>}</Card>
       <Card className="space-y-3 p-4"><h2 className="font-bold">Fasallada aan weli xaadirin gudbin</h2>{!dashboard?.classesNotSubmitted?.length?<p className="text-sm text-slate-500">Fasallada oo dhan waa la gudbiyey ama xog ma leh.</p>:dashboard.classesNotSubmitted.map((item:any)=><p key={item.id} className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{item.name}</p>)}</Card>
       <Card className="space-y-3 p-4"><h2 className="font-bold">Kulamada xaadirinta iyo furitaanka</h2>{!sessionRows.length?<p className="text-sm text-slate-500">Kulamo la gudbiyey ma jiraan.</p>:sessionRows.map((session:any)=><div key={session.id} className="space-y-2 rounded-xl border p-3 dark:border-slate-700"><div className="flex items-center justify-between"><span className="font-semibold">{(dashboard?.classes||[]).find((x:any)=>x.id===session.class_id)?.name || session.class_id}</span><Pill>{session.is_locked?'Xiran':'Furan'}</Pill></div><p className="text-xs text-slate-500">{session.submitted_at ? new Date(session.submitted_at).toLocaleString() : 'Weli lama gudbin'}</p>{session.is_locked && <div className="flex flex-col gap-2 sm:flex-row"><input value={unlockReason[session.id]||''} onChange={e=>setUnlockReason(old=>({...old,[session.id]:e.target.value}))} placeholder="Sababta furitaanka" className="min-h-11 flex-1 rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/><Button disabled={busy} onClick={()=>void unlock(session.id)}><LockKeyhole className="mr-2 h-4 w-4"/>Fur kulanka</Button></div>}</div>)}</Card>
