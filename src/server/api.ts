@@ -4190,7 +4190,7 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const firstId = String(req.body?.firstSlotId || '');
   const secondId = String(req.body?.secondSlotId || '');
   if (!firstId || !secondId || firstId === secondId) { res.status(400).json({ error: 'Choose two different timetable periods to swap.' }); return; }
-  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
+  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id');
   if (slots.items.length !== 2) { res.status(404).json({ error: 'One or both timetable periods were not found in this school.' }); return; }
   if (slots.items.some((slot: any) => slot.isLocked)) { res.status(409).json({ error: 'Cashar xiran lama beddeli karo. Marka hore fur casharka.' }); return; }
   if (slots.items[0].classId !== slots.items[1].classId || slots.items[0].termId !== slots.items[1].termId) { res.status(409).json({ error: 'Isku beddelka waxaa lagu samayn karaa casharrada isla fasalka iyo term-ka oo keliya.' }); return; }
