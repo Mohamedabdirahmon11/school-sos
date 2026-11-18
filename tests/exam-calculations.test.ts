@@ -18,6 +18,8 @@ const parts = [
 test('subject total requires every configured part and validates each maximum', () => {
   assert.equal(calculateExamSubjectTotal({ quiz: 8, mid: 20 }, parts), null);
   assert.equal(calculateExamSubjectTotal({ quiz: 8, mid: 20, final: 50 }, parts), 78);
+  assert.equal(calculateExamSubjectTotal({ quiz: 'ABS', mid: 'LB', final: 50 }, parts), 50);
+  assert.equal(calculateExamSubjectTotal({ quiz: 'ABS' }, parts), null);
   assert.equal(calculateExamSubjectTotal({ quiz: 11, mid: 20, final: 50 }, parts), null);
 });
 
