@@ -16,8 +16,6 @@ BEGIN
 END $step6$;
 CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_id_uidx
   ON public.class_sections (id, school_id);
-CREATE UNIQUE INDEX IF NOT EXISTS class_sections_assignment_scope_uidx
-  ON public.class_sections (id, legacy_class_id, school_id);
 
 ALTER TABLE public.teachers
   ADD COLUMN IF NOT EXISTS max_periods_per_week integer;
@@ -45,9 +43,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
   CONSTRAINT teacher_assignments_class_school_fk
     FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
-  CONSTRAINT teacher_assignments_section_class_school_fk
-    FOREIGN KEY (section_id, class_id, school_id)
-    REFERENCES public.class_sections(id, legacy_class_id, school_id) ON DELETE CASCADE,
+  CONSTRAINT teacher_assignments_section_school_fk
+    FOREIGN KEY (section_id, school_id)
+    REFERENCES public.class_sections(id, school_id) ON DELETE CASCADE,
   CONSTRAINT teacher_assignments_subject_school_fk
     FOREIGN KEY (subject_id, school_id)
     REFERENCES public.subjects(id, school_id) ON DELETE CASCADE,
