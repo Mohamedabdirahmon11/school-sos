@@ -6,7 +6,7 @@ SET search_path = public, extensions;
 
 CREATE OR REPLACE FUNCTION public.timetable_time_seconds(value text)
 RETURNS bigint LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
-AS $ SELECT floor(extract(epoch FROM (value::time - time '00:00')))::bigint $;
+AS $fn$ SELECT floor(extract(epoch FROM (value::time - time '00:00')))::bigint $fn$;
 
 DO $$
 BEGIN
@@ -44,8 +44,8 @@ BEGIN
         room_id WITH =,
         day_of_week WITH =,
         int8range(
-          public.timetable_time_seconds(start_time::time),
-          public.timetable_time_seconds(end_time::time),
+          public.timetable_time_seconds(start_time),
+          public.timetable_time_seconds(end_time),
           '[)'
         ) WITH &&
       )
@@ -65,8 +65,8 @@ BEGIN
         lower(btrim(room_number)) WITH =,
         day_of_week WITH =,
         int8range(
-          public.timetable_time_seconds(start_time::time),
-          public.timetable_time_seconds(end_time::time),
+          public.timetable_time_seconds(start_time),
+          public.timetable_time_seconds(end_time),
           '[)'
         ) WITH &&
       )
@@ -75,4 +75,5 @@ BEGIN
 END;
 $$;
 
+RESET search_path;
 NOTIFY pgrst, 'reload schema';
