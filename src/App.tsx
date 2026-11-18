@@ -265,6 +265,9 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_curriculum' && (
               <CurriculumView onNavigate={handleNavigate} />
             )}
+            {activeView === 'sch_teacher_assignments' && (
+              <TeacherAssignmentsView onNavigate={handleNavigate} />
+            )}
             {activeView === 'sch_timetable' && (
               <TimetableView />
             )}
