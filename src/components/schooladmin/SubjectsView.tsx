@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, CheckCircle2, Loader2, Pencil, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { subjectText } from '../../lib/academic-translations.ts';
 import { useApi } from '../../hooks/useApi.ts';
-import { ErrorState } from '../common/ErrorState.tsx';
 import { Subject } from '../../types/index.ts';
 
 export const SubjectsView: React.FC = () => {
-  const { school, isReadOnly } = useAuth();
+  const { school, isReadOnly, language } = useAuth();
+  const tx = (key: string, values: Record<string, string | number> = {}) => Object.entries(values).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), subjectText(language, key));
   const load = useApi(() => ApiClient.getSubjects(), [school?.id], Boolean(school));
   const subjects: Subject[] = Array.isArray(load.data) ? load.data : [];
   const [name, setName] = useState('');
@@ -17,6 +18,12 @@ export const SubjectsView: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!load.error) return;
+    if (load.error.code === 'MUST_CHANGE_PASSWORD') window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
+    else if (load.error.status === 401) window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 401, message: load.error.message } }));
+  }, [load.error]);
 
   const visible = useMemo(() => subjects.filter(subject =>
     [subject.name, subject.code || ''].some(value => String(value).toLowerCase().includes(search.trim().toLowerCase()))
@@ -35,17 +42,17 @@ export const SubjectsView: React.FC = () => {
     setError('');
     const cleanName = name.trim();
     const cleanCode = code.trim().toUpperCase();
-    if (!cleanName) { setError('Fadlan geli magaca maaddada.'); return; }
-    if (cleanCode.length > 6) { setError('Koodhku waa inuu ahaadaa ugu badnaan 6 xaraf.'); return; }
+    if (!cleanName) { setError(tx('enterName')); return; }
+    if (cleanCode.length > 6) { setError(tx('codeLength')); return; }
     setBusy(true);
     try {
       if (editing) await ApiClient.updateSubject(editing.id, { name: cleanName, code: cleanCode });
       else await ApiClient.addSubject({ name: cleanName, code: cleanCode });
       await load.retry();
-      setNotice(editing ? 'Maaddada waa la cusboonaysiiyey.' : 'Maaddada waa la kaydiyey.');
+      setNotice(editing ? tx('updated') : tx('saved'));
       resetForm();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Maaddada lama kaydin.');
+      setError(tx('saveError'));
     } finally { setBusy(false); }
   };
 
@@ -56,38 +63,38 @@ export const SubjectsView: React.FC = () => {
       const result = await ApiClient.addDefaultSubjects();
       await load.retry();
       setNotice(result.createdCount
-        ? `${result.createdCount} maaddo ayaa lagu daray; ${result.skippedCount} hore ayay u jireen.`
-        : 'Dhammaan maaddooyinka caadiga ah hore ayay u jireen.');
+        ? tx('defaultAdded',{created:result.createdCount,skipped:result.skippedCount})
+        : tx('defaultsExist'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Maaddooyinka caadiga ah lama darin.');
+      setError(tx('defaultsError'));
     } finally { setBusy(false); }
   };
 
   const remove = async (subject: Subject) => {
-    if (!window.confirm(`Ma hubtaa inaad tirtirayso maaddada "${subject.name}"?`)) return;
+    if (!window.confirm(tx('confirmDelete',{name:subject.name}))) return;
     setError('');
     setBusy(true);
     try {
       await ApiClient.deleteSubject(subject.id);
       await load.retry();
       if (editing?.id === subject.id) resetForm();
-      setNotice('Maaddada waa la tirtiray.');
+      setNotice(tx('deleted'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Maaddada lama tirtiri karin.');
+      setError(tx('deleteError'));
     } finally { setBusy(false); }
   };
 
   if (load.loading) return <div className="mx-auto w-full max-w-5xl space-y-4 p-5 md:p-8"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-2xl bg-white" /></div>;
-  if (load.error) return <div className="p-5 md:p-8"><ErrorState error={load.error} onRetry={load.retry} /></div>;
+  if (load.error) return <div className="p-5 md:p-8"><section role="alert" className="mx-auto my-8 max-w-xl rounded-xl border border-rose-200 bg-white p-5 text-sm shadow-sm"><h2 className="font-semibold text-[#132A29]">{tx('loadError')}</h2><p className="mt-1 text-[#64748B]">{tx('loadErrorDetail')}</p><button type="button" onClick={load.retry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white hover:bg-[#0D655E]"><Loader2 className="h-4 w-4" /> {tx('retry')}</button></section></div>;
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-5xl space-y-6 p-5 md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#102522] dark:text-white">Maaddooyin</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Maamul maaddooyinka uu dugsigu dhigto.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#102522] dark:text-white">{tx('title')}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tx('subtitle')}</p>
         </div>
-        <span className="rounded-full bg-[#E7F4F0] px-3 py-1.5 text-xs font-semibold text-[#0F766E]">{subjects.length} maaddo</span>
+        <span className="rounded-full bg-[#E7F4F0] px-3 py-1.5 text-xs font-semibold text-[#0F766E]">{subjects.length} {tx('count')}</span>
       </header>
 
       {notice && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
@@ -95,37 +102,37 @@ export const SubjectsView: React.FC = () => {
 
       <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-700">
-          <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29] dark:text-white"><BookOpen className="h-5 w-5 text-[#0F766E]" />{editing ? 'Wax ka beddel maaddada' : 'Ku dar maaddo cusub'}</h2>
+          <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29] dark:text-white"><BookOpen className="h-5 w-5 text-[#0F766E]" />{editing ? tx('editTitle') : tx('addTitle')}</h2>
           <button type="button" disabled={busy || isReadOnly} onClick={() => void addDefaults()} className="inline-flex items-center gap-2 rounded-xl border border-[#B7D8D0] px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-[#F3F8F6] disabled:opacity-50">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Maaddooyin caadi ah
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {tx('addDefaults')}
           </button>
         </div>
         <form onSubmit={save} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Magaca maaddada *
-            <input value={name} onChange={event => setName(event.target.value)} maxLength={150} required disabled={busy || isReadOnly} placeholder="Tusaale: Soomaali" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('name')} *
+            <input value={name} onChange={event => setName(event.target.value)} maxLength={150} required disabled={busy || isReadOnly} placeholder={tx('namePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
           </label>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Koodh (ikhtiyaari)
-            <input value={code} onChange={event => setCode(event.target.value.toUpperCase().slice(0, 6))} maxLength={6} disabled={busy || isReadOnly} placeholder="SOM" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal uppercase text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('code')}
+            <input value={code} onChange={event => setCode(event.target.value.toUpperCase().slice(0, 6))} maxLength={6} disabled={busy || isReadOnly} placeholder={tx('codePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal uppercase text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
           </label>
           <div className="flex gap-2">
-            <button type="submit" disabled={busy || isReadOnly || !name.trim()} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50"><Plus className="h-4 w-4" />{editing ? 'Kaydi' : 'Ku dar'}</button>
-            {editing && <button type="button" onClick={resetForm} className="rounded-xl border border-slate-300 px-3 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300" aria-label="Jooji wax ka beddelka"><X className="h-4 w-4" /></button>}
+            <button type="submit" disabled={busy || isReadOnly || !name.trim()} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50"><Plus className="h-4 w-4" />{editing ? tx('save') : tx('add')}</button>
+            {editing && <button type="button" onClick={resetForm} className="rounded-xl border border-slate-300 px-3 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300" aria-label={tx('cancel')}><X className="h-4 w-4" /></button>}
           </div>
         </form>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-[#132A29] dark:text-white">Liiska maaddooyinka</h2>
-          <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Raadi maaddo..." aria-label="Raadi maaddo" className="w-full rounded-xl border border-slate-300 bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
+          <h2 className="text-base font-bold text-[#132A29] dark:text-white">{tx('list')}</h2>
+          <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder={tx('search')} aria-label={tx('search')} className="w-full rounded-xl border border-slate-300 bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
         </div>
-        {visible.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700">{search ? 'Wax natiijo ah lama helin.' : 'Weli ma jiraan maaddooyin. Ku dar maaddo ama dooro “Maaddooyin caadi ah”.'}</div> : (
+        {visible.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700">{search ? tx('noResults') : tx('empty')}</div> : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {visible.map(subject => <article key={subject.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="min-w-0"><h3 className="truncate text-sm font-bold text-[#132A29] dark:text-white">{subject.name}</h3>{subject.code && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">{subject.code}</span>}</div>
               <div className="flex shrink-0 gap-1">
-                <button type="button" disabled={busy || isReadOnly} onClick={() => { setEditing(subject); setName(subject.name); setCode(subject.code || ''); setError(''); }} aria-label={`Wax ka beddel ${subject.name}`} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50 dark:border-slate-600"><Pencil className="h-4 w-4" /></button>
-                <button type="button" disabled={busy || isReadOnly} onClick={() => void remove(subject)} aria-label={`Tirtir ${subject.name}`} className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" disabled={busy || isReadOnly} onClick={() => { setEditing(subject); setName(subject.name); setCode(subject.code || ''); setError(''); }} aria-label={`${tx('edit')} ${subject.name}`} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50 dark:border-slate-600"><Pencil className="h-4 w-4" /></button>
+                <button type="button" disabled={busy || isReadOnly} onClick={() => void remove(subject)} aria-label={`${tx('delete')} ${subject.name}`} className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
               </div>
             </article>)}
           </div>
