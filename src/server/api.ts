@@ -4330,7 +4330,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   }
   try { await db.replaceTimetableForClassTerm(school.id, classId, termId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
-  res.json({ slots: generated, unfilled, warnings, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
 });
 
 apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -4476,7 +4476,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   }
 
   if (req.body?.previewOnly === true) {
-    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, warnings, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), warnings, withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
     return;
   }
 
@@ -4496,7 +4496,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     res.status(409).json({ error: 'Bulk generation could not be completed. Previously replaced class timetables were restored where possible.' });
     return;
   }
-  res.json({ slots: generatedSlots, unfilled, skipped, warnings, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), warnings, withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
 });
 
 
