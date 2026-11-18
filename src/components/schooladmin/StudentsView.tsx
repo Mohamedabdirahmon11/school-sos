@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
@@ -304,6 +305,42 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     }
   };
 
+  const buildStudentExportQuery = () => {
+    const params = new URLSearchParams();
+    if (classFilter) params.set('classId', classFilter);
+    if (branchFilter) params.set('branchId', branchFilter);
+    if (search.trim()) params.set('search', search.trim());
+    if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+    return params.toString();
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const response = await fetch('/api/students/export?' + buildStudentExportQuery(), { credentials: 'include' });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Student Excel export failed.');
+      const csv = await response.text();
+      const workbook = XLSX.read(csv.replace(/^\\uFEFF/, ''), { type: 'string' });
+      XLSX.writeFile(workbook, (school?.code || 'school') + '_students_' + new Date().toISOString().slice(0,10) + '.xlsx');
+      setNotice('Excel file exported with all matching student records.');
+      window.setTimeout(() => setNotice(null), 4000);
+    } catch (error:any) { setNotice(error?.message || 'Student Excel export failed.'); }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const response = await fetch('/api/students/export.pdf?' + buildStudentExportQuery(), { credentials: 'include' });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Student PDF export failed.');
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = (school?.code || 'school') + '_students_' + new Date().toISOString().slice(0,10) + '.pdf';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Student PDF register exported.');
+      window.setTimeout(() => setNotice(null), 4000);
+    } catch (error:any) { setNotice(error?.message || 'Student PDF export failed.'); }
+  };
+
   // The PIN wizard stays mounted while the list reloads so one-time PINs are never lost.
   const pinResetWizard = <BulkStudentPinResetWizard open={showBulkPinReset} schoolId={school?.id} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />;
   if (isLoading) return <><div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>{pinResetWizard}</>;
@@ -323,6 +360,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           >
             <Download className="w-3.5 h-3.5 text-[#0F766E]" />
             <span>Export CSV</span>
+          </button>
+          <button type="button" onClick={handleExportExcel} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[#0F766E]" /><span>Excel</span>
+          </button>
+          <button type="button" onClick={handleExportPDF} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
+            <FileText className="w-3.5 h-3.5 text-[#0F766E]" /><span>PDF</span>
           </button>
           <button
             onClick={() => setShowBulkImport(true)}
