@@ -6117,11 +6117,15 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
       current = previous && next.getTime() - new Date(previous + 'T00:00:00.000Z').getTime() === 86400000 ? current + 1 : 1;
       longest = Math.max(longest, current); previous = day;
     }
-    const total = item.present + item.absent + item.late + item.excused;
+    const total = item.present + item.absent + item.late;
     return { ...item, absenceStreak: longest, attendancePercentage: total ? Math.round((item.present + item.late) * 100 / total) : 0 };
   });
   if (req.query.format === 'csv') {
-    const cell = (value: unknown) => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+    const cell = (value: unknown) => {
+      const raw = String(value ?? '');
+      const safe = /^\\s*[=+\\-@]/.test(raw) ? "'" + raw : raw;
+      return '"' + safe.replace(/"/g, '""') + '"';
+    };
     const csv = [['Student ID','Student','Class','Present','Absent','Late','Excused','Attendance %','Absence streak'],
       ...summaries.map(x => [x.studentId,x.studentName,x.className,x.present,x.absent,x.late,x.excused,x.attendancePercentage,x.absenceStreak])]
       .map(row => row.map(cell).join(',')).join('\r\n');
