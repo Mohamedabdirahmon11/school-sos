@@ -701,6 +701,14 @@ export class ApiClient {
     return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly, termId }) });
   }
 
+  public static async clearTimetableClass(classId: string, termId: string) {
+    return this.request<{ success: boolean; removed: number; lockedKept: number }>(`/timetable/classes/${encodeURIComponent(classId)}?termId=${encodeURIComponent(termId)}`, { method: 'DELETE' });
+  }
+
+  public static async copyTimetableTerm(sourceTermId: string, targetTermId: string) {
+    return this.request<{ success: boolean; copiedClasses: string[]; skipped: Array<{ classId: string; reason: string }>; copiedSlots: number }>('/timetable/copy-term', { method: 'POST', body: JSON.stringify({ sourceTermId, targetTermId }) });
+  }
+
   public static async getTimetableRooms() {
     return this.request<Array<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>>('/timetable/rooms');
   }
