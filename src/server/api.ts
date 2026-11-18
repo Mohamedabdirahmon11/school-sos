@@ -9506,7 +9506,7 @@ apiRouter.post('/teacher-assignments/bulk', requireAuth, requireSchoolAdminOrSup
   if (!targets.length || targets.length > 150) { res.status(400).json({ error: 'Dooro 1 ilaa 150 fasal/qaybood.' }); return; }
   const saved: any[] = [], skipped: any[] = [];
   for (const target of targets) {
-    try { saved.push(await upsertTeacherAssignment(teacherAssignmentClient(), school, user, { ...target, teacherId: req.body.teacherId, academicYearId: req.body.academicYearId, termId: req.body.termId, override: req.body.override === true })); }
+    try { saved.push(await upsertTeacherAssignment(teacherAssignmentClient(), school, user, { ...target, teacherId: req.body.teacherId, academicYearId: req.body.academicYearId, termId: req.body.termId, override: req.body.override === true, clearDependentEntries: req.body.clearDependentEntries === true })); }
     catch (error: any) { skipped.push({ target, reason: error?.message || 'Lama kaydin.' }); }
   }
   res.json({ success: true, saved: saved.length, skipped, warnings: saved.map(x => x.warning).filter(Boolean) });
@@ -9522,7 +9522,7 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
     if (error) throw error;
     const ids = Array.isArray(req.body?.assignmentIds) ? req.body.assignmentIds.map(String) : [];
     const selected = (rows || []).filter((x: any) => !ids.length || ids.includes(x.id));
-    let changed = 0; const skipped: any[] = [];
+    let changed = 0, overridden = 0; const skipped: any[] = [];
     for (const row of selected) {
       try {
         const { data: qualified } = await client.from('teacher_subjects').select('id').eq('school_id', school.id).eq('teacher_id', toId).eq('subject_id', row.subject_id).eq('is_active', true).maybeSingle();
@@ -9538,10 +9538,10 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
         let activeTerm = !row.term_id;
         if (row.term_id) { const { data: term } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', row.term_id).maybeSingle(); activeTerm = term?.is_current === true; }
         if (year?.is_current && activeTerm) await client.from('class_subjects').update({ teacher_id: toId }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
-        await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++;
+        await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++; if (!qualified) overridden++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama beddeli karin.' }); }
     }
-    res.json({ success: true, changed, skipped });
+    res.json({ success: true, changed, skipped, warnings: overridden ? [overridden + ' qoondeyn ayaa loo sameeyey macallin aan aqoontiisa lagu xaqiijin maaddada.'] : [] });
   } catch (error: any) { res.status(503).json({ error: error?.message || 'Macallinka lama beddeli karin.' }); }
 });
 apiRouter.put('/teacher-assignments/teachers/:teacherId/workload-limit', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
