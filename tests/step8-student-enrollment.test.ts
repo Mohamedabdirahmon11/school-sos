@@ -34,8 +34,8 @@ test('Step 8 guardian links store relationship per student and expose profile ac
   assert.match(api, /apiRouter\.post\('\/students\/:id\/guardians'/);
   assert.match(api, /phone_normalized', normalizedPhone/);
   assert.match(client, /linkStudentGuardian/);
-  assert.match(studentsView, /label: 'Guardians'/);
-  assert.match(studentsView, /Link guardian/);
+  assert.match(studentsView, /label: 'Waalidiinta'/);
+  assert.match(studentsView, /Ku xiro waalidka/);
   assert.match(studentsView, /Withdraw student \(keep records\)/);
 });
 
