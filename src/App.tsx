@@ -275,6 +275,7 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_timetable' && (
               <TimetableView />
             )}
+            {activeView === 'sch_teacher_attendance' && <TeacherAttendanceView />}
             {activeView === 'sch_attendance' && (
               <AttendanceAdminWorkspace />
             )}
