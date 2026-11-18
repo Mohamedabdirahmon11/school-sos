@@ -67,6 +67,21 @@ export interface TranslationDict {
   exam_publish_results: string;
   exam_withdraw_results: string;
   exam_return_for_correction: string;
+  exam_marks: string;
+  exam_class: string;
+  exam_term: string;
+  exam_search_student: string;
+  exam_teacher_comment: string;
+  exam_optional_comment: string;
+  exam_save_drafts: string;
+  exam_submit_marks: string;
+  exam_loading_class_marks: string;
+  exam_no_students: string;
+  exam_reopen_subject: string;
+  exam_sent_to_admin: string;
+  exam_waiting_admin_review: string;
+  exam_subjects_pending: string;
+  exam_subjects_submitted: string;
   assignments: string;
   fees_payments: string;
   events_holidays: string;
@@ -350,6 +365,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_publish_results: 'Publish results',
     exam_withdraw_results: 'Withdraw published results',
     exam_return_for_correction: 'Return for correction',
+    exam_marks: 'Marks',
+    exam_class: 'Class',
+    exam_term: 'Term',
+    exam_search_student: 'Search student...',
+    exam_teacher_comment: 'Teacher comment',
+    exam_optional_comment: 'Optional comment for the report card',
+    exam_save_drafts: 'Save drafts',
+    exam_submit_marks: 'Submit marks',
+    exam_loading_class_marks: 'Loading class marks...',
+    exam_no_students: 'No students found in this class.',
+    exam_reopen_subject: 'Reopen subject',
+    exam_sent_to_admin: 'Sent to Admin · waiting for review',
+    exam_waiting_admin_review: 'Waiting for Admin review',
+    exam_subjects_pending: 'Waiting',
+    exam_subjects_submitted: 'Submitted',
     assignments: 'Homework & Assignments',
     fees_payments: 'Student Fees & Ledger',
     events_holidays: 'Academic Calendar',
@@ -613,6 +643,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_publish_results: 'Daabac natiijooyinka',
     exam_withdraw_results: 'Ka noqo daabacaadda natiijooyinka',
     exam_return_for_correction: 'Ku celi sixitaan',
+    exam_marks: 'Dhibco',
+    exam_class: 'Fasal',
+    exam_term: 'Term',
+    exam_search_student: 'Raadi arday...',
+    exam_teacher_comment: 'Faallada macallinka',
+    exam_optional_comment: 'Faallo ikhtiyaari ah oo Report Card-ka ah',
+    exam_save_drafts: 'Kaydi qoraallada',
+    exam_submit_marks: 'Gudbi dhibcaha',
+    exam_loading_class_marks: 'Dhibcaha fasalka waa la soo rarayaa...',
+    exam_no_students: 'Fasalkan arday lagama helin.',
+    exam_reopen_subject: 'Dib u fur maaddada',
+    exam_sent_to_admin: 'Maamulka ayaa loo gudbiyey · dib-u-eegis sugaya',
+    exam_waiting_admin_review: 'Maamulka ayaa dib u eegaya',
+    exam_subjects_pending: 'Sugaya',
+    exam_subjects_submitted: 'La gudbiyey',
     assignments: 'Laylisyada & Shaqo-guri',
     fees_payments: 'Lacagaha & Kharashaadka',
     events_holidays: 'Jadwalka Fasaxyada',
@@ -876,6 +921,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_publish_results: 'ውጤቶችን አትም',
     exam_withdraw_results: 'የታተሙ ውጤቶችን አንሳ',
     exam_return_for_correction: 'ለማስተካከያ መልስ',
+    exam_marks: 'ውጤቶች',
+    exam_class: 'ክፍል',
+    exam_term: 'ተርም',
+    exam_search_student: 'ተማሪ ፈልግ...',
+    exam_teacher_comment: 'የመምህር አስተያየት',
+    exam_optional_comment: 'ለሪፖርት ካርዱ አማራጭ አስተያየት',
+    exam_save_drafts: 'ረቂቆችን አስቀምጥ',
+    exam_submit_marks: 'ውጤቶችን አስገባ',
+    exam_loading_class_marks: 'የክፍል ውጤቶች በመጫን ላይ...',
+    exam_no_students: 'በዚህ ክፍል ተማሪ አልተገኘም።',
+    exam_reopen_subject: 'ትምህርቱን እንደገና ክፈት',
+    exam_sent_to_admin: 'ለአስተዳደር ተልኳል · ግምገማ በመጠባበቅ ላይ',
+    exam_waiting_admin_review: 'የአስተዳደር ግምገማ በመጠባበቅ ላይ',
+    exam_subjects_pending: 'በመጠባበቅ ላይ',
+    exam_subjects_submitted: 'ቀርቧል',
     assignments: 'የቤት ስራዎች',
     fees_payments: 'የተማሪ ክፍያዎች',
     events_holidays: 'የዓመቱ የቀን መቁጠሪያ',
@@ -1119,6 +1179,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_publish_results: 'نشر النتائج',
     exam_withdraw_results: 'سحب النتائج المنشورة',
     exam_return_for_correction: 'إرجاع للتصحيح',
+    exam_marks: 'الدرجات',
+    exam_class: 'الصف',
+    exam_term: 'الفصل',
+    exam_search_student: 'ابحث عن طالب...',
+    exam_teacher_comment: 'تعليق المعلم',
+    exam_optional_comment: 'تعليق اختياري لبطاقة التقرير',
+    exam_save_drafts: 'حفظ المسودات',
+    exam_submit_marks: 'إرسال الدرجات',
+    exam_loading_class_marks: 'جارٍ تحميل درجات الصف...',
+    exam_no_students: 'لا يوجد طلاب في هذا الصف.',
+    exam_reopen_subject: 'إعادة فتح المادة',
+    exam_sent_to_admin: 'أُرسلت إلى الإدارة · بانتظار المراجعة',
+    exam_waiting_admin_review: 'بانتظار مراجعة الإدارة',
+    exam_subjects_pending: 'قيد الانتظار',
+    exam_subjects_submitted: 'تم التسليم',
     assignments: 'الواجبات',
     fees_payments: 'الرسوم والمدفوعات',
     events_holidays: 'الفعاليات والعطلات',
