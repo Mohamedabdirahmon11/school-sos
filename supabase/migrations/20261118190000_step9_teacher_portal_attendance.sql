@@ -88,6 +88,24 @@ CREATE INDEX IF NOT EXISTS attendance_sessions_school_date_idx
 CREATE INDEX IF NOT EXISTS attendance_sessions_teacher_date_idx
   ON public.attendance_sessions (school_id, teacher_id, date);
 
+-- Preserve existing teacher-marked attendance as read-only session history.
+WITH legacy_teacher_sessions AS (
+  SELECT DISTINCT ON (ar.school_id, ar.class_id, ar.date, ar.period_id)
+    ar.school_id, ar.date, ar.class_id, ar.section_id, ar.period_id, ar.subject_id,
+    t.id AS teacher_id, ar.marked_at
+  FROM public.attendance_records ar
+  JOIN public.teachers t
+    ON t.user_id = COALESCE(ar.marked_by, ar.recorded_by)
+   AND t.school_id = ar.school_id
+  ORDER BY ar.school_id, ar.class_id, ar.date, ar.period_id, ar.marked_at DESC NULLS LAST, ar.id
+)
+INSERT INTO public.attendance_sessions
+  (school_id, date, class_id, section_id, period_id, subject_id, teacher_id, submitted_at, is_locked)
+SELECT school_id, date, class_id, section_id, period_id, subject_id, teacher_id,
+       COALESCE(marked_at, now()), false
+FROM legacy_teacher_sessions
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS public.teacher_attendance (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id varchar NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
