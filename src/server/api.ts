@@ -9444,7 +9444,8 @@ async function removeTeacherAssignment(client: any, school: School, user: User, 
 }
 apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School, user = (req as any).user as User;
-  if (!['school_admin', 'super_admin'].includes(normalizeRole(user.role))) { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
   const client = teacherAssignmentClient();
   try {
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
