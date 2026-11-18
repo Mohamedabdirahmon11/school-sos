@@ -4461,6 +4461,8 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     let visible = visibleEnrollmentIds.length
       ? await queryAllRows('students', { school_id: school.id, id: visibleEnrollmentIds, branch_id: branchId }, LIST_QUERY_COLUMNS.students)
       : [];
+    const enrollmentByStudent = new Map(enrollments.map((row: any) => [String(row.studentId), row]));
+    visible = visible.map((student: any) => ({ ...student, classId: enrollmentByStudent.get(String(student.id))?.classId || student.classId }));
     if (search) visible = visible.filter((student: any) =>
       [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()))
