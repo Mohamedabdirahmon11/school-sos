@@ -52,7 +52,7 @@ test('Step 8 promotion workflow requires source and target academic years', () =
 });
 
 test('Step 8 student directory includes mobile cards and summary counts', () => {
-  assert.match(studentsView, /Total students/);
+  assert.match(studentsView, /Tirada ardayda/);
   assert.match(studentsView, /md:hidden/);
   assert.match(studentsView, /Export CSV/);
   assert.match(studentsView, /BulkImportWizard/);
