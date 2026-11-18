@@ -57,7 +57,9 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Class examination register/);
   assert.match(teacher, /Student name \/ ID/);
   assert.match(teacher, /examRegisterRows/);
-  assert.match(teacher, /let currentRank = 0/);
+  assert.match(teacher, /rankExamStudentResults/);
+  assert.match(teacher, /allClassMarksSubmitted/);
+  assert.match(teacher, /Rankings and class totals appear after every active subject is submitted/);
   assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
@@ -317,4 +319,23 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(sidebar, /item\('t_assignments'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
+});
+
+
+test('Form Teacher rankings and class totals stay hidden until every active subject is submitted', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const calculations = read('../src/lib/exam-calculations.ts');
+  assert.match(teacher, /allClassMarksSubmitted = isFormTeacher/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted\}/);
+  assert.match(teacher, /allClassMarksSubmitted \? row\.total/);
+  assert.match(teacher, /Draft marks autosaved/);
+  assert.match(teacher, /student\.rollNumber \|\| student\.studentId/);
+  assert.match(calculations, /row\.total !== previousTotal/);
+});
+
+test('Form Teacher review uses full 100-point subject totals rather than one exam half', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /calculateExamSubjectTotal\(scores, assessmentComponents\)/);
+  assert.match(teacher, /Total \/100/);
+  assert.doesNotMatch(teacher.slice(teacher.indexOf('const examRegisterRows'), teacher.indexOf('if (initialData.loading')), /assessmentComponents\.filter\(component => component\.category/);
 });
