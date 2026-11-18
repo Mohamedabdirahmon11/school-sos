@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS subjects (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
   name VARCHAR(150) NOT NULL,
-  code VARCHAR(50) NOT NULL,
+  code VARCHAR(50) NOT NULL DEFAULT '',
   description TEXT,
   credit_units INTEGER NOT NULL DEFAULT 0,
   department VARCHAR(100),
@@ -296,8 +296,13 @@ CREATE TABLE IF NOT EXISTS subjects (
 
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE subjects ALTER COLUMN credit_units SET DEFAULT 0;
+ALTER TABLE subjects ALTER COLUMN code SET DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_subjects_school ON subjects(school_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_code ON subjects(school_id, lower(code));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_code
+  ON subjects(school_id, lower(btrim(code)))
+  WHERE nullif(btrim(code), '') IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subjects_school_name_ci
+  ON subjects(school_id, lower(btrim(name)));
 
 -- 12. STUDENTS
 CREATE TABLE IF NOT EXISTS students (
