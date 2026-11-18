@@ -4319,9 +4319,10 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
   );
   for (const assignment of lessonQueue) {
+    const sectionKey = assignment.sectionId || '*';
     const available = candidates.filter(({ day, period }) => {
       const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
-      return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+      return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
         && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
         && !occupiedRooms.has(`${day}:${period}`);
     });
@@ -4331,11 +4332,11 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     }
     const ranked = available.map(candidate => {
       const { day, period } = candidate;
-      const sameSubjectToday = generated.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+      const sameSubjectToday = generated.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId));
       const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
-      const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
-      const classDayCount = dayLoad.get(day) || 0;
-      const periodCount = periodLoad.get(period) || 0;
+      const sameSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
+      const classDayCount = dayLoad.get(`${sectionKey}:${day}`) || 0;
+      const periodCount = periodLoad.get(`${sectionKey}:${period}`) || 0;
       const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
       const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
       const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
@@ -4368,11 +4369,11 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       roomNumber: klass.roomNumber || ''
     });
     if (teacherKey) { occupied.add(teacherKey); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
-    const priorSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+    const priorSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
     if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
-    dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
-    periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
-    subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+    dayLoad.set(`${sectionKey}:${day}`, (dayLoad.get(`${sectionKey}:${day}`) || 0) + 1);
+    periodLoad.set(`${sectionKey}:${period}`, (periodLoad.get(`${sectionKey}:${period}`) || 0) + 1);
+    subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
   }
   for (const assignment of timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
     unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
@@ -4462,6 +4463,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
         .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
     );
     for (const assignment of lessonQueue) {
+      const sectionKey = assignment.sectionId || '*';
       const available = candidates.filter(({ day, period }) => {
         const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
         const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
@@ -4469,7 +4471,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
           slot.dayOfWeek === day && slot.periodNumber === period &&
           String(slot.roomNumber || '').trim().toLowerCase() === roomKey
         );
-        return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+        return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
           && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
           && !roomBusy;
       });
@@ -4479,9 +4481,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       }
       const ranked = available.map(candidate => {
         const { day, period } = candidate;
-        const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+        const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId));
         const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
-        const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+        const sameSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
         const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
         const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
         const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
@@ -4490,8 +4492,8 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
           + sameSubjectCount * 35
           + teacherCount * 5
           + (heavySubject ? period * 8 : 0)
-          + (dayLoad.get(day) || 0) * 3
-          + (periodLoad.get(period) || 0) * 1.5
+          + (dayLoad.get(`${sectionKey}:${day}`) || 0) * 3
+          + (periodLoad.get(`${sectionKey}:${period}`) || 0) * 1.5
           + (assignment.occurrence / 1000);
         return { ...candidate, score };
       }).sort((left, right) => left.score - right.score);
@@ -4507,11 +4509,11 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       };
       generatedForClass.push(slot);
       if (assignment.teacherId) { occupied.add(`${day}:${period}:${assignment.teacherId}`); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
-      const priorSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+      const priorSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
       if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
-      dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
-      periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
-      subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+      dayLoad.set(`${sectionKey}:${day}`, (dayLoad.get(`${sectionKey}:${day}`) || 0) + 1);
+      periodLoad.set(`${sectionKey}:${period}`, (periodLoad.get(`${sectionKey}:${period}`) || 0) + 1);
+      subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
     }
     for (const assignment of classAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
       unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
