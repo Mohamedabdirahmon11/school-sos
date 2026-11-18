@@ -61,20 +61,20 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'students'/);
   assert.match(teacher, /activeTab === 'attendance'/);
   assert.match(teacher, /activeTab === 'grades'/);
-  assert.match(teacher, /Class results review/);
-  assert.match(teacher, /Enter marks by subject and exam type/);
+  assert.match(teacher, /t\('exam_class_review'\)/);
+  assert.match(teacher, /t\('exam_enter_component_marks'\)/);
   assert.match(teacher, /Student \/ Roll No\./);
   assert.match(teacher, /examRegisterRows/);
   assert.match(teacher, /rankExamStudentResults/);
   assert.match(teacher, /allClassMarksSubmitted/);
   assert.match(teacher, /t\('exam_waiting_for_all_subjects'\)/);
-  assert.match(teacher, /Enter individual assessment components/);
+  assert.match(teacher, /t\('exam_enter_component_marks'\)/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
   assert.match(teacher, /activeTab === 'notices'/);
   assert.match(teacher, /setActiveTab\(initialTab\)/);
-  assert.match(teacher, /Small Exam/);
-  assert.match(teacher, /Big Exam/);
+  assert.match(teacher, /t\('exam_small_exam'\)/);
+  assert.match(teacher, /t\('exam_big_exam'\)/);
   assert.match(teacher, /EXAM RESULTS — READ ONLY/);
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
@@ -83,7 +83,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
-  assert.match(teacher, /Submit marks/);
+  assert.match(teacher, /t\('exam_submit_marks'\)/);
   assert.match(teacher, /t\('exam_forward_to_admin'\)/);
 });
 
@@ -313,8 +313,8 @@ test('teacher workflows provide mobile student cards, searchable registers, and 
   assert.match(teacher, /Search attendance students/);
   assert.match(teacher, /md:hidden/);
   assert.match(teacher, /min-h-11 rounded-lg/);
-  assert.match(teacher, /Search students for marks/);
-  assert.match(teacher, /Search student name or ID/);
+  assert.match(teacher, /t\('exam_search_student'\)/);
+  assert.match(teacher, /t\('exam_search_student'\)/);
 });
 
 test('teacher mobile quick navigation prioritizes daily teaching actions while the full menu retains other sections', () => {
