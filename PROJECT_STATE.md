@@ -351,3 +351,12 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - M1–M5 status: **BLOCKED / NOT STARTED**. No source code, SQL, or production database was changed. No migration was applied.
 - Verification status: **UNVERIFIED**. No local checkout/runtime is available through the connected GitHub interface, so `npm ci`, lint, tests, build, browser checks, and Postgres migration validation have not been run. Known pre-existing failures from the task brief have not been re-investigated.
 - **Exact next step:** restore/add `docs/ARCHITECTURE.md` and `docs/demo/exam-flow-reference.html` to `feature/exam-system` (and restore the claimed M1 starter files if they exist in another branch/commit). Then read those two documents first, compare the branch to its intended base, and implement M1–M5 in order on this feature branch only.
+
+
+## Exam workflow reference restored from user upload (2026-11-18)
+
+- Confirmed canonical repository and owner from GitHub's installed-repository record: `Mohamedabdirahmon11/school-sos`. The previous 404 was caused by a mistyped owner in a tool request; the repository spelling in this file is the verified one.
+- Added the user's uploaded exact HTML reference to `docs/demo/exam-flow-reference.html` on `feature/exam-system` (commit `12aadff0bce377deca119b53975de6d9fceb7713`). This file is now the required design and workflow source of truth for the Exam System.
+- `docs/ARCHITECTURE.md` remains absent and must be restored or reconstructed from the actual app architecture before implementation.
+- M1–M5 remain NOT STARTED; no exam implementation or database migration was changed in this commit. Next: inspect the restored demo and current exam APIs/schema, document architecture, then implement the full workflow against this reference.
+- No changes to `main`, no production database writes, and no production migration execution.
