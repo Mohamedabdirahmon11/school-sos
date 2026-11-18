@@ -359,6 +359,8 @@ CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
         AND s.class_id = attendance_records.class_id
         AND s.date = attendance_records.date
         AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.subject_id IS NOT DISTINCT FROM attendance_records.subject_id
+        AND s.section_id IS NOT DISTINCT FROM attendance_records.section_id
         AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
         AND s.is_locked = false
     )
@@ -387,6 +389,8 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
         AND s.class_id = attendance_records.class_id
         AND s.date = attendance_records.date
         AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.subject_id IS NOT DISTINCT FROM attendance_records.subject_id
+        AND s.section_id IS NOT DISTINCT FROM attendance_records.section_id
         AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
         AND s.is_locked = false
         AND s.submitted_at IS NOT NULL
