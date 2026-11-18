@@ -5661,8 +5661,14 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
     const { data: students, error: studentsError } = await client.from('students').select('id,section')
       .eq('school_id', school.id).eq('class_id', classId).eq('status', 'active');
     if (studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+    let sectionName = '';
+    if (sectionId) {
+      const { data: section } = await client.from('class_sections').select('name,legacy_class_id').eq('id', sectionId).eq('school_id', school.id).maybeSingle();
+      if (!section || section.legacy_class_id !== classId) { res.status(400).json({ error: 'Qaybta fasalka sax ma aha.' }); return; }
+      sectionName = String(section.name || '');
+    }
     const selectedStudents = sectionId ? (students || []).filter((student: any) =>
-      !klass.section || String(student.section || '').toLowerCase() === String(klass.section || '').toLowerCase()
+      String(student.section || '').trim().toLowerCase() === sectionName.trim().toLowerCase()
     ) : (students || []);
     const studentIds = new Set(selectedStudents.map((student: any) => String(student.id)));
     const seen = new Set<string>(); const allowedStatuses = new Set(['present','absent','late','excused']);
