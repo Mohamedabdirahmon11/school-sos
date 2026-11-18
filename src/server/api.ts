@@ -5593,6 +5593,31 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: Number(settings?.edit_window_hours ?? 2), lateThresholdMinutes: Number(settings?.late_threshold_minutes ?? 15) } });
 });
 
+apiRouter.get('/teacher/attendance/sessions', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const teacher = await getAttendanceTeacher(client, school.id, user.id);
+  if (!teacher) { res.json([]); return; }
+  const fromDate = typeof req.query.fromDate === 'string' && attendanceDateIsValid(req.query.fromDate)
+    ? req.query.fromDate : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
+  const { data: sessions, error } = await client.from('attendance_sessions').select('*')
+    .eq('school_id', school.id).eq('teacher_id', teacher.id).gte('date', fromDate).order('date', { ascending: false }).limit(100);
+  if (error) { res.status(503).json({ error: 'Taariikhda xaadirinta lama soo dejin karin.' }); return; }
+  const classIds = [...new Set((sessions || []).map((row: any) => row.class_id))];
+  const subjectIds = [...new Set((sessions || []).map((row: any) => row.subject_id).filter(Boolean))];
+  const [{ data: classes }, { data: subjects }] = await Promise.all([
+    classIds.length ? client.from('classes').select('id,name,section').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] }),
+    subjectIds.length ? client.from('subjects').select('id,name').eq('school_id', school.id).in('id', subjectIds) : Promise.resolve({ data: [] })
+  ]);
+  const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
+  const subjectMap = new Map((subjects || []).map((row: any) => [row.id, row]));
+  res.json((sessions || []).map((row: any) => ({
+    ...row, className: (classMap.get(row.class_id) as any)?.name || row.class_id,
+    subjectName: (subjectMap.get(row.subject_id) as any)?.name || ''
+  })));
+});
+
 apiRouter.get('/attendance/settings', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School; const user = (req as any).user as User;
   if (!['school_admin','super_admin','teacher'].includes(normalizeRole(user.role) || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
