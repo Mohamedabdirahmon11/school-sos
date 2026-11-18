@@ -4327,7 +4327,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
     }
     if (!generatedForClass.some((slot: any) => !slot.isLocked)) {
-      skipped.push({ classId: klass.id, className: klass.name, reason: 'Cashar cusub lama meelayn; jadwalkii hore waa la ilaaliyey.' });
+      skipped.push({ classId: klass.id, className: klass.name, reason: 'No new periods could be placed; previous timetable was kept. Cashar cusub lama meelayn; jadwalkii hore waa la ilaaliyey.' });
       workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked !== true));
       continue;
     }
