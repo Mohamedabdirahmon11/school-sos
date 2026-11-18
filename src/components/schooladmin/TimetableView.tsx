@@ -18,6 +18,7 @@ export const TimetableView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [terms, setTerms] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>([]);
   const [selectedTermId, setSelectedTermId] = useState('');
+  const [copySourceTermId, setCopySourceTermId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
   const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -282,6 +283,32 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const handleClearSelectedClass = async () => {
+    if (!selectedClassId || !selectedTermId || isReadOnly) return;
+    if (!window.confirm('Ma hubtaa inaad nadiifinayso jadwalka fasalkan ee term-kan? Casharrada locked-ka ah waa la ilaalinayaa.')) return;
+    try {
+      const result = await ApiClient.clearTimetableClass(selectedClassId, selectedTermId);
+      setTimetable(current => current.filter(slot => slot.classId !== selectedClassId || slot.isLocked));
+      setNotice(`Jadwalka waa la nadiifiyey. ${result.removed} cashar waa la saaray; ${result.lockedKept} cashar oo locked ah waa la ilaaliyey.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.');
+    }
+  };
+
+  const handleCopyTerm = async () => {
+    if (!copySourceTermId || !selectedTermId || copySourceTermId === selectedTermId || isReadOnly) return;
+    const sourceName = terms.find(term => term.id === copySourceTermId)?.name || 'term-ka kale';
+    const targetName = terms.find(term => term.id === selectedTermId)?.name || 'term-kan';
+    if (!window.confirm(`Ma hubtaa inaad jadwalka ka koobiyeynayso ${sourceName} una guurinayso ${targetName}? Casharrada locked-ka ee target-ka waa la ilaalinayaa.`)) return;
+    try {
+      const result = await ApiClient.copyTimetableTerm(copySourceTermId, selectedTermId);
+      await fetchData();
+      setNotice(`${result.copiedSlots} cashar ayaa la koobiyey fasallada ${result.copiedClasses.length}. ${result.skipped.length} fasal lama koobiyeyn sababo la xiriira isku dhac.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Jadwalka term-ka lama koobiyeyn karin.');
+    }
+  };
+
   const handleToggleLock = async (slot: TimetableSlot) => {
     try {
       const isLocked = !slot.isLocked;
@@ -394,6 +421,14 @@ export const TimetableView: React.FC = () => {
           </>}
           
           <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>
+          <button type="button" onClick={() => void handleClearSelectedClass()} disabled={isReadOnly || !selectedClassId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-700 disabled:opacity-40">Clear class</button>
+          {terms.length > 1 && <>
+            <select aria-label="Copy timetable from term" value={copySourceTermId} onChange={e => setCopySourceTermId(e.target.value)} className="px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+              <option value="">Copy from term…</option>
+              {terms.filter(term => term.id !== selectedTermId).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
+            </select>
+            <button type="button" onClick={() => void handleCopyTerm()} disabled={isReadOnly || !copySourceTermId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40">Copy timetable</button>
+          </>}
           <button type="button" onClick={() => runTimetablePrint([selectedClassId], 'single')} disabled={viewMode !== 'class' || !selectedClassId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print this class</button>
           <button type="button" onClick={() => { setPrintSelection(selectedClassId && timetable.some(slot => slot.classId === selectedClassId) ? [selectedClassId] : []); setShowPrintModal(true); }} disabled={viewMode === 'teacher' || !timetable.length} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-xs font-semibold text-white disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print… (dooro fasallada)</button>
 
