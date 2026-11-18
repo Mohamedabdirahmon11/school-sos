@@ -360,6 +360,7 @@ CREATE TABLE IF NOT EXISTS teachers (
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   joined_date DATE NOT NULL DEFAULT CURRENT_DATE,
   monthly_salary NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  max_periods_per_week INTEGER CHECK (max_periods_per_week IS NULL OR max_periods_per_week BETWEEN 1 AND 60),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
