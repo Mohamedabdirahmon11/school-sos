@@ -22,8 +22,8 @@ create table if not exists public.class_sections (
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint class_sections_class_name_ci_key unique (class_id, name)
 );
+create unique index if not exists class_sections_class_name_ci_uidx on public.class_sections (class_id, lower(btrim(name)));
 create unique index if not exists class_sections_legacy_class_uidx
   on public.class_sections (legacy_class_id) where legacy_class_id is not null;
 create index if not exists class_sections_school_class_order_idx
@@ -31,16 +31,24 @@ create index if not exists class_sections_school_class_order_idx
 
 alter table public.class_groups enable row level security;
 alter table public.class_sections enable row level security;
-drop policy if exists class_groups_tenant_scope on public.class_groups;
-create policy class_groups_tenant_scope on public.class_groups
+drop policy if exists class_groups_tenant_read on public.class_groups;
+create policy class_groups_tenant_read on public.class_groups
+  for select to authenticated
+  using ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id());
+drop policy if exists class_groups_admin_write on public.class_groups;
+create policy class_groups_admin_write on public.class_groups
   for all to authenticated
-  using ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id())
-  with check ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id());
-drop policy if exists class_sections_tenant_scope on public.class_sections;
-create policy class_sections_tenant_scope on public.class_sections
+  using (private.auth_user_role() in ('school_admin','super_admin') and ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id()))
+  with check (private.auth_user_role() in ('school_admin','super_admin') and ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id()));
+drop policy if exists class_sections_tenant_read on public.class_sections;
+create policy class_sections_tenant_read on public.class_sections
+  for select to authenticated
+  using ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id());
+drop policy if exists class_sections_admin_write on public.class_sections;
+create policy class_sections_admin_write on public.class_sections
   for all to authenticated
-  using ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id())
-  with check ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id());
+  using (private.auth_user_role() in ('school_admin','super_admin') and ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id()))
+  with check (private.auth_user_role() in ('school_admin','super_admin') and ((private.auth_user_role() = 'super_admin') or school_id = private.auth_school_id()));
 grant select, insert, update, delete on public.class_groups, public.class_sections to authenticated;
 grant all on public.class_groups, public.class_sections to service_role;
 
