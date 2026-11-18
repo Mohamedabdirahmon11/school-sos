@@ -2193,6 +2193,53 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Unable to update the timetable lock.');
     if (!data) throw new Error('Timetable lesson was not found in this school.');
   }
+  public async listTimetableRooms(schoolId: string) {
+    return this.queryRows<any>('rooms', { school_id: schoolId });
+  }
+
+  public async saveTimetableRoom(schoolId: string, values: { id?: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Room storage is unavailable.');
+    const row = toSupabaseRow({ ...values, schoolId, updatedAt: new Date().toISOString() }, 'rooms');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('rooms').upsert(row, { onConflict: 'id' }).select('*').single();
+    this.recordQuery('rooms', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save room.');
+    return fromSupabaseRow(data, 'rooms');
+  }
+
+  public async deleteTimetableRoom(schoolId: string, roomId: string) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Room storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('rooms').delete().eq('school_id', schoolId).eq('id', roomId);
+    this.recordQuery('rooms', 'delete', startedAt);
+    if (error) throw new Error(error.message || 'Unable to delete room.');
+  }
+
+  public async listTimetableSubstitutions(schoolId: string, date?: string) {
+    return this.queryRows<any>('timetable_substitutions', { school_id: schoolId, ...(date ? { substitute_date: date } : {}) });
+  }
+
+  public async saveTimetableSubstitution(schoolId: string, values: { entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string; createdBy?: string }) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Substitution storage is unavailable.');
+    const row = toSupabaseRow({ ...values, schoolId, updatedAt: new Date().toISOString() }, 'timetable_substitutions');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('timetable_substitutions').upsert(row, { onConflict: 'school_id,entry_id,substitute_date' }).select('*').single();
+    this.recordQuery('timetable_substitutions', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save substitute teacher.');
+    return fromSupabaseRow(data, 'timetable_substitutions');
+  }
+
+  public async deleteTimetableSubstitution(schoolId: string, substitutionId: string) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Substitution storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('timetable_substitutions').delete().eq('school_id', schoolId).eq('id', substitutionId);
+    this.recordQuery('timetable_substitutions', 'delete', startedAt);
+    if (error) throw new Error(error.message || 'Unable to delete substitute teacher.');
+  }
   public async swapTimetableSlots(schoolId: string, firstId: string, secondId: string): Promise<void> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable storage is unavailable.');
