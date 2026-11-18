@@ -9479,7 +9479,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     const visibleSections = (sections.data || []).filter((x: any) => !x.legacy_class_id || visibleClassIds.has(x.legacy_class_id));
     const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && !x.term_id);
     const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && termId && x.term_id === termId);
-    const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))];
+    const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id))];
     const cur = (curriculum.data || []).filter((x: any) => visibleClassIds.has(x.class_id));
     const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id))
       .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
@@ -9597,7 +9597,7 @@ apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSup
     const sourceYearRows = (source || []).filter((x: any) => !x.term_id);
     const sourceTermRows = sourceTermId ? (source || []).filter((x: any) => x.term_id === sourceTermId) : [];
     const rows = sourceTermId
-      ? [...sourceTermRows, ...sourceYearRows.filter((base: any) => !sourceTermRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))]
+      ? [...sourceTermRows, ...sourceYearRows.filter((base: any) => !sourceTermRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id))]
       : sourceYearRows;
     let copied = 0; const skipped: any[] = [];
     for (const row of rows) {
