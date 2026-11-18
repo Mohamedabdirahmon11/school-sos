@@ -49,7 +49,7 @@ interface TeacherPortalViewProps {
 const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
-  const { user, school, isReadOnly } = useAuth();
+  const { user, school, isReadOnly, t } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab);
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const initialData = useApi(async () => Promise.all([
