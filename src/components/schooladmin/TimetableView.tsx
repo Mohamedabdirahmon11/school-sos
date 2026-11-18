@@ -246,15 +246,22 @@ export const TimetableView: React.FC = () => {
 
   const handleGenerateAll = async () => {
     if (isReadOnly || !classes.length) return;
-    if (!window.confirm('Dhammaan fasallada jadwalkooda ma dib ayaa loo sameeyaa? Jadwalkii hore ee fasallada leh maaddooyin loo qoondeeyay waa la beddelayaa.')) return;
-    setNotice('Jadwalka dhammaan fasallada ayaa la diyaarinayaa…');
+    setNotice('Jadwalka waa la falanqaynayaa; weli waxba lama kaydin…');
     try {
-      const result = await ApiClient.generateAllTimetables();
+      const preview = await ApiClient.generateAllTimetables(true);
+      const previewClasses = preview.generatedClassIds?.length || 0;
+      const previewUnfilled = preview.unfilled?.length || 0;
+      const previewSkipped = preview.skipped?.length || 0;
+      const accepted = window.confirm(
+        `HOR-U-EEGID JADWALKA\\n\\nFasal jadwalkooda la diyaariyey: ${previewClasses}\\nCasharro aan boos helin: ${previewUnfilled}\\nFasallo la dhaafay: ${previewSkipped}\\n\\nJadwalkan ma kaydinaysaa? Casharrada locked-ka ah waa la ilaalinayaa.`
+      );
+      if (!accepted) { setNotice('Hor-u-eegidda waa la joojiyey; jadwalkii hore waxba lagama beddelin.'); return; }
+      const result = await ApiClient.generateAllTimetables(false);
       const generatedIds = new Set(result.generatedClassIds || []);
       setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
       const unfilledCount = result.unfilled.length;
       const skippedCount = result.skipped.length;
-      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la sameeyay. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyay.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh: marka hore macallin u qoondee maaddooyinka (Class Subjects) si jadwalku u noqdo mid buuxa.` : ''}`);
+      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la kaydiyey. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyey.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh.` : ''}`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
     }
