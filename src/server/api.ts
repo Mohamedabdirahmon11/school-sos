@@ -4435,9 +4435,9 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     ]);
     const yearId = String((yearPage.items[0] as any)?.id || '');
     const termId = String((termPage.items[0] as any)?.id || '');
-    const currentAssignments = allAssignments.filter((row: any) =>
-      (!yearId || row.academicYearId === yearId) && (!row.termId || !termId || row.termId === termId)
-    );
+    const currentAssignments = yearId ? allAssignments.filter((row: any) =>
+      row.academicYearId === yearId && (!row.termId || row.termId === termId)
+    ) : [];
     const fullClassIds = new Set<string>([
       ...formClasses.map((row: any) => String(row.id)),
       ...legacyAssignments.map((row: any) => String(row.classId))
@@ -5548,7 +5548,7 @@ async function canTeacherMarkAttendance(
     const { data: assignmentRows, error } = await query;
     if (error) throw new Error('Teacher assignment could not be verified.');
     assigned = (assignmentRows || []).some((row: any) =>
-      (!row.term_id || !currentTerm?.id || row.term_id === currentTerm.id) &&
+      (!row.term_id || row.term_id === currentTerm?.id) &&
       (!row.section_id || row.section_id === sectionId)
     );
   }
@@ -5610,7 +5610,7 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
     client.from('classes').select('id').eq('school_id', school.id).eq('id', classId).eq('class_teacher_id', user.id).maybeSingle()
   ]);
   if (assignmentError) { res.status(503).json({ error: 'Xilsaarista macallinka lama hubin karin.' }); return; }
-  const currentAssignments = (assignments || []).filter((row: any) => !row.term_id || !term?.id || row.term_id === term.id);
+  const currentAssignments = (assignments || []).filter((row: any) => !row.term_id || row.term_id === term?.id);
   const [{ data: legacyAssignments, error: legacyError }, { data: enrollments, error: enrollmentError }] = await Promise.all([
     client.from('class_subjects').select('id').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('class_id', classId).eq('is_active', true).limit(1),
     year?.id
@@ -5656,9 +5656,9 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     client.from('attendance_settings').select('attendance_mode,edit_window_hours,late_threshold_minutes').eq('school_id', school.id).maybeSingle()
   ]);
   if (assignmentError || formError || slotError || substitutionError) { res.status(503).json({ error: 'Macluumaadka macallinka lama soo dejin karin.' }); return; }
-  const currentAssignments = (assignmentRows || []).filter((row: any) =>
-    (!year?.id || row.academic_year_id === year.id) && (!row.term_id || !term?.id || row.term_id === term.id)
-  );
+  const currentAssignments = year?.id ? (assignmentRows || []).filter((row: any) =>
+    row.academic_year_id === year.id && (!row.term_id || row.term_id === term?.id)
+  ) : [];
   const substituteIds = (substitutions || []).map((row: any) => row.entry_id);
   const { data: substituteSlots, error: substituteSlotError } = substituteIds.length
     ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).in('id', substituteIds)
@@ -6031,7 +6031,7 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
       client.from('class_subjects').select('class_id,subject_id').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true)
     ]);
     const currentAssignments = (assignments || []).filter((item: any) =>
-      (!year?.id || item.academic_year_id === year.id) && (!item.term_id || item.term_id === term?.id)
+      Boolean(year?.id && item.academic_year_id === year.id) && (!item.term_id || item.term_id === term?.id)
     );
     const formClassIds = new Set((formClasses || []).map((row: any) => row.id));
     const legacySubjectKeys = new Set((legacyAssignments || []).map((row: any) => row.class_id + ':' + row.subject_id));
