@@ -393,7 +393,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           const savedMarks = results.flat();
           setClassMarks(current => [...current.filter(mark => !savedMarks.some(saved => saved.id === mark.id)), ...savedMarks]);
           setMarksDraftDirty(false);
-          setNotice('Draft marks autosaved.');
+          setNotice(t('exam_drafts_autosaved'));
         } catch (error) {
           setNotice(error instanceof Error ? error.message : 'Automatic draft save failed. Use Save drafts to retry.');
         }
@@ -872,7 +872,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 subjects={gradeSubjects}
                 components={assessmentComponents}
               />
-              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{t('exam_forward_to_admin')}</button>}
             </div>
           </div>
 
@@ -885,7 +885,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <>
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">{isFormTeacher ? 'Form Teacher class review' : 'My subject mark sheet'}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? 'All active subjects submitted · rankings ready' : 'Rankings and class totals appear after every active subject is submitted.'}</p>}</div>
+                  <div><h2 className="text-sm font-bold text-slate-900">{isFormTeacher ? t('exam_form_teacher_review') : t('exam_my_subject_mark_sheet')}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? t('exam_all_active_subjects_submitted') : t('exam_waiting_for_all_subjects')}</p>}</div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
                 </div>
                 <div className="hidden overflow-x-auto md:block">
@@ -894,7 +894,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                       <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
                       <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID</th>
                       {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
-                      {isFormTeacher && <><th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total /100</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th></>}
+                      {isFormTeacher && <><th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">{t('exam_total')} /100</th><th className="border-b bg-slate-50 px-3 py-3 text-center">{t('exam_rank')}</th></>}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {examRegisterRows.map((row, rowIndex) => <tr key={row.student.id} className="hover:bg-teal-50/40">
