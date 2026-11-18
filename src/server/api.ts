@@ -3448,7 +3448,23 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   const teacher = teacherPage.items[0] as any;
   if (!teacher) { res.json([]); return; }
 
-  const assignments = await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
+  const [currentYears, currentTerms, curriculumRows] = await Promise.all([
+    queryAllRows('academic_years', { school_id: school.id, is_current: 'true' }, 'id'),
+    queryAllRows('terms', { school_id: school.id, is_current: 'true' }, 'id,academic_year_id'),
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'class_id,subject_id,periods_per_week,small_exam_enabled,big_exam_enabled')
+  ]);
+  const currentYearId = String((currentYears[0] as any)?.id || '');
+  const currentTermId = String((currentTerms.find((term: any) => term.academicYearId === currentYearId) as any)?.id || '');
+  const step6Rows = currentYearId
+    ? await queryAllRows('teacher_class_subject_assignments', { school_id: school.id, teacher_id: teacher.id, academic_year_id: currentYearId }, 'id,school_id,academic_year_id,term_id,class_id,section_id,subject_id,teacher_id,qualification_override')
+    : [];
+  const currentStep6Rows = step6Rows.filter((row: any) => !row.termId || !currentTermId || row.termId === currentTermId);
+  const assignments = currentStep6Rows.length
+    ? currentStep6Rows.map((row: any) => {
+        const curriculum = curriculumRows.find((item: any) => item.classId === row.classId && item.subjectId === row.subjectId);
+        return { ...row, periodsPerWeek: Number((curriculum as any)?.periodsPerWeek || 0), smallExamEnabled: (curriculum as any)?.smallExamEnabled !== false, bigExamEnabled: (curriculum as any)?.bigExamEnabled !== false };
+      })
+    : await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
   const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
   // A Form Teacher is explicitly assigned on the class record. assignedClasses
   // describes teaching scope and must not grant whole-class Form Teacher privileges.
