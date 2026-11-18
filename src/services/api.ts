@@ -1180,6 +1180,10 @@ export class ApiClient {
     return this.request<any>('/teacher/attendance/overview');
   }
 
+  public static getTeacherAttendanceSessions(fromDate: string) {
+    return this.request<any[]>('/teacher/attendance/sessions?fromDate=' + encodeURIComponent(fromDate));
+  }
+
   public static getAttendanceSettings() {
     return this.request<{ attendanceMode: 'daily' | 'per_period'; editWindowHours: number; lateThresholdMinutes: number }>('/attendance/settings');
   }
