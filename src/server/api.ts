@@ -9545,7 +9545,10 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
         const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         if (dep.error) throw dep.error;
         if ((dep.count || 0) > 0 && req.body?.clearDependentEntries !== true) throw new Error('Waxaa jira jadwal ku xiran; xaqiiji nadiifintiisa.');
-        if ((dep.count || 0) > 0) await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+        if ((dep.count || 0) > 0) {
+          const cleared = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+          if (cleared.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
+        }
         const next = { ...row, teacher_id: toId, qualification_override: !qualified, updated_at: new Date().toISOString() };
         const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
         if (upd.error) throw upd.error;
