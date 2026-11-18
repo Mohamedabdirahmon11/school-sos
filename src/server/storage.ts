@@ -3030,6 +3030,9 @@ class StorageEngine {
     const yearlyResults = students.map(student => {
       const s1 = sem1Marks.filter(mark => mark.studentId === student.id);
       const s2 = sem2Marks.filter(mark => mark.studentId === student.id);
+      const hasAnyApprovedActiveMark = expectedSubjectIds.some(subjectId =>
+        s1.some(mark => mark.subjectId === subjectId) || s2.some(mark => mark.subjectId === subjectId)
+      );
       const subjectResults = subjects.map(sub => {
         const isActive = activeSubjectIds.has(sub.id);
         const m1 = isActive ? s1.find(mark => mark.subjectId === sub.id) : undefined;
@@ -3060,7 +3063,9 @@ class StorageEngine {
             total: (config.smallExamMax || 0) + (config.bigExamMax || 0)
           }
         };
-      });
+      }).filter(result => result.isActive
+        ? result.sem1Percentage !== null || result.sem2Percentage !== null
+        : hasAnyApprovedActiveMark);
 
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
