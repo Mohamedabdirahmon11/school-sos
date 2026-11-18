@@ -5450,12 +5450,9 @@ const attendanceDateIsValid = (date: unknown): date is string => {
 const attendanceLocalDate = (timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
 const attendanceWeekday = (date: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00.000Z'));
 
-async function isConfiguredSchoolDay(client: any, schoolId: string, date: string): Promise<boolean> {
-  const dayName = attendanceWeekday(date);
-  const { data, error } = await client.from('school_days').select('day_of_week,is_working').eq('school_id', schoolId);
-  if (error) throw new Error('School calendar could not be checked.');
-  const setting = (data || []).find((row: any) => String(row.day_of_week).toLowerCase() === dayName.toLowerCase());
-  return setting ? Boolean(setting.is_working) : !['Saturday', 'Sunday'].includes(dayName);
+async function isConfiguredSchoolDay(_client: any, _schoolId: string, date: string): Promise<boolean> {
+  // Keep the current SchoolOS weekday default; do not query a nonexistent table.
+  return !['Saturday', 'Sunday'].includes(attendanceWeekday(date));
 }
 
 async function getAttendanceTeacher(client: any, schoolId: string, userId: string) {
