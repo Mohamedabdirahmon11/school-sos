@@ -2,10 +2,17 @@
 -- Keep public.assignments untouched: it stores homework tasks/submissions.
 -- This dedicated table is additive and preserves class_subjects.teacher_id for legacy timetable/exam readers.
 
-CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_id_uidx
-  ON public.academic_years (id, school_id);
-CREATE UNIQUE INDEX IF NOT EXISTS terms_id_school_id_uidx
-  ON public.terms (id, school_id);
+-- Academic-year/term tables are supplied by the earlier academic setup step.
+-- Guard these references so baseline schema installs can still apply migrations in order.
+DO $
+BEGIN
+  IF to_regclass('public.academic_years') IS NOT NULL THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_id_uidx ON public.academic_years (id, school_id)';
+  END IF;
+  IF to_regclass('public.terms') IS NOT NULL THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS terms_id_school_id_uidx ON public.terms (id, school_id)';
+  END IF;
+END $;
 CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_id_uidx
   ON public.class_sections (id, school_id);
 
@@ -32,12 +39,6 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
   created_by varchar(64) NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT teacher_assignments_year_school_fk
-    FOREIGN KEY (academic_year_id, school_id)
-    REFERENCES public.academic_years(id, school_id) ON DELETE CASCADE,
-  CONSTRAINT teacher_assignments_term_school_fk
-    FOREIGN KEY (term_id, school_id)
-    REFERENCES public.terms(id, school_id) ON DELETE CASCADE,
   CONSTRAINT teacher_assignments_class_school_fk
     FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
@@ -52,6 +53,27 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
     REFERENCES public.teachers(id, school_id) ON DELETE RESTRICT
 );
 
+-- Add academic-year/term composite FKs only when the Step 1 tables exist.
+DO $
+BEGIN
+  IF to_regclass('public.academic_years') IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teacher_assignments_year_school_fk') THEN
+      ALTER TABLE public.teacher_class_subject_assignments
+        ADD CONSTRAINT teacher_assignments_year_school_fk
+        FOREIGN KEY (academic_year_id, school_id)
+        REFERENCES public.academic_years(id, school_id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+  IF to_regclass('public.terms') IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teacher_assignments_term_school_fk') THEN
+      ALTER TABLE public.teacher_class_subject_assignments
+        ADD CONSTRAINT teacher_assignments_term_school_fk
+        FOREIGN KEY (term_id, school_id)
+        REFERENCES public.terms(id, school_id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+END $;
+
 -- NULL term means the whole academic year; NULL section means the whole class.
 CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique
   ON public.teacher_class_subject_assignments (
@@ -62,19 +84,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique
     subject_id
   );
 -- Preserve existing Step 4 teacher links as whole-year Step 6 assignments.
-INSERT INTO public.teacher_class_subject_assignments (
-  school_id, academic_year_id, term_id, class_id, section_id, subject_id,
-  teacher_id, qualification_override, created_by
-)
-SELECT cs.school_id, ay.id, NULL, cs.class_id, section.id, cs.subject_id,
-       cs.teacher_id, false, 'step6-migration'
-FROM public.class_subjects cs
-JOIN public.academic_years ay
-  ON ay.school_id = cs.school_id AND ay.is_current = true
-LEFT JOIN public.class_sections section
-  ON section.school_id = cs.school_id AND section.legacy_class_id = cs.class_id
-WHERE cs.is_active = true AND cs.teacher_id IS NOT NULL
-ON CONFLICT DO NOTHING;
+DO $
+BEGIN
+  IF to_regclass('public.academic_years') IS NOT NULL THEN
+    INSERT INTO public.teacher_class_subject_assignments (
+      school_id, academic_year_id, term_id, class_id, section_id, subject_id,
+      teacher_id, qualification_override, created_by
+    )
+    SELECT cs.school_id, ay.id, NULL, cs.class_id, section.id, cs.subject_id,
+           cs.teacher_id, false, 'step6-migration'
+    FROM public.class_subjects cs
+    JOIN public.academic_years ay
+      ON ay.school_id = cs.school_id AND ay.is_current = true
+    LEFT JOIN public.class_sections section
+      ON section.school_id = cs.school_id AND section.legacy_class_id = cs.class_id
+    WHERE cs.is_active = true AND cs.teacher_id IS NOT NULL
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $;
 
 CREATE INDEX IF NOT EXISTS teacher_class_subject_assignments_teacher_idx
   ON public.teacher_class_subject_assignments (school_id, teacher_id, academic_year_id, term_id);
