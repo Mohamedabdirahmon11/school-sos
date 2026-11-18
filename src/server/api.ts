@@ -64,7 +64,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
-  teachers: 'id,school_id,user_id,staff_id,teacher_code,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
+  teachers: 'id,school_id,user_id,staff_id,teacher_code,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary,max_periods_per_week',
   fee_payments: 'id,school_id,student_id,receipt_number,reference_number,academic_year,month,fee_type,fee_structure_id,amount_due,amount_paid,remaining_amount,payment_method,status,date,recorded_by,notes,voided_at,voided_by,void_reason',
   payroll_records: 'id,school_id,user_id,staff_id,staff_name,payroll_month,base_salary,allowances,allowance_total,deductions,deduction_total,net_salary,status,created_by,approved_by,paid_by,created_at,approved_at,paid_at',
   attendance_records: 'id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at',
@@ -9396,7 +9396,7 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
     : await query.maybeSingle();
   if (found.error || (id && !found.data)) throw new Error('Qoondeyntan lagama helin dugsigan.');
   const old = found.data;
-  if (old && (old.teacher_id !== payload.teacher_id || id)) {
+  if (old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id)) {
     const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true })
       .eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id).eq('teacher_id', old.teacher_id);
     if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
@@ -9411,7 +9411,12 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
     : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
   if (saved.error || !saved.data) throw new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.');
   const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', payload.academic_year_id).maybeSingle();
-  if (year?.is_current && !payload.term_id) {
+  let activeTerm = !payload.term_id;
+  if (payload.term_id) {
+    const { data: term } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', payload.term_id).maybeSingle();
+    activeTerm = term?.is_current === true;
+  }
+  if (year?.is_current && activeTerm) {
     await client.from('class_subjects').update({ teacher_id: payload.teacher_id }).eq('school_id', school.id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
   }
   await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
@@ -9528,13 +9533,29 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
         const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
         if (upd.error) throw upd.error;
         const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', row.academic_year_id).maybeSingle();
-        if (year?.is_current && !row.term_id) await client.from('class_subjects').update({ teacher_id: toId }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+        let activeTerm = !row.term_id;
+        if (row.term_id) { const { data: term } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', row.term_id).maybeSingle(); activeTerm = term?.is_current === true; }
+        if (year?.is_current && activeTerm) await client.from('class_subjects').update({ teacher_id: toId }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama beddeli karin.' }); }
     }
     res.json({ success: true, changed, skipped });
   } catch (error: any) { res.status(503).json({ error: error?.message || 'Macallinka lama beddeli karin.' }); }
 });
+apiRouter.put('/teacher-assignments/teachers/:teacherId/workload-limit', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School, user = (req as any).user as User;
+  const raw = req.body?.maxPeriodsPerWeek;
+  const value = raw === null || raw === '' ? null : Number(raw);
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 60)) { res.status(400).json({ error: 'Xadka xiisadaha waa inuu noqdaa tiro dhan oo u dhexeysa 1 ilaa 60, ama bannaan.' }); return; }
+  const client = teacherAssignmentClient();
+  const { data: teacher, error } = await client.from('teachers').select('id,max_periods_per_week').eq('school_id', school.id).eq('id', String(req.params.teacherId)).maybeSingle();
+  if (error || !teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
+  const updated = await client.from('teachers').update({ max_periods_per_week: value }).eq('school_id', school.id).eq('id', teacher.id).select('id,max_periods_per_week').single();
+  if (updated.error) { res.status(400).json({ error: 'Xadka culayska macallinka lama kaydin karin.' }); return; }
+  await teacherAssignmentAudit(client, school.id, user.id, 'workload_limit_updated', teacher, updated.data);
+  res.json({ success: true, teacher: updated.data });
+});
+
 apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School, user = (req as any).user as User, client = teacherAssignmentClient();
   const sourceYearId = String(req.body?.sourceAcademicYearId || ''), targetYearId = String(req.body?.targetAcademicYearId || '');
