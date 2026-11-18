@@ -37,6 +37,7 @@ export const TimetableView: React.FC = () => {
   const [printAllClasses, setPrintAllClasses] = useState(false);
   const [printMode, setPrintMode] = useState<'single' | 'multiple'>('multiple');
   const [printClassIds, setPrintClassIds] = useState<string[]>([]);
+  const [printTeacherId, setPrintTeacherId] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSelection, setPrintSelection] = useState<string[]>([]);
   const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
@@ -453,16 +454,19 @@ export const TimetableView: React.FC = () => {
         ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
         : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
-  const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple') => {
-    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, mode === 'single' ? 1 : 5).map(klass => klass.id);
+  const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple', teacherId?: string) => {
+    const matchingClasses = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id && (!teacherId || slot.teacherId === teacherId)));
+    const validIds = (teacherId ? matchingClasses : matchingClasses.slice(0, mode === 'single' ? 1 : 5)).map(klass => klass.id);
     if (!validIds.length) { setNotice('Dooro ugu yaraan hal fasal oo jadwalkiisu diyaar yahay.'); return; }
     setPrintClassIds(validIds);
+    setPrintTeacherId(teacherId || '');
     setPrintMode(mode);
     setPrintAllClasses(true);
     window.setTimeout(() => {
       window.print();
       setPrintAllClasses(false);
       setPrintClassIds([]);
+      setPrintTeacherId('');
     }, 150);
   };
 
@@ -528,6 +532,7 @@ export const TimetableView: React.FC = () => {
             <button type="button" onClick={() => void handleCopyTerm()} disabled={isReadOnly || !copySourceTermId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40">Copy timetable</button>
           </>}
           <button type="button" onClick={() => runTimetablePrint([selectedClassId], 'single')} disabled={viewMode !== 'class' || !selectedClassId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print this class</button>
+          {viewMode === 'teacher' && <button type="button" onClick={() => runTimetablePrint(displayedClasses.map(klass => klass.id), 'multiple', selectedTeacherId)} disabled={!selectedTeacherId || !displayedClasses.length} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print teacher</button>}
           <button type="button" onClick={() => { setPrintSelection(selectedClassId && timetable.some(slot => slot.classId === selectedClassId) ? [selectedClassId] : []); setShowPrintModal(true); }} disabled={viewMode === 'teacher' || !timetable.length} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-xs font-semibold text-white disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print… (dooro fasallada)</button>
 
           <button
@@ -708,7 +713,7 @@ export const TimetableView: React.FC = () => {
       <style>{`@page { size: A4 landscape; margin: 5mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 3mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; } .timetable-print-class h2 { font-size: 7pt; margin-bottom: 1mm; } .timetable-print-class table { font-size: 5pt; } .timetable-print-class th, .timetable-print-class td { padding: 0.7mm !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-grid { display: block !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-class { width: 100%; } .timetable-print-all[data-print-mode='single'] .timetable-print-class h2 { font-size: 14pt; margin-bottom: 3mm; } .timetable-print-all[data-print-mode='single'] .timetable-print-class table { font-size: 10pt; table-layout: auto; } .timetable-print-all[data-print-mode='single'] .timetable-print-class th, .timetable-print-all[data-print-mode='single'] .timetable-print-class td { padding: 2mm !important; line-height: 1.3; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden" data-print-mode={printMode}>
         <h1 className="mb-1 text-lg font-bold">{school?.name || 'School'} · Timetables</h1>
-        <p className="mb-2 text-[9px]">{printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
+        <p className="mb-2 text-[9px]">{printTeacherId ? 'Teacher timetable · ' + (teachers.find(teacher => teacher.id === printTeacherId)?.fullName || printTeacherId) : printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
         <div className="timetable-print-grid grid grid-cols-3 gap-2">
         {printClasses.map(klass => (
           <article key={klass.id} className="timetable-print-class">
@@ -716,7 +721,7 @@ export const TimetableView: React.FC = () => {
             <table className="w-full border-collapse text-[7px]">
               <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
               <tbody>{days.map(day => <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
-                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId) && (viewMode !== 'teacher' || item.teacherId === selectedTeacherId) && (viewMode !== 'room' || item.roomId === selectedRoomId || (!item.roomId && item.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)));
+                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId) && (!printTeacherId || item.teacherId === printTeacherId) && (viewMode !== 'teacher' || item.teacherId === selectedTeacherId) && (viewMode !== 'room' || item.roomId === selectedRoomId || (!item.roomId && item.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)));
                 const subject = subjects.find(item => item.id === slot?.subjectId);
                 return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
