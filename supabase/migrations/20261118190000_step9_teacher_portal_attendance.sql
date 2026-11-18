@@ -51,6 +51,25 @@ INSERT INTO public.attendance_settings (school_id)
 SELECT id FROM public.schools
 ON CONFLICT (school_id) DO NOTHING;
 
+CREATE OR REPLACE FUNCTION private.ensure_school_attendance_settings()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  INSERT INTO public.attendance_settings (school_id)
+  VALUES (NEW.id)
+  ON CONFLICT (school_id) DO NOTHING;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS schools_create_attendance_settings ON public.schools;
+CREATE TRIGGER schools_create_attendance_settings
+AFTER INSERT ON public.schools
+FOR EACH ROW EXECUTE FUNCTION private.ensure_school_attendance_settings();
+
 CREATE UNIQUE INDEX IF NOT EXISTS teachers_id_school_uidx ON public.teachers (id, school_id);
 
 CREATE TABLE IF NOT EXISTS public.attendance_sessions (
