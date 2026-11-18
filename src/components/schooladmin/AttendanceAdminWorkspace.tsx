@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
 import { AttendanceView } from './AttendanceView.tsx';
 import { PageHeader, Card, Button, Pill, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
 import { CalendarCheck, Users, LockKeyhole, UserCheck, RefreshCw } from 'lucide-react';
 
 type Tab = 'students' | 'teachers' | 'reports' | 'register';
-const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
+const todayIso = (timeZone = 'Africa/Addis_Ababa') => new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
 
 export const AttendanceAdminWorkspace: React.FC = () => {
+  const { school } = useAuth();
   const [tab, setTab] = useState<Tab>('students');
-  const [date, setDate] = useState(todayIso());
-  const [month, setMonth] = useState(todayIso().slice(0, 7));
+  const [date, setDate] = useState(() => todayIso(school?.timezone));
+  const [month, setMonth] = useState(() => todayIso(school?.timezone).slice(0, 7));
   const [dashboard, setDashboard] = useState<any>(null);
   const [teacherData, setTeacherData] = useState<any>(null);
   const [teacherId, setTeacherId] = useState('');
@@ -22,8 +24,8 @@ export const AttendanceAdminWorkspace: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [reportStartDate, setReportStartDate] = useState(todayIso());
-  const [reportEndDate, setReportEndDate] = useState(todayIso());
+  const [reportStartDate, setReportStartDate] = useState(() => todayIso(school?.timezone));
+  const [reportEndDate, setReportEndDate] = useState(() => todayIso(school?.timezone));
   const [reportClassId, setReportClassId] = useState('');
   const [reportSubjectId, setReportSubjectId] = useState('');
   const [reportData, setReportData] = useState<any>(null);
@@ -45,7 +47,7 @@ export const AttendanceAdminWorkspace: React.FC = () => {
     catch (e) { setError(e instanceof Error ? e.message : 'Dejinta lama kaydin karin.'); }
     finally { setSettingsBusy(false); }
   };
-  useEffect(() => { void loadSettings(); }, []);
+  useEffect(() => { setDate(todayIso(school?.timezone)); setMonth(todayIso(school?.timezone).slice(0, 7)); void loadSettings(); }, [school?.id, school?.timezone]);
   useEffect(() => { if (tab === 'students') void loadStudents(); if (tab === 'teachers') void loadTeachers(); }, [tab, date, month]);
 
   const teacherOptions = teacherData?.teachers || [];
@@ -134,7 +136,7 @@ export const AttendanceAdminWorkspace: React.FC = () => {
       <div className="flex flex-wrap items-end gap-3"><FormRow label="Bisha"><input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="min-h-11 rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow><Button onClick={()=>void loadTeachers()}><RefreshCw className="mr-2 h-4 w-4"/>Cusboonaysii</Button></div>
       <Card className="grid gap-3 p-4 md:grid-cols-2">
         <FormRow label="Macallin"><select value={selectedTeacher?.id||''} onChange={e=>setTeacherId(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900">{teacherOptions.map((x:any)=><option key={x.id} value={x.id}>{x.full_name}</option>)}</select></FormRow>
-        <FormRow label="Taariikh"><input type="date" max={todayIso()} value={date} onChange={e=>setDate(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
+        <FormRow label="Taariikh"><input type="date" max={todayIso(school?.timezone)} value={date} onChange={e=>setDate(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
         <FormRow label="Xaalad"><select value={status} onChange={e=>setStatus(e.target.value as any)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"><option value="present">Jooga</option><option value="absent">Maqan</option><option value="late">Daahay</option><option value="on_leave">Fasax</option></select></FormRow>
         <FormRow label="Faallo"><input value={note} onChange={e=>setNote(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900" placeholder="Ikhtiyaari"/></FormRow>
         <FormRow label="Waqtiga imaanshaha"><input type="time" value={checkIn} onChange={e=>setCheckIn(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
