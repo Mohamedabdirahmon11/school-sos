@@ -29,14 +29,17 @@ interface ReportCardMark {
   totalMarks: number;
   percentage: number;
   status?: string;
+  teacherRemarks?: string;
 }
 
 interface ReportCardSubjectResult {
   subject: { id: string; name: string; code?: string };
+  isActive?: boolean;
   sem1Marks?: ReportCardMark | null;
   sem2Marks?: ReportCardMark | null;
   sem1Percentage: number | null;
   sem2Percentage: number | null;
+  yearlyMarks: number | null;
   yearlyPercentage: number | null;
   maxMarks: { small: number; big: number; total: number };
 }
@@ -45,6 +48,9 @@ interface ReportCardResult {
   student: { id: string; firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: ReportCardSubjectResult[];
   annualComplete: boolean;
+  annualPublished: boolean;
+  semester1Rank: number;
+  semester2Rank: number;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -66,6 +72,15 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
   const template = design.templateId || 'modern';
   const background = design.ownDesignImageUrl;
   const logoPosition = design.logoPosition || 'center';
+  const activeRows = result.subjectResults.filter(row => row.isActive !== false);
+  const activeCount = activeRows.length;
+  const term1Total = activeRows.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
+  const term2Total = activeRows.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
+  const finalTotal = activeRows.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
+  const term1Average = activeCount ? term1Total / activeCount : 0;
+  const term2Average = activeCount ? term2Total / activeCount : 0;
+  const term1Comments = activeRows.filter(row => row.sem1Marks?.teacherRemarks?.trim());
+  const term2Comments = activeRows.filter(row => row.sem2Marks?.teacherRemarks?.trim());
 
   const shellClass = template === 'classic'
     ? 'border-4 border-double rounded-sm font-serif'
@@ -119,7 +134,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl border" style={{ backgroundColor: `${primaryColor}0D`, borderColor: `${primaryColor}33` }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 rounded-xl border" style={{ backgroundColor: `${primaryColor}0D`, borderColor: `${primaryColor}33` }}>
           <div>
             <p className="text-[11px] text-[#64748B]">Student Full Name</p>
             <p className="font-bold text-[#132A29]">{result.student.firstName} {result.student.middleName} {result.student.lastName}</p>
@@ -132,12 +147,11 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             <p className="text-[11px] text-[#64748B]">Class & Section</p>
             <p className="font-bold text-[#132A29]">{className || 'Class'}</p>
           </div>
-          {blocks.rank && (
-            <div>
-              <p className="text-[11px] text-[#64748B]">Official Class Rank</p>
-              <p className="font-mono font-bold" style={{ color: primaryColor }}>{result.annualComplete ? `#${result.yearlyRank} of ${totalStudents}` : 'Pending'}</p>
-            </div>
-          )}
+          {blocks.rank && <>
+            <div><p className="text-[11px] text-[#64748B]">Term 1 Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.semester1Rank > 0 ? `#${result.semester1Rank} of ${totalStudents}` : 'Pending'}</p></div>
+            <div><p className="text-[11px] text-[#64748B]">Term 2 Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.semester2Rank > 0 ? `#${result.semester2Rank} of ${totalStudents}` : 'Pending'}</p></div>
+            <div><p className="text-[11px] text-[#64748B]">Final Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.annualComplete ? `#${result.yearlyRank} of ${totalStudents}` : 'Pending'}</p></div>
+          </>}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -153,7 +167,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-xs border" style={{ borderColor: '#E2E8F0' }}>
+          <table className="w-full min-w-[900px] text-left text-xs border" style={{ borderColor: '#E2E8F0' }}>
             <thead className="bg-[#F8FAFC] border-b text-[11px] uppercase font-semibold text-[#64748B]">
               <tr>
                 <th className="py-2.5 px-3">Subject</th>
@@ -161,13 +175,14 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <th className="py-2.5 px-3 text-center">Semester 1 %</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 Marks</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 %</th>
-                <th className="py-2.5 px-3 text-right font-bold">Yearly Result (%)</th>
+                <th className="py-2.5 px-3 text-center">Final Marks</th>
+                <th className="py-2.5 px-3 text-right font-bold">Final Average (%)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
               {result.subjectResults.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
+                  <td colSpan={7} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
                 </tr>
               ) : result.subjectResults.map(row => (
                 <tr key={row.subject.id} className="hover:bg-[#F8FAFC]">
@@ -176,15 +191,20 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem1Percentage !== null ? `${row.sem1Percentage}%` : '-'}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{formatReportCardMark(row.sem2Marks, row.maxMarks)}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem2Percentage !== null ? `${row.sem2Percentage}%` : '-'}</td>
+                  <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.yearlyMarks !== null ? row.yearlyMarks.toFixed(1).replace(/\\.0$/, '') : '-'}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-bold" style={{ color: primaryColor }}>{row.yearlyPercentage !== null ? `${row.yearlyPercentage}%` : '-'}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="bg-[#F8FAFC] border-t-2 font-bold" style={{ borderColor: '#CBD5E1' }}>
               <tr>
-                <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Combined Yearly Academic Average</td>
-                <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] text-[#64748B]">Exam maximums shown per subject</td>
-                <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</td>
+                <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Total / Average</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term1Total.toFixed(1).replace(/\\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term1Average.toFixed(1).replace(/\\.0$/, '')}%</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term2Total.toFixed(1).replace(/\\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term2Average.toFixed(1).replace(/\\.0$/, '')}%</td>
+                <td className="py-2.5 px-3 text-center font-mono">{finalTotal.toFixed(1).replace(/\\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.yearlyPercentage}%</td>
               </tr>
             </tfoot>
           </table>
@@ -194,8 +214,10 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
-                <p className="font-semibold text-[#475569] mb-1">Class Teacher Remarks:</p>
-                <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
+                <p className="font-semibold text-[#475569] mb-1">Term 1 Teacher Comments:</p>
+                {term1Comments.length ? term1Comments.map(row => <p key={row.subject.id} className="italic text-[#334155]">{row.subject.name}: {row.sem1Marks?.teacherRemarks}</p>) : <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>}
+                <p className="mt-3 font-semibold text-[#475569] mb-1">Term 2 Teacher Comments:</p>
+                {term2Comments.length ? term2Comments.map(row => <p key={row.subject.id} className="italic text-[#334155]">{row.subject.name}: {row.sem2Marks?.teacherRemarks}</p>) : <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
               </div>
             )}
             {blocks.adminRemarks && (
@@ -340,7 +362,7 @@ export const ReportCardsView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
             ))}
           </select>
-          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualComplete) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
+          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualPublished) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
           <button
             type="button"
             onClick={() => {
@@ -350,7 +372,7 @@ export const ReportCardsView: React.FC = () => {
                 setIsBulkPrintMode(false);
               }, 300);
             }}
-            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualComplete)}
+            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualPublished)}
             className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
           >
             <Layers className="w-3.5 h-3.5" />
@@ -359,7 +381,7 @@ export const ReportCardsView: React.FC = () => {
           <button
             type="button"
             onClick={() => window.print()}
-            disabled={!selectedStudentResult?.annualComplete}
+            disabled={!selectedStudentResult?.annualPublished}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -446,11 +468,11 @@ export const ReportCardsView: React.FC = () => {
                 <div className="h-24 rounded bg-slate-100 animate-pulse" />
                 <div className="h-40 rounded bg-slate-100 animate-pulse" />
               </div>
-            ) : selectedStudentResult && design && school ? (
+            ) : selectedStudentResult && design && school && selectedStudentResult.annualPublished ? (
               <ReportCardDocument school={school} design={design} className={className} result={selectedStudentResult} totalStudents={yearlyRankings.length} />
             ) : (
               <div className="bg-white rounded-xl border border-[#CBD5E1] p-12 text-center text-xs text-[#64748B]">
-                {yearlyRankings.length === 0 ? 'Select a class with enrolled students to generate report cards.' : 'Select a student from the class roster to generate their official report card.'}
+                {yearlyRankings.length === 0 ? 'Select a class with enrolled students to generate report cards.' : selectedStudentResult?.annualComplete ? 'Report Card becomes available after School Admin publishes both terms.' : 'Select a student with complete results for both terms.'}
               </div>
             )}
           </div>
