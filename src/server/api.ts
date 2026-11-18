@@ -3972,12 +3972,15 @@ apiRouter.get('/timetable/unavailability', requireAuth, requireSchoolAdminOrSupe
 });
 
 apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const teacherId = String(req.body?.teacherId || '');
   const dayOfWeek = String(req.body?.dayOfWeek || '');
-  const periodNumber = Number(req.body?.periodNumber);
-  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 8 || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, and a period from 1 to 8.' }); return; }
-  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true);
+  const rawPeriod = req.body?.periodNumber;
+  const periodNumber = rawPeriod === null || rawPeriod === undefined || rawPeriod === '' ? null : Number(rawPeriod);
+  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || (periodNumber !== null && (!Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 8)) || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) {
+    res.status(400).json({ error: 'Dooro macallin dugsigan ka tirsan, maalin shaqo, iyo cashar sax ah ama maalinta oo dhan.' }); return;
+  }
+  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true, String(req.body?.reason || ''));
   res.json({ success: true });
 });
 
@@ -4027,6 +4030,25 @@ apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, re
   res.json({ success: true });
 });
 
+apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const slotId = String(req.params.slotId || '');
+  if (typeof req.body?.isLocked !== 'boolean') { res.status(400).json({ error: 'isLocked must be true or false.' }); return; }
+  try {
+    await db.setTimetableSlotLocked(school.id, slotId, req.body.isLocked);
+    db.logAudit({
+      action: req.body.isLocked ? 'TIMETABLE_LESSON_LOCKED' : 'TIMETABLE_LESSON_UNLOCKED',
+      category: 'school', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: (req.body.isLocked ? 'Locked' : 'Unlocked') + ' timetable lesson ' + slotId + '.',
+      severity: 'info'
+    });
+    res.json({ success: true, isLocked: req.body.isLocked });
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : 'Timetable lesson was not found.' });
+  }
+});
 apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const firstId = String(req.body?.firstSlotId || '');
