@@ -19,7 +19,7 @@ const DEFAULT_DATA: SchoolSetupData = {
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
   terms: [{ name: 'Term 1', startDate: '', endDate: '' }, { name: 'Term 2', startDate: '', endDate: '' }],
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' },
-  workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 6 },
+  workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 },
   completedSteps: []
 };
 
@@ -53,7 +53,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         academicYear: { ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}) },
         terms: incoming.terms?.length ? incoming.terms : DEFAULT_DATA.terms,
         calendar: { ...DEFAULT_DATA.calendar, ...(incoming.calendar || {}) },
-        workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}), periodsPerDay: Math.min(6, Math.max(1, Number(incoming.workingHours?.periodsPerDay || DEFAULT_DATA.workingHours.periodsPerDay))) },
+        workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}), periodsPerDay: Math.min(8, Math.max(1, Number(incoming.workingHours?.periodsPerDay || DEFAULT_DATA.workingHours.periodsPerDay))) },
         completedSteps: incoming.completedSteps || []
       });
       setSaved(incoming.completedSteps || []);
@@ -100,7 +100,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: uploaded.logoUrl } }));
       }
       if (step === 5) {
-        const periods = Math.min(6, Math.max(1, Number(data.workingHours.periodsPerDay || 6)));
+        const periods = Math.min(8, Math.max(1, Number(data.workingHours.periodsPerDay || 8)));
         const firstFinish = shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, periods);
         const secondFinish = shiftFinish(timetable.shift2FirstPeriodStart, timetable.shift2PeriodMinutes, timetable.shift2BreakAfterPeriod, timetable.shift2BreakMinutes, periods);
         if (timetable.periodMinutes < 20 || timetable.periodMinutes > 120 || timetable.shift2PeriodMinutes < 20 || timetable.shift2PeriodMinutes > 120) throw new Error('Each shift period must be between 20 and 120 minutes.');
@@ -176,7 +176,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
           {field('School closing time', data.workingHours.closingTime, v => patch('workingHours', { ...data.workingHours, closingTime: v }), 'time')}
           {field('Break start time', data.workingHours.breakStartTime, v => patch('workingHours', { ...data.workingHours, breakStartTime: v }), 'time')}
           {field('Break end time', data.workingHours.breakEndTime, v => patch('workingHours', { ...data.workingHours, breakEndTime: v }), 'time')}
-          <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per shift</span><input type="number" min="1" max="6" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
+          <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Periods per shift</span><input type="number" min="1" max="8" value={data.workingHours.periodsPerDay} onChange={e => patch('workingHours', { ...data.workingHours, periodsPerDay: Math.min(8, Math.max(1, Number(e.target.value) || 1)) }) className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
           <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Number of shifts</span><select value={timetable.shiftCount} onChange={e => setTimetable(v => ({ ...v, shiftCount: Number(e.target.value) as 1 | 2 }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm"><option value={1}>One shift</option><option value={2}>Two shifts</option></select></label>
         </div>
         <section className="rounded-2xl border border-teal-200 bg-teal-50/40 p-4 space-y-4">
@@ -185,7 +185,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
             {field('Shift 1 starts', timetable.firstPeriodStart, v => { setTimetable(x => ({ ...x, firstPeriodStart: v })); patch('workingHours', { ...data.workingHours, classStartTime: v }); }, 'time')}
             {field('Shift 1 finishes', toTime(shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay)), v => { const duration = updateDurationForFinish(timetable.firstPeriodStart, v, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay); if (duration >= 20 && duration <= 120) setTimetable(x => ({ ...x, periodMinutes: duration })); }, 'time')}
             <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Lesson duration (minutes)</span><input type="number" min="20" max="120" value={timetable.periodMinutes} onChange={e => setTimetable(x => ({ ...x, periodMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
-            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break after period</span><select value={timetable.breakAfterPeriod} onChange={e => setTimetable(x => ({ ...x, breakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break after period</span><select value={timetable.breakAfterPeriod} onChange={e => setTimetable(x => ({ ...x, breakAfterPeriod: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm">{Array.from({ length: Math.max(1, data.workingHours.periodsPerDay - 1) }, (_, index) => index + 1).map(n => <option key={n} value={n}>{n}</option>)}</select></label>
             <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">Break duration (minutes)</span><input type="number" min="0" max="120" value={timetable.breakMinutes} onChange={e => setTimetable(x => ({ ...x, breakMinutes: Number(e.target.value) }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm" /></label>
           </div>
           <p className="text-xs font-semibold text-teal-900">Calculated Shift 1 finish: {toTime(shiftFinish(timetable.firstPeriodStart, timetable.periodMinutes, timetable.breakAfterPeriod, timetable.breakMinutes, data.workingHours.periodsPerDay))}</p>
