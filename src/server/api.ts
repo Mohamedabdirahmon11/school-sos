@@ -4422,6 +4422,66 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  if (user.role === 'teacher') {
+    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id, status: 'active' }, 1, 1, undefined, 'id');
+    const teacherId = String((teacherPage.items[0] as any)?.id || '');
+    if (!teacherId) { res.json([]); return; }
+    const [yearPage, termPage, allAssignments, formClasses, legacyAssignments] = await Promise.all([
+      db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id'),
+      db.queryPage('terms', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id'),
+      queryAllRows('teacher_class_subject_assignments', { school_id: school.id, teacher_id: teacherId }, 'class_id,section_id,term_id,academic_year_id'),
+      queryAllRows('classes', { school_id: school.id, class_teacher_id: user.id }, 'id'),
+      queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacherId, is_active: 'true' }, 'class_id')
+    ]);
+    const yearId = String((yearPage.items[0] as any)?.id || '');
+    const termId = String((termPage.items[0] as any)?.id || '');
+    const currentAssignments = allAssignments.filter((row: any) =>
+      (!yearId || row.academicYearId === yearId) && (!row.termId || !termId || row.termId === termId)
+    );
+    const fullClassIds = new Set<string>([
+      ...formClasses.map((row: any) => String(row.id)),
+      ...legacyAssignments.map((row: any) => String(row.classId))
+    ]);
+    const sectionIdsByClass = new Map<string, Set<string>>();
+    for (const assignment of currentAssignments as any[]) {
+      const id = String(assignment.classId || '');
+      if (!assignment.sectionId) { fullClassIds.add(id); continue; }
+      const ids = sectionIdsByClass.get(id) || new Set<string>();
+      ids.add(String(assignment.sectionId)); sectionIdsByClass.set(id, ids);
+    }
+    const restrictedSectionIds = [...new Set([...sectionIdsByClass.values()].flatMap(ids => [...ids]))];
+    const sectionRows = restrictedSectionIds.length
+      ? await queryAllRows('class_sections', { school_id: school.id, id: restrictedSectionIds }, 'id,name')
+      : [];
+    const sectionNames = new Map(sectionRows.map((row: any) => [String(row.id), String(row.name || '').trim().toLowerCase()]));
+    const restrictedNames = new Map<string, Set<string>>();
+    for (const [id, sectionIds] of sectionIdsByClass) {
+      if (fullClassIds.has(id)) continue;
+      restrictedNames.set(id, new Set([...sectionIds].map(sectionId => sectionNames.get(sectionId)).filter(Boolean) as string[]));
+    }
+    let visible = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
+    visible = visible.filter((student: any) => {
+      const id = String(student.classId || '');
+      if (fullClassIds.has(id)) return true;
+      const names = restrictedNames.get(id);
+      return Boolean(names?.has(String(student.section || '').trim().toLowerCase()));
+    });
+    if (search) visible = visible.filter((student: any) =>
+      [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
+        .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()))
+    );
+    visible.sort(compareStudentsByName);
+    const total = visible.length;
+    const allClass = req.query.allClass === 'true' && Boolean(classId);
+    const items = allClass ? visible : visible.slice((page - 1) * pageSize, page * pageSize);
+    res.set({
+      'X-Page': String(allClass ? 1 : page), 'X-Page-Size': String(allClass ? Math.max(total, 1) : pageSize),
+      'X-Total-Count': String(total), 'X-Total-Pages': String(allClass ? (total ? 1 : 0) : Math.ceil(total / pageSize))
+    });
+    res.json(sanitizeStudents(items));
+    return;
+  }
+
   // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
   if (typeof filters.class_id === 'string' && filters.class_id && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
     const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
