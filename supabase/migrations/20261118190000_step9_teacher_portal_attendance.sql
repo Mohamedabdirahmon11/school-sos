@@ -198,6 +198,7 @@ AS $$
             AND sub.substitute_date = target_date
             AND slot.class_id = target_class_id
             AND slot.is_active = true
+            AND (slot.section_id IS NULL OR slot.section_id = target_section_id)
             AND (target_period_id IS NULL OR p.id = target_period_id)
             AND (target_subject_id IS NULL OR slot.subject_id = target_subject_id)
             AND trim(to_char(target_date, 'Day')) = slot.day_of_week
