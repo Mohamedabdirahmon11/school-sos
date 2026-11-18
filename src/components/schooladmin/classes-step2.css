@@ -1,0 +1,42 @@
+.school-design-system{--ds-bg:#f1f3fa;--ds-card:#fff;--ds-text:#1b2133;--ds-muted:#667085;--ds-border:#e1e5f0;--ds-primary:#4f46e5;--ds-secondary:#7c3aed;--ds-success:#16a34a;--ds-danger:#dc2626;--ds-soft:#eef0ff;min-height:100%;width:100%;overflow-x:clip;background:var(--ds-bg);color:var(--ds-text);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.dark .school-design-system{--ds-bg:#0f1220;--ds-card:#181c2e;--ds-text:#e9ecf8;--ds-muted:#9aa3bd;--ds-border:#272d45;--ds-primary:#818cf8;--ds-secondary:#a78bfa;--ds-success:#4ade80;--ds-danger:#f87171;--ds-soft:#212648}
+@media(prefers-color-scheme:dark){html:not(.light):not(.dark) .school-design-system{--ds-bg:#0f1220;--ds-card:#181c2e;--ds-text:#e9ecf8;--ds-muted:#9aa3bd;--ds-border:#272d45;--ds-primary:#818cf8;--ds-secondary:#a78bfa;--ds-success:#4ade80;--ds-danger:#f87171;--ds-soft:#212648}}
+.classes-step2{padding:18px 14px calc(26px + env(safe-area-inset-bottom))}.classes-content{width:min(100%,1040px);margin:0 auto;display:grid;gap:14px}
+.ds-page-header{display:flex;align-items:center;min-height:100px;padding:18px;border-radius:18px;color:#fff;background:linear-gradient(135deg,var(--ds-primary),var(--ds-secondary))}
+.ds-page-header h1{margin:0;color:#fff!important;font-size:21px!important;line-height:1.25;font-weight:750}.ds-page-header p{margin:5px 0 0;color:rgba(255,255,255,.88);font-size:13px}
+.ds-stepper{display:grid;grid-template-columns:repeat(5,minmax(112px,1fr));gap:8px;overflow-x:auto;padding:2px 1px 8px;scrollbar-width:thin}
+.ds-step{display:flex;align-items:center;justify-content:center;gap:7px;min-height:48px;padding:6px 9px;border:1px solid var(--ds-border);border-radius:12px;background:var(--ds-card);color:var(--ds-muted);font-size:12px;font-weight:650;white-space:nowrap}
+.ds-step-number{display:grid;place-items:center;width:25px;height:25px;flex:0 0 25px;border:1px solid var(--ds-border);border-radius:50%;font-size:12px}
+.ds-step.is-active{border:2px solid var(--ds-primary);color:var(--ds-text);background:var(--ds-soft)}.ds-step.is-active .ds-step-number{border-color:var(--ds-primary);color:var(--ds-primary)}.ds-step.is-complete .ds-step-number{border-color:var(--ds-success);background:var(--ds-success);color:#fff}
+.ds-card{min-width:0;padding:14px;border:1px solid var(--ds-border);border-radius:16px;background:var(--ds-card);display:flex;flex-direction:column;gap:12px}
+.ds-card-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.ds-card-heading h2,.classes-default-card h2{display:flex;align-items:center;gap:8px;margin:3px 0 0;color:var(--ds-text);font-size:16px;font-weight:750}
+.ds-eyebrow{color:var(--ds-muted);font-size:10px;letter-spacing:.07em;font-weight:750}.ds-icon-tile{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;color:var(--ds-primary);background:var(--ds-soft)}
+.ds-form{display:grid;gap:12px}.ds-form-row{display:grid;gap:6px;color:var(--ds-text);font-size:12.5px;font-weight:650}
+.ds-form-row input{width:100%;min-width:0;min-height:42px;padding:9px 11px;border:1px solid var(--ds-border);border-radius:10px;outline:none;background:var(--ds-card);color:var(--ds-text);font:inherit;font-size:14px}
+.ds-form-row input:focus,.ds-inline-add input:focus,.ds-rename input:focus{border-color:var(--ds-primary);outline:2px solid color-mix(in srgb,var(--ds-primary) 18%,transparent)}.ds-form-row small{color:var(--ds-muted);font-size:11px;font-weight:400}
+.ds-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 13px;border:1px solid var(--ds-border);border-radius:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}.ds-button:disabled{opacity:.48;cursor:not-allowed}
+.ds-button-primary{border-color:transparent;color:#fff;background:linear-gradient(135deg,var(--ds-primary),var(--ds-secondary))}.ds-button-secondary{color:var(--ds-text);background:var(--ds-card)}.ds-button-danger{width:40px;min-width:40px;padding:8px;color:var(--ds-danger);background:var(--ds-card)}
+.ds-chip{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:4px 8px 4px 10px;border:1px solid var(--ds-border);border-radius:99px;background:var(--ds-soft);color:var(--ds-text);font-size:12px;font-weight:650}
+.ds-chip button{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--ds-danger);font-size:18px;cursor:pointer}.ds-chip button:disabled{opacity:.35;cursor:not-allowed}
+.ds-pill{display:inline-flex;align-items:center;min-height:28px;padding:4px 10px;border-radius:99px;background:var(--ds-soft);color:var(--ds-primary);font-size:12px;font-weight:750;white-space:nowrap}
+.ds-list{display:grid}.ds-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px;padding:14px 0;border-bottom:1px solid var(--ds-border)}.ds-list-row:last-child{border-bottom:0}
+.ds-row-main{min-width:0;display:grid;gap:9px}.ds-row-title h3{margin:2px 0 0;color:var(--ds-text);font-size:16px;font-weight:750;overflow-wrap:anywhere}
+.ds-section-pills{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.ds-row-actions{display:flex;align-items:flex-start;gap:6px}
+.ds-inline-add{grid-column:1/-1;display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--ds-border)}.ds-inline-add input,.ds-rename input{flex:1;min-width:0;min-height:40px;padding:8px 10px;border:1px solid var(--ds-border);border-radius:10px;background:var(--ds-card);color:var(--ds-text);font:inherit;font-size:13px}.ds-rename{display:flex;gap:6px}
+.ds-muted,.ds-empty,.ds-footer-note{color:var(--ds-muted)}.ds-empty{display:grid;place-items:center;min-height:108px;text-align:center;font-size:13px}
+.ds-notice{padding:11px 13px;border:1px solid var(--ds-border);border-radius:12px;background:var(--ds-card);font-size:13px}.ds-notice.is-success{border-color:var(--ds-success);color:var(--ds-success)}.ds-notice.is-error{border-color:var(--ds-danger);color:var(--ds-danger)}
+.classes-create-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(230px,1fr);gap:12px}.classes-default-card{justify-content:space-between}.classes-default-card p,.classes-list-heading p{margin:6px 0 0;color:var(--ds-muted);font-size:12px}
+.classes-list-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.classes-list-heading h2{margin:0;color:var(--ds-text);font-size:17px;font-weight:750}.classes-list-card{padding:0 14px}
+.ds-bottom-nav{display:flex;justify-content:space-between;gap:10px;padding-top:5px}.ds-bottom-nav .ds-button{min-width:92px}.ds-footer-note{display:flex;align-items:center;justify-content:center;gap:7px;margin:0;font-size:11px;text-align:center}
+@media(max-width:640px){.classes-step2{padding:12px 12px calc(22px + env(safe-area-inset-bottom))}.ds-stepper{grid-template-columns:repeat(5,minmax(100px,1fr))}.classes-create-grid{grid-template-columns:1fr}.ds-list-row{grid-template-columns:minmax(0,1fr) auto}.ds-inline-add .ds-button{padding-left:10px;padding-right:10px}}
+
+/* Keep the shared Step 2 tokens above legacy School Admin presentation overrides. */
+.school-admin-design main > .school-design-system.classes-step2{padding:18px 14px calc(26px + env(safe-area-inset-bottom))}
+.school-design-system .ds-page-header{background:linear-gradient(135deg,var(--ds-primary),var(--ds-secondary))!important;border:0!important;color:#fff!important;border-radius:18px!important}
+.school-design-system .ds-page-header h1{color:#fff!important}
+.school-design-system .ds-page-header p{color:rgba(255,255,255,.88)!important}
+.school-design-system .ds-card-heading h2,.school-design-system .classes-default-card h2,.school-design-system .classes-list-heading h2,.school-design-system .ds-row-title h3{color:var(--ds-text)!important}
+.school-design-system .ds-form-row input,.school-design-system .ds-inline-add input,.school-design-system .ds-rename input{border-color:var(--ds-border)!important;border-radius:10px!important;background:var(--ds-card)!important;color:var(--ds-text)!important}
+.school-admin-design main .school-design-system .ds-button:focus-visible{outline:3px solid color-mix(in srgb,var(--ds-primary) 35%,transparent)!important;outline-offset:2px}
+@media(max-width:640px){.school-admin-design main > .school-design-system.classes-step2{padding:12px 12px calc(22px + env(safe-area-inset-bottom))}}
+.school-design-system .ds-chip{min-height:42px;padding:3px 5px 3px 11px}.school-design-system .ds-chip button{width:40px;height:40px;min-width:40px;min-height:40px}
