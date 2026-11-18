@@ -47,7 +47,7 @@ export const SubjectsView: React.FC = () => {
       setNotice(editing ? tx('updated') : tx('saved'));
       resetForm();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : tx('saveError'));
+      setError(tx('saveError'));
     } finally { setBusy(false); }
   };
 
@@ -61,7 +61,7 @@ export const SubjectsView: React.FC = () => {
         ? tx('defaultAdded',{created:result.createdCount,skipped:result.skippedCount})
         : tx('defaultsExist'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : tx('defaultsError'));
+      setError(tx('defaultsError'));
     } finally { setBusy(false); }
   };
 
@@ -75,7 +75,7 @@ export const SubjectsView: React.FC = () => {
       if (editing?.id === subject.id) resetForm();
       setNotice(tx('deleted'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : tx('deleteError'));
+      setError(tx('deleteError'));
     } finally { setBusy(false); }
   };
 
