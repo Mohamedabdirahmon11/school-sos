@@ -53,7 +53,8 @@ export const AttendanceView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [schoolAbsences, setSchoolAbsences] = useState<Array<{ id: string; student: Student; className: string; note?: string }>>([]);
-  const [absencesLoading, setAbsencesLoading] = useState(false);\n  const [attendanceDashboard, setAttendanceDashboard] = useState<any>(null);\n  const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);\n  const [attendanceSettings, setAttendanceSettings] = useState({ attendanceMode: 'daily' as 'daily' | 'per_period', editWindowHours: 2, lateThresholdMinutes: 15 });\n  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [absencesLoading, setAbsencesLoading] = useState(false);
+  const [attendanceDashboard, setAttendanceDashboard] = useState<any>(null);\n  const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);\n  const [attendanceSettings, setAttendanceSettings] = useState({ attendanceMode: 'daily' as 'daily' | 'per_period', editWindowHours: 2, lateThresholdMinutes: 15 });\n  const [settingsSaving, setSettingsSaving] = useState(false);
 
   const loadClasses = async () => {
     if (!school) return;
