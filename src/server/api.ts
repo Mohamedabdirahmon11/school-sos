@@ -9417,11 +9417,11 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
   const old = found.data;
   if (old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id)) {
     const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true })
-      .eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id).eq('teacher_id', old.teacher_id);
+      .eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id);
     if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
     if ((dep.count || 0) > 0 && body?.clearDependentEntries !== true) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta jadwalka ka hor beddelidda.');
     if ((dep.count || 0) > 0) {
-      const cleared = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id).eq('teacher_id', old.teacher_id);
+      const cleared = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id);
       if (cleared.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
     }
   }
@@ -9436,11 +9436,11 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
 async function removeTeacherAssignment(client: any, school: School, user: User, id: string, clear: boolean) {
   const { data: row, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle();
   if (error || !row) throw new Error('Qoondeyntan lagama helin dugsigan.');
-  const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', row.teacher_id);
+  const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
   if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
   if ((dep.count || 0) > 0 && !clear) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta ka hor tirtiridda.');
   if ((dep.count || 0) > 0) {
-    const delSlots = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', row.teacher_id);
+    const delSlots = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
     if (delSlots.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
   }
   const deleted = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('id', id);
@@ -9533,10 +9533,10 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
       try {
         const { data: qualified } = await client.from('teacher_subjects').select('id').eq('school_id', school.id).eq('teacher_id', toId).eq('subject_id', row.subject_id).eq('is_active', true).maybeSingle();
         if (!qualified && req.body?.override !== true) throw new Error('Macallinka cusub kuma xirna maaddadan.');
-        const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', fromId);
+        const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         if (dep.error) throw dep.error;
         if ((dep.count || 0) > 0 && req.body?.clearDependentEntries !== true) throw new Error('Waxaa jira jadwal ku xiran; xaqiiji nadiifintiisa.');
-        if ((dep.count || 0) > 0) await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', fromId);
+        if ((dep.count || 0) > 0) await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         const next = { ...row, teacher_id: toId, qualification_override: !qualified, updated_at: new Date().toISOString() };
         const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
         if (upd.error) throw upd.error;
