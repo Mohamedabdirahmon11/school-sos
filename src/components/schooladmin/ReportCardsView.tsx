@@ -81,6 +81,8 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
   const term2Average = activeCount ? term2Total / activeCount : 0;
   const term1Comments = activeRows.filter(row => row.sem1Marks?.teacherRemarks?.trim());
   const term2Comments = activeRows.filter(row => row.sem2Marks?.teacherRemarks?.trim());
+  const term1CommentText = term1Comments.map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks || ''}`).join(' · ') || teacherRemark(result.yearlyPercentage);
+  const term2CommentText = term2Comments.map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks || ''}`).join(' · ') || teacherRemark(result.yearlyPercentage);
 
   const shellClass = template === 'classic'
     ? 'border-4 border-double rounded-sm font-serif'
@@ -215,9 +217,9 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
                 <p className="font-semibold text-[#475569] mb-1">Term 1 Teacher Comments:</p>
-                <p className="italic text-[#334155]">{term1Comments.map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
+                <p className="italic text-[#334155]">{term1CommentText}</p>
                 <p className="mt-3 font-semibold text-[#475569] mb-1">Term 2 Teacher Comments:</p>
-                <p className="italic text-[#334155]">{term2Comments.map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
+                <p className="italic text-[#334155]">{term2CommentText}</p>
               </div>
             )}
             {blocks.adminRemarks && (
