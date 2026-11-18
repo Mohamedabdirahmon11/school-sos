@@ -2063,6 +2063,17 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Unable to save subject assignments.');
   }
 
+  public async saveTeacherSubjects(schoolId: string, teacherId: string, subjectIds: string[]): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Teacher subject storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_sync_teacher_subjects', {
+      p_school_id: schoolId, p_teacher_id: teacherId, p_subject_ids: [...new Set(subjectIds)]
+    });
+    this.recordQuery('rpc:schoolos_sync_teacher_subjects', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save teacher subjects.');
+  }
+
   public createSubject(subjectData: Omit<Subject, 'id'>): Subject {
     const id = `sbj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newSubject: Subject = { ...subjectData, creditUnits: subjectData.creditUnits ?? 0, department: subjectData.department ?? '', id };
