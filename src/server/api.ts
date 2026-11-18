@@ -3145,6 +3145,33 @@ apiRouter.delete('/classes/:id', requireAuth, requireSchoolContext, async (req, 
 });
 
 const classGroupsClient = () => createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+const CLASS_DEPENDENCIES: Array<{ table: string; column: string; label: string }> = [
+  { table: 'students', column: 'class_id', label: 'arday' },
+  { table: 'admission_applications', column: 'class_id', label: 'codsiyada gelitaanka' },
+  { table: 'assignments', column: 'class_id', label: 'layliyada' },
+  { table: 'attendance_records', column: 'class_id', label: 'xaadirinta' },
+  { table: 'class_subjects', column: 'class_id', label: 'xiriirrada maaddooyinka' },
+  { table: 'exam_schedule_cohort_students', column: 'class_id', label: 'liisaska imtixaanka' },
+  { table: 'exam_schedules', column: 'class_id', label: 'jadwalka imtixaanka' },
+  { table: 'fee_structures', column: 'class_id', label: 'qaab-dhismeedka khidmadaha' },
+  { table: 'promotion_history', column: 'class_id', label: 'taariikhda dallacsiinta' },
+  { table: 'promotions', column: 'class_from_id', label: 'dallacsiinta' },
+  { table: 'promotions', column: 'class_to_id', label: 'dallacsiinta' },
+  { table: 'school_documents', column: 'class_id', label: 'dukumentiyada' },
+  { table: 'student_marks', column: 'class_id', label: 'natiijooyinka ardayda' },
+  { table: 'timetable_slots', column: 'class_id', label: 'jadwalka casharrada' }
+];
+
+async function findClassDependency(client: any, schoolId: string, classId: string): Promise<string | null> {
+  for (const dependency of CLASS_DEPENDENCIES) {
+    const { count, error } = await client.from(dependency.table).select('*', { count: 'exact', head: true })
+      .eq('school_id', schoolId).eq(dependency.column, classId);
+    if (error) throw error;
+    if ((count || 0) > 0) return dependency.label;
+  }
+  return null;
+}
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
  const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
  if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
@@ -3169,19 +3196,47 @@ apiRouter.post('/class-groups/:id/sections', requireAuth, requireSchoolAdminOrSu
  const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
 });
 apiRouter.delete('/class-sections/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const client=classGroupsClient();const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
- if(!section){res.status(404).json({error:'Qaybta lama helin.'});return;}if(section.legacy_class_id){res.status(409).json({error:'Qaybtan waxay ku xiran tahay diiwaannadii hore ee ardayda/jadwalka; lama tirtiri karo si xogtu u badbaado.'});return;}
- const {error}=await client.from('class_sections').delete().eq('id',section.id).eq('school_id',school.id);if(error){res.status(500).json({error:'Qaybta lama tirtiri karin.'});return;}res.json({success:true});
+ const school=(req as any).school as School;const client=classGroupsClient();
+ const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section){res.status(404).json({error:'Qaybta lama helin.'});return;}
+ try {
+  if(section.legacy_class_id){
+   const dependency=await findClassDependency(client,school.id,section.legacy_class_id);
+   if(dependency){res.status(409).json({error:'Qaybtan lama tirtiri karo; waxaa ku xiran '+dependency+'. Marka hore ka wareeji xogtaas.'});return;}
+   const {error:classError}=await client.from('classes').delete().eq('id',section.legacy_class_id).eq('school_id',school.id);
+   if(classError){res.status(409).json({error:'Qaybtan lama tirtiri karo sababtoo ah xog kale ayaa ku xiran.'});return;}
+  }
+  const {error}=await client.from('class_sections').delete().eq('id',section.id).eq('school_id',school.id);
+  if(error){res.status(409).json({error:'Qaybta lama tirtiri karin; hubi inaysan xog kale ku xirnayn.'});return;}
+  res.json({success:true});
+ } catch { res.status(500).json({error:'Xogta ku xiran qaybta lama hubin karin. Isku day mar kale.'}); }
 });
 apiRouter.delete('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
- const {data:sections}=await client.from('class_sections').select('legacy_class_id').eq('class_id',group.id);if((sections||[]).some((s:any)=>s.legacy_class_id)){res.status(409).json({error:'Fasalkan wuxuu leeyahay qaybo ku xiran xogtii hore. Lama tirtiri karo si xogta ardayda iyo jadwalku u badbaadaan.'});return;}
- const {error}=await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);if(error){res.status(500).json({error:'Fasalka lama tirtiri karin.'});return;}res.json({success:true});
+ const school=(req as any).school as School;const client=classGroupsClient();
+ const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
+ const {data:sections,error:sectionsError}=await client.from('class_sections').select('id,legacy_class_id').eq('class_id',group.id).eq('school_id',school.id);
+ if(sectionsError){res.status(500).json({error:'Qaybaha fasalka lama hubin karin.'});return;}
+ try {
+  for(const section of sections||[]){
+   if(!section.legacy_class_id) continue;
+   const dependency=await findClassDependency(client,school.id,section.legacy_class_id);
+   if(dependency){res.status(409).json({error:'Fasalkan lama tirtiri karo; qayb ka mid ah waxaa ku xiran '+dependency+'. Marka hore ka wareeji xogtaas.'});return;}
+  }
+  for(const section of sections||[]){
+   if(!section.legacy_class_id) continue;
+   const {error}=await client.from('classes').delete().eq('id',section.legacy_class_id).eq('school_id',school.id);
+   if(error){res.status(409).json({error:'Fasalka lama tirtiri karo sababtoo ah xog kale ayaa ku xiran.'});return;}
+  }
+  const {error}=await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);
+  if(error){res.status(409).json({error:'Fasalka lama tirtiri karo; xog kale ayaa ku xiran.'});return;}
+  res.json({success:true});
+ } catch { res.status(500).json({error:'Xogta ku xiran fasalka lama hubin karin. Isku day mar kale.'}); }
 });
 apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8'];
  const {data:existing,error:readError}=await client.from('class_groups').select('name').eq('school_id',school.id);if(readError){res.status(500).json({error:'Fasallada lama hubin karin.'});return;}
- const names=new Set((existing||[]).map((r:any)=>String(r.name).toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
+ const names=new Set((existing||[]).map((r:any)=>String(r.name).trim().toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
  const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
