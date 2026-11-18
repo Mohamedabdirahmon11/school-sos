@@ -6239,8 +6239,13 @@ apiRouter.get('/attendance/teachers', requireAuth, requireSchoolContext, require
   if (error) { res.status(503).json({ error: 'Xaadirinta macallimiinta lama soo dejin karin.' }); return; }
   const summary = (teachers || []).map((teacher: any) => {
     const rows = (records || []).filter((row: any) => row.teacher_id === teacher.id);
-    return { teacher, present: rows.filter((row: any) => row.status === 'present').length, absent: rows.filter((row: any) => row.status === 'absent').length,
-      late: rows.filter((row: any) => row.status === 'late').length, onLeave: rows.filter((row: any) => row.status === 'on_leave').length };
+    const present = rows.filter((row: any) => row.status === 'present').length;
+    const absent = rows.filter((row: any) => row.status === 'absent').length;
+    const late = rows.filter((row: any) => row.status === 'late').length;
+    const onLeave = rows.filter((row: any) => row.status === 'on_leave').length;
+    const workingDays = present + absent + late;
+    return { teacher, present, absent, late, onLeave,
+      attendancePercentage: workingDays ? Math.round((present + late) * 100 / workingDays) : 0 };
   });
   res.json({ month, teachers: teachers || [], records: records || [], summary });
 });
