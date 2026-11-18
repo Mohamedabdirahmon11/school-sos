@@ -18,8 +18,8 @@ test('Step 6 uses a dedicated table and does not alter homework assignments', ()
 test('Step 6 tables have tenant RLS and composite same-school relationships', () => {
   assert.match(migration, /teacher_assignments_school_scope/);
   assert.match(migration, /teacher_assignment_audit_school_read/);
-  assert.match(migration, /auth_user_role\\(\\)::text = 'school_admin'/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\\.teacher_assignment_audit/);
+  assert.match(migration, /auth_user_role\(\)::text = 'school_admin'/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.teacher_assignment_audit/);
   assert.match(migration, /FOREIGN KEY \(teacher_id, school_id\)[\s\S]*REFERENCES public\.teachers\s*\(id, school_id\)/);
   assert.match(migration, /FOREIGN KEY \(subject_id, school_id\)[\s\S]*REFERENCES public\.subjects \(id, school_id\)/);
   assert.match(migration, /teacher_class_subject_assignment_unique/);
@@ -29,6 +29,8 @@ test('Assignment API requires an active curriculum pair and explicit qualificati
   assert.match(api, /Maaddadan kuma jirto manhajka fasalkan/);
   assert.match(api, /teacher_subjects/);
   assert.match(api, /body\?\.override !== true/);
+  assert.match(api, /teacher-assignments\/teachers\/:teacherId\/workload-limit/);
+  assert.match(api, /max_periods_per_week/);
 });
 
 test('Assignment API is school-scoped and blocks timetable-dependent deletion without confirmation', () => {
