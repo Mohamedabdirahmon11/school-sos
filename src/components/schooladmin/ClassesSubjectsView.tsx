@@ -232,7 +232,7 @@ export const ClassesSubjectsView: React.FC = () => {
   return (
     <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">{t('exam_active_subjects')} & {t('exam_subjects_and_teachers')}</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#102522]">{t('exam_classes_subjects')}</h1>
       </div>
 
       {notice && (
