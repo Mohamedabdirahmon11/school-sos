@@ -4102,13 +4102,22 @@ apiRouter.post('/timetable/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, 
   if (!name || name.length > 120 || !['class', 'lab', 'hall'].includes(type) || (capacity !== null && (!Number.isInteger(capacity) || capacity < 1))) {
     res.status(400).json({ error: 'Geli magaca qolka, noociisa (class/lab/hall), iyo capacity sax ah.' }); return;
   }
-  try { res.status(201).json(await db.saveTimetableRoom(school.id, { id: req.body?.id ? String(req.body.id) : undefined, name, type, capacity })); }
-  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama kaydin karin.' }); }
+  try {
+    const saved = await db.saveTimetableRoom(school.id, { id: req.body?.id ? String(req.body.id) : undefined, name, type, capacity });
+    const user = (req as any).user as User;
+    db.logAudit({ action: 'TIMETABLE_ROOM_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved timetable room ' + name + ' (' + type + ').', severity: 'info' });
+    res.status(201).json(saved);
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama kaydin karin.' }); }
 });
 
 apiRouter.delete('/timetable/rooms/:roomId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  try { await db.deleteTimetableRoom((req as any).school.id, String(req.params.roomId)); res.json({ success: true }); }
-  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama tirtiri karin.' }); }
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  try {
+    await db.deleteTimetableRoom(school.id, String(req.params.roomId));
+    db.logAudit({ action: 'TIMETABLE_ROOM_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable room ' + req.params.roomId + '.', severity: 'warning' });
+    res.json({ success: true });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama tirtiri karin.' }); }
 });
 
 apiRouter.get('/timetable/substitutions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -4149,8 +4158,13 @@ apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSupe
 });
 
 apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  try { await db.deleteTimetableSubstitution((req as any).school.id, String(req.params.id)); res.json({ success: true }); }
-  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  try {
+    await db.deleteTimetableSubstitution(school.id, String(req.params.id));
+    db.logAudit({ action: 'TIMETABLE_SUBSTITUTE_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable substitution ' + req.params.id + '.', severity: 'info' });
+    res.json({ success: true });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
 });
 apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
