@@ -3172,6 +3172,195 @@ async function findClassDependency(client: any, schoolId: string, classId: strin
   }
   return null;
 }
+
+type CurriculumInput = { subjectId: string; periodsPerWeek: number };
+async function getClassCurriculumCapacity(schoolId: string) {
+  const client = classGroupsClient();
+  const [days, periods] = await Promise.all([
+    client.from('school_days').select('id', { count: 'exact', head: true }).eq('school_id', schoolId).eq('is_working', true),
+    client.from('periods').select('id', { count: 'exact', head: true }).eq('school_id', schoolId).eq('type', 'lesson')
+  ]);
+  if (days.error || periods.error) throw new Error('Awoodda xiisadaha lama akhrin karin.');
+  const workingDays = Number(days.count || 0);
+  const lessonPeriodsPerDay = Number(periods.count || 0);
+  return { workingDays, lessonPeriodsPerDay, weeklyCapacity: workingDays * lessonPeriodsPerDay };
+}
+async function findCurriculumDependency(schoolId: string, classId: string, subjectId: string): Promise<string | null> {
+  const client = classGroupsClient();
+  const dependencies: Array<{ table: string; label: string }> = [
+    { table: 'timetable_slots', label: 'jadwalka fasalka' },
+    { table: 'assignments', label: 'layliyada/shaqooyinka' },
+    { table: 'exam_schedules', label: 'jadwalka imtixaannada' },
+    { table: 'student_marks', label: 'dhibcaha ardayda' }
+  ];
+  for (const dependency of dependencies) {
+    const { count, error } = await client.from(dependency.table).select('id', { count: 'exact', head: true })
+      .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId);
+    if (error) throw new Error('Xiriirrada manhajka lama hubin karin.');
+    if ((count || 0) > 0) return dependency.label;
+  }
+  return null;
+}
+async function readClassCurriculumRows(schoolId: string, classId: string) {
+  const { data, error } = await classGroupsClient().from('class_subjects')
+    .select('id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at')
+    .eq('school_id', schoolId).eq('class_id', classId);
+  if (error) throw new Error('Manhajka fasalka lama soo akhrin karin.');
+  return data || [];
+}
+
+apiRouter.get('/curriculum/classes/:classId', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara manhajka.' }); return; }
+  const classId = String(req.params.classId || '');
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Fasalkan lagama helin dugsigan.' }); return; }
+  try {
+    const [capacity, curriculum] = await Promise.all([
+      getClassCurriculumCapacity(school.id),
+      readClassCurriculumRows(school.id, classId)
+    ]);
+    res.json({ class: klass, capacity, curriculum: curriculum.map((row: any) => ({
+      id: row.id, subjectId: row.subject_id, periodsPerWeek: Number(row.periods_per_week || 1),
+      teacherId: row.teacher_id || null, smallExamEnabled: Boolean(row.small_exam_enabled),
+      bigExamEnabled: Boolean(row.big_exam_enabled), isActive: row.is_active !== false
+    })) });
+  } catch (error: any) {
+    res.status(503).json({ error: error?.message || 'Manhajka lama soo akhrin karin.' });
+  }
+});
+
+apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa manhajka beddeli kara.' }); return; }
+  const classId = String(req.params.classId || '');
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Fasalkan lagama helin dugsigan.' }); return; }
+  const input = req.body?.subjects;
+  if (!Array.isArray(input) || input.length > 500) { res.status(400).json({ error: 'Dooro maaddooyinka fasalka si sax ah.' }); return; }
+  const normalized: CurriculumInput[] = input.map((item: any) => ({
+    subjectId: String(item?.subjectId || ''),
+    periodsPerWeek: Number(item?.periodsPerWeek)
+  }));
+  if (new Set(normalized.map(item => item.subjectId)).size !== normalized.length ||
+      normalized.some(item => !item.subjectId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 12)) {
+    res.status(400).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 12.' }); return;
+  }
+  const subjects = await db.getSubjects(school.id);
+  const validSubjectIds = new Set(subjects.map(subject => subject.id));
+  if (normalized.some(item => !validSubjectIds.has(item.subjectId))) { res.status(400).json({ error: 'Maaddo aan dugsigan ka tirsanayn ayaa la doortay.' }); return; }
+  try {
+    const [capacity, existing] = await Promise.all([
+      getClassCurriculumCapacity(school.id),
+      readClassCurriculumRows(school.id, classId)
+    ]);
+    const total = normalized.reduce((sum, item) => sum + item.periodsPerWeek, 0);
+    if (total > capacity.weeklyCapacity) {
+      res.status(400).json({ error: `Wadarta xiisaduhu waa ${total}, balse awoodda fasalku waa ${capacity.weeklyCapacity} xiisad toddobaadkii. Yaree xiisadaha.` }); return;
+    }
+    const selectedIds = new Set(normalized.map(item => item.subjectId));
+    const removed = existing.filter((row: any) => row.is_active !== false && !selectedIds.has(row.subject_id));
+    for (const row of removed) {
+      const dependency = await findCurriculumDependency(school.id, classId, row.subject_id);
+      if (dependency) {
+        res.status(409).json({ error: `Maaddadan lagama saari karo manhajka: waxaa hore ugu xiran ${dependency}. Marka hore ka saar xiriirkaas.` }); return;
+      }
+    }
+    const existingBySubject = new Map(existing.map((row: any) => [row.subject_id, row]));
+    const payload = normalized.map(item => {
+      const previous: any = existingBySubject.get(item.subjectId);
+      return {
+        id: previous?.id || randomUUID(), school_id: school.id, class_id: classId,
+        subject_id: item.subjectId, periods_per_week: item.periodsPerWeek,
+        teacher_id: previous?.teacher_id || null,
+        small_exam_enabled: previous?.small_exam_enabled ?? false,
+        big_exam_enabled: previous?.big_exam_enabled ?? false, is_active: true
+      };
+    });
+    const client = classGroupsClient();
+    if (payload.length) {
+      const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+      if (error) throw error;
+    }
+    if (removed.length) {
+      const { error } = await client.from('class_subjects').delete().eq('school_id', school.id).in('id', removed.map((row: any) => row.id));
+      if (error) throw error;
+    }
+    db.logAudit({ action: 'CLASS_CURRICULUM_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Saved curriculum for class ${klass.name}: ${payload.length} subjects, ${total} weekly periods.`, severity: 'info' });
+    res.json({ success: true, count: payload.length, totalPeriods: total, capacity: capacity.weeklyCapacity });
+  } catch (error: any) {
+    res.status(503).json({ error: error?.message || 'Manhajka lama kaydin karin. Isbeddelka dib u hubi.' });
+  }
+});
+
+apiRouter.delete('/curriculum/classes/:classId/subjects/:subjectId', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maaddo ka saari kara manhajka.' }); return; }
+  const classId = String(req.params.classId || ''), subjectId = String(req.params.subjectId || '');
+  const [klass, subjects] = await Promise.all([db.getClassById(classId, school.id), db.getSubjects(school.id)]);
+  if (!klass || !subjects.some(subject => subject.id === subjectId)) { res.status(404).json({ error: 'Fasalka ama maaddada lagama helin dugsigan.' }); return; }
+  try {
+    const dependency = await findCurriculumDependency(school.id, classId, subjectId);
+    if (dependency) { res.status(409).json({ error: `Maaddadan lagama saari karo manhajka: waxaa hore ugu xiran ${dependency}. Marka hore ka saar xiriirkaas.` }); return; }
+    const { error } = await classGroupsClient().from('class_subjects').delete().eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(503).json({ error: error?.message || 'Maaddada lagama saari karin manhajka.' });
+  }
+});
+
+apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa manhaj koobi gareyn kara.' }); return; }
+  const sourceId = String(req.params.classId || '');
+  const targetIds = Array.isArray(req.body?.targetClassIds) ? req.body.targetClassIds.map((id: unknown) => String(id || '')).filter(Boolean) : [];
+  if (!targetIds.length || targetIds.length > 100 || new Set(targetIds).size !== targetIds.length || targetIds.includes(sourceId)) {
+    res.status(400).json({ error: 'Dooro fasallo kale oo koobi-ga lagu shubayo.' }); return;
+  }
+  const [source, allClasses] = await Promise.all([db.getClassById(sourceId, school.id), db.getClasses(school.id)]);
+  if (!source || source.isArchived) { res.status(404).json({ error: 'Fasalka laga koobiyeeynayo lama helin.' }); return; }
+  const targetSet = new Set(targetIds);
+  const targets = allClasses.filter(klass => targetSet.has(klass.id) && !klass.isArchived);
+  if (targets.length !== targetIds.length) { res.status(400).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
+  try {
+    const [capacity, sourceRows] = await Promise.all([
+      getClassCurriculumCapacity(school.id),
+      readClassCurriculumRows(school.id, sourceId)
+    ]);
+    const activeSource = sourceRows.filter((row: any) => row.is_active !== false);
+    if (!activeSource.length) { res.status(400).json({ error: 'Fasalkaan weli ma laha manhaj la koobiyeeyo.' }); return; }
+    const total = activeSource.reduce((sum: number, row: any) => sum + Number(row.periods_per_week || 0), 0);
+    if (total > capacity.weeklyCapacity) { res.status(400).json({ error: `Manhajka asalka ahi wuxuu ka badan yahay awoodda toddobaadlaha ah ee ${capacity.weeklyCapacity} xiisad.` }); return; }
+    const client = classGroupsClient();
+    const { data: existingRows, error: existingError } = await client.from('class_subjects').select('*').eq('school_id', school.id).in('class_id', targetIds);
+    if (existingError) throw existingError;
+    const existingMap = new Map((existingRows || []).map((row: any) => [`${row.class_id}:${row.subject_id}`, row]));
+    const payload = targets.flatMap(target => activeSource.map((row: any) => {
+      const previous: any = existingMap.get(`${target.id}:${row.subject_id}`);
+      return {
+        id: previous?.id || randomUUID(), school_id: school.id, class_id: target.id,
+        subject_id: row.subject_id, periods_per_week: Number(row.periods_per_week),
+        teacher_id: previous?.teacher_id || null,
+        small_exam_enabled: previous?.small_exam_enabled ?? false,
+        big_exam_enabled: previous?.big_exam_enabled ?? false, is_active: true
+      };
+    }));
+    const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+    if (error) throw error;
+    db.logAudit({ action: 'CLASS_CURRICULUM_COPIED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Copied curriculum from ${source.name} to ${targets.length} class(es).`, severity: 'info' });
+    res.json({ success: true, copiedClasses: targets.length, subjectsPerClass: activeSource.length });
+  } catch (error: any) {
+    res.status(503).json({ error: error?.message || 'Manhajka fasallada lama koobiyeeyn karin.' });
+  }
+});
+
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
  const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
  if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
