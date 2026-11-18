@@ -614,7 +614,7 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     const klass = await db.getClassById(student.classId, student.schoolId);
     if (klass?.classTeacherId === user.id) return true;
     const yearPage = await db.queryPage('academic_years', { school_id: student.schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
-    const yearId = String((yearPage.items[0] as any)?.id || '');
+
     const assignment = yearId ? await db.queryPage('teacher_class_subject_assignments', {
       school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, academic_year_id: yearId
     }, 1, 1, undefined, 'id') : { items: [] as any[] };
@@ -6199,7 +6199,7 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
     item[row.status] = (item[row.status] || 0) + 1; item.dates.push({ date: row.date, status: row.status }); grouped.set(row.student_id, item);
   }
   const summaries = [...grouped.values()].map(item => {
-    const dates = [...new Set(item.dates.filter((x: any) => x.status === 'absent').map((x: any) => x.date))].sort();
+    const dates: string[] = Array.from(new Set<string>(item.dates.filter((x: any) => x.status === 'absent').map((x: any) => String(x.date)))).sort((a, b) => a.localeCompare(b));
     let longest = 0; let current = 0; let previous: string | null = null;
     for (const day of dates) {
       const next = new Date(day + 'T00:00:00.000Z');
