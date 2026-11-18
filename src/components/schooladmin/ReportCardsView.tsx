@@ -217,7 +217,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <p className="font-semibold text-[#475569] mb-1">Term 1 Teacher Comments:</p>
                 <p className="italic text-[#334155]">{term1Comments.map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
                 <p className="mt-3 font-semibold text-[#475569] mb-1">Term 2 Teacher Comments:</p>
-                <p className="italic text-[#334155]">{term2Comments.map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>}
+                <p className="italic text-[#334155]">{term2Comments.map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
               </div>
             )}
             {blocks.adminRemarks && (
