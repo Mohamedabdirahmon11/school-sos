@@ -3967,7 +3967,7 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
 });
 
 apiRouter.get('/timetable/unavailability', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const result = await db.queryPage('teacher_unavailability', { school_id: (req as any).school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number');
+  const result = await db.queryPage('teacher_unavailability', { school_id: (req as any).school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number,reason');
   res.json(result.items);
 });
 
@@ -4009,7 +4009,9 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (teacherId && sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
+  const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && item.isLocked === true);
+  if (lockedSlot) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan beddelin.' }); return; }
   const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
   const closingTime = school.setupData?.workingHours?.closingTime;
   if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
@@ -4024,7 +4026,9 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
 
 apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
+  const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber));
+  if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
   const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber)));
   try { await db.replaceTimetableForClass(school.id, String(req.params.classId), next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
   res.json({ success: true });
