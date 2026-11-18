@@ -39,3 +39,4 @@
 .school-design-system .ds-form-row input,.school-design-system .ds-inline-add input,.school-design-system .ds-rename input{border-color:var(--ds-border)!important;border-radius:10px!important;background:var(--ds-card)!important;color:var(--ds-text)!important}
 .school-admin-design main .school-design-system .ds-button:focus-visible{outline:3px solid color-mix(in srgb,var(--ds-primary) 35%,transparent)!important;outline-offset:2px}
 @media(max-width:640px){.school-admin-design main > .school-design-system.classes-step2{padding:12px 12px calc(22px + env(safe-area-inset-bottom))}}
+.school-design-system .ds-chip{min-height:42px;padding:3px 5px 3px 11px}.school-design-system .ds-chip button{width:40px;height:40px;min-width:40px;min-height:40px}
