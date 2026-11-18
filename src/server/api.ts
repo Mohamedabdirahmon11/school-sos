@@ -6009,7 +6009,7 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
     client.from('classes').select('id,name,section').eq('school_id', school.id).eq('is_archived', false),
     client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
     client.from('terms').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
-    client.from('attendance_settings').select('attendance_mode').eq('school_id', school.id).maybeSingle(),
+    client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle(),
     client.from('attendance_records').select('id,class_id,student_id,status,note,period_id,subject_id').eq('school_id', school.id).eq('date', date),
     client.from('attendance_sessions').select('id,class_id,period_id,subject_id,teacher_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
   ]);
@@ -6079,9 +6079,13 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
     const submittedDailyOrLegacy = new Set([...submittedDailyIds, ...legacyCompleteIds]);
     classesNotSubmitted = (classes || []).filter((klass: any) => (enrollmentCountByClass.get(klass.id) || 0) > 0 && !submittedDailyOrLegacy.has(klass.id));
   }
+  const editWindowMs = Number(settings?.edit_window_hours ?? 2) * 3600000;
+  const sessionRows = (sessions || []).map((row: any) => ({
+    ...row, is_locked: Boolean(row.is_locked || (row.submitted_at && Date.now() > new Date(row.submitted_at).getTime() + editWindowMs))
+  }));
   res.json({ date, totalStudents: enrolledStudentIds.length, recorded: records?.length || 0,
     attendanceRate: denominator ? Math.round(present * 100 / denominator) : 0, absentCount: absentStudents.length,
-    absentStudents, sessions: sessions || [], classesNotSubmitted, classes: classes || [] });
+    absentStudents, sessions: sessionRows, classesNotSubmitted, classes: classes || [] });
 });
 
 apiRouter.get('/attendance/sessions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -6089,9 +6093,15 @@ apiRouter.get('/attendance/sessions', requireAuth, requireSchoolContext, require
   const date = typeof req.query.date === 'string' ? req.query.date : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
   if (!attendanceDateIsValid(date)) { res.status(400).json({ error: 'Taariikh sax ah ayaa loo baahan yahay.' }); return; }
   const client = documentServiceClient(res); if (!client) return;
-  const { data, error } = await client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('date', date).order('submitted_at', { ascending: false });
+  const [{ data, error }, { data: settings }] = await Promise.all([
+    client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('date', date).order('submitted_at', { ascending: false }),
+    client.from('attendance_settings').select('edit_window_hours').eq('school_id', school.id).maybeSingle()
+  ]);
   if (error) { res.status(503).json({ error: 'Kulamada xaadirinta lama soo dejin karin.' }); return; }
-  res.json(data || []);
+  const editWindowMs = Number(settings?.edit_window_hours ?? 2) * 3600000;
+  res.json((data || []).map((row: any) => ({
+    ...row, is_locked: Boolean(row.is_locked || (row.submitted_at && Date.now() > new Date(row.submitted_at).getTime() + editWindowMs))
+  })));
 });
 
 apiRouter.post('/attendance/sessions/:id/unlock', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
