@@ -46,6 +46,15 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
     }
   }, [school?.id]);
 
+  const loadDetail = useCallback(async (id: string) => {
+    if (!id) { setDetail(null); setIncluded([]); setPeriods({}); return; }
+    const value = await ApiClient.getClassCurriculum(id) as CurriculumDetail;
+    setDetail(value);
+    const rows = (value.curriculum || []).filter(row => row.isActive);
+    setIncluded(rows.map(row => row.subjectId));
+    setPeriods(Object.fromEntries(rows.map(row => [row.subjectId, row.periodsPerWeek])));
+  }, []);
+
   useEffect(() => { void loadBase(); }, [loadBase]);
   useEffect(() => {
     let active = true;
