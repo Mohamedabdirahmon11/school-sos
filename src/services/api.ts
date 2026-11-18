@@ -692,8 +692,8 @@ export class ApiClient {
     return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
   }
 
-  public static async generateAllTimetables() {
-    return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
+  public static async generateAllTimetables(previewOnly = false) {
+    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly }) });
   }
 
   public static async getTimetableRooms() {
