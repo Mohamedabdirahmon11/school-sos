@@ -143,7 +143,7 @@ export const AttendanceAdminWorkspace: React.FC = () => {
         <FormRow label="Waqtiga bixitaanka"><input type="time" value={checkOut} onChange={e=>setCheckOut(e.target.value)} className="min-h-12 w-full rounded-xl border px-3 dark:border-slate-700 dark:bg-slate-900"/></FormRow>
         <Button disabled={busy||!selectedTeacher} className="min-h-12 md:col-span-2" onClick={()=>void markTeacher()}><UserCheck className="mr-2 h-4 w-4"/>Kaydi imaanshaha macallinka</Button>
       </Card>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{summary.map((item:any)=><Card key={item.teacher.id} className="space-y-2 p-4"><h3 className="font-bold">{item.teacher.full_name}</h3><div className="grid grid-cols-2 gap-2 text-sm"><p>Jooga: <b>{item.present}</b></p><p>Maqan: <b>{item.absent}</b></p><p>Daahay: <b>{item.late}</b></p><p>Fasax: <b>{item.onLeave}</b></p></div></Card>)}</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{summary.map((item:any)=><Card key={item.teacher.id} className="space-y-2 p-4"><h3 className="font-bold">{item.teacher.full_name}</h3><div className="grid grid-cols-2 gap-2 text-sm"><p>Jooga: <b>{item.present}</b></p><p>Maqan: <b>{item.absent}</b></p><p>Daahay: <b>{item.late}</b></p><p>Fasax: <b>{item.onLeave}</b></p><p className="col-span-2 border-t pt-2 font-semibold text-teal-700 dark:border-slate-700">Imaansho: {item.attendancePercentage}%</p></div></Card>)}</div>
     </section>}
 
     {tab === 'reports' && <section className="space-y-4">
