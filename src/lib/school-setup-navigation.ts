@@ -8,7 +8,7 @@ export const SCHOOL_SETUP_EXTRA_MODULES = [
 
 export const SCHOOL_SETUP_ALLOWED_VIEWS: ReadonlySet<string> = new Set([
   'sch_setup', 'sch_settings', 'sch_setup_academics', 'sch_classes', 'sch_subjects',
-  'sch_teachers', 'sch_students', 'sch_parents', 'sch_timetable', 'sch_attendance', 'sch_exams',
+  'sch_teachers', 'sch_teacher_assignments', 'sch_students', 'sch_parents', 'sch_timetable', 'sch_attendance', 'sch_exams',
   'sch_fees', ...SCHOOL_SETUP_EXTRA_MODULES.map(module => module.view),
   'sch_admissions', 'sch_events', 'sch_report_cards', 'sch_staff', 'sch_messages', 'sch_support'
 ]);
