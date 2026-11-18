@@ -9374,9 +9374,9 @@ async function checkTeacherAssignment(client: any, school: School, body: any) {
   const subjectId = String(body?.subjectId || ''), teacherId = String(body?.teacherId || '');
   if (!yearId || !classId || !subjectId || !teacherId) throw new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.');
   const [year, klass, subject, teacher, curriculum] = await Promise.all([
-    client.from('academic_years').select('id,is_current').eq('school_id', school.id).eq('id', yearId).maybeSingle(),
-    db.getClassById(classId, school.id),
-    db.getSubjects(school.id).then(rows => rows.find(item => item.id === subjectId)),
+    client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).eq('id', yearId).maybeSingle(),
+    client.from('classes').select('id,academic_year,is_archived').eq('school_id', school.id).eq('id', classId).maybeSingle(),
+    client.from('subjects').select('id').eq('school_id', school.id).eq('id', subjectId).maybeSingle(),
     client.from('teachers').select('id,status').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
     client.from('class_subjects').select('id,periods_per_week').eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle()
   ]);
@@ -9385,8 +9385,11 @@ async function checkTeacherAssignment(client: any, school: School, body: any) {
     const { data: term } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle();
     if (!term || term.academic_year_id !== yearId) throw new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.');
   }
-  if (!klass || klass.isArchived) throw new Error('Fasalkan lagama helin dugsigan.');
-  if (!subject) throw new Error('Maaddadani kama tirsana dugsigan.');
+  if (klass.error || !klass.data || klass.data.is_archived) throw new Error('Fasalkan lagama helin dugsigan.');
+  const yearKey = String(year.data.name || '').replace(/[^0-9]/g, '');
+  const classYearKey = String(klass.data.academic_year || '').replace(/[^0-9]/g, '');
+  if (yearKey && classYearKey && yearKey !== classYearKey) throw new Error('Fasalkan kuma jiro sannad-dugsiyeedka la doortay.');
+  if (subject.error || !subject.data) throw new Error('Maaddadani kama tirsana dugsigan.');
   if (curriculum.error) throw new Error('Manhajka lama xaqiijin karin.');
   if (!curriculum.data) throw new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).');
   if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') throw new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.');
