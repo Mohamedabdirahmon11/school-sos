@@ -4206,13 +4206,19 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  const [assignments, allSlots, unavailable, settings] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, teacherAssignments] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
-    db.getTimetableSettings(school.id)
+    db.getTimetableSettings(school.id),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id')
   ]);
-  const schedulableAssignments = assignments.items.filter((item: any) => Number(item.periodsPerWeek) > 0);
+  const timetableAssignments = assignments.items.map((item: any) => {
+    const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
+    const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
+    return { ...item, teacherId: selected?.teacherId || item.teacherId, assignmentId: selected?.id, sectionId: selected?.sectionId || null };
+  });
+  const schedulableAssignments = timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
   if (!schedulableAssignments.length) {
     res.status(400).json({ error: 'Fasalkan maaddooyin/macallimiin jadwal loo qoondeeyay ma leh. Marka hore Subject Assignments ka dooro maaddooyinka, macallimiinta iyo periods per week. Jadwalkii hore waxba lagama beddelin.' });
     return;
@@ -4287,6 +4293,8 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       ...getTimetablePeriodTimes(settings, period, targetShift),
       subjectId: assignment.subjectId,
       teacherId: assignment.teacherId || '',
+      assignmentId: assignment.assignmentId,
+      sectionId: assignment.sectionId || null,
       roomNumber: klass.roomNumber || ''
     });
     if (teacherKey) occupied.add(teacherKey);
@@ -4294,7 +4302,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
     subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
   }
-  for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
+  for (const assignment of timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
     unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
   }
   if (!generated.some((slot: any) => !slot.isLocked)) {
@@ -4314,15 +4322,21 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
   if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
 
-  const [assignments, allSlots, unavailable, settings, allClassRows] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id),
-    queryAllRows('classes', { school_id: school.id }, 'id,shift')
+    queryAllRows('classes', { school_id: school.id }, 'id,shift'),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id')
   ]);
+  const timetableAssignments = assignments.map((item: any) => {
+    const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
+    const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
+    return { ...item, teacherId: selected?.teacherId || item.teacherId, assignmentId: selected?.id, sectionId: selected?.sectionId || null };
+  });
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
-  const targetIds = new Set(assignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
+  const targetIds = new Set(timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
   // Existing timetables for classes without schedulable assignments remain in place
   // and continue to block teacher/room conflicts in the other classes.
   let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId) || slot.isLocked === true);
@@ -4332,7 +4346,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const replacements: Array<{ classId: string; slots: TimetableSlot[] }> = [];
 
   for (const klass of classes) {
-    const classAssignments = assignments.filter((item: any) => item.classId === klass.id);
+    const classAssignments = timetableAssignments.filter((item: any) => item.classId === klass.id);
     const schedulable = classAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
     if (!schedulable.length) {
       skipped.push({ classId: klass.id, className: klass.name, reason: 'No active subject assignments with periods per week.' });
@@ -4394,6 +4408,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
         dayOfWeek: day, periodNumber: period,
         ...getTimetablePeriodTimes(settings, period, targetShift),
         subjectId: assignment.subjectId, teacherId: assignment.teacherId || '',
+        assignmentId: assignment.assignmentId, sectionId: assignment.sectionId || null,
         roomNumber: klass.roomNumber || ''
       };
       generatedForClass.push(slot);
