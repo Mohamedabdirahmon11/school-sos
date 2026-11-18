@@ -37,6 +37,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceFrom, setReplaceFrom] = useState('');
   const [replaceTo, setReplaceTo] = useState('');
+  const [replaceOverride, setReplaceOverride] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyYear, setCopyYear] = useState('');
   const [copyTerm, setCopyTerm] = useState('');
@@ -95,9 +96,17 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
         sectionId: data.sections.find(s => s.legacy_class_id === row.class_id)?.id || null,
         subjectId: row.subject_id, teacherId, override
       };
-      const result: any = await ApiClient.request(existing ? '/teacher-assignments/' + existing.id : '/teacher-assignments', {
-        method: existing ? 'PUT' : 'POST', body: JSON.stringify(payload)
-      });
+      let result: any;
+      try {
+        result = await ApiClient.request(existing ? '/teacher-assignments/' + existing.id : '/teacher-assignments', {
+          method: existing ? 'PUT' : 'POST', body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        if (!errorText(e).toLowerCase().includes('jadwal') || !window.confirm('Qoondeyntan jadwal ayaa ku xiran. Ma xaqiijinaysaa in jadwalka ku xiran la nadiifiyo si macallinka loo beddelo?')) throw e;
+        result = await ApiClient.request(existing ? '/teacher-assignments/' + existing.id : '/teacher-assignments', {
+          method: existing ? 'PUT' : 'POST', body: JSON.stringify({ ...payload, clearDependentEntries: true })
+        });
+      }
       setNotice(result.warning || 'Macallinka si guul leh ayaa loo qoondeeyey.'); await load();
     } catch (e) { setError(errorText(e)); }
     finally { setSaving(false); }
@@ -132,10 +141,18 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
       const targets = bulkClasses.flatMap(classId => data.curriculum.filter(r => r.class_id === classId && r.subject_id === bulkSubject).map(r => ({
         classId, sectionId: data.sections.find(s => s.legacy_class_id === classId)?.id || null, subjectId: bulkSubject
       })));
-      const result: any = await ApiClient.request('/teacher-assignments/bulk', { method: 'POST', body: JSON.stringify({
+      let result: any = await ApiClient.request('/teacher-assignments/bulk', { method: 'POST', body: JSON.stringify({
         teacherId: bulkTeacher, academicYearId: yearId, termId: termId || null, override, targets
       }) });
-      setNotice(result.saved + ' qoondeyn ayaa la sameeyey; ' + (result.skipped?.length || 0) + ' waa la dhaafay.');
+      const timetableBlocked = (result.skipped || []).filter((x: any) => String(x.reason).toLowerCase().includes('jadwal'));
+      if (timetableBlocked.length && window.confirm('Qaar ka mid ah qoondeynta jadwal ayaa ku xiran. Ma xaqiijinaysaa in jadwalladaas la nadiifiyo oo qoondeynta la beddelo?')) {
+        const retry: any = await ApiClient.request('/teacher-assignments/bulk', { method: 'POST', body: JSON.stringify({
+          teacherId: bulkTeacher, academicYearId: yearId, termId: termId || null, override,
+          clearDependentEntries: true, targets: timetableBlocked.map((x: any) => x.target)
+        }) });
+        result = { ...retry, saved: result.saved + retry.saved, skipped: [...(result.skipped || []).filter((x: any) => !String(x.reason).toLowerCase().includes('jadwal')), ...(retry.skipped || [])] };
+      }
+      setNotice(result.saved + ' qoondeyn ayaa la sameeyey; ' + (result.skipped?.length || 0) + ' waa la dhaafay.' + (result.warnings?.length ? ' ' + result.warnings.join(' ') : ''));
       if (result.skipped?.length) setError(result.skipped.map((x: any) => x.reason).join(' · '));
       setBulkOpen(false); setBulkClasses([]); await load();
     } catch (e) { setError(errorText(e)); }
@@ -147,10 +164,12 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     const clear = window.confirm('Haddii jadwal casharro ku xiran yahay, ma xaqiijinaysaa in gelinnadaas la nadiifiyo?');
     setSaving(true); setError(''); setNotice('');
     try {
+      const allowOverride = replaceOverride && window.confirm('DIGNIIN: Ka-reebis ayaa loo adeegsan doonaa maaddooyinka aanu macallinka cusub aqoon ahaan ugu xirnayn. Ma sii waddaa?');
       const result: any = await ApiClient.request('/teacher-assignments/replace-teacher', { method: 'POST', body: JSON.stringify({
-        fromTeacherId: replaceFrom, toTeacherId: replaceTo, assignmentIds: selectedAssignmentIds, clearDependentEntries: clear
+        fromTeacherId: replaceFrom, toTeacherId: replaceTo, assignmentIds: selectedAssignmentIds,
+        override: allowOverride, clearDependentEntries: clear
       }) });
-      setNotice(result.changed + ' qoondeyn ayaa loo wareejiyey macallinka cusub; ' + result.skipped.length + ' waa la dhaafay.');
+      setNotice(result.changed + ' qoondeyn ayaa loo wareejiyey macallinka cusub; ' + result.skipped.length + ' waa la dhaafay.' + (result.warnings?.length ? ' ' + result.warnings.join(' ') : ''));
       if (result.skipped.length) setError(result.skipped.map((x: any) => x.reason).join(' · '));
       setReplaceOpen(false); setSelectedAssignmentIds([]); await load();
     } catch (e) { setError(errorText(e)); }
@@ -217,7 +236,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
       <div className="flex flex-wrap gap-2"><Button disabled={isReadOnly} onClick={() => setBulkOpen(!bulkOpen)}>Qoondee fasallo badan</Button><Button disabled={isReadOnly} onClick={() => setReplaceOpen(!replaceOpen)}>Beddel macallin</Button><Button disabled={isReadOnly} onClick={() => setCopyOpen(!copyOpen)}><Copy className="mr-1 inline h-4 w-4" /> Koobiyeey</Button><Button onClick={() => window.print()}><Printer className="mr-1 inline h-4 w-4" /> Daabac / PDF</Button><Button onClick={() => void load()}><RefreshCw className="mr-1 inline h-4 w-4" /> Cusboonaysii</Button></div>
     </div>
     {bulkOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">Hal macallin ku qoondee fasallo badan</h3><FormRow label="Macallin"><select value={bulkTeacher} onChange={e => setBulkTeacher(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{[...data.teachers].sort((a,b) => Number(qualified(bulkSubject, b.id)) - Number(qualified(bulkSubject, a.id))).map(t => <option key={t.id} value={t.id}>{qualified(bulkSubject, t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select></FormRow><FormRow label="Maaddo"><select value={bulkSubject} onChange={e => setBulkSubject(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro maaddo</option>{data.subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></FormRow><div className="md:col-span-2 flex flex-wrap gap-3">{data.classes.filter(c => !bulkSubject || data.curriculum.some(r => r.class_id === c.id && r.subject_id === bulkSubject)).map(c => <label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={bulkClasses.includes(c.id)} onChange={e => setBulkClasses(old => e.target.checked ? [...old, c.id] : old.filter(id => id !== c.id))} />{className(c.id)}</label>)}</div><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly} onClick={() => void doBulk()}>Kaydi qoondeynta</Button><Button onClick={() => setBulkOpen(false)}>Xir</Button></div></Card>}
-    {replaceOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">U wareeji dhammaan qoondeynta macallin kale</h3><FormRow label="Macallinka hadda"><select value={replaceFrom} onChange={e => setReplaceFrom(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow><FormRow label="Macallinka cusub"><select value={replaceTo} onChange={e => setReplaceTo(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly} onClick={() => void doReplace()}>Beddel dhammaan</Button><Button onClick={() => setReplaceOpen(false)}>Xir</Button></div></Card>}
+    {replaceOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">U wareeji dhammaan qoondeynta macallin kale</h3><FormRow label="Macallinka hadda"><select value={replaceFrom} onChange={e => setReplaceFrom(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow><FormRow label="Macallinka cusub"><select value={replaceTo} onChange={e => setReplaceTo(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow><label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={replaceOverride} onChange={e => setReplaceOverride(e.target.checked)} /> Oggolow ka-reebis aqooneed (digniin)</label><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly} onClick={() => void doReplace()}>Beddel dhammaan / kuwa la doortay</Button><Button onClick={() => setReplaceOpen(false)}>Xir</Button></div></Card>}
     {copyOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">Ka soo koobiyee sannad ama term hore</h3><FormRow label="Sannadka laga koobiyeeynayo"><select value={copyYear} onChange={e => { setCopyYear(e.target.value); setCopyTerm(''); }} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro sannad</option>{data.academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}</select></FormRow><FormRow label="Term-ka laga koobiyeeynayo"><select value={copyTerm} onChange={e => setCopyTerm(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Sannadka oo dhan</option>{data.terms.filter(t => t.academic_year_id === copyYear).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></FormRow><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly || !copyYear} onClick={() => void doCopy()}>Koobiyee, iska dhaaf isku dhacyada</Button><Button onClick={() => setCopyOpen(false)}>Xir</Button></div></Card>}
     {view === 'matrix' ? <Card className="overflow-hidden p-0"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr><th className="p-3">Fasal / Qayb</th>{filteredSubjects.map(s => <th key={s.id} className="p-3">{s.name}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{filteredClasses.map(c => <tr key={c.id}><th className="p-3 font-semibold">{className(c.id)}</th>{filteredSubjects.map(s => { const row = data.curriculum.find(r => r.class_id === c.id && r.subject_id === s.id); const assigned = row ? assignmentFor(c.id, s.id) : undefined; const isVisible = row && visibleRowKeys.has(c.id + ':' + s.id); const teacherIds = data.qualifiedTeacherIdsBySubject[s.id] || []; const options = [...data.teachers].sort((a,b) => Number(teacherIds.includes(b.id)) - Number(teacherIds.includes(a.id))); return <td key={s.id} className="p-2">{!row || !isVisible ? <span className="text-slate-300">—</span> : <div className={!assigned ? 'rounded-lg bg-amber-50 p-1 dark:bg-amber-950/40' : ''}><select aria-label={className(c.id) + ' ' + s.name} disabled={isReadOnly || saving} value={assigned?.teacher_id || ''} onChange={e => void saveCell(row, e.target.value)} className="w-full min-w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">— Lama qoondeyn —</option>{options.map(t => <option key={t.id} value={t.id}>{teacherIds.includes(t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select>{assigned?.qualification_override && <p className="mt-1 text-[10px] text-amber-700">⚠ Ka-reebis</p>}</div>}</td>; })}</tr>)}</tbody></table></div>{!data.curriculum.length && <EmptyState><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p>Manhaj lama helin.</p><Button onClick={() => onNavigate('sch_curriculum')}>Tag Manhajka (Tallaabada 4)</Button></EmptyState>}</Card>
     : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.teachers.filter(t => !teacherFilter || t.id === teacherFilter).map(t => { const w = workloadByTeacher.get(t.id); const pct = w?.maxPeriodsPerWeek ? Math.min(100, Math.round(w.periodsPerWeek / w.maxPeriodsPerWeek * 100)) : 0; const tone = w?.overloaded ? 'bg-rose-600' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-600'; const rows = data.assignments.filter(a => a.teacher_id === t.id); return <Card key={t.id} className="space-y-3 p-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold">{t.full_name}</h3><p className="text-xs text-slate-500">{t.teacher_code || t.staff_id || ''}</p></div><Pill>{rows.length} qoondeyn</Pill></div><div><div className="flex justify-between text-xs"><span>Culayska toddobaadka</span><strong>{w?.periodsPerWeek || 0} / {w?.maxPeriodsPerWeek ?? '—'} xiisadood</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className={'h-full rounded-full ' + tone} style={{ width: (w?.maxPeriodsPerWeek ? pct : 0) + '%' }} /></div>{w?.overloaded && <p className="mt-1 text-xs text-rose-700">Culayska shaqadu wuu ka badan yahay xadka.</p>}</div><div className="flex flex-wrap gap-2">{rows.map(a => <label key={a.id} className="flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"><input type="checkbox" checked={selectedAssignmentIds.includes(a.id)} onChange={e => setSelectedAssignmentIds(old => e.target.checked ? [...old, a.id] : old.filter(id => id !== a.id))} />{className(a.class_id)} · {subjectName(a.subject_id)}</label>)}</div>
