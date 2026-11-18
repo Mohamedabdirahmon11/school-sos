@@ -85,6 +85,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
+  const assessmentComponents = examConfig?.assessmentComponents || [];
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
@@ -493,7 +494,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const smallMax = examConfig?.smallExamMax ?? 40;
   const bigMax = examConfig?.bigExamMax ?? 60;
   const combinedMax = smallMax + bigMax;
-  const assessmentComponents = examConfig?.assessmentComponents || [];
 
   useEffect(() => {
     if (smallMax <= 0 && bigMax > 0) setExamType('big');
