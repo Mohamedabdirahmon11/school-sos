@@ -386,6 +386,11 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
   FOREIGN KEY (subject_id, school_id) REFERENCES subjects(id, school_id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_teacher_subjects_school_teacher ON teacher_subjects(school_id, teacher_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_subjects_school_subject ON teacher_subjects(school_id, subject_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_subjects_teacher_school_fk ON teacher_subjects(teacher_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_subjects_subject_school_fk ON teacher_subjects(subject_id, school_id);
+
 CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_id_uidx ON classes(id, school_id);
 CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_id_uidx ON subjects(id, school_id);
 CREATE TABLE IF NOT EXISTS class_subjects (
