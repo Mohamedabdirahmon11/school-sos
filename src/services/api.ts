@@ -742,11 +742,7 @@ export class ApiClient {
     return this.request<{ success: boolean; isLocked: boolean }>(`/timetable/${encodeURIComponent(slotId)}/lock`, { method: 'PATCH', body: JSON.stringify({ isLocked }) });
   }
   public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number, termId?: string, sectionId?: string | null) {
-    const params = new URLSearchParams();
-    if (termId) params.set('termId', termId);
-    if (sectionId) params.set('sectionId', sectionId);
-    const query = params.toString();
-    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}?${query}`, { method: 'DELETE' });
+    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE', body: JSON.stringify({ termId, sectionId }) });
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
