@@ -3725,6 +3725,10 @@ apiRouter.put('/academic-years/:id', requireAuth, requireSchoolAdminOrSuperAdmin
   if (!name || name.length > 50 || !academicDateIsValid(startDate) || !academicDateIsValid(endDate) || endDate <= startDate) {
     res.status(400).json({ error:'Magaca sannadka iyo taariikhihiisu sax ma aha.' }); return;
   }
+  const { data:attachedTerms } = await client.from('terms').select('id,start_date,end_date').eq('school_id',school.id).eq('academic_year_id',req.params.id);
+  if ((attachedTerms || []).some((term:any)=>term.start_date < startDate || term.end_date > endDate)) {
+    res.status(409).json({ error:'Taariikhaha sannadka cusub kama koobna dhammaan xiisadaha hore. Marka hore sax taariikhaha xiisadaha.' }); return;
+  }
   if (isCurrent) {
     const { error:clearError } = await client.from('academic_years').update({ is_current:false, updated_at:new Date().toISOString() }).eq('school_id',school.id);
     if (clearError) { res.status(503).json({ error:'Sannadka hadda jira lama beddeli karin.' }); return; }
@@ -3761,8 +3765,8 @@ apiRouter.post('/terms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSch
   if (!name || name.length > 80 || !academicDateIsValid(startDate) || !academicDateIsValid(endDate) || endDate <= startDate || startDate < year.start_date || endDate > year.end_date) {
     res.status(400).json({ error:'Xiisaddu waa inay leedahay magac iyo taariikho ku dhex jira sannadka la doortay.' }); return;
   }
-  const { data:existing } = await client.from('terms').select('id,start_date,end_date').eq('school_id',school.id).eq('academic_year_id',academicYearId);
-  if ((existing || []).some((x:any) => startDate <= x.end_date && endDate >= x.start_date)) { res.status(409).json({ error:'Taariikhda xiisaddan waxay ku dul dhacaysaa xiisad kale.' }); return; }
+  const { data:yearTerms } = await client.from('terms').select('id,start_date,end_date').eq('school_id',school.id).eq('academic_year_id',academicYearId);
+  if ((yearTerms || []).some((x:any) => startDate <= x.end_date && endDate >= x.start_date)) { res.status(409).json({ error:'Taariikhda xiisaddan waxay ku dul dhacaysaa xiisad kale.' }); return; }
   if (isCurrent) await client.from('terms').update({ is_current:false, updated_at:new Date().toISOString() }).eq('school_id',school.id);
   const { data, error } = await client.from('terms').insert({ school_id:school.id, academic_year_id:academicYearId, name, start_date:startDate, end_date:endDate, is_current:isCurrent }).select('*').single();
   if (error) { res.status(error.code === '23505' ? 409 : 400).json({ error:error.code === '23505' ? 'Magaca xiisaddan hore ayuu sannadkan uga jiraa.' : 'Xiisadda lama kaydin.' }); return; }
@@ -3821,6 +3825,8 @@ apiRouter.post('/periods', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const { data:existing } = await client.from('periods').select('*').eq('school_id',school.id);
   if ((existing || []).some((x:any)=>Number(x.number)===number)) { res.status(409).json({ error:'Lambarkan hore ayaa loo isticmaalay.' }); return; }
   if ((existing || []).some((x:any)=>startTime < String(x.end_time).slice(0,5) && endTime > String(x.start_time).slice(0,5))) { res.status(409).json({ error:'Waqtigan wuxuu ku dul dhacayaa xiisad ama nasasho kale.' }); return; }
+  const orderedPeriods = [...(existing || []), { number, start_time:startTime, end_time:endTime }].sort((a:any,b:any)=>Number(a.number)-Number(b.number));
+  if (orderedPeriods.some((x:any,i:number)=>i>0 && String(orderedPeriods[i-1].end_time).slice(0,5)>String(x.start_time).slice(0,5))) { res.status(409).json({ error:'Lambarrada xiisadaha iyo kala-horraynta waqtigu waa inay is waafaqaan.' }); return; }
   const { data, error } = await client.from('periods').insert({ school_id:school.id, number, type, start_time:startTime, end_time:endTime }).select('*').single();
   if (error) { res.status(400).json({ error:'Xiisadda lama kaydin.' }); return; }
   res.status(201).json({ id:data.id, number:data.number, type:data.type, startTime:String(data.start_time).slice(0,5), endTime:String(data.end_time).slice(0,5) });
@@ -3841,6 +3847,8 @@ apiRouter.put('/periods/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requi
   const { data:existing } = await client.from('periods').select('*').eq('school_id',school.id);
   if ((existing || []).some((x:any)=>x.id!==old.id && Number(x.number)===number)) { res.status(409).json({ error:'Lambarkan hore ayaa loo isticmaalay.' }); return; }
   if ((existing || []).some((x:any)=>x.id!==old.id && startTime < String(x.end_time).slice(0,5) && endTime > String(x.start_time).slice(0,5))) { res.status(409).json({ error:'Waqtigan wuxuu ku dul dhacayaa xiisad ama nasasho kale.' }); return; }
+  const orderedPeriods = (existing || []).map((x:any)=>x.id===old.id?{...x,number,start_time:startTime,end_time:endTime}:x).sort((a:any,b:any)=>Number(a.number)-Number(b.number));
+  if (orderedPeriods.some((x:any,i:number)=>i>0 && String(orderedPeriods[i-1].end_time).slice(0,5)>String(x.start_time).slice(0,5))) { res.status(409).json({ error:'Lambarrada xiisadaha iyo kala-horraynta waqtigu waa inay is waafaqaan.' }); return; }
   const { data, error } = await client.from('periods').update({ number, type, start_time:startTime, end_time:endTime, updated_at:new Date().toISOString() }).eq('id',old.id).eq('school_id',school.id).select('*').single();
   if (error) { res.status(400).json({ error:'Xiisadda lama cusboonaysiin.' }); return; }
   res.json({ id:data.id, number:data.number, type:data.type, startTime:String(data.start_time).slice(0,5), endTime:String(data.end_time).slice(0,5) });
@@ -3855,9 +3863,9 @@ apiRouter.post('/periods/reorder', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const current = rows || [];
   if (ids.length !== current.length || current.some((x:any)=>!ids.includes(x.id))) { res.status(400).json({ error:'Liiska xiisadaha wuu is beddelay; dib u cusboonaysii bogga.' }); return; }
   const ordered = ids.map((id:string)=>current.find((x:any)=>x.id===id));
-  for (let i=1;i<ordered.length;i++) if (String(ordered[i-1].end_time).slice(0,5) > String(ordered[i].start_time).slice(0,5)) { res.status(409).json({ error:'Kala-horraynta waqtigu sax ma aha; xiisaduhu isma dul saarmi karaan.' }); return; }
+  const timeSlots = [...current].sort((a:any,b:any)=>String(a.start_time).localeCompare(String(b.start_time)));
   for (let i=0;i<ordered.length;i++) {
-    const { error } = await client.from('periods').update({ number:i+1, updated_at:new Date().toISOString() }).eq('id',ordered[i].id).eq('school_id',school.id);
+    const { error } = await client.from('periods').update({ number:i+1, start_time:timeSlots[i].start_time, end_time:timeSlots[i].end_time, updated_at:new Date().toISOString() }).eq('id',ordered[i].id).eq('school_id',school.id);
     if (error) { res.status(503).json({ error:'Kala-horraynta xiisadaha lama kaydin.' }); return; }
   }
   res.json({ success:true });
