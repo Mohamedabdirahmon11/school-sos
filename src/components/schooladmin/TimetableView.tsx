@@ -397,7 +397,7 @@ export const TimetableView: React.FC = () => {
   };
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
-      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber, selectedTermId);
+      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber, selectedTermId, slot.sectionId);
       setTimetable(prev => prev.filter(item => item.id !== slot.id));
     } catch (err: any) { setNotice(err.message || 'Unable to remove this period.'); }
   };
