@@ -56,14 +56,14 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   INSERT INTO public.attendance_settings (school_id)
   VALUES (NEW.id)
   ON CONFLICT (school_id) DO NOTHING;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS schools_create_attendance_settings ON public.schools;
 CREATE TRIGGER schools_create_attendance_settings
@@ -248,7 +248,7 @@ $$;
 -- Keep existing student/class RLS aligned with Step 6's canonical assignments.
 CREATE OR REPLACE FUNCTION private.auth_can_access_student(target_student_id varchar)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
-AS $
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.students s
     JOIN public.users u ON u.id = private.auth_user_id()
@@ -298,7 +298,7 @@ AS $
         AND (u.student_id = s.student_id OR u.id = 'usr-student-' || s.id))
     )
   );
-$;
+$$;
 
 
 CREATE OR REPLACE FUNCTION private.auth_can_access_class(target_class_id varchar)
