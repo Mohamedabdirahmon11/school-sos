@@ -4322,9 +4322,23 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     const sectionKey = assignment.sectionId || '*';
     const available = candidates.filter(({ day, period }) => {
       const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
+      const candidateTimes = getTimetablePeriodTimes(settings, period, targetShift);
+      const candidateStart = timetableMinutes(candidateTimes.startTime);
+      const candidateEnd = timetableMinutes(candidateTimes.endTime);
+      const teacherTimeBusy = Boolean(assignment.teacherId) && existing.some((slot: any) =>
+        slot.teacherId === assignment.teacherId && slot.dayOfWeek === day &&
+        candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+      );
+      const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
+      const roomTimeBusy = Boolean(roomKey) && existing.some((slot: any) =>
+        slot.dayOfWeek === day && String(slot.roomNumber || '').trim().toLowerCase() === roomKey &&
+        candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+      );
       return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
         && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
-        && !occupiedRooms.has(`${day}:${period}`);
+        && !teacherTimeBusy
+        && !occupiedRooms.has(`${day}:${period}`)
+        && !roomTimeBusy;
     });
     if (!available.length) {
       unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
@@ -4467,13 +4481,26 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       const available = candidates.filter(({ day, period }) => {
         const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
         const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
+        const candidateTimes = getTimetablePeriodTimes(settings, period, targetShift);
+        const candidateStart = timetableMinutes(candidateTimes.startTime);
+        const candidateEnd = timetableMinutes(candidateTimes.endTime);
+        const teacherTimeBusy = Boolean(assignment.teacherId) && workingSlots.some((slot: any) =>
+          slot.teacherId === assignment.teacherId && slot.dayOfWeek === day &&
+          candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+        );
         const roomBusy = Boolean(roomKey) && sameShiftSlots.some(slot =>
           slot.dayOfWeek === day && slot.periodNumber === period &&
           String(slot.roomNumber || '').trim().toLowerCase() === roomKey
         );
+        const roomTimeBusy = Boolean(roomKey) && workingSlots.some((slot: any) =>
+          slot.dayOfWeek === day && String(slot.roomNumber || '').trim().toLowerCase() === roomKey &&
+          candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+        );
         return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
           && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
-          && !roomBusy;
+          && !teacherTimeBusy
+          && !roomBusy
+          && !roomTimeBusy;
       });
       if (!available.length) {
         unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
