@@ -61,6 +61,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique
     COALESCE(section_id, '00000000-0000-0000-0000-000000000000'::uuid),
     subject_id
   );
+-- Preserve existing Step 4 teacher links as whole-year Step 6 assignments.
+INSERT INTO public.teacher_class_subject_assignments (
+  school_id, academic_year_id, term_id, class_id, section_id, subject_id,
+  teacher_id, qualification_override, created_by
+)
+SELECT cs.school_id, ay.id, NULL, cs.class_id, section.id, cs.subject_id,
+       cs.teacher_id, false, 'step6-migration'
+FROM public.class_subjects cs
+JOIN public.academic_years ay
+  ON ay.school_id = cs.school_id AND ay.is_current = true
+LEFT JOIN public.class_sections section
+  ON section.school_id = cs.school_id AND section.legacy_class_id = cs.class_id
+WHERE cs.is_active = true AND cs.teacher_id IS NOT NULL
+ON CONFLICT DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS teacher_class_subject_assignments_teacher_idx
   ON public.teacher_class_subject_assignments (school_id, teacher_id, academic_year_id, term_id);
 CREATE INDEX IF NOT EXISTS teacher_class_subject_assignments_class_idx
