@@ -916,7 +916,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
-            <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. Small Exam and Big Exam scores are saved together in the student's subject record.</p></div>
+            <div><p className="text-sm font-bold text-teal-950">{t('exam_my_subject_mark_sheet')}</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. {t('exam_edit_marks_help')}</p></div>
             <div className="flex flex-wrap gap-2">
               <TeacherMarkEntryPrint
                 schoolName={school?.name || 'School'}
@@ -934,8 +934,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
 
           <div className="flex flex-wrap gap-2" role="group" aria-label="Exam type">
-            {smallMax > 0 && <button type="button" aria-pressed={examType === 'small'} onClick={() => setExamType('small')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'small' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.smallExamName || 'Small Exam'} · {smallMax} marks</button>}
-            {bigMax > 0 && <button type="button" aria-pressed={examType === 'big'} onClick={() => setExamType('big')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'big' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.bigExamName || 'Big Exam'} · {bigMax} marks</button>}
+            {smallMax > 0 && <button type="button" aria-pressed={examType === 'small'} onClick={() => setExamType('small')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'small' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.smallExamName || t('exam_small_exam')} · {smallMax} marks</button>}
+            {bigMax > 0 && <button type="button" aria-pressed={examType === 'big'} onClick={() => setExamType('big')} className={`rounded-xl border px-4 py-2 text-xs font-bold ${examType === 'big' ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{examConfig?.bigExamName || t('exam_big_exam')} · {bigMax} marks</button>}
           </div>
 
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : (
@@ -955,7 +955,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             return (
               <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">{subject.name}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'}</p></div>
+                  <div><h2 className="text-sm font-bold text-slate-900">{subject.name}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? t('exam_small_exam') : t('exam_big_exam')}</p></div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{students.length} students</span>
                 </div>
                 {subjectComponents.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No assessment components are configured for this exam type. Ask School Admin to configure the exam.</p> : (
@@ -1074,7 +1074,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                   <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
                     <th className="border-b px-3 py-3 text-left">#</th><th className="min-w-[200px] border-b px-3 py-3 text-left">Student / Roll No.</th>
                     {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[85px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/100</span></th>)}
-                    <th className="border-b border-l bg-teal-50 px-3 py-3 text-center">Total</th><th className="border-b px-3 py-3 text-center">Average</th><th className="border-b px-3 py-3 text-center">Rank</th>
+                    <th className="border-b border-l bg-teal-50 px-3 py-3 text-center">{t('exam_total')}</th><th className="border-b px-3 py-3 text-center">Average</th><th className="border-b px-3 py-3 text-center">Rank</th>
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {examRegisterRows.map((row, index) => <tr key={row.student.id}>
@@ -1115,17 +1115,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           <div className="rounded-2xl border border-slate-200 bg-teal-50 px-4 py-3"><h2 className="text-sm font-bold text-teal-950">Exam results</h2><p className="mt-1 text-xs text-teal-800">Read-only results for your assigned subjects. Enter or update marks in the separate Exam Marks section.</p></div>
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading exam results...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No assigned subject results are available for this class.</div> : gradeSubjects.map(subject => (
             <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><h3 className="text-sm font-bold text-slate-900">{subject.name}</h3><p className="mt-1 text-[10px] text-slate-500">{semester} · Small Exam + Big Exam</p></div>
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><h3 className="text-sm font-bold text-slate-900">{subject.name}</h3><p className="mt-1 text-[10px] text-slate-500">{semester} · {t('exam_small_exam')} + {t('exam_big_exam')}</p></div>
               <div className="space-y-3 p-3 md:hidden">
                 {visibleStudents.map(student => { const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id); return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Small Exam</span><strong>{mark ? mark.smallExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Big Exam</span><strong>{mark ? mark.bigExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Total</span><strong>{mark ? mark.totalMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Percentage</span><strong>{mark ? `${mark.percentage}%` : '—'}</strong></div></div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">{t('exam_small_exam')}</span><strong>{mark ? mark.smallExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">{t('exam_big_exam')}</span><strong>{mark ? mark.bigExamMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">{t('exam_total')}</span><strong>{mark ? mark.totalMarks : '—'}</strong></div><div className="rounded-lg bg-white p-2"><span className="block text-[10px] text-slate-500">Percentage</span><strong>{mark ? `${mark.percentage}%` : '—'}</strong></div></div>
                 </article>; })}
                 {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
               </div>
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[760px] text-xs">
-                  <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th><th className="px-3 py-3">Small Exam</th><th className="px-3 py-3">Big Exam</th><th className="px-3 py-3">Total</th><th className="px-3 py-3">Percentage</th><th className="px-3 py-3">Status</th></tr></thead>
+                  <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th><th className="px-3 py-3">{t('exam_small_exam')}</th><th className="px-3 py-3">{t('exam_big_exam')}</th><th className="px-3 py-3">Total</th><th className="px-3 py-3">Percentage</th><th className="px-3 py-3">Status</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">{visibleStudents.map(student => { const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id); return <tr key={student.id} className="hover:bg-slate-50"><td className="px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="block text-[10px] text-slate-400">{student.studentId}</span></td><td className="px-3 py-3 text-center">{mark ? mark.smallExamMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? mark.bigExamMarks : '—'}</td><td className="px-3 py-3 text-center font-semibold">{mark ? mark.totalMarks : '—'}</td><td className="px-3 py-3 text-center">{mark ? `${mark.percentage}%` : '—'}</td><td className="px-3 py-3 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td></tr>; })}</tbody>
                 </table>
               </div>
