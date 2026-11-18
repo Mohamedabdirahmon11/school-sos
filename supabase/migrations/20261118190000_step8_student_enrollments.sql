@@ -134,18 +134,21 @@ DROP POLICY IF EXISTS guardians_tenant_scope ON public.guardians;
 CREATE POLICY guardians_tenant_scope ON public.guardians AS RESTRICTIVE FOR ALL
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id())
   WITH CHECK ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
+DROP POLICY IF EXISTS guardians_tenant_read ON public.guardians;
 CREATE POLICY guardians_tenant_read ON public.guardians FOR SELECT
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
 DROP POLICY IF EXISTS student_guardians_tenant_scope ON public.student_guardians;
 CREATE POLICY student_guardians_tenant_scope ON public.student_guardians AS RESTRICTIVE FOR ALL
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id())
   WITH CHECK ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
+DROP POLICY IF EXISTS student_guardians_tenant_read ON public.student_guardians;
 CREATE POLICY student_guardians_tenant_read ON public.student_guardians FOR SELECT
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
 DROP POLICY IF EXISTS enrollments_tenant_scope ON public.enrollments;
 CREATE POLICY enrollments_tenant_scope ON public.enrollments AS RESTRICTIVE FOR ALL
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id())
   WITH CHECK ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
+DROP POLICY IF EXISTS enrollments_tenant_read ON public.enrollments;
 CREATE POLICY enrollments_tenant_read ON public.enrollments FOR SELECT
   USING ((private.auth_user_role() = 'super_admin') OR school_id = private.auth_school_id());
 
