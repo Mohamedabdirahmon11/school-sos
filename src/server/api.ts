@@ -5630,7 +5630,15 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
       : Promise.resolve({ data: [], error: null })
   ]);
   if (legacyError || enrollmentError) { res.status(503).json({ error: 'Diiwaanka diiwaangelinta ardayda lama soo dejin karin.' }); return; }
-  const fullClassAccess = Boolean(formTeacherClass || access.substitute || legacyAssignments?.length || currentAssignments.some((row: any) => !row.section_id));
+  const { data: substituteRows, error: substituteError } = await client.from('timetable_substitutions').select('entry_id')
+    .eq('school_id', school.id).eq('substitute_teacher_id', teacher.id).eq('substitute_date', date);
+  const substituteIds = (substituteRows || []).map((row: any) => row.entry_id);
+  const { data: substituteSlots, error: substituteSlotError } = substituteIds.length
+    ? await client.from('timetable_slots').select('id,class_id,section_id').eq('school_id', school.id).eq('class_id', classId).in('id', substituteIds)
+    : { data: [], error: null };
+  if (substituteError || substituteSlotError) { res.status(503).json({ error: 'Casharrada beddelka lama hubin karin.' }); return; }
+  const fullClassAccess = Boolean(formTeacherClass || legacyAssignments?.length ||
+    currentAssignments.some((row: any) => !row.section_id) || (substituteSlots || []).some((slot: any) => !slot.section_id));
   const enrollmentRows = enrollments || [];
   const studentIds = [...new Set(enrollmentRows.map((row: any) => row.student_id))];
   if (!studentIds.length) { res.json([]); return; }
@@ -5638,7 +5646,10 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
     .eq('school_id', school.id).eq('status', 'active').in('id', studentIds);
   if (studentError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
   const enrollmentByStudent = new Map(enrollmentRows.map((row: any) => [row.student_id, row]));
-  const allowedSectionIds = new Set(currentAssignments.map((row: any) => row.section_id).filter(Boolean));
+  const allowedSectionIds = new Set([
+    ...currentAssignments.map((row: any) => row.section_id).filter(Boolean),
+    ...(substituteSlots || []).map((slot: any) => slot.section_id).filter(Boolean)
+  ]);
   const roster = (studentRows || []).filter((student: any) => {
     if (fullClassAccess) return true;
     const enrollment: any = enrollmentByStudent.get(student.id);
