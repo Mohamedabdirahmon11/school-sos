@@ -4488,6 +4488,49 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
+apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
+  const [allStudents, classes] = await Promise.all([
+    queryAllRows('students', filters, '*'), db.getClasses(school.id)
+  ]);
+  const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
+  const filtered = allStudents.filter((student: any) => {
+    const klass = classNames.get(student.classId) || student.className || '';
+    const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, klass]
+      .some(value => String(value || '').toLowerCase().includes(search));
+    return (!search || searchable) && (feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase());
+  });
+  const lines = [
+    `${school.name} — STUDENT REGISTER`,
+    `Generated: ${new Date().toISOString().slice(0, 10)} | Students: ${filtered.length}`,
+    'ID | Student name | Gender | Class | Guardian phone | Status'
+  ];
+  const rows = filtered.map((student:any) => [
+    student.studentId,
+    [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+    student.gender,
+    classNames.get(student.classId) || student.className || '',
+    student.fatherPhone || '',
+    student.status || ''
+  ].join(' | '));
+  const pageSize = 42;
+  const pages: string[][] = [];
+  for (let index = 0; index < rows.length || index === 0; index += pageSize) {
+    pages.push(index === 0 ? [...lines, ...rows.slice(index, index + pageSize)] : [`${school.name} — STUDENT REGISTER (continued)`, ...rows.slice(index, index + pageSize)]);
+  }
+  const pdf = createPdf(pages);
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${String(school.code || 'school').replace(/[^A-Za-z0-9_-]/g, '_')}-students-${new Date().toISOString().slice(0, 10)}.pdf`,
+    'Content-Length': String(pdf.length)
+  }).send(pdf);
+});
+
 apiRouter.get('/students/academic-years', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const client = documentServiceClient(res);
