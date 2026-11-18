@@ -18,7 +18,7 @@ export function getSchoolWorkingDays(calendar?: SchoolCalendarConfig | null): st
 
 export function getSchoolPeriodsPerDay(workingHours?: { periodsPerDay?: number } | null): number {
   const count = Number(workingHours?.periodsPerDay);
-  return Number.isInteger(count) && count >= 1 && count <= 16 ? count : 6;
+  return Number.isInteger(count) && count >= 1 && count <= 8 ? count : 6;
 }
 
 export interface SchoolCalendarStatus {
