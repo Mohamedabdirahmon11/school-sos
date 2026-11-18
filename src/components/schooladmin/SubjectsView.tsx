@@ -99,7 +99,7 @@ export const SubjectsView: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-700">
           <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29] dark:text-white"><BookOpen className="h-5 w-5 text-[#0F766E]" />{editing ? tx('editTitle') : tx('addTitle')}</h2>
           <button type="button" disabled={busy || isReadOnly} onClick={() => void addDefaults()} className="inline-flex items-center gap-2 rounded-xl border border-[#B7D8D0] px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-[#F3F8F6] disabled:opacity-50">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Maaddooyin caadi ah
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {tx('addDefaults')}
           </button>
         </div>
         <form onSubmit={save} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
