@@ -337,6 +337,18 @@ CREATE POLICY attendance_teacher_read_assigned ON public.attendance_records
     )
   );
 
+CREATE POLICY attendance_accountant_read ON public.attendance_records
+  FOR SELECT TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'accountant');
+
+CREATE POLICY attendance_parent_student_read_own ON public.attendance_records
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND private.auth_user_role() IN ('parent', 'student')
+    AND private.auth_can_access_student(student_id)
+  );
+
 CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
   FOR INSERT TO authenticated
   WITH CHECK (
