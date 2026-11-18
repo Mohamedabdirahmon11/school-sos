@@ -97,8 +97,8 @@ ON CONFLICT DO NOTHING;
 
 -- Keep the legacy students.class_id column in sync with a current-year enrollment on admission.
 CREATE OR REPLACE FUNCTION public.schoolos_create_initial_student_enrollment()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
-DECLARE v_year UUID;
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS 'DECLARE v_year UUID;
 BEGIN
   SELECT id INTO v_year FROM public.academic_years
    WHERE school_id=NEW.school_id AND is_current=true ORDER BY start_date DESC LIMIT 1;
@@ -108,16 +108,16 @@ BEGIN
        AND name=(SELECT academic_year FROM public.classes WHERE id=NEW.class_id AND school_id=NEW.school_id)
      ORDER BY start_date DESC LIMIT 1;
   END IF;
-  IF v_year IS NOT NULL AND lower(COALESCE(NEW.status,''))='active' THEN
+  IF v_year IS NOT NULL AND lower(COALESCE(NEW.status, ''''))=''active'' THEN
     INSERT INTO public.enrollments(school_id,student_id,academic_year_id,class_id,section_id,roll_number,status,enrolled_at)
     VALUES(NEW.school_id,NEW.id,v_year,NEW.class_id,
       (SELECT cs.id FROM public.class_sections cs WHERE cs.school_id=NEW.school_id
         AND cs.legacy_class_id=NEW.class_id AND cs.name=NEW.section ORDER BY cs.sort_order LIMIT 1),
-      NEW.roll_number,'active',NEW.admission_date::timestamptz)
+      NEW.roll_number,''active'',NEW.admission_date::timestamptz)
     ON CONFLICT DO NOTHING;
   END IF;
   RETURN NEW;
-END; $;
+END;';
 DROP TRIGGER IF EXISTS students_create_initial_enrollment ON public.students;
 CREATE TRIGGER students_create_initial_enrollment
   AFTER INSERT ON public.students FOR EACH ROW
