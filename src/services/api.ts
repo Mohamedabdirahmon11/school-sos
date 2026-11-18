@@ -696,6 +696,30 @@ export class ApiClient {
     return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
   }
 
+  public static async getTimetableRooms() {
+    return this.request<Array<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>>('/timetable/rooms');
+  }
+
+  public static async saveTimetableRoom(room: { id?: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }) {
+    return this.request('/timetable/rooms', { method: 'POST', body: JSON.stringify(room) });
+  }
+
+  public static async deleteTimetableRoom(roomId: string) {
+    return this.request<{ success: boolean }>(`/timetable/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' });
+  }
+
+  public static async getTimetableSubstitutions(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request<Array<{ id: string; entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string }>>(`/timetable/substitutions${query}`);
+  }
+
+  public static async saveTimetableSubstitution(input: { entryId: string; substituteTeacherId: string; date: string; reason?: string }) {
+    return this.request('/timetable/substitutions', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  public static async deleteTimetableSubstitution(id: string) {
+    return this.request<{ success: boolean }>(`/timetable/substitutions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
   public static async setTimetableSlotLocked(slotId: string, isLocked: boolean) {
     return this.request<{ success: boolean; isLocked: boolean }>(`/timetable/${encodeURIComponent(slotId)}/lock`, { method: 'PATCH', body: JSON.stringify({ isLocked }) });
   }
