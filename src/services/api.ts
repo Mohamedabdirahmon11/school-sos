@@ -16,6 +16,7 @@ import {
   Subject,
   TimetableSlot,
   AttendanceRecord,
+  AttendanceStatus,
   ExamConfig,
   StudentMark,
   Assignment,
