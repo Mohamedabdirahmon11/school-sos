@@ -4866,7 +4866,7 @@ apiRouter.get('/teachers/:id/subjects', requireAuth, requireSchoolContext, async
   const school = (req as any).school as School;
   const teacher = (await db.queryPage('teachers', { school_id: school.id, id: String(req.params.id) }, 1, 1, undefined, 'id')).items[0];
   if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
-  const links = await db.queryPage('teacher_subjects', { school_id: school.id, teacher_id: String(req.params.id) }, 1, 100, undefined, 'subject_id');
+  const links = await db.queryPage('teacher_subjects', { school_id: school.id, teacher_id: String(req.params.id), is_active: true }, 1, 100, undefined, 'subject_id');
   res.json(links.items.map((item: any) => item.subjectId));
 });
 
