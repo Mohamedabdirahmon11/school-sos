@@ -612,14 +612,17 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     const teacher = teacherPage.items[0] as any;
     if (!teacher) return false;
     const klass = await db.getClassById(student.classId, student.schoolId);
-    if (klass && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
-    )) return true;
-    const assignment = await db.queryPage('class_subjects', {
+    if (klass?.classTeacherId === user.id) return true;
+    const yearPage = await db.queryPage('academic_years', { school_id: student.schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
+    const yearId = String((yearPage.items[0] as any)?.id || '');
+    const assignment = yearId ? await db.queryPage('teacher_class_subject_assignments', {
+      school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, academic_year_id: yearId
+    }, 1, 1, undefined, 'id') : { items: [] as any[] };
+    if (assignment.items.length) return true;
+    const legacyAssignment = await db.queryPage('class_subjects', {
       school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, is_active: 'true'
     }, 1, 1, undefined, 'id');
-    return assignment.items.length > 0;
+    return legacyAssignment.items.length > 0;
   }
   if (user.role === 'parent') {
     const parentPhones = [user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone));
