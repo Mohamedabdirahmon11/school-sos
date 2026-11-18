@@ -5587,8 +5587,8 @@ async function canTeacherMarkAttendance(
     ownLessonQuery = sectionId ? ownLessonQuery.or(`section_id.is.null,section_id.eq.${sectionId}`) : ownLessonQuery.is('section_id', null);
     ownLessonQuery = currentTerm?.id ? ownLessonQuery.or(`term_id.is.null,term_id.eq.${currentTerm.id}`) : ownLessonQuery.is('term_id', null);
     const ownershipFilter = currentAssignmentIds.length
-      ? `teacher_id.eq.${teacherId},assignment_id.in.(${currentAssignmentIds.join(',')}),teacher_id.is.null`
-      : `teacher_id.eq.${teacherId},teacher_id.is.null`;
+      ? `teacher_id.eq.${teacherId},assignment_id.in.(${currentAssignmentIds.join(',')}),and(teacher_id.is.null,assignment_id.is.null)`
+      : `teacher_id.eq.${teacherId},and(teacher_id.is.null,assignment_id.is.null)`;
     const { data: ownLesson, error: ownLessonError } = await ownLessonQuery.or(ownershipFilter).limit(1);
     if (ownLessonError) throw new Error('Jadwalka casharka lama xaqiijin karin.');
     return { allowed: Boolean(assigned && ownLesson?.length) || substitute, substitute, periodNumber };
