@@ -577,6 +577,28 @@ export class ApiClient {
     return this.request<{ class: SchoolClass; students: { items: Student[]; page: number; pageSize: number; total: number }; subjects: Array<{ id: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; subject: Subject | null; teacher: { id: string; fullName: string } | null }>; timetable: TimetableSlot[]; attendance: { date: string; recordedStudents: number } }>(`/classes/${encodeURIComponent(id)}/details?${query}`);
   }
 
+  public static async getClassCurriculum(classId: string) {
+    return this.request<{
+      class: SchoolClass;
+      capacity: { workingDays: number; lessonPeriodsPerDay: number; weeklyCapacity: number };
+      curriculum: Array<{ id: string; subjectId: string; periodsPerWeek: number; teacherId?: string | null; smallExamEnabled: boolean; bigExamEnabled: boolean; isActive: boolean }>;
+    }>(`/curriculum/classes/${encodeURIComponent(classId)}`);
+  }
+
+  public static async saveClassCurriculum(classId: string, subjects: Array<{ subjectId: string; periodsPerWeek: number }>) {
+    return this.request<{ success: boolean; count: number; totalPeriods: number; capacity: number }>(
+      `/curriculum/classes/${encodeURIComponent(classId)}`,
+      { method: 'PUT', body: JSON.stringify({ subjects }) }
+    );
+  }
+
+  public static async copyClassCurriculum(classId: string, targetClassIds: string[]) {
+    return this.request<{ success: boolean; copiedClasses: number; subjectsPerClass: number }>(
+      `/curriculum/classes/${encodeURIComponent(classId)}/copy`,
+      { method: 'POST', body: JSON.stringify({ targetClassIds }) }
+    );
+  }
+
   public static async getClassGroups() {
     return this.request<Array<{id:string;name:string;sort_order:number;class_sections:Array<{id:string;name:string;legacy_class_id:string|null}>}>>('/class-groups');
   }
