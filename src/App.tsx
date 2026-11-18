@@ -33,6 +33,7 @@ const ClassesView = React.lazy(() => import('./components/schooladmin/ClassesVie
 const ClassesSubjectsView = React.lazy(() => import('./components/schooladmin/ClassesSubjectsView.tsx').then(module => ({ default: module.ClassesSubjectsView })));
 const SubjectsView = React.lazy(() => import('./components/schooladmin/SubjectsView.tsx').then(module => ({ default: module.SubjectsView })));
 const CurriculumView = React.lazy(() => import('./components/schooladmin/CurriculumView.tsx').then(module => ({ default: module.CurriculumView })));
+const TeacherAssignmentsView = React.lazy(() => import('./components/schooladmin/TeacherAssignmentsView.tsx').then(module => ({ default: module.TeacherAssignmentsView })));
 const TimetableView = React.lazy(() => import('./components/schooladmin/TimetableView.tsx').then(module => ({ default: module.TimetableView })));
 const AttendanceView = React.lazy(() => import('./components/schooladmin/AttendanceView.tsx').then(module => ({ default: module.AttendanceView })));
 const ExamsResultsView = React.lazy(() => import('./components/schooladmin/ExamsResultsView.tsx').then(module => ({ default: module.ExamsResultsView })));
