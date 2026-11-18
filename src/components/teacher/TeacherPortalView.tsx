@@ -548,6 +548,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
     }));
 
+  const classAlreadyForwarded = isFormTeacher && classMarks.some(mark => ['form_teacher_submitted', 'approved'].includes(mark.status));
+
   const examRegisterRows = useMemo(() => {
     const rows = students.map(student => {
       const subjectScores = gradeSubjects.map(subject => {
@@ -1065,7 +1067,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">{allClassMarksSubmitted ? 'Class is complete and ready to forward.' : 'Complete all active subjects before forwarding to School Admin.'}</p>
-                <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{t('exam_forward_to_admin')}</button>
+                <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted || classAlreadyForwarded} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{classAlreadyForwarded ? 'Sent to Admin · waiting for review' : t('exam_forward_to_admin')}</button>
               </div>
             </section>
           )}
