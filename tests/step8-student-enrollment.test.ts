@@ -42,6 +42,8 @@ test('Step 8 guardian links store relationship per student and expose profile ac
 test('Step 8 deletion refuses to remove students with attendance, marks, finance or enrollment rows', () => {
   assert.match(api, /protectedTables = \['attendance_records', 'student_marks', 'fee_payments', 'student_invoices', 'enrollments'\]/);
   assert.match(api, /Student has linked attendance, marks, fees, invoices or enrollment history/);
+  assert.match(api, /apiRouter.get\\('\\/students\\/export\\.pdf'/);
+  assert.match(api, /Content-Type': 'application\\/pdf'/);
 });
 
 test('Step 8 promotion workflow requires source and target academic years', () => {
@@ -56,4 +58,7 @@ test('Step 8 student directory includes mobile cards and summary counts', () => 
   assert.match(studentsView, /md:hidden/);
   assert.match(studentsView, /Export CSV/);
   assert.match(studentsView, /BulkImportWizard/);
+  assert.match(studentsView, /handleExportExcel/);
+  assert.match(studentsView, /handleExportPDF/);
+  assert.match(studentsView, /from 'xlsx'/);
 });
