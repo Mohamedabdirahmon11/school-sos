@@ -9340,4 +9340,215 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   res.status(201).json({ documents:data.map(row => documentClientRow(row)), warnings });
 });
 
+
+const teacherAssignmentClient = () => classGroupsClient();
+async function teacherAssignmentAudit(client: any, schoolId: string, userId: string, action: string, row: any, after: any) {
+  const { error } = await client.from('teacher_assignment_audit').insert({
+    school_id: schoolId, assignment_id: row?.id || after?.id || null, action,
+    before_data: row || null, after_data: after || null, changed_by: userId
+  });
+  if (error) throw new Error('Diiwaanka isbeddelka lama kaydin karin.');
+}
+async function checkTeacherAssignment(client: any, school: School, body: any) {
+  const yearId = String(body?.academicYearId || ''), termId = body?.termId ? String(body.termId) : null;
+  const classId = String(body?.classId || ''), sectionId = body?.sectionId ? String(body.sectionId) : null;
+  const subjectId = String(body?.subjectId || ''), teacherId = String(body?.teacherId || '');
+  if (!yearId || !classId || !subjectId || !teacherId) throw new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.');
+  const [year, klass, subject, teacher, curriculum] = await Promise.all([
+    client.from('academic_years').select('id,is_current').eq('school_id', school.id).eq('id', yearId).maybeSingle(),
+    db.getClassById(classId, school.id),
+    db.getSubjects(school.id).then(rows => rows.find(item => item.id === subjectId)),
+    client.from('teachers').select('id,status').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
+    client.from('class_subjects').select('id,periods_per_week').eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle()
+  ]);
+  if (year.error || !year.data) throw new Error('Sannadka waxbarasho lagama helin dugsigan.');
+  if (termId) {
+    const { data: term } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle();
+    if (!term || term.academic_year_id !== yearId) throw new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.');
+  }
+  if (!klass || klass.isArchived) throw new Error('Fasalkan lagama helin dugsigan.');
+  if (!subject) throw new Error('Maaddadani kama tirsana dugsigan.');
+  if (curriculum.error) throw new Error('Manhajka lama xaqiijin karin.');
+  if (!curriculum.data) throw new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).');
+  if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') throw new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.');
+  if (sectionId) {
+    const { data: section } = await client.from('class_sections').select('id,legacy_class_id').eq('school_id', school.id).eq('id', sectionId).maybeSingle();
+    if (!section || section.legacy_class_id !== classId) throw new Error('Qaybtani kuma jirto fasalkan.');
+  }
+  const { data: qualified, error: qError } = await client.from('teacher_subjects').select('id')
+    .eq('school_id', school.id).eq('teacher_id', teacherId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle();
+  if (qError) throw new Error('Aqoonta macallinka lama xaqiijin karin.');
+  if (!qualified && body?.override !== true) throw new Error('Macallinkan kuma xirna maaddadan. Dooro ka-reebis cad haddii aad rabto inaad sii waddo.');
+  return {
+    school_id: school.id, academic_year_id: yearId, term_id: termId, class_id: classId,
+    section_id: sectionId, subject_id: subjectId, teacher_id: teacherId,
+    qualification_override: !qualified
+  };
+}
+async function upsertTeacherAssignment(client: any, school: School, user: User, body: any, id?: string) {
+  const payload = await checkTeacherAssignment(client, school, body);
+  let query = client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id)
+    .eq('academic_year_id', payload.academic_year_id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
+  query = payload.term_id ? query.eq('term_id', payload.term_id) : query.is('term_id', null);
+  query = payload.section_id ? query.eq('section_id', payload.section_id) : query.is('section_id', null);
+  const found = id
+    ? await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle()
+    : await query.maybeSingle();
+  if (found.error || (id && !found.data)) throw new Error('Qoondeyntan lagama helin dugsigan.');
+  const old = found.data;
+  if (old && (old.teacher_id !== payload.teacher_id || id)) {
+    const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true })
+      .eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id).eq('teacher_id', old.teacher_id);
+    if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
+    if ((dep.count || 0) > 0 && body?.clearDependentEntries !== true) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta jadwalka ka hor beddelidda.');
+    if ((dep.count || 0) > 0) {
+      const cleared = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id).eq('teacher_id', old.teacher_id);
+      if (cleared.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
+    }
+  }
+  const saved = old
+    ? await client.from('teacher_class_subject_assignments').update({ ...payload, updated_at: new Date().toISOString() }).eq('school_id', school.id).eq('id', old.id).select('*').single()
+    : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
+  if (saved.error || !saved.data) throw new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.');
+  const { data: year } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', payload.academic_year_id).maybeSingle();
+  if (year?.is_current && !payload.term_id) {
+    await client.from('class_subjects').update({ teacher_id: payload.teacher_id }).eq('school_id', school.id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
+  }
+  await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
+  return { assignment: saved.data, warning: payload.qualification_override ? 'Digniin: macallinku kuma xirna maaddadan.' : null };
+}
+async function removeTeacherAssignment(client: any, school: School, user: User, id: string, clear: boolean) {
+  const { data: row, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle();
+  if (error || !row) throw new Error('Qoondeyntan lagama helin dugsigan.');
+  const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', row.teacher_id);
+  if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
+  if ((dep.count || 0) > 0 && !clear) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta ka hor tirtiridda.');
+  if ((dep.count || 0) > 0) {
+    const delSlots = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', row.teacher_id);
+    if (delSlots.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
+  }
+  const deleted = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('id', id);
+  if (deleted.error) throw new Error('Qoondeynta lama tirtiri karin.');
+  await teacherAssignmentAudit(client, school.id, user.id, 'deleted', row, null);
+}
+apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School, user = (req as any).user as User;
+  if (!['school_admin', 'super_admin'].includes(normalizeRole(user.role))) { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
+  const client = teacherAssignmentClient();
+  try {
+    const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
+      client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
+      client.from('terms').select('id,name,academic_year_id,is_current').eq('school_id', school.id).order('start_date'),
+      client.from('classes').select('id,name,section,grade_level,academic_year').eq('school_id', school.id).eq('is_archived', false).order('grade_level').order('name'),
+      client.from('class_sections').select('id,class_id,name,legacy_class_id').eq('school_id', school.id).order('sort_order'),
+      client.from('subjects').select('id,name,code').eq('school_id', school.id).order('name'),
+      client.from('teachers').select('id,full_name,teacher_code,staff_id,status,max_periods_per_week').eq('school_id', school.id).order('full_name'),
+      client.from('class_subjects').select('id,class_id,subject_id,teacher_id,periods_per_week,is_active').eq('school_id', school.id).eq('is_active', true),
+      client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id),
+      client.from('teacher_subjects').select('teacher_id,subject_id').eq('school_id', school.id).eq('is_active', true)
+    ]);
+    if ([years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals].some(x => x.error)) throw new Error('Xogta qoondeynta lama soo wada qaadi karin. Hubi migration-ka Step 6.');
+    const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || '');
+    const termId = String(req.query.termId || (terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || '');
+    const current = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && (!termId || !x.term_id || x.term_id === termId));
+    const cur = curriculum.data || [];
+    const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id) && !x.teacher_id)
+      .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
+    const workload = (teachers.data || []).map((t: any) => {
+      const periods = current.filter((a: any) => a.teacher_id === t.id).reduce((sum: number, a: any) => {
+        const row: any = cur.find((c: any) => c.class_id === a.class_id && c.subject_id === a.subject_id);
+        return sum + Number(row?.periods_per_week || 0);
+      }, 0);
+      const max = t.max_periods_per_week == null ? null : Number(t.max_periods_per_week);
+      return { teacherId: t.id, periodsPerWeek: periods, maxPeriodsPerWeek: max, overloaded: max != null && periods > max };
+    });
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json({
+      academicYears: years.data || [], terms: terms.data || [], classes: classes.data || [], sections: sections.data || [],
+      subjects: subjects.data || [], teachers: teachers.data || [], curriculum: cur, assignments: current,
+      qualifiedTeacherIdsBySubject: (quals.data || []).reduce((out: any, row: any) => { (out[row.subject_id] ||= []).push(row.teacher_id); return out; }, {}),
+      workload, unassigned, selectedAcademicYearId: yearId, selectedTermId: termId,
+      totalClassSubjects: cur.length, assignedCount: cur.length - unassigned.length, unassignedCount: unassigned.length,
+      overloadedCount: workload.filter((x: any) => x.overloaded).length
+    });
+  } catch (error: any) { res.status(503).json({ error: error?.message || 'Qoondeynta lama soo qaadi karin.' }); }
+});
+apiRouter.post('/teacher-assignments', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  try { res.status(201).json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body) }); }
+  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama kaydin karin.' }); }
+});
+apiRouter.put('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  try { res.json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body, String(req.params.id)) }); }
+  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama beddeli karin.' }); }
+});
+apiRouter.delete('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  try { await removeTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, String(req.params.id), req.body?.clearDependentEntries === true); res.json({ success: true }); }
+  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama tirtiri karin.' }); }
+});
+apiRouter.post('/teacher-assignments/bulk', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School, user = (req as any).user as User;
+  const targets = Array.isArray(req.body?.targets) ? req.body.targets : [];
+  if (!targets.length || targets.length > 150) { res.status(400).json({ error: 'Dooro 1 ilaa 150 fasal/qaybood.' }); return; }
+  const saved: any[] = [], skipped: any[] = [];
+  for (const target of targets) {
+    try { saved.push(await upsertTeacherAssignment(teacherAssignmentClient(), school, user, { ...target, teacherId: req.body.teacherId, academicYearId: req.body.academicYearId, termId: req.body.termId, override: req.body.override === true })); }
+    catch (error: any) { skipped.push({ target, reason: error?.message || 'Lama kaydin.' }); }
+  }
+  res.json({ success: true, saved: saved.length, skipped, warnings: saved.map(x => x.warning).filter(Boolean) });
+});
+apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School, user = (req as any).user as User, client = teacherAssignmentClient();
+  const fromId = String(req.body?.fromTeacherId || ''), toId = String(req.body?.toTeacherId || '');
+  if (!fromId || !toId || fromId === toId) { res.status(400).json({ error: 'Dooro macallinka hore iyo kan cusub.' }); return; }
+  try {
+    const { data: rows, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('teacher_id', fromId);
+    if (error) throw error;
+    const ids = Array.isArray(req.body?.assignmentIds) ? req.body.assignmentIds.map(String) : [];
+    const selected = (rows || []).filter((x: any) => !ids.length || ids.includes(x.id));
+    let changed = 0; const skipped: any[] = [];
+    for (const row of selected) {
+      try {
+        const { data: qualified } = await client.from('teacher_subjects').select('id').eq('school_id', school.id).eq('teacher_id', toId).eq('subject_id', row.subject_id).eq('is_active', true).maybeSingle();
+        if (!qualified && req.body?.override !== true) throw new Error('Macallinka cusub kuma xirna maaddadan.');
+        const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', fromId);
+        if (dep.error) throw dep.error;
+        if ((dep.count || 0) > 0 && req.body?.clearDependentEntries !== true) throw new Error('Waxaa jira jadwal ku xiran; xaqiiji nadiifintiisa.');
+        if ((dep.count || 0) > 0) await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id).eq('teacher_id', fromId);
+        const next = { ...row, teacher_id: toId, qualification_override: !qualified, updated_at: new Date().toISOString() };
+        const upd = await client.from('teacher_class_subject_assignments').update({ teacher_id: toId, qualification_override: !qualified, updated_at: next.updated_at }).eq('school_id', school.id).eq('id', row.id);
+        if (upd.error) throw upd.error;
+        await teacherAssignmentAudit(client, school.id, user.id, 'replaced', row, next); changed++;
+      } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama beddeli karin.' }); }
+    }
+    res.json({ success: true, changed, skipped });
+  } catch (error: any) { res.status(503).json({ error: error?.message || 'Macallinka lama beddeli karin.' }); }
+});
+apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School, user = (req as any).user as User, client = teacherAssignmentClient();
+  const sourceYearId = String(req.body?.sourceAcademicYearId || ''), targetYearId = String(req.body?.targetAcademicYearId || '');
+  const sourceTermId = req.body?.sourceTermId ? String(req.body.sourceTermId) : null, targetTermId = req.body?.targetTermId ? String(req.body.targetTermId) : null;
+  if (!sourceYearId || !targetYearId || (sourceYearId === targetYearId && sourceTermId === targetTermId)) { res.status(400).json({ error: 'Dooro sannad/term asal ah iyo mid kale oo loo koobiyeeyo.' }); return; }
+  try {
+    const { data: source, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('academic_year_id', sourceYearId);
+    if (error) throw error;
+    const rows = (source || []).filter((x: any) => sourceTermId ? (!x.term_id || x.term_id === sourceTermId) : !x.term_id);
+    let copied = 0; const skipped: any[] = [];
+    for (const row of rows) {
+      try {
+        const body = { academicYearId: targetYearId, termId: targetTermId, classId: row.class_id, sectionId: row.section_id, subjectId: row.subject_id, teacherId: row.teacher_id, override: row.qualification_override };
+        const payload = await checkTeacherAssignment(client, school, body);
+        let check = client.from('teacher_class_subject_assignments').select('id').eq('school_id', school.id).eq('academic_year_id', targetYearId).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
+        check = targetTermId ? check.eq('term_id', targetTermId) : check.is('term_id', null);
+        check = row.section_id ? check.eq('section_id', row.section_id) : check.is('section_id', null);
+        const { data: exists } = await check.maybeSingle();
+        if (exists) { skipped.push({ assignmentId: row.id, reason: 'Qoondeyn hore ayaa meeshaas ka jirta.' }); continue; }
+        const inserted = await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
+        if (inserted.error) throw inserted.error;
+        await teacherAssignmentAudit(client, school.id, user.id, 'copied', null, inserted.data); copied++;
+      } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama koobiyeeyn.' }); }
+    }
+    res.json({ success: true, copied, skipped });
+  } catch (error: any) { res.status(503).json({ error: error?.message || 'Qoondeynta lama koobiyeeyn karin.' }); }
+});
+
 forwardAsyncErrors(apiRouter);
