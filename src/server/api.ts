@@ -9531,7 +9531,8 @@ apiRouter.post('/teacher-assignments/replace-teacher', requireAuth, requireSchoo
     let changed = 0, overridden = 0; const skipped: any[] = [];
     for (const row of selected) {
       try {
-        const { data: qualified } = await client.from('teacher_subjects').select('id').eq('school_id', school.id).eq('teacher_id', toId).eq('subject_id', row.subject_id).eq('is_active', true).maybeSingle();
+        const { data: qualified, error: qualificationError } = await client.from('teacher_subjects').select('id').eq('school_id', school.id).eq('teacher_id', toId).eq('subject_id', row.subject_id).eq('is_active', true).maybeSingle();
+        if (qualificationError) throw new Error('Aqoonta macallinka cusub lama xaqiijin karin.');
         if (!qualified && req.body?.override !== true) throw new Error('Macallinka cusub kuma xirna maaddadan.');
         const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         if (dep.error) throw dep.error;
