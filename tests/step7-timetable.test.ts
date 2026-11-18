@@ -16,7 +16,8 @@ const migrations = [
   read('../supabase/migrations/20261118161206_step7_time_overlap_conflict_guard.sql'),
   read('../supabase/migrations/20261118170000_step7_timetable_constraint_fixes.sql'),
   read('../supabase/migrations/20261118172000_step7_timetable_overlap_constraints.sql'),
-  read('../supabase/migrations/20261118173000_step7_swap_term_restore_fix.sql')
+  read('../supabase/migrations/20261118173000_step7_swap_term_restore_fix.sql'),
+  read('../supabase/migrations/20261118174000_step7_somali_swap_conflicts.sql')
 ].join('\n');
 
 test('timetable reads and edits are scoped to the selected school term', () => {
@@ -70,6 +71,8 @@ test('copy, clear, swap and overlap guardrails are implemented', () => {
   assert.match(migrations, /timetable_teacher_time_no_overlap/);
   assert.match(migrations, /timetable_room_id_time_no_overlap/);
   assert.match(migrations, /timetable_room_name_time_no_overlap/);
+  assert.match(migrations, /timetable_time_seconds/);
+  assert.match(migrations, /Labada cashar ee la isku beddelayo waxay isku dhacayaan waqtiga macallinka/);
   assert.match(migrations, /term_id = first_slot\.term_id/);
   assert.match(api, /targetAssignments/);
   assert.match(api, /sectionId/);
