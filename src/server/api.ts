@@ -38,6 +38,7 @@ import {
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
+import { DEFAULT_SUBJECT_NAMES, normalizeSubjectCode, normalizeSubjectName, subjectNameExists } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -3216,47 +3217,74 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   res.json(result);
 });
 
+apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulaha dugsiga ayaa ku dari kara maaddooyin.' }); return; }
+  const existing = await db.getSubjects(school.id);
+  let createdCount = 0;
+  for (const name of DEFAULT_SUBJECT_NAMES) {
+    if (subjectNameExists(existing, name)) continue;
+    existing.push(db.createSubject({ schoolId: school.id, name, code: '', description: '', creditUnits: 0, department: '', assignedTeacherIds: [] }));
+    createdCount += 1;
+  }
+  await db.flush();
+  res.status(200).json({ success: true, createdCount, skippedCount: DEFAULT_SUBJECT_NAMES.length - createdCount, subjects: await db.getSubjects(school.id) });
+});
+
 apiRouter.post('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
-  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
-  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
-  const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
-  if (!name || !code || code.length > 50 || description.length > 1000) { res.status(400).json({ error: 'Subject name, code (up to 50 characters), and optional description (up to 1,000 characters) are required.' }); return; }
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulaha dugsiga ayaa maaddo abuuri kara.' }); return; }
+  const name = normalizeSubjectName(req.body?.name);
+  const code = normalizeSubjectCode(req.body?.code);
+  if (!name || name.length > 150) { res.status(400).json({ error: 'Fadlan geli magaca maaddada (ugu badnaan 150 xaraf).' }); return; }
+  if (code.length > 6) { res.status(400).json({ error: 'Koodhka maaddadu waa inuu ahaadaa ugu badnaan 6 xaraf.' }); return; }
   const existing = await db.getSubjects(school.id);
-  if (existing.some(item => item.code.toLowerCase() === code.toLowerCase())) { res.status(409).json({ error: `Subject code ${code} already exists in this school.` }); return; }
-  const subject = db.createSubject({ schoolId: school.id, name, code, description, creditUnits: 0, department: '', assignedTeacherIds: [] });
+  if (subjectNameExists(existing, name)) { res.status(409).json({ error: 'Maaddadan hore ayay uga jirtaa dugsigan.' }); return; }
+  if (code && existing.some(item => normalizeSubjectCode(item.code) === code)) { res.status(409).json({ error: `Koodhka ${code} hore ayaa looga isticmaalay dugsigan.` }); return; }
+  const subject = db.createSubject({ schoolId: school.id, name, code, description: '', creditUnits: 0, department: '', assignedTeacherIds: [] });
+  await db.flush();
   res.status(201).json(subject);
 });
 
 apiRouter.put('/subjects/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
-  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
-  const subject = (await db.getSubjects(school.id)).find(item => item.id === String(req.params.id));
-  if (!subject) { res.status(404).json({ error: 'Subject was not found.' }); return; }
-  if ((req.body?.name !== undefined && !String(req.body.name).trim()) || (req.body?.code !== undefined && !String(req.body.code).trim())) { res.status(400).json({ error: 'Subject name and code cannot be empty.' }); return; }
-  const code = String(req.body?.code ?? subject.code).trim().toUpperCase();
-  const description = String(req.body?.description ?? subject.description ?? '').trim();
-  if (code.length > 50 || description.length > 1000) { res.status(400).json({ error: 'Subject code must be 50 characters or fewer and description 1,000 characters or fewer.' }); return; }
-  const duplicates = (await db.getSubjects(school.id)).some(item => item.id !== subject.id && item.code.toLowerCase() === code.toLowerCase());
-  if (duplicates) { res.status(409).json({ error: `Subject code ${code} already exists in this school.` }); return; }
-  const updated = db.updateSubject(subject.id, { name: String(req.body?.name ?? subject.name).trim(), code, description, creditUnits: 0, department: '', id: subject.id, schoolId: school.id });
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulaha dugsiga ayaa maaddo beddeli kara.' }); return; }
+  const existing = await db.getSubjects(school.id);
+  const subject = existing.find(item => item.id === String(req.params.id));
+  if (!subject) { res.status(404).json({ error: 'Maaddada lagama helin dugsigan.' }); return; }
+  const name = req.body?.name === undefined ? subject.name : normalizeSubjectName(req.body.name);
+  const code = req.body?.code === undefined ? normalizeSubjectCode(subject.code) : normalizeSubjectCode(req.body.code);
+  if (!name || name.length > 150) { res.status(400).json({ error: 'Magaca maaddadu waa waajib, waana inuu ka yaraadaa 150 xaraf.' }); return; }
+  if (code.length > 6) { res.status(400).json({ error: 'Koodhka maaddadu waa inuu ahaadaa ugu badnaan 6 xaraf.' }); return; }
+  if (subjectNameExists(existing, name, subject.id)) { res.status(409).json({ error: 'Maaddo kale oo isla magacan leh ayaa dugsigan ka jirta.' }); return; }
+  if (code && existing.some(item => item.id !== subject.id && normalizeSubjectCode(item.code) === code)) { res.status(409).json({ error: `Koodhka ${code} hore ayaa looga isticmaalay dugsigan.` }); return; }
+  const updated = db.updateSubject(subject.id, { name, code, id: subject.id, schoolId: school.id });
+  await db.flush();
   res.json(updated);
 });
 
 apiRouter.delete('/subjects/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
-  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'School administrator privilege is required.' }); return; }
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulaha dugsiga ayaa maaddo tirtiri kara.' }); return; }
   const subject = (await db.getSubjects(school.id)).find(item => item.id === String(req.params.id));
-  if (!subject) { res.status(404).json({ error: 'Subject was not found.' }); return; }
-  const uses = await db.queryPage('timetable_slots', { school_id: school.id, subject_id: subject.id, is_active: 'true' }, 1, 1, undefined, 'id');
-  if (uses.total) { res.status(409).json({ error: 'Subject is used in the timetable. Remove its timetable periods before deleting it.' }); return; }
-  const assignments = await db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id, is_active: 'true' }, 1, 1, undefined, 'id');
-  if (assignments.total) { res.status(409).json({ error: 'Subject is assigned to classes. Remove its class assignments before deleting it.' }); return; }
+  if (!subject) { res.status(404).json({ error: 'Maaddada lagama helin dugsigan.' }); return; }
+  const dependencies = await Promise.all([
+    db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('timetable_slots', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('student_marks', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('exam_schedules', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('assignments', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id')
+  ]);
+  if (dependencies.some(item => item.total > 0)) {
+    res.status(409).json({ error: 'Maaddadan lama tirtiri karo, sababtoo ah waxaa ku xiran fasallo, jadwal, imtixaan, natiijooyin ama shaqooyin. Marka hore ka saar xiriirradaas.' });
+    return;
+  }
   db.deleteSubject(subject.id);
+  await db.flush();
   res.json({ success: true });
 });
 
