@@ -50,6 +50,7 @@ export const TimetableView: React.FC = () => {
   const [subjectId, setSubjectId] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
+  const [roomId, setRoomId] = useState('');
 
   const hasConfiguredWorkingDays = Boolean(school?.setupData?.calendar?.workingDays?.length);
   const days = getSchoolWorkingDays(school?.setupData?.calendar);
@@ -250,7 +251,7 @@ export const TimetableView: React.FC = () => {
     const clash = checkClash(dayOfWeek, periodNumber, teacherId, roomNumber);
     if (clash) { setClashWarning(clash); return; }
     try {
-      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
+      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, sectionId: null, roomId: roomId || null, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
       setTimetable(prev => [...prev.filter(s => !(s.dayOfWeek === dayOfWeek && s.periodNumber === periodNumber && s.classId === selectedClassId)), newSlot]);
       setShowAddModal(false); setClashWarning(null); setNotice('Timetable period saved.');
       setTimeout(() => setNotice(null), 3000);
@@ -567,7 +568,7 @@ export const TimetableView: React.FC = () => {
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
                               <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
-                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
                                 {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
@@ -655,7 +656,21 @@ export const TimetableView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-medium text-[#334155]">Classroom Number</label>
+                <label className="block font-medium text-[#334155]">Registered Room (optional)</label>
+                <select
+                  value={roomId}
+                  onChange={e => {
+                    const nextRoomId = e.target.value;
+                    setRoomId(nextRoomId);
+                    const selectedRoom = rooms.find(room => room.id === nextRoomId);
+                    if (selectedRoom) setRoomNumber(selectedRoom.name);
+                  }}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                >
+                  <option value="">Use room number below</option>
+                  {rooms.map(room => <option key={room.id} value={room.id}>{room.name} · {room.type}</option>)}
+                </select>
+                <label className="mt-2 block font-medium text-[#334155]">Room label</label>
                 <input
                   type="text"
                   required
