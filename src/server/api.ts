@@ -4365,7 +4365,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   }
   try { await db.replaceTimetableForClassTerm(school.id, classId, termId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
-  res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generated, unfilled, warnings, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
 });
 
 apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
