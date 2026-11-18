@@ -5606,8 +5606,6 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
   const teacher = await getAttendanceTeacher(client, school.id, user.id);
   if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
   const date = attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
-  const access = await canTeacherMarkAttendance(client, school.id, user.id, teacher.id, classId, date, null, null, null);
-  if (!access.allowed) { res.status(403).json({ error: 'Liiska ardayda fasalkan adiga kuma lihid.' }); return; }
   const [{ data: klass }, { data: year }, { data: term }] = await Promise.all([
     client.from('classes').select('id').eq('id', classId).eq('school_id', school.id).maybeSingle(),
     client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
@@ -5637,6 +5635,8 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
     ? await client.from('timetable_slots').select('id,class_id,section_id').eq('school_id', school.id).eq('class_id', classId).in('id', substituteIds)
     : { data: [], error: null };
   if (substituteError || substituteSlotError) { res.status(503).json({ error: 'Casharrada beddelka lama hubin karin.' }); return; }
+  const hasClassAccess = Boolean(formTeacherClass || legacyAssignments?.length || currentAssignments.length || substituteSlots?.length);
+  if (!hasClassAccess) { res.status(403).json({ error: 'Liiska ardayda fasalkan adiga kuma lihid.' }); return; }
   const fullClassAccess = Boolean(formTeacherClass || legacyAssignments?.length ||
     currentAssignments.some((row: any) => !row.section_id) || (substituteSlots || []).some((slot: any) => !slot.section_id));
   const enrollmentRows = enrollments || [];
