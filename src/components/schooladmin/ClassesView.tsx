@@ -23,7 +23,7 @@ export const ClassesView: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try { setRows(await ApiClient.getClassGroups()); }
-    catch(e:any) { setNotice({kind:'error',text:e?.message || tx('loadError')}); }
+    catch { setNotice({kind:'error',text:tx('loadError')}); }
     finally { setLoading(false); }
   },[language]);
   useEffect(()=>{ void load(); },[load]);
@@ -31,7 +31,7 @@ export const ClassesView: React.FC = () => {
   const run = async (action:()=>Promise<any>, success:string) => {
     setBusy(true); setNotice(null);
     try { await action(); setNotice({kind:'ok',text:success}); await load(); }
-    catch(e:any) { setNotice({kind:'error',text:e?.message || tx('actionError')}); }
+    catch { setNotice({kind:'error',text:tx('actionError')}); }
     finally { setBusy(false); }
   };
 
