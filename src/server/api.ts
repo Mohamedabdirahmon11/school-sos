@@ -3641,7 +3641,7 @@ apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSupe
   const teacherId = String(req.body?.teacherId || '');
   const dayOfWeek = String(req.body?.dayOfWeek || '');
   const periodNumber = Number(req.body?.periodNumber);
-  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 6 || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, and a period from 1 to 6.' }); return; }
+  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 8 || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, and a period from 1 to 8.' }); return; }
   await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true);
   res.json({ success: true });
 });
@@ -3650,7 +3650,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
   const period = Number(periodNumber);
-  if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 6)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (Friday has five periods).' }); return; }
+  if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 8)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (up to eight; Friday has five).' }); return; }
   const [klass, subject, teacher, assignment, settings, existing, unavailable] = await Promise.all([
     db.getClassById(String(classId || ''), school.id),
     db.queryPage('subjects', { school_id: school.id, id: String(subjectId || '') }, 1, 1, undefined, 'id'),

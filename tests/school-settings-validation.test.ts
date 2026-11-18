@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sanitizeSchoolSettings, sanitizeExamConfigSettings } from '../src/server/school-settings.ts';
+import { sanitizeSchoolSettings, sanitizeExamConfigSettings, sanitizeTimetableSettings } from '../src/server/school-settings.ts';
 import { getLanguageDirection } from '../src/lib/translations.ts';
 
 test('school class-level settings allow KG alongside numeric grades', () => {
@@ -138,4 +138,23 @@ test('Arabic language switches the application direction to RTL', () => {
   assert.equal(getLanguageDirection('en'), 'ltr');
   assert.equal(getLanguageDirection('so'), 'ltr');
   assert.equal(getLanguageDirection('am'), 'ltr');
+});
+
+
+test('timetable settings support breaks after periods one through seven for eight-period days', () => {
+  const base = {
+    shiftCount: 2 as const,
+    firstPeriodStart: '08:00',
+    periodMinutes: 40,
+    breakAfterPeriod: 7,
+    breakMinutes: 20,
+    shift2FirstPeriodStart: '13:00',
+    shift2PeriodMinutes: 40,
+    shift2BreakAfterPeriod: 7,
+    shift2BreakMinutes: 20
+  };
+  assert.equal(sanitizeTimetableSettings(base).breakAfterPeriod, 7);
+  assert.equal(sanitizeTimetableSettings(base).shift2BreakAfterPeriod, 7);
+  assert.throws(() => sanitizeTimetableSettings({ ...base, breakAfterPeriod: 8 }), /Break must follow period 1-7/);
+  assert.throws(() => sanitizeTimetableSettings({ ...base, shift2BreakAfterPeriod: 8 }));
 });

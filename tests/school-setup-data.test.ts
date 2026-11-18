@@ -42,7 +42,7 @@ test('working hours enforce time ordering and a bounded period count', () => {
   const workingHours = { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 };
   assert.equal(validateSchoolSetupStep(5, { workingHours }), null);
   assert.match(validateSchoolSetupStep(5, { workingHours: { ...workingHours, breakEndTime: '07:00' } }) || '', /not in the correct order/);
-  assert.match(validateSchoolSetupStep(5, { workingHours: { ...workingHours, periodsPerDay: 20 } }) || '', /1–16 daily periods/);
+  assert.match(validateSchoolSetupStep(5, { workingHours: { ...workingHours, periodsPerDay: 20 } }) || '', /1–8 daily periods/);
 });
 
 test('academic year is only made current when the administrator selects the current-year option', () => {

@@ -8,7 +8,8 @@ test('school working days use configured days in weekday order and safe defaults
 });
 
 test('school period count respects valid setup values and caps invalid settings', () => {
-  assert.equal(getSchoolPeriodsPerDay({ periodsPerDay: 9 }), 9);
+  assert.equal(getSchoolPeriodsPerDay({ periodsPerDay: 8 }), 8);
+  assert.equal(getSchoolPeriodsPerDay({ periodsPerDay: 9 }), 6);
   assert.equal(getSchoolPeriodsPerDay({ periodsPerDay: 0 }), 6);
   assert.equal(getSchoolPeriodsPerDay({ periodsPerDay: 17 }), 6);
 });
