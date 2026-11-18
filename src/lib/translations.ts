@@ -98,6 +98,7 @@ export interface TranslationDict {
   exam_periods_per_week: string;
   exam_small_exam: string;
   exam_big_exam: string;
+  exam_classes_subjects: string;
   assignments: string;
   fees_payments: string;
   events_holidays: string;
@@ -412,6 +413,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_periods_per_week: 'Periods/week',
     exam_small_exam: 'Small exam',
     exam_big_exam: 'Big exam',
+    exam_classes_subjects: 'Classes & Subjects',
     assignments: 'Homework & Assignments',
     fees_payments: 'Student Fees & Ledger',
     events_holidays: 'Academic Calendar',
@@ -706,6 +708,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_periods_per_week: 'Casharro/toddobaad',
     exam_small_exam: 'Imtixaan yar',
     exam_big_exam: 'Imtixaan weyn',
+    exam_classes_subjects: 'Fasallada iyo Maaddooyinka',
     assignments: 'Laylisyada & Shaqo-guri',
     fees_payments: 'Lacagaha & Kharashaadka',
     events_holidays: 'Jadwalka Fasaxyada',
@@ -1001,6 +1004,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_periods_per_week: 'الحصص/الأسبوع',
     exam_small_exam: 'اختبار قصير',
     exam_big_exam: 'اختبار نهائي',
+    exam_classes_subjects: 'الفصول والمواد',
     assignments: 'የቤት ስራዎች',
     fees_payments: 'የተማሪ ክፍያዎች',
     events_holidays: 'የዓመቱ የቀን መቁጠሪያ',
@@ -1274,6 +1278,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_periods_per_week: 'በሳምንት ክፍለ ጊዜዎች',
     exam_small_exam: 'አነስተኛ ፈተና',
     exam_big_exam: 'ትልቅ ፈተና',
+    exam_classes_subjects: 'ክፍሎችና ትምህርቶች',
     assignments: 'الواجبات',
     fees_payments: 'الرسوم والمدفوعات',
     events_holidays: 'الفعاليات والعطلات',
