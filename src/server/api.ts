@@ -5551,6 +5551,39 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 });
 
+apiRouter.post('/exams/reopen-subject', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can reopen a subject before forwarding.' });
+    return;
+  }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const subjectId = typeof req.body?.subjectId === 'string' ? req.body.subjectId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !subjectId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class, subject, and valid semester.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  if (klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can reopen a subject.' });
+    return;
+  }
+  try {
+    const reopenedCount = await db.reopenClassSubjectMarks(
+      school.id, classId, subjectId, semester, user.id, user.fullName, user.role
+    );
+    res.json({ success: true, reopenedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Subject marks could not be reopened.' });
+  }
+});
+
 apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
