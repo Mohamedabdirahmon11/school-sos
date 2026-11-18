@@ -278,11 +278,11 @@ const timetableSettingsSchema = z.object({
   shiftCount: z.union([z.literal(1), z.literal(2)]).default(1),
   firstPeriodStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Timetable start must use HH:MM.'),
   periodMinutes: z.number().int('Period length must be a whole number.').min(20, 'Period length must be 20-120 minutes.').max(120, 'Period length must be 20-120 minutes.'),
-  breakAfterPeriod: z.number().int('Break position must be a whole number.').min(1, 'Break must follow period 1-5.').max(5, 'Break must follow period 1-5.'),
+  breakAfterPeriod: z.number().int('Break position must be a whole number.').min(1, 'Break must follow period 1-7.').max(5, 'Break must follow period 1-5.'),
   breakMinutes: z.number().int('Break length must be a whole number.').min(0, 'Break length must be 0-120 minutes.').max(120, 'Break length must be 0-120 minutes.'),
   shift2FirstPeriodStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Second shift timetable start must use HH:MM.').optional(),
   shift2PeriodMinutes: z.number().int().min(20).max(120).optional(),
-  shift2BreakAfterPeriod: z.number().int().min(1).max(5).optional(),
+  shift2BreakAfterPeriod: z.number().int().min(1).max(7).optional(),
   shift2BreakMinutes: z.number().int().min(0).max(120).optional()
 }).superRefine((settings, ctx) => {
   if (settings.shiftCount === 2) {
@@ -312,8 +312,8 @@ export function calculateShiftEndMinutes(settings: {
 }, periodsPerDay: number): number {
   const start = settings.shift2FirstPeriodStart || '13:00';
   const [hours, minutes] = start.split(':').map(Number);
-  // The timetable API currently permits at most six periods per day (Friday five).
-  const periods = Number.isInteger(periodsPerDay) && periodsPerDay > 0 ? Math.min(6, periodsPerDay) : 6;
+  // The timetable API permits up to eight periods per day (Friday remains limited to five).
+  const periods = Number.isInteger(periodsPerDay) && periodsPerDay > 0 ? Math.min(8, periodsPerDay) : 8;
   const periodMinutes = Number(settings.shift2PeriodMinutes || 40);
   const breakAfter = Number(settings.shift2BreakAfterPeriod || 3);
   const breakMinutes = Number(settings.shift2BreakMinutes ?? 20);
