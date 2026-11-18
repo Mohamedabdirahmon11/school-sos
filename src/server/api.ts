@@ -5536,22 +5536,28 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
   const teacher = await getAttendanceTeacher(client, school.id, user.id);
   const date = attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa'); const weekday = attendanceWeekday(date);
   if (!teacher) { res.json({ date, teacher: null, classes: [], timetable: [], todayLessons: [], settings: { attendanceMode: 'daily', editWindowHours: 2 } }); return; }
-  const [{ data: year }, { data: term }, { data: assignmentRows, error: assignmentError }, { data: formClasses, error: formError }, { data: slots, error: slotError }, { data: settings }] = await Promise.all([
+  const [{ data: year }, { data: term }, { data: assignmentRows, error: assignmentError }, { data: formClasses, error: formError }, { data: slots, error: slotError }, { data: substitutions, error: substitutionError }, { data: settings }] = await Promise.all([
     client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
     client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
     client.from('teacher_class_subject_assignments').select('id,class_id,section_id,subject_id,term_id,academic_year_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
     client.from('classes').select('id,name,section,class_teacher_id,grade_level').eq('school_id', school.id).eq('class_teacher_id', user.id).eq('is_archived', false),
     client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true),
+    client.from('timetable_substitutions').select('entry_id').eq('school_id', school.id).eq('substitute_teacher_id', teacher.id).eq('substitute_date', date),
     client.from('attendance_settings').select('attendance_mode,edit_window_hours,late_threshold_minutes').eq('school_id', school.id).maybeSingle()
   ]);
-  if (assignmentError || formError || slotError) { res.status(503).json({ error: 'Macluumaadka macallinka lama soo dejin karin.' }); return; }
+  if (assignmentError || formError || slotError || substitutionError) { res.status(503).json({ error: 'Macluumaadka macallinka lama soo dejin karin.' }); return; }
   const currentAssignments = (assignmentRows || []).filter((row: any) =>
     (!year?.id || row.academic_year_id === year.id) && (!row.term_id || !term?.id || row.term_id === term.id)
   );
-  const classIds = [...new Set([...currentAssignments.map((row: any) => row.class_id), ...(formClasses || []).map((row: any) => row.id)])];
+  const substituteIds = (substitutions || []).map((row: any) => row.entry_id);
+  const { data: substituteSlots, error: substituteSlotError } = substituteIds.length
+    ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).in('id', substituteIds)
+    : { data: [], error: null };
+  if (substituteSlotError) { res.status(503).json({ error: 'Casharrada beddelka lama soo dejin karin.' }); return; }
+  const classIds = [...new Set([...currentAssignments.map((row: any) => row.class_id), ...(formClasses || []).map((row: any) => row.id), ...(substituteSlots || []).map((row: any) => row.class_id)])];
   const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }] = await Promise.all([
     classIds.length ? client.from('classes').select('id,name,section,grade_level').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] }),
-    currentAssignments.length ? client.from('subjects').select('id,name,code').eq('school_id', school.id).in('id', [...new Set(currentAssignments.map((row: any) => row.subject_id))]) : Promise.resolve({ data: [] }),
+    (currentAssignments.length || (substituteSlots || []).length) ? client.from('subjects').select('id,name,code').eq('school_id', school.id).in('id', [...new Set([...currentAssignments.map((row: any) => row.subject_id), ...(substituteSlots || []).map((row: any) => row.subject_id)])]) : Promise.resolve({ data: [] }),
     client.from('periods').select('id,number,start_time,end_time,type').eq('school_id', school.id),
     client.from('attendance_sessions').select('id,class_id,period_id,subject_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
   ]);
@@ -5572,7 +5578,16 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     className: (classMap.get(slot.class_id) as any)?.name || slot.class_id,
     periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id
   }));
-  const todayLessons = timetable.filter((slot: any) => slot.dayOfWeek === weekday).map((slot: any) => {
+  const todayLessons = [
+    ...timetable.filter((slot: any) => slot.dayOfWeek === weekday),
+    ...(substituteSlots || []).filter((slot: any) => slot.day_of_week === weekday && slot.is_active).map((slot: any) => ({
+      id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
+      startTime: slot.start_time, endTime: slot.end_time, subjectId: slot.subject_id,
+      subjectName: (subjectMap.get(slot.subject_id) as any)?.name || slot.subject_id,
+      className: (classMap.get(slot.class_id) as any)?.name || slot.class_id,
+      periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id, isSubstitute: true
+    }))
+  ].map((slot: any) => {
     const session: any = sessionMap.get(slot.classId + ':' + (slot.periodId || 'daily'));
     return { ...slot, attendanceTaken: Boolean(session?.submitted_at), attendanceLocked: Boolean(session?.is_locked), sessionId: session?.id || null };
   });
