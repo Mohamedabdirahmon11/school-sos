@@ -215,9 +215,9 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
                 <p className="font-semibold text-[#475569] mb-1">Term 1 Teacher Comments:</p>
-                {term1Comments.length ? term1Comments.map(row => <p key={row.subject.id} className="italic text-[#334155]">{row.subject.name}: {row.sem1Marks?.teacherRemarks}</p>) : <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>}
+                <p className="italic text-[#334155]">{term1Comments.map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
                 <p className="mt-3 font-semibold text-[#475569] mb-1">Term 2 Teacher Comments:</p>
-                {term2Comments.length ? term2Comments.map(row => <p key={row.subject.id} className="italic text-[#334155]">{row.subject.name}: {row.sem2Marks?.teacherRemarks}</p>) : <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>}
+                <p className="italic text-[#334155]">{term2Comments.map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`).join(' · ') || teacherRemark(result.yearlyPercentage)}</p>}
               </div>
             )}
             {blocks.adminRemarks && (
