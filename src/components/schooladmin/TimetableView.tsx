@@ -379,6 +379,8 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
   const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
       const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
@@ -576,7 +578,7 @@ export const TimetableView: React.FC = () => {
             <h2 className="mb-2 text-sm font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
             <table className="w-full border-collapse text-[7px]">
               <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
-              <tbody>{days.map(day => <tr key={day}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
+              <tbody>{days.map(day => <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
                 const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                 const subject = subjects.find(item => item.id === slot?.subjectId);
                 return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
@@ -634,6 +636,8 @@ export const TimetableView: React.FC = () => {
                       {periods.map(period => {
                         const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                         const subject = subjects.find(item => item.id === slot?.subjectId);
+                        const teacher = teachers.find(item => item.id === slot?.teacherId);
+                        const registeredRoom = rooms.find(item => item.id === slot?.roomId);
                         const isClosedPeriod = !hasConfiguredWorkingDays && day === 'Friday' && period === 6;
                         return (
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
@@ -648,6 +652,8 @@ export const TimetableView: React.FC = () => {
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
+                                <span className="mt-1 block text-[9px] text-[#475569]">{teacher?.fullName || teacher?.name || 'Macallin lama qoondeyn'}</span>
+                                <span className="block text-[9px] text-[#64748B]">{registeredRoom?.name || slot.roomNumber || 'Qol lama cayimin'}</span>
                                 {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
                               </div>
                             ) : <span className="text-[9px] text-[#CBD5E1]">—</span>}
