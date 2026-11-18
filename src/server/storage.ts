@@ -2741,6 +2741,59 @@ class StorageEngine {
     return results;
   }
 
+  public async reopenClassSubjectMarks(
+    schoolId: string,
+    classId: string,
+    subjectId: string,
+    semester: 'Semester 1' | 'Semester 2',
+    reopenedBy: string,
+    reopenedByName: string,
+    reopenedByRole: UserRole
+  ): Promise<number> {
+    const klass = await this.getClassById(classId, schoolId);
+    if (!klass || klass.isArchived) throw new Error('The selected class was not found in this school.');
+    const assignment = await this.queryRows<any>('class_subjects', {
+      school_id: schoolId, class_id: classId, subject_id: subjectId, is_active: 'true'
+    });
+    if (!assignment.length) throw new Error('The subject is not active in this class.');
+    const rows = await this.getMarks(schoolId, classId, subjectId, semester);
+    if (!rows.length || rows.some(mark => mark.status !== 'submitted' || mark.publishedAt)) {
+      throw new Error('Only a subject submitted to the Form Teacher and not yet forwarded can be reopened.');
+    }
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam marks storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('student_marks')
+      .update({ status: 'draft', correction_reason: 'Reopened by Form Teacher', updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId)
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .eq('academic_year', klass.academicYear)
+      .eq('semester', semester)
+      .eq('status', 'submitted')
+      .is('published_at', null)
+      .select('*');
+    this.recordQuery('student_marks', 'reopen-form-teacher-subject', startedAt);
+    if (error) throw new Error(error.message || 'Subject marks could not be reopened.');
+    const reopened = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    for (const row of reopened) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+    }
+    this.logAudit({
+      action: 'FORM_TEACHER_REOPENED_SUBJECT_MARKS',
+      category: 'academics',
+      schoolId,
+      userId: reopenedBy,
+      userName: reopenedByName,
+      userRole: reopenedByRole,
+      details: JSON.stringify({ classId, subjectId, semester, reopenedCount: reopened.length }),
+      severity: 'warning'
+    });
+    await this.flush();
+    return reopened.length;
+  }
+
   public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string, forwardedByName = 'Class Form Teacher'): Promise<{ count: number }> {
     const [assignments, students, marks] = await Promise.all([
       this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' }),
