@@ -7,6 +7,7 @@ import {
   calculateFinalSubjectScore,
   formatExamScore
 } from '../src/lib/exam-calculations.ts';
+import { translations } from '../src/lib/translations.ts';
 
 const parts = [
   { id: 'quiz', name: 'Quiz', maxMarks: 10 },
@@ -57,4 +58,22 @@ test('final term subject score requires both terms and averages without early ro
   assert.equal(calculateFinalSubjectScore(80, 85), 82.5);
   assert.equal(formatExamScore(82.5), '82.5');
   assert.equal(formatExamScore(80), '80');
+});
+
+
+test('seven-subject yearly example preserves half marks until the final average', () => {
+  const term1 = Array(7).fill(80) as number[];
+  const term2 = Array(7).fill(85) as number[];
+  assert.equal(term1.reduce((sum, score) => sum + score, 0), 560);
+  assert.equal(term2.reduce((sum, score) => sum + score, 0), 595);
+  const finalSubjects = term1.map((score, index) => calculateFinalSubjectScore(score, term2[index])!);
+  assert.equal(finalSubjects.reduce((sum, score) => sum + score, 0), 577.5);
+  assert.equal(finalSubjects.reduce((sum, score) => sum + score, 0) / 7, 82.5);
+});
+
+test('exam workflow labels are available in English, Somali, and Arabic', () => {
+  assert.equal(translations.en.exam_forward_to_admin, 'Forward class to Admin');
+  assert.equal(translations.so.exam_forward_to_admin, 'Fasalka u gudbi Maamulka');
+  assert.equal(translations.ar.exam_forward_to_admin, 'إرسال الصف إلى الإدارة');
+  assert.equal(translations.ar.exam_publish_results, 'نشر النتائج');
 });
