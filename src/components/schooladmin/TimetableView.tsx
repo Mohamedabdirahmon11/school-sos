@@ -221,6 +221,16 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const handleToggleLock = async (slot: TimetableSlot) => {
+    try {
+      const isLocked = !slot.isLocked;
+      await ApiClient.setTimetableSlotLocked(slot.id, isLocked);
+      setTimetable(current => current.map(item => item.id === slot.id ? { ...item, isLocked } : item));
+      setNotice(isLocked ? 'Casharka waa la xiray; auto-generate ma beddeli doono.' : 'Casharka waa la furay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Xaaladda casharka lama beddeli karin.');
+    }
+  };
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
       await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber);
@@ -475,7 +485,7 @@ export const TimetableView: React.FC = () => {
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
-                                {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
+                                {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
                               </div>
                             ) : <span className="text-[9px] text-[#CBD5E1]">—</span>}
                           </td>
