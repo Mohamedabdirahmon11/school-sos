@@ -5526,6 +5526,52 @@ async function canTeacherMarkAttendance(
   return { allowed: assigned || formTeacherDaily || substitute, substitute, periodNumber };
 }
 
+apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya.' }); return; }
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  if (!classId) { res.status(400).json({ error: 'Fasal ayaa loo baahan yahay.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const teacher = await getAttendanceTeacher(client, school.id, user.id);
+  if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+  const date = attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
+  const access = await canTeacherMarkAttendance(client, school.id, user.id, teacher.id, classId, date, null, null, null);
+  if (!access.allowed) { res.status(403).json({ error: 'Liiska ardayda fasalkan adiga kuma lihid.' }); return; }
+  const [{ data: klass }, { data: year }, { data: term }] = await Promise.all([
+    client.from('classes').select('id').eq('id', classId).eq('school_id', school.id).maybeSingle(),
+    client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+    client.from('terms').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle()
+  ]);
+  if (!klass) { res.status(404).json({ error: 'Fasalka lagama helin dugsigan.' }); return; }
+  const [{ data: assignments, error: assignmentError }, { data: formTeacherClass }] = await Promise.all([
+    year?.id
+      ? client.from('teacher_class_subject_assignments').select('section_id,term_id').eq('school_id', school.id)
+        .eq('academic_year_id', year.id).eq('teacher_id', teacher.id).eq('class_id', classId)
+      : Promise.resolve({ data: [], error: null }),
+    client.from('classes').select('id').eq('school_id', school.id).eq('id', classId).eq('class_teacher_id', user.id).maybeSingle()
+  ]);
+  if (assignmentError) { res.status(503).json({ error: 'Xilsaarista macallinka lama hubin karin.' }); return; }
+  const currentAssignments = (assignments || []).filter((row: any) => !row.term_id || !term?.id || row.term_id === term.id);
+  const [{ data: legacyAssignments, error: legacyError }, { data: students, error: studentsError }] = await Promise.all([
+    client.from('class_subjects').select('id').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('class_id', classId).eq('is_active', true).limit(1),
+    client.from('students').select(LIST_QUERY_COLUMNS.students).eq('school_id', school.id).eq('class_id', classId).eq('status', 'active')
+  ]);
+  if (legacyError || studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+  const fullClassAccess = Boolean(formTeacherClass || access.substitute || legacyAssignments?.length || currentAssignments.some((row: any) => !row.section_id));
+  let roster = students || [];
+  if (!fullClassAccess) {
+    const sectionIds = [...new Set(currentAssignments.map((row: any) => row.section_id).filter(Boolean))];
+    if (!sectionIds.length) { res.json([]); return; }
+    const { data: sections, error: sectionError } = await client.from('class_sections').select('id,name')
+      .eq('school_id', school.id).in('id', sectionIds);
+    if (sectionError) { res.status(503).json({ error: 'Qaybaha fasalka lama soo dejin karin.' }); return; }
+    const allowedNames = new Set((sections || []).map((row: any) => String(row.name || '').trim().toLowerCase()));
+    roster = roster.filter((student: any) => allowedNames.has(String(student.section || '').trim().toLowerCase()));
+  }
+  res.json(sanitizeStudents(roster));
+});
+
 apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School; const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya ayaa geli kara boggan.' }); return; }
