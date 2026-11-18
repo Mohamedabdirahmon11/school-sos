@@ -3766,7 +3766,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
     const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
     res.json(await decorateTimetableSlots(school.id, slots.filter((slot: any) => !req.query.dayOfWeek || slot.dayOfWeek === req.query.dayOfWeek))); return;
   } else if (!isSchoolAdmin(user)) { res.status(403).json({ error: 'This role cannot view timetables.' }); return; }
-  const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
   res.json(await decorateTimetableSlots(school.id, slots));
 });
 
@@ -4220,6 +4220,10 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
     unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
   }
+  if (!generated.some((slot: any) => !slot.isLocked)) {
+    res.json({ slots: lockedForClass, unfilled, withoutTeacher: lockedForClass.filter((slot: any) => !slot.teacherId).length, skipped: true, reason: 'Wax cashar cusub ah lama meelayn; jadwalkii hore waa la ilaaliyey.' });
+    return;
+  }
   try { await db.replaceTimetableForClass(school.id, classId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
   res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
@@ -4233,7 +4237,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
 
   const [assignments, allSlots, unavailable, settings, allClassRows] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id),
     queryAllRows('classes', { school_id: school.id }, 'id,shift')
@@ -4258,7 +4262,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     const targetShift = Number(klass.shift) === 2 ? 2 : 1;
     const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
     const occupied = new Set(sameShiftSlots.filter((slot: any) => slot.teacherId).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
-    const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
+    const blocked = new Set(unavailable.flatMap((item: any) => item.periodNumber == null
+      ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`)
+      : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
     const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
     const generatedForClass: TimetableSlot[] = [...lockedForClass];
     const dayLoad = new Map<string, number>();
@@ -4320,9 +4326,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     for (const assignment of classAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
       unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
     }
-    if (!generatedForClass.length) {
-      skipped.push({ classId: klass.id, className: klass.name, reason: 'No timetable periods could be placed; the previous timetable was kept.' });
-      workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id));
+    if (!generatedForClass.some((slot: any) => !slot.isLocked)) {
+      skipped.push({ classId: klass.id, className: klass.name, reason: 'Cashar cusub lama meelayn; jadwalkii hore waa la ilaaliyey.' });
+      workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked !== true));
       continue;
     }
     replacements.push({ classId: klass.id, slots: generatedForClass });
