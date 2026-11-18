@@ -5708,7 +5708,7 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     className: (classMap.get(slot.class_id) as any)?.name || slot.class_id,
     periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id
   }));
-  const todayLessons = [
+  const orderedTodayLessons = [
     ...timetable.filter((slot: any) => slot.dayOfWeek === weekday),
     ...(substituteSlots || []).filter((slot: any) => slot.day_of_week === weekday && slot.is_active).map((slot: any) => ({
       id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
@@ -5717,10 +5717,16 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
       className: (classMap.get(slot.class_id) as any)?.name || slot.class_id,
       periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id, isSubstitute: true
     }))
-  ].map((slot: any) => {
+  ].sort((a: any, b: any) => String(a.startTime).localeCompare(String(b.startTime)));
+  const localClock = new Intl.DateTimeFormat('en-GB', {
+    timeZone: school.timezone || 'Africa/Addis_Ababa', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(new Date());
+  const nextLesson = orderedTodayLessons.find((slot: any) => String(slot.endTime) >= localClock);
+  const todayLessons = orderedTodayLessons.map((slot: any) => {
     const sessionKey = settings?.attendance_mode === 'per_period' ? (slot.periodId || 'daily') : 'daily';
     const session: any = sessionMap.get(slot.classId + ':' + sessionKey);
-    return { ...slot, attendanceTaken: Boolean(session?.submitted_at), attendanceLocked: Boolean(session?.is_locked), sessionId: session?.id || null };
+    return { ...slot, isNextLesson: nextLesson?.id === slot.id, attendanceTaken: Boolean(session?.submitted_at),
+      attendanceLocked: Boolean(session?.is_locked), sessionId: session?.id || null };
   });
   res.json({ date, weekday, teacher: { id: teacher.id, fullName: teacher.full_name }, classes: classRows, timetable, todayLessons,
     settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: Number(settings?.edit_window_hours ?? 2), lateThresholdMinutes: Number(settings?.late_threshold_minutes ?? 15) } });
