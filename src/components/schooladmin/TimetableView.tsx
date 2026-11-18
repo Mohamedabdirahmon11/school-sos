@@ -180,7 +180,7 @@ export const TimetableView: React.FC = () => {
     ApiClient.getTimetableSections(selectedClassId).then(rows => {
       const available = Array.isArray(rows) ? rows : [];
       setSections(available);
-      setSelectedSectionId(current => current && available.some(section => section.id === current) ? current : '');
+      setSelectedSectionId(current => current && available.some(section => section.id === current) ? current : (available[0]?.id || ''));
     }).catch(() => setNotice('Qaybaha fasalka lama soo dejin karin.'));
   }, [selectedClassId]);
 
