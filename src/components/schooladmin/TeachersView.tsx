@@ -115,6 +115,25 @@ export const TeachersView: React.FC = () => {
     }
   };
 
+  const handleToggleTeacherStatus = async (teacher: Teacher) => {
+    if (isReadOnly) return;
+    const status = teacher.status === 'active' ? 'inactive' : 'active';
+    try {
+      await ApiClient.updateTeacher(teacher.id, { status });
+      setNotice(status === 'active' ? 'Macallinka waa la hawlgeliyey.' : 'Macallinka waa la joojiyey.');
+      await fetchData();
+    } catch (error: any) { setNotice(error?.message || 'Xaaladda macallinka lama beddeli karin.'); }
+  };
+
+  const handleDeleteTeacher = async (teacher: Teacher) => {
+    if (isReadOnly || !window.confirm('Ma hubtaa inaad tirtirayso ' + teacher.fullName + '? Haddii xog kale ku xiran tahay, nidaamku wuu diidi doonaa.')) return;
+    try {
+      await ApiClient.deleteTeacher(teacher.id);
+      setNotice('Macallinka waa la tirtiray.');
+      await fetchData();
+    } catch (error: any) { setNotice(error?.message || 'Macallinka lama tirtiri karin.'); }
+  };
+
   const handleResetTeacherPin = async (teacher: Teacher) => {
     if (isReadOnly) return;
     if (!confirm(`Reset the sign-in PIN for ${teacher.fullName}? The new PIN will be shown once.`)) return;
@@ -276,6 +295,10 @@ export const TeachersView: React.FC = () => {
                       className="ml-1 inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-2 font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50">
                       Reset PIN
                     </button>
+                    <button type="button" onClick={() => void handleToggleTeacherStatus(t)} disabled={isReadOnly}
+                      className="ml-1 inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{t.status === 'active' ? 'Jooji' : 'Hawl geli'}</button>
+                    <button type="button" onClick={() => void handleDeleteTeacher(t)} disabled={isReadOnly}
+                      className="ml-1 inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">Tirtir</button>
                   </td>
                 </tr>
                 );
