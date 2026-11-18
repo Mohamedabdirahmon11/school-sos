@@ -5601,7 +5601,7 @@ apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requir
   }
 });
 
-apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { markIds } = req.body;
@@ -5624,7 +5624,7 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
   res.json({ success: true, approvedCount: approved.length });
 });
 
-apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const markIds = req.body?.markIds;
@@ -5649,7 +5649,7 @@ apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchool
   }
 });
 
-apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
