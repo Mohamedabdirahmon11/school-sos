@@ -5441,6 +5441,484 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   res.json({ success: true, count: saved.length, records: saved });
 });
 
+
+const attendanceDateIsValid = (date: unknown): date is string => {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(date + 'T00:00:00.000Z');
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+};
+const attendanceLocalDate = (timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
+const attendanceWeekday = (date: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00.000Z'));
+
+async function isConfiguredSchoolDay(client: any, schoolId: string, date: string): Promise<boolean> {
+  const dayName = attendanceWeekday(date);
+  const { data, error } = await client.from('school_days').select('day_of_week,is_working').eq('school_id', schoolId);
+  if (error) throw new Error('School calendar could not be checked.');
+  const setting = (data || []).find((row: any) => String(row.day_of_week).toLowerCase() === dayName.toLowerCase());
+  return setting ? Boolean(setting.is_working) : !['Saturday', 'Sunday'].includes(dayName);
+}
+
+async function getAttendanceTeacher(client: any, schoolId: string, userId: string) {
+  const { data, error } = await client.from('teachers').select('id,full_name,status').eq('school_id', schoolId).eq('user_id', userId).maybeSingle();
+  if (error) throw new Error('Teacher profile could not be loaded.');
+  if (!data || data.status !== 'active') return null;
+  return data;
+}
+
+async function canTeacherMarkAttendance(
+  client: any, schoolId: string, userId: string, teacherId: string,
+  classId: string, date: string, subjectId: string | null, periodId: string | null, sectionId: string | null
+): Promise<{ allowed: boolean; substitute: boolean; periodNumber: number | null }> {
+  const [{ data: klass, error: classError }, { data: currentYear }, { data: currentTerm }] = await Promise.all([
+    client.from('classes').select('id,class_teacher_id,school_id').eq('id', classId).eq('school_id', schoolId).maybeSingle(),
+    client.from('academic_years').select('id').eq('school_id', schoolId).eq('is_current', true).maybeSingle(),
+    client.from('terms').select('id,academic_year_id').eq('school_id', schoolId).eq('is_current', true).maybeSingle()
+  ]);
+  if (classError || !klass) return { allowed: false, substitute: false, periodNumber: null };
+  if (sectionId) {
+    const { data: section } = await client.from('class_sections').select('id,legacy_class_id').eq('id', sectionId).eq('school_id', schoolId).maybeSingle();
+    if (!section || section.legacy_class_id !== classId) return { allowed: false, substitute: false, periodNumber: null };
+  }
+  let periodNumber: number | null = null;
+  if (periodId) {
+    const { data: period } = await client.from('periods').select('id,number').eq('id', periodId).eq('school_id', schoolId).maybeSingle();
+    if (!period) return { allowed: false, substitute: false, periodNumber: null };
+    periodNumber = Number(period.number);
+  }
+  let assigned = false;
+  if (currentYear?.id) {
+    let query = client.from('teacher_class_subject_assignments').select('id,section_id,subject_id,term_id')
+      .eq('school_id', schoolId).eq('academic_year_id', currentYear.id).eq('class_id', classId).eq('teacher_id', teacherId);
+    if (subjectId) query = query.eq('subject_id', subjectId);
+    const { data: assignmentRows, error } = await query;
+    if (error) throw new Error('Teacher assignment could not be verified.');
+    assigned = (assignmentRows || []).some((row: any) =>
+      (!row.term_id || !currentTerm?.id || row.term_id === currentTerm.id) &&
+      (!row.section_id || !sectionId || row.section_id === sectionId)
+    );
+  }
+  if (!assigned) {
+    let legacy = client.from('class_subjects').select('id,subject_id').eq('school_id', schoolId)
+      .eq('class_id', classId).eq('teacher_id', teacherId).eq('is_active', true);
+    if (subjectId) legacy = legacy.eq('subject_id', subjectId);
+    const { data: rows, error } = await legacy;
+    if (error) throw new Error('Legacy teacher assignment could not be checked.');
+    assigned = Boolean(rows?.length);
+  }
+  const formTeacherDaily = !periodId && !subjectId && klass.class_teacher_id === userId;
+  let substitute = false;
+  const { data: substitutions, error: substitutionError } = await client.from('timetable_substitutions')
+    .select('entry_id').eq('school_id', schoolId).eq('substitute_teacher_id', teacherId).eq('substitute_date', date);
+  if (substitutionError) throw new Error('Substitute lesson could not be verified.');
+  for (const substitution of substitutions || []) {
+    const { data: slot } = await client.from('timetable_slots').select('id,class_id,subject_id,period_number,day_of_week,is_active')
+      .eq('id', substitution.entry_id).eq('school_id', schoolId).maybeSingle();
+    if (!slot || !slot.is_active || slot.class_id !== classId || slot.day_of_week !== attendanceWeekday(date)) continue;
+    if (subjectId && slot.subject_id !== subjectId) continue;
+    if (periodNumber !== null && Number(slot.period_number) !== periodNumber) continue;
+    substitute = true; break;
+  }
+  if (periodId) {
+    if (!subjectId) return { allowed: false, substitute, periodNumber };
+    const { data: ownLesson } = await client.from('timetable_slots').select('id')
+      .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId)
+      .eq('teacher_id', teacherId).eq('period_number', periodNumber)
+      .eq('day_of_week', attendanceWeekday(date)).eq('is_active', true).limit(1);
+    return { allowed: Boolean(assigned && ownLesson?.length) || substitute, substitute, periodNumber };
+  }
+  return { allowed: assigned || formTeacherDaily || substitute, substitute, periodNumber };
+}
+
+apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya ayaa geli kara boggan.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const teacher = await getAttendanceTeacher(client, school.id, user.id);
+  const date = attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa'); const weekday = attendanceWeekday(date);
+  if (!teacher) { res.json({ date, teacher: null, classes: [], timetable: [], todayLessons: [], settings: { attendanceMode: 'daily', editWindowHours: 2 } }); return; }
+  const [{ data: year }, { data: term }, { data: assignmentRows, error: assignmentError }, { data: formClasses, error: formError }, { data: slots, error: slotError }, { data: settings }] = await Promise.all([
+    client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+    client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+    client.from('teacher_class_subject_assignments').select('id,class_id,section_id,subject_id,term_id,academic_year_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
+    client.from('classes').select('id,name,section,class_teacher_id,grade_level').eq('school_id', school.id).eq('class_teacher_id', user.id).eq('is_archived', false),
+    client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true),
+    client.from('attendance_settings').select('attendance_mode,edit_window_hours,late_threshold_minutes').eq('school_id', school.id).maybeSingle()
+  ]);
+  if (assignmentError || formError || slotError) { res.status(503).json({ error: 'Macluumaadka macallinka lama soo dejin karin.' }); return; }
+  const currentAssignments = (assignmentRows || []).filter((row: any) =>
+    (!year?.id || row.academic_year_id === year.id) && (!row.term_id || !term?.id || row.term_id === term.id)
+  );
+  const classIds = [...new Set([...currentAssignments.map((row: any) => row.class_id), ...(formClasses || []).map((row: any) => row.id)])];
+  const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }] = await Promise.all([
+    classIds.length ? client.from('classes').select('id,name,section,grade_level').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] }),
+    currentAssignments.length ? client.from('subjects').select('id,name,code').eq('school_id', school.id).in('id', [...new Set(currentAssignments.map((row: any) => row.subject_id))]) : Promise.resolve({ data: [] }),
+    client.from('periods').select('id,number,start_time,end_time,type').eq('school_id', school.id),
+    client.from('attendance_sessions').select('id,class_id,period_id,subject_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
+  ]);
+  const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
+  const subjectMap = new Map((subjects || []).map((row: any) => [row.id, row]));
+  const periodMap = new Map((periods || []).map((row: any) => [row.number, row]));
+  const sessionMap = new Map((todaySessions || []).map((row: any) => [row.class_id + ':' + (row.period_id || 'daily'), row]));
+  const classRows = classIds.map(classId => {
+    const klass: any = classMap.get(classId);
+    const assignedSubjects = currentAssignments.filter((row: any) => row.class_id === classId)
+      .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id }));
+    return { ...(klass || { id: classId, name: classId }), subjects: assignedSubjects };
+  });
+  const timetable = (slots || []).map((slot: any) => ({
+    id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
+    startTime: slot.start_time, endTime: slot.end_time, subjectId: slot.subject_id,
+    subjectName: (subjectMap.get(slot.subject_id) as any)?.name || slot.subject_id,
+    className: (classMap.get(slot.class_id) as any)?.name || slot.class_id,
+    periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id
+  }));
+  const todayLessons = timetable.filter((slot: any) => slot.dayOfWeek === weekday).map((slot: any) => {
+    const session: any = sessionMap.get(slot.classId + ':' + (slot.periodId || 'daily'));
+    return { ...slot, attendanceTaken: Boolean(session?.submitted_at), attendanceLocked: Boolean(session?.is_locked), sessionId: session?.id || null };
+  });
+  res.json({ date, weekday, teacher: { id: teacher.id, fullName: teacher.full_name }, classes: classRows, timetable, todayLessons,
+    settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: Number(settings?.edit_window_hours ?? 2), lateThresholdMinutes: Number(settings?.late_threshold_minutes ?? 15) } });
+});
+
+apiRouter.get('/attendance/settings', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  if (!['school_admin','super_admin','teacher'].includes(normalizeRole(user.role) || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data, error } = await client.from('attendance_settings').select('*').eq('school_id', school.id).maybeSingle();
+  if (error) { res.status(503).json({ error: 'Dejinta xaadirinta lama akhrin karin.' }); return; }
+  res.json({ attendanceMode: data?.attendance_mode || 'daily', editWindowHours: data?.edit_window_hours ?? 2, lateThresholdMinutes: data?.late_threshold_minutes ?? 15 });
+});
+
+apiRouter.put('/attendance/settings', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const mode = req.body?.attendanceMode; const editWindowHours = Number(req.body?.editWindowHours); const lateThresholdMinutes = Number(req.body?.lateThresholdMinutes);
+  if (!['daily','per_period'].includes(mode) || !Number.isInteger(editWindowHours) || editWindowHours < 0 || editWindowHours > 168 || !Number.isInteger(lateThresholdMinutes) || lateThresholdMinutes < 0 || lateThresholdMinutes > 240) {
+    res.status(400).json({ error: 'Dejinta xaadirinta sax ma aha.' }); return;
+  }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data, error } = await client.from('attendance_settings').upsert({
+    school_id: school.id, attendance_mode: mode, edit_window_hours: editWindowHours,
+    late_threshold_minutes: lateThresholdMinutes, updated_by: user.id, updated_at: new Date().toISOString()
+  }, { onConflict: 'school_id' }).select().single();
+  if (error) { res.status(503).json({ error: 'Dejinta xaadirinta lama kaydin karin.' }); return; }
+  res.json({ attendanceMode: data.attendance_mode, editWindowHours: data.edit_window_hours, lateThresholdMinutes: data.late_threshold_minutes });
+});
+
+apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const classId = String(req.query.classId || ''); const date = String(req.query.date || '');
+  const periodId = typeof req.query.periodId === 'string' && req.query.periodId ? req.query.periodId : null;
+  const subjectId = typeof req.query.subjectId === 'string' && req.query.subjectId ? req.query.subjectId : null;
+  const sectionId = typeof req.query.sectionId === 'string' && req.query.sectionId ? req.query.sectionId : null;
+  if (!classId || !attendanceDateIsValid(date)) { res.status(400).json({ error: 'Fasal iyo taariikh sax ah ayaa loo baahan yahay.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const role = normalizeRole(user.role);
+  if (role === 'teacher') {
+    const teacher = await getAttendanceTeacher(client, school.id, user.id);
+    if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+    const access = await canTeacherMarkAttendance(client, school.id, user.id, teacher.id, classId, date, subjectId, periodId, sectionId);
+    if (!access.allowed) { res.status(403).json({ error: 'Waxaad arki kartaa oo keliya fasallada iyo casharrada laguu qoondeeyey.' }); return; }
+  } else if (!['school_admin','super_admin'].includes(role || '')) { res.status(403).json({ error: 'Rukhsad ma lihid.' }); return; }
+  let sessionQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
+  sessionQuery = periodId ? sessionQuery.eq('period_id', periodId) : sessionQuery.is('period_id', null);
+  const [{ data: session, error: sessionError }, { data: records, error: recordsError }, { data: settings }] = await Promise.all([
+    sessionQuery.maybeSingle(),
+    (() => { let q = client.from('attendance_records').select('id,student_id,status,note,marked_by,marked_at,updated_at').eq('school_id', school.id).eq('class_id', classId).eq('date', date); return periodId ? q.eq('period_id', periodId) : q.is('period_id', null); })(),
+    client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle()
+  ]);
+  if (sessionError || recordsError) { res.status(503).json({ error: 'Xaadirinta lama soo dejin karin.' }); return; }
+  res.json({ session: session || null, records: records || [], settings: { attendanceMode: settings?.attendance_mode || 'daily', editWindowHours: settings?.edit_window_hours ?? 2 } });
+});
+
+apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'Macallin keliya ayaa gudbin kara xaadirinta casharka.' }); return; }
+  const classId = String(req.body?.classId || ''); const date = req.body?.date;
+  const periodId = typeof req.body?.periodId === 'string' && req.body.periodId ? req.body.periodId : null;
+  const subjectId = typeof req.body?.subjectId === 'string' && req.body.subjectId ? req.body.subjectId : null;
+  const sectionId = typeof req.body?.sectionId === 'string' && req.body.sectionId ? req.body.sectionId : null;
+  const records = req.body?.records;
+  if (!classId || !attendanceDateIsValid(date) || !Array.isArray(records) || records.length < 1 || records.length > 2000) {
+    res.status(400).json({ error: 'Fasal, taariikh iyo liiska ardayda ayaa loo baahan yahay.' }); return;
+  }
+  const client = documentServiceClient(res); if (!client) return;
+  const today = attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
+  if (date > today) { res.status(400).json({ error: 'Xaadirin mustaqbal ah lama qaadi karo.' }); return; }
+  try {
+    if (!await isConfiguredSchoolDay(client, school.id, date)) { res.status(400).json({ error: 'Taariikhdani ma aha maalin waxbarasho oo dugsigu furan yahay.' }); return; }
+    const [{ data: settings }, teacher] = await Promise.all([
+      client.from('attendance_settings').select('attendance_mode,edit_window_hours').eq('school_id', school.id).maybeSingle(),
+      getAttendanceTeacher(client, school.id, user.id)
+    ]);
+    if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+    const mode = settings?.attendance_mode || 'daily';
+    if (mode === 'per_period' && (!periodId || !subjectId)) { res.status(400).json({ error: 'Dooro casharka iyo maaddada si aad xaadirinta u qaaddo.' }); return; }
+    if (mode === 'daily' && (periodId || subjectId)) { res.status(400).json({ error: 'Dugsigu wuxuu isticmaalayaa xaadirin maalinle ah.' }); return; }
+    const access = await canTeacherMarkAttendance(client, school.id, user.id, teacher.id, classId, date, subjectId, periodId, sectionId);
+    if (!access.allowed) { res.status(403).json({ error: 'Ma lihid fasax aad xaadirinta fasalkan/casharkan ku qaaddo.' }); return; }
+    const { data: klass } = await client.from('classes').select('id,name,section').eq('id', classId).eq('school_id', school.id).maybeSingle();
+    if (!klass) { res.status(404).json({ error: 'Fasalka lagama helin dugsigan.' }); return; }
+    const { data: students, error: studentsError } = await client.from('students').select('id,section')
+      .eq('school_id', school.id).eq('class_id', classId).eq('status', 'active');
+    if (studentsError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+    const selectedStudents = sectionId ? (students || []).filter((student: any) =>
+      !klass.section || String(student.section || '').toLowerCase() === String(klass.section || '').toLowerCase()
+    ) : (students || []);
+    const studentIds = new Set(selectedStudents.map((student: any) => String(student.id)));
+    const seen = new Set<string>(); const allowedStatuses = new Set(['present','absent','late','excused']);
+    for (const row of records) {
+      if (!row || typeof row.studentId !== 'string' || !studentIds.has(row.studentId) || seen.has(row.studentId) || !allowedStatuses.has(row.status)) {
+        res.status(400).json({ error: 'Liiska xaadirintu wuxuu leeyahay arday ama xaalad aan sax ahayn.' }); return;
+      }
+      if (typeof row.note === 'string' && row.note.length > 500) { res.status(400).json({ error: 'Faalladu kama badnaan karto 500 xaraf.' }); return; }
+      if (row.status === 'excused' && school.attendanceRules?.requireExcusedReason && !String(row.note || '').trim()) {
+        res.status(400).json({ error: 'Cudur-daar kasta waa inuu leeyahay sabab.' }); return;
+      }
+      seen.add(row.studentId);
+    }
+    if (seen.size !== studentIds.size || [...studentIds].some(id => !seen.has(id))) {
+      res.status(400).json({ error: 'Dhammaan ardayda fasalka waa in xaadirintooda la gudbiyaa.' }); return;
+    }
+    let existingQuery = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
+    existingQuery = periodId ? existingQuery.eq('period_id', periodId) : existingQuery.is('period_id', null);
+    const { data: existingSession, error: existingError } = await existingQuery.maybeSingle();
+    if (existingError) { res.status(503).json({ error: 'Xaaladda xaadirinta lama hubin karin.' }); return; }
+    const now = new Date(); const editWindowHours = Number(settings?.edit_window_hours ?? 2);
+    if (existingSession) {
+      if (existingSession.is_locked || (existingSession.submitted_at && now.getTime() > new Date(existingSession.submitted_at).getTime() + editWindowHours * 3600000)) {
+        await client.from('attendance_sessions').update({ is_locked: true, updated_at: now.toISOString() }).eq('id', existingSession.id).eq('school_id', school.id);
+        res.status(423).json({ error: 'Xaadirintan waa la xiray. Maamulka dugsiga ayaa dib u furi kara.' }); return;
+      }
+      if (existingSession.teacher_id !== teacher.id) { res.status(403).json({ error: 'Macallinkii gudbiyey xaadirintan oo keliya ayaa wax ka beddeli kara.' }); return; }
+    }
+    let session = existingSession;
+    if (!session) {
+      const { data: created, error: createError } = await client.from('attendance_sessions').insert({
+        school_id: school.id, date, class_id: classId, section_id: sectionId, period_id: periodId,
+        subject_id: subjectId, teacher_id: teacher.id, is_locked: false
+      }).select().single();
+      if (createError) {
+        let retry = client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
+        retry = periodId ? retry.eq('period_id', periodId) : retry.is('period_id', null);
+        const { data: raced } = await retry.maybeSingle();
+        if (!raced) { res.status(503).json({ error: 'Xaadirinta lama bilaabi karin. Mar kale isku day.' }); return; }
+        session = raced;
+      } else session = created;
+    }
+    let previousQuery = client.from('attendance_records').select('id,student_id,status,note').eq('school_id', school.id).eq('class_id', classId).eq('date', date);
+    previousQuery = periodId ? previousQuery.eq('period_id', periodId) : previousQuery.is('period_id', null);
+    const { data: previousRows } = await previousQuery;
+    const previousByStudent = new Map((previousRows || []).map((row: any) => [String(row.student_id), row]));
+    const markedAt = now.toISOString();
+    const payload = records.map((row: any) => {
+      const key = [school.id, classId, row.studentId, date, periodId || 'daily'].join('\u0000');
+      const id = 'att-' + createHash('sha256').update(key).digest('hex').slice(0, 32);
+      return {
+        id, school_id: school.id, class_id: classId, section_id: sectionId, period_id: periodId,
+        subject_id: subjectId, student_id: row.studentId, date, status: row.status,
+        note: String(row.note || '').trim() || null, recorded_by: user.id, recorded_at: markedAt,
+        marked_by: user.id, marked_at: markedAt, updated_at: markedAt
+      };
+    });
+    const { data: saved, error: saveError } = await client.from('attendance_records').upsert(payload, { onConflict: 'id' }).select();
+    if (saveError) { res.status(503).json({ error: 'Xaadirinta lama kaydin karin. Calaamadaha aad dooratay weli way kuu muuqanayaan; mar kale isku day.' }); return; }
+    const auditRows = payload.map((row: any) => {
+      const previous: any = previousByStudent.get(row.student_id);
+      return {
+        school_id: school.id, session_id: session.id, attendance_record_id: row.id,
+        entity_type: 'student', entity_id: row.student_id,
+        action: previous ? (previous.status === row.status ? 'note_updated' : 'status_changed') : 'marked',
+        before_data: previous ? { status: previous.status, note: previous.note } : null,
+        after_data: { status: row.status, note: row.note }, changed_by: user.id
+      };
+    });
+    const [{ error: auditError }, { data: updatedSession, error: sessionUpdateError }] = await Promise.all([
+      client.from('attendance_audit_logs').insert(auditRows),
+      client.from('attendance_sessions').update({ submitted_at: markedAt, is_locked: false, updated_at: markedAt })
+        .eq('id', session.id).eq('school_id', school.id).select().single()
+    ]);
+    if (sessionUpdateError) { res.status(503).json({ error: 'Xaadirinta waa la kaydiyey, balse xaaladdeeda lama cusboonaysiin karin. La xiriir maamulka.' }); return; }
+    if (auditError) console.error('Attendance audit insert failed:', auditError.message);
+    res.json({ success: true, count: saved?.length || payload.length, session: updatedSession, records: saved || payload });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Xaadirinta lama kaydin karin.' });
+  }
+});
+
+apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const date = typeof req.query.date === 'string' ? req.query.date : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
+  if (!attendanceDateIsValid(date)) { res.status(400).json({ error: 'Taariikh sax ah ayaa loo baahan yahay.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const [{ data: classes }, { data: students }, { data: records }, { data: sessions }] = await Promise.all([
+    client.from('classes').select('id,name,section').eq('school_id', school.id).eq('is_archived', false),
+    client.from('students').select('id,class_id,student_id,first_name,middle_name,last_name,father_phone,mother_phone').eq('school_id', school.id).eq('status', 'active'),
+    client.from('attendance_records').select('id,class_id,student_id,status,note,period_id,subject_id').eq('school_id', school.id).eq('date', date),
+    client.from('attendance_sessions').select('id,class_id,period_id,subject_id,teacher_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
+  ]);
+  const studentMap = new Map((students || []).map((row: any) => [row.id, row]));
+  const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
+  const absentStudents = (records || []).filter((row: any) => row.status === 'absent').map((row: any) => {
+    const student: any = studentMap.get(row.student_id); if (!student) return null;
+    return { ...row, student, className: (classMap.get(row.class_id) as any)?.name || '—' };
+  }).filter(Boolean);
+  const present = (records || []).filter((row: any) => ['present','late'].includes(row.status)).length;
+  const excused = (records || []).filter((row: any) => row.status === 'excused').length;
+  const denominator = Math.max(0, (students || []).length - excused);
+  const submittedClassIds = new Set((sessions || []).map((row: any) => row.class_id));
+  const classesNotSubmitted = (classes || []).filter((row: any) => !submittedClassIds.has(row.id) && !(records || []).some((record: any) => record.class_id === row.id));
+  res.json({ date, totalStudents: students?.length || 0, recorded: records?.length || 0,
+    attendanceRate: denominator ? Math.round(present * 100 / denominator) : 0, absentCount: absentStudents.length,
+    absentStudents, sessions: sessions || [], classesNotSubmitted, classes: classes || [] });
+});
+
+apiRouter.get('/attendance/sessions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const date = typeof req.query.date === 'string' ? req.query.date : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
+  if (!attendanceDateIsValid(date)) { res.status(400).json({ error: 'Taariikh sax ah ayaa loo baahan yahay.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data, error } = await client.from('attendance_sessions').select('*').eq('school_id', school.id).eq('date', date).order('submitted_at', { ascending: false });
+  if (error) { res.status(503).json({ error: 'Kulamada xaadirinta lama soo dejin karin.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/attendance/sessions/:id/unlock', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const reason = String(req.body?.reason || '').trim();
+  if (reason.length < 4 || reason.length > 500) { res.status(400).json({ error: 'Sababta furitaanka waa inay u dhexaysaa 4–500 xaraf.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data: before } = await client.from('attendance_sessions').select('*').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
+  if (!before) { res.status(404).json({ error: 'Kulanka xaadirinta lama helin.' }); return; }
+  const now = new Date().toISOString();
+  const { data, error } = await client.from('attendance_sessions').update({
+    is_locked: false, submitted_at: now, unlocked_at: now, unlocked_by: user.id, unlock_reason: reason, updated_at: now
+  }).eq('id', before.id).eq('school_id', school.id).select().single();
+  if (error) { res.status(503).json({ error: 'Kulanka lama furi karin.' }); return; }
+  await client.from('attendance_audit_logs').insert({
+    school_id: school.id, session_id: before.id, entity_type: 'session', entity_id: before.id,
+    action: 'admin_unlocked', before_data: before, after_data: data, changed_by: user.id, details: reason
+  });
+  res.json({ success: true, session: data });
+});
+
+apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const startDate = String(req.query.startDate || ''); const endDate = String(req.query.endDate || '');
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const subjectId = typeof req.query.subjectId === 'string' ? req.query.subjectId : '';
+  if (!attendanceDateIsValid(startDate) || !attendanceDateIsValid(endDate) || startDate > endDate ||
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) > 366 * 86400000) {
+    res.status(400).json({ error: 'Dooro taariikho sax ah oo aan ka badnayn 12 bilood.' }); return;
+  }
+  const client = documentServiceClient(res); if (!client) return;
+  let query = client.from('attendance_records').select('id,class_id,student_id,date,status,subject_id,period_id,note,marked_by')
+    .eq('school_id', school.id).gte('date', startDate).lte('date', endDate);
+  if (classId) query = query.eq('class_id', classId);
+  if (subjectId) query = query.eq('subject_id', subjectId);
+  const { data: rows, error } = await query.order('date', { ascending: true }).limit(20000);
+  if (error) { res.status(503).json({ error: 'Warbixinta xaadirinta lama soo dejin karin.' }); return; }
+  let scopedRows: any[] = rows || [];
+  if (normalizeRole(user.role) === 'teacher') {
+    const teacher = await getAttendanceTeacher(client, school.id, user.id);
+    if (!teacher) { res.status(403).json({ error: 'Macallinka lama helin.' }); return; }
+    const [{ data: assignments }, { data: formClasses }] = await Promise.all([
+      client.from('teacher_class_subject_assignments').select('class_id,subject_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
+      client.from('classes').select('id').eq('school_id', school.id).eq('class_teacher_id', user.id)
+    ]);
+    const allowed = new Set((assignments || []).map((row: any) => row.class_id + ':' + row.subject_id));
+    const allowedClasses = new Set((formClasses || []).map((row: any) => row.id));
+    scopedRows = scopedRows.filter((row: any) => allowed.has(row.class_id + ':' + row.subject_id) || (allowedClasses.has(row.class_id) && !row.subject_id));
+  } else if (!['school_admin','super_admin','accountant'].includes(normalizeRole(user.role) || '')) {
+    res.status(403).json({ error: 'Rukhsad ma lihid.' }); return;
+  } else if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) {
+    res.status(403).json({ error: 'Rukhsad xaadirin ma lihid.' }); return;
+  }
+  const studentIds = [...new Set(scopedRows.map((row: any) => row.student_id))];
+  const classIds = [...new Set(scopedRows.map((row: any) => row.class_id))];
+  const [{ data: students }, { data: classes }] = await Promise.all([
+    studentIds.length ? client.from('students').select('id,student_id,first_name,middle_name,last_name,class_id').eq('school_id', school.id).in('id', studentIds) : Promise.resolve({ data: [] }),
+    classIds.length ? client.from('classes').select('id,name,section').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] })
+  ]);
+  const studentMap = new Map((students || []).map((row: any) => [row.id, row]));
+  const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
+  const grouped = new Map<string, any>();
+  for (const row of scopedRows) {
+    const student: any = studentMap.get(row.student_id); if (!student) continue;
+    const item = grouped.get(row.student_id) || {
+      studentId: student.student_id, studentName: [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' '),
+      className: (classMap.get(row.class_id) as any)?.name || '—', present: 0, absent: 0, late: 0, excused: 0, dates: []
+    };
+    item[row.status] = (item[row.status] || 0) + 1; item.dates.push({ date: row.date, status: row.status }); grouped.set(row.student_id, item);
+  }
+  const summaries = [...grouped.values()].map(item => {
+    const dates = [...new Set(item.dates.filter((x: any) => x.status === 'absent').map((x: any) => x.date))].sort();
+    let longest = 0; let current = 0; let previous: string | null = null;
+    for (const day of dates) {
+      const next = new Date(day + 'T00:00:00.000Z');
+      current = previous && next.getTime() - new Date(previous + 'T00:00:00.000Z').getTime() === 86400000 ? current + 1 : 1;
+      longest = Math.max(longest, current); previous = day;
+    }
+    const total = item.present + item.absent + item.late + item.excused;
+    return { ...item, absenceStreak: longest, attendancePercentage: total ? Math.round((item.present + item.late) * 100 / total) : 0 };
+  });
+  if (req.query.format === 'csv') {
+    const cell = (value: unknown) => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+    const csv = [['Student ID','Student','Class','Present','Absent','Late','Excused','Attendance %','Absence streak'],
+      ...summaries.map(x => [x.studentId,x.studentName,x.className,x.present,x.absent,x.late,x.excused,x.attendancePercentage,x.absenceStreak])]
+      .map(row => row.map(cell).join(',')).join('\r\n');
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="attendance-' + startDate + '-' + endDate + '.csv"' }).send('\uFEFF' + csv);
+    return;
+  }
+  res.json({ startDate, endDate, summaries, totalRecords: scopedRows.length });
+});
+
+apiRouter.get('/attendance/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const month = typeof req.query.month === 'string' ? req.query.month : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa').slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) { res.status(400).json({ error: 'Bil sax ah ayaa loo baahan yahay.' }); return; }
+  const start = month + '-01'; const end = new Date(Date.UTC(Number(month.slice(0,4)), Number(month.slice(5,7)), 0)).toISOString().slice(0,10);
+  const client = documentServiceClient(res); if (!client) return;
+  const [{ data: teachers }, { data: records, error }] = await Promise.all([
+    client.from('teachers').select('id,full_name,staff_id,phone,status').eq('school_id', school.id).order('full_name'),
+    client.from('teacher_attendance').select('*').eq('school_id', school.id).gte('date', start).lte('date', end).order('date')
+  ]);
+  if (error) { res.status(503).json({ error: 'Xaadirinta macallimiinta lama soo dejin karin.' }); return; }
+  const summary = (teachers || []).map((teacher: any) => {
+    const rows = (records || []).filter((row: any) => row.teacher_id === teacher.id);
+    return { teacher, present: rows.filter((row: any) => row.status === 'present').length, absent: rows.filter((row: any) => row.status === 'absent').length,
+      late: rows.filter((row: any) => row.status === 'late').length, onLeave: rows.filter((row: any) => row.status === 'on_leave').length };
+  });
+  res.json({ month, teachers: teachers || [], records: records || [], summary });
+});
+
+apiRouter.post('/attendance/teachers', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const teacherId = String(req.body?.teacherId || ''); const date = req.body?.date; const status = req.body?.status;
+  const note = String(req.body?.note || '').trim();
+  if (!teacherId || !attendanceDateIsValid(date) || !['present','absent','late','on_leave'].includes(status) || note.length > 500) {
+    res.status(400).json({ error: 'Xogta xaadirinta macallinka sax ma aha.' }); return;
+  }
+  if (date > attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa')) { res.status(400).json({ error: 'Taariikh mustaqbal ah lama diiwaangelin karo.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data: teacher } = await client.from('teachers').select('id').eq('id', teacherId).eq('school_id', school.id).maybeSingle();
+  if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
+  let checkIn: string | null = null; let checkOut: string | null = null;
+  if (req.body?.checkIn) { const parsed = new Date(req.body.checkIn); if (Number.isNaN(parsed.getTime())) { res.status(400).json({ error: 'Waqtiga imaanshaha sax ma aha.' }); return; } checkIn = parsed.toISOString(); }
+  if (req.body?.checkOut) { const parsed = new Date(req.body.checkOut); if (Number.isNaN(parsed.getTime())) { res.status(400).json({ error: 'Waqtiga bixitaanka sax ma aha.' }); return; } checkOut = parsed.toISOString(); }
+  if (checkIn && checkOut && new Date(checkOut) < new Date(checkIn)) { res.status(400).json({ error: 'Waqtiga bixitaanku kama horrayn karo waqtiga imaanshaha.' }); return; }
+  const { data: before } = await client.from('teacher_attendance').select('*').eq('school_id', school.id).eq('teacher_id', teacherId).eq('date', date).maybeSingle();
+  const { data, error } = await client.from('teacher_attendance').upsert({
+    school_id: school.id, teacher_id: teacherId, date, status, note: note || null, check_in: checkIn, check_out: checkOut,
+    marked_by: user.id, updated_at: new Date().toISOString()
+  }, { onConflict: 'school_id,teacher_id,date' }).select().single();
+  if (error) { res.status(503).json({ error: 'Xaadirinta macallinka lama kaydin karin.' }); return; }
+  await client.from('attendance_audit_logs').insert({
+    school_id: school.id, entity_type: 'teacher', entity_id: teacherId, action: before ? 'teacher_status_changed' : 'teacher_marked',
+    before_data: before || null, after_data: data, changed_by: user.id
+  });
+  res.json({ success: true, attendance: data });
+});
+
 // ==============================================================================
 // 6. EXAMS & RESULTS: SMALL + BIG EXAM -> PERCENTAGE ONLY
 // ==============================================================================
