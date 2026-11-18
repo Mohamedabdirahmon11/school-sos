@@ -694,11 +694,11 @@ export class ApiClient {
   }
 
   public static async generateTimetable(classId: string, termId?: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId, termId }) });
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number; warnings?: string[] }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId, termId }) });
   }
 
   public static async generateAllTimetables(previewOnly = false, termId?: string) {
-    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly, termId }) });
+    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number; warnings?: string[] }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly, termId }) });
   }
 
   public static async clearTimetableClass(classId: string, termId: string) {
