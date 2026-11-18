@@ -4678,6 +4678,32 @@ apiRouter.put('/teachers/:id/subjects', requireAuth, requireSchoolContext, requi
   res.json({ success: true, subjectIds: ids });
 });
 
+apiRouter.delete('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const teacherId = String(req.params.id || '');
+  const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id,user_id,full_name')).items[0] as any;
+  if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
+  const userId = String(teacher.userId || '');
+  const [assignments, timetable, curriculum, payroll, classes, attendance] = await Promise.all([
+    db.queryPage('assignments', { school_id: school.id, teacher_id: teacherId }, 1, 1, undefined, 'id'),
+    db.queryPage('timetable_slots', { school_id: school.id, teacher_id: teacherId }, 1, 1, undefined, 'id'),
+    db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacherId }, 1, 1, undefined, 'id'),
+    userId ? db.queryPage('payroll_records', { school_id: school.id, user_id: userId }, 1, 1, undefined, 'id') : Promise.resolve({ total: 0, items: [] }),
+    userId ? db.queryPage('classes', { school_id: school.id, class_teacher_id: userId }, 1, 1, undefined, 'id') : Promise.resolve({ total: 0, items: [] }),
+    userId ? db.queryPage('attendance_records', { school_id: school.id, recorded_by: userId }, 1, 1, undefined, 'id') : Promise.resolve({ total: 0, items: [] })
+  ]);
+  if ([assignments, timetable, curriculum, payroll, classes, attendance].some(result => result.total > 0)) {
+    res.status(409).json({ error: 'Macallinkan lama tirtiri karo: waxaa ku xiran shaqooyin, manhaj/fasallo, jadwal, mushahar ama xaadirin. Fadlan xaaladdiisa ka dhig “Aan firfircoonayn” halkii aad ka tirtiri lahayd.' });
+    return;
+  }
+  await db.getTeachers(school.id);
+  if (userId) await db.getUsers(school.id, 'teacher');
+  db.deleteTeacher(teacherId);
+  if (userId) db.deleteUser(userId);
+  await db.flush();
+  res.json({ success: true });
+});
+
 apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const id = String(req.params.id || '');
