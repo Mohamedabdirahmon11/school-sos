@@ -6005,9 +6005,11 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
   const date = typeof req.query.date === 'string' ? req.query.date : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
   if (!attendanceDateIsValid(date)) { res.status(400).json({ error: 'Taariikh sax ah ayaa loo baahan yahay.' }); return; }
   const client = documentServiceClient(res); if (!client) return;
-  const [{ data: classes }, { data: year }, { data: records }, { data: sessions }] = await Promise.all([
+  const [{ data: classes }, { data: year }, { data: term }, { data: settings }, { data: records }, { data: sessions }] = await Promise.all([
     client.from('classes').select('id,name,section').eq('school_id', school.id).eq('is_archived', false),
     client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+    client.from('terms').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
+    client.from('attendance_settings').select('attendance_mode').eq('school_id', school.id).maybeSingle(),
     client.from('attendance_records').select('id,class_id,student_id,status,note,period_id,subject_id').eq('school_id', school.id).eq('date', date),
     client.from('attendance_sessions').select('id,class_id,period_id,subject_id,teacher_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
   ]);
@@ -6025,22 +6027,58 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
   (enrollments || []).forEach((row: any) => enrollmentCountByClass.set(row.class_id, (enrollmentCountByClass.get(row.class_id) || 0) + 1));
   const studentMap = new Map((students || []).map((row: any) => [row.id, row]));
   const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
-  const absentStudents = (records || []).filter((row: any) => row.status === 'absent').map((row: any) => {
-    const student: any = studentMap.get(row.student_id); if (!student) return null;
-    return { ...row, student, className: (classMap.get(row.class_id) as any)?.name || '—' };
-  }).filter(Boolean);
+  const absentByStudent = new Map<string, any>();
+  (records || []).filter((row: any) => row.status === 'absent').forEach((row: any) => {
+    const student: any = studentMap.get(row.student_id);
+    if (student && !absentByStudent.has(row.student_id)) {
+      absentByStudent.set(row.student_id, { ...row, student, className: (classMap.get(row.class_id) as any)?.name || '—' });
+    }
+  });
+  const absentStudents = [...absentByStudent.values()];
   const present = (records || []).filter((row: any) => ['present','late'].includes(row.status)).length;
   const excused = (records || []).filter((row: any) => row.status === 'excused').length;
   const denominator = Math.max(0, (records || []).length - excused);
-  const submittedClassIds = new Set([
-    ...(sessions || []).filter((row: any) => Boolean(row.submitted_at)).map((row: any) => row.class_id),
-    ...(classes || []).filter((klass: any) => {
+  let classesNotSubmitted: any[] = [];
+  if ((settings?.attendance_mode || 'daily') === 'per_period') {
+    const weekday = attendanceWeekday(date);
+    const { data: timetableRows, error: timetableError } = await client.from('timetable_slots')
+      .select('class_id,period_number,term_id').eq('school_id', school.id).eq('day_of_week', weekday).eq('is_active', true);
+    if (timetableError) { res.status(503).json({ error: 'Jadwalka maanta lama hubin karin.' }); return; }
+    const currentSlots = (timetableRows || []).filter((slot: any) => !slot.term_id || slot.term_id === term?.id);
+    const periodNumbers = [...new Set(currentSlots.map((slot: any) => slot.period_number))];
+    const { data: periodRows, error: periodError } = periodNumbers.length
+      ? await client.from('periods').select('id,number').eq('school_id', school.id).in('number', periodNumbers)
+      : { data: [], error: null };
+    if (periodError) { res.status(503).json({ error: 'Waqtiyada casharrada lama hubin karin.' }); return; }
+    const periodIdByNumber = new Map((periodRows || []).map((period: any) => [period.number, period.id]));
+    const expectedByClass = new Map<string, Set<string>>();
+    currentSlots.forEach((slot: any) => {
+      const periodKey = periodIdByNumber.get(slot.period_number);
+      if (!periodKey) return;
+      const expected = expectedByClass.get(slot.class_id) || new Set<string>();
+      expected.add(periodKey); expectedByClass.set(slot.class_id, expected);
+    });
+    const submittedByClass = new Map<string, Set<string>>();
+    (sessions || []).filter((row: any) => row.submitted_at && row.period_id).forEach((row: any) => {
+      const submitted = submittedByClass.get(row.class_id) || new Set<string>();
+      submitted.add(row.period_id); submittedByClass.set(row.class_id, submitted);
+    });
+    classesNotSubmitted = (classes || []).filter((klass: any) => {
+      if (!(enrollmentCountByClass.get(klass.id) || 0)) return false;
+      const expected = expectedByClass.get(klass.id);
+      if (!expected?.size) return false;
+      return [...expected].some(period => !submittedByClass.get(klass.id)?.has(period));
+    });
+  } else {
+    const submittedDailyIds = new Set((sessions || []).filter((row: any) => row.submitted_at && !row.period_id).map((row: any) => row.class_id));
+    const legacyCompleteIds = (classes || []).filter((klass: any) => {
       const enrolled = enrollmentCountByClass.get(klass.id) || 0;
-      const marked = (records || []).filter((record: any) => record.class_id === klass.id).length;
+      const marked = new Set((records || []).filter((record: any) => record.class_id === klass.id && !record.period_id).map((record: any) => record.student_id)).size;
       return enrolled > 0 && marked >= enrolled;
-    }).map((klass: any) => klass.id)
-  ]);
-  const classesNotSubmitted = (classes || []).filter((row: any) => (enrollmentCountByClass.get(row.id) || 0) > 0 && !submittedClassIds.has(row.id));
+    }).map((klass: any) => klass.id);
+    const submittedDailyOrLegacy = new Set([...submittedDailyIds, ...legacyCompleteIds]);
+    classesNotSubmitted = (classes || []).filter((klass: any) => (enrollmentCountByClass.get(klass.id) || 0) > 0 && !submittedDailyOrLegacy.has(klass.id));
+  }
   res.json({ date, totalStudents: enrolledStudentIds.length, recorded: records?.length || 0,
     attendanceRate: denominator ? Math.round(present * 100 / denominator) : 0, absentCount: absentStudents.length,
     absentStudents, sessions: sessions || [], classesNotSubmitted, classes: classes || [] });
