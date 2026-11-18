@@ -4237,18 +4237,18 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
   const blocked = new Set(unavailable.flatMap((item: any) => item.periodNumber == null ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`) : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
   const generated: TimetableSlot[] = [...lockedForClass];
-  for (const slot of lockedForClass) {
-    dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
-    periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
-    subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
-    if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
-  }
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
   const dayLoad = new Map<string, number>();
   const periodLoad = new Map<number, number>();
   const subjectDayLoad = new Map<string, number>();
   const teacherDayLoad = new Map<string, number>();
   const warnings: string[] = [];
+  for (const slot of lockedForClass) {
+    dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
+    periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
+    subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+    if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
+  }
   const lessonQueue: any[] = [];
   for (const assignment of schedulableAssignments) {
     for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) {
@@ -4366,6 +4366,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
   const skipped: Array<{ classId: string; className: string; reason: string }> = [];
   const replacements: Array<{ classId: string; slots: TimetableSlot[] }> = [];
+  const warnings: string[] = [];
 
   for (const klass of classes) {
     const classAssignments = timetableAssignments.filter((item: any) => item.classId === klass.id);
@@ -4382,17 +4383,16 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
     const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
     const generatedForClass: TimetableSlot[] = [...lockedForClass];
+    const dayLoad = new Map<string, number>();
+    const periodLoad = new Map<number, number>();
+    const subjectDayLoad = new Map<string, number>();
+    const teacherDayLoad = new Map<string, number>();
     for (const slot of lockedForClass) {
       dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
       periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
       subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
       if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
     }
-    const dayLoad = new Map<string, number>();
-    const periodLoad = new Map<number, number>();
-    const subjectDayLoad = new Map<string, number>();
-  const teacherDayLoad = new Map<string, number>();
-  const warnings: string[] = [];
     const lessonQueue: any[] = [];
     for (const assignment of schedulable) {
       for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) lessonQueue.push({ ...assignment, occurrence });
