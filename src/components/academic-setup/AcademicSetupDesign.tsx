@@ -8,10 +8,10 @@ export const PageHeader: React.FC<{ title: string; subtitle: string }> = ({ titl
 export const Stepper: React.FC<{ steps: SetupStep[]; active: number }> = ({ steps, active }) => (
   <nav className="as-stepper-scroll" aria-label="Tallaabooyinka dejinta">
     <div className="as-stepper">{steps.map((step, index) => (
-      <div key={step.label} className={'as-step ' + (index === active ? 'is-active ' : '') + (step.complete ? 'is-complete' : '')}>
+      <button type="button" key={step.label} disabled={index > active} className={'as-step ' + (index === active ? 'is-active ' : '') + (step.complete ? 'is-complete' : '')}>
         <span className="as-step-number">{step.complete ? '✓' : index + 1}</span>
         <span className="as-step-label">{step.label}</span>
-      </div>
+      </button>
     ))}</div>
   </nav>
 );
@@ -35,7 +35,7 @@ export const Pill: React.FC<React.PropsWithChildren<{ tone?: 'primary' | 'succes
   <span className={'as-pill as-pill-' + tone}>{children}</span>
 );
 
-export const DataTable: React.FC<React.PropsWithChildren> = ({ children }) => (
+export const Table: React.FC<React.PropsWithChildren> = ({ children }) => (
   <div className="as-table-scroll"><table className="as-table">{children}</table></div>
 );
 
