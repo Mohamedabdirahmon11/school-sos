@@ -324,6 +324,7 @@ CREATE POLICY attendance_teacher_read_assigned ON public.attendance_records
   USING (
     school_id = private.auth_school_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND private.auth_can_access_student(student_id)
   );
 
 CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
@@ -332,6 +333,7 @@ CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND private.auth_can_access_student(student_id)
     AND EXISTS (
       SELECT 1 FROM public.attendance_sessions s
       WHERE s.school_id = attendance_records.school_id
@@ -349,6 +351,7 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND private.auth_can_access_student(student_id)
     AND EXISTS (
       SELECT 1 FROM public.attendance_sessions s
       JOIN public.attendance_settings cfg ON cfg.school_id = s.school_id
@@ -366,6 +369,7 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND private.auth_can_access_student(student_id)
   );
 
 ALTER TABLE public.attendance_settings ENABLE ROW LEVEL SECURITY;
