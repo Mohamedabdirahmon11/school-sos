@@ -167,7 +167,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
   const [examType, setExamType] = useState<'small' | 'big'>('small');
-  const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
+  const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, ExamScoreValue>; remarks: string }>>({});
   const [marksDraftDirty, setMarksDraftDirty] = useState(false);
   const [isReopeningSubjectId, setIsReopeningSubjectId] = useState<string | null>(null);
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
@@ -251,7 +251,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         }
         if (needsGrades || needsResults) setClassMarks(existingMarks);
         if (needsGrades) {
-          const inputMap: Record<string, { scores: Record<string, number>; remarks: string }> = {};
+          const inputMap: Record<string, { scores: Record<string, ExamScoreValue>; remarks: string }> = {};
           const components = examConfig?.assessmentComponents || [];
           const allocateLegacy = (total: number, rows: typeof components) => {
             let remaining = Number(total) || 0;
@@ -316,8 +316,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   ) => {
     const key = `${studentId}:${subjectId}`;
     const previousValue = marksInput[key]?.scores[component.id];
-    const value = rawValue.trim();
-    if (value !== '' && (!/^\d+(\.\d+)?$/.test(value) || Number(value) < 0 || Number(value) > component.maxMarks)) {
+    const value = rawValue.trim().toUpperCase();
+    const isException = value === 'ABS' || value === 'LB';
+    if (value !== '' && !isException && (!/^\d+(\.\d+)?$/.test(value) || Number(value) < 0 || Number(value) > component.maxMarks)) {
       inputElement.classList.add('border-rose-500', 'ring-2', 'ring-rose-500');
       setNotice(`Khalad: geli 0 ilaa ${component.maxMarks}.`);
       inputElement.value = previousValue === undefined ? '' : String(previousValue);
@@ -328,7 +329,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     setMarksInput(previous => {
       const scores = { ...(previous[key]?.scores || {}) };
       if (value === '') delete scores[component.id];
-      else scores[component.id] = Number(value);
+      else scores[component.id] = value === 'ABS' || value === 'LB' ? value : Number(value);
       return { ...previous, [key]: { ...previous[key], scores } };
     });
   };
@@ -545,7 +546,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     students.every(student => gradeSubjects.every(subject => {
       const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
       return Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
-        assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+        assessmentComponents.every(component => mark.assessmentScores?.[component.id] !== undefined));
     }));
 
   const classAlreadyForwarded = isFormTeacher && classMarks.some(mark => ['form_teacher_submitted', 'approved'].includes(mark.status));
@@ -559,7 +560,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         const scores = { ...(mark?.assessmentScores || {}), ...(input?.scores || {}) };
         const total = calculateExamSubjectTotal(scores, assessmentComponents);
         const submitted = Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
-          assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+          assessmentComponents.every(component => mark.assessmentScores?.[component.id] !== undefined));
         return {
           subjectId: subject.id,
           total: total ?? 0,
@@ -958,11 +959,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                         const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
                         const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
-                        const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
+                        const examTotal = subjectComponents.reduce((sum, component) => { const value = input.scores[component.id] ?? mark?.assessmentScores?.[component.id]; return sum + (typeof value === 'number' ? value : 0); }, 0);
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
                           <div className="grid grid-cols-2 gap-3">
-                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => handleAssessmentScoreChange(student.id, subject.id, component, event.target.value, event.currentTarget)} onKeyDown={event => {
+                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="text" inputMode="decimal" placeholder="0 / ABS / LB" value={input.scores[component.id] ?? ''} onChange={event => handleAssessmentScoreChange(student.id, subject.id, component, event.target.value, event.currentTarget)} onKeyDown={event => {
                               if (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
                               event.preventDefault();
                               const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[data-mark-entry="true"]')).filter(input => input.offsetParent !== null);
