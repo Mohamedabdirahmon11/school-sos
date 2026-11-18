@@ -93,7 +93,7 @@ BEGIN
       teacher_id, qualification_override, created_by
     )
     SELECT cs.school_id, ay.id, NULL, cs.class_id, section.id, cs.subject_id,
-           cs.teacher_id, false, 'step6-migration'
+           cs.teacher_id, NOT EXISTS (SELECT 1 FROM public.teacher_subjects ts WHERE ts.school_id = cs.school_id AND ts.teacher_id = cs.teacher_id AND ts.subject_id = cs.subject_id AND ts.is_active = true), 'step6-migration'
     FROM public.class_subjects cs
     JOIN public.academic_years ay
       ON ay.school_id = cs.school_id AND ay.is_current = true
