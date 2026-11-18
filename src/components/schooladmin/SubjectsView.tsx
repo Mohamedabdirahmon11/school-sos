@@ -4,7 +4,6 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { subjectText } from '../../lib/academic-translations.ts';
 import { useApi } from '../../hooks/useApi.ts';
-import { ErrorState } from '../common/ErrorState.tsx';
 import { Subject } from '../../types/index.ts';
 
 export const SubjectsView: React.FC = () => {
@@ -19,6 +18,12 @@ export const SubjectsView: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!load.error) return;
+    if (load.error.code === 'MUST_CHANGE_PASSWORD') window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
+    else if (load.error.status === 401) window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 401, message: load.error.message } }));
+  }, [load.error]);
 
   const visible = useMemo(() => subjects.filter(subject =>
     [subject.name, subject.code || ''].some(value => String(value).toLowerCase().includes(search.trim().toLowerCase()))
@@ -80,7 +85,7 @@ export const SubjectsView: React.FC = () => {
   };
 
   if (load.loading) return <div className="mx-auto w-full max-w-5xl space-y-4 p-5 md:p-8"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-2xl bg-white" /></div>;
-  if (load.error) return <div className="p-5 md:p-8"><ErrorState error={load.error} onRetry={load.retry} /></div>;
+  if (load.error) return <div className="p-5 md:p-8"><section role="alert" className="mx-auto my-8 max-w-xl rounded-xl border border-rose-200 bg-white p-5 text-sm shadow-sm"><h2 className="font-semibold text-[#132A29]">{tx('loadError')}</h2><p className="mt-1 text-[#64748B]">{tx('loadErrorDetail')}</p><button type="button" onClick={load.retry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white hover:bg-[#0D655E]"><Loader2 className="h-4 w-4" /> {tx('retry')}</button></section></div>;
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-5xl space-y-6 p-5 md:p-8">
