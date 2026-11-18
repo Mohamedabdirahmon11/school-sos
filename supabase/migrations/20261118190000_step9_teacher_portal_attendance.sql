@@ -233,7 +233,7 @@ CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
   WITH CHECK (
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
-    AND private.auth_can_mark_attendance(school_id, class_id, subject_id, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 
 CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
@@ -241,12 +241,12 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
   USING (
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
-    AND private.auth_can_mark_attendance(school_id, class_id, subject_id, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   )
   WITH CHECK (
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
-    AND private.auth_can_mark_attendance(school_id, class_id, subject_id, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 
 ALTER TABLE public.attendance_settings ENABLE ROW LEVEL SECURITY;
@@ -277,7 +277,7 @@ CREATE POLICY attendance_sessions_teacher_insert ON public.attendance_sessions
   WITH CHECK (
     school_id = private.auth_school_id()
     AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
-    AND private.auth_can_mark_attendance(school_id, class_id, NULL, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 CREATE POLICY attendance_sessions_teacher_update ON public.attendance_sessions
   FOR UPDATE TO authenticated
@@ -285,13 +285,13 @@ CREATE POLICY attendance_sessions_teacher_update ON public.attendance_sessions
     school_id = private.auth_school_id()
     AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
     AND is_locked = false
-    AND private.auth_can_mark_attendance(school_id, class_id, NULL, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   )
   WITH CHECK (
     school_id = private.auth_school_id()
     AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
     AND is_locked = false
-    AND private.auth_can_mark_attendance(school_id, class_id, NULL, period_id, date)
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
   );
 
 CREATE POLICY teacher_attendance_admin_all ON public.teacher_attendance
@@ -318,7 +318,7 @@ CREATE POLICY attendance_audit_teacher_read_own ON public.attendance_audit_logs
   );
 
 REVOKE ALL ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, varchar, uuid, date) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) TO authenticated, service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_records TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.attendance_sessions TO authenticated;
