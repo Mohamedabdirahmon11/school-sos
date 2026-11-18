@@ -1176,6 +1176,10 @@ export class ApiClient {
     });
   }
 
+  public static getTeacherAttendanceStudents(classId: string) {
+    return this.request<Student[]>('/teacher/attendance/students?classId=' + encodeURIComponent(classId));
+  }
+
   public static getTeacherAttendanceOverview() {
     return this.request<any>('/teacher/attendance/overview');
   }
