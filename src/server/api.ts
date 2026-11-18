@@ -3154,7 +3154,7 @@ apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, req
  if(!name||name.length>120||sections.some((s:unknown)=>typeof s!=='string'||!String(s).trim()||String(s).trim().length>80)){res.status(400).json({error:'Geli magaca fasalka iyo qaybaha saxda ah.'});return;}
  const client=classGroupsClient(); const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:Number(req.body?.sortOrder)||0}).select().single();
  if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
- const unique=[...new Set(sections.map((s:string)=>s.trim()).filter(Boolean))];
+ const unique: string[] = Array.from(new Set<string>((sections as unknown[]).map(value => String(value).trim()).filter(value => value.length > 0)));
  if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
  const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
 });
