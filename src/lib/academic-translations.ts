@@ -52,7 +52,9 @@ const academicLabels = {
 } satisfies Record<LanguageCode, Record<string, string>>;
 
 export function academicText(language: LanguageCode, key: string): string {
-  return academicLabels[language]?.[key] ?? academicLabels.en[key] ?? key;
+  const labels = academicLabels[language] as Record<string, string>;
+  const fallback = academicLabels.en as Record<string, string>;
+  return labels[key] ?? fallback[key] ?? key;
 }
 
 const subjectLabels = {
@@ -63,5 +65,7 @@ const subjectLabels = {
 } satisfies Record<LanguageCode, Record<string, string>>;
 
 export function subjectText(language: LanguageCode, key: string): string {
-  return subjectLabels[language]?.[key] ?? subjectLabels.en[key] ?? key;
+  const labels = subjectLabels[language] as Record<string, string>;
+  const fallback = subjectLabels.en as Record<string, string>;
+  return labels[key] ?? fallback[key] ?? key;
 }
