@@ -5385,9 +5385,14 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   }
   const attendanceClass = await db.getClassById(normalizedClassId, school.id);
   if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
-  if (attendanceClass.classTeacherId !== user.id) {
-    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
-    return;
+  if (!await canAccessTeachingClass(req, res, normalizedClassId)) return;
+  const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  if (date > localToday) { res.status(400).json({ error: 'Attendance cannot be recorded for a future date.' }); return; }
+  const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00.000Z`));
+  const configuredDays = await queryAllRows('school_days', { school_id: school.id }, 'day_of_week,is_working');
+  const daySetting = configuredDays.find((row: any) => String(row.dayOfWeek).toLowerCase() === dayName.toLowerCase());
+  if (daySetting ? !daySetting.isWorking : ['Saturday', 'Sunday'].includes(dayName)) {
+    res.status(400).json({ error: 'Attendance can only be marked on a configured school day.' }); return;
   }
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
