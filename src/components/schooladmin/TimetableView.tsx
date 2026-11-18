@@ -448,7 +448,7 @@ export const TimetableView: React.FC = () => {
   const displayedClasses = viewMode === 'teacher'
     ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
     : viewMode === 'room'
-      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.roomId === selectedRoomId)).slice(0, 5)
+      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && (slot.roomId === selectedRoomId || (!slot.roomId && slot.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)))).slice(0, 5)
       : viewMode === 'school'
         ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
         : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
@@ -716,7 +716,7 @@ export const TimetableView: React.FC = () => {
             <table className="w-full border-collapse text-[7px]">
               <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
               <tbody>{days.map(day => <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
-                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId));
+                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId) && (viewMode !== 'teacher' || item.teacherId === selectedTeacherId) && (viewMode !== 'room' || item.roomId === selectedRoomId || (!item.roomId && item.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)));
                 const subject = subjects.find(item => item.id === slot?.subjectId);
                 return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
