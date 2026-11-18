@@ -122,8 +122,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const visibleStudents = students.filter(student =>
     `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId} ${student.rollNumber || ''}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
   ).sort((a, b) =>
-    (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true }) ||
-    `${a.firstName} ${a.middleName || ''} ${a.lastName}`.localeCompare(`${b.firstName} ${b.middleName || ''} ${b.lastName}`)
+    `${a.firstName} ${a.middleName || ''} ${a.lastName}`.localeCompare(`${b.firstName} ${b.middleName || ''} ${b.lastName}`) ||
+    (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true })
   );
   const [assignedClassStudentCounts, setAssignedClassStudentCounts] = useState<Record<string, number>>({});
   const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
@@ -885,7 +885,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <>
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? 'All active subjects submitted · rankings ready' : 'Rankings and class totals appear after every active subject is submitted.'}</p>}</div>
+                  <div><h2 className="text-sm font-bold text-slate-900">{isFormTeacher ? 'Form Teacher class review' : 'My subject mark sheet'}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? 'All active subjects submitted · rankings ready' : 'Rankings and class totals appear after every active subject is submitted.'}</p>}</div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
                 </div>
                 <div className="hidden overflow-x-auto md:block">
@@ -897,8 +897,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                       {isFormTeacher && <><th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total /100</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th></>}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-100">
-                      {examRegisterRows.map(row => <tr key={row.student.id} className="hover:bg-teal-50/40">
-                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank ?? '—'}</td>
+                      {examRegisterRows.map((row, rowIndex) => <tr key={row.student.id} className="hover:bg-teal-50/40">
+                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank ?? rowIndex + 1}</td>
                         <td className="sticky left-9 bg-white px-3 py-2.5"><strong className="block text-slate-800">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.rollNumber || row.student.studentId}</span></td>
                         {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center font-semibold text-slate-700">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
                         {isFormTeacher && <><td className="border-l bg-teal-50/60 px-3 py-2.5 text-center font-black text-teal-900">{allClassMarksSubmitted ? row.total.toFixed(1).replace(/\.0$/, '') : '—'}</td><td className="px-3 py-2.5 text-center font-bold text-slate-700">{row.rank ?? '—'}</td></>}
@@ -957,7 +957,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                           const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
                           return <tr key={student.id} className="hover:bg-slate-50">
                             <td className="whitespace-nowrap px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="mt-0.5 block text-[10px] text-slate-400">{student.studentId}</span></td>
-                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; }); }} className="w-16 rounded-lg border border-slate-300 px-1.5 py-1.5 text-center" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</td>)}
+                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => { setMarksDraftDirty(true); setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; }); }} className="w-16 rounded-lg border border-slate-300 px-1.5 py-1.5 text-center" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</td>)}
                             <td className="border-l px-3 py-2 text-center font-bold text-slate-800">{examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</td>
                             <td className="px-3 py-2 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td>
                           </tr>;
