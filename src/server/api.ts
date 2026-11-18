@@ -3669,8 +3669,6 @@ const academicDateIsValid = (value: unknown): value is string => {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
 const academicTimeIsValid = (value: unknown): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-const academicOverlap = (items: any[], start: string, end: string, exceptId?: string) =>
-  items.some(item => item.id !== exceptId && start < String(item.end_date || item.endTime || item.end_time).slice(0,10) && end > String(item.start_date || item.startTime || item.start_time).slice(0,10));
 
 apiRouter.get('/academic-setup', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
