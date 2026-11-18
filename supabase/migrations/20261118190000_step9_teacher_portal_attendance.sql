@@ -170,6 +170,10 @@ AS $$
             AND a.teacher_id = t.id
             AND (target_subject_id IS NULL OR a.subject_id = target_subject_id)
             AND (a.section_id IS NULL OR a.section_id = target_section_id)
+            AND (a.term_id IS NULL OR a.term_id = (
+              SELECT tr.id FROM public.terms tr
+              WHERE tr.school_id = target_school_id AND tr.is_current = true
+            ))
         )
         OR EXISTS (
           SELECT 1
@@ -225,6 +229,10 @@ AS $
             ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
           WHERE e.student_id = s.id AND e.school_id = s.school_id AND e.status = 'active'
             AND a.academic_year_id = e.academic_year_id
+            AND (a.term_id IS NULL OR a.term_id = (
+              SELECT tr.id FROM public.terms tr
+              WHERE tr.school_id = e.school_id AND tr.is_current = true
+            ))
         )
         OR EXISTS (
           SELECT 1 FROM public.enrollments e
