@@ -5575,10 +5575,18 @@ async function canTeacherMarkAttendance(
   }
   if (periodId) {
     if (!subjectId) return { allowed: false, substitute, periodNumber };
-    const { data: ownLesson } = await client.from('timetable_slots').select('id')
+    const currentAssignmentIds = (assignmentRows || [])
+      .filter((row: any) => !row.term_id || row.term_id === currentTerm?.id)
+      .map((row: any) => row.id);
+    let ownLessonQuery = client.from('timetable_slots').select('id')
       .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId)
-      .eq('teacher_id', teacherId).eq('period_number', periodNumber)
-      .eq('day_of_week', attendanceWeekday(date)).eq('is_active', true).limit(1);
+      .eq('period_number', periodNumber).eq('day_of_week', attendanceWeekday(date)).eq('is_active', true);
+    ownLessonQuery = sectionId ? ownLessonQuery.eq('section_id', sectionId) : ownLessonQuery.is('section_id', null);
+    const ownershipFilter = currentAssignmentIds.length
+      ? `teacher_id.eq.${teacherId},assignment_id.in.(${currentAssignmentIds.join(',')}),teacher_id.is.null`
+      : `teacher_id.eq.${teacherId},teacher_id.is.null`;
+    const { data: ownLesson, error: ownLessonError } = await ownLessonQuery.or(ownershipFilter).limit(1);
+    if (ownLessonError) throw new Error('Jadwalka casharka lama xaqiijin karin.');
     return { allowed: Boolean(assigned && ownLesson?.length) || substitute, substitute, periodNumber };
   }
   return { allowed: assigned || formTeacherDaily || substitute, substitute, periodNumber };
@@ -5659,6 +5667,13 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
   const currentAssignments = year?.id ? (assignmentRows || []).filter((row: any) =>
     row.academic_year_id === year.id && (!row.term_id || row.term_id === term?.id)
   ) : [];
+  const assignmentIds = currentAssignments.map((row: any) => row.id);
+  const { data: assignmentSlots, error: assignmentSlotError } = assignmentIds.length
+    ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active')
+      .eq('school_id', school.id).eq('is_active', true).in('assignment_id', assignmentIds)
+    : { data: [], error: null };
+  if (assignmentSlotError) { res.status(503).json({ error: 'Jadwalka casharrada laguu qoondeeyey lama soo dejin karin.' }); return; }
+  const teacherSlots = [...new Map([...(slots || []), ...(assignmentSlots || [])].map((slot: any) => [slot.id, slot])).values()];
   const substituteIds = (substitutions || []).map((row: any) => row.entry_id);
   const { data: substituteSlots, error: substituteSlotError } = substituteIds.length
     ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).in('id', substituteIds)
@@ -5701,7 +5716,7 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
       sections: (sections || []).filter((section: any) => section.legacy_class_id === classId &&
         (fullRosterClassIds.has(classId) || assignedSectionsByClass.get(classId)?.has(section.id))) };
   });
-  const timetable = (slots || []).map((slot: any) => ({
+  const timetable = teacherSlots.map((slot: any) => ({
     id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
     startTime: slot.start_time, endTime: slot.end_time, subjectId: slot.subject_id,
     subjectName: (subjectMap.get(slot.subject_id) as any)?.name || slot.subject_id,
