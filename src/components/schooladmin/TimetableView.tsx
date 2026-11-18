@@ -33,6 +33,7 @@ export const TimetableView: React.FC = () => {
   const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
   const [settings, setSettings] = useState({ shiftCount: 1 as 1 | 2, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [generatePreview, setGeneratePreview] = useState<any | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
   const [printMode, setPrintMode] = useState<'single' | 'multiple'>('multiple');
   const [printClassIds, setPrintClassIds] = useState<string[]>([]);
@@ -318,22 +319,26 @@ export const TimetableView: React.FC = () => {
     setNotice('Jadwalka waa la falanqaynayaa; weli waxba lama kaydin…');
     try {
       const preview = await ApiClient.generateAllTimetables(true, selectedTermId);
-      const previewClasses = preview.generatedClassIds?.length || 0;
-      const previewUnfilled = preview.unfilled?.length || 0;
-      const previewSkipped = preview.skipped?.length || 0;
-      const previewWarnings = preview.warnings?.length || 0;
-      const accepted = window.confirm(
-        `HOR-U-EEGID JADWALKA\n\nFasal jadwalkooda la diyaariyey: ${previewClasses}\\nCasharro aan boos helin: ${previewUnfilled}\\nFasallo la dhaafay: ${previewSkipped}\\nDigniino (maaddo maalin gudaheed in ka badan 2 jeer): ${previewWarnings}\\n\\nJadwalkan ma kaydinaysaa? Casharrada locked-ka ah waa la ilaalinayaa.`
-      );
-      if (!accepted) { setNotice('Hor-u-eegidda waa la joojiyey; jadwalkii hore waxba lagama beddelin.'); return; }
+      setGeneratePreview(preview);
+      setNotice('Hor-u-eegidda jadwalka waa diyaar. Waxba weli lama kaydin.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
+    }
+  };
+
+  const handleConfirmGenerate = async () => {
+    if (!generatePreview) return;
+    setNotice('Jadwalka waa la kaydinayaa…');
+    try {
       const result = await ApiClient.generateAllTimetables(false, selectedTermId);
       const generatedIds = new Set(result.generatedClassIds || []);
       setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
       const unfilledCount = result.unfilled.length;
       const skippedCount = result.skipped.length;
+      setGeneratePreview(null);
       setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la kaydiyey. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay; ${result.warnings?.length || 0} digniin maaddo/maalin ah.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh.` : ''}`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
+      setNotice(error instanceof Error ? error.message : 'Jadwalka lama kaydin karin.');
     }
   };
 
@@ -610,6 +615,60 @@ export const TimetableView: React.FC = () => {
           {!teacherUnavailability.length && <p className="text-xs text-[#64748B]">Maqnaansho macallin lama diiwaangelin.</p>}
         </div>
       </section>
+      {generatePreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Timetable generation preview">
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#E2E8F0] p-5">
+              <div>
+                <h2 className="text-base font-bold text-[#132A29]">Hor-u-eegidda jadwalka</h2>
+                <p className="mt-1 text-xs text-[#64748B]">Jadwalkan weli lama kaydin. Hubi casharrada, meelaha bannaan iyo digniinaha ka hor xaqiijinta.</p>
+              </div>
+              <button type="button" onClick={() => setGeneratePreview(null)} aria-label="Close preview" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 border-b border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-4">
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Fasallo la diyaariyey</p><strong className="text-lg text-[#0F766E]">{generatePreview.generatedClassIds?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Casharro aan boos helin</p><strong className="text-lg text-amber-700">{generatePreview.unfilled?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Fasallo la dhaafay</p><strong className="text-lg text-slate-700">{generatePreview.skipped?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Digniino</p><strong className="text-lg text-rose-700">{generatePreview.warnings?.length || 0}</strong></div>
+            </div>
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)]">
+              <div className="min-w-0">
+                <h3 className="mb-2 text-xs font-bold text-[#132A29]">Casharrada la qorsheeyey ({generatePreview.slots?.length || 0})</h3>
+                <div className="overflow-x-auto rounded-lg border border-[#E2E8F0]">
+                  <table className="w-full min-w-[620px] border-collapse text-[11px]">
+                    <thead className="bg-[#F8FAFC] text-left text-[#64748B]"><tr><th className="p-2">Fasal</th><th className="p-2">Maalin</th><th className="p-2">Cashar</th><th className="p-2">Maaddo</th><th className="p-2">Macallin</th><th className="p-2">Qol</th></tr></thead>
+                    <tbody>{(generatePreview.slots || []).map((slot: TimetableSlot) => <tr key={slot.id} className="border-t border-[#E2E8F0]">
+                      <td className="p-2">{classes.find(item => item.id === slot.classId)?.name || slot.classId}{slot.sectionId ? ' · ' + (sections.find(section => section.id === slot.sectionId)?.name || 'Section') : ''}</td>
+                      <td className="p-2">{slot.dayOfWeek}</td><td className="p-2">P{slot.periodNumber} · {slot.startTime}–{slot.endTime}</td>
+                      <td className="p-2">{subjects.find(item => item.id === slot.subjectId)?.name || slot.subjectId}</td>
+                      <td className="p-2">{teachers.find(item => item.id === slot.teacherId)?.fullName || 'Macallin lama qoondeyn'}</td>
+                      <td className="p-2">{rooms.find(item => item.id === slot.roomId)?.name || slot.roomNumber || '—'}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div><h3 className="mb-2 text-xs font-bold text-amber-800">Casharrada aan boos helin</h3>
+                  {(generatePreview.unfilled || []).map((item: any, index: number) => <p key={index} className="mb-1 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900">{classes.find(klass => klass.id === item.classId)?.name || item.className || ''} · {subjects.find(subject => subject.id === item.subjectId)?.name || item.subjectId} · {item.reason || 'Boos ku habboon lama helin.'}</p>)}
+                  {!generatePreview.unfilled?.length && <p className="text-[11px] text-slate-500">Casharro aan boos helin ma jiraan.</p>}
+                </div>
+                <div><h3 className="mb-2 text-xs font-bold text-rose-800">Digniinaha jadwalka</h3>
+                  {(generatePreview.warnings || []).map((warning: string, index: number) => <p key={index} className="mb-1 rounded-lg bg-rose-50 p-2 text-[11px] text-rose-900">{warning}</p>)}
+                  {!generatePreview.warnings?.length && <p className="text-[11px] text-slate-500">Digniin ma jirto.</p>}
+                </div>
+                <div><h3 className="mb-2 text-xs font-bold text-slate-700">Fasallada la dhaafay</h3>
+                  {(generatePreview.skipped || []).map((item: any) => <p key={item.classId} className="mb-1 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-700">{item.className || item.classId} · {item.reason}</p>)}
+                  {!generatePreview.skipped?.length && <p className="text-[11px] text-slate-500">Fasal lama dhaafin.</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[#E2E8F0] p-4">
+              <button type="button" onClick={() => setGeneratePreview(null)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs font-semibold text-[#334155]">Jooji</button>
+              <button type="button" onClick={() => void handleConfirmGenerate()} disabled={isReadOnly || !generatePreview.generatedClassIds?.length} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">Xaqiiji oo kaydi jadwalka</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Print timetables">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
