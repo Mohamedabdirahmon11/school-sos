@@ -368,11 +368,11 @@ CREATE INDEX IF NOT EXISTS idx_teachers_user ON teachers(user_id);
 ALTER TABLE teachers ADD COLUMN IF NOT EXISTS staff_id VARCHAR(40);
 UPDATE teachers t SET staff_id = u.staff_id FROM users u WHERE t.user_id = u.id AND t.staff_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_staff_id ON teachers(school_id, lower(staff_id)) WHERE staff_id IS NOT NULL;
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_teacher_code ON teachers(school_id, teacher_code);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_phone_normalized
-  ON teachers(school_id, regexp_replace(phone, '\\D', '', 'g'))
-  WHERE nullif(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), '') IS NOT NULL;
+  ON teachers(school_id, regexp_replace(phone, '[^0-9]', '', 'g'))
+  WHERE nullif(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), '') IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS teachers_id_school_id_uidx ON teachers(id, school_id);
 
 CREATE TABLE IF NOT EXISTS teacher_subjects (
   id VARCHAR(64) PRIMARY KEY DEFAULT ('ts-' || gen_random_uuid()::text),
@@ -385,18 +385,23 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
   FOREIGN KEY (subject_id, school_id) REFERENCES subjects(id, school_id) ON DELETE CASCADE
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_id_uidx ON classes(id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_id_uidx ON subjects(id, school_id);
 CREATE TABLE IF NOT EXISTS class_subjects (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-  class_id VARCHAR(64) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-  subject_id VARCHAR(64) NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  class_id VARCHAR(64) NOT NULL,
+  subject_id VARCHAR(64) NOT NULL,
   teacher_id VARCHAR(64) REFERENCES teachers(id) ON DELETE SET NULL,
-  periods_per_week INTEGER NOT NULL DEFAULT 3 CHECK (periods_per_week BETWEEN 1 AND 30),
+  periods_per_week INTEGER NOT NULL DEFAULT 3 CHECK (periods_per_week BETWEEN 1 AND 12),
   small_exam_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   big_exam_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (school_id, class_id, subject_id)
+  UNIQUE (school_id, class_id, subject_id),
+  UNIQUE (class_id, subject_id),
+  FOREIGN KEY (class_id, school_id) REFERENCES classes(id, school_id) ON DELETE CASCADE,
+  FOREIGN KEY (subject_id, school_id) REFERENCES subjects(id, school_id) ON DELETE CASCADE
 );
 ALTER TABLE class_subjects ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 CREATE INDEX IF NOT EXISTS idx_class_subjects_school_class ON class_subjects(school_id, class_id);
