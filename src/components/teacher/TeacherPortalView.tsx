@@ -523,7 +523,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }));
 
   const examRegisterRows = useMemo(() => {
-    const rows = visibleStudents.map(student => {
+    const rows = students.map(student => {
       const subjectScores = gradeSubjects.map(subject => {
         const key = `${student.id}:${subject.id}`;
         const input = marksInput[key];
@@ -558,10 +558,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     return rows
       .sort((a, b) => allClassMarksSubmitted
         ? b.total - a.total || a.student.firstName.localeCompare(b.student.firstName)
-        : (a.student.rollNumber || '').localeCompare(b.student.rollNumber || '', undefined, { numeric: true }) ||
-          a.student.firstName.localeCompare(b.student.firstName))
-      .map(row => ({ ...row, rank: rankByStudent.get(row.student.id) ?? null }));
-  }, [visibleStudents, gradeSubjects, assessmentComponents, marksInput, classMarks, isFormTeacher, allClassMarksSubmitted]);
+        : `${a.student.firstName} ${a.student.middleName || ''} ${a.student.lastName}`.localeCompare(`${b.student.firstName} ${b.student.middleName || ''} ${b.student.lastName}`) ||
+          (a.student.rollNumber || '').localeCompare(b.student.rollNumber || '', undefined, { numeric: true }))
+      .map(row => ({ ...row, rank: rankByStudent.get(row.student.id) ?? null }))
+      .filter(row => `${row.student.firstName} ${row.student.middleName || ''} ${row.student.lastName} ${row.student.studentId} ${row.student.rollNumber || ''}`.toLowerCase().includes(studentSearch.trim().toLowerCase()));
+  }, [students, studentSearch, gradeSubjects, assessmentComponents, marksInput, classMarks, isFormTeacher, allClassMarksSubmitted]);
 
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
@@ -1013,14 +1014,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                   <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
                     <th className="border-b px-3 py-3 text-left">#</th><th className="min-w-[200px] border-b px-3 py-3 text-left">Student / Roll No.</th>
                     {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[85px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/100</span></th>)}
-                    <th className="border-b border-l bg-teal-50 px-3 py-3 text-center">Total /100 each</th><th className="border-b px-3 py-3 text-center">Average</th><th className="border-b px-3 py-3 text-center">Rank</th>
+                    <th className="border-b border-l bg-teal-50 px-3 py-3 text-center">Total</th><th className="border-b px-3 py-3 text-center">Average</th><th className="border-b px-3 py-3 text-center">Rank</th>
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {examRegisterRows.map((row, index) => <tr key={row.student.id}>
                       <td className="px-3 py-2.5 text-center">{allClassMarksSubmitted ? row.rank : index + 1}</td>
                       <td className="px-3 py-2.5"><strong className="block">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.rollNumber || row.student.studentId}</span></td>
                       {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
-                      <td className="border-l bg-teal-50/50 px-3 py-2.5 text-center font-bold">{allClassMarksSubmitted ? row.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>
+                      <td className="border-l bg-teal-50/50 px-3 py-2.5 text-center font-bold">{allClassMarksSubmitted ? `${row.total.toFixed(1).replace(/\.0$/, '')}/${row.max}` : '—'}</td>
                       <td className="px-3 py-2.5 text-center">{allClassMarksSubmitted ? row.average.toFixed(1).replace(/\.0$/, '') : '—'}</td>
                       <td className="px-3 py-2.5 text-center font-bold">{allClassMarksSubmitted ? row.rank : '—'}</td>
                     </tr>)}
