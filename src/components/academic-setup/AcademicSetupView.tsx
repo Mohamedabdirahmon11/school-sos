@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Pencil, Plus, Save, X } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { Button, Card, Chip, Table, EmptyState, FormRow, PageHeader, Pill, Stepper } from './AcademicSetupDesign.tsx';
@@ -153,7 +153,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
         <tbody>{data.academicYears.map(year=><tr key={year.id}>
           <td><button type="button" className="font-semibold text-[var(--as-primary)] underline-offset-2 hover:underline" onClick={()=>setSelectedYearId(year.id)}>{year.name}</button></td>
           <td>{year.startDate}</td><td>{year.endDate}</td><td>{year.isCurrent?<Pill tone="success">Hadda jira</Pill>:<Pill>Caadi</Pill>}</td>
-          <td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>{setSelectedYearId(year.id);editYear(year);}}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} aria-label="Tirtir sannadka" onClick={()=>deleteYear(year)}><Trash2 size={15}/></Button></div></td>
+          <td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>{setSelectedYearId(year.id);editYear(year);}}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} aria-label="Tirtir sannadka" onClick={()=>deleteYear(year)}><X size={17}/></Button></div></td>
         </tr>)}</tbody>
       </Table>}
     </Card>
@@ -172,7 +172,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
       </form>}
       {!selectedYear?<EmptyState>Ma jiro sannad la doortay.</EmptyState>:yearTerms.length===0?<EmptyState>Weli sannadkan xiisado laguma darin.</EmptyState>:<Table>
         <thead><tr><th>Xiisadda</th><th>Bilow</th><th>Dhammaad</th><th>Xaalad</th><th>Ficil</th></tr></thead>
-        <tbody>{yearTerms.map(term=><tr key={term.id}><td className="font-semibold">{term.name}</td><td>{term.startDate}</td><td>{term.endDate}</td><td>{term.isCurrent?<Pill tone="success">Hadda socota</Pill>:<Pill>Caadi</Pill>}</td><td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>editTerm(term)}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deleteTerm(term)}><Trash2 size={15}/></Button></div></td></tr>)}</tbody>
+        <tbody>{yearTerms.map(term=><tr key={term.id}><td className="font-semibold">{term.name}</td><td>{term.startDate}</td><td>{term.endDate}</td><td>{term.isCurrent?<Pill tone="success">Hadda socota</Pill>:<Pill>Caadi</Pill>}</td><td><div className="flex gap-1"><Button disabled={saving||isReadOnly} onClick={()=>editTerm(term)}><Pencil size={14}/>Wax ka beddel</Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deleteTerm(term)}><X size={17}/></Button></div></td></tr>)}</tbody>
       </Table>}
     </Card>
 
@@ -198,7 +198,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
         <thead><tr><th>#</th><th>Nooca</th><th>Bilow</th><th>Dhammaad</th><th>Ficil</th></tr></thead>
         <tbody>{[...data.periods].sort((a,b)=>a.number-b.number).map((period,index,all)=><tr key={period.id}>
           <td className="font-semibold">{period.number}</td><td><Pill tone={period.type==='break'?'muted':'primary'}>{period.type==='break'?'Nasasho':'Xiisad'}</Pill></td><td>{period.startTime}</td><td>{period.endTime}</td>
-          <td><div className="flex gap-1"><Button disabled={saving||isReadOnly||index===0} aria-label="Kor u qaad" onClick={()=>movePeriod(period,-1)}><ChevronUp size={15}/></Button><Button disabled={saving||isReadOnly||index===all.length-1} aria-label="Hoos u dhig" onClick={()=>movePeriod(period,1)}><ChevronDown size={15}/></Button><Button disabled={saving||isReadOnly} onClick={()=>editPeriod(period)}><Pencil size={14}/></Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deletePeriod(period)}><Trash2 size={15}/></Button></div></td>
+          <td><div className="flex gap-1"><Button disabled={saving||isReadOnly||index===0} aria-label="Kor u qaad" onClick={()=>movePeriod(period,-1)}><ChevronUp size={15}/></Button><Button disabled={saving||isReadOnly||index===all.length-1} aria-label="Hoos u dhig" onClick={()=>movePeriod(period,1)}><ChevronDown size={15}/></Button><Button disabled={saving||isReadOnly} onClick={()=>editPeriod(period)}><Pencil size={14}/></Button><Button variant="danger" disabled={saving||isReadOnly} onClick={()=>deletePeriod(period)}><X size={17}/></Button></div></td>
         </tr>)}</tbody>
       </Table>}
       <div className="flex flex-wrap gap-2"><Pill tone="success">{lessonCount} xiisad / maalin</Pill><Pill tone="primary">{lessonCount*workingDays} xiisad / toddobaad</Pill></div>
