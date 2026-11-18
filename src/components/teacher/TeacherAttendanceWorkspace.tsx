@@ -42,6 +42,8 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const loadOverview = async () => {
     setLoadingOverview(true); setError('');
@@ -120,6 +122,17 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
       .finally(() => { if (!cancelled) setLoadingAttendance(false); });
     return () => { cancelled = true; };
   }, [tab, selectedClassId, attendanceDate, attendanceMode, selectedSubjectId, selectedPeriodId, selectedSectionId, school?.id]);
+
+  useEffect(() => {
+    if (tab !== 'attendance' || !overview?.date) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    ApiClient.getTeacherAttendanceSessions(dateDaysAgo(overview.date, 30))
+      .then(rows => { if (!cancelled) setSessionHistory(rows); })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Taariikhda xaadirinta lama soo dejin karin.'); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [tab, overview?.date, school?.id, user?.id]);
 
   const openAttendance = (lesson?: any) => {
     if (lesson) {
@@ -240,6 +253,15 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
           </Card>;
         })}</div>}
       <Button variant="primary" disabled={isReadOnly || saving || loadingAttendance || isLocked || !students.length} className="min-h-14 w-full text-base" onClick={() => void saveAttendance()}>{saving ? 'Waa la gudbinayaa…' : 'Gudbi xaadirinta'}</Button>
+      <Card className="space-y-3 p-4">
+        <div className="flex items-center justify-between gap-2"><h2 className="font-bold">Taariikhda xaadirinta (30 maalmood)</h2><Pill>{sessionHistory.length} kulan</Pill></div>
+        {historyLoading ? <p className="text-sm text-slate-500">Taariikhda waa la soo dejinayaa…</p> : !sessionHistory.length
+          ? <EmptyState><Clock3 className="mx-auto h-7 w-7" /><p>Weli kulan xaadirin hore lama helin.</p></EmptyState>
+          : <div className="space-y-2">{sessionHistory.map((item: any) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <div className="min-w-0"><p className="font-semibold">{item.className} · {item.subjectName || 'Maalinle'}</p><p className="text-xs text-slate-500">{item.date} · {item.period_id ? 'Cashar' : 'Maalinle'} · {item.submitted_at ? new Date(item.submitted_at).toLocaleString() : 'Aan la gudbin'}</p></div>
+              <div className="flex items-center gap-2"><Pill>{item.is_locked ? 'Xiran' : 'Furan'}</Pill><Button size="sm" disabled={isReadOnly || item.is_locked || (item.submitted_at && Date.now() > new Date(item.submitted_at).getTime() + Number(overview?.settings?.editWindowHours ?? 2) * 3600000)} onClick={() => { setSelectedClassId(item.class_id); setSelectedSubjectId(item.subject_id || ''); setSelectedPeriodId(item.period_id || ''); setSelectedSectionId(item.section_id || ''); setAttendanceDate(item.date); }}>{item.is_locked ? 'Xiran' : 'Dib u eeg'}</Button></div>
+            </div>)}</div>}
+      </Card>
     </section>}
 
     {tab === 'reports' && <section className="space-y-3">
