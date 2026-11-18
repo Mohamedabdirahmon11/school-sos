@@ -82,6 +82,14 @@ export interface TranslationDict {
   exam_waiting_admin_review: string;
   exam_subjects_pending: string;
   exam_subjects_submitted: string;
+  exam_class_review: string;
+  exam_enter_component_marks: string;
+  exam_marks: string;
+  exam_edit_marks_help: string;
+  exam_teacher_review_scope: string;
+  exam_forward_ready: string;
+  exam_term1: string;
+  exam_term2: string;
   assignments: string;
   fees_payments: string;
   events_holidays: string;
@@ -380,6 +388,14 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_waiting_admin_review: 'Waiting for Admin review',
     exam_subjects_pending: 'Waiting',
     exam_subjects_submitted: 'Submitted',
+    exam_class_review: 'Class results review',
+    exam_enter_component_marks: 'Enter individual assessment components',
+    exam_marks: 'Marks',
+    exam_edit_marks_help: 'Edit the subject marks below, then save or submit',
+    exam_teacher_review_scope: 'Form Teacher can review every active class subject, but can enter marks only for their assigned subject.',
+    exam_forward_ready: 'Class is complete and ready to forward to School Admin.',
+    exam_term1: 'Term 1',
+    exam_term2: 'Term 2',
     assignments: 'Homework & Assignments',
     fees_payments: 'Student Fees & Ledger',
     events_holidays: 'Academic Calendar',
@@ -658,6 +674,14 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_waiting_admin_review: 'Maamulka ayaa dib u eegaya',
     exam_subjects_pending: 'Sugaya',
     exam_subjects_submitted: 'La gudbiyey',
+    exam_class_review: 'Dib-u-eegista natiijada fasalka',
+    exam_enter_component_marks: 'Geli qaybaha dhibcaha',
+    exam_marks: 'Dhibco',
+    exam_edit_marks_help: 'Wax ka beddel dhibcaha maaddada, kadib kaydi ama gudbi',
+    exam_teacher_review_scope: 'Form Teacher-ku wuxuu arki karaa dhammaan maaddooyinka fasalka, balse wuxuu geli karaa dhibcaha maaddada isaga loo xilsaaray oo keliya.',
+    exam_forward_ready: 'Fasalku wuu dhammaystiran yahay, wuxuuna diyaar u yahay in loo gudbiyo Maamulka.',
+    exam_term1: 'Term 1',
+    exam_term2: 'Term 2',
     assignments: 'Laylisyada & Shaqo-guri',
     fees_payments: 'Lacagaha & Kharashaadka',
     events_holidays: 'Jadwalka Fasaxyada',
@@ -936,6 +960,14 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_waiting_admin_review: 'የአስተዳደር ግምገማ በመጠባበቅ ላይ',
     exam_subjects_pending: 'በመጠባበቅ ላይ',
     exam_subjects_submitted: 'ቀርቧል',
+    exam_class_review: 'مراجعة نتائج الصف',
+    exam_enter_component_marks: 'إدخال أجزاء الدرجات',
+    exam_marks: 'الدرجات',
+    exam_edit_marks_help: 'عدّل درجات المادة ثم احفظ أو أرسل',
+    exam_teacher_review_scope: 'يمكن لمعلم الصف مراجعة جميع المواد النشطة، لكنه يدخل درجات المادة المعيّنة له فقط.',
+    exam_forward_ready: 'اكتمل الصف وأصبح جاهزاً للإرسال إلى الإدارة.',
+    exam_term1: 'الفصل الأول',
+    exam_term2: 'الفصل الثاني',
     assignments: 'የቤት ስራዎች',
     fees_payments: 'የተማሪ ክፍያዎች',
     events_holidays: 'የዓመቱ የቀን መቁጠሪያ',
@@ -1194,6 +1226,14 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_waiting_admin_review: 'بانتظار مراجعة الإدارة',
     exam_subjects_pending: 'قيد الانتظار',
     exam_subjects_submitted: 'تم التسليم',
+    exam_class_review: 'የክፍል ውጤት ግምገማ',
+    exam_enter_component_marks: 'የነጥብ ክፍሎችን አስገባ',
+    exam_marks: 'ውጤቶች',
+    exam_edit_marks_help: 'የትምህርቱን ውጤት አርትዕ ከዚያ አስቀምጥ ወይም አስገባ',
+    exam_teacher_review_scope: 'የክፍል አስተማሪው ሁሉንም ንቁ ትምህርቶች ማየት ይችላል፣ ግን ለእሱ የተመደበውን ትምህርት ብቻ ያስገባል።',
+    exam_forward_ready: 'ክፍሉ ተጠናቋል እና ለአስተዳደር ለመላክ ዝግጁ ነው።',
+    exam_term1: 'ተርም 1',
+    exam_term2: 'ተርም 2',
     assignments: 'الواجبات',
     fees_payments: 'الرسوم والمدفوعات',
     events_holidays: 'الفعاليات والعطلات',
