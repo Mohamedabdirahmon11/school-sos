@@ -9578,6 +9578,10 @@ apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSup
         if (exists) { skipped.push({ assignmentId: row.id, reason: 'Qoondeyn hore ayaa meeshaas ka jirta.' }); continue; }
         const inserted = await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
         if (inserted.error) throw inserted.error;
+        const { data: targetYear } = await client.from('academic_years').select('is_current').eq('school_id', school.id).eq('id', targetYearId).maybeSingle();
+        let targetIsCurrentTerm = !targetTermId;
+        if (targetTermId) { const { data: targetTerm } = await client.from('terms').select('is_current').eq('school_id', school.id).eq('id', targetTermId).maybeSingle(); targetIsCurrentTerm = targetTerm?.is_current === true; }
+        if (targetYear?.is_current && targetIsCurrentTerm) await client.from('class_subjects').update({ teacher_id: row.teacher_id }).eq('school_id', school.id).eq('class_id', row.class_id).eq('subject_id', row.subject_id);
         await teacherAssignmentAudit(client, school.id, user.id, 'copied', null, inserted.data); copied++;
       } catch (error: any) { skipped.push({ assignmentId: row.id, reason: error?.message || 'Lama koobiyeeyn.' }); }
     }
