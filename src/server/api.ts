@@ -3828,6 +3828,8 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
       skipped.push({ classId, reason: error instanceof Error ? error.message : 'Jadwalkan wuxuu keenayaa isku dhac.' });
     }
   }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_TERM_COPIED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Copied timetable from term ' + sourceTermId + ' to ' + targetTermId + '; copied ' + copiedClasses.length + ' classes and skipped ' + skipped.length + '.', severity: 'info' });
   res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
 });
 
