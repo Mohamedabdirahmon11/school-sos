@@ -2,6 +2,13 @@
 drop policy if exists class_groups_admin_write on public.class_groups;
 drop policy if exists class_sections_admin_write on public.class_sections;
 
+drop policy if exists class_groups_admin_insert on public.class_groups;
+drop policy if exists class_groups_admin_update on public.class_groups;
+drop policy if exists class_groups_admin_delete on public.class_groups;
+drop policy if exists class_sections_admin_insert on public.class_sections;
+drop policy if exists class_sections_admin_update on public.class_sections;
+drop policy if exists class_sections_admin_delete on public.class_sections;
+
 create policy class_groups_admin_insert on public.class_groups
 for insert to authenticated
 with check (private.auth_user_role() in ('school_admin','super_admin')
