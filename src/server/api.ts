@@ -4488,6 +4488,106 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
+apiRouter.get('/students/academic-years', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('academic_years')
+    .select('id,name,is_current,start_date,end_date').eq('school_id', school.id)
+    .order('start_date', { ascending: false }).limit(50);
+  if (error) { res.status(503).json({ error: 'Academic years could not be loaded.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.get('/students/:id/guardians', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('student_guardians')
+    .select('guardian_id,relation,is_primary,guardians(id,full_name,phone)')
+    .eq('school_id', school.id).eq('student_id', String(req.params.id))
+    .order('is_primary', { ascending: false });
+  if (error) { res.status(503).json({ error: 'Guardian links could not be loaded.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/students/:id/guardians', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const relation = String(body.relation || 'kale');
+  const isPrimary = body.isPrimary === true;
+  const normalizedPhone = phone.replace(/[^0-9]/g, '');
+  if (!fullName || fullName.length > 160 || normalizedPhone.length < 7 || normalizedPhone.length > 20 ||
+      !['aabo','hooyo','walaal','kale'].includes(relation)) {
+    res.status(400).json({ error: 'Enter a valid guardian name, phone and relationship.' }); return;
+  }
+  const student = await db.getStudentById(String(req.params.id), school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found in this school.' }); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  let { data: guardian, error } = await client.from('guardians').select('id,full_name,phone')
+    .eq('school_id', school.id).eq('phone_normalized', normalizedPhone).maybeSingle();
+  if (error) { res.status(503).json({ error: 'Guardian could not be checked.' }); return; }
+  if (!guardian) {
+    const created = await client.from('guardians').insert({ school_id: school.id, full_name: fullName, phone })
+      .select('id,full_name,phone').single();
+    if (created.error || !created.data) { res.status(409).json({ error: created.error?.message || 'Guardian could not be created.' }); return; }
+    guardian = created.data;
+  }
+  if (isPrimary) await client.from('student_guardians').update({ is_primary: false })
+    .eq('school_id', school.id).eq('student_id', student.id);
+  const linked = await client.from('student_guardians').upsert({
+    school_id: school.id, student_id: student.id, guardian_id: guardian.id,
+    relation, is_primary: isPrimary
+  }, { onConflict: 'student_id,guardian_id' }).select('guardian_id,relation,is_primary,guardians(id,full_name,phone)').single();
+  if (linked.error) { res.status(409).json({ error: linked.error.message || 'Guardian link could not be saved.' }); return; }
+  db.logAudit({ action: 'STUDENT_GUARDIAN_LINKED', category: 'school', schoolId: school.id,
+    schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role,
+    details: 'Linked guardian ' + guardian.full_name + ' to student ' + student.studentId + '.', severity: 'info' });
+  res.status(201).json(linked.data);
+});
+
+apiRouter.get('/students/:id/enrollments', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('enrollments')
+    .select('id,student_id,academic_year_id,class_id,section_id,roll_number,status,enrolled_at,left_at,academic_years(name),classes(name,section)')
+    .eq('school_id', school.id).eq('student_id', String(req.params.id))
+    .order('enrolled_at', { ascending: false }).limit(100);
+  if (error) { res.status(503).json({ error: 'Enrollment history could not be loaded.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/students/:id/transfer', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const academicYearId = String(body.academicYearId || '');
+  const withdraw = body.action === 'withdraw';
+  const classId = String(body.classId || '');
+  if (!/^[0-9a-f-]{36}$/i.test(academicYearId) || (!withdraw && !classId) ||
+      (body.sectionId && !/^[0-9a-f-]{36}$/i.test(String(body.sectionId))) ||
+      (body.rollNumber !== undefined && (typeof body.rollNumber !== 'string' || body.rollNumber.length > 40))) {
+    res.status(400).json({ error: 'Choose a valid academic year and target class/section.' }); return;
+  }
+  const student = await db.getStudentById(String(req.params.id), school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found in this school.' }); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.rpc('schoolos_transfer_enrollment', {
+    p_school_id: school.id, p_student_id: student.id, p_academic_year_id: academicYearId,
+    p_class_id: withdraw ? student.classId : classId,
+    p_section_id: body.sectionId || null, p_roll_number: body.rollNumber || null,
+    p_actor_id: user.id, p_withdraw: withdraw
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Enrollment transfer failed.' }); return; }
+  res.json({ success: true, enrollmentId: data || null, withdrawn: withdraw });
+});
+
 apiRouter.get('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
   const studentId = String(req.params.id || '');
@@ -4792,6 +4892,20 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
   const user = (req as any).user as User;
   const student = await db.getStudentById(req.params.id, school.id);
   if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const protectedTables = ['attendance_records', 'student_marks', 'fee_payments', 'student_invoices', 'enrollments'];
+  const linkedCounts = await Promise.all(protectedTables.map(async table => {
+    const { count, error } = await client.from(table).select('id', { count: 'exact', head: true })
+      .eq('school_id', school.id).eq('student_id', student.id);
+    if (error) throw new Error('Unable to verify linked student records before deletion.');
+    return { table, count: count || 0 };
+  }));
+  const linked = linkedCounts.filter(item => item.count > 0);
+  if (linked.length) {
+    res.status(409).json({ error: 'Student has linked attendance, marks, fees, invoices or enrollment history. Archive/withdraw the student instead of deleting.', linkedRecords: linked });
+    return;
+  }
   const deleted = await db.deleteStudent(req.params.id, school.id);
   if (!deleted) { res.status(404).json({ error: 'Student not found.' }); return; }
   db.logAudit({
@@ -6161,6 +6275,28 @@ apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmi
 
   try {
     const confirmed = await db.confirmYearEndPromotions(school.id, classId, Number(topN), promotions, user.id);
+    const sourceAcademicYearId = typeof req.body?.sourceAcademicYearId === 'string' ? req.body.sourceAcademicYearId : '';
+    const targetAcademicYearId = typeof req.body?.targetAcademicYearId === 'string' ? req.body.targetAcademicYearId : '';
+    if (sourceAcademicYearId && targetAcademicYearId) {
+      if (!/^[0-9a-f-]{36}$/i.test(sourceAcademicYearId) || !/^[0-9a-f-]{36}$/i.test(targetAcademicYearId)) {
+        res.status(400).json({ error: 'Choose valid source and target academic years.' }); return;
+      }
+      const client = documentServiceClient(res);
+      if (!client) return;
+      const decisions = promotions.map((item: any) => ({
+        studentId: String(item.studentId || ''),
+        decision: item.decision,
+        targetClassId: item.decision === 'promoted' ? String(item.classToId || '') : classId
+      }));
+      const { data, error } = await client.rpc('schoolos_promote_enrollments', {
+        p_school_id: school.id, p_source_year: sourceAcademicYearId,
+        p_target_year: targetAcademicYearId, p_class_id: classId,
+        p_decisions: decisions, p_actor_id: user.id
+      });
+      if (error) { res.status(409).json({ error: error.message || 'Enrollment history could not be updated.' }); return; }
+      res.json({ success: true, count: confirmed.length, enrollmentCount: data });
+      return;
+    }
     res.json({ success: true, count: confirmed.length });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Promotion confirmation failed.' });
