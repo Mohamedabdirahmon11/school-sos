@@ -18,7 +18,7 @@ test('Step 6 uses a dedicated table and does not alter homework assignments', ()
 test('Step 6 tables have tenant RLS and composite same-school relationships', () => {
   assert.match(migration, /teacher_assignments_school_scope/);
   assert.match(migration, /teacher_assignment_audit_school_read/);
-  assert.match(migration, /FOREIGN KEY \(teacher_id, school_id\)[\s\S]*REFERENCES public\.teachers \(id, school_id\)/);
+  assert.match(migration, /FOREIGN KEY \(teacher_id, school_id\)[\s\S]*REFERENCES public\.teachers\s*\(id, school_id\)/);
   assert.match(migration, /FOREIGN KEY \(subject_id, school_id\)[\s\S]*REFERENCES public\.subjects \(id, school_id\)/);
   assert.match(migration, /teacher_class_subject_assignment_unique/);
 });
