@@ -581,6 +581,13 @@ export class ApiClient {
     return this.request<Subject[]>('/subjects');
   }
 
+  public static async addDefaultSubjects() {
+    return this.request<{ success: boolean; createdCount: number; skippedCount: number; subjects: Subject[] }>('/subjects/defaults', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+  }
+
   public static async getMyFormTeacherClasses() {
     return this.request<SchoolClass[]>('/teacher/form-teacher-classes');
   }
