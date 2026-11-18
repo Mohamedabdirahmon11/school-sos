@@ -5665,22 +5665,41 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     : { data: [], error: null };
   if (substituteSlotError) { res.status(503).json({ error: 'Casharrada beddelka lama soo dejin karin.' }); return; }
   const classIds = [...new Set([...currentAssignments.map((row: any) => row.class_id), ...(formClasses || []).map((row: any) => row.id), ...(substituteSlots || []).map((row: any) => row.class_id)])];
-  const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }, { data: sections }] = await Promise.all([
-    classIds.length ? client.from('classes').select('id,name,section,grade_level').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] }),
+  const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }, { data: sections }, { data: enrollments, error: enrollmentError }] = await Promise.all([
+    classIds.length ? client.from('classes').select('id,name,section,grade_level').eq('school_id', school.id).eq('is_archived', false).in('id', classIds) : Promise.resolve({ data: [] }),
     (currentAssignments.length || (substituteSlots || []).length) ? client.from('subjects').select('id,name,code').eq('school_id', school.id).in('id', [...new Set([...currentAssignments.map((row: any) => row.subject_id), ...(substituteSlots || []).map((row: any) => row.subject_id)])]) : Promise.resolve({ data: [] }),
     client.from('periods').select('id,number,start_time,end_time,type').eq('school_id', school.id),
     client.from('attendance_sessions').select('id,class_id,period_id,subject_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date),
-    classIds.length ? client.from('class_sections').select('id,name,legacy_class_id').eq('school_id', school.id).in('legacy_class_id', classIds) : Promise.resolve({ data: [] })
+    classIds.length ? client.from('class_sections').select('id,name,legacy_class_id').eq('school_id', school.id).in('legacy_class_id', classIds) : Promise.resolve({ data: [] }),
+    year?.id && classIds.length ? client.from('enrollments').select('student_id,class_id,section_id').eq('school_id', school.id)
+      .eq('academic_year_id', year.id).eq('status', 'active').in('class_id', classIds) : Promise.resolve({ data: [], error: null })
   ]);
+  if (enrollmentError) { res.status(503).json({ error: 'Tirada ardayda laguu qoondeeyey lama soo dejin karin.' }); return; }
   const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
   const subjectMap = new Map((subjects || []).map((row: any) => [row.id, row]));
   const periodMap = new Map((periods || []).map((row: any) => [row.number, row]));
   const sessionMap = new Map((todaySessions || []).map((row: any) => [row.class_id + ':' + (row.period_id || 'daily'), row]));
+  const fullRosterClassIds = new Set<string>([
+    ...(formClasses || []).map((row: any) => row.id),
+    ...(substituteSlots || []).map((row: any) => row.class_id),
+    ...currentAssignments.filter((row: any) => !row.section_id).map((row: any) => row.class_id)
+  ]);
+  const assignedSectionsByClass = new Map<string, Set<string>>();
+  for (const assignment of currentAssignments as any[]) {
+    if (!assignment.section_id) continue;
+    const ids = assignedSectionsByClass.get(assignment.class_id) || new Set<string>();
+    ids.add(assignment.section_id); assignedSectionsByClass.set(assignment.class_id, ids);
+  }
   const classRows = classIds.map(classId => {
     const klass: any = classMap.get(classId);
     const assignedSubjects = currentAssignments.filter((row: any) => row.class_id === classId)
       .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id }));
-    return { ...(klass || { id: classId, name: classId }), subjects: assignedSubjects, sections: (sections || []).filter((section: any) => section.legacy_class_id === classId) };
+    const visibleEnrollments = (enrollments || []).filter((row: any) => row.class_id === classId &&
+      (fullRosterClassIds.has(classId) || assignedSectionsByClass.get(classId)?.has(row.section_id)));
+    const studentCount = new Set(visibleEnrollments.map((row: any) => row.student_id)).size;
+    return { ...(klass || { id: classId, name: classId }), subjects: assignedSubjects, studentCount,
+      sections: (sections || []).filter((section: any) => section.legacy_class_id === classId &&
+        (fullRosterClassIds.has(classId) || assignedSectionsByClass.get(classId)?.has(section.id))) };
   });
   const timetable = (slots || []).map((slot: any) => ({
     id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
