@@ -2915,6 +2915,49 @@ class StorageEngine {
     return { publishedCount, publishedAt };
   }
 
+  public async unpublishClassSemesterResults(
+    schoolId: string,
+    classId: string,
+    semester: 'Semester 1' | 'Semester 2',
+    unpublishedBy: string,
+    unpublishedByName: string,
+    unpublishedByRole: UserRole
+  ): Promise<number> {
+    const klass = await this.getClassById(classId, schoolId);
+    if (!klass) throw new Error('The selected class was not found in this school.');
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam result publication storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('student_marks')
+      .update({ published_at: null, published_by: null })
+      .eq('school_id', schoolId)
+      .eq('class_id', classId)
+      .eq('academic_year', klass.academicYear)
+      .eq('semester', semester)
+      .eq('status', 'approved')
+      .not('published_at', 'is', null)
+      .select('*');
+    this.recordQuery('student_marks', 'unpublish-class-semester-results', startedAt);
+    if (error) throw new Error(error.message || 'Exam results could not be unpublished.');
+    const rows = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    for (const row of rows) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+    }
+    this.logAudit({
+      action: 'MARKS_UNPUBLISHED_FROM_PARENTS',
+      category: 'academics',
+      schoolId,
+      userId: unpublishedBy,
+      userName: unpublishedByName,
+      userRole: unpublishedByRole,
+      details: JSON.stringify({ classId, semester, unpublishedCount: rows.length }),
+      severity: 'warning'
+    });
+    await this.flush();
+    return rows.length;
+  }
+
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
