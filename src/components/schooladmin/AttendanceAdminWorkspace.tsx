@@ -37,7 +37,7 @@ export const AttendanceAdminWorkspace: React.FC = () => {
     if (!selectedTeacher || busy) return;
     setBusy(true); setError(''); setMessage('');
     try {
-      await ApiClient.markTeacherAttendance({ teacherId: selectedTeacher.id, date, status, note, checkIn: checkIn || null, checkOut: checkOut || null });
+      await ApiClient.saveTeacherAttendance({ teacherId: selectedTeacher.id, date, status, note, checkIn: checkIn ? date + 'T' + checkIn + ':00' : null, checkOut: checkOut ? date + 'T' + checkOut + ':00' : null });
       setMessage('Xaadirinta macallinka waa la kaydiyey.'); await loadTeachers();
     } catch(e) { setError(e instanceof Error ? e.message : 'Xaadirinta lama kaydin karin.'); }
     finally { setBusy(false); }
