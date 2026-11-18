@@ -16,6 +16,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
+import { calculateExamSubjectTotal, rankExamStudentResults } from '../../lib/exam-calculations.ts';
 import { 
   SchoolClass, 
   Subject, 
@@ -119,7 +120,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     .slice()
     .sort((a, b) => timetableDays.indexOf(a.dayOfWeek) - timetableDays.indexOf(b.dayOfWeek) || a.periodNumber - b.periodNumber);
   const visibleStudents = students.filter(student =>
-    `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
+    `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId} ${student.rollNumber || ''}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
+  ).sort((a, b) =>
+    (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true }) ||
+    `${a.firstName} ${a.middleName || ''} ${a.lastName}`.localeCompare(`${b.firstName} ${b.middleName || ''} ${b.lastName}`)
   );
   const [assignedClassStudentCounts, setAssignedClassStudentCounts] = useState<Record<string, number>>({});
   const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
@@ -163,6 +167,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
+  const [marksDraftDirty, setMarksDraftDirty] = useState(false);
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -193,6 +198,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       setAttendanceMap({});
       setClassMarks([]);
       setMarksInput({});
+      setMarksDraftDirty(false);
       setIsLoadingClassData(false);
       return;
     }
@@ -302,6 +308,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
     if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    setMarksDraftDirty(false);
     if (status === 'submitted') {
       const incompleteSubject = editableClassSubjects.find(subject => {
         const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
@@ -363,6 +370,37 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       setIsSaving(false);
     }
   };
+
+  // Automatically persist editable marks as drafts after a short pause. Submitted rows stay locked.
+  useEffect(() => {
+    if (!marksDraftDirty || activeTab !== 'grades' || isReadOnly || isLoadingClassData ||
+        !selectedClassId || !students.length || !editableClassSubjects.length || !assessmentComponents.length) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const results = await Promise.all(editableClassSubjects.map(async subject => {
+            const lockedIds = new Set(classMarks
+              .filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status))
+              .map(mark => mark.studentId));
+            const rows = students.filter(student => !lockedIds.has(student.id)).map(student => {
+              const input = marksInput[`${student.id}:${subject.id}`] || { scores: {}, remarks: '' };
+              return { studentId: student.id, assessmentScores: input.scores, teacherRemarks: input.remarks || '', status: 'draft' as const };
+            });
+            if (!rows.length) return [];
+            const saved = await ApiClient.saveMarks(selectedClassId, subject.id, semester, rows);
+            return saved.marks || [];
+          }));
+          const savedMarks = results.flat();
+          setClassMarks(current => [...current.filter(mark => !savedMarks.some(saved => saved.id === mark.id)), ...savedMarks]);
+          setMarksDraftDirty(false);
+          setNotice('Draft marks autosaved.');
+        } catch (error) {
+          setNotice(error instanceof Error ? error.message : 'Automatic draft save failed. Use Save drafts to retry.');
+        }
+      })();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [marksDraftDirty, activeTab, isReadOnly, isLoadingClassData, selectedClassId, students, editableClassSubjects, assessmentComponents, classMarks, marksInput, semester]);
 
   const handleCreateAssignment = async () => {
     const title = assignmentTitle.trim();
@@ -461,27 +499,51 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     if (smallMax <= 0 && bigMax > 0) setExamType('big');
     else if (bigMax <= 0 && smallMax > 0) setExamType('small');
   }, [smallMax, bigMax]);
+  const allClassMarksSubmitted = isFormTeacher && gradeSubjects.length > 0 && students.length > 0 &&
+    students.every(student => gradeSubjects.every(subject => {
+      const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+      return Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
+        assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+    }));
+
   const examRegisterRows = useMemo(() => {
-    const components = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
     const rows = visibleStudents.map(student => {
       const subjectScores = gradeSubjects.map(subject => {
         const key = `${student.id}:${subject.id}`;
         const input = marksInput[key];
         const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
-        const hasSaved = Boolean(mark?.assessmentScores && components.some(component => mark.assessmentScores?.[component.id] !== undefined));
-        const hasDraft = Boolean(input && components.some(component => input.scores[component.id] !== undefined));
-        const total = components.reduce((sum, component) => sum + Number(input?.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
-        const max = components.reduce((sum, component) => sum + component.maxMarks, 0);
-        return { subjectId: subject.id, total, max, hasMarks: hasSaved || hasDraft };
+        const scores = { ...(mark?.assessmentScores || {}), ...(input?.scores || {}) };
+        const total = calculateExamSubjectTotal(scores, assessmentComponents);
+        const submitted = Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
+          assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+        return {
+          subjectId: subject.id,
+          total: total ?? 0,
+          max: assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0),
+          hasMarks: total !== null,
+          submitted
+        };
       });
-      return { student, subjectScores, total: subjectScores.reduce((sum, score) => sum + score.total, 0), max: subjectScores.reduce((sum, score) => sum + score.max, 0) };
-    }).sort((a, b) => b.total - a.total || a.student.firstName.localeCompare(b.student.firstName));
-    let currentRank = 0;
-    return rows.map((row, index): typeof row & { rank: number } => {
-      if (index === 0 || rows[index - 1].total !== row.total) currentRank = index + 1;
-      return { ...row, rank: currentRank };
+      const complete = subjectScores.length > 0 && subjectScores.every(score => score.submitted);
+      return {
+        student,
+        subjectScores,
+        total: subjectScores.reduce((sum, score) => sum + score.total, 0),
+        max: subjectScores.reduce((sum, score) => sum + score.max, 0),
+        complete
+      };
     });
-  }, [visibleStudents, gradeSubjects, assessmentComponents, examType, marksInput, classMarks]);
+    const ranked = isFormTeacher && allClassMarksSubmitted
+      ? rankExamStudentResults(rows.map(row => ({ studentId: row.student.id, total: row.total, complete: row.complete })))
+      : [];
+    const rankByStudent = new Map(ranked.map(row => [row.studentId, row.rank]));
+    return rows
+      .sort((a, b) => allClassMarksSubmitted
+        ? b.total - a.total || a.student.firstName.localeCompare(b.student.firstName)
+        : (a.student.rollNumber || '').localeCompare(b.student.rollNumber || '', undefined, { numeric: true }) ||
+          a.student.firstName.localeCompare(b.student.firstName))
+      .map(row => ({ ...row, rank: rankByStudent.get(row.student.id) ?? null }));
+  }, [visibleStudents, gradeSubjects, assessmentComponents, marksInput, classMarks, isFormTeacher, allClassMarksSubmitted]);
 
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
@@ -810,7 +872,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 subjects={gradeSubjects}
                 components={assessmentComponents}
               />
-              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
+              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Forward class to Admin</button>}
             </div>
           </div>
 
@@ -823,7 +885,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <>
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
+                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? 'All active subjects submitted · rankings ready' : 'Rankings and class totals appear after every active subject is submitted.'}</p>}</div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
                 </div>
                 <div className="hidden overflow-x-auto md:block">
@@ -832,23 +894,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                       <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
                       <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID</th>
                       {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
-                      <th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th>
+                      {isFormTeacher && <><th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total /100</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th></>}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {examRegisterRows.map(row => <tr key={row.student.id} className="hover:bg-teal-50/40">
-                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank}</td>
-                        <td className="sticky left-9 bg-white px-3 py-2.5"><strong className="block text-slate-800">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.studentId}</span></td>
-                        {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center font-semibold text-slate-700">{score.hasMarks ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
-                        <td className="border-l bg-teal-50/60 px-3 py-2.5 text-center font-black text-teal-900">{row.total.toFixed(1).replace(/\.0$/, '')}/{row.max}</td><td className="px-3 py-2.5 text-center font-bold text-slate-700">{row.rank}</td>
+                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank ?? '—'}</td>
+                        <td className="sticky left-9 bg-white px-3 py-2.5"><strong className="block text-slate-800">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.rollNumber || row.student.studentId}</span></td>
+                        {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center font-semibold text-slate-700">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
+                        {isFormTeacher && <><td className="border-l bg-teal-50/60 px-3 py-2.5 text-center font-black text-teal-900">{allClassMarksSubmitted ? row.total.toFixed(1).replace(/\.0$/, '') : '—'}</td><td className="px-3 py-2.5 text-center font-bold text-slate-700">{row.rank ?? '—'}</td></>}
                       </tr>)}
                     </tbody>
                   </table>
                 </div>
                 <div className="space-y-3 p-3 md:hidden">
                   {examRegisterRows.map(row => <article key={row.student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{row.student.firstName} {row.student.middleName} {row.student.lastName}</p><p className="text-[10px] text-slate-500">{row.student.studentId}</p></div><span className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-xs font-bold text-white">#{row.rank}</span></div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">{row.subjectScores.map(score => <div key={score.subjectId} className="rounded-lg bg-white px-2.5 py-2"><p className="truncate text-[10px] text-slate-500">{gradeSubjects.find(subject => subject.id === score.subjectId)?.name}</p><p className="text-sm font-bold text-slate-800">{score.hasMarks ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}<span className="text-[10px] font-normal text-slate-400">/{score.max}</span></p></div>)}</div>
-                    <p className="mt-3 border-t border-slate-200 pt-2 text-right text-sm font-black text-teal-900">Total: {row.total.toFixed(1).replace(/\.0$/, '')}/{row.max}</p>
+                    <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{row.student.firstName} {row.student.middleName} {row.student.lastName}</p><p className="text-[10px] text-slate-500">{row.student.studentId}</p></div>{isFormTeacher && allClassMarksSubmitted && <span className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-xs font-bold text-white">#{row.rank}</span>}</div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">{row.subjectScores.map(score => <div key={score.subjectId} className="rounded-lg bg-white px-2.5 py-2"><p className="truncate text-[10px] text-slate-500">{gradeSubjects.find(subject => subject.id === score.subjectId)?.name}</p><p className="text-sm font-bold text-slate-800">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}<span className="text-[10px] font-normal text-slate-400">/{score.max}</span></p></div>)}</div>
+                    {isFormTeacher && <p className="mt-3 border-t border-slate-200 pt-2 text-right text-sm font-black text-teal-900">{allClassMarksSubmitted ? `Total: ${row.total.toFixed(1).replace(/\.0$/, '')}/100` : 'Total and rank pending subject submissions'}</p>}
                   </article>)}
                 </div>
                 {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
@@ -876,7 +938,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
                           <div className="grid grid-cols-2 gap-3">
-                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
+                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => { setMarksDraftDirty(true); setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; }); }} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
                           </div>
                           <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
                         </article>;
@@ -895,7 +957,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                           const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
                           return <tr key={student.id} className="hover:bg-slate-50">
                             <td className="whitespace-nowrap px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="mt-0.5 block text-[10px] text-slate-400">{student.studentId}</span></td>
-                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; })} className="w-16 rounded-lg border border-slate-300 px-1.5 py-1.5 text-center" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</td>)}
+                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; }); }} className="w-16 rounded-lg border border-slate-300 px-1.5 py-1.5 text-center" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</td>)}
                             <td className="border-l px-3 py-2 text-center font-bold text-slate-800">{examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</td>
                             <td className="px-3 py-2 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td>
                           </tr>;
