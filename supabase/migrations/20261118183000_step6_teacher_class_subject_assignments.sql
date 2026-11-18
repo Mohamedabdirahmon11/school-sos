@@ -129,17 +129,17 @@ CREATE POLICY teacher_assignments_school_scope ON public.teacher_class_subject_a
   FOR ALL TO authenticated
   USING (
     private.auth_user_role()::text = 'super_admin'
-    OR (private.auth_user_role()::text NOT IN ('parent','student') AND school_id = private.auth_school_id()::text)
+    OR (private.auth_user_role()::text = 'school_admin' AND school_id = private.auth_school_id()::text)
   )
   WITH CHECK (
     private.auth_user_role()::text = 'super_admin'
-    OR (private.auth_user_role()::text NOT IN ('parent','student') AND school_id = private.auth_school_id()::text)
+    OR (private.auth_user_role()::text = 'school_admin' AND school_id = private.auth_school_id()::text)
   );
 
 DROP POLICY IF EXISTS teacher_assignment_audit_school_read ON public.teacher_assignment_audit;
 CREATE POLICY teacher_assignment_audit_school_read ON public.teacher_assignment_audit
   FOR SELECT TO authenticated
-  USING (private.auth_user_role()::text = 'super_admin' OR school_id = private.auth_school_id()::text);
+  USING (private.auth_user_role()::text = 'super_admin' OR (private.auth_user_role()::text = 'school_admin' AND school_id = private.auth_school_id()::text));
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.teacher_class_subject_assignments TO authenticated, service_role;
 GRANT SELECT ON public.teacher_assignment_audit TO authenticated, service_role;
