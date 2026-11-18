@@ -701,7 +701,7 @@ export class ApiClient {
   }
 
   public static async saveTimetableRoom(room: { id?: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }) {
-    return this.request('/timetable/rooms', { method: 'POST', body: JSON.stringify(room) });
+    return this.request<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>('/timetable/rooms', { method: 'POST', body: JSON.stringify(room) });
   }
 
   public static async deleteTimetableRoom(roomId: string) {
