@@ -4449,7 +4449,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       const ids = sectionIdsByClass.get(id) || new Set<string>();
       ids.add(String(assignment.sectionId)); sectionIdsByClass.set(id, ids);
     }
-    const yearId = String((yearPage.items[0] as any)?.id || '');
+
     const enrollments = yearId
       ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: yearId, class_id: filters.class_id, status: 'active' }, 'student_id,class_id,section_id')
       : [];
