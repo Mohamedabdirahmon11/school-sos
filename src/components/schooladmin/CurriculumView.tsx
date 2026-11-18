@@ -100,7 +100,9 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
     if (!classId || !targets.length || isReadOnly) return;
     setCopying(true); setError(''); setNotice('');
     try {
+      await ApiClient.saveClassCurriculum(classId, included.map(subjectId => ({ subjectId, periodsPerWeek: periods[subjectId] || 1 })));
       const result = await ApiClient.copyClassCurriculum(classId, targets);
+      await loadDetail(classId);
       setNotice(`Manhajka waxaa lagu koobiyeeyey ${result.copiedClasses} fasal.`);
       setTargets([]);
     } catch (cause) {
