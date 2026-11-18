@@ -250,18 +250,19 @@ export const TimetableView: React.FC = () => {
     const clash = checkClash(dayOfWeek, periodNumber, teacherId, roomNumber);
     if (clash) { setClashWarning(clash); return; }
     try {
-      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
+      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
       setTimetable(prev => [...prev.filter(s => !(s.dayOfWeek === dayOfWeek && s.periodNumber === periodNumber && s.classId === selectedClassId)), newSlot]);
       setShowAddModal(false); setClashWarning(null); setNotice('Timetable period saved.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
   };
 
+  // ApiClient.generateAllTimetables() remains available as the default-term compatibility call.
   const handleGenerateAll = async () => {
     if (isReadOnly || !classes.length) return;
     setNotice('Jadwalka waa la falanqaynayaa; weli waxba lama kaydin…');
     try {
-      const preview = await ApiClient.generateAllTimetables(true);
+      const preview = await ApiClient.generateAllTimetables(true, selectedTermId);
       const previewClasses = preview.generatedClassIds?.length || 0;
       const previewUnfilled = preview.unfilled?.length || 0;
       const previewSkipped = preview.skipped?.length || 0;
@@ -269,7 +270,7 @@ export const TimetableView: React.FC = () => {
         `HOR-U-EEGID JADWALKA\n\nFasal jadwalkooda la diyaariyey: ${previewClasses}\\nCasharro aan boos helin: ${previewUnfilled}\\nFasallo la dhaafay: ${previewSkipped}\\n\\nJadwalkan ma kaydinaysaa? Casharrada locked-ka ah waa la ilaalinayaa.`
       );
       if (!accepted) { setNotice('Hor-u-eegidda waa la joojiyey; jadwalkii hore waxba lagama beddelin.'); return; }
-      const result = await ApiClient.generateAllTimetables();
+      const result = await ApiClient.generateAllTimetables(false, selectedTermId);
       const generatedIds = new Set(result.generatedClassIds || []);
       setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
       const unfilledCount = result.unfilled.length;
@@ -292,7 +293,7 @@ export const TimetableView: React.FC = () => {
   };
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
-      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber);
+      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber, selectedTermId);
       setTimetable(prev => prev.filter(item => item.id !== slot.id));
     } catch (err: any) { setNotice(err.message || 'Unable to remove this period.'); }
   };
