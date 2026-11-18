@@ -32,6 +32,13 @@ export const TimetableView: React.FC = () => {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSelection, setPrintSelection] = useState<string[]>([]);
   const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
+  const [rooms, setRooms] = useState<Array<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>>([]);
+  const [roomDraft, setRoomDraft] = useState({ name: '', type: 'class' as 'class' | 'lab' | 'hall', capacity: '' });
+  const [substitutions, setSubstitutions] = useState<Array<{ id: string; entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string }>>([]);
+  const [substitutionDate, setSubstitutionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [substitutionSlotId, setSubstitutionSlotId] = useState('');
+  const [substituteTeacherId, setSubstituteTeacherId] = useState('');
+  const [substitutionReason, setSubstitutionReason] = useState('');
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -141,6 +148,38 @@ export const TimetableView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [school]);
+  useEffect(() => {
+    if (!school?.id) return;
+    Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions()])
+      .then(([roomRows, substitutionRows]) => {
+        setRooms(Array.isArray(roomRows) ? roomRows : []);
+        setSubstitutions(Array.isArray(substitutionRows) ? substitutionRows : []);
+      })
+      .catch(() => setNotice('Qolalka ama macallimiinta beddelka ah lama soo dejin karin.'));
+  }, [school?.id]);
+
+  useEffect(() => {
+    if (!substitutionSlotId && timetable.length) setSubstitutionSlotId(timetable[0].id);
+    if (!substituteTeacherId && teachers.length) setSubstituteTeacherId(teachers[0].id);
+  }, [timetable, teachers, substitutionSlotId, substituteTeacherId]);
+
+  const handleSaveRoom = async () => {
+    try {
+      const saved = await ApiClient.saveTimetableRoom({ name: roomDraft.name.trim(), type: roomDraft.type, capacity: roomDraft.capacity.trim() ? Number(roomDraft.capacity) : null });
+      setRooms(current => [...current.filter(room => room.id !== saved.id), saved]);
+      setRoomDraft({ name: '', type: 'class', capacity: '' });
+      setNotice('Qolka waa la kaydiyey.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Qolka lama kaydin karin.'); }
+  };
+
+  const handleSaveSubstitution = async () => {
+    try {
+      await ApiClient.saveTimetableSubstitution({ entryId: substitutionSlotId, substituteTeacherId, date: substitutionDate, reason: substitutionReason.trim() });
+      setSubstitutions(await ApiClient.getTimetableSubstitutions(substitutionDate));
+      setSubstitutionReason('');
+      setNotice('Macallinka beddelka ah waa la diiwaangeliyey; jadwalka joogtada ah isma beddelin.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Beddelka lama kaydin karin.'); }
+  };
 
   useEffect(() => {
     setRoomNumber(classes.find(klass => klass.id === selectedClassId)?.roomNumber || '');
@@ -373,6 +412,28 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
       </details>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <details className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[#132A29]">Qolalka dugsiga</summary>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input value={roomDraft.name} onChange={event => setRoomDraft(current => ({ ...current, name: event.target.value }))} placeholder="Magaca qolka" className="rounded-lg border px-3 py-2 text-xs" />
+            <select value={roomDraft.type} onChange={event => setRoomDraft(current => ({ ...current, type: event.target.value as 'class' | 'lab' | 'hall' }))} className="rounded-lg border px-3 py-2 text-xs"><option value="class">Fasal</option><option value="lab">Laboratory</option><option value="hall">Hall</option></select>
+            <div className="flex gap-2"><input type="number" min="1" value={roomDraft.capacity} onChange={event => setRoomDraft(current => ({ ...current, capacity: event.target.value }))} placeholder="Capacity" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs" /><button type="button" onClick={() => void handleSaveRoom()} disabled={isReadOnly || !roomDraft.name.trim()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Kaydi</button></div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">{rooms.map(room => <span key={room.id} className="rounded-full border border-[#DCE7E4] bg-[#F8FAFC] px-3 py-1 text-[11px] text-[#334155]">{room.name} · {room.type}{room.capacity ? ' · ' + room.capacity : ''}</span>)}{!rooms.length && <p className="text-xs text-[#64748B]">Weli qolal lama diiwaangelin.</p>}</div>
+        </details>
+        <details className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[#132A29]">Macallin beddel ah (hal maalin)</summary>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="text-xs text-[#475569]">Taariikhda<input type="date" value={substitutionDate} onChange={event => setSubstitutionDate(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="text-xs text-[#475569]">Casharka<select value={substitutionSlotId} onChange={event => setSubstitutionSlotId(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2">{timetable.map(slot => <option key={slot.id} value={slot.id}>{classes.find(item => item.id === slot.classId)?.name || slot.classId} · {slot.dayOfWeek} P{slot.periodNumber}</option>)}</select></label>
+            <label className="text-xs text-[#475569]">Macallinka beddelka ah<select value={substituteTeacherId} onChange={event => setSubstituteTeacherId(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select></label>
+            <label className="text-xs text-[#475569]">Sababta<input value={substitutionReason} onChange={event => setSubstitutionReason(event.target.value)} placeholder="Sababta beddelka" className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          </div>
+          <button type="button" onClick={() => void handleSaveSubstitution()} disabled={isReadOnly || !timetable.length || !substituteTeacherId || !substitutionSlotId} className="mt-3 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Diiwaangeli beddelka</button>
+          <div className="mt-3 space-y-1">{substitutions.filter(item => item.substituteDate === substitutionDate).map(item => <p key={item.id} className="text-xs text-[#475569]">{teachers.find(teacher => teacher.id === item.substituteTeacherId)?.fullName || item.substituteTeacherId} · {item.reason || 'Beddel macallin'}</p>)}{!substitutions.some(item => item.substituteDate === substitutionDate) && <p className="text-xs text-[#64748B]">Taariikhdan beddel macallin ma jiro.</p>}</div>
+        </details>
+      </section>
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Print timetables">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
