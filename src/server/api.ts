@@ -4341,6 +4341,11 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     return;
   }
 
+  if (req.body?.previewOnly === true) {
+    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+    return;
+  }
+
   const previousByClass = new Map<string, TimetableSlot[]>();
   for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId));
   const written: string[] = [];
