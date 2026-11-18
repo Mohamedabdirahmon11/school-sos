@@ -5582,6 +5582,7 @@ async function canTeacherMarkAttendance(
       .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId)
       .eq('period_number', periodNumber).eq('day_of_week', attendanceWeekday(date)).eq('is_active', true);
     ownLessonQuery = sectionId ? ownLessonQuery.eq('section_id', sectionId) : ownLessonQuery.is('section_id', null);
+    ownLessonQuery = currentTerm?.id ? ownLessonQuery.or(`term_id.is.null,term_id.eq.${currentTerm.id}`) : ownLessonQuery.is('term_id', null);
     const ownershipFilter = currentAssignmentIds.length
       ? `teacher_id.eq.${teacherId},assignment_id.in.(${currentAssignmentIds.join(',')}),teacher_id.is.null`
       : `teacher_id.eq.${teacherId},teacher_id.is.null`;
@@ -5659,7 +5660,7 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
     client.from('teacher_class_subject_assignments').select('id,class_id,section_id,subject_id,term_id,academic_year_id').eq('school_id', school.id).eq('teacher_id', teacher.id),
     client.from('classes').select('id,name,section,class_teacher_id,grade_level').eq('school_id', school.id).eq('class_teacher_id', user.id).eq('is_archived', false),
-    client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true),
+    client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,assignment_id,term_id,is_active').eq('school_id', school.id).eq('teacher_id', teacher.id).eq('is_active', true),
     client.from('timetable_substitutions').select('entry_id').eq('school_id', school.id).eq('substitute_teacher_id', teacher.id).eq('substitute_date', date),
     client.from('attendance_settings').select('attendance_mode,edit_window_hours,late_threshold_minutes').eq('school_id', school.id).maybeSingle()
   ]);
@@ -5669,11 +5670,12 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
   ) : [];
   const assignmentIds = currentAssignments.map((row: any) => row.id);
   const { data: assignmentSlots, error: assignmentSlotError } = assignmentIds.length
-    ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active')
+    ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,assignment_id,term_id,is_active')
       .eq('school_id', school.id).eq('is_active', true).in('assignment_id', assignmentIds)
     : { data: [], error: null };
   if (assignmentSlotError) { res.status(503).json({ error: 'Jadwalka casharrada laguu qoondeeyey lama soo dejin karin.' }); return; }
-  const teacherSlots = [...new Map([...(slots || []), ...(assignmentSlots || [])].map((slot: any) => [slot.id, slot])).values()];
+  const teacherSlots = [...new Map([...(slots || []), ...(assignmentSlots || [])].map((slot: any) => [slot.id, slot])).values()]
+    .filter((slot: any) => !slot.term_id || slot.term_id === term?.id);
   const substituteIds = (substitutions || []).map((row: any) => row.entry_id);
   const { data: substituteSlots, error: substituteSlotError } = substituteIds.length
     ? await client.from('timetable_slots').select('id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,section_id,is_active').eq('school_id', school.id).in('id', substituteIds)
