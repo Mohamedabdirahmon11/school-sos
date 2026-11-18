@@ -2,7 +2,7 @@ import type { LanguageCode } from './translations.ts';
 
 const academicLabels = {
   en: {
-    classes: 'Classes & Sections', academics: 'ACADEMIC MANAGEMENT', stepperLabel: 'Setup steps', stepSchool: 'School', stepClasses: 'Classes', stepSubjects: 'Subjects', stepTeachers: 'Teachers', stepFinish: 'Finish', removeSection: 'Remove section', subtitle: 'Create school classes and add sections such as A, B and C.', refresh: 'Refresh',
+    classes: 'Classes & Sections', academics: 'ACADEMIC MANAGEMENT', stepperLabel: 'Setup steps', stepSchool: 'School', stepClasses: 'Classes', stepSubjects: 'Subjects', stepTeachers: 'Teachers', stepFinish: 'Finish', removeSection: 'Remove section', back: 'Back', next: 'Next', footerNote: 'Changes are saved automatically and remain after you reopen the page.', subtitle: 'Create school classes and add sections such as A, B and C.', refresh: 'Refresh',
     addClass: 'Add a class', className: 'Class name', classExample: 'e.g. Grade 9', sections: 'Sections (optional)', sectionExample: 'e.g. A, B, C',
     sectionHelp: 'Separate section names with commas. A class can exist without sections.', saveClass: 'Save class', defaults: 'Standard classes',
     defaultsHelp: 'Add KG 1 and Grades 1–8. Existing classes are skipped and duplicates are not created.', addDefaults: 'Add KG 1 – Grade 8',
@@ -14,7 +14,7 @@ const academicLabels = {
     loadError: 'Could not load classes.', actionError: 'The operation failed.'
   },
   so: {
-    classes: 'Fasallo iyo Qaybo', academics: 'MAAMULKA WAXBARASHADA', stepperLabel: 'Tallaabooyinka dejinta', stepSchool: 'Dugsiga', stepClasses: 'Fasallo', stepSubjects: 'Maaddooyin', stepTeachers: 'Macallimiin', stepFinish: 'Dhammaystir', removeSection: 'Ka saar qaybta', subtitle: 'Samee fasallada dugsiga, kuna dar qaybaha sida A, B iyo C.', refresh: 'Cusboonaysii',
+    classes: 'Fasallo iyo Qaybo', academics: 'MAAMULKA WAXBARASHADA', stepperLabel: 'Tallaabooyinka dejinta', stepSchool: 'Dugsiga', stepClasses: 'Fasallo', stepSubjects: 'Maaddooyin', stepTeachers: 'Macallimiin', stepFinish: 'Dhammaystir', removeSection: 'Ka saar qaybta', back: 'Hore', next: 'Xiga', footerNote: 'Isbeddellada si toos ah ayaa loo kaydiyaa, waana sii jiri doonaan marka bogga dib loo furo.', subtitle: 'Samee fasallada dugsiga, kuna dar qaybaha sida A, B iyo C.', refresh: 'Cusboonaysii',
     addClass: 'Ku dar fasal cusub', className: 'Magaca fasalka', classExample: 'Tusaale: Fasalka 9aad', sections: 'Qaybaha (ikhtiyaari)', sectionExample: 'Tusaale: A, B, C',
     sectionHelp: 'Kala saar magacyada qaybaha hakad (,). Fasalku wuu jiri karaa isaga oo aan qaybo lahayn.', saveClass: 'Kaydi fasalka', defaults: 'Fasallada caadiga ah',
     defaultsHelp: 'Hal mar ku dar KG 1 iyo Fasallada 1 ilaa 8. Fasallada hore u jiray waa la dhaafayaa, nuqullo lama samaynayo.', addDefaults: 'Ku dar KG 1 – Fasalka 8aad',
@@ -26,7 +26,7 @@ const academicLabels = {
     loadError: 'Fasallada lama soo qaadi karin.', actionError: 'Hawlgalka wuu fashilmay.'
   },
   am: {
-    classes: 'ክፍሎች እና ክፍል ንዑስ ክፍሎች', academics: 'የትምህርት አስተዳደር', stepperLabel: 'የዝግጅት ደረጃዎች', stepSchool: 'ትምህርት ቤት', stepClasses: 'ክፍሎች', stepSubjects: 'ትምህርቶች', stepTeachers: 'መምህራን', stepFinish: 'ጨርስ', removeSection: 'ንዑስ ክፍሉን አስወግድ', subtitle: 'የትምህርት ቤቱን ክፍሎች ይፍጠሩ እና እንደ A፣ B እና C ያሉ ንዑስ ክፍሎችን ያክሉ።', refresh: 'አድስ',
+    classes: 'ክፍሎች እና ክፍል ንዑስ ክፍሎች', academics: 'የትምህርት አስተዳደር', stepperLabel: 'የዝግጅት ደረጃዎች', stepSchool: 'ትምህርት ቤት', stepClasses: 'ክፍሎች', stepSubjects: 'ትምህርቶች', stepTeachers: 'መምህራን', stepFinish: 'ጨርስ', removeSection: 'ንዑስ ክፍሉን አስወግድ', back: 'ተመለስ', next: 'ቀጣይ', footerNote: 'ለውጦች በራስ-ሰር ይቀመጣሉ።', subtitle: 'የትምህርት ቤቱን ክፍሎች ይፍጠሩ እና እንደ A፣ B እና C ያሉ ንዑስ ክፍሎችን ያክሉ።', refresh: 'አድስ',
     addClass: 'አዲስ ክፍል ጨምር', className: 'የክፍል ስም', classExample: 'ለምሳሌ፦ 9ኛ ክፍል', sections: 'ንዑስ ክፍሎች (አማራጭ)', sectionExample: 'ለምሳሌ፦ A፣ B፣ C',
     sectionHelp: 'የንዑስ ክፍል ስሞችን በኮማ ይለዩ። ክፍሉ ንዑስ ክፍሎች ሳይኖሩትም ሊኖር ይችላል።', saveClass: 'ክፍሉን አስቀምጥ', defaults: 'መደበኛ ክፍሎች',
     defaultsHelp: 'KG 1 እና ከ1ኛ እስከ 8ኛ ክፍል ይጨምሩ። ቀድሞ ያሉ ክፍሎች ይዘለላሉ።', addDefaults: 'KG 1 – 8ኛ ክፍል ጨምር',
@@ -38,7 +38,7 @@ const academicLabels = {
     loadError: 'ክፍሎችን መጫን አልተቻለም።', actionError: 'ተግባሩ አልተሳካም።'
   },
   ar: {
-    classes: 'الفصول والشُعب', academics: 'الإدارة الأكاديمية', stepperLabel: 'خطوات الإعداد', stepSchool: 'المدرسة', stepClasses: 'الفصول', stepSubjects: 'المواد', stepTeachers: 'المعلمون', stepFinish: 'إنهاء', removeSection: 'إزالة الشعبة', subtitle: 'أنشئ فصول المدرسة وأضف شعبًا مثل A وB وC.', refresh: 'تحديث',
+    classes: 'الفصول والشُعب', academics: 'الإدارة الأكاديمية', stepperLabel: 'خطوات الإعداد', stepSchool: 'المدرسة', stepClasses: 'الفصول', stepSubjects: 'المواد', stepTeachers: 'المعلمون', stepFinish: 'إنهاء', removeSection: 'إزالة الشعبة', back: 'السابق', next: 'التالي', footerNote: 'يتم حفظ التغييرات تلقائيًا وتظل محفوظة عند إعادة فتح الصفحة.', subtitle: 'أنشئ فصول المدرسة وأضف شعبًا مثل A وB وC.', refresh: 'تحديث',
     addClass: 'إضافة فصل', className: 'اسم الفصل', classExample: 'مثال: الصف التاسع', sections: 'الشُعب (اختياري)', sectionExample: 'مثال: A، B، C',
     sectionHelp: 'افصل أسماء الشُعب بفواصل. يمكن أن يوجد الفصل دون شُعب.', saveClass: 'حفظ الفصل', defaults: 'الفصول الافتراضية',
     defaultsHelp: 'إضافة KG 1 والصفوف من 1 إلى 8. سيتم تخطي الفصول الموجودة دون إنشاء نسخ مكررة.', addDefaults: 'إضافة KG 1 – الصف 8',
