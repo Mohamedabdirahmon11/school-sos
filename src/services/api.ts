@@ -1197,6 +1197,13 @@ export class ApiClient {
     });
   }
 
+  public static async reopenClassSubjectMarks(classId: string, subjectId: string, semester: string) {
+    return this.request<{ success: boolean; reopenedCount: number }>('/exams/reopen-subject', {
+      method: 'POST',
+      body: JSON.stringify({ classId, subjectId, semester })
+    });
+  }
+
   public static async forwardClassMarks(classId: string, semester: string) {
     return this.request<{ success: boolean; forwardedCount: number }>('/exams/forward-class', {
       method: 'POST',
