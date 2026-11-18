@@ -221,6 +221,12 @@ AS $$
           JOIN public.academic_years ay
             ON ay.id = a.academic_year_id AND ay.school_id = a.school_id AND ay.is_current = true
           WHERE t.user_id = u.id AND t.school_id = s.school_id AND a.class_id = s.class_id
+            AND (a.section_id IS NULL OR EXISTS (
+              SELECT 1 FROM public.class_sections sec
+              WHERE sec.id = a.section_id AND sec.school_id = s.school_id
+                AND sec.legacy_class_id = s.class_id
+                AND lower(trim(sec.name)) = lower(trim(s.section))
+            ))
         )
         OR EXISTS (
           SELECT 1 FROM public.teachers t
