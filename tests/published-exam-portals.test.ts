@@ -24,3 +24,16 @@ test('published exam schedules are school-scoped and limited to authorized porta
   assert.ok(parent.includes('Published Exam Schedule'));
   assert.ok(teacher.includes('Published Exam Timetable'));
 });
+
+
+test('school admin can withdraw a published term and remove the stale parent notice', () => {
+  assert.match(api, /apiRouter\.post\('\/exams\/unpublish'/);
+  assert.match(api, /requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /db\.unpublishClassSemesterResults/);
+  assert.match(api, /db\.archiveNotice\(notice\.id, school\.id\)/);
+  assert.match(storage, /unpublishClassSemesterResults/);
+  assert.match(storage, /published_at: null, published_by: null/);
+  assert.match(storage, /MARKS_UNPUBLISHED_FROM_PARENTS/);
+  assert.match(client, /unpublishExamResults\(classId: string, semester: string\)/);
+  assert.match(readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8'), /Withdraw published results/);
+});
