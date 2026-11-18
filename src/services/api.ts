@@ -1013,6 +1013,20 @@ export class ApiClient {
     });
   }
 
+  public static async saveTeacherSubjects(id: string, subjectIds: string[]) {
+    return this.request<{ success: boolean; subjectIds: string[] }>(`/teachers/${encodeURIComponent(id)}/subjects`, {
+      method: 'PUT', body: JSON.stringify({ subjectIds })
+    });
+  }
+
+  public static async getTeacherSubjects(id: string) {
+    return this.request<string[]>(`/teachers/${encodeURIComponent(id)}/subjects`);
+  }
+
+  public static async deleteTeacher(id: string) {
+    return this.request<{ success: boolean }>(`/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
   public static async resetTeacherPin(id: string) {
     return this.request<{ success: boolean; newPin: string; teacher: Teacher }>(`/teachers/${encodeURIComponent(id)}/reset-pin`, { method: 'POST' });
   }
