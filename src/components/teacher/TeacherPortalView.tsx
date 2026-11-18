@@ -307,6 +307,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
+  const handleStudentRemarkChange = (studentId: string, subjectId: string, remarks: string) => {
+    const key = `${studentId}:${subjectId}`;
+    setMarksDraftDirty(true);
+    setMarksInput(previous => ({
+      ...previous,
+      [key]: { ...(previous[key] || { scores: {}, remarks: '' }), remarks: remarks.slice(0, 1000) }
+    }));
+  };
+
   const handleAssessmentScoreChange = (
     studentId: string,
     subjectId: string,
@@ -804,7 +813,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               {isLoadingClassData ? <p className="p-5 text-center text-sm text-slate-500">Loading students and attendance...</p> : visibleStudents.map(student => {
                 const current = attendanceMap[student.id] || { status: 'present' as AttendanceStatus, note: '' };
                 return <article key={student.id} className="rounded-xl border border-slate-200 p-3">
-                  <div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-bold text-slate-900">{student.firstName} {student.lastName}</p><p className="mt-0.5 font-mono text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold capitalize text-slate-600">{current.status}</span></div>
+                  <div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-bold text-slate-900">{student.firstName} {student.lastName}</p><p className="mt-0.5 font-mono text-[11px] text-slate-500">{student.rollNumber || student.studentId}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold capitalize text-slate-600">{current.status}</span></div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {(['present', 'absent', 'late', 'excused'] as AttendanceStatus[]).map(status => <button key={status} type="button" aria-pressed={current.status === status} onClick={() => setAttendanceMap(previous => ({ ...previous, [student.id]: { ...previous[student.id], status } }))} className={`min-h-11 rounded-lg px-2 text-xs font-bold capitalize ${current.status === status ? status === 'present' ? 'bg-emerald-600 text-white' : status === 'absent' ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{status}</button>)}
                   </div>
@@ -971,13 +980,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                               inputs[current + (event.key === 'ArrowUp' ? -1 : 1)]?.focus();
                             }} data-mark-entry="true" className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
                           </div>
+                          <label className="mt-3 block text-xs font-semibold text-slate-600">Teacher comment <textarea value={input.remarks} onChange={event => handleStudentRemarkChange(student.id, subject.id, event.target.value)} disabled={!editable} maxLength={1000} rows={2} placeholder="Optional comment for the report card" className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs disabled:bg-slate-100" /></label>
                           <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
                         </article>;
                       })}
                       {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
                     </div>
                     <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[760px] border-collapse text-xs">
-                      <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th>{subjectComponents.map(component => <th key={component.id} className="border-l px-2 py-3 text-center">{component.name}<span className="block text-[9px] normal-case">Max {component.maxMarks}</span></th>)}<th className="border-l px-3 py-3">Exam total</th><th className="px-3 py-3">Status</th></tr></thead>
+                      <thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Student</th>{subjectComponents.map(component => <th key={component.id} className="border-l px-2 py-3 text-center">{component.name}<span className="block text-[9px] normal-case">Max {component.maxMarks}</span></th>)}<th className="border-l px-3 py-3">Exam total</th><th className="px-3 py-3">Teacher comment</th><th className="px-3 py-3">Status</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
                         {visibleStudents.map(student => {
                           const key = `${student.id}:${subject.id}`;
@@ -985,10 +995,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                           const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                           const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
                           const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
-                          const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
+                          const examTotal = subjectComponents.reduce((sum, component) => { const value = input.scores[component.id] ?? mark?.assessmentScores?.[component.id]; return sum + (typeof value === 'number' ? value : 0); }, 0);
                           return <tr key={student.id} className="hover:bg-slate-50">
                             <td className="whitespace-nowrap px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="mt-0.5 block text-[10px] text-slate-400">{student.rollNumber || student.studentId}</span></td>
-                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => handleAssessmentScoreChange(student.id, subject.id, component, event.target.value, event.currentTarget)} onKeyDown={event => {
+                            {subjectComponents.map(component => <td key={component.id} className="border-l px-2 py-2 text-center">{editable ? <input type="text" inputMode="decimal" placeholder="0 / ABS / LB" value={input.scores[component.id] ?? ''} onChange={event => handleAssessmentScoreChange(student.id, subject.id, component, event.target.value, event.currentTarget)} onKeyDown={event => {
                               if (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
                               event.preventDefault();
                               const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[data-mark-entry="true"]')).filter(input => input.offsetParent !== null);
@@ -996,6 +1006,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                               inputs[current + (event.key === 'ArrowUp' ? -1 : 1)]?.focus();
                             }} data-mark-entry="true" className="w-16 rounded-lg border border-slate-300 px-1.5 py-1.5 text-center" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span>{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</td>)}
                             <td className="border-l px-3 py-2 text-center font-bold text-slate-800">{examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</td>
+                            <td className="px-2 py-2"><input type="text" value={input.remarks} onChange={event => handleStudentRemarkChange(student.id, subject.id, event.target.value)} disabled={!editable} maxLength={1000} placeholder="Optional report comment" className="w-40 rounded-lg border border-slate-300 px-2 py-1.5 text-[10px] disabled:bg-slate-100" /></td>
                             <td className="px-3 py-2 text-center text-[10px] text-slate-500">{mark?.status || 'Not entered'}</td>
                           </tr>;
                         })}
