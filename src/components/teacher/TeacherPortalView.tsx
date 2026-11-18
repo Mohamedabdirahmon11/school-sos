@@ -317,7 +317,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     const key = `${studentId}:${subjectId}`;
     const previousValue = marksInput[key]?.scores[component.id];
     const value = rawValue.trim();
-    if (value !== '' && (!/^\\d+(\\.\\d+)?$/.test(value) || Number(value) < 0 || Number(value) > component.maxMarks)) {
+    if (value !== '' && (!/^\d+(\.\d+)?$/.test(value) || Number(value) < 0 || Number(value) > component.maxMarks)) {
       inputElement.classList.add('border-rose-500', 'ring-2', 'ring-rose-500');
       setNotice(`Khalad: geli 0 ilaa ${component.maxMarks}.`);
       inputElement.value = previousValue === undefined ? '' : String(previousValue);
@@ -936,7 +936,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               const input = marksInput[`${student.id}:${subject.id}`];
               const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
               return count + subjectComponents.filter(component =>
-                input?.scores[component.id] !== undefined || mark?.assessmentScores?.[component.id] !== undefined
+                input ? input.scores[component.id] !== undefined : mark?.assessmentScores?.[component.id] !== undefined
               ).length;
             }, 0);
             const expectedMarksCount = students.length * subjectComponents.length;
