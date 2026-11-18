@@ -5712,11 +5712,11 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
   const sessionMap = new Map((todaySessions || []).map((row: any) => [row.class_id + ':' + (row.period_id || 'daily'), row]));
   const fullRosterClassIds = new Set<string>([
     ...(formClasses || []).map((row: any) => row.id),
-    ...(substituteSlots || []).map((row: any) => row.class_id),
-    ...currentAssignments.filter((row: any) => !row.section_id).map((row: any) => row.class_id)
+    ...currentAssignments.filter((row: any) => !row.section_id).map((row: any) => row.class_id),
+    ...(substituteSlots || []).filter((row: any) => !row.section_id).map((row: any) => row.class_id)
   ]);
   const assignedSectionsByClass = new Map<string, Set<string>>();
-  for (const assignment of currentAssignments as any[]) {
+  for (const assignment of [...(currentAssignments || []), ...(substituteSlots || [])] as any[]) {
     if (!assignment.section_id) continue;
     const ids = assignedSectionsByClass.get(assignment.class_id) || new Set<string>();
     ids.add(assignment.section_id); assignedSectionsByClass.set(assignment.class_id, ids);
