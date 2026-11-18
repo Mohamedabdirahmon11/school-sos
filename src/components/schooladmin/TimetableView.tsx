@@ -24,7 +24,8 @@ export const TimetableView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'class' | 'teacher'>('class');
+  const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'room' | 'school'>('class');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
   const [settings, setSettings] = useState({ shiftCount: 1 as 1 | 2, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
@@ -364,7 +365,11 @@ export const TimetableView: React.FC = () => {
   });
   const displayedClasses = viewMode === 'teacher'
     ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
-    : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
+    : viewMode === 'room'
+      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.roomId === selectedRoomId)).slice(0, 5)
+      : viewMode === 'school'
+        ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
+        : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
   const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple') => {
     const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, mode === 'single' ? 1 : 5).map(klass => klass.id);
@@ -401,6 +406,8 @@ export const TimetableView: React.FC = () => {
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
+            <option value="room">Room view</option>
+            <option value="school">School overview</option>
           </select>
           <select
             value={selectedClassId}
@@ -415,6 +422,10 @@ export const TimetableView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.roomNumber}) · Shift {c.shift || 1}</option>
             ))}
           </select>
+          {viewMode === 'room' && <select aria-label="Select room" value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            <option value="">Select room</option>
+            {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
+          </select>}
           {viewMode === 'teacher' && <>
             <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option>{(settings.shiftCount === 2 || classes.some(klass => Number(klass.shift) === 2)) && <option value={2}>Shift 2 · Afternoon</option>}</select>
