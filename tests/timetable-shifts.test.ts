@@ -101,8 +101,8 @@ test('second-shift closing validation follows the timetable API eight-period lim
     shift2BreakAfterPeriod: 3,
     shift2BreakMinutes: 20
   };
-  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '17:40'), true);
-  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '17:39'), false);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '18:40'), true);
+  assert.equal(isShiftWithinSchoolClosingTime(settings, 8, '18:39'), false);
 });
 
 test('second-shift closing validation includes periods but omits a break after the final period', () => {
