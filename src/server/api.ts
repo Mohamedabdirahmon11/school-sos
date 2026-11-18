@@ -4449,23 +4449,18 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       const ids = sectionIdsByClass.get(id) || new Set<string>();
       ids.add(String(assignment.sectionId)); sectionIdsByClass.set(id, ids);
     }
-    const restrictedSectionIds = [...new Set([...sectionIdsByClass.values()].flatMap(ids => [...ids]))];
-    const sectionRows = restrictedSectionIds.length
-      ? await queryAllRows('class_sections', { school_id: school.id, id: restrictedSectionIds }, 'id,name')
+    const yearId = String((yearPage.items[0] as any)?.id || '');
+    const enrollments = yearId
+      ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: yearId, class_id: filters.class_id, status: 'active' }, 'student_id,class_id,section_id')
       : [];
-    const sectionNames = new Map(sectionRows.map((row: any) => [String(row.id), String(row.name || '').trim().toLowerCase()]));
-    const restrictedNames = new Map<string, Set<string>>();
-    for (const [id, sectionIds] of sectionIdsByClass) {
-      if (fullClassIds.has(id)) continue;
-      restrictedNames.set(id, new Set([...sectionIds].map(sectionId => sectionNames.get(sectionId)).filter(Boolean) as string[]));
-    }
-    let visible = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
-    visible = visible.filter((student: any) => {
-      const id = String(student.classId || '');
-      if (fullClassIds.has(id)) return true;
-      const names = restrictedNames.get(id);
-      return Boolean(names?.has(String(student.section || '').trim().toLowerCase()));
-    });
+    const visibleEnrollmentIds = [...new Set(enrollments.filter((enrollment: any) => {
+      const classKey = String(enrollment.classId || '');
+      if (fullClassIds.has(classKey)) return true;
+      return Boolean(enrollment.sectionId && sectionIdsByClass.get(classKey)?.has(String(enrollment.sectionId)));
+    }).map((enrollment: any) => String(enrollment.studentId || '')).filter(Boolean))];
+    let visible = visibleEnrollmentIds.length
+      ? await queryAllRows('students', { school_id: school.id, id: visibleEnrollmentIds, branch_id: branchId }, LIST_QUERY_COLUMNS.students)
+      : [];
     if (search) visible = visible.filter((student: any) =>
       [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()))
