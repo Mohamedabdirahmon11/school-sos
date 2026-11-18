@@ -717,7 +717,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm sm:max-w-sm" />
               <div><h2 className="text-sm font-bold text-slate-900">Students in this class</h2><p className="mt-1 text-[11px] text-slate-500">Students in classes where you teach a subject or serve as Form Teacher are shown.</p></div>
-              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{enteredMarksCount}/{expectedMarksCount} marks entered</span>
+              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
             </div>
             {isLoadingClassData ? <p className="p-8 text-center text-sm text-slate-500">Loading assigned students...</p> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{classes.length ? 'No students found in this assigned class.' : 'No teaching classes have been assigned to your teacher profile yet. Ask the School Admin to check your class and subject assignments.'}</p> : (
               <>
