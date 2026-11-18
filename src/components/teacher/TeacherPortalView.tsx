@@ -1050,7 +1050,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 const submitted = students.length > 0 && students.every(student => {
                   const mark = subjectRows.find(row => row.studentId === student.id);
                   return Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
-                    assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+                    assessmentComponents.every(component => mark.assessmentScores?.[component.id] !== undefined));
                 });
                 const reopenable = students.length > 0 && students.every(student => {
                   const mark = subjectRows.find(row => row.studentId === student.id);
