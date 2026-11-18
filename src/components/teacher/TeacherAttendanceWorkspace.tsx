@@ -26,7 +26,8 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   const [overview, setOverview] = useState<any>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');\n  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
   const [attendanceDate, setAttendanceDate] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
@@ -60,7 +61,9 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   const todayLessons = overview?.todayLessons || [];
   const attendanceMode = overview?.settings?.attendanceMode || 'daily';
   const selectedClass = classes.find((item: any) => item.id === selectedClassId);
-  const classSubjects = selectedClass?.subjects || [];\n  const assignedSectionIds = [...new Set(classSubjects.map((item: any) => item.sectionId).filter(Boolean))];\n  const availableSections = (selectedClass?.sections || []).filter((section: any) => !assignedSectionIds.length || assignedSectionIds.includes(section.id));
+  const classSubjects = selectedClass?.subjects || [];
+  const assignedSectionIds = [...new Set(classSubjects.map((item: any) => item.sectionId).filter(Boolean))];
+  const availableSections = (selectedClass?.sections || []).filter((section: any) => !assignedSectionIds.length || assignedSectionIds.includes(section.id));
   const lessonOptions = useMemo(() => timetable.filter((item: any) =>
     item.classId === selectedClassId && item.subjectId === selectedSubjectId && item.dayOfWeek === (attendanceDate ? new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(attendanceDate + 'T12:00:00.000Z')) : overview?.weekday)
   ), [timetable, selectedClassId, selectedSubjectId, attendanceDate, overview?.weekday]);
