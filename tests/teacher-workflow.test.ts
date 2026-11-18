@@ -54,7 +54,8 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'students'/);
   assert.match(teacher, /activeTab === 'attendance'/);
   assert.match(teacher, /activeTab === 'grades'/);
-  assert.match(teacher, /Class examination register/);
+  assert.match(teacher, /Form Teacher class review/);
+  assert.match(teacher, /My subject mark sheet/);
   assert.match(teacher, /Student name \/ ID/);
   assert.match(teacher, /examRegisterRows/);
   assert.match(teacher, /rankExamStudentResults/);
@@ -156,7 +157,7 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
   assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
-  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !editableClassSubjects\.length \|\| !students\.length\}/);
 });
 
 
@@ -328,7 +329,7 @@ test('Form Teacher rankings and class totals stay hidden until every active subj
   assert.match(teacher, /allClassMarksSubmitted = isFormTeacher/);
   assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted\}/);
   assert.match(teacher, /allClassMarksSubmitted \? row\.total/);
-  assert.match(teacher, /Draft marks autosaved/);
+  assert.match(teacher, /t\('exam_drafts_autosaved'\)/);
   assert.match(teacher, /student\.rollNumber \|\| student\.studentId/);
   assert.match(calculations, /row\.total !== previousTotal/);
 });
@@ -336,6 +337,6 @@ test('Form Teacher rankings and class totals stay hidden until every active subj
 test('Form Teacher review uses full 100-point subject totals rather than one exam half', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /calculateExamSubjectTotal\(scores, assessmentComponents\)/);
-  assert.match(teacher, /Total \/100/);
+  assert.match(teacher, /t\('exam_total'\) \/100/);
   assert.doesNotMatch(teacher.slice(teacher.indexOf('const examRegisterRows'), teacher.indexOf('if (initialData.loading')), /assessmentComponents\.filter\(component => component\.category/);
 });
