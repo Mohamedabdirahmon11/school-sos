@@ -9579,9 +9579,26 @@ apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSup
   const sourceTermId = req.body?.sourceTermId ? String(req.body.sourceTermId) : null, targetTermId = req.body?.targetTermId ? String(req.body.targetTermId) : null;
   if (!sourceYearId || !targetYearId || (sourceYearId === targetYearId && sourceTermId === targetTermId)) { res.status(400).json({ error: 'Dooro sannad/term asal ah iyo mid kale oo loo koobiyeeyo.' }); return; }
   try {
+    const [sourceYear, targetYear] = await Promise.all([
+      client.from('academic_years').select('id').eq('school_id', school.id).eq('id', sourceYearId).maybeSingle(),
+      client.from('academic_years').select('id').eq('school_id', school.id).eq('id', targetYearId).maybeSingle()
+    ]);
+    if (sourceYear.error || !sourceYear.data || targetYear.error || !targetYear.data) throw new Error('Sannadka laga koobiyeeynayo ama kan loo koobiyeeynayo lagama helin dugsigan.');
+    if (sourceTermId) {
+      const { data: sourceTerm } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', sourceTermId).maybeSingle();
+      if (!sourceTerm || sourceTerm.academic_year_id !== sourceYearId) throw new Error('Term-ka asalka ahi kuma jiro sannadka la doortay.');
+    }
+    if (targetTermId) {
+      const { data: targetTerm } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', targetTermId).maybeSingle();
+      if (!targetTerm || targetTerm.academic_year_id !== targetYearId) throw new Error('Term-ka loo koobiyeeynayo kuma jiro sannadka la doortay.');
+    }
     const { data: source, error } = await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('academic_year_id', sourceYearId);
     if (error) throw error;
-    const rows = (source || []).filter((x: any) => sourceTermId ? (!x.term_id || x.term_id === sourceTermId) : !x.term_id);
+    const sourceYearRows = (source || []).filter((x: any) => !x.term_id);
+    const sourceTermRows = sourceTermId ? (source || []).filter((x: any) => x.term_id === sourceTermId) : [];
+    const rows = sourceTermId
+      ? [...sourceTermRows, ...sourceYearRows.filter((base: any) => !sourceTermRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))]
+      : sourceYearRows;
     let copied = 0; const skipped: any[] = [];
     for (const row of rows) {
       try {
