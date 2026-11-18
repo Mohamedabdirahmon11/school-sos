@@ -39,7 +39,7 @@ test('Form Teacher saves editable subjects for the class in one submission actio
   assert.match(handler, /editableClassSubjects\.map\(async subject =>/);
   assert.match(handler, /Promise\.all\(/);
   assert.match(handler, /ApiClient\.saveMarks\(selectedClassId, subject\.id, semester, formatted\)/);
-  assert.match(teacher, /Form Teacher can review every active class subject, but can enter marks only for the subject assigned to their teacher profile/);
+  assert.match(teacher, /t\('exam_teacher_review_scope'\)/);
 });
 
 test('Class bulk import template includes KG and backend accepts KG grade zero', () => {
