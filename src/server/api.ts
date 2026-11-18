@@ -5491,7 +5491,7 @@ async function canTeacherMarkAttendance(
     if (error) throw new Error('Teacher assignment could not be verified.');
     assigned = (assignmentRows || []).some((row: any) =>
       (!row.term_id || !currentTerm?.id || row.term_id === currentTerm.id) &&
-      (!row.section_id || !sectionId || row.section_id === sectionId)
+      (!row.section_id || row.section_id === sectionId)
     );
   }
   if (!assigned) {
@@ -5552,11 +5552,12 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     : { data: [], error: null };
   if (substituteSlotError) { res.status(503).json({ error: 'Casharrada beddelka lama soo dejin karin.' }); return; }
   const classIds = [...new Set([...currentAssignments.map((row: any) => row.class_id), ...(formClasses || []).map((row: any) => row.id), ...(substituteSlots || []).map((row: any) => row.class_id)])];
-  const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }] = await Promise.all([
+  const [{ data: classes }, { data: subjects }, { data: periods }, { data: todaySessions }, { data: sections }] = await Promise.all([
     classIds.length ? client.from('classes').select('id,name,section,grade_level').eq('school_id', school.id).in('id', classIds) : Promise.resolve({ data: [] }),
     (currentAssignments.length || (substituteSlots || []).length) ? client.from('subjects').select('id,name,code').eq('school_id', school.id).in('id', [...new Set([...currentAssignments.map((row: any) => row.subject_id), ...(substituteSlots || []).map((row: any) => row.subject_id)])]) : Promise.resolve({ data: [] }),
     client.from('periods').select('id,number,start_time,end_time,type').eq('school_id', school.id),
-    client.from('attendance_sessions').select('id,class_id,period_id,subject_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
+    client.from('attendance_sessions').select('id,class_id,period_id,subject_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date),
+    classIds.length ? client.from('class_sections').select('id,name,legacy_class_id').eq('school_id', school.id).in('legacy_class_id', classIds) : Promise.resolve({ data: [] })
   ]);
   const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
   const subjectMap = new Map((subjects || []).map((row: any) => [row.id, row]));
@@ -5566,7 +5567,7 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
     const klass: any = classMap.get(classId);
     const assignedSubjects = currentAssignments.filter((row: any) => row.class_id === classId)
       .map((row: any) => ({ id: row.subject_id, name: (subjectMap.get(row.subject_id) as any)?.name || row.subject_id, sectionId: row.section_id }));
-    return { ...(klass || { id: classId, name: classId }), subjects: assignedSubjects };
+    return { ...(klass || { id: classId, name: classId }), subjects: assignedSubjects, sections: (sections || []).filter((section: any) => section.legacy_class_id === classId) };
   });
   const timetable = (slots || []).map((slot: any) => ({
     id: slot.id, classId: slot.class_id, dayOfWeek: slot.day_of_week, periodNumber: slot.period_number,
