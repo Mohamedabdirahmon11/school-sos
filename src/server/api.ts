@@ -4226,9 +4226,8 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
 apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const termId = String(req.body?.termId || req.query.termId || '');
-  const sectionId = String(req.body?.sectionId || req.query.sectionId || '');
+  const sectionId = (typeof req.body?.sectionId === 'string' ? req.body.sectionId : (typeof req.query.sectionId === 'string' ? req.query.sectionId : '')) || null;
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
-  const sectionId = typeof req.query.sectionId === 'string' && req.query.sectionId ? String(req.query.sectionId) : null;
   const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
   const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId);
   if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
