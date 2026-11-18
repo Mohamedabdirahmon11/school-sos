@@ -253,9 +253,8 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_parents' && (
               <ParentsView />
             )}
-            {(activeView === 'sch_classes' || activeView === 'sch_subjects') && (
-              <ClassesSubjectsView />
-            )}
+            {activeView === 'sch_classes' && <ClassesView />}
+            {activeView === 'sch_subjects' && <ClassesSubjectsView />}
             {activeView === 'sch_timetable' && (
               <TimetableView />
             )}
