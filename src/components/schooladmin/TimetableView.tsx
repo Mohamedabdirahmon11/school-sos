@@ -16,22 +16,44 @@ export const TimetableView: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [terms, setTerms] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>([]);
+  const [selectedTermId, setSelectedTermId] = useState('');
+  const [sections, setSections] = useState<Array<{ id: string; name: string; sortOrder: number }>>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [copySourceTermId, setCopySourceTermId] = useState('');
+  const [draggingSlotId, setDraggingSlotId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
-  const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
+  const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; periodsPerWeek?: number; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'class' | 'teacher'>('class');
+  const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'room' | 'school'>('class');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedTeacherShift, setSelectedTeacherShift] = useState<1 | 2>(1);
   const [settings, setSettings] = useState({ shiftCount: 1 as 1 | 2, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [generatePreview, setGeneratePreview] = useState<any | null>(null);
   const [printAllClasses, setPrintAllClasses] = useState(false);
   const [printMode, setPrintMode] = useState<'single' | 'multiple'>('multiple');
   const [printClassIds, setPrintClassIds] = useState<string[]>([]);
+  const [printTeacherId, setPrintTeacherId] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSelection, setPrintSelection] = useState<string[]>([]);
   const [displayClassIds, setDisplayClassIds] = useState<string[]>([]);
+  const [rooms, setRooms] = useState<Array<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>>([]);
+  const [roomDraft, setRoomDraft] = useState({ name: '', type: 'class' as 'class' | 'lab' | 'hall', capacity: '' });
+  const [substitutions, setSubstitutions] = useState<Array<{ id: string; entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string }>>([]);
+  const [substitutionDate, setSubstitutionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [substitutionSlotId, setSubstitutionSlotId] = useState('');
+  const [substituteTeacherId, setSubstituteTeacherId] = useState('');
+  const [substitutionReason, setSubstitutionReason] = useState('');
+  const [teacherUnavailability, setTeacherUnavailabilityRows] = useState<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number | null; reason?: string }>>([]);
+  const [availabilityTeacherId, setAvailabilityTeacherId] = useState('');
+  const [availabilityDay, setAvailabilityDay] = useState('Monday');
+  const [availabilityPeriod, setAvailabilityPeriod] = useState('');
+  const [availabilityReason, setAvailabilityReason] = useState('');
+  const [overviewDay, setOverviewDay] = useState('');
 
   // New slot form state
   const [dayOfWeek, setDayOfWeek] = useState<any>('Monday');
@@ -41,11 +63,17 @@ export const TimetableView: React.FC = () => {
   const [subjectId, setSubjectId] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
+  const [roomId, setRoomId] = useState('');
 
   const hasConfiguredWorkingDays = Boolean(school?.setupData?.calendar?.workingDays?.length);
   const days = getSchoolWorkingDays(school?.setupData?.calendar);
+  const visibleDays = viewMode === 'school' ? days.filter(day => day === overviewDay) : days;
   const periods = Array.from({ length: getSchoolPeriodsPerDay(school?.setupData?.workingHours) }, (_value, index) => index + 1);
   const periodsForDay = (day: string) => periods.filter(period => hasConfiguredWorkingDays || day !== 'Friday' || period <= 5);
+  useEffect(() => {
+    setOverviewDay(current => days.includes(current) ? current : (days[0] || 'Monday'));
+    setAvailabilityDay(current => days.includes(current) ? current : (days[0] || 'Monday'));
+  }, [school?.id, days.join('|')]);
 
   useEffect(() => {
     setDayOfWeek((current: string) => days.includes(current) ? current : (days[0] || 'Monday'));
@@ -70,7 +98,7 @@ export const TimetableView: React.FC = () => {
       ApiClient.getClasses(),
       ApiClient.getSubjects(school.id),
       ApiClient.getTeachers(school.id),
-      ApiClient.getTimetable(),
+      ApiClient.getTimetable({ termId: selectedTermId || undefined }),
       ApiClient.getTimetableSettings()
     ]);
     const errors: string[] = [];
@@ -139,8 +167,86 @@ export const TimetableView: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!school?.id) return;
+    ApiClient.getTimetableTerms().then(rows => {
+      const available = Array.isArray(rows) ? rows : [];
+      setTerms(available);
+      setSelectedTermId(current => current && available.some(term => term.id === current)
+        ? current
+        : (available.find(term => term.isCurrent)?.id || available[0]?.id || ''));
+    }).catch(() => setNotice('Xilliyada waxbarashada lama soo dejin karin.'));
+  }, [school?.id]);
+
+  useEffect(() => {
+    if (!selectedClassId) { setSections([]); setSelectedSectionId(''); return; }
+    ApiClient.getTimetableSections(selectedClassId).then(rows => {
+      const available = Array.isArray(rows) ? rows : [];
+      setSections(available);
+      setSelectedSectionId(current => current && available.some(section => section.id === current) ? current : (available[0]?.id || ''));
+    }).catch(() => setNotice('Qaybaha fasalka lama soo dejin karin.'));
+  }, [selectedClassId]);
+
+  useEffect(() => {
     fetchData();
-  }, [school]);
+  }, [school?.id, selectedTermId]);
+  useEffect(() => {
+    if (!school?.id) return;
+    Promise.all([ApiClient.getTimetableRooms(), ApiClient.getTimetableSubstitutions(), ApiClient.getTeacherUnavailability()])
+      .then(([roomRows, substitutionRows, unavailabilityRows]) => {
+        setRooms(Array.isArray(roomRows) ? roomRows : []);
+        setSubstitutions(Array.isArray(substitutionRows) ? substitutionRows : []);
+        setTeacherUnavailabilityRows(Array.isArray(unavailabilityRows) ? unavailabilityRows : []);
+      })
+      .catch(() => setNotice('Qolalka, beddelka ama maqnaanshaha macallimiinta lama soo dejin karin.'));
+  }, [school?.id]);
+
+  useEffect(() => {
+    if (!substitutionSlotId && timetable.length) setSubstitutionSlotId(timetable[0].id);
+    if (!substituteTeacherId && teachers.length) setSubstituteTeacherId(teachers[0].id);
+    if (!availabilityTeacherId && teachers.length) setAvailabilityTeacherId(teachers[0].id);
+  }, [timetable, teachers, substitutionSlotId, substituteTeacherId, availabilityTeacherId]);
+
+  const handleSaveRoom = async () => {
+    try {
+      const saved = await ApiClient.saveTimetableRoom({ name: roomDraft.name.trim(), type: roomDraft.type, capacity: roomDraft.capacity.trim() ? Number(roomDraft.capacity) : null });
+      setRooms(current => [...current.filter(room => room.id !== saved.id), saved]);
+      setRoomDraft({ name: '', type: 'class', capacity: '' });
+      setNotice('Qolka waa la kaydiyey.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Qolka lama kaydin karin.'); }
+  };
+
+  const handleSaveSubstitution = async () => {
+    try {
+      await ApiClient.saveTimetableSubstitution({ entryId: substitutionSlotId, substituteTeacherId, date: substitutionDate, reason: substitutionReason.trim() });
+      setSubstitutions(await ApiClient.getTimetableSubstitutions(substitutionDate));
+      setSubstitutionReason('');
+      setNotice('Macallinka beddelka ah waa la diiwaangeliyey; jadwalka joogtada ah isma beddelin.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Beddelka lama kaydin karin.'); }
+  };
+
+  const handleSaveUnavailability = async () => {
+    if (!availabilityTeacherId) return;
+    try {
+      await ApiClient.setTeacherUnavailability({
+        teacherId: availabilityTeacherId,
+        dayOfWeek: availabilityDay,
+        periodNumber: availabilityPeriod === '' ? null : Number(availabilityPeriod),
+        unavailable: true,
+        reason: availabilityReason.trim()
+      });
+      setTeacherUnavailabilityRows(await ApiClient.getTeacherUnavailability());
+      setAvailabilityReason('');
+      setNotice(availabilityPeriod === '' ? 'Maqnaanshaha maalinta oo dhan waa la kaydiyey.' : 'Maqnaanshaha casharka waa la kaydiyey.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Maqnaanshaha macallinka lama kaydin karin.'); }
+  };
+
+  const handleRemoveUnavailability = async (row: { teacherId: string; dayOfWeek: string; periodNumber: number | null }) => {
+    try {
+      await ApiClient.setTeacherUnavailability({ ...row, unavailable: false });
+      setTeacherUnavailabilityRows(await ApiClient.getTeacherUnavailability());
+      setNotice('Maqnaanshaha waa laga saaray.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Maqnaanshaha lama saari karin.'); }
+  };
 
   useEffect(() => {
     setRoomNumber(classes.find(klass => klass.id === selectedClassId)?.roomNumber || '');
@@ -152,7 +258,7 @@ export const TimetableView: React.FC = () => {
     ApiClient.getClassDetails(selectedClassId, { page: 1, pageSize: 1 })
       .then(details => {
         if (!active) return;
-        const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+        const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, periodsPerWeek: Number(item.periodsPerWeek || 0), subject: item.subject, teacher: item.teacher }));
         setClassSubjectAssignments(assignments);
         if (assignments.length) {
           setSubjectId(current => assignments.some(item => item.subject?.id === current) ? current : assignments[0].subject!.id);
@@ -167,6 +273,9 @@ export const TimetableView: React.FC = () => {
   const assignedSubjectsForClass = classSubjectAssignments
     .map(item => item.subject)
     .filter((item): item is Subject => Boolean(item));
+  const requiredPeriods = classSubjectAssignments.reduce((total, item) => total + Number(item.periodsPerWeek || 0), 0);
+  const placedPeriods = timetable.filter(slot => slot.classId === selectedClassId && (!selectedTermId || slot.termId === selectedTermId) && (!selectedSectionId || !slot.sectionId || slot.sectionId === selectedSectionId)).length;
+  const coveragePercent = requiredPeriods > 0 ? Math.min(100, Math.round((placedPeriods / requiredPeriods) * 100)) : 0;
   const selectedSubjectAssignment = classSubjectAssignments.find(item => item.subject?.id === subjectId);
   const assignedTeachersForSubject = selectedSubjectAssignment?.teacher
     ? teachers.filter(item => item.id === selectedSubjectAssignment.teacher?.id)
@@ -198,32 +307,103 @@ export const TimetableView: React.FC = () => {
     const clash = checkClash(dayOfWeek, periodNumber, teacherId, roomNumber);
     if (clash) { setClashWarning(clash); return; }
     try {
-      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
+      const newSlot = await ApiClient.setTimetableSlot({ classId: selectedClassId, termId: selectedTermId, sectionId: selectedSectionId || null, roomId: roomId || null, dayOfWeek, periodNumber, startTime, endTime, subjectId, teacherId, roomNumber });
       setTimetable(prev => [...prev.filter(s => !(s.dayOfWeek === dayOfWeek && s.periodNumber === periodNumber && s.classId === selectedClassId)), newSlot]);
       setShowAddModal(false); setClashWarning(null); setNotice('Timetable period saved.');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) { setClashWarning(err.message || 'Unable to save this timetable period.'); }
   };
 
+  // ApiClient.generateAllTimetables() remains available as the default-term compatibility call.
   const handleGenerateAll = async () => {
     if (isReadOnly || !classes.length) return;
-    if (!window.confirm('Dhammaan fasallada jadwalkooda ma dib ayaa loo sameeyaa? Jadwalkii hore ee fasallada leh maaddooyin loo qoondeeyay waa la beddelayaa.')) return;
-    setNotice('Jadwalka dhammaan fasallada ayaa la diyaarinayaa…');
+    setNotice('Jadwalka waa la falanqaynayaa; weli waxba lama kaydin…');
     try {
-      const result = await ApiClient.generateAllTimetables();
-      const generatedIds = new Set(result.generatedClassIds || []);
-      setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
-      const unfilledCount = result.unfilled.length;
-      const skippedCount = result.skipped.length;
-      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la sameeyay. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay, jadwalkoodii hore waa la ilaaliyay.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh: marka hore macallin u qoondee maaddooyinka (Class Subjects) si jadwalku u noqdo mid buuxa.` : ''}`);
+      const preview = await ApiClient.generateAllTimetables(true, selectedTermId);
+      setGeneratePreview(preview);
+      setNotice('Hor-u-eegidda jadwalka waa diyaar. Waxba weli lama kaydin.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Auto-generate dhammaan fasallada wuu fashilmay.');
     }
   };
 
+  const handleConfirmGenerate = async () => {
+    if (!generatePreview) return;
+    setNotice('Jadwalka waa la kaydinayaa…');
+    try {
+      const result = await ApiClient.generateAllTimetables(false, selectedTermId);
+      const generatedIds = new Set(result.generatedClassIds || []);
+      setTimetable(current => [...current.filter(slot => !generatedIds.has(slot.classId)), ...result.slots]);
+      const unfilledCount = result.unfilled.length;
+      const skippedCount = result.skipped.length;
+      setGeneratePreview(null);
+      setNotice(`Jadwalka ${generatedIds.size} fasal ayaa la kaydiyey. ${unfilledCount} cashar lama meelayn; ${skippedCount} fasal waa la dhaafay; ${result.warnings?.length || 0} digniin maaddo/maalin ah.${result.withoutTeacher ? ` ⚠ ${result.withoutTeacher} cashar macallin ma leh.` : ''}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Jadwalka lama kaydin karin.');
+    }
+  };
+
+  const handleSwapSlots = async (sourceId: string, target: TimetableSlot) => {
+    const source = timetable.find(slot => slot.id === sourceId);
+    if (!source || source.id === target.id || source.isLocked || target.isLocked) return;
+    if (source.classId !== target.classId || source.termId !== target.termId) {
+      setNotice('Isku beddelku wuxuu ka shaqeeyaa casharrada isla fasalka iyo term-ka.');
+      return;
+    }
+    try {
+      await ApiClient.swapTimetableSlots(source.id, target.id);
+      setTimetable(current => current.map(slot => {
+        if (slot.id === source.id) return { ...slot, dayOfWeek: target.dayOfWeek, periodNumber: target.periodNumber, startTime: target.startTime, endTime: target.endTime };
+        if (slot.id === target.id) return { ...slot, dayOfWeek: source.dayOfWeek, periodNumber: source.periodNumber, startTime: source.startTime, endTime: source.endTime };
+        return slot;
+      }));
+      setNotice('Labada cashar si guul leh ayaa la isku beddelay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Isku beddelka casharrada wuu fashilmay.');
+    } finally {
+      setDraggingSlotId('');
+    }
+  };
+
+  const handleClearSelectedClass = async () => {
+    if (!selectedClassId || !selectedTermId || isReadOnly) return;
+    if (!window.confirm('Ma hubtaa inaad nadiifinayso jadwalka fasalkan ee term-kan? Casharrada locked-ka ah waa la ilaalinayaa.')) return;
+    try {
+      const result = await ApiClient.clearTimetableClass(selectedClassId, selectedTermId);
+      setTimetable(current => current.filter(slot => slot.classId !== selectedClassId || slot.isLocked));
+      setNotice(`Jadwalka waa la nadiifiyey. ${result.removed} cashar waa la saaray; ${result.lockedKept} cashar oo locked ah waa la ilaaliyey.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.');
+    }
+  };
+
+  const handleCopyTerm = async () => {
+    if (!copySourceTermId || !selectedTermId || copySourceTermId === selectedTermId || isReadOnly) return;
+    const sourceName = terms.find(term => term.id === copySourceTermId)?.name || 'term-ka kale';
+    const targetName = terms.find(term => term.id === selectedTermId)?.name || 'term-kan';
+    if (!window.confirm(`Ma hubtaa inaad jadwalka ka koobiyeynayso ${sourceName} una guurinayso ${targetName}? Casharrada locked-ka ee target-ka waa la ilaalinayaa.`)) return;
+    try {
+      const result = await ApiClient.copyTimetableTerm(copySourceTermId, selectedTermId);
+      await fetchData();
+      setNotice(`${result.copiedSlots} cashar ayaa la koobiyey fasallada ${result.copiedClasses.length}. ${result.skipped.length} fasal lama koobiyeyn sababo la xiriira isku dhac.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Jadwalka term-ka lama koobiyeyn karin.');
+    }
+  };
+
+  const handleToggleLock = async (slot: TimetableSlot) => {
+    try {
+      const isLocked = !slot.isLocked;
+      await ApiClient.setTimetableSlotLocked(slot.id, isLocked);
+      setTimetable(current => current.map(item => item.id === slot.id ? { ...item, isLocked } : item));
+      setNotice(isLocked ? 'Casharka waa la xiray; auto-generate ma beddeli doono.' : 'Casharka waa la furay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Xaaladda casharka lama beddeli karin.');
+    }
+  };
   const handleRemovePeriod = async (slot: TimetableSlot) => {
     try {
-      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber);
+      await ApiClient.removeTimetablePeriod(slot.classId, slot.dayOfWeek, slot.periodNumber, selectedTermId, slot.sectionId);
       setTimetable(prev => prev.filter(item => item.id !== slot.id));
     } catch (err: any) { setNotice(err.message || 'Unable to remove this period.'); }
   };
@@ -236,6 +416,7 @@ export const TimetableView: React.FC = () => {
   const openClassPeriodEditor = async (klass: SchoolClass) => {
     setSelectedClassId(klass.id);
     setRoomNumber(klass.roomNumber || '');
+    setRoomId('');
     setDayOfWeek(days[0] || 'Monday');
     setPeriodNumber(1);
     const defaultTimes = periodTime(1, Number(klass.shift) === 2 ? 2 : 1).split(' - ');
@@ -244,7 +425,7 @@ export const TimetableView: React.FC = () => {
     setClashWarning(null);
     try {
       const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
-      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, periodsPerWeek: Number(item.periodsPerWeek || 0), subject: item.subject, teacher: item.teacher }));
       setClassSubjectAssignments(assignments);
       const first = assignments[0];
       setSubjectId(first?.subject?.id || '');
@@ -255,6 +436,8 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
   const orderedClasses = [...classes].sort((a, b) => {
     const grade = (klass: SchoolClass) => {
       const label = String(klass.gradeLevel || klass.name || '').toLowerCase();
@@ -264,19 +447,26 @@ export const TimetableView: React.FC = () => {
     return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
   });
   const displayedClasses = viewMode === 'teacher'
-    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
-    : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
+    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift))
+    : viewMode === 'room'
+      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && (slot.roomId === selectedRoomId || (!slot.roomId && slot.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name))))
+      : viewMode === 'school'
+        ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
+        : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
   const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
-  const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple') => {
-    const validIds = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, mode === 'single' ? 1 : 5).map(klass => klass.id);
+  const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple', teacherId?: string) => {
+    const matchingClasses = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id && (!teacherId || slot.teacherId === teacherId)));
+    const validIds = (teacherId ? matchingClasses : matchingClasses.slice(0, mode === 'single' ? 1 : 5)).map(klass => klass.id);
     if (!validIds.length) { setNotice('Dooro ugu yaraan hal fasal oo jadwalkiisu diyaar yahay.'); return; }
     setPrintClassIds(validIds);
+    setPrintTeacherId(teacherId || '');
     setPrintMode(mode);
     setPrintAllClasses(true);
     window.setTimeout(() => {
       window.print();
       setPrintAllClasses(false);
       setPrintClassIds([]);
+      setPrintTeacherId('');
     }, 150);
   };
 
@@ -296,9 +486,18 @@ export const TimetableView: React.FC = () => {
         </div>}
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
+          </select>}
+          {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            {terms.map(term => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? ' · Current' : ''}</option>)}
+          </select>}
+          <span className="rounded-full border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-1.5 text-[11px] font-semibold text-[#0F766E]">Coverage {coveragePercent}% · {placedPeriods}/{requiredPeriods || 0} periods</span>
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
+            <option value="room">Room view</option>
+            <option value="school">School overview</option>
           </select>
           <select
             value={selectedClassId}
@@ -313,13 +512,27 @@ export const TimetableView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.roomNumber}) · Shift {c.shift || 1}</option>
             ))}
           </select>
+          {viewMode === 'school' && <select aria-label="Overview day" value={overviewDay} onChange={e => setOverviewDay(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>}
+          {viewMode === 'room' && <select aria-label="Select room" value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+            <option value="">Select room</option>
+            {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
+          </select>}
           {viewMode === 'teacher' && <>
             <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select>
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option>{(settings.shiftCount === 2 || classes.some(klass => Number(klass.shift) === 2)) && <option value={2}>Shift 2 · Afternoon</option>}</select>
           </>}
           
           <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>
+          <button type="button" onClick={() => void handleClearSelectedClass()} disabled={isReadOnly || !selectedClassId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-700 disabled:opacity-40">Clear class</button>
+          {terms.length > 1 && <>
+            <select aria-label="Copy timetable from term" value={copySourceTermId} onChange={e => setCopySourceTermId(e.target.value)} className="px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+              <option value="">Copy from term…</option>
+              {terms.filter(term => term.id !== selectedTermId).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
+            </select>
+            <button type="button" onClick={() => void handleCopyTerm()} disabled={isReadOnly || !copySourceTermId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40">Copy timetable</button>
+          </>}
           <button type="button" onClick={() => runTimetablePrint([selectedClassId], 'single')} disabled={viewMode !== 'class' || !selectedClassId} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print this class</button>
+          {viewMode === 'teacher' && <button type="button" onClick={() => runTimetablePrint(displayedClasses.map(klass => klass.id), 'multiple', selectedTeacherId)} disabled={!selectedTeacherId || !displayedClasses.length} className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-xs font-semibold text-[#0F766E] disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print teacher</button>}
           <button type="button" onClick={() => { setPrintSelection(selectedClassId && timetable.some(slot => slot.classId === selectedClassId) ? [selectedClassId] : []); setShowPrintModal(true); }} disabled={viewMode === 'teacher' || !timetable.length} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-xs font-semibold text-white disabled:opacity-40"><Printer className="w-3.5 h-3.5" /> Print… (dooro fasallada)</button>
 
           <button
@@ -363,6 +576,104 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
       </details>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <details className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[#132A29]">Qolalka dugsiga</summary>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input value={roomDraft.name} onChange={event => setRoomDraft(current => ({ ...current, name: event.target.value }))} placeholder="Magaca qolka" className="rounded-lg border px-3 py-2 text-xs" />
+            <select value={roomDraft.type} onChange={event => setRoomDraft(current => ({ ...current, type: event.target.value as 'class' | 'lab' | 'hall' }))} className="rounded-lg border px-3 py-2 text-xs"><option value="class">Fasal</option><option value="lab">Laboratory</option><option value="hall">Hall</option></select>
+            <div className="flex gap-2"><input type="number" min="1" value={roomDraft.capacity} onChange={event => setRoomDraft(current => ({ ...current, capacity: event.target.value }))} placeholder="Capacity" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs" /><button type="button" onClick={() => void handleSaveRoom()} disabled={isReadOnly || !roomDraft.name.trim()} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Kaydi</button></div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">{rooms.map(room => <span key={room.id} className="rounded-full border border-[#DCE7E4] bg-[#F8FAFC] px-3 py-1 text-[11px] text-[#334155]">{room.name} · {room.type}{room.capacity ? ' · ' + room.capacity : ''}</span>)}{!rooms.length && <p className="text-xs text-[#64748B]">Weli qolal lama diiwaangelin.</p>}</div>
+        </details>
+        <details className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[#132A29]">Macallin beddel ah (hal maalin)</summary>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="text-xs text-[#475569]">Taariikhda<input type="date" value={substitutionDate} onChange={event => setSubstitutionDate(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="text-xs text-[#475569]">Casharka<select value={substitutionSlotId} onChange={event => setSubstitutionSlotId(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2">{timetable.map(slot => <option key={slot.id} value={slot.id}>{classes.find(item => item.id === slot.classId)?.name || slot.classId} · {slot.dayOfWeek} P{slot.periodNumber}</option>)}</select></label>
+            <label className="text-xs text-[#475569]">Macallinka beddelka ah<select value={substituteTeacherId} onChange={event => setSubstituteTeacherId(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2">{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}</select></label>
+            <label className="text-xs text-[#475569]">Sababta<input value={substitutionReason} onChange={event => setSubstitutionReason(event.target.value)} placeholder="Sababta beddelka" className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          </div>
+          <button type="button" onClick={() => void handleSaveSubstitution()} disabled={isReadOnly || !timetable.length || !substituteTeacherId || !substitutionSlotId} className="mt-3 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Diiwaangeli beddelka</button>
+          <div className="mt-3 space-y-1">{substitutions.filter(item => item.substituteDate === substitutionDate).map(item => <p key={item.id} className="text-xs text-[#475569]">{teachers.find(teacher => teacher.id === item.substituteTeacherId)?.fullName || item.substituteTeacherId} · {item.reason || 'Beddel macallin'}</p>)}{!substitutions.some(item => item.substituteDate === substitutionDate) && <p className="text-xs text-[#64748B]">Taariikhdan beddel macallin ma jiro.</p>}</div>
+        </details>
+      </section>
+      <section className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+        <h2 className="text-sm font-semibold text-[#132A29]">Maqnaanshaha macallimiinta</h2>
+        <p className="mt-1 text-xs text-[#64748B]">Qeex cashar gaar ah ama maalinta oo dhan; auto-generate iyo beddelka macallinku way tixgelinayaan.</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <select aria-label="Teacher unavailable" value={availabilityTeacherId} onChange={e => setAvailabilityTeacherId(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">
+            <option value="">Dooro macallin</option>{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}
+          </select>
+          <select aria-label="Unavailable day" value={availabilityDay} onChange={e => setAvailabilityDay(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">{days.map(day => <option key={day} value={day}>{day}</option>)}</select>
+          <select aria-label="Unavailable period" value={availabilityPeriod} onChange={e => setAvailabilityPeriod(e.target.value)} className="rounded-lg border px-3 py-2 text-xs">
+            <option value="">Maalinta oo dhan</option>{periodsForDay(availabilityDay).map(period => <option key={period} value={period}>Period {period}</option>)}
+          </select>
+          <input value={availabilityReason} onChange={e => setAvailabilityReason(e.target.value)} placeholder="Sababta (ikhtiyaari)" className="rounded-lg border px-3 py-2 text-xs" />
+          <button type="button" onClick={() => void handleSaveUnavailability()} disabled={isReadOnly || !availabilityTeacherId} className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Kaydi maqnaansho</button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {teacherUnavailability.map(row => <span key={row.id} className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+            {teachers.find(teacher => teacher.id === row.teacherId)?.fullName || row.teacherId} · {row.dayOfWeek} · {row.periodNumber == null ? 'Maalinta oo dhan' : 'P' + row.periodNumber} {row.reason ? '· ' + row.reason : ''}
+            {!isReadOnly && <button type="button" onClick={() => void handleRemoveUnavailability(row)} className="font-bold underline">Ka saar</button>}
+          </span>)}
+          {!teacherUnavailability.length && <p className="text-xs text-[#64748B]">Maqnaansho macallin lama diiwaangelin.</p>}
+        </div>
+      </section>
+      {generatePreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Timetable generation preview">
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#E2E8F0] p-5">
+              <div>
+                <h2 className="text-base font-bold text-[#132A29]">Hor-u-eegidda jadwalka</h2>
+                <p className="mt-1 text-xs text-[#64748B]">Jadwalkan weli lama kaydin. Hubi casharrada, meelaha bannaan iyo digniinaha ka hor xaqiijinta.</p>
+              </div>
+              <button type="button" onClick={() => setGeneratePreview(null)} aria-label="Close preview" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 border-b border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-4">
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Fasallo la diyaariyey</p><strong className="text-lg text-[#0F766E]">{generatePreview.generatedClassIds?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Casharro aan boos helin</p><strong className="text-lg text-amber-700">{generatePreview.unfilled?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Fasallo la dhaafay</p><strong className="text-lg text-slate-700">{generatePreview.skipped?.length || 0}</strong></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[10px] text-[#64748B]">Digniino</p><strong className="text-lg text-rose-700">{generatePreview.warnings?.length || 0}</strong></div>
+            </div>
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)]">
+              <div className="min-w-0">
+                <h3 className="mb-2 text-xs font-bold text-[#132A29]">Casharrada la qorsheeyey ({generatePreview.slots?.length || 0})</h3>
+                <div className="overflow-x-auto rounded-lg border border-[#E2E8F0]">
+                  <table className="w-full min-w-[620px] border-collapse text-[11px]">
+                    <thead className="bg-[#F8FAFC] text-left text-[#64748B]"><tr><th className="p-2">Fasal</th><th className="p-2">Maalin</th><th className="p-2">Cashar</th><th className="p-2">Maaddo</th><th className="p-2">Macallin</th><th className="p-2">Qol</th></tr></thead>
+                    <tbody>{(generatePreview.slots || []).map((slot: TimetableSlot) => <tr key={slot.id} className="border-t border-[#E2E8F0]">
+                      <td className="p-2">{classes.find(item => item.id === slot.classId)?.name || slot.classId}{slot.sectionId ? ' · ' + (sections.find(section => section.id === slot.sectionId)?.name || 'Section') : ''}</td>
+                      <td className="p-2">{slot.dayOfWeek}</td><td className="p-2">P{slot.periodNumber} · {slot.startTime}–{slot.endTime}</td>
+                      <td className="p-2">{subjects.find(item => item.id === slot.subjectId)?.name || slot.subjectId}</td>
+                      <td className="p-2">{teachers.find(item => item.id === slot.teacherId)?.fullName || 'Macallin lama qoondeyn'}</td>
+                      <td className="p-2">{rooms.find(item => item.id === slot.roomId)?.name || slot.roomNumber || '—'}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div><h3 className="mb-2 text-xs font-bold text-amber-800">Casharrada aan boos helin</h3>
+                  {(generatePreview.unfilled || []).map((item: any, index: number) => <p key={index} className="mb-1 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900">{classes.find(klass => klass.id === item.classId)?.name || item.className || ''} · {subjects.find(subject => subject.id === item.subjectId)?.name || item.subjectId} · {item.reason || 'Boos ku habboon lama helin.'}</p>)}
+                  {!generatePreview.unfilled?.length && <p className="text-[11px] text-slate-500">Casharro aan boos helin ma jiraan.</p>}
+                </div>
+                <div><h3 className="mb-2 text-xs font-bold text-rose-800">Digniinaha jadwalka</h3>
+                  {(generatePreview.warnings || []).map((warning: string, index: number) => <p key={index} className="mb-1 rounded-lg bg-rose-50 p-2 text-[11px] text-rose-900">{warning}</p>)}
+                  {!generatePreview.warnings?.length && <p className="text-[11px] text-slate-500">Digniin ma jirto.</p>}
+                </div>
+                <div><h3 className="mb-2 text-xs font-bold text-slate-700">Fasallada la dhaafay</h3>
+                  {(generatePreview.skipped || []).map((item: any) => <p key={item.classId} className="mb-1 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-700">{item.className || item.classId} · {item.reason}</p>)}
+                  {!generatePreview.skipped?.length && <p className="text-[11px] text-slate-500">Fasal lama dhaafin.</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[#E2E8F0] p-4">
+              <button type="button" onClick={() => setGeneratePreview(null)} className="rounded-lg border border-[#CBD5E1] px-4 py-2 text-xs font-semibold text-[#334155]">Jooji</button>
+              <button type="button" onClick={() => void handleConfirmGenerate()} disabled={isReadOnly || !generatePreview.generatedClassIds?.length} className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">Xaqiiji oo kaydi jadwalka</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Print timetables">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
@@ -402,15 +713,15 @@ export const TimetableView: React.FC = () => {
       <style>{`@page { size: A4 landscape; margin: 5mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 3mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; } .timetable-print-class h2 { font-size: 7pt; margin-bottom: 1mm; } .timetable-print-class table { font-size: 5pt; } .timetable-print-class th, .timetable-print-class td { padding: 0.7mm !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-grid { display: block !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-class { width: 100%; } .timetable-print-all[data-print-mode='single'] .timetable-print-class h2 { font-size: 14pt; margin-bottom: 3mm; } .timetable-print-all[data-print-mode='single'] .timetable-print-class table { font-size: 10pt; table-layout: auto; } .timetable-print-all[data-print-mode='single'] .timetable-print-class th, .timetable-print-all[data-print-mode='single'] .timetable-print-class td { padding: 2mm !important; line-height: 1.3; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden" data-print-mode={printMode}>
         <h1 className="mb-1 text-lg font-bold">{school?.name || 'School'} · Timetables</h1>
-        <p className="mb-2 text-[9px]">{printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
+        <p className="mb-2 text-[9px]">{printTeacherId ? 'Teacher timetable · ' + (teachers.find(teacher => teacher.id === printTeacherId)?.fullName || printTeacherId) : printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
         <div className="timetable-print-grid grid grid-cols-3 gap-2">
         {printClasses.map(klass => (
           <article key={klass.id} className="timetable-print-class">
             <h2 className="mb-2 text-sm font-bold">{klass.name}{klass.section ? ` · Section ${klass.section}` : ''} {klass.roomNumber ? `· Room ${klass.roomNumber}` : ''}</h2>
             <table className="w-full border-collapse text-[7px]">
               <thead><tr><th className="border p-1 text-left">Day</th>{periods.map(period => <th key={period} className="border p-1">P{period}<span className="block font-normal">{periodTime(period, Number(klass.shift) === 2 ? 2 : 1)}</span></th>)}</tr></thead>
-              <tbody>{days.map(day => <tr key={day}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
-                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
+              <tbody>{days.map(day => <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}><th className="border p-1 text-left">{day.slice(0, 3)}</th>{periods.map(period => {
+                const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (klass.id !== selectedClassId || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId) && (!printTeacherId || item.teacherId === printTeacherId) && (viewMode !== 'teacher' || item.teacherId === selectedTeacherId) && (viewMode !== 'room' || item.roomId === selectedRoomId || (!item.roomId && item.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)));
                 const subject = subjects.find(item => item.id === slot?.subjectId);
                 return <td key={period} className={`border p-1 text-center ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'text-transparent' : ''}`}>{slot ? <><strong>{subject?.name || 'Subject'}</strong><span className="block">{slot.startTime}–{slot.endTime}</span></> : !hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? '' : '—'}</td>;
               })}</tr>)}</tbody>
@@ -461,21 +772,31 @@ export const TimetableView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {days.map(day => (
-                    <tr key={day}>
+                  {visibleDays.map(day => (
+                    <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
                         const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
                         const subject = subjects.find(item => item.id === slot?.subjectId);
+                        const teacher = teachers.find(item => item.id === slot?.teacherId);
+                        const registeredRoom = rooms.find(item => item.id === slot?.roomId);
                         const isClosedPeriod = !hasConfiguredWorkingDays && day === 'Friday' && period === 6;
                         return (
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
                             {isClosedPeriod ? <span className="text-slate-300">—</span> : slot ? (
-                              <div className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-pointer hover:border-[#0F766E]' : ''}`}
-                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setShowAddModal(true); } }}>
+                              <div
+                                draggable={!isReadOnly && !slot.isLocked}
+                                onDragStart={event => { setDraggingSlotId(slot.id); event.dataTransfer.setData('text/plain', slot.id); }}
+                                onDragEnd={() => setDraggingSlotId('')}
+                                onDragOver={event => { if (draggingSlotId && draggingSlotId !== slot.id) event.preventDefault(); }}
+                                onDrop={event => { event.preventDefault(); const sourceId = event.dataTransfer.getData('text/plain') || draggingSlotId; if (sourceId) void handleSwapSlots(sourceId, slot); }}
+                                className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-grab hover:border-[#0F766E]' : ''} ${draggingSlotId === slot.id ? 'opacity-50' : ''}`}
+                                onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setSelectedSectionId(slot.sectionId || ''); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
-                                {!isReadOnly && <button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} className="mt-1 text-[9px] text-rose-700 underline">{t('timetable_remove_period')}</button>}
+                                <span className="mt-1 block text-[9px] text-[#475569]">{teacher?.fullName || 'Macallin lama qoondeyn'}</span>
+                                <span className="block text-[9px] text-[#64748B]">{registeredRoom?.name || slot.roomNumber || 'Qol lama cayimin'}</span>
+                                {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
                               </div>
                             ) : <span className="text-[9px] text-[#CBD5E1]">—</span>}
                           </td>
@@ -560,10 +881,23 @@ export const TimetableView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-medium text-[#334155]">Classroom Number</label>
+                <label className="block font-medium text-[#334155]">Registered Room (optional)</label>
+                <select
+                  value={roomId}
+                  onChange={e => {
+                    const nextRoomId = e.target.value;
+                    setRoomId(nextRoomId);
+                    const selectedRoom = rooms.find(room => room.id === nextRoomId);
+                    if (selectedRoom) setRoomNumber(selectedRoom.name);
+                  }}
+                  className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
+                >
+                  <option value="">Use room number below</option>
+                  {rooms.map(room => <option key={room.id} value={room.id}>{room.name} · {room.type}</option>)}
+                </select>
+                <label className="mt-2 block font-medium text-[#334155]">Room label</label>
                 <input
                   type="text"
-                  required
                   value={roomNumber}
                   onChange={e => setRoomNumber(e.target.value)}
                   placeholder="e.g. Room 201"

@@ -312,6 +312,11 @@ export interface TimetableSlot {
   teacherName?: string;
   className?: string;
   shift?: 1 | 2;
+  isLocked?: boolean;
+  termId?: string;
+  sectionId?: string | null;
+  assignmentId?: string;
+  roomId?: string | null;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';

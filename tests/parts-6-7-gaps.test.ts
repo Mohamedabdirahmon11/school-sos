@@ -29,7 +29,7 @@ test('yearly results CSV exports the decision and neutralises spreadsheet formul
 
 test('timetable generation reports lessons that have no teacher', () => {
   const api = read('../src/server/api.ts');
-  assert.match(api, /res\.json\(\{ slots: generated, unfilled, withoutTeacher: generated\.filter\(slot => !slot\.teacherId\)\.length \}\)/);
+  assert.match(api, /res\.json\(\{ slots: generated, unfilled, warnings, withoutTeacher: generated\.filter\(slot => !slot\.teacherId\)\.length \}\)/);
   assert.match(api, /withoutTeacher: generatedSlots\.filter\(slot => !slot\.teacherId\)\.length/);
   assert.match(read('../src/components/schooladmin/TimetableView.tsx'), /result\.withoutTeacher/);
 });

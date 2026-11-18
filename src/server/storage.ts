@@ -2182,6 +2182,78 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Unable to replace timetable.');
   }
 
+  public async replaceTimetableForClassTerm(schoolId: string, classId: string, termId: string, slots: TimetableSlot[]): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Timetable storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_replace_class_timetable_for_term', {
+      p_school_id: schoolId,
+      p_class_id: classId,
+      p_term_id: termId,
+      p_slots: slots.map(slot => toSupabaseRow({ ...slot, teacherId: slot.teacherId || null }, 'timetable_slots'))
+    });
+    this.recordQuery('rpc:schoolos_replace_class_timetable_for_term', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Unable to replace this term timetable.');
+  }
+
+  public async setTimetableSlotLocked(schoolId: string, slotId: string, locked: boolean): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Timetable storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('timetable_slots')
+      .update({ is_locked: locked, updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId).eq('id', slotId).select('id').maybeSingle();
+    this.recordQuery('timetable_slots', 'set-slot-lock', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update the timetable lock.');
+    if (!data) throw new Error('Timetable lesson was not found in this school.');
+  }
+  public async listTimetableRooms(schoolId: string) {
+    return this.queryRows<any>('rooms', { school_id: schoolId });
+  }
+
+  public async saveTimetableRoom(schoolId: string, values: { id?: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Room storage is unavailable.');
+    const row = toSupabaseRow({ ...values, schoolId, updatedAt: new Date().toISOString() }, 'rooms');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('rooms').upsert(row, { onConflict: 'id' }).select('*').single();
+    this.recordQuery('rooms', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save room.');
+    return fromSupabaseRow(data, 'rooms');
+  }
+
+  public async deleteTimetableRoom(schoolId: string, roomId: string) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Room storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('rooms').delete().eq('school_id', schoolId).eq('id', roomId);
+    this.recordQuery('rooms', 'delete', startedAt);
+    if (error) throw new Error(error.message || 'Unable to delete room.');
+  }
+
+  public async listTimetableSubstitutions(schoolId: string, date?: string) {
+    return this.queryRows<any>('timetable_substitutions', { school_id: schoolId, ...(date ? { substitute_date: date } : {}) });
+  }
+
+  public async saveTimetableSubstitution(schoolId: string, values: { entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string; createdBy?: string }) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Substitution storage is unavailable.');
+    const row = toSupabaseRow({ ...values, schoolId, updatedAt: new Date().toISOString() }, 'timetable_substitutions');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('timetable_substitutions').upsert(row, { onConflict: 'school_id,entry_id,substitute_date' }).select('*').single();
+    this.recordQuery('timetable_substitutions', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Unable to save substitute teacher.');
+    return fromSupabaseRow(data, 'timetable_substitutions');
+  }
+
+  public async deleteTimetableSubstitution(schoolId: string, substitutionId: string) {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Substitution storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('timetable_substitutions').delete().eq('school_id', schoolId).eq('id', substitutionId);
+    this.recordQuery('timetable_substitutions', 'delete', startedAt);
+    if (error) throw new Error(error.message || 'Unable to delete substitute teacher.');
+  }
   public async swapTimetableSlots(schoolId: string, firstId: string, secondId: string): Promise<void> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable storage is unavailable.');
@@ -2207,13 +2279,16 @@ class StorageEngine {
     return { schoolId, ...values };
   }
 
-  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, unavailable: boolean) {
+  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number | null, unavailable: boolean, reason?: string) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Teacher availability storage is unavailable.');
-    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}`;
+    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber ?? 'ALL'}`;
     if (unavailable) {
       const startedAt = performance.now();
-      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber }, { onConflict: 'school_id,teacher_id,day_of_week,period_number' });
+      const { error } = await client.from('teacher_unavailability').upsert({
+        id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek,
+        period_number: periodNumber, reason: reason?.trim() || null
+      }, { onConflict: 'id' });
       this.recordQuery('teacher_unavailability', 'upsert', startedAt);
       if (error) throw new Error(error.message || 'Unable to save teacher availability.');
     } else {

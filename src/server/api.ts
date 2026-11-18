@@ -2824,7 +2824,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   const [students, assignments, timetable, attendance] = await Promise.all([
     db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
     db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
     db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
   ]);
   const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
@@ -3739,12 +3739,108 @@ const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
   return slots.map(slot => ({ ...slot, shift: classShifts.get(slot.classId) || 1, subjectName: subjectNames.get(slot.subjectId) || slot.subjectId, teacherName: teacherNames.get(slot.teacherId) || '', className: classNames.get(slot.classId) || '' }));
 };
 
+apiRouter.get('/timetable/sections', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const classId = String(req.query.classId || '');
+  if (!classId) { res.json([]); return; }
+  const sections = await queryAllRows('class_sections', { school_id: school.id, legacy_class_id: classId }, 'id,school_id,legacy_class_id,name,sort_order');
+  res.json(sections);
+});
+
+apiRouter.get('/timetable/terms', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const terms = await queryAllRows('terms', { school_id: school.id }, 'id,school_id,name,start_date,end_date,is_current');
+  res.json(terms);
+});
+
+apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const classId = String(req.params.classId || '');
+  const termId = String(req.query.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) {
+    res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return;
+  }
+  const current = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  if (!current.length) { res.json({ success: true, removed: 0, lockedKept: 0 }); return; }
+  const locked = current.filter((slot: any) => slot.isLocked === true);
+  try {
+    await db.replaceTimetableForClassTerm(school.id, classId, termId, locked);
+    const user = (req as any).user as User;
+    db.logAudit({ action: 'TIMETABLE_CLASS_CLEARED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Cleared timetable for class ' + classId + ' in term ' + termId + '; preserved ' + locked.length + ' locked lessons.', severity: 'warning' });
+    res.json({ success: true, removed: current.length - locked.length, lockedKept: locked.length });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.' });
+  }
+});
+
+apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const sourceTermId = String(req.body?.sourceTermId || '');
+  const targetTermId = String(req.body?.targetTermId || '');
+  if (!sourceTermId || !targetTermId || sourceTermId === targetTermId) {
+    res.status(400).json({ error: 'Dooro laba term oo kala duwan.' }); return;
+  }
+  const [sourceTerm, targetTerm] = await Promise.all([
+    db.queryPage('terms', { school_id: school.id, id: sourceTermId }, 1, 1, undefined, 'id'),
+    db.queryPage('terms', { school_id: school.id, id: targetTermId }, 1, 1, undefined, 'id')
+  ]);
+  if (!sourceTerm.total || !targetTerm.total) { res.status(404).json({ error: 'Mid ka mid ah term-yada lagama helin dugsigan.' }); return; }
+  const [sourceSlots, targetSlots, targetAssignments] = await Promise.all([
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: sourceTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: targetTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id')
+  ]);
+  const sourceByClass = new Map<string, any[]>();
+  for (const slot of sourceSlots) sourceByClass.set(slot.classId, [...(sourceByClass.get(slot.classId) || []), slot]);
+  const copiedClasses: string[] = [];
+  const skipped: Array<{ classId: string; reason: string }> = [];
+  for (const [classId, sourceClassSlots] of sourceByClass) {
+    const lockedTarget = targetSlots.filter((slot: any) => slot.classId === classId && slot.isLocked === true);
+    const slotKey = (slot: any) => String(slot.sectionId || '') + ':' + slot.dayOfWeek + ':' + slot.periodNumber;
+    const lockedKeys = new Set(lockedTarget.map(slotKey));
+    const incoming = sourceClassSlots
+      .filter((slot: any) => !lockedKeys.has(slotKey(slot)))
+      .map((slot: any) => {
+        const matches = targetAssignments.filter((assignment: any) =>
+          assignment.classId === slot.classId &&
+          assignment.subjectId === slot.subjectId &&
+          (!assignment.termId || assignment.termId === targetTermId) &&
+          (!slot.sectionId || assignment.sectionId === slot.sectionId)
+        );
+        const targetAssignment = matches.find((assignment: any) => assignment.termId === targetTermId && (!slot.teacherId || assignment.teacherId === slot.teacherId))
+          || matches.find((assignment: any) => !slot.teacherId || assignment.teacherId === slot.teacherId)
+          || matches.find((assignment: any) => assignment.termId === targetTermId)
+          || matches[0];
+        return {
+          ...slot,
+          id: 'tt-' + randomUUID(),
+          termId: targetTermId,
+          assignmentId: targetAssignment?.id,
+          sectionId: targetAssignment?.sectionId ?? slot.sectionId ?? null,
+          teacherId: targetAssignment?.teacherId || slot.teacherId || '',
+          isLocked: false
+        };
+      });
+    try {
+      await db.replaceTimetableForClassTerm(school.id, classId, targetTermId, [...lockedTarget, ...incoming]);
+      copiedClasses.push(classId);
+    } catch (error) {
+      skipped.push({ classId, reason: error instanceof Error ? error.message : 'Jadwalkan wuxuu keenayaa isku dhac.' });
+    }
+  }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_TERM_COPIED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Copied timetable from term ' + sourceTermId + ' to ' + targetTermId + '; copied ' + copiedClasses.length + ' classes and skipped ' + skipped.length + '.', severity: 'info' });
+  res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
+});
+
 apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
   let classId = String(req.query.classId || '');
   let teacherId = String(req.query.teacherId || '');
+  const termId = typeof req.query.termId === 'string' ? req.query.termId : '';
+  const sectionId = typeof req.query.sectionId === 'string' ? req.query.sectionId : '';
   if (role === 'teacher') {
     const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     if (!own.items.length) { res.json([]); return; }
@@ -3763,10 +3859,12 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
     const classIds = [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
-    const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+    let slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, term_id: termId || undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+    if (sectionId) slots = slots.filter((slot: any) => !slot.sectionId || slot.sectionId === sectionId);
     res.json(await decorateTimetableSlots(school.id, slots.filter((slot: any) => !req.query.dayOfWeek || slot.dayOfWeek === req.query.dayOfWeek))); return;
   } else if (!isSchoolAdmin(user)) { res.status(403).json({ error: 'This role cannot view timetables.' }); return; }
-  const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  let slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, term_id: termId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  if (sectionId) slots = slots.filter((slot: any) => !slot.sectionId || slot.sectionId === sectionId);
   res.json(await decorateTimetableSlots(school.id, slots));
 });
 
@@ -3967,108 +4065,267 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
 });
 
 apiRouter.get('/timetable/unavailability', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const result = await db.queryPage('teacher_unavailability', { school_id: (req as any).school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number');
+  const result = await db.queryPage('teacher_unavailability', { school_id: (req as any).school.id, teacher_id: req.query.teacherId ? String(req.query.teacherId) : undefined }, 1, 100, undefined, 'id,school_id,teacher_id,day_of_week,period_number,reason');
   res.json(result.items);
 });
 
 apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const teacherId = String(req.body?.teacherId || '');
   const dayOfWeek = String(req.body?.dayOfWeek || '');
-  const periodNumber = Number(req.body?.periodNumber);
-  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || !Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 8 || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Choose a teacher in this school, a weekday, and a period from 1 to 8.' }); return; }
-  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true);
+  const rawPeriod = req.body?.periodNumber;
+  const periodNumber = rawPeriod === null || rawPeriod === undefined || rawPeriod === '' ? null : Number(rawPeriod);
+  if (!TIMETABLE_DAYS.includes(dayOfWeek as any) || (periodNumber !== null && (!Number.isInteger(periodNumber) || periodNumber < 1 || periodNumber > 8)) || !(await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).total) {
+    res.status(400).json({ error: 'Dooro macallin dugsigan ka tirsan, maalin shaqo, iyo cashar sax ah ama maalinta oo dhan.' }); return;
+  }
+  await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true, String(req.body?.reason || ''));
+  const user = (req as any).user as User;
+  db.logAudit({
+    action: req.body?.unavailable === true ? 'TEACHER_UNAVAILABILITY_SET' : 'TEACHER_UNAVAILABILITY_REMOVED',
+    category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: 'Teacher ' + teacherId + ' ' + (req.body?.unavailable === true ? 'marked unavailable' : 'made available') + ' on ' + dayOfWeek + ', period ' + (periodNumber ?? 'ALL') + '.',
+    severity: 'info'
+  });
   res.json({ success: true });
 });
 
+apiRouter.get('/timetable/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  res.json(await db.listTimetableRooms((req as any).school.id));
+});
+
+apiRouter.post('/timetable/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const name = String(req.body?.name || '').trim();
+  const type = req.body?.type;
+  const capacity = req.body?.capacity == null || req.body?.capacity === '' ? null : Number(req.body.capacity);
+  if (!name || name.length > 120 || !['class', 'lab', 'hall'].includes(type) || (capacity !== null && (!Number.isInteger(capacity) || capacity < 1))) {
+    res.status(400).json({ error: 'Geli magaca qolka, noociisa (class/lab/hall), iyo capacity sax ah.' }); return;
+  }
+  try {
+    const saved = await db.saveTimetableRoom(school.id, { id: req.body?.id ? String(req.body.id) : undefined, name, type, capacity });
+    const user = (req as any).user as User;
+    db.logAudit({ action: 'TIMETABLE_ROOM_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved timetable room ' + name + ' (' + type + ').', severity: 'info' });
+    res.status(201).json(saved);
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama kaydin karin.' }); }
+});
+
+apiRouter.delete('/timetable/rooms/:roomId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  try {
+    await db.deleteTimetableRoom(school.id, String(req.params.roomId));
+    db.logAudit({ action: 'TIMETABLE_ROOM_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable room ' + req.params.roomId + '.', severity: 'warning' });
+    res.json({ success: true });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama tirtiri karin.' }); }
+});
+
+apiRouter.get('/timetable/substitutions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+  res.json(await db.listTimetableSubstitutions((req as any).school.id, date));
+});
+
+apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const entryId = String(req.body?.entryId || '');
+  const substituteTeacherId = String(req.body?.substituteTeacherId || '');
+  const substituteDate = String(req.body?.date || '');
+  const dateValue = new Date(substituteDate + 'T12:00:00Z');
+  if (!entryId || !substituteTeacherId || !/^\d{4}-\d{2}-\d{2}$/.test(substituteDate) || Number.isNaN(dateValue.getTime()) || dateValue.toISOString().slice(0, 10) !== substituteDate) {
+    res.status(400).json({ error: 'Dooro cashar, macallin beddel ah, iyo taariikh sax ah.' }); return;
+  }
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dateValue.getUTCDay()];
+  const entry = await db.queryPage('timetable_slots', { school_id: school.id, id: entryId, is_active: 'true' }, 1, 1, undefined, 'id,school_id,class_id,term_id,day_of_week,period_number,start_time,end_time');
+  const teacher = await db.queryPage('teachers', { school_id: school.id, id: substituteTeacherId }, 1, 1, undefined, 'id');
+  if (!entry.items.length || !teacher.items.length) { res.status(404).json({ error: 'Casharka ama macallinka lagama helin dugsigan.' }); return; }
+  const slot = entry.items[0] as any;
+  if (slot.dayOfWeek !== weekday) { res.status(400).json({ error: 'Taariikhda la doortay ma waafaqsana maalinta casharka jadwalkiisa.' }); return; }
+  const slotClass = await db.getClassById(slot.classId, school.id);
+  const slotShift = Number(slotClass?.shift) === 2 ? 2 : 1;
+  const [busy, unavailable] = await Promise.all([
+    queryAllRows('timetable_slots', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday, is_active: 'true', ...(slot.termId ? { term_id: slot.termId } : {}) }, 'id,start_time,end_time'),
+    queryAllRows('teacher_unavailability', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday }, 'id,period_number,shift')
+  ]);
+  const overlaps = busy.some((item: any) => item.id !== entryId && String(item.startTime) < String(slot.endTime) && String(item.endTime) > String(slot.startTime));
+  if (overlaps) { res.status(409).json({ error: 'Macallinkan wuxuu cashar kale leeyahay waqtigan.' }); return; }
+  if (unavailable.some((item: any) => Number(item.shift || 1) === slotShift && (item.periodNumber == null || Number(item.periodNumber) === Number(slot.periodNumber)))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
+  try {
+    const saved = await db.saveTimetableSubstitution(school.id, { entryId, substituteTeacherId, substituteDate, reason: String(req.body?.reason || '').trim(), createdBy: user.id });
+    db.logAudit({ action: 'TIMETABLE_SUBSTITUTE_ASSIGNED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Assigned a substitute teacher for timetable entry ' + entryId + ' on ' + substituteDate + '.', severity: 'info' });
+    res.status(201).json(saved);
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Macallinka beddelka ah lama kaydin karin.' }); }
+});
+
+apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  try {
+    await db.deleteTimetableSubstitution(school.id, String(req.params.id));
+    db.logAudit({ action: 'TIMETABLE_SUBSTITUTE_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable substitution ' + req.params.id + '.', severity: 'info' });
+    res.json({ success: true });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
+});
 apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
+  const termId = String(req.body?.termId || '');
+  const roomId = req.body?.roomId ? String(req.body.roomId) : '';
+  const sectionId = req.body?.sectionId ? String(req.body.sectionId) : '';
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const period = Number(periodNumber);
   if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 8)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (up to eight; Friday has five).' }); return; }
-  const [klass, subject, teacher, assignment, settings, existing, unavailable] = await Promise.all([
+  const [klass, subject, teacher, assignment, step6Assignments, settings, existing, unavailable, room, section] = await Promise.all([
     db.getClassById(String(classId || ''), school.id),
     db.queryPage('subjects', { school_id: school.id, id: String(subjectId || '') }, 1, 1, undefined, 'id'),
     teacherId ? db.queryPage('teachers', { school_id: school.id, id: String(teacherId) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 }),
     db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || ''), is_active: 'true' }, 1, 100, undefined, 'id,teacher_id'),
+    db.queryPage('teacher_class_subject_assignments', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || '') }, 1, 100, undefined, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
     db.getTimetableSettings(school.id),
-    db.queryPage('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek, period_number: String(period) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
+    db.queryPage('timetable_slots', { school_id: school.id, term_id: termId, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek }, 1, 100, undefined, 'id,period_number,shift') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 100 }),
+    roomId ? db.queryPage('rooms', { school_id: school.id, id: roomId }, 1, 1, undefined, 'id,name') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 }),
+    sectionId ? db.queryPage('class_sections', { school_id: school.id, id: sectionId, legacy_class_id: String(classId || '') }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
   ]);
-  const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId));
-  if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
-  if (unavailable.total) { res.status(409).json({ error: 'This teacher is unavailable for that period.' }); return; }
+  const termAssignments = step6Assignments.items.filter((item: any) => !item.termId || item.termId === termId);
+  const selectedStep6Assignment = teacherId
+    ? termAssignments.find((item: any) =>
+      item.teacherId === String(teacherId) &&
+      (!sectionId || item.sectionId === sectionId)
+    )
+    : undefined;
+  const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId)) || Boolean(selectedStep6Assignment);
+  if (!klass || klass.isArchived || !subject.total || (teacherId && !teacher.total) || !matchingAssignment || (roomId && !room.total) || (sectionId && !section.total)) { res.status(400).json({ error: 'Class and subject must belong to this school and match an active subject assignment; an assigned teacher is optional.' }); return; }
+  if (unavailable.items.some((item: any) => Number(item.shift || 1) === (Number(klass.shift) === 2 ? 2 : 1) && (item.periodNumber == null || Number(item.periodNumber) === period))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
   const existingClassIds = [...new Set(existing.items.map((slot: any) => slot.classId).filter((id: string) => id !== String(classId)))];
   const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
   const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
   const targetShift = Number(klass.shift) === 2 ? 2 : 1;
   const sameShiftSlots = existing.items.filter((slot: any) => slot.classId !== classId && (shiftByClass.get(slot.classId) || 1) === targetShift);
   if (teacherId && sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
-  const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
+  const effectiveRoomNumber = String((roomId ? room.items[0]?.name : '') || roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const effectiveSectionId = selectedStep6Assignment?.sectionId || sectionId || null;
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId && item.isLocked === true);
+  if (lockedSlot) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan beddelin.' }); return; }
   const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
   const closingTime = school.setupData?.workingHours?.closingTime;
   if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
     res.status(400).json({ error: 'This second-shift period would finish after the school closing time configured in School Setup.' }); return;
   }
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
-  const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
-  try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), termId, sectionId: effectiveSectionId, assignmentId: selectedStep6Assignment?.id || (req.body?.assignmentId ? String(req.body.assignmentId) : undefined), roomId: roomId || null, dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
+  const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId)), slot];
+  try { await db.replaceTimetableForClassTerm(school.id, String(classId), termId, slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSON_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved lesson ' + slot.id + ' for class ' + classId + ', section ' + (effectiveSectionId || 'default') + ', term ' + termId + '.', severity: 'info' });
   res.status(201).json(slot);
 });
 
 apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
-  const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber)));
-  try { await db.replaceTimetableForClass(school.id, String(req.params.classId), next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
+  const termId = String(req.body?.termId || req.query.termId || '');
+  const sectionId = (typeof req.body?.sectionId === 'string' ? req.body.sectionId : (typeof req.query.sectionId === 'string' ? req.query.sectionId : '')) || null;
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId);
+  if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
+  const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId));
+  try { await db.replaceTimetableForClassTerm(school.id, String(req.params.classId), termId, next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSON_REMOVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Removed timetable lesson for class ' + req.params.classId + ', section ' + (sectionId || 'default') + ', ' + req.params.dayOfWeek + ' period ' + req.params.periodNumber + '.', severity: 'warning' });
   res.json({ success: true });
 });
 
+apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const slotId = String(req.params.slotId || '');
+  if (typeof req.body?.isLocked !== 'boolean') { res.status(400).json({ error: 'isLocked must be true or false.' }); return; }
+  try {
+    await db.setTimetableSlotLocked(school.id, slotId, req.body.isLocked);
+    db.logAudit({
+      action: req.body.isLocked ? 'TIMETABLE_LESSON_LOCKED' : 'TIMETABLE_LESSON_UNLOCKED',
+      category: 'school', schoolId: school.id, schoolName: school.name,
+      userId: user.id, userName: user.fullName, userRole: user.role,
+      details: (req.body.isLocked ? 'Locked' : 'Unlocked') + ' timetable lesson ' + slotId + '.',
+      severity: 'info'
+    });
+    res.json({ success: true, isLocked: req.body.isLocked });
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : 'Timetable lesson was not found.' });
+  }
+});
 apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const firstId = String(req.body?.firstSlotId || '');
   const secondId = String(req.body?.secondSlotId || '');
   if (!firstId || !secondId || firstId === secondId) { res.status(400).json({ error: 'Choose two different timetable periods to swap.' }); return; }
-  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active');
+  const slots = await db.queryPage('timetable_slots', { school_id: school.id, id: [firstId, secondId], is_active: 'true' }, 1, 2, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id');
   if (slots.items.length !== 2) { res.status(404).json({ error: 'One or both timetable periods were not found in this school.' }); return; }
+  if (slots.items.some((slot: any) => slot.isLocked)) { res.status(409).json({ error: 'Cashar xiran lama beddeli karo. Marka hore fur casharka.' }); return; }
+  if (slots.items[0].classId !== slots.items[1].classId || slots.items[0].termId !== slots.items[1].termId) { res.status(409).json({ error: 'Isku beddelka waxaa lagu samayn karaa casharrada isla fasalka iyo term-ka oo keliya.' }); return; }
   try { await db.swapTimetableSlots(school.id, firstId, secondId); }
   catch (error: any) { res.status(409).json({ error: error.message || 'The swap would create a schedule conflict.' }); return; }
+  const user = (req as any).user as User;
+  db.logAudit({ action: 'TIMETABLE_LESSONS_SWAPPED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Swapped timetable lessons ' + firstId + ' and ' + secondId + '.', severity: 'info' });
   res.json({ success: true });
 });
 
 apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const classId = String(req.body?.classId || '');
+  const termId = String(req.body?.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  const [assignments, allSlots, unavailable, settings] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, teacherAssignments, rooms, subjectRows] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
-    db.getTimetableSettings(school.id)
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number,shift'),
+    db.getTimetableSettings(school.id),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
+    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
-  const schedulableAssignments = assignments.items.filter((item: any) => Number(item.periodsPerWeek) > 0);
+  const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
+  const timetableAssignments = assignments.items.flatMap((item: any) => {
+    const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
+    const exact = matches.filter((candidate: any) => candidate.termId === termId);
+    const applicable = exact.length ? exact : matches.filter((candidate: any) => !candidate.termId);
+    return applicable.length
+      ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
+      : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
+  });
+  const schedulableAssignments = timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
   if (!schedulableAssignments.length) {
     res.status(400).json({ error: 'Fasalkan maaddooyin/macallimiin jadwal loo qoondeeyay ma leh. Marka hore Subject Assignments ka dooro maaddooyinka, macallimiinta iyo periods per week. Jadwalkii hore waxba lagama beddelin.' });
     return;
   }
-  const existing = allSlots.filter((slot: any) => slot.classId !== classId);
+  const lockedForClass = allSlots.filter((slot: any) => slot.classId === classId && slot.isLocked === true);
+  const existing = allSlots.filter((slot: any) => slot.classId !== classId || slot.isLocked === true);
   const existingClassIds = [...new Set(existing.map((slot: any) => slot.classId))];
   const existingClasses = existingClassIds.length ? await queryAllRows('classes', { school_id: school.id, id: existingClassIds }, 'id,shift') : [];
   const shiftByClass = new Map(existingClasses.map((item: any) => [item.id, Number(item.shift) === 2 ? 2 : 1]));
   const targetShift = Number(klass.shift) === 2 ? 2 : 1;
-  const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+  const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
   const occupied = new Set(sameShiftExisting.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
-  const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
-  const generated: TimetableSlot[] = [];
-  const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
+  const blocked = new Set(unavailable.filter((item: any) => Number(item.shift || 1) === targetShift).flatMap((item: any) => item.periodNumber == null ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`) : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
+  const generated: TimetableSlot[] = [...lockedForClass];
+  const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number; reason: string }> = [];
   const dayLoad = new Map<string, number>();
-  const periodLoad = new Map<number, number>();
+  const periodLoad = new Map<string, number>();
   const subjectDayLoad = new Map<string, number>();
+  const teacherDayLoad = new Map<string, number>();
+  const warnings: string[] = [];
+  for (const slot of lockedForClass) {
+    dayLoad.set(`${slot.sectionId || '*'}:${slot.dayOfWeek}`, (dayLoad.get(`${slot.sectionId || '*'}:${slot.dayOfWeek}`) || 0) + 1);
+    periodLoad.set(`${slot.sectionId || '*'}:${slot.periodNumber}`, (periodLoad.get(`${slot.sectionId || '*'}:${slot.periodNumber}`) || 0) + 1);
+    subjectDayLoad.set(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+    if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
+  }
   const lessonQueue: any[] = [];
   for (const assignment of schedulableAssignments) {
     for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) {
@@ -4077,10 +4334,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   }
   // Shuffle lesson order so subjects are interleaved instead of being placed
   // in long consecutive blocks (e.g. all Maths, then all English).
-  for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
-  }
+
   const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
   const closingTime = school.setupData?.workingHours?.closingTime;
   const candidates = TIMETABLE_DAYS.flatMap(day =>
@@ -4089,30 +4343,50 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
   );
   for (const assignment of lessonQueue) {
+    const sectionKey = assignment.sectionId || '*';
     const available = candidates.filter(({ day, period }) => {
       const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
-      return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+      const candidateTimes = getTimetablePeriodTimes(settings, period, targetShift);
+      const candidateStart = timetableMinutes(candidateTimes.startTime);
+      const candidateEnd = timetableMinutes(candidateTimes.endTime);
+      const teacherTimeBusy = Boolean(assignment.teacherId) && existing.some((slot: any) =>
+        slot.teacherId === assignment.teacherId && slot.dayOfWeek === day &&
+        candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+      );
+      const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
+      const roomTimeBusy = Boolean(roomKey) && existing.some((slot: any) =>
+        slot.dayOfWeek === day && String(slot.roomNumber || '').trim().toLowerCase() === roomKey &&
+        candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+      );
+      return !generated.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
         && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
-        && !occupiedRooms.has(`${day}:${period}`);
+        && !teacherTimeBusy
+        && !occupiedRooms.has(`${day}:${period}`)
+        && !roomTimeBusy;
     });
     if (!available.length) {
-      unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+      unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence, reason: 'Ma jirin boos bannaan oo waafaqsan macallinka, qolka, maqnaanshaha iyo casharrada xiran.' });
       continue;
     }
     const ranked = available.map(candidate => {
       const { day, period } = candidate;
-      const sameSubjectToday = generated.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+      const sameSubjectToday = generated.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId));
       const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
-      const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
-      const classDayCount = dayLoad.get(day) || 0;
-      const periodCount = periodLoad.get(period) || 0;
-      // Strongly avoid consecutive identical subjects; spread repeated lessons
-      // across different days and balance the class workload by day/period.
+      const sameSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
+      const classDayCount = dayLoad.get(`${sectionKey}:${day}`) || 0;
+      const periodCount = periodLoad.get(`${sectionKey}:${period}`) || 0;
+      const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
+      const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
+      const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
+      // Spread each subject, balance teacher workload and place core subjects earlier.
       const score = (hasAdjacentSameSubject ? 1000 : 0)
+        + (sameSubjectCount >= 2 ? 500 : 0)
         + sameSubjectCount * 35
+        + teacherCount * 5
+        + (heavySubject ? period * 8 : 0)
         + classDayCount * 3
         + periodCount * 1.5
-        + Math.random();
+        + (assignment.occurrence / 1000);
       return { ...candidate, score };
     }).sort((left, right) => left.score - right.score);
     const { day, period } = ranked[0];
@@ -4121,72 +4395,104 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       id: `tt-${randomUUID()}`,
       schoolId: school.id,
       classId,
+      termId,
       dayOfWeek: day,
       periodNumber: period,
       ...getTimetablePeriodTimes(settings, period, targetShift),
       subjectId: assignment.subjectId,
       teacherId: assignment.teacherId || '',
+      assignmentId: assignment.assignmentId,
+      sectionId: assignment.sectionId || null,
+      roomId: rooms.find((room: any) => String(room.name).trim().toLowerCase() === String(klass.roomNumber || '').trim().toLowerCase())?.id || null,
       roomNumber: klass.roomNumber || ''
     });
-    if (teacherKey) occupied.add(teacherKey);
-    dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
-    periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
-    subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+    if (teacherKey) { occupied.add(teacherKey); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
+    const priorSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
+    if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
+    dayLoad.set(`${sectionKey}:${day}`, (dayLoad.get(`${sectionKey}:${day}`) || 0) + 1);
+    periodLoad.set(`${sectionKey}:${period}`, (periodLoad.get(`${sectionKey}:${period}`) || 0) + 1);
+    subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
   }
-  for (const assignment of assignments.items.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
-    unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+  for (const assignment of timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
+    unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1, reason: 'Maaddadan weli looma dejin tirada casharrada toddobaadlaha ah (periods per week).' });
   }
-  try { await db.replaceTimetableForClass(school.id, classId, generated); }
+  if (!generated.some((slot: any) => !slot.isLocked)) {
+    res.json({ slots: lockedForClass, unfilled, withoutTeacher: lockedForClass.filter((slot: any) => !slot.teacherId).length, skipped: true, reason: 'Wax cashar cusub ah lama meelayn; jadwalkii hore waa la ilaaliyey.' });
+    return;
+  }
+  try { await db.replaceTimetableForClassTerm(school.id, classId, termId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
-  res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generated, unfilled, warnings, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
 });
 
 apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   if (req.body?.allClasses !== true) { res.status(400).json({ error: 'Confirm that all active classes should be regenerated.' }); return; }
+  const termId = String(req.body?.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
   if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
 
-  const [assignments, allSlots, unavailable, settings, allClassRows] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments, rooms, subjectRows] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
-    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number,shift'),
     db.getTimetableSettings(school.id),
-    queryAllRows('classes', { school_id: school.id }, 'id,shift')
+    queryAllRows('classes', { school_id: school.id }, 'id,shift'),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
+    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
+  const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
+  const timetableAssignments = assignments.flatMap((item: any) => {
+    const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
+    const exact = matches.filter((candidate: any) => candidate.termId === termId);
+    const applicable = exact.length ? exact : matches.filter((candidate: any) => !candidate.termId);
+    return applicable.length
+      ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
+      : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
+  });
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
-  const targetIds = new Set(assignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
+  const targetIds = new Set(timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
   // Existing timetables for classes without schedulable assignments remain in place
   // and continue to block teacher/room conflicts in the other classes.
-  let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId));
+  let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId) || slot.isLocked === true);
   const generatedSlots: TimetableSlot[] = [];
-  const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
+  const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number; reason: string }> = [];
   const skipped: Array<{ classId: string; className: string; reason: string }> = [];
   const replacements: Array<{ classId: string; slots: TimetableSlot[] }> = [];
+  const warnings: string[] = [];
 
   for (const klass of classes) {
-    const classAssignments = assignments.filter((item: any) => item.classId === klass.id);
+    const classAssignments = timetableAssignments.filter((item: any) => item.classId === klass.id);
     const schedulable = classAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
     if (!schedulable.length) {
       skipped.push({ classId: klass.id, className: klass.name, reason: 'No active subject assignments with periods per week.' });
       continue;
     }
     const targetShift = Number(klass.shift) === 2 ? 2 : 1;
-    const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || 1) === targetShift);
+    const sameShiftSlots = workingSlots.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
     const occupied = new Set(sameShiftSlots.filter((slot: any) => slot.teacherId).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
-    const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
-    const generatedForClass: TimetableSlot[] = [];
+    const blocked = new Set(unavailable.filter((item: any) => Number(item.shift || 1) === targetShift).flatMap((item: any) => item.periodNumber == null
+      ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`)
+      : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
+    const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
+    const generatedForClass: TimetableSlot[] = [...lockedForClass];
     const dayLoad = new Map<string, number>();
-    const periodLoad = new Map<number, number>();
+    const periodLoad = new Map<string, number>();
     const subjectDayLoad = new Map<string, number>();
+    const teacherDayLoad = new Map<string, number>();
+    for (const slot of lockedForClass) {
+      dayLoad.set(`${slot.sectionId || '*'}:${slot.dayOfWeek}`, (dayLoad.get(`${slot.sectionId || '*'}:${slot.dayOfWeek}`) || 0) + 1);
+      periodLoad.set(`${slot.sectionId || '*'}:${slot.periodNumber}`, (periodLoad.get(`${slot.sectionId || '*'}:${slot.periodNumber}`) || 0) + 1);
+      subjectDayLoad.set(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+      if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
+    }
     const lessonQueue: any[] = [];
     for (const assignment of schedulable) {
       for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) lessonQueue.push({ ...assignment, occurrence });
     }
-    for (let i = lessonQueue.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [lessonQueue[i], lessonQueue[j]] = [lessonQueue[j], lessonQueue[i]];
-    }
+
     const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
     const closingTime = school.setupData?.workingHours?.closingTime;
     const candidates = TIMETABLE_DAYS.flatMap(day =>
@@ -4195,52 +4501,77 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
         .filter(item => targetShift !== 2 || !closingTime || timetableMinutes(getTimetablePeriodTimes(settings, item.period, targetShift).endTime) <= timetableMinutes(closingTime))
     );
     for (const assignment of lessonQueue) {
+      const sectionKey = assignment.sectionId || '*';
       const available = candidates.filter(({ day, period }) => {
         const teacherKey = assignment.teacherId ? `${day}:${period}:${assignment.teacherId}` : '';
         const roomKey = String(klass.roomNumber || '').trim().toLowerCase();
+        const candidateTimes = getTimetablePeriodTimes(settings, period, targetShift);
+        const candidateStart = timetableMinutes(candidateTimes.startTime);
+        const candidateEnd = timetableMinutes(candidateTimes.endTime);
+        const teacherTimeBusy = Boolean(assignment.teacherId) && workingSlots.some((slot: any) =>
+          slot.teacherId === assignment.teacherId && slot.dayOfWeek === day &&
+          candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+        );
         const roomBusy = Boolean(roomKey) && sameShiftSlots.some(slot =>
           slot.dayOfWeek === day && slot.periodNumber === period &&
           String(slot.roomNumber || '').trim().toLowerCase() === roomKey
         );
-        return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period)
+        const roomTimeBusy = Boolean(roomKey) && workingSlots.some((slot: any) =>
+          slot.dayOfWeek === day && String(slot.roomNumber || '').trim().toLowerCase() === roomKey &&
+          candidateStart < timetableMinutes(slot.endTime) && candidateEnd > timetableMinutes(slot.startTime)
+        );
+        return !generatedForClass.some(slot => slot.dayOfWeek === day && slot.periodNumber === period && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId))
           && !(teacherKey && (occupied.has(teacherKey) || blocked.has(teacherKey)))
-          && !roomBusy;
+          && !teacherTimeBusy
+          && !roomBusy
+          && !roomTimeBusy;
       });
       if (!available.length) {
-        unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+        unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence, reason: 'Ma jirin boos bannaan oo waafaqsan macallinka, qolka, maqnaanshaha iyo casharrada xiran.' });
         continue;
       }
       const ranked = available.map(candidate => {
         const { day, period } = candidate;
-        const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
+        const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId && (!slot.sectionId || !assignment.sectionId || slot.sectionId === assignment.sectionId));
         const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
+        const sameSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
+        const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
+        const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
+        const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
         const score = (hasAdjacentSameSubject ? 1000 : 0)
-          + (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) * 35
-          + (dayLoad.get(day) || 0) * 3
-          + (periodLoad.get(period) || 0) * 1.5
-          + Math.random();
+          + (sameSubjectCount >= 2 ? 500 : 0)
+          + sameSubjectCount * 35
+          + teacherCount * 5
+          + (heavySubject ? period * 8 : 0)
+          + (dayLoad.get(`${sectionKey}:${day}`) || 0) * 3
+          + (periodLoad.get(`${sectionKey}:${period}`) || 0) * 1.5
+          + (assignment.occurrence / 1000);
         return { ...candidate, score };
       }).sort((left, right) => left.score - right.score);
       const { day, period } = ranked[0];
       const slot: TimetableSlot = {
-        id: `tt-${randomUUID()}`, schoolId: school.id, classId: klass.id,
+        id: `tt-${randomUUID()}`, schoolId: school.id, classId: klass.id, termId,
         dayOfWeek: day, periodNumber: period,
         ...getTimetablePeriodTimes(settings, period, targetShift),
         subjectId: assignment.subjectId, teacherId: assignment.teacherId || '',
+        assignmentId: assignment.assignmentId, sectionId: assignment.sectionId || null,
+        roomId: rooms.find((room: any) => String(room.name).trim().toLowerCase() === String(klass.roomNumber || '').trim().toLowerCase())?.id || null,
         roomNumber: klass.roomNumber || ''
       };
       generatedForClass.push(slot);
-      if (assignment.teacherId) occupied.add(`${day}:${period}:${assignment.teacherId}`);
-      dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
-      periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
-      subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
+      if (assignment.teacherId) { occupied.add(`${day}:${period}:${assignment.teacherId}`); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
+      const priorSubjectCount = subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0;
+      if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
+      dayLoad.set(`${sectionKey}:${day}`, (dayLoad.get(`${sectionKey}:${day}`) || 0) + 1);
+      periodLoad.set(`${sectionKey}:${period}`, (periodLoad.get(`${sectionKey}:${period}`) || 0) + 1);
+      subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
     }
     for (const assignment of classAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
-      unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+      unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1, reason: 'Maaddadan weli looma dejin tirada casharrada toddobaadlaha ah (periods per week).' });
     }
-    if (!generatedForClass.length) {
-      skipped.push({ classId: klass.id, className: klass.name, reason: 'No timetable periods could be placed; the previous timetable was kept.' });
-      workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id));
+    if (!generatedForClass.some((slot: any) => !slot.isLocked)) {
+      skipped.push({ classId: klass.id, className: klass.name, reason: 'No new periods could be placed; previous timetable was kept. Cashar cusub lama meelayn; jadwalkii hore waa la ilaaliyey.' });
+      workingSlots.push(...allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked !== true));
       continue;
     }
     replacements.push({ classId: klass.id, slots: generatedForClass });
@@ -4253,23 +4584,28 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     return;
   }
 
+  if (req.body?.previewOnly === true) {
+    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), warnings, withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+    return;
+  }
+
   const previousByClass = new Map<string, TimetableSlot[]>();
-  for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId));
+  for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId && slot.termId === termId));
   const written: string[] = [];
   try {
     for (const replacement of replacements) {
-      await db.replaceTimetableForClass(school.id, replacement.classId, replacement.slots);
+      await db.replaceTimetableForClassTerm(school.id, replacement.classId, termId, replacement.slots);
       written.push(replacement.classId);
     }
   } catch {
     // Restore any class timetable already replaced if a later class write fails.
     for (const classId of written.reverse()) {
-      try { await db.replaceTimetableForClass(school.id, classId, previousByClass.get(classId) || []); } catch { /* surfaced as a failed bulk operation */ }
+      try { await db.replaceTimetableForClassTerm(school.id, classId, termId, previousByClass.get(classId) || []); } catch { /* surfaced as a failed bulk operation */ }
     }
     res.status(409).json({ error: 'Bulk generation could not be completed. Previously replaced class timetables were restored where possible.' });
     return;
   }
-  res.json({ slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), warnings, withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
 });
 
 

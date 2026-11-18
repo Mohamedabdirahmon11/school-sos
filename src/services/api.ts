@@ -667,6 +667,14 @@ export class ApiClient {
     return this.createSubject(subData, schoolId);
   }
 
+  public static async getTimetableSections(classId: string) {
+    return this.request<Array<{ id: string; name: string; sortOrder: number }>>(`/timetable/sections?classId=${encodeURIComponent(classId)}`);
+  }
+
+  public static async getTimetableTerms() {
+    return this.request<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>('/timetable/terms');
+  }
+
   public static async getTimetable(classOrParams?: any, teacherId?: string, dayOfWeek?: string) {
     const params = new URLSearchParams();
     if (typeof classOrParams === 'string') {
@@ -678,6 +686,8 @@ export class ApiClient {
     if (tId) params.append('teacherId', tId);
     if (classOrParams?.dayOfWeek || dayOfWeek) params.append('dayOfWeek', classOrParams?.dayOfWeek || dayOfWeek!);
     if (classOrParams?.scope === 'school') params.append('scope', 'school');
+    if (classOrParams?.termId) params.append('termId', classOrParams.termId);
+    if (classOrParams?.sectionId) params.append('sectionId', classOrParams.sectionId);
     return this.request<TimetableSlot[]>(`/timetable?${params.toString()}`);
   }
 
@@ -688,16 +698,51 @@ export class ApiClient {
     });
   }
 
-  public static async generateTimetable(classId: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+  public static async generateTimetable(classId: string, termId?: string) {
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number; warnings?: string[] }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId, termId }) });
   }
 
-  public static async generateAllTimetables() {
-    return this.request<{ slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true }) });
+  public static async generateAllTimetables(previewOnly = false, termId?: string) {
+    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number; warnings?: string[] }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly, termId }) });
   }
 
-  public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
-    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE' });
+  public static async clearTimetableClass(classId: string, termId: string) {
+    return this.request<{ success: boolean; removed: number; lockedKept: number }>(`/timetable/classes/${encodeURIComponent(classId)}?termId=${encodeURIComponent(termId)}`, { method: 'DELETE' });
+  }
+
+  public static async copyTimetableTerm(sourceTermId: string, targetTermId: string) {
+    return this.request<{ success: boolean; copiedClasses: string[]; skipped: Array<{ classId: string; reason: string }>; copiedSlots: number }>('/timetable/copy-term', { method: 'POST', body: JSON.stringify({ sourceTermId, targetTermId }) });
+  }
+
+  public static async getTimetableRooms() {
+    return this.request<Array<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>>('/timetable/rooms');
+  }
+
+  public static async saveTimetableRoom(room: { id?: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }) {
+    return this.request<{ id: string; name: string; type: 'class' | 'lab' | 'hall'; capacity?: number | null }>('/timetable/rooms', { method: 'POST', body: JSON.stringify(room) });
+  }
+
+  public static async deleteTimetableRoom(roomId: string) {
+    return this.request<{ success: boolean }>(`/timetable/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' });
+  }
+
+  public static async getTimetableSubstitutions(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request<Array<{ id: string; entryId: string; substituteTeacherId: string; substituteDate: string; reason?: string }>>(`/timetable/substitutions${query}`);
+  }
+
+  public static async saveTimetableSubstitution(input: { entryId: string; substituteTeacherId: string; date: string; reason?: string }) {
+    return this.request('/timetable/substitutions', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  public static async deleteTimetableSubstitution(id: string) {
+    return this.request<{ success: boolean }>(`/timetable/substitutions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+  public static async setTimetableSlotLocked(slotId: string, isLocked: boolean) {
+    return this.request<{ success: boolean; isLocked: boolean }>(`/timetable/${encodeURIComponent(slotId)}/lock`, { method: 'PATCH', body: JSON.stringify({ isLocked }) });
+  }
+  public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number, termId?: string, sectionId?: string | null) {
+    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE', body: JSON.stringify({ termId, sectionId }) });
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
@@ -714,10 +759,10 @@ export class ApiClient {
 
   public static async getTeacherUnavailability(teacherId?: string) {
     const query = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
-    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number }>>(`/timetable/unavailability${query}`);
+    return this.request<Array<{ id: string; teacherId: string; dayOfWeek: string; periodNumber: number | null; reason?: string }>>(`/timetable/unavailability${query}`);
   }
 
-  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number; unavailable: boolean }) {
+  public static async setTeacherUnavailability(input: { teacherId: string; dayOfWeek: string; periodNumber: number | null; unavailable: boolean; reason?: string }) {
     return this.request<{ success: boolean }>('/timetable/unavailability', { method: 'PUT', body: JSON.stringify(input) });
   }
 
