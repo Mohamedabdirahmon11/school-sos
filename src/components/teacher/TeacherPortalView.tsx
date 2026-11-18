@@ -16,7 +16,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
-import { calculateExamSubjectTotal, rankExamStudentResults } from '../../lib/exam-calculations.ts';
+import { calculateExamSubjectTotal, rankExamStudentResults, type ExamScoreValue } from '../../lib/exam-calculations.ts';
 import { 
   SchoolClass, 
   Subject, 
