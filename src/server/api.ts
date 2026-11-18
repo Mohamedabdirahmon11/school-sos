@@ -3757,6 +3757,8 @@ apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminO
   const locked = current.filter((slot: any) => slot.isLocked === true);
   try {
     await db.replaceTimetableForClassTerm(school.id, classId, termId, locked);
+    const user = (req as any).user as User;
+    db.logAudit({ action: 'TIMETABLE_CLASS_CLEARED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Cleared timetable for class ' + classId + ' in term ' + termId + '; preserved ' + locked.length + ' locked lessons.', severity: 'warning' });
     res.json({ success: true, removed: current.length - locked.length, lockedKept: locked.length });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.' });
@@ -3775,9 +3777,10 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
     db.queryPage('terms', { school_id: school.id, id: targetTermId }, 1, 1, undefined, 'id')
   ]);
   if (!sourceTerm.total || !targetTerm.total) { res.status(404).json({ error: 'Mid ka mid ah term-yada lagama helin dugsigan.' }); return; }
-  const [sourceSlots, targetSlots] = await Promise.all([
+  const [sourceSlots, targetSlots, targetAssignments] = await Promise.all([
     queryAllRows('timetable_slots', { school_id: school.id, term_id: sourceTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
-    queryAllRows('timetable_slots', { school_id: school.id, term_id: targetTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id')
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: targetTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id')
   ]);
   const sourceByClass = new Map<string, any[]>();
   for (const slot of sourceSlots) sourceByClass.set(slot.classId, [...(sourceByClass.get(slot.classId) || []), slot]);
@@ -3785,16 +3788,31 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
   const skipped: Array<{ classId: string; reason: string }> = [];
   for (const [classId, sourceClassSlots] of sourceByClass) {
     const lockedTarget = targetSlots.filter((slot: any) => slot.classId === classId && slot.isLocked === true);
-    const lockedKeys = new Set(lockedTarget.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
+    const slotKey = (slot: any) => String(slot.sectionId || '') + ':' + slot.dayOfWeek + ':' + slot.periodNumber;
+    const lockedKeys = new Set(lockedTarget.map(slotKey));
     const incoming = sourceClassSlots
-      .filter((slot: any) => !lockedKeys.has(`${slot.dayOfWeek}:${slot.periodNumber}`))
-      .map((slot: any) => ({
-        ...slot,
-        id: `tt-${randomUUID()}`,
-        termId: targetTermId,
-        assignmentId: undefined,
-        isLocked: false
-      }));
+      .filter((slot: any) => !lockedKeys.has(slotKey(slot)))
+      .map((slot: any) => {
+        const matches = targetAssignments.filter((assignment: any) =>
+          assignment.classId === slot.classId &&
+          assignment.subjectId === slot.subjectId &&
+          (!assignment.termId || assignment.termId === targetTermId) &&
+          (!slot.sectionId || assignment.sectionId === slot.sectionId)
+        );
+        const targetAssignment = matches.find((assignment: any) => assignment.termId === targetTermId && (!slot.teacherId || assignment.teacherId === slot.teacherId))
+          || matches.find((assignment: any) => !slot.teacherId || assignment.teacherId === slot.teacherId)
+          || matches.find((assignment: any) => assignment.termId === targetTermId)
+          || matches[0];
+        return {
+          ...slot,
+          id: 'tt-' + randomUUID(),
+          termId: targetTermId,
+          assignmentId: targetAssignment?.id,
+          sectionId: targetAssignment?.sectionId ?? slot.sectionId ?? null,
+          teacherId: targetAssignment?.teacherId || slot.teacherId || '',
+          isLocked: false
+        };
+      });
     try {
       await db.replaceTimetableForClassTerm(school.id, classId, targetTermId, [...lockedTarget, ...incoming]);
       copiedClasses.push(classId);
@@ -4048,6 +4066,14 @@ apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSupe
     res.status(400).json({ error: 'Dooro macallin dugsigan ka tirsan, maalin shaqo, iyo cashar sax ah ama maalinta oo dhan.' }); return;
   }
   await db.setTeacherUnavailability(school.id, teacherId, dayOfWeek, periodNumber, req.body?.unavailable === true, String(req.body?.reason || ''));
+  const user = (req as any).user as User;
+  db.logAudit({
+    action: req.body?.unavailable === true ? 'TEACHER_UNAVAILABILITY_SET' : 'TEACHER_UNAVAILABILITY_REMOVED',
+    category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role,
+    details: 'Teacher ' + teacherId + ' ' + (req.body?.unavailable === true ? 'marked unavailable' : 'made available') + ' on ' + dayOfWeek + ', period ' + (periodNumber ?? 'ALL') + '.',
+    severity: 'info'
+  });
   res.json({ success: true });
 });
 
