@@ -17,7 +17,7 @@ test('Classes & Sections are grouped by academic year, grade, branch and shift w
 test('Subjects remain editable with class-specific teacher, periods and exam assignments', () => {
   assert.match(classesSource, /Class Subject Assignment/);
   assert.match(classesSource, /t\('exam_periods_per_week'\)/);
-  assert.match(classesSource, /Teacher<select/);
+  assert.match(classesSource, /t\('exam_teacher_assignment'\)[\s\S]*?<select/);
   assert.match(classesSource, /smallExamEnabled/);
   assert.match(classesSource, /bigExamEnabled/);
   assert.match(classesSource, /Credit units and departments are not required/);
