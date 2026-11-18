@@ -5695,7 +5695,8 @@ apiRouter.get('/teacher/attendance/overview', requireAuth, requireSchoolContext,
       periodId: (periodMap.get(slot.period_number) as any)?.id || null, sectionId: slot.section_id, isSubstitute: true
     }))
   ].map((slot: any) => {
-    const session: any = sessionMap.get(slot.classId + ':' + (slot.periodId || 'daily'));
+    const sessionKey = settings?.attendance_mode === 'per_period' ? (slot.periodId || 'daily') : 'daily';
+    const session: any = sessionMap.get(slot.classId + ':' + sessionKey);
     return { ...slot, attendanceTaken: Boolean(session?.submitted_at), attendanceLocked: Boolean(session?.is_locked), sessionId: session?.id || null };
   });
   res.json({ date, weekday, teacher: { id: teacher.id, fullName: teacher.full_name }, classes: classRows, timetable, todayLessons,
