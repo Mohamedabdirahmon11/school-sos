@@ -3752,12 +3752,12 @@ apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminO
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) {
     res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return;
   }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: classId, term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
-  if (!current.items.length) { res.json({ success: true, removed: 0, lockedKept: 0 }); return; }
-  const locked = current.items.filter((slot: any) => slot.isLocked === true);
+  const current = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  if (!current.length) { res.json({ success: true, removed: 0, lockedKept: 0 }); return; }
+  const locked = current.filter((slot: any) => slot.isLocked === true);
   try {
     await db.replaceTimetableForClassTerm(school.id, classId, termId, locked);
-    res.json({ success: true, removed: current.items.length - locked.length, lockedKept: locked.length });
+    res.json({ success: true, removed: current.length - locked.length, lockedKept: locked.length });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.' });
   }
