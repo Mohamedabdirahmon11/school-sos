@@ -145,7 +145,10 @@ CREATE POLICY teacher_assignment_audit_school_read ON public.teacher_assignment_
   FOR SELECT TO authenticated
   USING (private.auth_user_role()::text = 'super_admin' OR (private.auth_user_role()::text = 'school_admin' AND school_id = private.auth_school_id()::text));
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.teacher_class_subject_assignments TO authenticated, service_role;
+REVOKE ALL ON public.teacher_class_subject_assignments FROM anon, authenticated;
+GRANT SELECT ON public.teacher_class_subject_assignments TO authenticated;
+GRANT ALL ON public.teacher_class_subject_assignments TO service_role;
+REVOKE ALL ON public.teacher_assignment_audit FROM anon;
 GRANT SELECT ON public.teacher_assignment_audit TO authenticated, service_role;
 GRANT INSERT ON public.teacher_assignment_audit TO service_role;
 
