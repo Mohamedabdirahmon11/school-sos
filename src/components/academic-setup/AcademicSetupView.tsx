@@ -8,6 +8,7 @@ type AcademicYear = { id:string; name:string; startDate:string; endDate:string; 
 type Term = { id:string; academicYearId:string; name:string; startDate:string; endDate:string; isCurrent:boolean };
 type SchoolDay = { id:string; dayOfWeek:string; isWorking:boolean };
 type Period = { id:string; number:number; type:'lesson'|'break'; startTime:string; endTime:string };
+type PeriodForm = { number:number; type:'lesson'|'break'; startTime:string; endTime:string };
 type SetupData = { academicYears:AcademicYear[]; terms:Term[]; schoolDays:SchoolDay[]; periods:Period[] };
 
 const DAYS = [
@@ -32,7 +33,7 @@ export const AcademicSetupView: React.FC<{ onNavigate:(view:string)=>void }> = (
   const [editingYearId,setEditingYearId] = useState('');
   const [termForm,setTermForm] = useState(emptyTerm);
   const [editingTermId,setEditingTermId] = useState('');
-  const [periodForm,setPeriodForm] = useState(emptyPeriod);
+  const [periodForm,setPeriodForm] = useState<PeriodForm>(emptyPeriod);
   const [editingPeriodId,setEditingPeriodId] = useState('');
 
   const selectedYear = data.academicYears.find(year => year.id === selectedYearId) || data.academicYears.find(year => year.isCurrent) || data.academicYears[0];
