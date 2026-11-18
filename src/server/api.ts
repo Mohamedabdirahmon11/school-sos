@@ -3143,6 +3143,47 @@ apiRouter.delete('/classes/:id', requireAuth, requireSchoolContext, async (req, 
   res.json({ success: Boolean(archived), class: archived });
 });
 
+
+const classGroupsClient = () => createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
+ const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
+ if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
+});
+apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School; const name=typeof req.body?.name==='string'?req.body.name.trim():''; const sections=Array.isArray(req.body?.sections)?req.body.sections:[];
+ if(!name||name.length>120||sections.some((s:unknown)=>typeof s!=='string'||!String(s).trim()||String(s).trim().length>80)){res.status(400).json({error:'Geli magaca fasalka iyo qaybaha saxda ah.'});return;}
+ const client=classGroupsClient(); const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:Number(req.body?.sortOrder)||0}).select().single();
+ if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
+ const unique=[...new Set(sections.map((s:string)=>s.trim()).filter(Boolean))];
+ if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
+ const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
+});
+apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
+ const {data,error}=await classGroupsClient().from('class_groups').update({name,updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('school_id',school.id).select().maybeSingle();
+ if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Magacan fasal kale ayaa leh.':'Fasalka lama beddeli karin.'});return;}if(!data){res.status(404).json({error:'Fasalka lama helin.'});return;}res.json(data);
+});
+apiRouter.post('/class-groups/:id/sections', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>80){res.status(400).json({error:'Magaca qaybtu waa inuu ahaadaa 1 ilaa 80 xaraf.'});return;}
+ const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
+ const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
+});
+apiRouter.delete('/class-sections/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;const client=classGroupsClient();const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section){res.status(404).json({error:'Qaybta lama helin.'});return;}if(section.legacy_class_id){res.status(409).json({error:'Qaybtan waxay ku xiran tahay diiwaannadii hore ee ardayda/jadwalka; lama tirtiri karo si xogtu u badbaado.'});return;}
+ const {error}=await client.from('class_sections').delete().eq('id',section.id).eq('school_id',school.id);if(error){res.status(500).json({error:'Qaybta lama tirtiri karin.'});return;}res.json({success:true});
+});
+apiRouter.delete('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
+ const {data:sections}=await client.from('class_sections').select('legacy_class_id').eq('class_id',group.id);if((sections||[]).some((s:any)=>s.legacy_class_id)){res.status(409).json({error:'Fasalkan wuxuu leeyahay qaybo ku xiran xogtii hore. Lama tirtiri karo si xogta ardayda iyo jadwalku u badbaadaan.'});return;}
+ const {error}=await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);if(error){res.status(500).json({error:'Fasalka lama tirtiri karin.'});return;}res.json({success:true});
+});
+apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8'];
+ const {data:existing,error:readError}=await client.from('class_groups').select('name').eq('school_id',school.id);if(readError){res.status(500).json({error:'Fasallada lama hubin karin.'});return;}
+ const names=new Set((existing||[]).map((r:any)=>String(r.name).toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
+ const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
+});
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
