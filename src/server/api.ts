@@ -9460,7 +9460,8 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     ]);
     if ([years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals].some(x => x.error)) throw new Error('Xogta qoondeynta lama soo wada qaadi karin. Hubi migration-ka Step 6.');
     const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || '');
-    const termId = String(req.query.termId || (terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || '');
+    const requestedTerm = typeof req.query.termId === 'string' ? String(req.query.termId) : null;
+    const termId = requestedTerm === 'all' ? '' : (requestedTerm || String((terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || ''));
     const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && !x.term_id);
     const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && termId && x.term_id === termId);
     const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))];
