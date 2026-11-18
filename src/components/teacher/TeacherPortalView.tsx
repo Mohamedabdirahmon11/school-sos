@@ -307,6 +307,32 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
+  const handleAssessmentScoreChange = (
+    studentId: string,
+    subjectId: string,
+    component: (typeof assessmentComponents)[number],
+    rawValue: string,
+    inputElement: HTMLInputElement
+  ) => {
+    const key = `${studentId}:${subjectId}`;
+    const previousValue = marksInput[key]?.scores[component.id];
+    const value = rawValue.trim();
+    if (value !== '' && (!/^\\d+(\\.\\d+)?$/.test(value) || Number(value) < 0 || Number(value) > component.maxMarks)) {
+      inputElement.classList.add('border-rose-500', 'ring-2', 'ring-rose-500');
+      setNotice(`Khalad: geli 0 ilaa ${component.maxMarks}.`);
+      inputElement.value = previousValue === undefined ? '' : String(previousValue);
+      return;
+    }
+    inputElement.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500');
+    setMarksDraftDirty(true);
+    setMarksInput(previous => {
+      const scores = { ...(previous[key]?.scores || {}) };
+      if (value === '') delete scores[component.id];
+      else scores[component.id] = Number(value);
+      return { ...previous, [key]: { ...previous[key], scores } };
+    });
+  };
+
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
     if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
@@ -689,7 +715,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student name or ID..." aria-label="Search students" className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm sm:max-w-sm" />
               <div><h2 className="text-sm font-bold text-slate-900">Students in this class</h2><p className="mt-1 text-[11px] text-slate-500">Students in classes where you teach a subject or serve as Form Teacher are shown.</p></div>
-              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
+              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{enteredMarksCount}/{expectedMarksCount} marks entered</span>
             </div>
             {isLoadingClassData ? <p className="p-8 text-center text-sm text-slate-500">Loading assigned students...</p> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{classes.length ? 'No students found in this assigned class.' : 'No teaching classes have been assigned to your teacher profile yet. Ask the School Admin to check your class and subject assignments.'}</p> : (
               <>
@@ -906,6 +932,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
               {editableClassSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
+            const enteredMarksCount = students.reduce((count, student) => {
+              const input = marksInput[`${student.id}:${subject.id}`];
+              const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+              return count + subjectComponents.filter(component =>
+                input?.scores[component.id] !== undefined || mark?.assessmentScores?.[component.id] !== undefined
+              ).length;
+            }, 0);
+            const expectedMarksCount = students.length * subjectComponents.length;
             return (
               <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
@@ -926,7 +960,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
                           <div className="grid grid-cols-2 gap-3">
-                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => { setMarksDraftDirty(true); setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; }); }} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
+                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => handleAssessmentScoreChange(student.id, subject.id, component, event.target.value, event.currentTarget)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
                           </div>
                           <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
                         </article>;
