@@ -2182,6 +2182,17 @@ class StorageEngine {
     if (error) throw new Error(error.message || 'Unable to replace timetable.');
   }
 
+  public async setTimetableSlotLocked(schoolId: string, slotId: string, locked: boolean): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Timetable storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('timetable_slots')
+      .update({ is_locked: locked, updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId).eq('id', slotId).select('id').maybeSingle();
+    this.recordQuery('timetable_slots', 'set-slot-lock', startedAt);
+    if (error) throw new Error(error.message || 'Unable to update the timetable lock.');
+    if (!data) throw new Error('Timetable lesson was not found in this school.');
+  }
   public async swapTimetableSlots(schoolId: string, firstId: string, secondId: string): Promise<void> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Timetable storage is unavailable.');
@@ -2207,13 +2218,16 @@ class StorageEngine {
     return { schoolId, ...values };
   }
 
-  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number, unavailable: boolean) {
+  public async setTeacherUnavailability(schoolId: string, teacherId: string, dayOfWeek: string, periodNumber: number | null, unavailable: boolean, reason?: string) {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Teacher availability storage is unavailable.');
-    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber}`;
+    const id = `${schoolId}-${teacherId}-${dayOfWeek}-${periodNumber ?? 'ALL'}`;
     if (unavailable) {
       const startedAt = performance.now();
-      const { error } = await client.from('teacher_unavailability').upsert({ id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek, period_number: periodNumber }, { onConflict: 'school_id,teacher_id,day_of_week,period_number' });
+      const { error } = await client.from('teacher_unavailability').upsert({
+        id, school_id: schoolId, teacher_id: teacherId, day_of_week: dayOfWeek,
+        period_number: periodNumber, reason: reason?.trim() || null
+      }, { onConflict: 'id' });
       this.recordQuery('teacher_unavailability', 'upsert', startedAt);
       if (error) throw new Error(error.message || 'Unable to save teacher availability.');
     } else {
