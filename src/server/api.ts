@@ -64,7 +64,7 @@ const LIST_QUERY_COLUMNS: Record<string, string> = {
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
-  teachers: 'id,school_id,user_id,staff_id,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
+  teachers: 'id,school_id,user_id,staff_id,teacher_code,full_name,email,phone,address,gender,qualification,department,assigned_classes,assigned_subjects,status,joined_date,monthly_salary',
   fee_payments: 'id,school_id,student_id,receipt_number,reference_number,academic_year,month,fee_type,fee_structure_id,amount_due,amount_paid,remaining_amount,payment_method,status,date,recorded_by,notes,voided_at,voided_by,void_reason',
   payroll_records: 'id,school_id,user_id,staff_id,staff_name,payroll_month,base_salary,allowances,allowance_total,deductions,deduction_total,net_salary,status,created_by,approved_by,paid_by,created_at,approved_at,paid_at',
   attendance_records: 'id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at',
@@ -4654,6 +4654,30 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
   );
 });
 
+apiRouter.get('/teachers/:id/subjects', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const teacher = (await db.queryPage('teachers', { school_id: school.id, id: String(req.params.id) }, 1, 1, undefined, 'id')).items[0];
+  if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
+  const links = await db.queryPage('teacher_subjects', { school_id: school.id, teacher_id: String(req.params.id) }, 1, 100, undefined, 'subject_id');
+  res.json(links.items.map((item: any) => item.subjectId));
+});
+
+apiRouter.put('/teachers/:id/subjects', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const teacherId = String(req.params.id || '');
+  const subjectIds = req.body?.subjectIds;
+  if (!Array.isArray(subjectIds) || subjectIds.length > 100 || subjectIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+    res.status(400).json({ error: 'Fadlan dooro maaddooyin sax ah.' }); return;
+  }
+  const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).items[0];
+  if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
+  const ids = [...new Set(subjectIds.map((id: string) => id.trim()))];
+  const valid = ids.length ? await queryAllRows('subjects', { school_id: school.id, id: ids }, 'id') : [];
+  if (valid.length !== ids.length) { res.status(400).json({ error: 'Maaddooyinka la doortay dhammaantood waa inay ka tirsan yihiin dugsigan.' }); return; }
+  await db.saveTeacherSubjects(school.id, teacherId, ids);
+  res.json({ success: true, subjectIds: ids });
+});
+
 apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const id = String(req.params.id || '');
@@ -4714,6 +4738,10 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   await db.getTeachers(school.id);
   if (current.userId) await db.getUsers(school.id, 'teacher');
   const updated = db.updateTeacher(id, updates as any);
+  if (updates.assignedSubjects !== undefined) {
+    try { await db.saveTeacherSubjects(school.id, id, updates.assignedSubjects as string[]); }
+    catch (error: any) { res.status(400).json({ error: error?.message || 'Maaddooyinka macallinka lama kaydin.' }); return; }
+  }
   if (!updated) { res.status(404).json({ error: 'Teacher could not be updated.' }); return; }
   if (formTeacherClassId !== undefined) {
     const schoolClasses = await db.getClasses(school.id);
@@ -4827,6 +4855,10 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
     joinedDate,
     monthlySalary
   });
+  if (assignedSubjects.length) {
+    try { await db.saveTeacherSubjects(school.id, teacher.id, assignedSubjects); }
+    catch (error: any) { res.status(400).json({ error: error?.message || 'Maaddooyinka macallinka lama kaydin.' }); return; }
+  }
   if (formTeacherClassId) {
     await db.getClasses(school.id);
     await db.updateClass(formTeacherClassId, { classTeacherId: account.id }, school.id);
