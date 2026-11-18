@@ -325,7 +325,16 @@ CREATE POLICY attendance_teacher_read_assigned ON public.attendance_records
   USING (
     school_id = private.auth_school_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-    AND private.auth_can_access_student(student_id)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
   );
 
 CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
@@ -334,7 +343,16 @@ CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-    AND private.auth_can_access_student(student_id)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
     AND EXISTS (
       SELECT 1 FROM public.attendance_sessions s
       WHERE s.school_id = attendance_records.school_id
@@ -352,7 +370,16 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-    AND private.auth_can_access_student(student_id)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
     AND EXISTS (
       SELECT 1 FROM public.attendance_sessions s
       JOIN public.attendance_settings cfg ON cfg.school_id = s.school_id
@@ -370,7 +397,16 @@ CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
     school_id = private.auth_school_id()
     AND marked_by = private.auth_user_id()
     AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
-    AND private.auth_can_access_student(student_id)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
   );
 
 ALTER TABLE public.attendance_settings ENABLE ROW LEVEL SECURITY;
