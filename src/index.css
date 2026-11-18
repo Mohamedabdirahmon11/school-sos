@@ -1324,8 +1324,8 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .as-page-header p { margin:5px 0 0; color:rgba(255,255,255,.88); font-size:13px; }
 .as-stepper-scroll { overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; }
 .as-stepper { display:grid; grid-template-columns:repeat(5,minmax(118px,1fr)); gap:8px; min-width:640px; }
-.as-step { display:flex; align-items:center; gap:8px; min-height:54px; padding:8px; border:1px solid var(--as-border); border-radius:12px; background:var(--as-card); color:var(--as-muted); font-size:12px; font-weight:650; }
-.as-step.is-active { outline:2px solid var(--as-primary); outline-offset:-2px; color:var(--as-text); }
+.as-step { appearance:none; text-align:left; cursor:pointer; font-family:system-ui,sans-serif; display:flex; align-items:center; gap:8px; min-height:54px; padding:8px; border:1px solid var(--as-border); border-radius:12px; background:var(--as-card); color:var(--as-muted); font-size:12px; font-weight:650; }
+.as-step:disabled { cursor:not-allowed; opacity:.72; }\n.as-step.is-active { outline:2px solid var(--as-primary); outline-offset:-2px; color:var(--as-text); }
 .as-step.is-complete .as-step-number { background:var(--as-success); color:#fff; border-color:var(--as-success); }
 .as-step-number { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border:1px solid var(--as-border); border-radius:50%; font-size:12px; font-weight:800; }
 .as-step-label { min-width:0; line-height:1.25; }
@@ -1344,7 +1344,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .as-pill-primary { background:var(--as-soft); color:var(--as-primary); }
 .as-pill-success { background:color-mix(in srgb,var(--as-success) 14%,var(--as-card)); color:var(--as-success); }
 .as-pill-muted { background:var(--as-bg); color:var(--as-muted); }
-.as-table-scroll { width:100%; overflow-x:auto; border:1px solid var(--as-border); border-radius:12px; }
+.as-table-scroll { width:100%; overflow-x:auto; }
 .as-table { width:100%; min-width:620px; border-collapse:collapse; text-align:left; }
 .as-table th,.as-table td { padding:10px 12px; border-bottom:1px solid var(--as-border); font-size:13px; vertical-align:middle; }
 .as-table th { color:var(--as-muted); font-size:11px; font-weight:750; }
