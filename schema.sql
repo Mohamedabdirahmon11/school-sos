@@ -348,9 +348,10 @@ CREATE TABLE IF NOT EXISTS teachers (
   user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(150) NOT NULL,
-  phone VARCHAR(50) NOT NULL,
+  phone VARCHAR(50),
   address TEXT NOT NULL DEFAULT '',
   staff_id VARCHAR(40),
+  teacher_code VARCHAR(16),
   gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female')),
   qualification VARCHAR(150),
   department VARCHAR(100),
@@ -367,6 +368,22 @@ CREATE INDEX IF NOT EXISTS idx_teachers_user ON teachers(user_id);
 ALTER TABLE teachers ADD COLUMN IF NOT EXISTS staff_id VARCHAR(40);
 UPDATE teachers t SET staff_id = u.staff_id FROM users u WHERE t.user_id = u.id AND t.staff_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_staff_id ON teachers(school_id, lower(staff_id)) WHERE staff_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_teacher_code ON teachers(school_id, teacher_code);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_school_phone_normalized
+  ON teachers(school_id, regexp_replace(phone, '\\D', '', 'g'))
+  WHERE nullif(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), '') IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS teacher_subjects (
+  id VARCHAR(64) PRIMARY KEY DEFAULT ('ts-' || gen_random_uuid()::text),
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  teacher_id VARCHAR(64) NOT NULL,
+  subject_id VARCHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (teacher_id, subject_id),
+  FOREIGN KEY (teacher_id, school_id) REFERENCES teachers(id, school_id) ON DELETE CASCADE,
+  FOREIGN KEY (subject_id, school_id) REFERENCES subjects(id, school_id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS class_subjects (
   id VARCHAR(64) PRIMARY KEY,
