@@ -84,7 +84,6 @@ export interface TranslationDict {
   exam_subjects_submitted: string;
   exam_class_review: string;
   exam_enter_component_marks: string;
-  exam_marks: string;
   exam_edit_marks_help: string;
   exam_teacher_review_scope: string;
   exam_forward_ready: string;
@@ -399,7 +398,6 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_subjects_submitted: 'Submitted',
     exam_class_review: 'Class results review',
     exam_enter_component_marks: 'Enter individual assessment components',
-    exam_marks: 'Marks',
     exam_edit_marks_help: 'Edit the subject marks below, then save or submit',
     exam_teacher_review_scope: 'Form Teacher can review every active class subject, but can enter marks only for their assigned subject.',
     exam_forward_ready: 'Class is complete and ready to forward to School Admin.',
@@ -694,7 +692,6 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_subjects_submitted: 'La gudbiyey',
     exam_class_review: 'Dib-u-eegista natiijada fasalka',
     exam_enter_component_marks: 'Geli qaybaha dhibcaha',
-    exam_marks: 'Dhibco',
     exam_edit_marks_help: 'Wax ka beddel dhibcaha maaddada, kadib kaydi ama gudbi',
     exam_teacher_review_scope: 'Form Teacher-ku wuxuu arki karaa dhammaan maaddooyinka fasalka, balse wuxuu geli karaa dhibcaha maaddada isaga loo xilsaaray oo keliya.',
     exam_forward_ready: 'Fasalku wuu dhammaystiran yahay, wuxuuna diyaar u yahay in loo gudbiyo Maamulka.',
@@ -1247,7 +1244,6 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_publish_results: 'نشر النتائج',
     exam_withdraw_results: 'سحب النتائج المنشورة',
     exam_return_for_correction: 'إرجاع للتصحيح',
-    exam_marks: 'الدرجات',
     exam_class: 'الصف',
     exam_term: 'الفصل',
     exam_search_student: 'ابحث عن طالب...',
@@ -1264,7 +1260,6 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     exam_subjects_submitted: 'تم التسليم',
     exam_class_review: 'የክፍል ውጤት ግምገማ',
     exam_enter_component_marks: 'የነጥብ ክፍሎችን አስገባ',
-    exam_marks: 'ውጤቶች',
     exam_edit_marks_help: 'የትምህርቱን ውጤት አርትዕ ከዚያ አስቀምጥ ወይም አስገባ',
     exam_teacher_review_scope: 'የክፍል አስተማሪው ሁሉንም ንቁ ትምህርቶች ማየት ይችላል፣ ግን ለእሱ የተመደበውን ትምህርት ብቻ ያስገባል።',
     exam_forward_ready: 'ክፍሉ ተጠናቋል እና ለአስተዳደር ለመላክ ዝግጁ ነው።',
