@@ -2960,63 +2960,84 @@ class StorageEngine {
 
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
-    const students = await this.getStudents(schoolId, classId);
-    const marks = (await this.getMarks(schoolId, classId, undefined, semester)).filter(mark => mark.status === 'approved');
-
+    const [students, marks, assignments] = await Promise.all([
+      this.getStudents(schoolId, classId),
+      this.getMarks(schoolId, classId, undefined, semester),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' })
+    ]);
+    const expectedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const expectedSubjectIdSet = new Set(expectedSubjectIds);
+    const approvedMarks = marks.filter(mark => mark.status === 'approved' && expectedSubjectIdSet.has(mark.subjectId));
     const rankings = students.map(student => {
-      const studentMarks = marks.filter(m => m.studentId === student.id);
-      const totalPercentage = studentMarks.reduce((acc, m) => acc + (m.percentage || 0), 0);
+      const studentMarks = approvedMarks.filter(mark => mark.studentId === student.id);
+      const complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
+        studentMarks.some(mark => mark.subjectId === subjectId)
+      );
+      const totalPercentage = studentMarks.reduce((sum, mark) => sum + (Number(mark.percentage) || 0), 0);
       const subjectCount = studentMarks.length;
-      const averagePercentage = subjectCount > 0 ? Math.round((totalPercentage / subjectCount) * 100) / 100 : 0;
-
+      const averagePercentage = subjectCount > 0
+        ? Math.round((totalPercentage / subjectCount) * 100) / 100
+        : 0;
       return {
-        student,
-        subjectCount,
-        marks: studentMarks,
-        averagePercentage,
-        rank: 0,
-        isTopThree: false
+        student, subjectCount, marks: studentMarks, totalPercentage, averagePercentage, complete,
+        rank: 0, isTopThree: false
       };
     });
 
-    // Sort descending by average percentage
-    rankings.sort((a, b) => b.averagePercentage - a.averagePercentage);
-
-    rankings.forEach((r, idx) => {
-      r.rank = idx + 1;
-      r.isTopThree = idx < 3 && r.averagePercentage > 0;
-    });
-
+    rankings.sort((a, b) =>
+      Number(b.complete) - Number(a.complete) ||
+      b.totalPercentage - a.totalPercentage ||
+      [a.student.firstName, a.student.middleName, a.student.lastName].join(' ').localeCompare(
+        [b.student.firstName, b.student.middleName, b.student.lastName].join(' ')
+      )
+    );
+    let completedRank = 0;
+    let previousTotal: number | null = null;
+    let previousRank = 0;
+    for (const row of rankings) {
+      if (!row.complete) continue;
+      completedRank += 1;
+      if (previousTotal !== null && row.totalPercentage === previousTotal) {
+        row.rank = previousRank;
+      } else {
+        row.rank = completedRank;
+        previousRank = completedRank;
+        previousTotal = row.totalPercentage;
+      }
+      row.isTopThree = row.rank > 0 && row.rank <= 3;
+    }
     return rankings;
   }
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
   public async getClassYearlyRankings(schoolId: string, classId: string) {
     const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
-    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
-    const config = await this.getExamConfig(schoolId);
-    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' });
-    const expectedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const [sem1Rows, sem2Rows, config, assignments] = await Promise.all([
+      this.getMarks(schoolId, classId, undefined, 'Semester 1'),
+      this.getMarks(schoolId, classId, undefined, 'Semester 2'),
+      this.getExamConfig(schoolId),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId })
+    ]);
+    const sem1Marks = sem1Rows.filter(mark => mark.status === 'approved');
+    const sem2Marks = sem2Rows.filter(mark => mark.status === 'approved');
+    const activeAssignments = assignments.filter(assignment => assignment.isActive);
+    const expectedSubjectIds = [...new Set(activeAssignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const expectedSubjectIdSet = new Set(expectedSubjectIds);
-    const subjects = (await this.getSubjects(schoolId)).filter(subject => expectedSubjectIdSet.has(subject.id));
+    const allAssignedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const activeSubjectIds = new Set(expectedSubjectIds);
+    const subjects = (await this.getSubjects(schoolId)).filter(subject => allAssignedSubjectIds.includes(subject.id));
 
     const yearlyResults = students.map(student => {
-      const s1 = sem1Marks.filter(m => m.studentId === student.id);
-      const s2 = sem2Marks.filter(m => m.studentId === student.id);
-
-      // Subject by subject combining
+      const s1 = sem1Marks.filter(mark => mark.studentId === student.id);
+      const s2 = sem2Marks.filter(mark => mark.studentId === student.id);
       const subjectResults = subjects.map(sub => {
-        const m1 = s1.find(m => m.subjectId === sub.id);
-        const m2 = s2.find(m => m.subjectId === sub.id);
+        const isActive = activeSubjectIds.has(sub.id);
+        const m1 = isActive ? s1.find(mark => mark.subjectId === sub.id) : undefined;
+        const m2 = isActive ? s2.find(mark => mark.subjectId === sub.id) : undefined;
         const p1 = m1 ? m1.percentage : null;
         const p2 = m2 ? m2.percentage : null;
-        // A yearly subject average is valid only when both semester results
-        // have been approved. Never present a single semester as the full-year average.
-        const yearlyP = p1 !== null && p2 !== null
-          ? Math.round(((p1 + p2) / 2) * 100) / 100
-          : null;
-
+        // Keep per-subject averages unrounded; round only the final displayed class/student average.
+        const yearlyP = p1 !== null && p2 !== null ? (p1 + p2) / 2 : null;
         const markDetails = (mark: StudentMark | undefined) => mark ? {
           smallExamMarks: mark.smallExamMarks,
           bigExamMarks: mark.bigExamMarks,
@@ -3025,9 +3046,9 @@ class StorageEngine {
           status: mark.status,
           publishedAt: mark.publishedAt || null
         } : null;
-
         return {
           subject: sub,
+          isActive,
           sem1Marks: markDetails(m1),
           sem2Marks: markDetails(m2),
           sem1Percentage: p1,
@@ -3039,7 +3060,7 @@ class StorageEngine {
             total: (config.smallExamMax || 0) + (config.bigExamMax || 0)
           }
         };
-      }).filter(sr => sr.sem1Percentage !== null || sr.sem2Percentage !== null);
+      });
 
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
@@ -3048,17 +3069,21 @@ class StorageEngine {
         Boolean(s1.find(mark => mark.subjectId === subjectId)?.publishedAt) &&
         Boolean(s2.find(mark => mark.subjectId === subjectId)?.publishedAt)
       );
-      const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
+      const validPercentages = subjectResults
+        .filter(result => result.isActive)
+        .map(result => result.yearlyPercentage)
+        .filter((percentage): percentage is number => percentage !== null);
+      const yearlyTotal = validPercentages.reduce((sum, percentage) => sum + percentage, 0);
       const yearlyAvg = annualComplete && validPercentages.length === expectedSubjectIds.length
-        ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100
+        ? Math.round((yearlyTotal / validPercentages.length) * 100) / 100
         : 0;
       const isPass = annualComplete && yearlyAvg >= (config.passMarkPercentage || 50);
-
       return {
         student,
         subjectResults,
         annualComplete,
         annualPublished,
+        yearlyTotal,
         yearlyPercentage: yearlyAvg,
         isPass,
         yearlyRank: 0,
@@ -3066,28 +3091,28 @@ class StorageEngine {
       };
     });
 
-    yearlyResults.sort((a, b) => Number(b.annualComplete) - Number(a.annualComplete) || b.yearlyPercentage - a.yearlyPercentage);
-
+    yearlyResults.sort((a, b) =>
+      Number(b.annualComplete) - Number(a.annualComplete) ||
+      b.yearlyTotal - a.yearlyTotal ||
+      [a.student.firstName, a.student.middleName, a.student.lastName].join(' ').localeCompare(
+        [b.student.firstName, b.student.middleName, b.student.lastName].join(' ')
+      )
+    );
     let completedRank = 0;
-    let previousPercentage: number | null = null;
+    let previousTotal: number | null = null;
     let previousRank = 0;
     for (const result of yearlyResults) {
-      if (!result.annualComplete) {
-        result.yearlyRank = 0;
-        result.isTopThree = false;
-        continue;
-      }
+      if (!result.annualComplete) continue;
       completedRank += 1;
-      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) {
+      if (previousTotal !== null && result.yearlyTotal === previousTotal) {
         result.yearlyRank = previousRank;
       } else {
         result.yearlyRank = completedRank;
         previousRank = completedRank;
-        previousPercentage = result.yearlyPercentage;
+        previousTotal = result.yearlyTotal;
       }
       result.isTopThree = result.yearlyRank > 0 && result.yearlyRank <= 3;
     }
-
     return yearlyResults;
   }
 
