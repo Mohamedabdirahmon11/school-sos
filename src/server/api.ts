@@ -3984,6 +3984,65 @@ apiRouter.put('/timetable/unavailability', requireAuth, requireSchoolAdminOrSupe
   res.json({ success: true });
 });
 
+apiRouter.get('/timetable/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  res.json(await db.listTimetableRooms((req as any).school.id));
+});
+
+apiRouter.post('/timetable/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const name = String(req.body?.name || '').trim();
+  const type = req.body?.type;
+  const capacity = req.body?.capacity == null || req.body?.capacity === '' ? null : Number(req.body.capacity);
+  if (!name || name.length > 120 || !['class', 'lab', 'hall'].includes(type) || (capacity !== null && (!Number.isInteger(capacity) || capacity < 1))) {
+    res.status(400).json({ error: 'Geli magaca qolka, noociisa (class/lab/hall), iyo capacity sax ah.' }); return;
+  }
+  try { res.status(201).json(await db.saveTimetableRoom(school.id, { id: req.body?.id ? String(req.body.id) : undefined, name, type, capacity })); }
+  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama kaydin karin.' }); }
+});
+
+apiRouter.delete('/timetable/rooms/:roomId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  try { await db.deleteTimetableRoom((req as any).school.id, String(req.params.roomId)); res.json({ success: true }); }
+  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Qolka lama tirtiri karin.' }); }
+});
+
+apiRouter.get('/timetable/substitutions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+  res.json(await db.listTimetableSubstitutions((req as any).school.id, date));
+});
+
+apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const entryId = String(req.body?.entryId || '');
+  const substituteTeacherId = String(req.body?.substituteTeacherId || '');
+  const substituteDate = String(req.body?.date || '');
+  const dateValue = new Date(substituteDate + 'T12:00:00Z');
+  if (!entryId || !substituteTeacherId || !/^\d{4}-\d{2}-\d{2}$/.test(substituteDate) || Number.isNaN(dateValue.getTime()) || dateValue.toISOString().slice(0, 10) !== substituteDate) {
+    res.status(400).json({ error: 'Dooro cashar, macallin beddel ah, iyo taariikh sax ah.' }); return;
+  }
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dateValue.getUTCDay()];
+  const entry = await db.queryPage('timetable_slots', { school_id: school.id, id: entryId, is_active: 'true' }, 1, 1, undefined, 'id,school_id,class_id,term_id,day_of_week,period_number');
+  const teacher = await db.queryPage('teachers', { school_id: school.id, id: substituteTeacherId }, 1, 1, undefined, 'id');
+  if (!entry.items.length || !teacher.items.length) { res.status(404).json({ error: 'Casharka ama macallinka lagama helin dugsigan.' }); return; }
+  const slot = entry.items[0] as any;
+  if (slot.dayOfWeek !== weekday) { res.status(400).json({ error: 'Taariikhda la doortay ma waafaqsana maalinta casharka jadwalkiisa.' }); return; }
+  const [busy, unavailable] = await Promise.all([
+    db.queryPage('timetable_slots', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday, period_number: String(slot.periodNumber), is_active: 'true', ...(slot.termId ? { term_id: slot.termId } : {}) }, 1, 100, undefined, 'id'),
+    db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: substituteTeacherId, day_of_week: weekday }, 1, 100, undefined, 'id,period_number')
+  ]);
+  if (busy.items.some((item: any) => item.id !== entryId)) { res.status(409).json({ error: 'Macallinkan wuxuu cashar kale leeyahay waqtigan.' }); return; }
+  if (unavailable.items.some((item: any) => item.periodNumber == null || Number(item.periodNumber) === Number(slot.periodNumber))) { res.status(409).json({ error: 'Macallinkan lama heli karo maalintan ama waqtigan.' }); return; }
+  try {
+    const saved = await db.saveTimetableSubstitution(school.id, { entryId, substituteTeacherId, substituteDate, reason: String(req.body?.reason || '').trim(), createdBy: user.id });
+    db.logAudit({ action: 'TIMETABLE_SUBSTITUTE_ASSIGNED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Assigned a substitute teacher for timetable entry ' + entryId + ' on ' + substituteDate + '.', severity: 'info' });
+    res.status(201).json(saved);
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Macallinka beddelka ah lama kaydin karin.' }); }
+});
+
+apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  try { await db.deleteTimetableSubstitution((req as any).school.id, String(req.params.id)); res.json({ success: true }); }
+  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
+});
 apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
