@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.enrollments (
   class_id VARCHAR(64) NOT NULL,
   section_id UUID,
   roll_number TEXT,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','promoted','repeated','transferred')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','promoted','repeated','transferred','withdrawn')),
   enrolled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   left_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -61,6 +61,8 @@ CREATE INDEX IF NOT EXISTS enrollments_school_class_year_idx
   ON public.enrollments (school_id, class_id, academic_year_id, status);
 CREATE INDEX IF NOT EXISTS student_guardians_school_guardian_idx
   ON public.student_guardians (school_id, guardian_id);
+CREATE UNIQUE INDEX IF NOT EXISTS student_guardians_one_primary_uidx
+  ON public.student_guardians (school_id, student_id) WHERE is_primary = true;
 
 -- Backfill existing parent information without changing users, linked_student_ids or student IDs.
 INSERT INTO public.guardians (school_id, full_name, phone)
@@ -198,9 +200,15 @@ BEGIN
    WHERE id = p_student_id AND school_id = p_school_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Student not found in this school.'; END IF;
   IF p_withdraw THEN
-    UPDATE public.enrollments SET status='transferred', left_at=now()
+    UPDATE public.enrollments SET status='withdrawn', left_at=now()
      WHERE school_id=p_school_id AND student_id=p_student_id AND academic_year_id=p_academic_year_id AND status='active';
+    IF NOT FOUND THEN RAISE EXCEPTION 'Student has no active enrollment in the selected academic year.'; END IF;
     UPDATE public.students SET status='dropped' WHERE id=p_student_id AND school_id=p_school_id;
+    INSERT INTO public.audit_logs (id,action,category,school_id,school_name,user_id,user_name,user_role,details,severity)
+    SELECT 'log-'||gen_random_uuid()::text,'STUDENT_WITHDRAWN','school',p_school_id,sc.name,
+      COALESCE(p_actor_id,'system'),'School admin','school_admin',
+      'Withdrawn student '||v_student.student_id||' from academic year '||p_academic_year_id::text,'warning'
+    FROM public.schools sc WHERE sc.id=p_school_id;
     RETURN NULL;
   END IF;
   SELECT * INTO v_class FROM public.classes
@@ -239,7 +247,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_promote_enrollments(
   p_school_id TEXT, p_source_year UUID, p_target_year UUID,
   p_class_id TEXT, p_decisions JSONB, p_actor_id TEXT DEFAULT NULL
 ) RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_item JSONB; v_student_id TEXT; v_decision TEXT; v_target_class TEXT; v_count INTEGER:=0;
+DECLARE v_item JSONB; v_student_id TEXT; v_decision TEXT; v_target_class TEXT; v_count INTEGER:=0; v_target_class_capacity INTEGER;
 BEGIN
   IF jsonb_typeof(p_decisions)<>'array' OR jsonb_array_length(p_decisions)>2000 THEN
     RAISE EXCEPTION 'Promotion decisions must be an array of at most 2,000 students.';
@@ -257,9 +265,9 @@ BEGIN
        AND academic_year_id=p_source_year AND class_id=p_class_id AND status='active') THEN
       RAISE EXCEPTION 'A selected student is not actively enrolled in the source class.';
     END IF;
-    IF NOT EXISTS(SELECT 1 FROM public.classes WHERE id=v_target_class AND school_id=p_school_id AND NOT is_archived) THEN
-      RAISE EXCEPTION 'Target class not found in this school.';
-    END IF;
+    SELECT capacity INTO v_target_class_capacity FROM public.classes WHERE id=v_target_class AND school_id=p_school_id AND NOT is_archived;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Target class not found in this school.'; END IF;
+    IF (SELECT count(*) FROM public.enrollments e WHERE e.school_id=p_school_id AND e.academic_year_id=p_target_year AND e.class_id=v_target_class AND e.status='active') >= v_target_class_capacity THEN RAISE EXCEPTION 'Target class capacity has been reached.'; END IF;
     UPDATE public.enrollments SET status=v_decision,left_at=now()
      WHERE school_id=p_school_id AND student_id=v_student_id AND academic_year_id=p_source_year AND status='active';
     INSERT INTO public.enrollments(school_id,student_id,academic_year_id,class_id,section_id,roll_number,status)
