@@ -4264,10 +4264,13 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
   const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
-  const timetableAssignments = assignments.items.map((item: any) => {
+  const timetableAssignments = assignments.items.flatMap((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
-    const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
-    return { ...item, teacherId: selected ? (selected.teacherId || '') : (item.teacherId || ''), assignmentId: selected?.id, sectionId: selected?.sectionId || null };
+    const exact = matches.filter((candidate: any) => candidate.termId === termId);
+    const applicable = exact.length ? exact : matches.filter((candidate: any) => !candidate.termId);
+    return applicable.length
+      ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
+      : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
   });
   const schedulableAssignments = timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
   if (!schedulableAssignments.length) {
@@ -4287,14 +4290,14 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const generated: TimetableSlot[] = [...lockedForClass];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
   const dayLoad = new Map<string, number>();
-  const periodLoad = new Map<number, number>();
+  const periodLoad = new Map<string, number>();
   const subjectDayLoad = new Map<string, number>();
   const teacherDayLoad = new Map<string, number>();
   const warnings: string[] = [];
   for (const slot of lockedForClass) {
-    dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
-    periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
-    subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+    dayLoad.set(`${slot.sectionId || '*'}:${slot.dayOfWeek}`, (dayLoad.get(`${slot.sectionId || '*'}:${slot.dayOfWeek}`) || 0) + 1);
+    periodLoad.set(`${slot.sectionId || '*'}:${slot.periodNumber}`, (periodLoad.get(`${slot.sectionId || '*'}:${slot.periodNumber}`) || 0) + 1);
+    subjectDayLoad.set(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
     if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
   }
   const lessonQueue: any[] = [];
@@ -4400,10 +4403,13 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
   const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
-  const timetableAssignments = assignments.map((item: any) => {
+  const timetableAssignments = assignments.flatMap((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
-    const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
-    return { ...item, teacherId: selected ? (selected.teacherId || '') : (item.teacherId || ''), assignmentId: selected?.id, sectionId: selected?.sectionId || null };
+    const exact = matches.filter((candidate: any) => candidate.termId === termId);
+    const applicable = exact.length ? exact : matches.filter((candidate: any) => !candidate.termId);
+    return applicable.length
+      ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
+      : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
   });
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
   const targetIds = new Set(timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
@@ -4432,13 +4438,13 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
     const generatedForClass: TimetableSlot[] = [...lockedForClass];
     const dayLoad = new Map<string, number>();
-    const periodLoad = new Map<number, number>();
+    const periodLoad = new Map<string, number>();
     const subjectDayLoad = new Map<string, number>();
     const teacherDayLoad = new Map<string, number>();
     for (const slot of lockedForClass) {
-      dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
-      periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
-      subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+      dayLoad.set(`${slot.sectionId || '*'}:${slot.dayOfWeek}`, (dayLoad.get(`${slot.sectionId || '*'}:${slot.dayOfWeek}`) || 0) + 1);
+      periodLoad.set(`${slot.sectionId || '*'}:${slot.periodNumber}`, (periodLoad.get(`${slot.sectionId || '*'}:${slot.periodNumber}`) || 0) + 1);
+      subjectDayLoad.set(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.sectionId || '*'}:${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
       if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
     }
     const lessonQueue: any[] = [];
