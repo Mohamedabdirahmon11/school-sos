@@ -693,12 +693,12 @@ export class ApiClient {
     });
   }
 
-  public static async generateTimetable(classId: string) {
-    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId }) });
+  public static async generateTimetable(classId: string, termId?: string) {
+    return this.request<{ slots: TimetableSlot[]; unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }>; withoutTeacher?: number }>('/timetable/generate', { method: 'POST', body: JSON.stringify({ classId, termId }) });
   }
 
-  public static async generateAllTimetables(previewOnly = false) {
-    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly }) });
+  public static async generateAllTimetables(previewOnly = false, termId?: string) {
+    return this.request<{ preview?: boolean; slots: TimetableSlot[]; generatedClassIds: string[]; unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }>; skipped: Array<{ classId: string; className: string; reason: string }>; withoutTeacher?: number }>('/timetable/generate-all', { method: 'POST', body: JSON.stringify({ allClasses: true, previewOnly, termId }) });
   }
 
   public static async getTimetableRooms() {
@@ -728,8 +728,9 @@ export class ApiClient {
   public static async setTimetableSlotLocked(slotId: string, isLocked: boolean) {
     return this.request<{ success: boolean; isLocked: boolean }>(`/timetable/${encodeURIComponent(slotId)}/lock`, { method: 'PATCH', body: JSON.stringify({ isLocked }) });
   }
-  public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number) {
-    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}`, { method: 'DELETE' });
+  public static async removeTimetablePeriod(classId: string, dayOfWeek: string, periodNumber: number, termId?: string) {
+    const query = termId ? `?termId=${encodeURIComponent(termId)}` : '';
+    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}${query}`, { method: 'DELETE' });
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
