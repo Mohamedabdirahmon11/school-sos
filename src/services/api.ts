@@ -577,6 +577,29 @@ export class ApiClient {
     return this.request<{ class: SchoolClass; students: { items: Student[]; page: number; pageSize: number; total: number }; subjects: Array<{ id: string; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; subject: Subject | null; teacher: { id: string; fullName: string } | null }>; timetable: TimetableSlot[]; attendance: { date: string; recordedStudents: number } }>(`/classes/${encodeURIComponent(id)}/details?${query}`);
   }
 
+
+  public static async getClassGroups() {
+    return this.request<Array<{id:string;name:string;sort_order:number;class_sections:Array<{id:string;name:string;legacy_class_id:string|null}>}>>('/class-groups');
+  }
+  public static async createClassGroup(name:string, sections:string[] = []) {
+    return this.request('/class-groups',{method:'POST',body:JSON.stringify({name,sections})});
+  }
+  public static async renameClassGroup(id:string,name:string) {
+    return this.request('/class-groups/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify({name})});
+  }
+  public static async deleteClassGroup(id:string) {
+    return this.request('/class-groups/'+encodeURIComponent(id),{method:'DELETE'});
+  }
+  public static async addClassSection(id:string,name:string) {
+    return this.request('/class-groups/'+encodeURIComponent(id)+'/sections',{method:'POST',body:JSON.stringify({name})});
+  }
+  public static async deleteClassSection(id:string) {
+    return this.request('/class-sections/'+encodeURIComponent(id),{method:'DELETE'});
+  }
+  public static async createDefaultClassGroups() {
+    return this.request<{created:number;skipped:number}>('/class-groups/defaults',{method:'POST'});
+  }
+
   public static async getSubjects(params?: any) {
     return this.request<Subject[]>('/subjects');
   }
