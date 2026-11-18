@@ -17,6 +17,7 @@ export const TeachersView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('');
   const teacherLoad = useApi(() => Promise.all([
     ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
   ]), [school?.id, page, search], Boolean(school));
@@ -48,9 +49,10 @@ export const TeachersView: React.FC = () => {
 
   const filteredTeachers = teachers.filter(teacher => {
     const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [teacher.fullName, teacher.staffId, teacher.phone, teacher.qualification]
+    const matchesSearch = !query || [teacher.fullName, teacher.staffId, teacher.teacherCode, teacher.phone, teacher.qualification]
       .some(value => String(value || '').toLowerCase().includes(query));
+    const matchesSubject = !subjectFilter || (teacher.assignedSubjects || []).includes(subjectFilter);
+    return matchesSearch && matchesSubject;
   });
 
   const fetchData = teacherLoad.retry;
@@ -111,6 +113,25 @@ export const TeachersView: React.FC = () => {
     } finally {
       setIsSavingEdit(false);
     }
+  };
+
+  const handleToggleTeacherStatus = async (teacher: Teacher) => {
+    if (isReadOnly) return;
+    const status = teacher.status === 'active' ? 'inactive' : 'active';
+    try {
+      await ApiClient.updateTeacher(teacher.id, { status });
+      setNotice(status === 'active' ? 'Macallinka waa la hawlgeliyey.' : 'Macallinka waa la joojiyey.');
+      await fetchData();
+    } catch (error: any) { setNotice(error?.message || 'Xaaladda macallinka lama beddeli karin.'); }
+  };
+
+  const handleDeleteTeacher = async (teacher: Teacher) => {
+    if (isReadOnly || !window.confirm('Ma hubtaa inaad tirtirayso ' + teacher.fullName + '? Haddii xog kale ku xiran tahay, nidaamku wuu diidi doonaa.')) return;
+    try {
+      await ApiClient.deleteTeacher(teacher.id);
+      setNotice('Macallinka waa la tirtiray.');
+      await fetchData();
+    } catch (error: any) { setNotice(error?.message || 'Macallinka lama tirtiri karin.'); }
   };
 
   const handleResetTeacherPin = async (teacher: Teacher) => {
@@ -176,20 +197,20 @@ export const TeachersView: React.FC = () => {
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-teal-100">School administration · Faculty</p>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Teachers & staff directory</h1>
-            <p className="mt-2 max-w-2xl text-sm text-teal-100/90">Manage teacher profiles, class and subject assignments, and secure school-issued sign-in IDs.</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Macallimiin</h1>
+            <p className="mt-2 max-w-2xl text-sm text-teal-100/90">Diiwaangeli macallimiinta, dooro maaddooyinka ay dhigi karaan, kuna maamul xogtooda.</p>
           </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <button type="button" onClick={handleExportTeachers}
             className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] hover:bg-[#f6faf8]">
             <Download className="w-4 h-4" />
-            <span>Export CSV</span>
+            <span>Soo dejiso CSV</span>
           </button>
           <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
             className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50">
             <Plus className="w-4 h-4" />
-            <span>Appoint Teacher</span>
+            <span>Diiwaangeli macallin</span>
           </button>
         </div>
         </div>
@@ -222,11 +243,12 @@ export const TeachersView: React.FC = () => {
         <label className="relative block w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <input type="search" value={search} onChange={event => setSearch(event.target.value)}
-            placeholder="Search this page by teacher name, ID or phone"
-            aria-label="Search teachers on this page"
+            placeholder="Ku raadi magaca, koodhka ama telefoonka"
+            aria-label="Raadi macallimiin"
             className="w-full rounded-lg border border-[#CBD5E1] bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E]" />
         </label>
-        <span className="text-xs text-[#64748B]">{filteredTeachers.length} of {teachers.length} teachers on this page</span>
+        <select aria-label="Ku shaandhee maaddo" value={subjectFilter} onChange={e => setSubjectFilter(e.target.value)} className="min-h-10 rounded-lg border border-[#CBD5E1] bg-white px-3 text-xs"><option value="">Dhammaan maaddooyinka</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+        <span className="text-xs text-[#64748B]">{filteredTeachers.length} / {teachers.length} macallin</span>
       </div>
 
       {/* Teachers Directory: reference-style table, retaining all existing teacher details */}
@@ -235,12 +257,12 @@ export const TeachersView: React.FC = () => {
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead>
               <tr className="border-b border-[#E2E8F0]">
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Teacher</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Subjects</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Classes</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Phone</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Status</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Actions</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Macallin</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Maaddooyin</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Fasallo</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Telefoon</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Xaalad</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Hawlgal</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
@@ -252,9 +274,9 @@ export const TeachersView: React.FC = () => {
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[#132A29]">{t.fullName}</p>
                     <p className="mt-0.5 text-[11px] text-[#64748B]">{t.qualification}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">ID: {t.staffId || t.id}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-[#0F766E]">Koodh: {t.teacherCode || t.staffId || t.id}</p>
                   </td>
-                  <td className="px-4 py-3 text-[#334155]">{(t.assignedSubjects || []).map(id => subjects.find(item => item.id === id)?.name || id).join(', ') || 'Not assigned'}</td>
+                  <td className="px-4 py-3"><div className="flex max-w-xs flex-wrap gap-1">{(t.assignedSubjects || []).map(id => <span key={id} className="rounded-full bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-800">{subjects.find(item => item.id === id)?.name || id}</span>)}{!(t.assignedSubjects || []).length && <span className="text-slate-400">Lama dooran</span>}</div></td>
                   <td className="px-4 py-3 text-[#334155]">{displayedClassIds.map(id => {
                     const klass = classes.find(item => item.id === id);
                     const label = klass ? `${klass.name}${klass.section ? ` · ${klass.section}` : ''}` : id;
@@ -273,6 +295,10 @@ export const TeachersView: React.FC = () => {
                       className="ml-1 inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-2 font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50">
                       Reset PIN
                     </button>
+                    <button type="button" onClick={() => void handleToggleTeacherStatus(t)} disabled={isReadOnly}
+                      className="ml-1 inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{t.status === 'active' ? 'Jooji' : 'Hawl geli'}</button>
+                    <button type="button" onClick={() => void handleDeleteTeacher(t)} disabled={isReadOnly}
+                      className="ml-1 inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">Tirtir</button>
                   </td>
                 </tr>
                 );
@@ -280,7 +306,7 @@ export const TeachersView: React.FC = () => {
               {filteredTeachers.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
-                    {teachers.length ? 'No teachers on this page match your search.' : 'No teachers have been appointed yet.'}
+                    {teachers.length ? 'Wax macallin ah lama helin.' : 'Weli macallin lama diiwaangelin.'}
                   </td>
                 </tr>
               )}
@@ -288,6 +314,7 @@ export const TeachersView: React.FC = () => {
           </table>
         </div>
       </div>
+      {!subjects.length && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Weli ma jiraan maaddooyin. Marka hore ka samee bogga <strong>Maaddooyin</strong>, kadib ku xiro macallimiinta.</div>}
       <PaginationControls info={pageInfo} onPage={setPage} />
 
       {editingTeacher && (
@@ -309,11 +336,11 @@ export const TeachersView: React.FC = () => {
               <label className="text-xs font-medium">Monthly salary ({school?.currency || 'ETB'})<input type="number" min="0" value={Number(editForm.monthlySalary || 0)} onChange={e => setEditForm(v => ({...v,monthlySalary:Number(e.target.value)}))} className="mt-1 w-full rounded-lg border p-2 text-sm" /></label>
               <label className="text-xs font-medium">Assigned classes<select multiple value={editForm.assignedClasses || []} onChange={e => setEditForm(v => ({...v,assignedClasses:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple classes.</span></label>
               <label className="text-xs font-medium">Form Teacher class<select value={String((editForm as any).formTeacherClassId || '')} onChange={e => setEditForm(v => ({...v, formTeacherClassId:e.target.value} as any))} className="mt-1 w-full rounded-lg border p-2 text-sm"><option value="">Not a Form Teacher</option>{classes.filter(item => !item.isArchived).map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` · ${item.section}` : ''}{item.classTeacherId && item.classTeacherId !== editingTeacher.userId ? ' · Reassign current Form Teacher' : ''}</option>)}</select><span className="text-[10px] text-slate-500">Changing the assignment does not alter attendance or exam history.</span></label>
-              <label className="text-xs font-medium">Assigned subjects<select multiple value={editForm.assignedSubjects || []} onChange={e => setEditForm(v => ({...v,assignedSubjects:Array.from(e.target.selectedOptions, option => option.value)}))} className="mt-1 h-28 w-full rounded-lg border p-2 text-sm">{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className="text-[10px] text-slate-500">Hold Ctrl to select multiple subjects.</span></label>
+              <div className="text-xs font-medium">Maaddooyinka uu dhigi karo<div className="mt-2 flex flex-wrap gap-2">{subjects.map(item => { const selected = (editForm.assignedSubjects || []).includes(item.id); return <button type="button" key={item.id} aria-pressed={selected} onClick={() => setEditForm(v => ({...v,assignedSubjects:selected?(v.assignedSubjects || []).filter(id => id !== item.id):[...(v.assignedSubjects || []),item.id]}))} className={`rounded-full border px-3 py-2 text-xs font-semibold ${selected?'border-teal-700 bg-teal-700 text-white':'border-slate-300 bg-white text-slate-700'}`}>{item.name}</button>; })}</div></div>
             </div>
             <div className="flex justify-end gap-2 border-t pt-3">
-              <button type="button" onClick={() => setEditingTeacher(null)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-              <button type="submit" disabled={isSavingEdit} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSavingEdit ? 'Saving…' : 'Save changes'}</button>
+              <button type="button" onClick={() => setEditingTeacher(null)} className="rounded-lg border px-4 py-2 text-sm">Ka noqo</button>
+              <button type="submit" disabled={isSavingEdit} className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSavingEdit ? 'Saving…' : 'Kaydi isbeddellada'}</button>
             </div>
           </form>
         </div>
@@ -326,7 +353,7 @@ export const TeachersView: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
               <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-[#0F766E]" />
-                <span>Appoint Faculty Member</span>
+                <span>Diiwaangeli macallin</span>
               </h2>
               <button onClick={() => setShowAddModal(false)} className="text-[#64748B] hover:text-[#132A29]">
                 <X className="w-5 h-5" />
@@ -335,7 +362,7 @@ export const TeachersView: React.FC = () => {
 
             <form onSubmit={handleAddTeacher} className="space-y-4 text-xs">
               <div>
-                <label className="block font-medium text-[#334155]">Full Name *</label>
+                <label className="block font-medium text-[#334155]">Magaca oo buuxa *</label>
                 <input
                   type="text"
                   required
@@ -356,11 +383,11 @@ export const TeachersView: React.FC = () => {
                 <input value={address} onChange={e => setAddress(e.target.value)} maxLength={250} placeholder="Teacher address" className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
               </div>
               <div>
-                <label className="block font-medium text-[#334155]">Date of Joining</label>
+                <label className="block font-medium text-[#334155]">Taariikhda shaqo-bilaabidda {/* Date of Joining */}</label>
                 <input type="date" value={joinedDate} onChange={e => setJoinedDate(e.target.value)} required className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2" />
               </div>
               <div>
-                <label className="block font-medium text-[#334155]">Phone Number (optional)</label>
+                <label className="block font-medium text-[#334155]">Telefoon (ikhtiyaari)</label>
                 <input
                   type="tel"
                   value={phone}
@@ -380,9 +407,9 @@ export const TeachersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-[#334155]">Assigned subjects (optional)</label>
-                  <select multiple size={4} value={selectedSubjectIds} onChange={e => setSelectedSubjectIds(Array.from(e.target.selectedOptions, option => option.value))} className="mt-1 w-full rounded-lg border border-[#CBD5E1] bg-white p-2 text-sm">{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
-                  <span className="mt-1 block text-[10px] text-slate-500">{selectedSubjectIds.length} subject(s) selected. Use Ctrl/Command to select multiple.</span>
+                  <label className="block font-medium text-[#334155]">Maaddooyinka uu dhigi karo</label>
+                  <div className="mt-2 flex flex-wrap gap-2">{subjects.map(subject => { const selected = selectedSubjectIds.includes(subject.id); return <button type="button" key={subject.id} aria-pressed={selected} onClick={() => setSelectedSubjectIds(v => selected?v.filter(id => id !== subject.id):[...v,subject.id])} className={`rounded-full border px-3 py-2 text-xs font-semibold ${selected?'border-teal-700 bg-teal-700 text-white':'border-slate-300 bg-white text-slate-700'}`}>{subject.name}</button>; })}</div>
+                  <span className="mt-1 block text-[10px] text-slate-500">{selectedSubjectIds.length} maaddo ayaa la doortay.</span>
                 </div>
                 <div>
                   <label className="block font-medium text-[#334155]">Monthly Salary ({school?.currency || 'ETB'})</label>
