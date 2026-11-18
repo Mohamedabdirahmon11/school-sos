@@ -446,9 +446,9 @@ export const TimetableView: React.FC = () => {
     return grade(a) - grade(b) || String(a.section || '').localeCompare(String(b.section || ''));
   });
   const displayedClasses = viewMode === 'teacher'
-    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift)).slice(0, 5)
+    ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && slot.teacherId === selectedTeacherId && (Number(slot.shift) === 2 ? 2 : 1) === selectedTeacherShift))
     : viewMode === 'room'
-      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && (slot.roomId === selectedRoomId || (!slot.roomId && slot.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name)))).slice(0, 5)
+      ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && (slot.roomId === selectedRoomId || (!slot.roomId && slot.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name))))
       : viewMode === 'school'
         ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
         : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
