@@ -6188,7 +6188,7 @@ apiRouter.post('/exams/rooms', requireAuth, requireSchoolAdminOrSuperAdmin, requ
     return;
   }
   try {
-    const room = await db.createExamRoom({ id: 'room-' + randomUUID(), schoolId: school.id, name, roomCode, capacity, location, shiftName });
+    const room = await db.createExamRoom({ id: 'room-' + randomUUID(), schoolId: school.id, name, roomCode, capacity, location, shiftName } as Parameters<typeof db.createExamRoom>[0]);
     db.logAudit({ action: 'EXAM_ROOM_CREATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Created exam room "${name}" with capacity ${capacity}.`, severity: 'info' });
     await db.flush();
     res.status(201).json(room);
