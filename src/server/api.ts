@@ -4294,7 +4294,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
   const blocked = new Set(unavailable.filter((item: any) => Number(item.shift || 1) === targetShift).flatMap((item: any) => item.periodNumber == null ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`) : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
   const generated: TimetableSlot[] = [...lockedForClass];
-  const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
+  const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number; reason: string }> = [];
   const dayLoad = new Map<string, number>();
   const periodLoad = new Map<string, number>();
   const subjectDayLoad = new Map<string, number>();
@@ -4345,7 +4345,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
         && !roomTimeBusy;
     });
     if (!available.length) {
-      unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+      unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence, reason: 'Ma jirin boos bannaan oo waafaqsan macallinka, qolka, maqnaanshaha iyo casharrada xiran.' });
       continue;
     }
     const ranked = available.map(candidate => {
@@ -4394,7 +4394,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
   }
   for (const assignment of timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
-    unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+    unfilled.push({ subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1, reason: 'Maaddadan weli looma dejin tirada casharrada toddobaadlaha ah (periods per week).' });
   }
   if (!generated.some((slot: any) => !slot.isLocked)) {
     res.json({ slots: lockedForClass, unfilled, withoutTeacher: lockedForClass.filter((slot: any) => !slot.teacherId).length, skipped: true, reason: 'Wax cashar cusub ah lama meelayn; jadwalkii hore waa la ilaaliyey.' });
@@ -4438,7 +4438,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   // and continue to block teacher/room conflicts in the other classes.
   let workingSlots = allSlots.filter((slot: any) => !targetIds.has(slot.classId) || slot.isLocked === true);
   const generatedSlots: TimetableSlot[] = [];
-  const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number }> = [];
+  const unfilled: Array<{ classId: string; className: string; subjectId: string; teacherId: string; occurrence: number; reason: string }> = [];
   const skipped: Array<{ classId: string; className: string; reason: string }> = [];
   const replacements: Array<{ classId: string; slots: TimetableSlot[] }> = [];
   const warnings: string[] = [];
@@ -4507,7 +4507,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
           && !roomTimeBusy;
       });
       if (!available.length) {
-        unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence });
+        unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: assignment.occurrence, reason: 'Ma jirin boos bannaan oo waafaqsan macallinka, qolka, maqnaanshaha iyo casharrada xiran.' });
         continue;
       }
       const ranked = available.map(candidate => {
@@ -4547,7 +4547,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       subjectDayLoad.set(`${sectionKey}:${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${sectionKey}:${assignment.subjectId}:${day}`) || 0) + 1);
     }
     for (const assignment of classAssignments.filter((item: any) => Number(item.periodsPerWeek) <= 0)) {
-      unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1 });
+      unfilled.push({ classId: klass.id, className: klass.name, subjectId: assignment.subjectId, teacherId: assignment.teacherId || '', occurrence: 1, reason: 'Maaddadan weli looma dejin tirada casharrada toddobaadlaha ah (periods per week).' });
     }
     if (!generatedForClass.some((slot: any) => !slot.isLocked)) {
       skipped.push({ classId: klass.id, className: klass.name, reason: 'No new periods could be placed; previous timetable was kept. Cashar cusub lama meelayn; jadwalkii hore waa la ilaaliyey.' });
