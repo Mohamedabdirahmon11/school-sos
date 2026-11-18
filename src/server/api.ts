@@ -9469,10 +9469,15 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     const yearId = String(req.query.academicYearId || (years.data || []).find((x: any) => x.is_current)?.id || (years.data || [])[0]?.id || '');
     const requestedTerm = typeof req.query.termId === 'string' ? String(req.query.termId) : null;
     const termId = requestedTerm === 'all' ? '' : (requestedTerm || String((terms.data || []).find((x: any) => x.academic_year_id === yearId && x.is_current)?.id || ''));
-    const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && !x.term_id);
-    const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && termId && x.term_id === termId);
+    const selectedYear = (years.data || []).find((x: any) => x.id === yearId);
+    const yearKey = String(selectedYear?.name || '').replace(/[^0-9]/g, '');
+    const visibleClasses = (classes.data || []).filter((x: any) => !x.academic_year || !yearKey || String(x.academic_year).replace(/[^0-9]/g, '') === yearKey);
+    const visibleClassIds = new Set(visibleClasses.map((x: any) => x.id));
+    const visibleSections = (sections.data || []).filter((x: any) => !x.legacy_class_id || visibleClassIds.has(x.legacy_class_id));
+    const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && !x.term_id);
+    const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && termId && x.term_id === termId);
     const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))];
-    const cur = curriculum.data || [];
+    const cur = (curriculum.data || []).filter((x: any) => visibleClassIds.has(x.class_id));
     const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id))
       .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
     const workload = (teachers.data || []).map((t: any) => {
@@ -9485,7 +9490,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     });
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({
-      academicYears: years.data || [], terms: terms.data || [], classes: classes.data || [], sections: sections.data || [],
+      academicYears: years.data || [], terms: terms.data || [], classes: visibleClasses, sections: visibleSections,
       subjects: subjects.data || [], teachers: teachers.data || [], curriculum: cur, assignments: current,
       qualifiedTeacherIdsBySubject: (quals.data || []).reduce((out: any, row: any) => { (out[row.subject_id] ||= []).push(row.teacher_id); return out; }, {}),
       workload, unassigned, selectedAcademicYearId: yearId, selectedTermId: termId,
