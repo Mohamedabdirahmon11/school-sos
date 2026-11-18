@@ -217,7 +217,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="px-3 py-3 text-xs font-bold">Cashar / Waqti</th>{[{key:'Monday',label:'Isniin'},{key:'Tuesday',label:'Talaado'},{key:'Wednesday',label:'Arbaco'},{key:'Thursday',label:'Khamiis'},{key:'Friday',label:'Jimce'},{key:'Saturday',label:'Sabti'}].map(day => <th key={day.key} className={'px-3 py-3 text-xs font-bold ' + (day.key === overview?.weekday ? 'bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-200' : '')}>{day.label}{day.key === overview?.weekday ? ' · Maanta' : ''}</th>)}</tr></thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{[...new Set(timetable.map((item: any) => item.periodNumber))].sort((a: number,b: number) => a-b).map(period => {
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{Array.from(new Set<number>(timetable.map((item: any) => Number(item.periodNumber)))).sort((a,b) => a-b).map((period: number) => {
               const periodLessons = timetable.filter((item: any) => item.periodNumber === period);
               const first = periodLessons[0];
               return <tr key={period}><th className="whitespace-nowrap px-3 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">Cashar {period}<span className="mt-1 block font-normal text-slate-400">{first?.startTime}–{first?.endTime}</span></th>
