@@ -667,6 +667,10 @@ export class ApiClient {
     return this.createSubject(subData, schoolId);
   }
 
+  public static async getTimetableSections(classId: string) {
+    return this.request<Array<{ id: string; name: string; sortOrder: number }>>(`/timetable/sections?classId=${encodeURIComponent(classId)}`);
+  }
+
   public static async getTimetableTerms() {
     return this.request<Array<{ id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }>>('/timetable/terms');
   }
@@ -683,6 +687,7 @@ export class ApiClient {
     if (classOrParams?.dayOfWeek || dayOfWeek) params.append('dayOfWeek', classOrParams?.dayOfWeek || dayOfWeek!);
     if (classOrParams?.scope === 'school') params.append('scope', 'school');
     if (classOrParams?.termId) params.append('termId', classOrParams.termId);
+    if (classOrParams?.sectionId) params.append('sectionId', classOrParams.sectionId);
     return this.request<TimetableSlot[]>(`/timetable?${params.toString()}`);
   }
 
