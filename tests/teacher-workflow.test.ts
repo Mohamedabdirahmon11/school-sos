@@ -56,13 +56,13 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'students'/);
   assert.match(teacher, /activeTab === 'attendance'/);
   assert.match(teacher, /activeTab === 'grades'/);
-  assert.match(teacher, /Form Teacher class review/);
-  assert.match(teacher, /My subject mark sheet/);
+  assert.match(teacher, /t\('exam_form_teacher_review'\)/);
+  assert.match(teacher, /t\('exam_my_subject_mark_sheet'\)/);
   assert.match(teacher, /Student name \/ ID/);
   assert.match(teacher, /examRegisterRows/);
   assert.match(teacher, /rankExamStudentResults/);
   assert.match(teacher, /allClassMarksSubmitted/);
-  assert.match(teacher, /Rankings and class totals appear after every active subject is submitted/);
+  assert.match(teacher, /t\('exam_waiting_for_all_subjects'\)/);
   assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
@@ -79,7 +79,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit marks/);
-  assert.match(teacher, /Forward class to Admin/);
+  assert.match(teacher, /t\('exam_forward_to_admin'\)/);
 });
 
 test('teacher appointment supports optional multiple profile tags and one-time school credentials', () => {
@@ -332,14 +332,14 @@ test('Form Teacher rankings and class totals stay hidden until every active subj
   assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted\}/);
   assert.match(teacher, /allClassMarksSubmitted \? row\.total/);
   assert.match(teacher, /t\('exam_drafts_autosaved'\)/);
-  assert.match(teacher, /student\.rollNumber \|\| student\.studentId/);
+  assert.match(teacher, /row\.student\.rollNumber \|\| row\.student\.studentId/);
   assert.match(calculations, /row\.total !== previousTotal/);
 });
 
 test('Form Teacher review uses full 100-point subject totals rather than one exam half', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /calculateExamSubjectTotal\(scores, assessmentComponents\)/);
-  assert.match(teacher, /t\('exam_total'\) \/100/);
+  assert.match(teacher, /t\('exam_total'\)\} \/100/);
   assert.doesNotMatch(teacher.slice(teacher.indexOf('const examRegisterRows'), teacher.indexOf('if (initialData.loading')), /assessmentComponents\.filter\(component => component\.category/);
 });
 
