@@ -3739,12 +3739,19 @@ const decorateTimetableSlots = async (schoolId: string, slots: any[]) => {
   return slots.map(slot => ({ ...slot, shift: classShifts.get(slot.classId) || 1, subjectName: subjectNames.get(slot.subjectId) || slot.subjectId, teacherName: teacherNames.get(slot.teacherId) || '', className: classNames.get(slot.classId) || '' }));
 };
 
+apiRouter.get('/timetable/terms', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const terms = await queryAllRows('terms', { school_id: school.id }, 'id,school_id,name,start_date,end_date,is_current');
+  res.json(terms);
+});
+
 apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
   let classId = String(req.query.classId || '');
   let teacherId = String(req.query.teacherId || '');
+  const termId = typeof req.query.termId === 'string' ? req.query.termId : '';
   if (role === 'teacher') {
     const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     if (!own.items.length) { res.json([]); return; }
@@ -3763,10 +3770,10 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
     const classIds = [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
-    const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+    const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, term_id: termId || undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
     res.json(await decorateTimetableSlots(school.id, slots.filter((slot: any) => !req.query.dayOfWeek || slot.dayOfWeek === req.query.dayOfWeek))); return;
   } else if (!isSchoolAdmin(user)) { res.status(403).json({ error: 'This role cannot view timetables.' }); return; }
-  const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  const slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || undefined, teacher_id: teacherId || undefined, term_id: termId || undefined, day_of_week: req.query.dayOfWeek ? String(req.query.dayOfWeek) : undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
   res.json(await decorateTimetableSlots(school.id, slots));
 });
 
