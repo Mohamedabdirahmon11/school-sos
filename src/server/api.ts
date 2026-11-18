@@ -5584,7 +5584,7 @@ async function canTeacherMarkAttendance(
     let ownLessonQuery = client.from('timetable_slots').select('id')
       .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId)
       .eq('period_number', periodNumber).eq('day_of_week', attendanceWeekday(date)).eq('is_active', true);
-    ownLessonQuery = sectionId ? ownLessonQuery.eq('section_id', sectionId) : ownLessonQuery.is('section_id', null);
+    ownLessonQuery = sectionId ? ownLessonQuery.or(`section_id.is.null,section_id.eq.${sectionId}`) : ownLessonQuery.is('section_id', null);
     ownLessonQuery = currentTerm?.id ? ownLessonQuery.or(`term_id.is.null,term_id.eq.${currentTerm.id}`) : ownLessonQuery.is('term_id', null);
     const ownershipFilter = currentAssignmentIds.length
       ? `teacher_id.eq.${teacherId},assignment_id.in.(${currentAssignmentIds.join(',')}),teacher_id.is.null`
