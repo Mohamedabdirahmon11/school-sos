@@ -48,7 +48,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     try {
       const q = new URLSearchParams();
       if (yearId) q.set('academicYearId', yearId);
-      if (termId) q.set('termId', termId);
+      if (yearId) q.set('termId', termId || 'all');
       const result = await ApiClient.request<Data>('/teacher-assignments' + (q.size ? '?' + q.toString() : ''));
       setData(result);
       setWorkloadLimits(Object.fromEntries((result.teachers || []).map((t: any) => [t.id, t.max_periods_per_week == null ? '' : String(t.max_periods_per_week)])));
