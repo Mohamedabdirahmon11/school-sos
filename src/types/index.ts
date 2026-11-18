@@ -253,6 +253,7 @@ export interface Teacher {
   branchId?: string;
   userId: string;
   staffId?: string;
+  teacherCode?: string;
   fullName: string;
   email?: string;
   phone: string;
