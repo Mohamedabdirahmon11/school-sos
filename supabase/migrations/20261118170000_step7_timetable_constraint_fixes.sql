@@ -9,6 +9,35 @@ ALTER TABLE public.teacher_unavailability
   ADD CONSTRAINT teacher_unavailability_period_number_check
   CHECK (period_number IS NULL OR (period_number >= 1 AND period_number <= 8));
 
+-- Use actual time-range exclusions so separate shifts can reuse period numbers
+-- when their clock times do not overlap.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+CREATE OR REPLACE FUNCTION public.timetable_time_seconds(value text)
+RETURNS bigint LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT
+AS $function$ SELECT floor(extract(epoch FROM (value::time - time '00:00')))::bigint $function$;
+
+DO $
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='timetable_teacher_time_no_overlap' AND conrelid='public.timetable_slots'::regclass) THEN
+  ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_teacher_time_no_overlap
+   EXCLUDE USING gist (school_id WITH =, term_id WITH =, teacher_id WITH =, day_of_week WITH =,
+    int8range(public.timetable_time_seconds(start_time::text), public.timetable_time_seconds(end_time::text), '[)') WITH &&)
+   WHERE (term_id IS NOT NULL AND is_active=true AND teacher_id IS NOT NULL);
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='timetable_room_id_time_no_overlap' AND conrelid='public.timetable_slots'::regclass) THEN
+  ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_room_id_time_no_overlap
+   EXCLUDE USING gist (school_id WITH =, term_id WITH =, room_id WITH =, day_of_week WITH =,
+    int8range(public.timetable_time_seconds(start_time::text), public.timetable_time_seconds(end_time::text), '[)') WITH &&)
+   WHERE (term_id IS NOT NULL AND is_active=true AND room_id IS NOT NULL);
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='timetable_room_name_time_no_overlap' AND conrelid='public.timetable_slots'::regclass) THEN
+  ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_room_name_time_no_overlap
+   EXCLUDE USING gist (school_id WITH =, term_id WITH =, lower(btrim(room_number::text)) WITH =, day_of_week WITH =,
+    int8range(public.timetable_time_seconds(start_time::text), public.timetable_time_seconds(end_time::text), '[)') WITH &&)
+   WHERE (term_id IS NOT NULL AND is_active=true AND NULLIF(btrim(room_number::text),'') IS NOT NULL);
+ END IF;
+END $;
+
 DO $$
 DECLARE
   definition text;
