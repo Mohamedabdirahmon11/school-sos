@@ -2824,7 +2824,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   const [students, assignments, timetable, attendance] = await Promise.all([
     db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
     db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
     db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
   ]);
   const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
@@ -4090,7 +4090,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const sameShiftExisting = existing.filter((slot: any) => (shiftByClass.get(slot.classId) || targetShift) === targetShift);
   const occupied = new Set(sameShiftExisting.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}:${slot.teacherId}`));
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
-  const blocked = new Set(unavailable.map((item: any) => `${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`));
+  const blocked = new Set(unavailable.flatMap((item: any) => item.periodNumber == null ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`) : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
   const generated: TimetableSlot[] = [...lockedForClass];
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
   const dayLoad = new Map<string, number>();
