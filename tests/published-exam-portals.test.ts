@@ -35,5 +35,5 @@ test('school admin can withdraw a published term and remove the stale parent not
   assert.match(storage, /published_at: null, published_by: null/);
   assert.match(storage, /MARKS_UNPUBLISHED_FROM_PARENTS/);
   assert.match(client, /unpublishExamResults\(classId: string, semester: string\)/);
-  assert.match(readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8'), /Withdraw published results/);
+  assert.match(readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8'), /t\('exam_withdraw_results'\)/);
 });
