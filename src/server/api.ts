@@ -6123,7 +6123,7 @@ apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSc
   if (req.query.format === 'csv') {
     const cell = (value: unknown) => {
       const raw = String(value ?? '');
-      const safe = /^\\s*[=+\\-@]/.test(raw) ? "'" + raw : raw;
+      const safe = /^\s*[=+\-@]/.test(raw) ? "'" + raw : raw;
       return '"' + safe.replace(/"/g, '""') + '"';
     };
     const csv = [['Student ID','Student','Class','Present','Absent','Late','Excused','Attendance %','Absence streak'],
