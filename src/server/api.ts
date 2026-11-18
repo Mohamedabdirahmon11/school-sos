@@ -3745,6 +3745,66 @@ apiRouter.get('/timetable/terms', requireAuth, requireSchoolContext, async (req,
   res.json(terms);
 });
 
+apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const classId = String(req.params.classId || '');
+  const termId = String(req.query.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) {
+    res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return;
+  }
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: classId, term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  if (!current.items.length) { res.json({ success: true, removed: 0, lockedKept: 0 }); return; }
+  const locked = current.items.filter((slot: any) => slot.isLocked === true);
+  try {
+    await db.replaceTimetableForClassTerm(school.id, classId, termId, locked);
+    res.json({ success: true, removed: current.items.length - locked.length, lockedKept: locked.length });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Jadwalka fasalka lama nadiifin karin.' });
+  }
+});
+
+apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const sourceTermId = String(req.body?.sourceTermId || '');
+  const targetTermId = String(req.body?.targetTermId || '');
+  if (!sourceTermId || !targetTermId || sourceTermId === targetTermId) {
+    res.status(400).json({ error: 'Dooro laba term oo kala duwan.' }); return;
+  }
+  const [sourceTerm, targetTerm] = await Promise.all([
+    db.queryPage('terms', { school_id: school.id, id: sourceTermId }, 1, 1, undefined, 'id'),
+    db.queryPage('terms', { school_id: school.id, id: targetTermId }, 1, 1, undefined, 'id')
+  ]);
+  if (!sourceTerm.total || !targetTerm.total) { res.status(404).json({ error: 'Mid ka mid ah term-yada lagama helin dugsigan.' }); return; }
+  const [sourceSlots, targetSlots] = await Promise.all([
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: sourceTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: targetTermId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id')
+  ]);
+  const sourceByClass = new Map<string, any[]>();
+  for (const slot of sourceSlots) sourceByClass.set(slot.classId, [...(sourceByClass.get(slot.classId) || []), slot]);
+  const copiedClasses: string[] = [];
+  const skipped: Array<{ classId: string; reason: string }> = [];
+  for (const [classId, sourceClassSlots] of sourceByClass) {
+    const lockedTarget = targetSlots.filter((slot: any) => slot.classId === classId && slot.isLocked === true);
+    const lockedKeys = new Set(lockedTarget.map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
+    const incoming = sourceClassSlots
+      .filter((slot: any) => !lockedKeys.has(`${slot.dayOfWeek}:${slot.periodNumber}`))
+      .map((slot: any) => ({
+        ...slot,
+        id: `tt-${randomUUID()}`,
+        termId: targetTermId,
+        assignmentId: undefined,
+        isLocked: false
+      }));
+    try {
+      await db.replaceTimetableForClassTerm(school.id, classId, targetTermId, [...lockedTarget, ...incoming]);
+      copiedClasses.push(classId);
+    } catch (error) {
+      skipped.push({ classId, reason: error instanceof Error ? error.message : 'Jadwalkan wuxuu keenayaa isku dhac.' });
+    }
+  }
+  res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
+});
+
 apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
