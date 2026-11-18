@@ -86,6 +86,12 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
   }, [selectedClassId, classSubjects, selectedSubjectId]);
 
   useEffect(() => {
+    const subjectSection = classSubjects.find((item: any) => item.id === selectedSubjectId)?.sectionId;
+    if (subjectSection && availableSections.some((section: any) => section.id === subjectSection)) setSelectedSectionId(subjectSection);
+    else if (!availableSections.some((section: any) => section.id === selectedSectionId)) setSelectedSectionId(availableSections[0]?.id || '');
+  }, [selectedClassId, selectedSubjectId, availableSections, classSubjects, selectedSectionId]);
+
+  useEffect(() => {
     if (attendanceMode !== 'per_period') { setSelectedPeriodId(''); return; }
     if (!lessonOptions.some((item: any) => item.periodId === selectedPeriodId)) setSelectedPeriodId(lessonOptions[0]?.periodId || '');
   }, [attendanceMode, lessonOptions, selectedPeriodId]);
@@ -120,6 +126,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
       setSelectedClassId(lesson.classId);
       setSelectedSubjectId(lesson.subjectId || '');
       setSelectedPeriodId(lesson.periodId || '');
+      setSelectedSectionId(lesson.sectionId || '');
       setAttendanceDate(overview?.date || attendanceDate);
     }
     setTab('attendance');
@@ -222,7 +229,7 @@ export const TeacherAttendanceWorkspace: React.FC = () => {
       </Card>
       {isLocked && <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><LockKeyhole className="h-5 w-5" />Xaadirintan waa xiran tahay. Maamulka dugsiga ayaa furi kara.</div>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{(['present','absent','late','excused'] as AttendanceStatus[]).map(status => <Card key={status} className="p-3"><p className="text-xs text-slate-500">{STATUS_LABELS[status]}</p><p className="text-2xl font-black">{counts[status]}</p></Card>)}</div>
-      <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Liiska ardayda</h2><Pill>{counts.present} jooga · {counts.absent} maqan</Pill></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-bold">Liiska ardayda</h2><Pill>{counts.present} jooga · {counts.absent} maqan</Pill></div><Button disabled={isLocked || saving || isReadOnly || !students.length} onClick={() => setMarks(Object.fromEntries(students.map(student => [student.id, { status: 'present' as AttendanceStatus, note: marks[student.id]?.note || '' }]))) }>Dhammaan Jooga</Button></div>
       {loadingAttendance ? <Card><p className="p-6 text-center text-sm text-slate-500">Liiska iyo xaadirinta waa la soo dejinayaa…</p></Card> :
         !students.length ? <Card><EmptyState><Users className="mx-auto h-8 w-8" /><p>Arday lama helin fasalkan.</p></EmptyState></Card> :
         <div className="space-y-3">{students.map(student => {
