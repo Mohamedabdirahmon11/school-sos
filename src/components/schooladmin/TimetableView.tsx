@@ -408,7 +408,7 @@ export const TimetableView: React.FC = () => {
     setClashWarning(null);
     try {
       const details = await ApiClient.getClassDetails(klass.id, { page: 1, pageSize: 1 });
-      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+      const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, periodsPerWeek: Number(item.periodsPerWeek || 0), subject: item.subject, teacher: item.teacher }));
       setClassSubjectAssignments(assignments);
       const first = assignments[0];
       setSubjectId(first?.subject?.id || '');
