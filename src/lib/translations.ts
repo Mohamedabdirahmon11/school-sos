@@ -52,6 +52,21 @@ export interface TranslationDict {
   timetable_unfilled: string;
   attendance: string;
   exams_results: string;
+  exam_scheme: string;
+  exam_active_subjects: string;
+  exam_teacher_assignment: string;
+  exam_form_teacher_review: string;
+  exam_my_subject_mark_sheet: string;
+  exam_submit_to_form_teacher: string;
+  exam_forward_to_admin: string;
+  exam_total: string;
+  exam_rank: string;
+  exam_all_active_subjects_submitted: string;
+  exam_waiting_for_all_subjects: string;
+  exam_drafts_autosaved: string;
+  exam_publish_results: string;
+  exam_withdraw_results: string;
+  exam_return_for_correction: string;
   assignments: string;
   fees_payments: string;
   events_holidays: string;
@@ -320,6 +335,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_unfilled: 'Unfilled subject periods',
     attendance: 'Daily Attendance',
     exams_results: 'Exams & Marks Approval',
+    exam_scheme: 'Mark scheme',
+    exam_active_subjects: 'Active subjects',
+    exam_teacher_assignment: 'Teacher assignment',
+    exam_form_teacher_review: 'Form Teacher class review',
+    exam_my_subject_mark_sheet: 'My subject mark sheet',
+    exam_submit_to_form_teacher: 'Submit to Form Teacher',
+    exam_forward_to_admin: 'Forward class to Admin',
+    exam_total: 'Total',
+    exam_rank: 'Rank',
+    exam_all_active_subjects_submitted: 'All active subjects submitted · rankings ready',
+    exam_waiting_for_all_subjects: 'Rankings and class totals appear after every active subject is submitted.',
+    exam_drafts_autosaved: 'Draft marks autosaved.',
+    exam_publish_results: 'Publish results',
+    exam_withdraw_results: 'Withdraw published results',
+    exam_return_for_correction: 'Return for correction',
     assignments: 'Homework & Assignments',
     fees_payments: 'Student Fees & Ledger',
     events_holidays: 'Academic Calendar',
@@ -568,6 +598,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_unfilled: 'Casharrada jadwalka ee aan la buuxin',
     attendance: 'Xaadirinta Maalinlaha ah',
     exams_results: 'Imtixaanaadka & Natiijooyinka',
+    exam_scheme: 'Qaabka dhibcaha',
+    exam_active_subjects: 'Maaddooyinka firfircoon',
+    exam_teacher_assignment: 'Macallinka maaddada',
+    exam_form_teacher_review: 'Hubinta Form Teacher-ka',
+    exam_my_subject_mark_sheet: 'Warqadda maaddooyinkayga',
+    exam_submit_to_form_teacher: 'U gudbi Form Teacher-ka',
+    exam_forward_to_admin: 'Fasalka u gudbi Maamulka',
+    exam_total: 'Wadar',
+    exam_rank: 'Kaalin',
+    exam_all_active_subjects_submitted: 'Dhammaan maaddooyinka waa la gudbiyey · kaalintu waa diyaar',
+    exam_waiting_for_all_subjects: 'Wadarta iyo kaalintu waxay muuqanayaan marka maaddooyinka oo dhan la gudbiyo.',
+    exam_drafts_autosaved: 'Qoraallada dhibcaha si toos ah ayaa loo kaydiyey.',
+    exam_publish_results: 'Daabac natiijooyinka',
+    exam_withdraw_results: 'Ka noqo daabacaadda natiijooyinka',
+    exam_return_for_correction: 'Ku celi sixitaan',
     assignments: 'Laylisyada & Shaqo-guri',
     fees_payments: 'Lacagaha & Kharashaadka',
     events_holidays: 'Jadwalka Fasaxyada',
@@ -816,6 +861,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable_unfilled: 'ያልተሞሉ የትምህርት ክፍለ ጊዜዎች',
     attendance: 'የዕለት መገኘት',
     exams_results: 'ፈተናዎች እና ውጤቶች',
+    exam_scheme: 'የውጤት ነጥብ አወቃቀር',
+    exam_active_subjects: 'ንቁ ትምህርቶች',
+    exam_teacher_assignment: 'የመምህር ምደባ',
+    exam_form_teacher_review: 'የክፍል አስተማሪ ግምገማ',
+    exam_my_subject_mark_sheet: 'የእኔ ትምህርት ውጤት ሰንጠረዥ',
+    exam_submit_to_form_teacher: 'ለክፍል አስተማሪ አስገባ',
+    exam_forward_to_admin: 'ክፍሉን ለአስተዳደር አስተላልፍ',
+    exam_total: 'ድምር',
+    exam_rank: 'ደረጃ',
+    exam_all_active_subjects_submitted: 'ሁሉም ንቁ ትምህርቶች ቀርበዋል · ደረጃዎች ዝግጁ ናቸው',
+    exam_waiting_for_all_subjects: 'ደረጃዎችና ድምሮች ሁሉም ንቁ ትምህርቶች ከቀረቡ በኋላ ይታያሉ።',
+    exam_drafts_autosaved: 'የጊዜያዊ ውጤቶች በራስ-ሰር ተቀምጠዋል።',
+    exam_publish_results: 'ውጤቶችን አትም',
+    exam_withdraw_results: 'የታተሙ ውጤቶችን አንሳ',
+    exam_return_for_correction: 'ለማስተካከያ መልስ',
     assignments: 'የቤት ስራዎች',
     fees_payments: 'የተማሪ ክፍያዎች',
     events_holidays: 'የዓመቱ የቀን መቁጠሪያ',
@@ -1044,6 +1104,21 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     timetable: 'الجدول الدراسي',
     attendance: 'الحضور',
     exams_results: 'الامتحانات والنتائج',
+    exam_scheme: 'نظام الدرجات',
+    exam_active_subjects: 'المواد النشطة',
+    exam_teacher_assignment: 'تعيين المعلم',
+    exam_form_teacher_review: 'مراجعة معلم الصف',
+    exam_my_subject_mark_sheet: 'كشف درجات موادي',
+    exam_submit_to_form_teacher: 'إرسال إلى معلم الصف',
+    exam_forward_to_admin: 'إرسال الصف إلى الإدارة',
+    exam_total: 'المجموع',
+    exam_rank: 'الترتيب',
+    exam_all_active_subjects_submitted: 'تم تسليم جميع المواد النشطة · الترتيب جاهز',
+    exam_waiting_for_all_subjects: 'يظهر المجموع والترتيب بعد تسليم جميع المواد النشطة.',
+    exam_drafts_autosaved: 'تم حفظ مسودات الدرجات تلقائياً.',
+    exam_publish_results: 'نشر النتائج',
+    exam_withdraw_results: 'سحب النتائج المنشورة',
+    exam_return_for_correction: 'إرجاع للتصحيح',
     assignments: 'الواجبات',
     fees_payments: 'الرسوم والمدفوعات',
     events_holidays: 'الفعاليات والعطلات',
