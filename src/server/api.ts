@@ -4053,6 +4053,8 @@ apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdmin
 apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
+  const termId = String(req.body?.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const period = Number(periodNumber);
   if (!TIMETABLE_DAYS.includes(dayOfWeek) || !Number.isInteger(period) || period < 1 || period > (dayOfWeek === 'Friday' ? 5 : 8)) { res.status(400).json({ error: 'Choose Monday–Friday and a valid period (up to eight; Friday has five).' }); return; }
   const [klass, subject, teacher, assignment, settings, existing, unavailable] = await Promise.all([
@@ -4061,7 +4063,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
     teacherId ? db.queryPage('teachers', { school_id: school.id, id: String(teacherId) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 }),
     db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId || ''), subject_id: String(subjectId || ''), is_active: 'true' }, 1, 100, undefined, 'id,teacher_id'),
     db.getTimetableSettings(school.id),
-    db.queryPage('timetable_slots', { school_id: school.id, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
+    db.queryPage('timetable_slots', { school_id: school.id, term_id: termId, day_of_week: dayOfWeek, period_number: String(period), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active'),
     teacherId ? db.queryPage('teacher_unavailability', { school_id: school.id, teacher_id: String(teacherId), day_of_week: dayOfWeek, period_number: String(period) }, 1, 1, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0, page: 1, pageSize: 1 })
   ]);
   const matchingAssignment = assignment.items.some((item: any) => !teacherId || item.teacherId === String(teacherId));
@@ -4075,7 +4077,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (teacherId && sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
   const effectiveRoomNumber = String(roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
   const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && item.isLocked === true);
   if (lockedSlot) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan beddelin.' }); return; }
   const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
@@ -4083,20 +4085,22 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
     res.status(400).json({ error: 'This second-shift period would finish after the school closing time configured in School Setup.' }); return;
   }
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), termId, sectionId: req.body?.sectionId ? String(req.body.sectionId) : null, assignmentId: req.body?.assignmentId ? String(req.body.assignmentId) : undefined, roomId: req.body?.roomId ? String(req.body.roomId) : null, dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
   const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
-  try { await db.replaceTimetableForClass(school.id, String(classId), slots); }
+  try { await db.replaceTimetableForClassTerm(school.id, String(classId), termId, slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
   res.status(201).json(slot);
 });
 
 apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
+  const termId = String(req.query.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
   const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber));
   if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
   const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber)));
-  try { await db.replaceTimetableForClass(school.id, String(req.params.classId), next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
+  try { await db.replaceTimetableForClassTerm(school.id, String(req.params.classId), termId, next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
   res.json({ success: true });
 });
 
@@ -4135,11 +4139,13 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
 apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const classId = String(req.body?.classId || '');
+  const termId = String(req.body?.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
   const [assignments, allSlots, unavailable, settings] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id)
   ]);
@@ -4212,6 +4218,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       id: `tt-${randomUUID()}`,
       schoolId: school.id,
       classId,
+      termId,
       dayOfWeek: day,
       periodNumber: period,
       ...getTimetablePeriodTimes(settings, period, targetShift),
@@ -4231,7 +4238,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
     res.json({ slots: lockedForClass, unfilled, withoutTeacher: lockedForClass.filter((slot: any) => !slot.teacherId).length, skipped: true, reason: 'Wax cashar cusub ah lama meelayn; jadwalkii hore waa la ilaaliyey.' });
     return;
   }
-  try { await db.replaceTimetableForClass(school.id, classId, generated); }
+  try { await db.replaceTimetableForClassTerm(school.id, classId, termId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
   res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
 });
@@ -4239,12 +4246,14 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
 apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   if (req.body?.allClasses !== true) { res.status(400).json({ error: 'Confirm that all active classes should be regenerated.' }); return; }
+  const termId = String(req.body?.termId || '');
+  if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
   if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
 
   const [assignments, allSlots, unavailable, settings, allClassRows] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('timetable_slots', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
+    queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id),
     queryAllRows('classes', { school_id: school.id }, 'id,shift')
@@ -4318,7 +4327,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       }).sort((left, right) => left.score - right.score);
       const { day, period } = ranked[0];
       const slot: TimetableSlot = {
-        id: `tt-${randomUUID()}`, schoolId: school.id, classId: klass.id,
+        id: `tt-${randomUUID()}`, schoolId: school.id, classId: klass.id, termId,
         dayOfWeek: day, periodNumber: period,
         ...getTimetablePeriodTimes(settings, period, targetShift),
         subjectId: assignment.subjectId, teacherId: assignment.teacherId || '',
@@ -4354,17 +4363,17 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   }
 
   const previousByClass = new Map<string, TimetableSlot[]>();
-  for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId));
+  for (const replacement of replacements) previousByClass.set(replacement.classId, allSlots.filter((slot: any) => slot.classId === replacement.classId && slot.termId === termId));
   const written: string[] = [];
   try {
     for (const replacement of replacements) {
-      await db.replaceTimetableForClass(school.id, replacement.classId, replacement.slots);
+      await db.replaceTimetableForClassTerm(school.id, replacement.classId, termId, replacement.slots);
       written.push(replacement.classId);
     }
   } catch {
     // Restore any class timetable already replaced if a later class write fails.
     for (const classId of written.reverse()) {
-      try { await db.replaceTimetableForClass(school.id, classId, previousByClass.get(classId) || []); } catch { /* surfaced as a failed bulk operation */ }
+      try { await db.replaceTimetableForClassTerm(school.id, classId, termId, previousByClass.get(classId) || []); } catch { /* surfaced as a failed bulk operation */ }
     }
     res.status(409).json({ error: 'Bulk generation could not be completed. Previously replaced class timetables were restored where possible.' });
     return;
