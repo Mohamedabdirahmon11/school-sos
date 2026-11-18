@@ -284,11 +284,6 @@ export interface SchoolClass {
   isArchived?: boolean;
   /** Morning (1) or afternoon (2) school session. */
   shift?: 1 | 2;
-  isLocked?: boolean;
-  termId?: string;
-  sectionId?: string | null;
-  assignmentId?: string;
-  roomId?: string | null;
 }
 
 export interface Subject {
@@ -317,6 +312,11 @@ export interface TimetableSlot {
   teacherName?: string;
   className?: string;
   shift?: 1 | 2;
+  isLocked?: boolean;
+  termId?: string;
+  sectionId?: string | null;
+  assignmentId?: string;
+  roomId?: string | null;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
