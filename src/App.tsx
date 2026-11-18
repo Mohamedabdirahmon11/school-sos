@@ -255,7 +255,7 @@ const AppContent: React.FC = () => {
               <ParentsView />
             )}
             {activeView === 'sch_classes' && (
-              <ClassesSubjectsView />
+              <ClassesView />
             )}
             {activeView === 'sch_subjects' && (
               <SubjectsView />
