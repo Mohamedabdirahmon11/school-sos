@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
   CONSTRAINT teacher_assignments_class_school_fk
     FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT teacher_assignments_curriculum_school_fk
+    FOREIGN KEY (school_id, class_id, subject_id)
+    REFERENCES public.class_subjects(school_id, class_id, subject_id) ON DELETE CASCADE,
   CONSTRAINT teacher_assignments_section_school_fk
     FOREIGN KEY (section_id, school_id)
     REFERENCES public.class_sections(id, school_id) ON DELETE CASCADE,
