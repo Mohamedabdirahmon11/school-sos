@@ -4206,14 +4206,16 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  const [assignments, allSlots, unavailable, settings, teacherAssignments, rooms] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, teacherAssignments, rooms, subjectRows] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id),
     queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
-    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity')
+    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
+  const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
   const timetableAssignments = assignments.items.map((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
     const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
@@ -4235,10 +4237,18 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   const occupiedRooms = new Set(sameShiftExisting.filter((slot: any) => klass.roomNumber && String(slot.roomNumber || '').toLowerCase() === String(klass.roomNumber).toLowerCase()).map((slot: any) => `${slot.dayOfWeek}:${slot.periodNumber}`));
   const blocked = new Set(unavailable.flatMap((item: any) => item.periodNumber == null ? Array.from({ length: 8 }, (_value, index) => `${item.dayOfWeek}:${index + 1}:${item.teacherId}`) : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
   const generated: TimetableSlot[] = [...lockedForClass];
+  for (const slot of lockedForClass) {
+    dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
+    periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
+    subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+    if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
+  }
   const unfilled: Array<{ subjectId: string; teacherId: string; occurrence: number }> = [];
   const dayLoad = new Map<string, number>();
   const periodLoad = new Map<number, number>();
   const subjectDayLoad = new Map<string, number>();
+  const teacherDayLoad = new Map<string, number>();
+  const warnings: string[] = [];
   const lessonQueue: any[] = [];
   for (const assignment of schedulableAssignments) {
     for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) {
@@ -4273,10 +4283,15 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
       const classDayCount = dayLoad.get(day) || 0;
       const periodCount = periodLoad.get(period) || 0;
-      // Strongly avoid consecutive identical subjects; spread repeated lessons
-      // across different days and balance the class workload by day/period.
+      const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
+      const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
+      const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
+      // Spread each subject, balance teacher workload and place core subjects earlier.
       const score = (hasAdjacentSameSubject ? 1000 : 0)
+        + (sameSubjectCount >= 2 ? 500 : 0)
         + sameSubjectCount * 35
+        + teacherCount * 5
+        + (heavySubject ? period * 8 : 0)
         + classDayCount * 3
         + periodCount * 1.5
         + (assignment.occurrence / 1000);
@@ -4299,7 +4314,9 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       roomId: rooms.find((room: any) => String(room.name).trim().toLowerCase() === String(klass.roomNumber || '').trim().toLowerCase())?.id || null,
       roomNumber: klass.roomNumber || ''
     });
-    if (teacherKey) occupied.add(teacherKey);
+    if (teacherKey) { occupied.add(teacherKey); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
+    const priorSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+    if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
     dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
     periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
     subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
@@ -4313,7 +4330,7 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   }
   try { await db.replaceTimetableForClassTerm(school.id, classId, termId, generated); }
   catch { res.status(409).json({ error: 'Generated timetable conflicts with an existing teacher assignment. No changes were applied.' }); return; }
-  res.json({ slots: generated, unfilled, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generated, unfilled, warnings, withoutTeacher: generated.filter(slot => !slot.teacherId).length });
 });
 
 apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -4324,15 +4341,17 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
   if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
 
-  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments, rooms] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments, rooms, subjectRows] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number'),
     db.getTimetableSettings(school.id),
     queryAllRows('classes', { school_id: school.id }, 'id,shift'),
     queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
-    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity')
+    queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
+  const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
   const timetableAssignments = assignments.map((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
     const selected = matches.find((candidate: any) => candidate.termId === termId) || matches[0];
@@ -4363,9 +4382,17 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       : [`${item.dayOfWeek}:${item.periodNumber}:${item.teacherId}`]));
     const lockedForClass = allSlots.filter((slot: any) => slot.classId === klass.id && slot.isLocked === true);
     const generatedForClass: TimetableSlot[] = [...lockedForClass];
+    for (const slot of lockedForClass) {
+      dayLoad.set(slot.dayOfWeek, (dayLoad.get(slot.dayOfWeek) || 0) + 1);
+      periodLoad.set(slot.periodNumber, (periodLoad.get(slot.periodNumber) || 0) + 1);
+      subjectDayLoad.set(`${slot.subjectId}:${slot.dayOfWeek}`, (subjectDayLoad.get(`${slot.subjectId}:${slot.dayOfWeek}`) || 0) + 1);
+      if (slot.teacherId) teacherDayLoad.set(`${slot.teacherId}:${slot.dayOfWeek}`, (teacherDayLoad.get(`${slot.teacherId}:${slot.dayOfWeek}`) || 0) + 1);
+    }
     const dayLoad = new Map<string, number>();
     const periodLoad = new Map<number, number>();
     const subjectDayLoad = new Map<string, number>();
+  const teacherDayLoad = new Map<string, number>();
+  const warnings: string[] = [];
     const lessonQueue: any[] = [];
     for (const assignment of schedulable) {
       for (let occurrence = 1; occurrence <= Number(assignment.periodsPerWeek); occurrence += 1) lessonQueue.push({ ...assignment, occurrence });
@@ -4398,8 +4425,15 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
         const { day, period } = candidate;
         const sameSubjectToday = generatedForClass.filter(slot => slot.dayOfWeek === day && slot.subjectId === assignment.subjectId);
         const hasAdjacentSameSubject = sameSubjectToday.some(slot => Math.abs(slot.periodNumber - period) === 1);
+        const sameSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+        const teacherCount = assignment.teacherId ? (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) : 0;
+        const subjectName = subjectNameById.get(assignment.subjectId) || assignment.subjectId;
+        const heavySubject = /math|mathemat|xisaab|science|saynis|english|ingiriis/i.test(subjectName);
         const score = (hasAdjacentSameSubject ? 1000 : 0)
-          + (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) * 35
+          + (sameSubjectCount >= 2 ? 500 : 0)
+          + sameSubjectCount * 35
+          + teacherCount * 5
+          + (heavySubject ? period * 8 : 0)
           + (dayLoad.get(day) || 0) * 3
           + (periodLoad.get(period) || 0) * 1.5
           + (assignment.occurrence / 1000);
@@ -4416,7 +4450,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
         roomNumber: klass.roomNumber || ''
       };
       generatedForClass.push(slot);
-      if (assignment.teacherId) occupied.add(`${day}:${period}:${assignment.teacherId}`);
+      if (assignment.teacherId) { occupied.add(`${day}:${period}:${assignment.teacherId}`); teacherDayLoad.set(`${assignment.teacherId}:${day}`, (teacherDayLoad.get(`${assignment.teacherId}:${day}`) || 0) + 1); }
+      const priorSubjectCount = subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0;
+      if (priorSubjectCount >= 2) warnings.push(`${subjectNameById.get(assignment.subjectId) || assignment.subjectId} waxaa maalintii la dhigay in ka badan laba jeer (${day}).`);
       dayLoad.set(day, (dayLoad.get(day) || 0) + 1);
       periodLoad.set(period, (periodLoad.get(period) || 0) + 1);
       subjectDayLoad.set(`${assignment.subjectId}:${day}`, (subjectDayLoad.get(`${assignment.subjectId}:${day}`) || 0) + 1);
@@ -4440,7 +4476,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   }
 
   if (req.body?.previewOnly === true) {
-    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+    res.json({ preview: true, slots: generatedSlots, unfilled, skipped, warnings, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
     return;
   }
 
@@ -4460,7 +4496,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     res.status(409).json({ error: 'Bulk generation could not be completed. Previously replaced class timetables were restored where possible.' });
     return;
   }
-  res.json({ slots: generatedSlots, unfilled, skipped, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
+  res.json({ slots: generatedSlots, unfilled, skipped, warnings, generatedClassIds: replacements.map(item => item.classId), withoutTeacher: generatedSlots.filter(slot => !slot.teacherId).length });
 });
 
 
