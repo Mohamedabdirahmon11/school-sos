@@ -5907,9 +5907,10 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
         after_data: { status: row.status, note: row.note }, changed_by: user.id
       };
     });
+    const submittedAt = session?.submitted_at || markedAt;
     const [{ error: auditError }, { data: updatedSession, error: sessionUpdateError }] = await Promise.all([
       client.from('attendance_audit_logs').insert(auditRows),
-      client.from('attendance_sessions').update({ submitted_at: markedAt, is_locked: false, updated_at: markedAt })
+      client.from('attendance_sessions').update({ submitted_at: submittedAt, is_locked: false, updated_at: markedAt })
         .eq('id', session.id).eq('school_id', school.id).select().single()
     ]);
     if (sessionUpdateError) { res.status(503).json({ error: 'Xaadirinta waa la kaydiyey, balse xaaladdeeda lama cusboonaysiin karin. La xiriir maamulka.' }); return; }
