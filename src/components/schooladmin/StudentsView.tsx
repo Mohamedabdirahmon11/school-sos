@@ -217,6 +217,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     } catch (error: any) { setModalError(error?.message || 'Unable to update student information.'); }
   };
 
+  const handleStudentWithdraw = async () => {
+    if (isReadOnly || !selectedStudent || !selectedAcademicYearId) return;
+    if (!confirm(`Withdraw ${selectedStudent.firstName} ${selectedStudent.lastName} from the selected academic year? Their records will be retained.`)) return;
+    setEnrollmentBusy(true);
+    setModalError(null);
+    try {
+      await ApiClient.transferStudent(selectedStudent.id, { academicYearId: selectedAcademicYearId, action: 'withdraw' });
+      setEnrollmentRows(await ApiClient.getStudentEnrollments(selectedStudent.id));
+      await fetchStudents();
+      setNotice('Student withdrawn. Their academic and financial history was retained.');
+    } catch (error:any) { setModalError(error?.message || 'Student withdrawal failed.'); }
+    finally { setEnrollmentBusy(false); }
+  };
+
   const handleStudentTransfer = async () => {
     if (isReadOnly || !selectedStudent || !selectedAcademicYearId || !transferClassId) return;
     setEnrollmentBusy(true);
@@ -694,6 +708,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                     {classes.filter(item=>!item.isArchived && item.id!==selectedStudent.classId).map(item=><option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}
                   </select>
                   <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Transfer student'}</button>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !selectedAcademicYearId} onClick={()=>void handleStudentWithdraw()} className="w-full rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">Withdraw student (keep records)</button>
                 </div>
               </div>
             )}
