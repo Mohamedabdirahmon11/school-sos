@@ -47,7 +47,7 @@ export const AttendanceAdminWorkspace: React.FC = () => {
     catch (e) { setError(e instanceof Error ? e.message : 'Dejinta lama kaydin karin.'); }
     finally { setSettingsBusy(false); }
   };
-  useEffect(() => { setDate(todayIso(school?.timezone)); setMonth(todayIso(school?.timezone).slice(0, 7)); void loadSettings(); }, [school?.id, school?.timezone]);
+  useEffect(() => { setDate(todayIso(school?.timezone)); setMonth(todayIso(school?.timezone).slice(0, 7)); setReportStartDate(todayIso(school?.timezone)); setReportEndDate(todayIso(school?.timezone)); void loadSettings(); }, [school?.id, school?.timezone]);
   useEffect(() => { if (tab === 'students') void loadStudents(); if (tab === 'teachers') void loadTeachers(); }, [tab, date, month]);
 
   const teacherOptions = teacherData?.teachers || [];
