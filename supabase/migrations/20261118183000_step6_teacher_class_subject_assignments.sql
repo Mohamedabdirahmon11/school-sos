@@ -11,10 +11,13 @@ BEGIN
   END IF;
   IF to_regclass('public.terms') IS NOT NULL THEN
     EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS terms_id_school_id_uidx ON public.terms (id, school_id)';
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS terms_id_year_school_uidx ON public.terms (id, academic_year_id, school_id)';
   END IF;
-END $;
+END $step6$;
 CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_id_uidx
   ON public.class_sections (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS class_sections_assignment_scope_uidx
+  ON public.class_sections (id, legacy_class_id, school_id);
 
 ALTER TABLE public.teachers
   ADD COLUMN IF NOT EXISTS max_periods_per_week integer;
@@ -42,9 +45,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
   CONSTRAINT teacher_assignments_class_school_fk
     FOREIGN KEY (class_id, school_id)
     REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
-  CONSTRAINT teacher_assignments_section_school_fk
-    FOREIGN KEY (section_id, school_id)
-    REFERENCES public.class_sections(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT teacher_assignments_section_class_school_fk
+    FOREIGN KEY (section_id, class_id, school_id)
+    REFERENCES public.class_sections(id, legacy_class_id, school_id) ON DELETE CASCADE,
   CONSTRAINT teacher_assignments_subject_school_fk
     FOREIGN KEY (subject_id, school_id)
     REFERENCES public.subjects(id, school_id) ON DELETE CASCADE,
@@ -65,14 +68,14 @@ BEGIN
     END IF;
   END IF;
   IF to_regclass('public.terms') IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teacher_assignments_term_school_fk') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teacher_assignments_term_year_school_fk') THEN
       ALTER TABLE public.teacher_class_subject_assignments
-        ADD CONSTRAINT teacher_assignments_term_school_fk
-        FOREIGN KEY (term_id, school_id)
-        REFERENCES public.terms(id, school_id) ON DELETE CASCADE;
+        ADD CONSTRAINT teacher_assignments_term_year_school_fk
+        FOREIGN KEY (term_id, academic_year_id, school_id)
+        REFERENCES public.terms(id, academic_year_id, school_id) ON DELETE CASCADE;
     END IF;
   END IF;
-END $;
+END $step6$;
 
 -- NULL term means the whole academic year; NULL section means the whole class.
 CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique
@@ -101,7 +104,7 @@ BEGIN
     WHERE cs.is_active = true AND cs.teacher_id IS NOT NULL
     ON CONFLICT DO NOTHING;
   END IF;
-END $;
+END $step6$;
 
 CREATE INDEX IF NOT EXISTS teacher_class_subject_assignments_teacher_idx
   ON public.teacher_class_subject_assignments (school_id, teacher_id, academic_year_id, term_id);
