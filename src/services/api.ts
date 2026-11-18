@@ -745,8 +745,8 @@ export class ApiClient {
     const params = new URLSearchParams();
     if (termId) params.set('termId', termId);
     if (sectionId) params.set('sectionId', sectionId);
-    const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}${query}`, { method: 'DELETE' });
+    const query = params.toString();
+    return this.request<{ success: boolean }>(`/timetable/${encodeURIComponent(classId)}/${encodeURIComponent(dayOfWeek)}/${periodNumber}?${query}`, { method: 'DELETE' });
   }
 
   public static async swapTimetableSlots(firstSlotId: string, secondSlotId: string) {
