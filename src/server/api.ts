@@ -4187,16 +4187,17 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   if (teacherId && sameShiftSlots.some((slot: any) => slot.teacherId === teacherId)) { res.status(409).json({ error: 'Teacher is already assigned to another class in this shift and period.' }); return; }
   const effectiveRoomNumber = String((roomId ? room.items[0]?.name : '') || roomNumber || klass.roomNumber || '').trim();
   if (effectiveRoomNumber && sameShiftSlots.some((slot: any) => String(slot.roomNumber || '').trim().toLowerCase() === effectiveRoomNumber.toLowerCase())) { res.status(409).json({ error: 'This classroom is already occupied in this shift and period.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
-  const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && item.isLocked === true);
+  const effectiveSectionId = selectedStep6Assignment?.sectionId || (req.body?.sectionId ? String(req.body.sectionId) : null);
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  const lockedSlot = current.items.find((item: any) => item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId && item.isLocked === true);
   if (lockedSlot) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan beddelin.' }); return; }
   const periodTimes = getTimetablePeriodTimes(settings, period, targetShift);
   const closingTime = school.setupData?.workingHours?.closingTime;
   if (targetShift === 2 && closingTime && timetableMinutes(periodTimes.endTime) > timetableMinutes(closingTime)) {
     res.status(400).json({ error: 'This second-shift period would finish after the school closing time configured in School Setup.' }); return;
   }
-  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), termId, sectionId: selectedStep6Assignment?.sectionId || (req.body?.sectionId ? String(req.body.sectionId) : null), assignmentId: selectedStep6Assignment?.id || (req.body?.assignmentId ? String(req.body.assignmentId) : undefined), roomId: roomId || null, dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
-  const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period)), slot];
+  const slot: TimetableSlot = { id: `tt-${randomUUID()}`, schoolId: school.id, classId: String(classId), termId, sectionId: effectiveSectionId, assignmentId: selectedStep6Assignment?.id || (req.body?.assignmentId ? String(req.body.assignmentId) : undefined), roomId: roomId || null, dayOfWeek, periodNumber: period, ...periodTimes, subjectId: String(subjectId), teacherId: String(teacherId || ''), roomNumber: effectiveRoomNumber };
+  const slots = [...current.items.filter((item: any) => !(item.dayOfWeek === dayOfWeek && item.periodNumber === period && (item.sectionId || null) === effectiveSectionId)), slot];
   try { await db.replaceTimetableForClassTerm(school.id, String(classId), termId, slots); }
   catch (error: any) { const message = error?.message || 'Unable to save this timetable period.'; res.status(message.toLowerCase().includes('conflict') ? 409 : 503).json({ error: message }); return; }
   res.status(201).json(slot);
@@ -4206,10 +4207,11 @@ apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, re
   const school = (req as any).school;
   const termId = String(req.query.termId || '');
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
-  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked');
-  const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber));
+  const sectionId = typeof req.query.sectionId === 'string' && req.query.sectionId ? String(req.query.sectionId) : null;
+  const current = await db.queryPage('timetable_slots', { school_id: school.id, class_id: String(req.params.classId), term_id: termId, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
+  const target = current.items.find((slot: any) => slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId);
   if (target?.isLocked) { res.status(409).json({ error: 'Casharkan waa xiran yahay. Marka hore fur ka hor intaadan tirtirin.' }); return; }
-  const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber)));
+  const next = current.items.filter((slot: any) => !(slot.dayOfWeek === req.params.dayOfWeek && slot.periodNumber === Number(req.params.periodNumber) && (slot.sectionId || null) === sectionId));
   try { await db.replaceTimetableForClassTerm(school.id, String(req.params.classId), termId, next); } catch { res.status(503).json({ error: 'Unable to remove this timetable period.' }); return; }
   res.json({ success: true });
 });
