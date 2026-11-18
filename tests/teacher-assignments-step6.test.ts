@@ -21,7 +21,7 @@ test('Step 6 tables have tenant RLS and composite same-school relationships', ()
   assert.match(migration, /auth_user_role\(\)::text = 'school_admin'/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.teacher_assignment_audit/);
   assert.match(migration, /FOREIGN KEY \(teacher_id, school_id\)[\s\S]*REFERENCES public\.teachers\s*\(id, school_id\)/);
-  assert.match(migration, /FOREIGN KEY \(subject_id, school_id\)[\s\S]*REFERENCES public\.subjects \(id, school_id\)/);
+  assert.match(migration, /FOREIGN KEY \(subject_id, school_id\)[\s\S]*REFERENCES public\.subjects\s*\(id, school_id\)/);
   assert.match(migration, /teacher_class_subject_assignment_unique/);
 });
 
