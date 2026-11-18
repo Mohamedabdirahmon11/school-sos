@@ -66,7 +66,7 @@ export const SubjectsView: React.FC = () => {
   };
 
   const remove = async (subject: Subject) => {
-    if (!window.confirm(`Ma hubtaa inaad tirtirayso maaddada "${subject.name}"?`)) return;
+    if (!window.confirm(`${tx('confirmDelete',{name:subject.name})}`)) return;
     setError('');
     setBusy(true);
     try {
@@ -86,10 +86,10 @@ export const SubjectsView: React.FC = () => {
     <div className="mx-auto min-w-0 w-full max-w-5xl space-y-6 p-5 md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#102522] dark:text-white">Maaddooyin</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Maamul maaddooyinka uu dugsigu dhigto.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#102522] dark:text-white">{tx('title')}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tx('subtitle')}</p>
         </div>
-        <span className="rounded-full bg-[#E7F4F0] px-3 py-1.5 text-xs font-semibold text-[#0F766E]">{subjects.length} maaddo</span>
+        <span className="rounded-full bg-[#E7F4F0] px-3 py-1.5 text-xs font-semibold text-[#0F766E]">{subjects.length} {tx('count')}</span>
       </header>
 
       {notice && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
@@ -103,31 +103,31 @@ export const SubjectsView: React.FC = () => {
           </button>
         </div>
         <form onSubmit={save} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Magaca maaddada *
-            <input value={name} onChange={event => setName(event.target.value)} maxLength={150} required disabled={busy || isReadOnly} placeholder="Tusaale: Soomaali" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('name')} *
+            <input value={name} onChange={event => setName(event.target.value)} maxLength={150} required disabled={busy || isReadOnly} placeholder={tx('namePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
           </label>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Koodh (ikhtiyaari)
-            <input value={code} onChange={event => setCode(event.target.value.toUpperCase().slice(0, 6))} maxLength={6} disabled={busy || isReadOnly} placeholder="SOM" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal uppercase text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('code')}
+            <input value={code} onChange={event => setCode(event.target.value.toUpperCase().slice(0, 6))} maxLength={6} disabled={busy || isReadOnly} placeholder={tx('codePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal uppercase text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
           </label>
           <div className="flex gap-2">
             <button type="submit" disabled={busy || isReadOnly || !name.trim()} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50"><Plus className="h-4 w-4" />{editing ? tx('save') : tx('add')}</button>
-            {editing && <button type="button" onClick={resetForm} className="rounded-xl border border-slate-300 px-3 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300" aria-label="Jooji wax ka beddelka"><X className="h-4 w-4" /></button>}
+            {editing && <button type="button" onClick={resetForm} className="rounded-xl border border-slate-300 px-3 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300" aria-label={tx('cancel')}><X className="h-4 w-4" /></button>}
           </div>
         </form>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-[#132A29] dark:text-white">Liiska maaddooyinka</h2>
-          <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Raadi maaddo..." aria-label="Raadi maaddo" className="w-full rounded-xl border border-slate-300 bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
+          <h2 className="text-base font-bold text-[#132A29] dark:text-white">{tx('list')}</h2>
+          <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder={tx('search')} aria-label={tx('search')} className="w-full rounded-xl border border-slate-300 bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
         </div>
         {visible.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700">{search ? tx('noResults') : tx('empty')}</div> : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {visible.map(subject => <article key={subject.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="min-w-0"><h3 className="truncate text-sm font-bold text-[#132A29] dark:text-white">{subject.name}</h3>{subject.code && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">{subject.code}</span>}</div>
               <div className="flex shrink-0 gap-1">
-                <button type="button" disabled={busy || isReadOnly} onClick={() => { setEditing(subject); setName(subject.name); setCode(subject.code || ''); setError(''); }} aria-label={`Wax ka beddel ${subject.name}`} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50 dark:border-slate-600"><Pencil className="h-4 w-4" /></button>
-                <button type="button" disabled={busy || isReadOnly} onClick={() => void remove(subject)} aria-label={`Tirtir ${subject.name}`} className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" disabled={busy || isReadOnly} onClick={() => { setEditing(subject); setName(subject.name); setCode(subject.code || ''); setError(''); }} aria-label={`${tx('edit')} ${subject.name}`} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50 dark:border-slate-600"><Pencil className="h-4 w-4" /></button>
+                <button type="button" disabled={busy || isReadOnly} onClick={() => void remove(subject)} aria-label={`${tx('delete')} ${subject.name}`} className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
               </div>
             </article>)}
           </div>
