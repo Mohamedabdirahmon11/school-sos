@@ -3596,7 +3596,7 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
   const normalized = inputs.map((item: any) => ({ classId: String(item?.classId || ''), teacherId: item?.teacherId ? String(item.teacherId) : undefined, periodsPerWeek: Number(item?.periodsPerWeek), smallExamEnabled: item?.smallExamEnabled === true, bigExamEnabled: item?.bigExamEnabled === true }));
   const classIds = normalized.map((item: any) => item.classId);
   const teacherIds = normalized.map((item: any) => item.teacherId).filter(Boolean);
-  if (new Set(classIds).size !== classIds.length || normalized.some((item: any) => !item.classId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 30)) { res.status(400).json({ error: 'Each class must be unique and periods per week must be between 1 and 30.' }); return; }
+  if (new Set(classIds).size !== classIds.length || normalized.some((item: any) => !item.classId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 12)) { res.status(400).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 12.' }); return; }
   const [classes, teachers] = await Promise.all([
     classIds.length ? db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 500, undefined, 'id,is_archived') : Promise.resolve({ items: [] as any[], total: 0 }),
     teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 500, undefined, 'id') : Promise.resolve({ items: [] as any[], total: 0 })
@@ -3604,6 +3604,15 @@ apiRouter.put('/subjects/:id/assignments', requireAuth, requireSchoolContext, as
   if (classes.items.length !== classIds.length || classes.items.some((item: any) => item.isArchived)) { res.status(400).json({ error: 'One or more classes are unavailable in this school.' }); return; }
   if (teachers.items.length !== new Set(teacherIds).size) { res.status(400).json({ error: 'One or more teachers do not belong to this school.' }); return; }
   try {
+    const capacity = await getClassCurriculumCapacity(school.id);
+    for (const item of normalized) {
+      const currentRows = await readClassCurriculumRows(school.id, item.classId);
+      const otherTotal = currentRows.filter((row: any) => row.is_active !== false && row.subject_id !== subject.id)
+        .reduce((sum: number, row: any) => sum + Number(row.periods_per_week || 0), 0);
+      if (otherTotal + item.periodsPerWeek > capacity.weeklyCapacity) {
+        res.status(400).json({ error: `Wadarta xiisadaha fasalka waxay ka badanaysaa awoodda ${capacity.weeklyCapacity} xiisad toddobaadkii.` }); return;
+      }
+    }
     await db.saveSubjectAssignments(school.id, subject.id, normalized);
   } catch { res.status(503).json({ error: 'Unable to save subject assignments. No assignment changes were applied.' }); return; }
   db.logAudit({ action: 'SUBJECT_CLASS_ASSIGNMENTS_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Saved ${normalized.length} class assignment(s) for subject ${subject.name}.`, severity: 'info' });
