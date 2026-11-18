@@ -1175,6 +1175,67 @@ export class ApiClient {
     });
   }
 
+  public static getTeacherAttendanceOverview() {
+    return this.request<any>('/teacher/attendance/overview');
+  }
+
+  public static getAttendanceSettings() {
+    return this.request<{ attendanceMode: 'daily' | 'per_period'; editWindowHours: number; lateThresholdMinutes: number }>('/attendance/settings');
+  }
+
+  public static updateAttendanceSettings(settings: { attendanceMode: 'daily' | 'per_period'; editWindowHours: number; lateThresholdMinutes: number }) {
+    return this.request<any>('/attendance/settings', { method: 'PUT', body: JSON.stringify(settings) });
+  }
+
+  public static getAttendanceSession(params: { classId: string; date: string; periodId?: string | null; subjectId?: string | null; sectionId?: string | null }) {
+    const query = new URLSearchParams({ classId: params.classId, date: params.date });
+    if (params.periodId) query.set('periodId', params.periodId);
+    if (params.subjectId) query.set('subjectId', params.subjectId);
+    if (params.sectionId) query.set('sectionId', params.sectionId);
+    return this.request<any>('/attendance/session?' + query.toString());
+  }
+
+  public static submitAttendanceSession(payload: { classId: string; date: string; periodId?: string | null; subjectId?: string | null; sectionId?: string | null; records: Array<{ studentId: string; status: AttendanceStatus; note?: string }> }) {
+    return this.request<any>('/attendance/session', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  public static getAttendanceDashboard(date: string) {
+    return this.request<any>('/attendance/dashboard?date=' + encodeURIComponent(date));
+  }
+
+  public static getAttendanceSessions(date: string) {
+    return this.request<any[]>('/attendance/sessions?date=' + encodeURIComponent(date));
+  }
+
+  public static unlockAttendanceSession(sessionId: string, reason: string) {
+    return this.request<any>('/attendance/sessions/' + encodeURIComponent(sessionId) + '/unlock', { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+
+  public static getAttendanceReport(params: { startDate: string; endDate: string; classId?: string; subjectId?: string }) {
+    const query = new URLSearchParams({ startDate: params.startDate, endDate: params.endDate });
+    if (params.classId) query.set('classId', params.classId);
+    if (params.subjectId) query.set('subjectId', params.subjectId);
+    return this.request<any>('/attendance/report?' + query.toString());
+  }
+
+  public static async downloadAttendanceReportCsv(params: { startDate: string; endDate: string; classId?: string; subjectId?: string }) {
+    const query = new URLSearchParams({ startDate: params.startDate, endDate: params.endDate, format: 'csv' });
+    if (params.classId) query.set('classId', params.classId);
+    if (params.subjectId) query.set('subjectId', params.subjectId);
+    const response = await fetch('/api/attendance/report?' + query.toString(), { credentials: 'include' });
+    if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || 'Attendance export failed.'); }
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'attendance-' + params.startDate + '-' + params.endDate + '.csv'; anchor.click(); URL.revokeObjectURL(url);
+  }
+
+  public static getTeacherAttendance(month: string) {
+    return this.request<any>('/attendance/teachers?month=' + encodeURIComponent(month));
+  }
+
+  public static saveTeacherAttendance(payload: { teacherId: string; date: string; status: 'present' | 'absent' | 'late' | 'on_leave'; checkIn?: string | null; checkOut?: string | null; note?: string }) {
+    return this.request<any>('/attendance/teachers', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
   // Exams & Results
   public static async getExamConfig() {
     return this.request<ExamConfig>('/exams/config');
