@@ -585,16 +585,16 @@ export class ApiClient {
     return this.request('/class-groups',{method:'POST',body:JSON.stringify({name,sections})});
   }
   public static async renameClassGroup(id:string,name:string) {
-    return this.request('/class-groups/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify({name})});
+    return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({name})});
   }
   public static async deleteClassGroup(id:string) {
-    return this.request('/class-groups/'+encodeURIComponent(id),{method:'DELETE'});
+    return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'DELETE'});
   }
   public static async addClassSection(id:string,name:string) {
     return this.request('/class-groups/'+encodeURIComponent(id)+'/sections',{method:'POST',body:JSON.stringify({name})});
   }
   public static async deleteClassSection(id:string) {
-    return this.request('/class-sections/'+encodeURIComponent(id),{method:'DELETE'});
+    return this.request(`/class-sections/${encodeURIComponent(id)}`,{method:'DELETE'});
   }
   public static async createDefaultClassGroups() {
     return this.request<{created:number;skipped:number}>('/class-groups/defaults',{method:'POST'});
