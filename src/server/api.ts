@@ -5717,7 +5717,7 @@ apiRouter.post('/attendance/session', requireAuth, requireSchoolContext, require
     const previousByStudent = new Map((previousRows || []).map((row: any) => [String(row.student_id), row]));
     const markedAt = now.toISOString();
     const payload = records.map((row: any) => {
-      const key = [school.id, classId, row.studentId, date, periodId || 'daily'].join('\u0000');
+      const key = periodId ? [school.id, classId, row.studentId, date, periodId].join('\\u0000') : [school.id, classId, row.studentId, date].join('\\u0000');
       const id = 'att-' + createHash('sha256').update(key).digest('hex').slice(0, 32);
       return {
         id, school_id: school.id, class_id: classId, section_id: sectionId, period_id: periodId,
