@@ -5945,12 +5945,24 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
   const date = typeof req.query.date === 'string' ? req.query.date : attendanceLocalDate(school.timezone || 'Africa/Addis_Ababa');
   if (!attendanceDateIsValid(date)) { res.status(400).json({ error: 'Taariikh sax ah ayaa loo baahan yahay.' }); return; }
   const client = documentServiceClient(res); if (!client) return;
-  const [{ data: classes }, { data: students }, { data: records }, { data: sessions }] = await Promise.all([
+  const [{ data: classes }, { data: year }, { data: records }, { data: sessions }] = await Promise.all([
     client.from('classes').select('id,name,section').eq('school_id', school.id).eq('is_archived', false),
-    client.from('students').select('id,class_id,student_id,first_name,middle_name,last_name,father_phone,mother_phone').eq('school_id', school.id).eq('status', 'active'),
+    client.from('academic_years').select('id').eq('school_id', school.id).eq('is_current', true).maybeSingle(),
     client.from('attendance_records').select('id,class_id,student_id,status,note,period_id,subject_id').eq('school_id', school.id).eq('date', date),
     client.from('attendance_sessions').select('id,class_id,period_id,subject_id,teacher_id,submitted_at,is_locked').eq('school_id', school.id).eq('date', date)
   ]);
+  const { data: enrollments, error: enrollmentError } = year?.id
+    ? await client.from('enrollments').select('student_id,class_id').eq('school_id', school.id).eq('academic_year_id', year.id).eq('status', 'active')
+    : { data: [], error: null };
+  if (enrollmentError) { res.status(503).json({ error: 'Diiwaangelinta sanadkan lama soo dejin karin.' }); return; }
+  const enrolledStudentIds = [...new Set((enrollments || []).map((row: any) => row.student_id))];
+  const { data: students, error: studentError } = enrolledStudentIds.length
+    ? await client.from('students').select('id,student_id,first_name,middle_name,last_name,father_phone,mother_phone')
+      .eq('school_id', school.id).eq('status', 'active').in('id', enrolledStudentIds)
+    : { data: [], error: null };
+  if (studentError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
+  const enrollmentCountByClass = new Map<string, number>();
+  (enrollments || []).forEach((row: any) => enrollmentCountByClass.set(row.class_id, (enrollmentCountByClass.get(row.class_id) || 0) + 1));
   const studentMap = new Map((students || []).map((row: any) => [row.id, row]));
   const classMap = new Map((classes || []).map((row: any) => [row.id, row]));
   const absentStudents = (records || []).filter((row: any) => row.status === 'absent').map((row: any) => {
@@ -5963,13 +5975,13 @@ apiRouter.get('/attendance/dashboard', requireAuth, requireSchoolContext, requir
   const submittedClassIds = new Set([
     ...(sessions || []).filter((row: any) => Boolean(row.submitted_at)).map((row: any) => row.class_id),
     ...(classes || []).filter((klass: any) => {
-      const enrolled = (students || []).filter((student: any) => student.class_id === klass.id).length;
+      const enrolled = enrollmentCountByClass.get(klass.id) || 0;
       const marked = (records || []).filter((record: any) => record.class_id === klass.id).length;
       return enrolled > 0 && marked >= enrolled;
     }).map((klass: any) => klass.id)
   ]);
-  const classesNotSubmitted = (classes || []).filter((row: any) => !submittedClassIds.has(row.id));
-  res.json({ date, totalStudents: students?.length || 0, recorded: records?.length || 0,
+  const classesNotSubmitted = (classes || []).filter((row: any) => (enrollmentCountByClass.get(row.id) || 0) > 0 && !submittedClassIds.has(row.id));
+  res.json({ date, totalStudents: enrolledStudentIds.length, recorded: records?.length || 0,
     attendanceRate: denominator ? Math.round(present * 100 / denominator) : 0, absentCount: absentStudents.length,
     absentStudents, sessions: sessions || [], classesNotSubmitted, classes: classes || [] });
 });
