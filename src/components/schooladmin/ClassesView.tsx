@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import './classes-step2.css';
 import { Plus, Pencil, Trash2, X, Check, RefreshCw, Sparkles, Layers } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
