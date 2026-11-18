@@ -3238,12 +3238,14 @@ apiRouter.post('/subjects', requireAuth, requireSchoolContext, async (req, res) 
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulaha dugsiga ayaa maaddo abuuri kara.' }); return; }
   const name = normalizeSubjectName(req.body?.name);
   const code = normalizeSubjectCode(req.body?.code);
+  const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
   if (!name || name.length > 150) { res.status(400).json({ error: 'Fadlan geli magaca maaddada (ugu badnaan 150 xaraf).' }); return; }
   if (code.length > 6) { res.status(400).json({ error: 'Koodhka maaddadu waa inuu ahaadaa ugu badnaan 6 xaraf.' }); return; }
+  if (description.length > 1000) { res.status(400).json({ error: 'Faahfaahinta maaddadu kama badnaan karto 1,000 xaraf.' }); return; }
   const existing = await db.getSubjects(school.id);
   if (subjectNameExists(existing, name)) { res.status(409).json({ error: 'Maaddadan hore ayay uga jirtaa dugsigan.' }); return; }
   if (code && existing.some(item => normalizeSubjectCode(item.code) === code)) { res.status(409).json({ error: `Koodhka ${code} hore ayaa looga isticmaalay dugsigan.` }); return; }
-  const subject = db.createSubject({ schoolId: school.id, name, code, description: '', creditUnits: 0, department: '', assignedTeacherIds: [] });
+  const subject = db.createSubject({ schoolId: school.id, name, code, description, creditUnits: 0, department: '', assignedTeacherIds: [] });
   await db.flush();
   res.status(201).json(subject);
 });
@@ -3257,11 +3259,13 @@ apiRouter.put('/subjects/:id', requireAuth, requireSchoolContext, async (req, re
   if (!subject) { res.status(404).json({ error: 'Maaddada lagama helin dugsigan.' }); return; }
   const name = req.body?.name === undefined ? subject.name : normalizeSubjectName(req.body.name);
   const code = req.body?.code === undefined ? normalizeSubjectCode(subject.code) : normalizeSubjectCode(req.body.code);
+  const description = req.body?.description === undefined ? (subject.description || '') : (typeof req.body.description === 'string' ? req.body.description.trim() : '');
   if (!name || name.length > 150) { res.status(400).json({ error: 'Magaca maaddadu waa waajib, waana inuu ka yaraadaa 150 xaraf.' }); return; }
   if (code.length > 6) { res.status(400).json({ error: 'Koodhka maaddadu waa inuu ahaadaa ugu badnaan 6 xaraf.' }); return; }
+  if (description.length > 1000) { res.status(400).json({ error: 'Faahfaahinta maaddadu kama badnaan karto 1,000 xaraf.' }); return; }
   if (subjectNameExists(existing, name, subject.id)) { res.status(409).json({ error: 'Maaddo kale oo isla magacan leh ayaa dugsigan ka jirta.' }); return; }
   if (code && existing.some(item => item.id !== subject.id && normalizeSubjectCode(item.code) === code)) { res.status(409).json({ error: `Koodhka ${code} hore ayaa looga isticmaalay dugsigan.` }); return; }
-  const updated = db.updateSubject(subject.id, { name, code, id: subject.id, schoolId: school.id });
+  const updated = db.updateSubject(subject.id, { name, code, description, id: subject.id, schoolId: school.id });
   await db.flush();
   res.json(updated);
 });
