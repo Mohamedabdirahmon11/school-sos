@@ -9473,7 +9473,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && termId && x.term_id === termId);
     const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id && specific.section_id === base.section_id))];
     const cur = curriculum.data || [];
-    const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id) && !x.teacher_id)
+    const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id))
       .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
     const workload = (teachers.data || []).map((t: any) => {
       const periods = current.filter((a: any) => a.teacher_id === t.id).reduce((sum: number, a: any) => {
