@@ -13,7 +13,10 @@ const migrations = [
   read('../supabase/migrations/20261118155122_step7_backfill_current_timetable_term.sql'),
   read('../supabase/migrations/20261118155626_step7_term_scoped_timetable_replace.sql'),
   read('../supabase/migrations/20261118160647_step7_safe_term_scoped_swap.sql'),
-  read('../supabase/migrations/20261118161206_step7_time_overlap_conflict_guard.sql')
+  read('../supabase/migrations/20261118161206_step7_time_overlap_conflict_guard.sql'),
+  read('../supabase/migrations/20261118170000_step7_timetable_constraint_fixes.sql'),
+  read('../supabase/migrations/20261118172000_step7_timetable_overlap_constraints.sql'),
+  read('../supabase/migrations/20261118173000_step7_swap_term_restore_fix.sql')
 ].join('\n');
 
 test('timetable reads and edits are scoped to the selected school term', () => {
@@ -40,6 +43,13 @@ test('generator uses Step 6 teacher assignments and respects full-day unavailabi
   assert.match(api, /teacherDayLoad/);
   assert.match(api, /heavySubject/);
   assert.match(api, /warnings/);
+  assert.match(api, /teacherTimeBusy/);
+  assert.match(api, /roomTimeBusy/);
+  assert.match(api, /teacher_class_subject_assignments/);
+  assert.match(ui, /getTeacherUnavailability/);
+  assert.match(ui, /setTeacherUnavailability/);
+  assert.match(ui, /coveragePercent/);
+  assert.match(ui, /visibleDays/);
 });
 
 test('registered rooms and dated substitutions are school-scoped', () => {
@@ -56,5 +66,13 @@ test('copy, clear, swap and overlap guardrails are implemented', () => {
   assert.match(api, /apiRouter\.post\('\/timetable\/swap'/);
   assert.match(migrations, /schoolos_swap_timetable_slots/);
   assert.match(migrations, /schoolos_guard_timetable_booking_conflicts/);
+  assert.match(migrations, /teacher_unavailability_period_number_check/);
+  assert.match(migrations, /timetable_teacher_time_no_overlap/);
+  assert.match(migrations, /timetable_room_id_time_no_overlap/);
+  assert.match(migrations, /timetable_room_name_time_no_overlap/);
+  assert.match(migrations, /term_id = first_slot\.term_id/);
+  assert.match(api, /targetAssignments/);
+  assert.match(api, /sectionId/);
+  assert.match(ui, /selectedSectionId/);
   assert.match(ui, /handleSwapSlots/);
 });
