@@ -169,6 +169,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [marksDraftDirty, setMarksDraftDirty] = useState(false);
+  const [isReopeningSubjectId, setIsReopeningSubjectId] = useState<string | null>(null);
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -262,7 +263,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             return values;
           };
           for (const student of stdList) {
-            for (const subject of gradeSubjects) {
+            for (const subject of editableClassSubjects) {
               const mark = existingMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
               const legacyScores = {
                 ...allocateLegacy(mark?.smallExamMarks || 0, components.filter(component => component.category === 'continuous')),
@@ -354,6 +355,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       setNotice(err.message || 'Failed to save class marks.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleReopenSubjectMarks = async (subjectId: string) => {
+    if (isReadOnly || !isFormTeacher || !selectedClassId || isReopeningSubjectId) return;
+    setIsReopeningSubjectId(subjectId);
+    try {
+      const result = await ApiClient.reopenClassSubjectMarks(selectedClassId, subjectId, semester);
+      const refreshed = await ApiClient.getMarks(selectedClassId, undefined, semester);
+      setClassMarks(refreshed);
+      setNotice(`Reopened ${result.reopenedCount} mark records for correction.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Subject marks could not be reopened.');
+    } finally {
+      setIsReopeningSubjectId(null);
     }
   };
 
@@ -525,10 +541,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         };
       });
       const complete = subjectScores.length > 0 && subjectScores.every(score => score.submitted);
+      const total = subjectScores.reduce((sum, score) => sum + score.total, 0);
       return {
         student,
         subjectScores,
-        total: subjectScores.reduce((sum, score) => sum + score.total, 0),
+        total,
+        average: subjectScores.length ? total / subjectScores.length : 0,
         max: subjectScores.reduce((sum, score) => sum + score.max, 0),
         complete
       };
@@ -869,10 +887,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 semester={semester}
                 teacherName={user?.fullName || 'Teacher'}
                 students={students}
-                subjects={gradeSubjects}
+                subjects={editableClassSubjects}
                 components={assessmentComponents}
               />
-              {isFormTeacher && <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{t('exam_forward_to_admin')}</button>}
+
             </div>
           </div>
 
@@ -883,40 +901,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
           {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading students and saved marks...</div> : gradeSubjects.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No subjects are assigned to this teacher for the selected class.</div> : (
             <>
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">{isFormTeacher ? t('exam_form_teacher_review') : t('exam_my_subject_mark_sheet')}</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {semester} · {assessmentComponents.reduce((sum, component) => sum + component.maxMarks, 0)}/100</p>{isFormTeacher && <p className="mt-1 text-[10px] font-semibold text-teal-800">{allClassMarksSubmitted ? t('exam_all_active_subjects_submitted') : t('exam_waiting_for_all_subjects')}</p>}</div>
-                  <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
-                </div>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[900px] border-collapse text-xs">
-                    <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
-                      <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
-                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID</th>
-                      {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
-                      {isFormTeacher && <><th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">{t('exam_total')} /100</th><th className="border-b bg-slate-50 px-3 py-3 text-center">{t('exam_rank')}</th></>}
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {examRegisterRows.map((row, rowIndex) => <tr key={row.student.id} className="hover:bg-teal-50/40">
-                        <td className="sticky left-0 bg-white px-3 py-2.5 text-center font-semibold text-slate-500">{row.rank ?? rowIndex + 1}</td>
-                        <td className="sticky left-9 bg-white px-3 py-2.5"><strong className="block text-slate-800">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.rollNumber || row.student.studentId}</span></td>
-                        {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center font-semibold text-slate-700">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
-                        {isFormTeacher && <><td className="border-l bg-teal-50/60 px-3 py-2.5 text-center font-black text-teal-900">{allClassMarksSubmitted ? row.total.toFixed(1).replace(/\.0$/, '') : '—'}</td><td className="px-3 py-2.5 text-center font-bold text-slate-700">{row.rank ?? '—'}</td></>}
-                      </tr>)}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="space-y-3 p-3 md:hidden">
-                  {examRegisterRows.map(row => <article key={row.student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{row.student.firstName} {row.student.middleName} {row.student.lastName}</p><p className="text-[10px] text-slate-500">{row.student.studentId}</p></div>{isFormTeacher && allClassMarksSubmitted && <span className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-xs font-bold text-white">#{row.rank}</span>}</div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">{row.subjectScores.map(score => <div key={score.subjectId} className="rounded-lg bg-white px-2.5 py-2"><p className="truncate text-[10px] text-slate-500">{gradeSubjects.find(subject => subject.id === score.subjectId)?.name}</p><p className="text-sm font-bold text-slate-800">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}<span className="text-[10px] font-normal text-slate-400">/{score.max}</span></p></div>)}</div>
-                    {isFormTeacher && <p className="mt-3 border-t border-slate-200 pt-2 text-right text-sm font-black text-teal-900">{allClassMarksSubmitted ? `Total: ${row.total.toFixed(1).replace(/\.0$/, '')}/100` : 'Total and rank pending subject submissions'}</p>}
-                  </article>)}
-                </div>
-                {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
-              </section>
+
               <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
-              {gradeSubjects.map(subject => {
+              {editableClassSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
             return (
               <section key={subject.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -972,12 +959,85 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               })}
             </>
           )}
-          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you may complete all subjects for your class. Subject teachers can enter only their assigned subjects. Submitted marks are locked; forwarding sends the completed class sheet to School Admin.</p>}
+          {isFormTeacher && <p className="text-[11px] text-slate-500">Form Teacher can review every active class subject, but can enter marks only for the subject assigned to their teacher profile. The class is forwarded only after every active subject has been submitted.</p>}
         </section>
       )}
 
       {/* EXAM RESULTS — READ ONLY */}
-      {activeTab === 'exam_results' && (
+      {activeTab === 'exam_results' && isFormTeacher && (
+        <section className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2">
+            <label className="text-xs font-semibold text-slate-600">Class
+              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
+                {formTeacherClasses.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Term
+              <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
+                <option value="Semester 1">Term 1</option><option value="Semester 2">Term 2</option>
+              </select>
+            </label>
+          </div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h2 className="text-sm font-bold text-slate-900">Fasalka · {semester}</h2><p className="mt-1 text-xs text-slate-500">Review all active subjects. Totals, averages and ranks appear only after every subject has been submitted.</p></div>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${allClassMarksSubmitted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{allClassMarksSubmitted ? t('exam_all_active_subjects_submitted') : t('exam_waiting_for_all_subjects')}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {gradeSubjects.map(subject => {
+                const subjectRows = classMarks.filter(mark => mark.subjectId === subject.id);
+                const submitted = students.length > 0 && students.every(student => {
+                  const mark = subjectRows.find(row => row.studentId === student.id);
+                  return Boolean(mark && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status) &&
+                    assessmentComponents.every(component => Number.isFinite(mark.assessmentScores?.[component.id])));
+                });
+                const reopenable = students.length > 0 && students.every(student => {
+                  const mark = subjectRows.find(row => row.studentId === student.id);
+                  return Boolean(mark && mark.status === 'submitted' && !mark.publishedAt);
+                });
+                return <span key={subject.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${submitted ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                  {subject.name} {submitted ? '✓' : '⏳'}
+                  {reopenable && <button type="button" title={`Reopen ${subject.name}`} onClick={() => void handleReopenSubjectMarks(subject.id)} disabled={isReadOnly || isReopeningSubjectId !== null} className="font-bold text-rose-700 disabled:opacity-40">↺</button>}
+                </span>;
+              })}
+            </div>
+          </section>
+          {isLoadingClassData ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading class marks...</div> : (
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <div><h2 className="text-sm font-bold text-slate-900">Class results review</h2><p className="mt-1 text-[10px] text-slate-500">{students.length} students · {gradeSubjects.length} active subjects</p></div>
+                <input type="search" value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Search student..." className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs" />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] border-collapse text-xs">
+                  <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
+                    <th className="border-b px-3 py-3 text-left">#</th><th className="min-w-[200px] border-b px-3 py-3 text-left">Student / Roll No.</th>
+                    {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[85px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/100</span></th>)}
+                    <th className="border-b border-l bg-teal-50 px-3 py-3 text-center">Total /100 each</th><th className="border-b px-3 py-3 text-center">Average</th><th className="border-b px-3 py-3 text-center">Rank</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {examRegisterRows.map((row, index) => <tr key={row.student.id}>
+                      <td className="px-3 py-2.5 text-center">{allClassMarksSubmitted ? row.rank : index + 1}</td>
+                      <td className="px-3 py-2.5"><strong className="block">{row.student.firstName} {row.student.middleName} {row.student.lastName}</strong><span className="text-[10px] text-slate-400">{row.student.rollNumber || row.student.studentId}</span></td>
+                      {row.subjectScores.map(score => <td key={score.subjectId} className="border-l px-2 py-2.5 text-center">{score.submitted ? score.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>)}
+                      <td className="border-l bg-teal-50/50 px-3 py-2.5 text-center font-bold">{allClassMarksSubmitted ? row.total.toFixed(1).replace(/\.0$/, '') : '—'}</td>
+                      <td className="px-3 py-2.5 text-center">{allClassMarksSubmitted ? row.average.toFixed(1).replace(/\.0$/, '') : '—'}</td>
+                      <td className="px-3 py-2.5 text-center font-bold">{allClassMarksSubmitted ? row.rank : '—'}</td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+              {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">{allClassMarksSubmitted ? 'Class is complete and ready to forward.' : 'Complete all active subjects before forwarding to School Admin.'}</p>
+                <button type="button" onClick={() => void handleForwardClassMarks()} disabled={isReadOnly || isSaving || isLoadingClassData || !allClassMarksSubmitted} className="rounded-xl bg-[#0B2B2A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>{t('exam_forward_to_admin')}</button>
+              </div>
+            </section>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'exam_results' && !isFormTeacher && (
         <section className="space-y-4">
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2">
             <label className="text-xs font-semibold text-slate-600">Class
