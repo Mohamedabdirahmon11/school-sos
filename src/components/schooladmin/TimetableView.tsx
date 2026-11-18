@@ -21,7 +21,7 @@ export const TimetableView: React.FC = () => {
   const [copySourceTermId, setCopySourceTermId] = useState('');
   const [draggingSlotId, setDraggingSlotId] = useState('');
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
-  const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
+  const [classSubjectAssignments, setClassSubjectAssignments] = useState<Array<{ id: string; teacherId?: string; periodsPerWeek?: number; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [clashWarning, setClashWarning] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -245,7 +245,7 @@ export const TimetableView: React.FC = () => {
     ApiClient.getClassDetails(selectedClassId, { page: 1, pageSize: 1 })
       .then(details => {
         if (!active) return;
-        const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, subject: item.subject, teacher: item.teacher }));
+        const assignments = details.subjects.filter(item => item.subject).map(item => ({ id: item.id, teacherId: item.teacher?.id, periodsPerWeek: Number(item.periodsPerWeek || 0), subject: item.subject, teacher: item.teacher }));
         setClassSubjectAssignments(assignments);
         if (assignments.length) {
           setSubjectId(current => assignments.some(item => item.subject?.id === current) ? current : assignments[0].subject!.id);
@@ -260,6 +260,9 @@ export const TimetableView: React.FC = () => {
   const assignedSubjectsForClass = classSubjectAssignments
     .map(item => item.subject)
     .filter((item): item is Subject => Boolean(item));
+  const requiredPeriods = classSubjectAssignments.reduce((total, item) => total + Number(item.periodsPerWeek || 0), 0);
+  const placedPeriods = timetable.filter(slot => slot.classId === selectedClassId && (!selectedTermId || slot.termId === selectedTermId)).length;
+  const coveragePercent = requiredPeriods > 0 ? Math.min(100, Math.round((placedPeriods / requiredPeriods) * 100)) : 0;
   const selectedSubjectAssignment = classSubjectAssignments.find(item => item.subject?.id === subjectId);
   const assignedTeachersForSubject = selectedSubjectAssignment?.teacher
     ? teachers.filter(item => item.id === selectedSubjectAssignment.teacher?.id)
@@ -466,6 +469,7 @@ export const TimetableView: React.FC = () => {
           {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             {terms.map(term => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? ' · Current' : ''}</option>)}
           </select>}
+          <span className="rounded-full border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-1.5 text-[11px] font-semibold text-[#0F766E]">Coverage {coveragePercent}% · {placedPeriods}/{requiredPeriods || 0} periods</span>
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
@@ -691,7 +695,7 @@ export const TimetableView: React.FC = () => {
                 </thead>
                 <tbody>
                   {visibleDays.map(day => (
-                    <tr key={day}>
+                    <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
                         const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
