@@ -5643,7 +5643,7 @@ apiRouter.get('/teacher/attendance/students', requireAuth, requireSchoolContext,
   const studentIds = [...new Set(enrollmentRows.map((row: any) => row.student_id))];
   if (!studentIds.length) { res.json([]); return; }
   const { data: studentRows, error: studentError } = await client.from('students').select(LIST_QUERY_COLUMNS.students)
-    .eq('school_id', school.id).eq('status', 'active').in('id', studentIds);
+    .eq('school_id', school.id).eq('status', 'active').in('id', studentIds).order('first_name', { ascending: true }).order('last_name', { ascending: true });
   if (studentError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
   const enrollmentByStudent = new Map(enrollmentRows.map((row: any) => [row.student_id, row]));
   const allowedSectionIds = new Set([
@@ -5861,7 +5861,7 @@ apiRouter.get('/attendance/session', requireAuth, requireSchoolContext, requireS
   const rosterIds = [...new Set(selectedEnrollments.map((row: any) => row.student_id))];
   const { data: rosterRows, error: rosterError } = rosterIds.length
     ? await client.from('students').select('id,student_id,first_name,middle_name,last_name,section,father_phone,mother_phone')
-      .eq('school_id', school.id).eq('status', 'active').in('id', rosterIds)
+      .eq('school_id', school.id).eq('status', 'active').in('id', rosterIds).order('first_name', { ascending: true }).order('last_name', { ascending: true })
     : { data: [], error: null };
   if (rosterError) { res.status(503).json({ error: 'Liiska ardayda lama soo dejin karin.' }); return; }
   const roster = rosterRows || [];
