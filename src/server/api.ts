@@ -3609,7 +3609,7 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
     }
   }
   if (settings.shiftCount === 2) {
-    const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 8);
+    const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
     const closingTime = school.setupData?.workingHours?.closingTime;
     if (!isShiftWithinSchoolClosingTime(settings, periodsPerDay, closingTime)) {
       res.status(400).json({ error: 'Second shift must finish at or before the school closing time configured in School Setup.' });
