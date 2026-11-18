@@ -391,4 +391,7 @@ Branch: `feature/documents-designer-finish` (based on current `main`). This audi
 - GitHub Actions has run typecheck and tests on intermediate commits; the latest run for the current head must be checked before considering this work complete.
 - Do not claim browser, visual, or live Postgres verification unless a successful CI job actually ran those checks.
 - Known baseline failures from the task brief must be distinguished from failures introduced by this branch.
-- Remaining work: fix all newly introduced CI failures; run/review final CI; update PR #220 with exact results; keep the PR open/draft until all required checks pass and the remaining M4/M5 gaps are resolved or explicitly listed.
+- Final GitHub Actions verification for head `ea65d1ab40b19f9fecc950f89edee60193a6900c` (run [44273738716](https://github.com/Mohamedabdirahmon11/school-sos/actions/runs/44273738716)): **PASS** — dependency install, TypeScript checks, all tests, route parity audit, RLS source audit, and production build.
+- Added regression coverage for Form Teacher review after Admin approval, admin-only approve/return/publish permissions, published-term report-card gates, term ranks, special ABS/LB values, and the updated report-card output.
+- Remaining gaps are explicitly limited to QR verification on report cards and unrun browser/visual role journeys plus live PostgreSQL/RLS integration. CI's RLS source audit passed; it is not a substitute for live database validation.
+- PR #220 remains open as Draft and mergeable. No changes to `main`; no production migration or data write was executed. Keep the PR unmerged until the remaining M4/M5 gaps are accepted or completed.
