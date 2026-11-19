@@ -3441,6 +3441,58 @@ apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext
   const classes = await db.getClasses(school.id);
   res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
 });
+apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Exam invigilation requires the configured Supabase database.' }); return; }
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+  const teacher = teacherPage.items[0] as any;
+  if (!teacher) { res.json([]); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: assignments, error } = await client.from('exam_invigilators').select('exam_session_id,room_id')
+      .eq('school_id', school.id).eq('teacher_id', teacher.id);
+    if (error) throw error;
+    const sessionIds = [...new Set((assignments || []).map((row: any) => row.exam_session_id))];
+    if (!sessionIds.length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
+    const { data: sessions, error: sessionError } = await client.from('exam_sessions').select('id,exam_day_id,name,start_time,end_time,shift_tag')
+      .eq('school_id', school.id).in('id', sessionIds);
+    if (sessionError) throw sessionError;
+    const dayIds = [...new Set((sessions || []).map((row: any) => row.exam_day_id))];
+    const { data: days, error: dayError } = await client.from('exam_days').select('id,exam_period_id,exam_date')
+      .eq('school_id', school.id).in('id', dayIds);
+    if (dayError) throw dayError;
+    const periodIds = [...new Set((days || []).map((row: any) => row.exam_period_id))];
+    const { data: periods, error: periodError } = await client.from('exam_periods').select('id,name,term_id,status')
+      .eq('school_id', school.id).in('id', periodIds).eq('status', 'published');
+    if (periodError) throw periodError;
+    const roomIds = [...new Set((assignments || []).map((row: any) => row.room_id))];
+    const { data: rooms, error: roomError } = await client.from('exam_rooms').select('id,name')
+      .eq('school_id', school.id).in('id', roomIds);
+    if (roomError) throw roomError;
+    const sessionById = new Map((sessions || []).map((row: any) => [row.id, row]));
+    const dayById = new Map((days || []).map((row: any) => [row.id, row]));
+    const periodById = new Map((periods || []).map((row: any) => [row.id, row]));
+    const roomById = new Map((rooms || []).map((row: any) => [row.id, row]));
+    const result = (assignments || []).flatMap((assignment: any) => {
+      const session = sessionById.get(assignment.exam_session_id) as any;
+      const day = session ? dayById.get(session.exam_day_id) as any : null;
+      const period = day ? periodById.get(day.exam_period_id) as any : null;
+      if (!session || !day || !period) return [];
+      return [{
+        periodName: period.name, examDate: day.exam_date, sessionName: session.name,
+        startTime: session.start_time, endTime: session.end_time, shiftTag: session.shift_tag,
+        roomName: (roomById.get(assignment.room_id) as any)?.name || assignment.room_id
+      }];
+    }).sort((a: any, b: any) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime)));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load teacher invigilation assignments.' });
+  }
+});
+
 apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
