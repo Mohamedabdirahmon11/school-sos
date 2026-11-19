@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS public.report_cards (
   head_comment text,
   published_at timestamptz,
   published_by varchar(64),
+  is_stale boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (student_id,school_id) REFERENCES public.students(id,school_id) ON DELETE CASCADE,
@@ -448,7 +449,7 @@ BEGIN
         AND academic_year_id=(SELECT academic_year_id FROM public.terms WHERE id=p_term_id AND school_id=p_school_id)
         AND published_at IS NOT NULL
     ), revoked AS (
-      UPDATE public.report_cards SET published_at=NULL,published_by=NULL,updated_at=now()
+      UPDATE public.report_cards SET published_at=NULL,published_by=NULL,is_stale=true,updated_at=now()
       WHERE id IN (SELECT id FROM old_cards)
       RETURNING id
     )
@@ -629,15 +630,15 @@ BEGIN
   )
   INSERT INTO public.report_cards(
     school_id,student_id,academic_year_id,class_id,yearly_average,overall_grade,
-    rank_in_class,subject_results,updated_at
+    rank_in_class,subject_results,is_stale,updated_at
   )
   SELECT p_school_id,g.student_id,p_academic_year_id,p_class_id,g.yearly_average,
-    g.grade,g.class_rank,g.subject_results,now()
+    g.grade,g.class_rank,g.subject_results,false,now()
   FROM grades g
   ON CONFLICT(school_id,student_id,academic_year_id) DO UPDATE SET
     class_id=EXCLUDED.class_id,yearly_average=EXCLUDED.yearly_average,
     overall_grade=EXCLUDED.overall_grade,rank_in_class=EXCLUDED.rank_in_class,
-    subject_results=EXCLUDED.subject_results,updated_at=now()
+    subject_results=EXCLUDED.subject_results,is_stale=false,updated_at=now()
   WHERE public.report_cards.published_at IS NULL;
   GET DIAGNOSTICS v_count=ROW_COUNT;
   RETURN jsonb_build_object('generated_count',v_count,'academic_year_id',p_academic_year_id,
