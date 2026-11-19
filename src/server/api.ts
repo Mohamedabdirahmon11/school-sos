@@ -3429,6 +3429,34 @@ apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperA
  const names=new Set((existing||[]).map((r:any)=>String(r.name).trim().toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
  const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
+apiRouter.get('/subject-catalog', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('subject_catalog')
+    .select('id,name,code,description,sort_order').eq('is_active', true)
+    .order('sort_order').order('name');
+  if (error) { res.status(503).json({ error: 'The shared subject catalog could not be loaded.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/subjects/catalog-selection', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const ids = Array.isArray(req.body?.catalogIds) ? req.body.catalogIds.map((value: unknown) => String(value)) : [];
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!ids.length || ids.length > 100 || ids.some((id: string) => !uuidPattern.test(id)) || new Set(ids).size !== ids.length) {
+    res.status(400).json({ error: 'Select between 1 and 100 valid, unique catalog subjects.' }); return;
+  }
+  const { data, error } = await client.rpc('schoolos_select_subject_catalog', {
+    p_school_id: school.id, p_catalog_ids: ids
+  });
+  if (error) { res.status(400).json({ error: error.message || 'Catalog subjects could not be added to this school.' }); return; }
+  auditAcademicSetup(school, user, 'SCHOOL_SUBJECTS_SELECTED', 'Selected shared catalog subjects for the school.');
+  res.json(data || { createdCount: 0, linkedCount: 0, skippedCount: 0 });
+});
+
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
