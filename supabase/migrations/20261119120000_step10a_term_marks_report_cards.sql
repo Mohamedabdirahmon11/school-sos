@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS component_marks_student_idx
 
 
 CREATE OR REPLACE FUNCTION public.schoolos_guard_component_mark()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $guard$
 DECLARE v_max numeric; v_term uuid; v_year uuid;
 BEGIN
   SELECT mc.max_marks,ms.term_id,t.academic_year_id INTO v_max,v_term,v_year
@@ -113,7 +113,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$guard$;
 DROP TRIGGER IF EXISTS component_marks_guard ON public.component_marks;
 CREATE TRIGGER component_marks_guard BEFORE INSERT OR UPDATE ON public.component_marks
 FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_component_mark();
@@ -189,7 +189,7 @@ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
 EXECUTE FUNCTION public.schoolos_check_mark_structure_total();
 
 CREATE OR REPLACE FUNCTION public.schoolos_audit_component_mark()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $audit$
 BEGIN
   INSERT INTO public.marks_audit(
     school_id,entity_type,entity_id,component_id,class_id,subject_id,student_id,
@@ -205,7 +205,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$audit$;
 DROP TRIGGER IF EXISTS component_marks_audit ON public.component_marks;
 CREATE TRIGGER component_marks_audit
 AFTER INSERT OR UPDATE OR DELETE ON public.component_marks
