@@ -11,6 +11,7 @@ const idCard = read('../src/components/common/PrintIDCardModal.tsx');
 const classesView = read('../src/components/schooladmin/ClassesView.tsx');
 const lifecycle = read('../supabase/migrations/20261119160000_school_setup_lifecycle.sql');
 const classConfig = read('../supabase/migrations/20261119162000_class_section_configuration.sql');
+const schema = read('../schema.sql');
 
 test('academic date validator uses actual digit tokens', () => {
   assert.ok(api.includes("!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)"));
@@ -74,4 +75,11 @@ test('saved school logo is used in ID cards, invoices and receipts', () => {
   assert.ok(api.includes('getSchoolLogoPdfImage(school, client)'));
   assert.ok(api.includes('images: logoImage ? [logoImage] : []'));
   assert.ok(api.includes('SCHOOL_LOGO_BUCKET'));
+});
+
+test('canonical fresh-install schema mirrors the school setup migrations', () => {
+  assert.ok(schema.includes('subject_catalog'));
+  assert.ok(schema.includes('schools_date_format_check'));
+  assert.ok(schema.includes('schoolos_update_class_section_config'));
+  assert.ok(schema.includes('schoolos_confirm_promotions_with_enrollments'));
 });
