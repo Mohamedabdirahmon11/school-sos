@@ -429,6 +429,7 @@ ALTER TABLE public.terms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS academic_years_admin_delete ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_admin_insert ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_admin_update ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_select ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_tenant_scope ON public.academic_years;
 CREATE POLICY academic_years_admin_select ON public.academic_years FOR SELECT TO authenticated
  USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
@@ -442,6 +443,7 @@ CREATE POLICY academic_years_admin_delete ON public.academic_years FOR DELETE TO
 DROP POLICY IF EXISTS terms_admin_delete ON public.terms;
 DROP POLICY IF EXISTS terms_admin_insert ON public.terms;
 DROP POLICY IF EXISTS terms_admin_update ON public.terms;
+DROP POLICY IF EXISTS terms_admin_select ON public.terms;
 DROP POLICY IF EXISTS terms_tenant_scope ON public.terms;
 CREATE POLICY terms_admin_select ON public.terms FOR SELECT TO authenticated
  USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
