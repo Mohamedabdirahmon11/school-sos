@@ -16,6 +16,24 @@ ALTER TABLE public.classes
   ADD CONSTRAINT classes_normal_exam_shift_check
   CHECK (normal_exam_shift IN ('morning','afternoon'));
 
+-- Keep the class-level normal exam shift aligned with its existing normal
+-- timetable shift (1 = morning, 2 = afternoon). Per-term overrides remain in
+-- class_exam_settings and never mutate the class's normal shift.
+CREATE OR REPLACE FUNCTION public.schoolos_sync_class_normal_exam_shift()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.shift IS DISTINCT FROM OLD.shift THEN
+    NEW.normal_exam_shift := CASE WHEN NEW.shift = 2 THEN 'afternoon' ELSE 'morning' END;
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS classes_sync_normal_exam_shift ON public.classes;
+CREATE TRIGGER classes_sync_normal_exam_shift
+BEFORE INSERT OR UPDATE OF shift ON public.classes
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_sync_class_normal_exam_shift();
+
 CREATE TABLE IF NOT EXISTS public.exam_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
