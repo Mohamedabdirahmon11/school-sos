@@ -19,8 +19,19 @@ export function buildResultsCsv(
     : ['Yearly Rank', 'Student ID', 'Student Name', 'Yearly Total (%)', 'Grade', 'Decision'];
   const lines = rows.map(row => {
     if (kind === 'semester') {
+      const complete = row.isComplete !== false;
       const average = Number(row.averagePercentage) || 0;
-      return [row.rank, row.student?.studentId, fullName(row.student), row.subjectCount, average, gradeFor(average), average >= passMark ? 'Passing' : 'Below Pass Mark'];
+      const rank = Number(row.rank) > 0 ? row.rank : 'Pending';
+      const subjectCount = row.expectedSubjectCount
+        ? `${row.subjectCount || 0}/${row.expectedSubjectCount}`
+        : row.subjectCount;
+      const status = !complete
+        ? 'Pending subjects'
+        : (typeof row.isPass === 'boolean' ? row.isPass : average >= passMark)
+          ? 'Passing'
+          : 'Below Pass Mark';
+      return [rank, row.student?.studentId, fullName(row.student), subjectCount,
+        complete ? average : '', complete ? (row.grade || gradeFor(average)) : '', status];
     }
     const yearly = Number(row.yearlyPercentage) || 0;
     return [row.yearlyRank, row.student?.studentId, fullName(row.student), yearly, gradeFor(yearly), row.isPass ? 'Promote Candidate' : 'Repeat Required'];
