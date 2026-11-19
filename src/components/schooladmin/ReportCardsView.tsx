@@ -2,7 +2,7 @@
  * Official Student Yearly Report Cards & Class Bulk Generator
  * Strictly follows rules:
  * 1. Combines Semester 1 + Semester 2 for final yearly percentage and class rank
- * 2. Percentages only (no letter grades, no GPA)
+ * 2. Uses the school's configured grade labels; no GPA is calculated.
  * 3. Report-card printing is blocked until both semesters have been published by the school.
  * 4. Attendance is not currently included in this report-card data contract.
  * 5. Shows school branding, student info, semester marks and yearly percentages, generated remarks, signatures, and stamp.
