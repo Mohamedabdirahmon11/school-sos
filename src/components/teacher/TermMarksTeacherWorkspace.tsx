@@ -30,7 +30,10 @@ export const TermMarksTeacherWorkspace:React.FC<{
   const refs=useRef<Array<HTMLInputElement|null>>([]);
   const currentTerm=terms.find(t=>t.id===termId);
   const assignedClassIds=useMemo(()=>new Set(assignments.map(a=>a.classId)),[assignments]);
-  const availableClasses=classes.filter(klass=>assignedClassIds.has(klass.id));
+  const availableClasses=[...new Map([
+    ...classes.filter(klass=>assignedClassIds.has(klass.id)).map(klass=>[klass.id,klass] as [string,SchoolClass]),
+    ...assignments.filter(row=>row.class).map(row=>[row.classId,row.class!] as [string,SchoolClass])
+  ]).values()];
   const subjects=useMemo(()=>[...new Map(assignments.filter(a=>a.classId===selectedClassId&&a.subject).map(a=>[a.subjectId,a.subject!])).values()], [assignments,selectedClassId]);
   const visibleStudents=students.filter(s=>allowedIds.includes(s.id));
   const enteredCount=visibleStudents.filter(s=>statuses[s.id]==='absent'||statuses[s.id]==='excused'||(values[s.id]!==undefined&&values[s.id]!=='' )).length;
