@@ -3362,6 +3362,20 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   }
 });
 
+apiRouter.post('/class-groups/reorder', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req,res) => {
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ const ids=Array.isArray(req.body?.orderedIds)?req.body.orderedIds.map((value:unknown)=>String(value)):[];
+ const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ if(ids.length>500||ids.some((id:string)=>!uuidPattern.test(id))||new Set(ids).size!==ids.length){
+   res.status(400).json({error:'Liiska kala horreynta fasalladu sax ma aha.'});return;
+ }
+ const {error}=await classGroupsClient().rpc('schoolos_reorder_class_groups',{p_school_id:school.id,p_ordered_ids:ids});
+ if(error){res.status(409).json({error:error.message||'Kala horreynta fasallada lama kaydin karin.'});return;}
+ db.logAudit({action:'CLASS_GROUPS_REORDERED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:'Reordered school class groups.',severity:'info'});
+ res.json({success:true});
+});
+
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
  const school=(req as any).school as School;
  const client=classGroupsClient();
