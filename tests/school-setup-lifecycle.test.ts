@@ -34,8 +34,8 @@ test('new academic years require exactly two semesters before activation', () =>
 });
 
 test('lifecycle and class configuration functions have balanced dollar quotes', () => {
-  assert.equal(lifecycle.split('\\n').filter(line => line.trim() === 'AS $' || line.trim() === '$;').length, 0);
-  assert.equal(classConfig.split('\\n').filter(line => line.trim() === 'AS $' || line.trim() === '$;').length, 0);
+  assert.equal(lifecycle.split('\n').filter(line => line.trim() === 'AS $' || line.trim() === '$;').length, 0);
+  assert.equal(classConfig.split('\n').filter(line => line.trim() === 'AS $' || line.trim() === '$;').length, 0);
 });
 
 test('school settings validate date format and extended currencies', () => {
