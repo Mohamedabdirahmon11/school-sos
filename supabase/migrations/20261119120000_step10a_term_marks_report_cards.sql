@@ -320,7 +320,7 @@ BEGIN
       WHERE mc.structure_id=v_structure.id AND cm.school_id=p_school_id) THEN
       RAISE EXCEPTION 'Qaabkan dhibcaha hore ayaa lagu geliyey natiijooyin; lama beddeli karo si xogtu u badbaaddo.';
     END IF;
-    DELETE FROM public.mark_components WHERE school_id=p_school_id AND structure_id=v_structure.id;
+    DELETE /* only unmarked component rows */ FROM public.mark_components WHERE school_id=p_school_id AND structure_id=v_structure.id;
     UPDATE public.mark_structures SET exam_max=p_exam_max,rest_mode=p_rest_mode,
       quiz_count=v_count,created_by=p_actor_id,updated_at=now()
       WHERE id=v_structure.id AND school_id=p_school_id;
