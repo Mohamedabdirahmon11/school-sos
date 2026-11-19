@@ -6402,6 +6402,10 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
   if (sessions.some((item: any) => !item.name || !/^\d{2}:\d{2}$/.test(item.start_time) || !/^\d{2}:\d{2}$/.test(item.end_time) || item.start_time >= item.end_time)) {
     res.status(400).json({ error: 'Hubi magaca session-ka iyo waqtiga bilowga/dhammaadka.' }); return;
   }
+  const sessionsOverlap = sessions.some((session: any, index: number) =>
+    sessions.slice(index + 1).some((other: any) => session.start_time < other.end_time && other.start_time < session.end_time)
+  );
+  if (sessionsOverlap) { res.status(400).json({ error: 'Waqtiyada fadhiyada isku maalin ah ma is dul saarmi karaan.' }); return; }
   const dates = requestedDays.length ? [...new Set(requestedDays)].sort() : (() => {
     const values: string[] = [];
     const cursor = new Date(startDate + 'T12:00:00Z');
