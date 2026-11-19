@@ -101,7 +101,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [currency, setCurrency] = useState(school?.currency || 'ETB');
   const [language, setLanguage] = useState(school?.language || 'en');
   const [timezone, setTimezone] = useState(school?.timezone || 'Africa/Addis_Ababa');
-  const [dateFormat, setDateFormat] = useState<NonNullable<School['dateFormat']>>(school?.dateFormat || 'dd/MM/yyyy');
+  const [dateFormat, setDateFormat] = useState<'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd'>(school?.dateFormat || 'dd/MM/yyyy');
   const [studentAccessEnabled, setStudentAccessEnabled] = useState(school?.studentAccessEnabled === true);
   const [defaultClassCapacity, setDefaultClassCapacity] = useState(String(school?.defaultClassCapacity ?? 40));
 
@@ -847,7 +847,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               </div>
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Date Format</label>
-                <select value={dateFormat} onChange={e => setDateFormat(e.target.value as NonNullable<School['dateFormat']>)} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                <select value={dateFormat} onChange={e => setDateFormat(e.target.value as 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd')} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
                   <option value="dd/MM/yyyy">DD/MM/YYYY (19/11/2026)</option>
                   <option value="MM/dd/yyyy">MM/DD/YYYY (11/19/2026)</option>
                   <option value="yyyy-MM-dd">YYYY-MM-DD (2026-11-19)</option>
