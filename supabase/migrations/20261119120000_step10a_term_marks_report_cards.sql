@@ -3,6 +3,44 @@
 
 BEGIN;
 
+-- Link the existing exam configuration and marks records to the new academic terms.
+-- Legacy columns and values are retained; no existing mark rows are deleted or rewritten.
+ALTER TABLE public.exam_configs
+  ADD COLUMN IF NOT EXISTS term_id uuid,
+  ADD COLUMN IF NOT EXISTS class_id varchar(64);
+ALTER TABLE public.student_marks
+  ADD COLUMN IF NOT EXISTS term_id uuid;
+
+DO $legacy_fks$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='exam_configs_term_school_fk') THEN
+    ALTER TABLE public.exam_configs ADD CONSTRAINT exam_configs_term_school_fk
+      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='exam_configs_class_school_fk') THEN
+    ALTER TABLE public.exam_configs ADD CONSTRAINT exam_configs_class_school_fk
+      FOREIGN KEY (class_id,school_id) REFERENCES public.classes(id,school_id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='student_marks_term_school_fk') THEN
+    ALTER TABLE public.student_marks ADD CONSTRAINT student_marks_term_school_fk
+      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE SET NULL;
+  END IF;
+END;
+$legacy_fks$;
+
+UPDATE public.student_marks sm
+SET term_id=t.id
+FROM public.academic_years ay
+JOIN public.terms t ON t.academic_year_id=ay.id AND t.school_id=ay.school_id
+WHERE sm.term_id IS NULL
+  AND sm.school_id=ay.school_id
+  AND sm.academic_year=ay.name
+  AND regexp_replace(lower(t.name),'[^0-9]','','g')
+      = regexp_replace(lower(sm.semester),'[^0-9]','','g')
+  AND regexp_replace(lower(sm.semester),'[^0-9]','','g') IN ('1','2');
+CREATE INDEX IF NOT EXISTS exam_configs_school_term_idx ON public.exam_configs(school_id,term_id);
+CREATE INDEX IF NOT EXISTS student_marks_school_term_class_idx ON public.student_marks(school_id,term_id,class_id);
+
 CREATE TABLE IF NOT EXISTS public.mark_structures (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
