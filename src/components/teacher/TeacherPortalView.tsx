@@ -16,6 +16,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
+import { TermMarksTeacherWorkspace } from './TermMarksTeacherWorkspace.tsx';
 import { 
   SchoolClass, 
   Subject, 
@@ -767,6 +768,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* SUBJECT-WISE EXAM MARK ENTRY */}
       {activeTab === 'grades' && (
         <section className="space-y-4">
+          <TermMarksTeacherWorkspace
+            classes={classes}
+            assignments={teacherAssignments}
+            students={students}
+            selectedClassId={selectedClassId}
+            onClassChange={setSelectedClassId}
+          />
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
             <label className="text-xs font-semibold text-slate-600">Class
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
