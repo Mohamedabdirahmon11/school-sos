@@ -240,3 +240,21 @@ test('report card prefers dedicated Form Teacher comments over generated teacher
   assert.ok(text.includes('Form Teacher comment (Semester 2): Shows strong progress in all subjects.'));
   assert.ok(!text.includes('Teacher remarks:'));
 });
+
+test('report card uses the saved maximum for each semester when the admin scheme changes', () => {
+  const savedSchemes = {
+    ...result,
+    subjectResults: [{
+      ...result.subjectResults[0],
+      sem1Marks: { ...result.subjectResults[0].sem1Marks!, maxMarks: { small: 40, big: 60, total: 100 } },
+      sem2Marks: { ...result.subjectResults[0].sem2Marks!, maxMarks: { small: 20, big: 80, total: 100 } },
+      // This is the current scheme fallback and intentionally differs from both saved snapshots.
+      maxMarks: { small: 10, big: 40, total: 50 }
+    }]
+  };
+  const page = buildReportCardPdfPage({ school, design, className: 'Grade 10 A', result: savedSchemes, totalStudents: 24 });
+  const text = page.lines.join('\\n');
+  assert.ok(text.includes('10 + 40 = 50/100'));
+  assert.ok(text.includes('8 + 32 = 40/100'));
+  assert.ok(text.includes('Exam maximum marks: Semester 1 40 + 60 = 100; Semester 2 20 + 80 = 100'));
+});
