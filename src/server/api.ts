@@ -10333,7 +10333,9 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
     const count=Math.max(0,Number(subject.required||0)-Number(subject.entered||0));
     if(!count) continue;
     const sectionId=sectionByStudent.get(row.student_id);
-    const matching=(assignments||[]).filter((a:any)=>a.subject_id===subject.subject_id&&(!a.section_id||a.section_id===sectionId));
+    const sectionSpecific=(assignments||[]).filter((a:any)=>a.subject_id===subject.subject_id&&a.section_id===sectionId);
+    const wholeClass=(assignments||[]).filter((a:any)=>a.subject_id===subject.subject_id&&!a.section_id);
+    const matching=sectionSpecific.length?sectionSpecific:wholeClass;
     if(!matching.length){
       const key='unassigned:'+subject.subject_id;
       const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:'',teacherName:'Macallin aan la aqoonsan',missing:0};
