@@ -5159,7 +5159,7 @@ apiRouter.put('/academic-years/:id', requireAuth, requireSchoolAdminOrSuperAdmin
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const startDate = req.body?.startDate;
   const endDate = req.body?.endDate;
-  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+  if (!isAcademicYearName(name) || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
     res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
   }
   const { data, error } = await client.from('academic_years').update({
