@@ -803,10 +803,8 @@ USING (
 REVOKE ALL ON public.mark_structures,public.mark_components,public.component_marks,
   public.term_status,public.marks_audit,public.report_cards FROM anon;
 GRANT SELECT ON public.mark_structures,public.mark_components,public.component_marks,public.term_status,public.report_cards TO authenticated;
-GRANT INSERT,UPDATE ON public.mark_structures,public.mark_components TO authenticated;
 GRANT INSERT,UPDATE ON public.component_marks TO authenticated;
 GRANT SELECT ON public.marks_audit TO authenticated;
-GRANT INSERT,UPDATE ON public.report_cards TO authenticated;
 GRANT ALL ON public.mark_structures,public.mark_components,public.component_marks,
   public.term_status,public.marks_audit,public.report_cards TO service_role;
 
