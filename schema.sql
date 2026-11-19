@@ -6781,6 +6781,8 @@ CREATE TRIGGER schoolos_structured_template_audit
 -- END: structured document templates
 
 
+
+
 -- BEGIN STEP 10A TERM MARKS SCHEMA SNAPSHOT
 -- STEP 10A: term-based assessment components, mark entry, term closure and yearly report cards.
 -- Additive migration: legacy exam_configs/student_marks and their data are untouched.
