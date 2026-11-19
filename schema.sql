@@ -279,6 +279,21 @@ BEGIN
 END
 $shift_constraint$;
 
+CREATE OR REPLACE FUNCTION public.schoolos_sync_class_normal_exam_shift()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.shift IS DISTINCT FROM OLD.shift THEN
+    NEW.normal_exam_shift := CASE WHEN NEW.shift = 2 THEN 'afternoon' ELSE 'morning' END;
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS classes_sync_normal_exam_shift ON public.classes;
+CREATE TRIGGER classes_sync_normal_exam_shift
+BEFORE INSERT OR UPDATE OF shift ON public.classes
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_sync_class_normal_exam_shift();
+
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);
 CREATE INDEX IF NOT EXISTS idx_classes_active ON classes(school_id, is_archived);
