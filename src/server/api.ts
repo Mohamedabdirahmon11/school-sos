@@ -6317,7 +6317,7 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
     const { data: period, error } = await client.from('exam_periods').select('*')
       .eq('school_id', school.id).eq('term_id', req.params.termId).maybeSingle();
     if (error) throw error;
-    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [] }); return; }
+    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [], roomAssignments: [], classExamSettings: [] }); return; }
     const days = await client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date');
     if (days.error) throw days.error;
     const dayIds = (days.data || []).map((day: any) => day.id);
@@ -6627,10 +6627,6 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       .eq('school_id', school.id).in('exam_day_id', (days || []).map((day: any) => day.id));
     if (sessionsError) throw sessionsError;
     const sessionIds = (sessions || []).map((session: any) => session.id);
-    if (sessionIds.length) {
-      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
-      if (deleteError) throw deleteError;
-    }
     const rows = assignments.map((item: any) => ({
       school_id: school.id, exam_session_id: String(item.sessionId || ''),
       room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
@@ -6657,6 +6653,13 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       : { data: [], error: null };
     if (teachingError) throw teachingError;
     const schedulesById = new Map((periodSchedules || []).map((item: any) => [item.id, item]));
+    const usedRoomSessionKeys = new Set((periodSeats || []).map((seat: any) => {
+      const schedule = schedulesById.get(seat.schedule_id) as any;
+      return schedule ? schedule.exam_session_id + ':' + seat.room_id : '';
+    }));
+    if (rows.some((row: any) => !usedRoomSessionKeys.has(row.exam_session_id + ':' + row.room_id))) {
+      throw new Error('Kormeeraha waxaa lagu xiri karaa oo keliya qol dhab ahaan loo isticmaalayo session-kan.');
+    }
     for (const row of rows) {
       const teachesRoomSubject = (periodSeats || []).some((seat: any) => {
         if (seat.room_id !== row.room_id) return false;
