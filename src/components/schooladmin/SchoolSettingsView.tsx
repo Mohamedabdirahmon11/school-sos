@@ -555,94 +555,61 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
-            School Settings
+            Dejinta Dugsiga
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Manage your school profile, academic rules, timetable, campuses, documents, report cards, and data backups in one place.
+            Halkaan ka maamul xogta dugsiga, waxbarashada, jadwalka, laamaha, ogeysiisyada, naqshadda natiijooyinka iyo kaydka xogta.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#DCE7E4] bg-[#F5F8F7] p-2 text-xs shadow-sm sm:grid-cols-3 lg:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('identity')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'identity' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            {t('settings_identity')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('academics')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'academics' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            {t('settings_academics')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('shifts')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'shifts' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            {t('settings_timetable')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('documents')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'documents' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            {t('settings_documents')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('branches')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'branches' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            {t('settings_branches')} ({branches.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('designer')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'designer' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Report Card Designer
-          </button>
-          {user?.role === 'school_admin' && (
-            <button type="button" onClick={() => setActiveTab('appearance')}
-              className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-                activeTab === 'appearance' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-              }`}>
-              <Palette className="w-3.5 h-3.5" />
-              Navigation Appearance
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setActiveTab('backup')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'backup' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            Backup & Data Export
-          </button>
+        {/* Organized settings navigation: grouped by purpose, with stable tab IDs. */}
+        <div className="grid w-full grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Aasaaska Dugsiga</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('identity')} aria-current={activeTab === 'identity' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'identity' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Building2 className="h-4 w-4 shrink-0" /><span>Macluumaadka Dugsiga</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('branches')} aria-current={activeTab === 'branches' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'branches' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <GitBranch className="h-4 w-4 shrink-0" /><span>Laamaha Dugsiga</span><span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px]">{branches.length}</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Waxbarashada</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('academics')} aria-current={activeTab === 'academics' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'academics' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <CalendarDays className="h-4 w-4 shrink-0" /><span>Sanad-dugsiyeedka & Dhibcaha</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('shifts')} aria-current={activeTab === 'shifts' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'shifts' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Clock className="h-4 w-4 shrink-0" /><span>Jadwalka & Waqtiyada</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Dukumentiyada & Isgaarsiinta</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('documents')} aria-current={activeTab === 'documents' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'documents' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Bell className="h-4 w-4 shrink-0" /><span>Dukumentiyada & Ogeysiisyada</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('designer')} aria-current={activeTab === 'designer' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'designer' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <FileText className="h-4 w-4 shrink-0" /><span>Naqshadda Warqadda Natiijada</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Muuqaalka & Xogta</h2>
+            <div className="grid grid-cols-1 gap-2">
+              {user?.role === 'school_admin' && (
+                <button type="button" onClick={() => setActiveTab('appearance')} aria-current={activeTab === 'appearance' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'appearance' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                  <Palette className="h-4 w-4 shrink-0" /><span>Muuqaalka Menu-ga</span>
+                </button>
+              )}
+              <button type="button" onClick={() => setActiveTab('backup')} aria-current={activeTab === 'backup' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'backup' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Database className="h-4 w-4 shrink-0" /><span>Kaydinta & Dhoofinta Xogta</span>
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 
