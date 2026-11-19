@@ -101,6 +101,10 @@ test('Step 10B empty periods return complete data and invigilator replacement va
   assert.ok(rowsIndex >= 0 && validationIndex > rowsIndex && deleteIndex > validationIndex);
   assert.equal((route.match(/from\('exam_invigilators'\)\.delete\(\)/g) || []).length, 1);
   assert.ok(route.includes('Kormeeraha waxaa lagu xiri karaa oo keliya qol dhab ahaan loo isticmaalayo session-kan.'));
+  assert.ok(api.includes("select('schedule_id,room_id,class_id,exam_number,seat_number,student_id')"));
+  assert.ok(api.includes('studentName: [student?.first_name, student?.middle_name, student?.last_name]'));
+  assert.ok(termUi.includes('Liisaska Fadhiyada Qolalka'));
+  assert.ok(termUi.includes('Daabac A4 (jadwalka + liisaska qolalka)'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
