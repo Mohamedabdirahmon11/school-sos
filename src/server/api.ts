@@ -6447,7 +6447,8 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
     for (const klass of classes) {
       const requested = shiftOverrides[klass.id];
       classExamShifts[klass.id] = requested === 'morning' || requested === 'afternoon'
-        ? requested : klass.normal_exam_shift === 'afternoon' || klass.shift === 2 ? 'afternoon' : 'morning';
+        ? requested : klass.normal_exam_shift === 'morning' || klass.normal_exam_shift === 'afternoon'
+          ? klass.normal_exam_shift : klass.shift === 2 ? 'afternoon' : 'morning';
     }
     const groups = buildManhajGroups(classes.map(klass => ({
       id: klass.id, name: klass.name,
