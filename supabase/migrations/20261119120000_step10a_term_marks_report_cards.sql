@@ -15,15 +15,15 @@ DO $legacy_fks$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='exam_configs_term_school_fk') THEN
     ALTER TABLE public.exam_configs ADD CONSTRAINT exam_configs_term_school_fk
-      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE SET NULL;
+      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE RESTRICT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='exam_configs_class_school_fk') THEN
     ALTER TABLE public.exam_configs ADD CONSTRAINT exam_configs_class_school_fk
-      FOREIGN KEY (class_id,school_id) REFERENCES public.classes(id,school_id) ON DELETE SET NULL;
+      FOREIGN KEY (class_id,school_id) REFERENCES public.classes(id,school_id) ON DELETE RESTRICT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='student_marks_term_school_fk') THEN
     ALTER TABLE public.student_marks ADD CONSTRAINT student_marks_term_school_fk
-      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE SET NULL;
+      FOREIGN KEY (term_id,school_id) REFERENCES public.terms(id,school_id) ON DELETE RESTRICT;
   END IF;
 END;
 $legacy_fks$;
