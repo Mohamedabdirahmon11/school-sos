@@ -141,8 +141,8 @@ ALTER TABLE public.exam_schedules
   ADD CONSTRAINT exam_schedules_exam_shift_check
     CHECK (exam_shift IS NULL OR exam_shift IN ('morning','afternoon','all'));
 CREATE UNIQUE INDEX IF NOT EXISTS exam_schedules_term_group_subject_uidx
-  ON public.exam_schedules(school_id, exam_session_id, manhaj_group_key, subject_id, exam_shift)
-  WHERE exam_type = 'term' AND exam_session_id IS NOT NULL AND status <> 'cancelled';
+  ON public.exam_schedules(school_id, exam_period_id, manhaj_group_key, subject_id, exam_shift)
+  WHERE exam_type = 'term' AND exam_period_id IS NOT NULL AND status <> 'cancelled';
 CREATE INDEX IF NOT EXISTS exam_schedules_term_period_idx
   ON public.exam_schedules(school_id, exam_period_id, exam_session_id)
   WHERE exam_type = 'term';
