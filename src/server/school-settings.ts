@@ -231,6 +231,7 @@ const examConfigSchema = z.object({
   bigExamName: z.string().trim().min(1, 'Final examination name is required.').max(100).optional(),
   bigExamMax: z.number().min(0).max(1000).optional(),
   assessmentComponents: z.array(examAssessmentComponentSchema).min(1).max(6).optional(),
+  lockedSemesters: z.array(z.enum(['Semester 1', 'Semester 2'])).max(2).optional(),
   passMarkPercentage: z.number().min(0, 'Pass mark must be between 0 and 100.').max(100).optional()
 }).superRefine((value, context) => {
   if (!value.assessmentComponents) return;
@@ -239,8 +240,14 @@ const examConfigSchema = z.object({
   if (new Set(ids).size !== ids.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component IDs must be unique.' });
   if (new Set(orders).size !== orders.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component order values must be unique.' });
   const continuousTotal = value.assessmentComponents.filter(item => item.category === 'continuous').reduce((sum, item) => sum + item.maxMarks, 0);
-  const finalTotal = value.assessmentComponents.filter(item => item.category === 'final').reduce((sum, item) => sum + item.maxMarks, 0);
+  const finalComponents = value.assessmentComponents.filter(item => item.category === 'final');
+  const finalTotal = finalComponents.reduce((sum, item) => sum + item.maxMarks, 0);
   const total = continuousTotal + finalTotal;
+  if (finalComponents.length !== 1 || ![50, 60].includes(finalTotal)) context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['assessmentComponents'],
+    message: 'Exactly one final examination worth 50 or 60 marks is required.'
+  });
   if (total !== 100) context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ['assessmentComponents'],
