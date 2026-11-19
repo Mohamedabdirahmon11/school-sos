@@ -1002,6 +1002,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             )}
 
             </div>
+          </div>
         </div>
       )}
 
