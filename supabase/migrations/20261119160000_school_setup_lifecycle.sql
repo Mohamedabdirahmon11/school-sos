@@ -157,7 +157,7 @@ BEGIN
    WHERE id = p_school_id;
   PERFORM public.schoolos_sync_school_semester_dates(p_school_id, p_year_id);
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) TO service_role;
 
@@ -197,7 +197,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_sync_school_semester_dates(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   UPDATE public.schools s
      SET terms = jsonb_build_object(
@@ -269,7 +269,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
@@ -310,7 +310,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_component_id uuid;
@@ -342,7 +342,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_date date;
@@ -375,7 +375,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
