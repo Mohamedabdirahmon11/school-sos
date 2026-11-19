@@ -153,6 +153,7 @@ export interface School {
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS
   language?: SchoolLanguage; // English default; Somali enabled
   timezone?: string;
+  dateFormat?: 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd';
   academicYear: string; // e.g. "2026-2027"
   currentSemester: 'Semester 1' | 'Semester 2';
   terms?: SchoolTermDates;
