@@ -122,13 +122,18 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
       gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
     ].join(' | '));
   }
+  const savedTeacherRemarks = result.subjectResults.flatMap(row => [
+    row.sem1Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 1: ${row.sem1Marks.teacherRemarks.trim().slice(0, 500)}` : '',
+    row.sem2Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 2: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}` : ''
+  ].filter(Boolean));
+  if (blocks.teacherRemarks && savedTeacherRemarks.length) lines.push('', 'TEACHER REMARKS', ...savedTeacherRemarks);
   lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
   if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
   lines.push(`Result: ${result.isPass ? 'PASS' : 'BELOW PASS MARK'}`);
   if (blocks.teacherRemarks) {
     const comments = (result.formTeacherComments || []).filter(item => item.comment?.trim());
     if (comments.length) lines.push('', ...comments.map(item => `Form Teacher comment (${item.semester}): ${item.comment}`));
-    else lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
+    else if (!savedTeacherRemarks.length) lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
   }
   if (blocks.adminRemarks) lines.push(`Administrator remarks: ${adminRemark(result.isPass)}`);
   if (blocks.signatures) lines.push('', `Teacher: ${design.signatureTitleLeft || 'Class Teacher'}`, `Administrator: ${design.signatureTitleRight || 'Principal'}`);
