@@ -1,7 +1,7 @@
 /**
  * Comprehensive School Configuration Hub
  * Features:
- * 1. Institution {t('settings_identity')} (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
+ * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
  * 3. Report Card Design (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
  * 4. Administrator WhatsApp contact (manual parent messaging; no SMS provider)
