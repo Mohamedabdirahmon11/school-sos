@@ -1362,24 +1362,28 @@ export const ExamsResultsView: React.FC = () => {
                   {semRankings.map(r => (
                     <tr key={r.student.id} className={r.isTopThree ? 'bg-teal-50/30' : 'hover:bg-[#F8FAFC]'}>
                       <td className="py-3 px-4 text-center font-mono font-bold">
-                        {r.rank === 1 ? '🥇 1' : r.rank === 2 ? '🥈 2' : r.rank === 3 ? '🥉 3' : `#${r.rank}`}
+                        {r.rank === 0 ? '—' : r.rank === 1 ? '🥇 1' : r.rank === 2 ? '🥈 2' : r.rank === 3 ? '🥉 3' : `#${r.rank}`}
                       </td>
                       <td className="py-3 px-4 font-mono text-[#64748B]">{r.student.studentId}</td>
                       <td className="py-3 px-4 font-semibold text-[#132A29]">
                         {r.student.firstName} {r.student.middleName} {r.student.lastName}
                       </td>
-                      <td className="py-3 px-4 text-center font-mono">{r.subjectCount}</td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">
-                        {r.averagePercentage}%
+                      <td className="py-3 px-4 text-center font-mono">
+                        {r.subjectCount}/{r.expectedSubjectCount || r.subjectCount}
                       </td>
-                      <td className="py-3 px-4 text-center font-semibold">{getGradeLabel(r.averagePercentage, school?.gradingScale)}</td>
+                      <td className="py-3 px-4 text-center font-mono font-bold text-[#0F766E]">
+                        {r.isComplete ? `${r.averagePercentage}%` : 'Pending'}
+                      </td>
+                      <td className="py-3 px-4 text-center font-semibold">
+                        {r.isComplete ? (r.grade || getGradeLabel(r.averagePercentage, school?.gradingScale)) : '—'}
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          r.averagePercentage >= (examConfig?.passMarkPercentage || 50)
+                          !r.isComplete ? 'bg-amber-50 text-amber-700' : r.isPass
                             ? 'bg-emerald-50 text-emerald-700'
                             : 'bg-rose-50 text-rose-700'
                         }`}>
-                          {r.averagePercentage >= (examConfig?.passMarkPercentage || 50) ? 'Passing' : 'Below Pass Mark'}
+                          {!r.isComplete ? 'Pending subjects' : r.isPass ? 'Passing' : 'Below Pass Mark'}
                         </span>
                       </td>
                     </tr>
