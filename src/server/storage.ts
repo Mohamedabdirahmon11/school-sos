@@ -2441,6 +2441,8 @@ class StorageEngine {
     if (updates.assessmentComponents) {
       const components = updates.assessmentComponents;
       const total = components.reduce((sum, component) => sum + Number(component.maxMarks), 0);
+      const finalComponents = components.filter(component => component.category === 'final');
+      const finalTotal = finalComponents.reduce((sum, component) => sum + Number(component.maxMarks), 0);
       const ids = components.map(component => component.id);
       const orders = components.map(component => component.order);
       if (components.length < 1 || components.length > 6) {
@@ -2449,6 +2451,9 @@ class StorageEngine {
       if (!components.every(component => Number.isInteger(component.maxMarks) && component.maxMarks >= 1 && component.maxMarks <= 100)
         || new Set(ids).size !== ids.length || new Set(orders).size !== orders.length) {
         throw new Error('Assessment components need unique IDs and positions, with whole-number maximums from 1 to 100.');
+      }
+      if (finalComponents.length !== 1 || ![50, 60].includes(finalTotal)) {
+        throw new Error('Exactly one final examination worth 50 or 60 marks is required.');
       }
       if (total !== 100) throw new Error(`Wadarta waa inay noqotaa 100 (hadda ${total})`);
     }
