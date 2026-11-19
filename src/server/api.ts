@@ -5098,6 +5098,10 @@ const isAcademicSetupDate = (value: unknown): value is string => {
   const parsed = new Date(value + 'T00:00:00.000Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
+const isAcademicYearName = (value: string): boolean => {
+  const match = value.match(/^(\\d{4})[-/](\\d{4})$/);
+  return Boolean(match && Number(match[2]) === Number(match[1]) + 1);
+};
 
 const auditAcademicSetup = (school: School, user: User, action: string, details: string, severity: 'info' | 'warning' = 'info') => {
   db.logAudit({
@@ -5125,7 +5129,7 @@ apiRouter.post('/academic-years', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const startDate = req.body?.startDate;
   const endDate = req.body?.endDate;
-  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+  if (!isAcademicYearName(name) || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
     res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
   }
   const { data, error } = await client.from('academic_years').insert({
