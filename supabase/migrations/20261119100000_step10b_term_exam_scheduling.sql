@@ -21,14 +21,14 @@ ALTER TABLE public.classes
 -- class_exam_settings and never mutate the class's normal shift.
 CREATE OR REPLACE FUNCTION public.schoolos_sync_class_normal_exam_shift()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.shift IS DISTINCT FROM OLD.shift THEN
     NEW.normal_exam_shift := CASE WHEN NEW.shift = 2 THEN 'afternoon' ELSE 'morning' END;
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS classes_sync_normal_exam_shift ON public.classes;
 CREATE TRIGGER classes_sync_normal_exam_shift
 BEFORE INSERT OR UPDATE OF shift ON public.classes
@@ -99,7 +99,7 @@ CREATE INDEX IF NOT EXISTS exam_sessions_school_day_time_idx
 
 CREATE OR REPLACE FUNCTION public.schoolos_guard_exam_session_overlap()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.exam_sessions other
@@ -113,7 +113,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS exam_session_no_overlap ON public.exam_sessions;
 CREATE TRIGGER exam_session_no_overlap
 BEFORE INSERT OR UPDATE OF exam_day_id, start_time, end_time
@@ -253,7 +253,7 @@ END $$;
 -- session tag 'all' is the full-day option and accepts either normal shift.
 CREATE OR REPLACE FUNCTION public.schoolos_guard_term_exam_shift()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
-AS $
+AS $$
 DECLARE v_session_shift TEXT;
 BEGIN
   IF NEW.exam_type <> 'term' THEN RETURN NEW; END IF;
@@ -269,7 +269,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS exam_schedule_term_shift_guard ON public.exam_schedules;
 CREATE TRIGGER exam_schedule_term_shift_guard
 BEFORE INSERT OR UPDATE OF exam_type, exam_session_id, exam_shift
@@ -284,7 +284,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_publish_term_exam_period(
   p_published_by VARCHAR(64)
 )
 RETURNS JSONB LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_period public.exam_periods%ROWTYPE;
   v_schedule_count INTEGER;
@@ -354,7 +354,7 @@ BEGIN
   RETURN jsonb_build_object('period_id', p_period_id, 'schedule_count', v_schedule_count,
                             'updated_schedules', v_seat_count, 'status', 'published');
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) TO service_role;
 
