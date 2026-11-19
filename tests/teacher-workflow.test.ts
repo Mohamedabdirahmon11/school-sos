@@ -210,6 +210,7 @@ test('Form Teacher exam register reviews every active class subject while edits 
   assert.match(teacher, /const gradeSubjects: Subject\[\] = isFormTeacher \? allClassSubjects : editableClassSubjects/);
   assert.match(teacher, /const allClassSubjects = uniqueSubjects\(classAssignments\)/);
   assert.match(teacher, /const editableClassSubjects = uniqueSubjects\(classAssignments\.filter\(\(assignment: any\) => !assignment\.isFormTeacher\)\)/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSemesterLocked \|\| isSaving/);
   assert.match(teacher, /const examRegisterRows = useMemo/);
 });
 
