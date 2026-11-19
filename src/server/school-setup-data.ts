@@ -28,12 +28,14 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
-    const existingTerms = existingData?.terms;
-    if (Array.isArray(existingTerms) && existingTerms.some((term: any) => validIsoDate(term.startDate) && validIsoDate(term.endDate) && (term.startDate < y.startDate || term.endDate > y.endDate))) return 'The new academic year would exclude saved terms. Update the term dates first.';
   }
   if (step === 3) {
     const terms = data.terms;
-    if (!Array.isArray(terms) || terms.length < 1 || terms.length > 3 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Add 1–3 terms with valid names and start/end dates.';
+    if (!Array.isArray(terms) || terms.length !== 2 ||
+        terms[0]?.name !== 'Semester 1' || terms[1]?.name !== 'Semester 2' ||
+        terms.some((t: any) => !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) {
+      return 'Configure exactly Semester 1 and Semester 2 with valid start/end dates.';
+    }
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
