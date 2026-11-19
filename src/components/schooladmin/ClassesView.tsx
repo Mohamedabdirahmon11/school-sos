@@ -6,7 +6,7 @@ import { Plus, Pencil, Trash2, X, Check, Layers, RefreshCw, Sparkles, ChevronUp,
 import { Teacher } from '../../types/index.ts';
 
 type Section = { id:string; name:string; legacy_class_id:string|null; max_students?:number; capacity?:number; class_teacher_id?:string|null; student_count?:number; available_seats?:number };
-type ClassGroup = { id:string; name:string; sort_order:number; class_sections:Section[] };
+type ClassGroup = { id:string; name:string; sort_order:number; is_active:boolean; class_sections:Section[] };
 type SectionDraft = { name:string; maxStudents:string; teacherId:string };
 
 export const ClassesView: React.FC = () => {
@@ -89,6 +89,12 @@ export const ClassesView: React.FC = () => {
     await run(()=>ApiClient.reorderClassGroups(ordered.map(item=>item.id)),tx('orderUpdated'));
   };
 
+  const toggleClassGroup = async (row:ClassGroup) => {
+    const nextActive=!row.is_active;
+    if(!nextActive&&!window.confirm(tx('confirmDeactivateClass'))) return;
+    await run(()=>ApiClient.setClassGroupActive(row.id,nextActive),tx(nextActive?'classActive':'classInactive'));
+  };
+
   return <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-7">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -114,8 +120,12 @@ export const ClassesView: React.FC = () => {
     <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">{tx('classList')}</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{rows.length} {tx('classCount')}</span></div>
     {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">{tx('loading')}</div> : rows.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">{tx('empty')}</div> :
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((row,index)=><article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1">{editing===row.id ? <div className="flex gap-2"><input aria-label={tx('className')} value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"/><button disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)} title={tx('save')} className="text-emerald-700 disabled:opacity-40"><Check size={18}/></button><button onClick={()=>setEditing(null)} title={tx('cancel')} className="text-slate-400"><X size={18}/></button></div> : <><div className="text-xs font-semibold text-teal-700">{tx('classLabel')} {index+1}</div><h3 className="mt-1 truncate text-lg font-bold text-slate-900">{row.name}</h3></>}</div>
-          {!isReadOnly && editing!==row.id && <div className="flex gap-1"><button disabled={busy||index===0} onClick={()=>void moveClass(index,-1)} title={tx('moveUp')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ChevronUp size={16}/></button><button disabled={busy||index===rows.length-1} onClick={()=>void moveClass(index,1)} title={tx('moveDown')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ChevronDown size={16}/></button><button onClick={()=>{setEditing(row.id);setEditName(row.name);}} title={tx('rename')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><Pencil size={16}/></button><button onClick={()=>removeClass(row)} title={tx('delete')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16}/></button></div>}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">{editing===row.id ? <div className="flex gap-2"><input aria-label={tx('className')} value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"/><button disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)} title={tx('save')} className="text-emerald-700 disabled:opacity-40"><Check size={18}/></button><button onClick={()=>setEditing(null)} title={tx('cancel')} className="text-slate-400"><X size={18}/></button></div> : <><div className="text-xs font-semibold text-teal-700">{tx('classLabel')} {index+1}</div><h3 className="mt-1 truncate text-lg font-bold text-slate-900">{row.name}</h3></>}</div>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.is_active?'bg-emerald-100 text-emerald-800':'bg-slate-100 text-slate-600'}`}>{tx(row.is_active?'classActive':'classInactive')}</span>
+            {!isReadOnly && editing!==row.id && <div className="flex gap-1"><button disabled={busy||index===0} onClick={()=>void moveClass(index,-1)} title={tx('moveUp')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ChevronUp size={16}/></button><button disabled={busy||index===rows.length-1} onClick={()=>void moveClass(index,1)} title={tx('moveDown')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ChevronDown size={16}/></button><button disabled={busy} onClick={()=>void toggleClassGroup(row)} title={tx(row.is_active?'deactivateClass':'activateClass')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30">{row.is_active?<X size={16}/>:<Check size={16}/>}</button><button onClick={()=>{setEditing(row.id);setEditName(row.name);}} title={tx('rename')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><Pencil size={16}/></button><button onClick={()=>removeClass(row)} title={tx('delete')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16}/></button></div>}
+          </div>
         </div>
         <div className="mt-4 space-y-3">{row.class_sections?.length ? row.class_sections.map(sec=>{
           const draft=sectionConfigDraft[sec.id]||{name:sec.name,maxStudents:String(sec.max_students??sec.capacity??40),teacherId:sec.class_teacher_id||''};
