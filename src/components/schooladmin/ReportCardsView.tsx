@@ -21,7 +21,10 @@ import {
   Search,
   Trophy,
   Layers,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  X,
+  Save
 } from 'lucide-react';
 
 interface ReportCardMark {
@@ -271,7 +274,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
 };
 
 export const ReportCardsView: React.FC = () => {
-  const { school, t } = useAuth();
+  const { school, user, currentRole, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [branches, setBranches] = useState<SchoolBranch[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
@@ -284,6 +287,8 @@ export const ReportCardsView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSavingDesign, setIsSavingDesign] = useState(false);
+  const [designMessage, setDesignMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!school) return;
@@ -327,6 +332,44 @@ export const ReportCardsView: React.FC = () => {
   const filteredRankings = yearlyRankings.filter(r =>
     `${r.student.firstName} ${r.student.lastName} ${r.student.studentId}`.toLowerCase().includes(search.toLowerCase())
   );
+
+
+  const canManageDesign = currentRole === 'school_admin' || currentRole === 'super_admin' || user?.role === 'school_admin' || user?.role === 'super_admin';
+
+  const saveOwnDesign = async (imageData: string) => {
+    if (!design) return;
+    setIsSavingDesign(true);
+    setError(null);
+    setDesignMessage(null);
+    try {
+      const updated = await ApiClient.updateReportCardDesign({ ownDesignImageUrl: imageData });
+      setDesign(updated);
+      setDesignMessage(imageData ? 'Your school report card design has been saved.' : 'Custom report card design removed. Default design is active.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The school report card design could not be saved.');
+    } finally {
+      setIsSavingDesign(false);
+    }
+  };
+
+  const handleOwnDesignUpload = (file?: File) => {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Upload a PNG, JPG or WebP report card design.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('The report card design must be 2 MB or smaller.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') void saveOwnDesign(reader.result);
+      else setError('The selected design could not be read.');
+    };
+    reader.onerror = () => setError('The selected design could not be read.');
+    reader.readAsDataURL(file);
+  };
 
   const download = async (action: () => Promise<void>) => {
     setError(null);
@@ -406,6 +449,52 @@ export const ReportCardsView: React.FC = () => {
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
+      )}
+
+      {design && canManageDesign && (
+        <section className="no-print rounded-xl border border-[#DCE5E4] bg-white p-4 md:p-5 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-[#132A29]">School-specific Report Card Design</h2>
+              <p className="mt-1 text-xs text-[#64748B] max-w-2xl">Upload your school’s official report-card background or stationery. It will be used for this school’s student report cards and class PDF exports only.</p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700 border border-teal-100">This school only</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-4 items-start">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white cursor-pointer hover:bg-[#0D655E]">
+                  <Upload className="w-4 h-4" />
+                  {design.ownDesignImageUrl ? 'Replace school design' : 'Upload school design'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isSavingDesign} onChange={event => {
+                    const file = event.target.files?.[0];
+                    handleOwnDesignUpload(file);
+                    event.currentTarget.value = '';
+                  }} />
+                </label>
+                {design.ownDesignImageUrl && (
+                  <button type="button" onClick={() => void saveOwnDesign('')} disabled={isSavingDesign} className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                    <X className="w-4 h-4" /> Remove custom design
+                  </button>
+                )}
+                {isSavingDesign && <span className="inline-flex items-center gap-2 text-xs text-[#64748B]"><Save className="w-4 h-4 animate-pulse" /> Saving design…</span>}
+              </div>
+              <p className="text-[11px] leading-5 text-[#64748B]">Accepted formats: PNG, JPG or WebP · Maximum size: 2 MB. Use a portrait A4 page (2480 × 3508 px recommended) with your school header, borders and watermark. Student marks and details remain generated by SchoolOS on top.</p>
+              {designMessage && <p className="text-xs font-medium text-emerald-700">{designMessage}</p>}
+            </div>
+            <div className="rounded-lg border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-2">
+              {design.ownDesignImageUrl ? (
+                <img src={design.ownDesignImageUrl} alt="Uploaded school report card design preview" className="w-full aspect-[210/297] object-contain rounded bg-white" />
+              ) : (
+                <div className="aspect-[210/297] flex flex-col items-center justify-center gap-2 text-center text-[#94A3B8]">
+                  <FileText className="w-8 h-8" />
+                  <span className="text-[11px] font-medium">Default SchoolOS report card</span>
+                </div>
+              )}
+              <p className="pt-2 text-center text-[10px] font-medium text-[#64748B]">{design.ownDesignImageUrl ? 'Current school design' : 'No custom background uploaded'}</p>
+            </div>
+          </div>
+        </section>
       )}
 
       {design && (
