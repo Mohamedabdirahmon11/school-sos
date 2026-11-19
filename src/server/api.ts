@@ -5150,6 +5150,10 @@ apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAd
     await client.from('terms').delete().eq('id', term.id).eq('school_id', school.id);
     res.status(503).json({ error: 'Semester status could not be initialized.' }); return;
   }
+  const calendarSync = await client.rpc('schoolos_sync_school_semester_dates', {
+    p_school_id: school.id, p_year_id: req.params.yearId
+  });
+  if (calendarSync.error) { res.status(503).json({ error: 'Semester was saved, but school calendar settings could not be synchronized.' }); return; }
   auditAcademicSetup(school, user, 'SEMESTER_CREATED', 'Created ' + name + ' in academic year ' + req.params.yearId + '.');
   res.status(201).json({ ...term, status: 'open', examPeriod });
 });
@@ -5200,6 +5204,10 @@ apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, req
     if (savedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but exam dates could not be updated.' }); return; }
     examPeriod = savedExam.data;
   }
+  const calendarSync = await client.rpc('schoolos_sync_school_semester_dates', {
+    p_school_id: school.id, p_year_id: term.academic_year_id
+  });
+  if (calendarSync.error) { res.status(503).json({ error: 'Semester was saved, but school calendar settings could not be synchronized.' }); return; }
   auditAcademicSetup(school, user, 'SEMESTER_UPDATED', 'Updated ' + name + ' in academic year ' + term.academic_year_id + '.');
   res.json({ ...data, examPeriod });
 });
