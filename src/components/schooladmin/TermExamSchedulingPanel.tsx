@@ -77,7 +77,19 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
       return;
     }
     const data = await ApiClient.getTermExamPeriod(termId);
-    setPeriodData(data);
+    setPeriodData({ ...data, roomAssignments: data.roomAssignments || [], classExamSettings: data.classExamSettings || [] });
+    if (data.period) {
+      setPeriodName(data.period.name || 'Imtixaanka Term-ka');
+      setStartDate(data.period.start_date || '');
+      setEndDate(data.period.end_date || '');
+      if (data.sessions?.length) setSessions(data.sessions.map((row: any) => ({
+        name: row.name, startTime: String(row.start_time).slice(0, 5), endTime: String(row.end_time).slice(0, 5),
+        shiftTag: row.shift_tag === 'morning' || row.shift_tag === 'afternoon' ? row.shift_tag : 'all'
+      })));
+    } else {
+      setPeriodName('Imtixaanka Term-ka');
+      setSessions(defaultSessions);
+    }
     setClassShifts(Object.fromEntries((data.classExamSettings || []).map((row: any) => [row.class_id, row.exam_shift])));
     const next: Record<string, string> = {};
     for (const row of data.invigilators || []) next[row.exam_session_id + ':' + row.room_id] = row.teacher_id;
@@ -144,6 +156,22 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
       setNotice('Kormeerayaasha waa la kaydiyey. Qol kasta oo la isticmaalayo waa inuu yeeshaa kormeere.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Kormeerayaasha lama kaydin karin.');
+    } finally { setSaving(false); }
+  };
+
+  const handleCancelPeriod = async () => {
+    if (isReadOnly || !periodData.period || periodData.period.status !== 'draft') return;
+    if (!window.confirm('Ma hubtaa inaad tirtirayso jadwalkan draft-ka ah iyo kuraastiisa?')) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await ApiClient.deleteTermExamPeriod(periodData.period.id);
+      setPeriodData({ period: null, days: [], sessions: [], schedules: [], invigilators: [], roomAssignments: [] });
+      setClassShifts({});
+      setInvigilators({});
+      setSessions(defaultSessions);
+      setNotice('Jadwalkii draft-ka ahaa waa la joojiyey.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Jadwalka lama joojin karin.');
     } finally { setSaving(false); }
   };
 
@@ -268,6 +296,7 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
         </div>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={printTimetable} className="rounded-lg border border-[#CBD5E1] px-4 py-2.5 text-xs font-bold text-[#334155]">Daabac A4 (jadwalka + liisaska qolalka)</button>
+          <button type="button" onClick={() => void handleCancelPeriod()} disabled={isReadOnly || saving || periodData.period.status === 'published'} className="rounded-lg border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-700 disabled:opacity-50">Jooji draft-ka</button>
           <button type="button" onClick={() => void handlePublish()} disabled={isReadOnly || saving || periodData.period.status === 'published' || !periodData.schedules.length} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">Daabac jadwalka (Publish)</button>
         </div>
       </section>}
