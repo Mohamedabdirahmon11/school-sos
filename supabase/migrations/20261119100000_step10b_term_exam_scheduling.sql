@@ -79,6 +79,29 @@ CREATE TABLE IF NOT EXISTS public.exam_sessions (
 CREATE INDEX IF NOT EXISTS exam_sessions_school_day_time_idx
   ON public.exam_sessions(school_id, exam_day_id, start_time);
 
+CREATE OR REPLACE FUNCTION public.schoolos_guard_exam_session_overlap()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.exam_sessions other
+     WHERE other.school_id = NEW.school_id
+       AND other.exam_day_id = NEW.exam_day_id
+       AND other.id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+       AND NEW.start_time < other.end_time
+       AND other.start_time < NEW.end_time
+  ) THEN
+    RAISE EXCEPTION 'Exam sessions on the same day cannot overlap.';
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS exam_session_no_overlap ON public.exam_sessions;
+CREATE TRIGGER exam_session_no_overlap
+BEFORE INSERT OR UPDATE OF exam_day_id, start_time, end_time
+ON public.exam_sessions FOR EACH ROW
+EXECUTE FUNCTION public.schoolos_guard_exam_session_overlap();
+
 -- Extend the existing schedule master instead of creating a parallel exam
 -- schedule table. One row represents one subject for one manhaj group/session;
 -- room-by-room allocations live on the existing seat assignment records.
@@ -263,7 +286,7 @@ BEGIN
      JOIN public.exam_rooms room ON room.id = seat.room_id AND room.school_id = seat.school_id
      WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
        AND schedule.exam_type = 'term'
-     GROUP BY seat.schedule_id, seat.room_id, room.capacity
+     GROUP BY schedule.exam_session_id, seat.room_id, room.capacity
      HAVING COUNT(*) > room.capacity
   ) THEN RAISE EXCEPTION 'One or more rooms exceed their registered capacity.'; END IF;
 
