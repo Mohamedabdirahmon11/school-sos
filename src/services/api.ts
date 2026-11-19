@@ -625,6 +625,16 @@ export class ApiClient {
     return this.request<Subject[]>('/subjects');
   }
 
+  public static async getSubjectCatalog() {
+    return this.request<Array<{ id: string; name: string; code: string; description?: string | null; sort_order: number }>>('/subject-catalog');
+  }
+
+  public static async selectSubjectCatalog(catalogIds: string[]) {
+    return this.request<{ createdCount: number; linkedCount: number; skippedCount: number }>('/subjects/catalog-selection', {
+      method: 'POST', body: JSON.stringify({ catalogIds })
+    });
+  }
+
   public static async addDefaultSubjects() {
     return this.request<{ success: boolean; createdCount: number; skippedCount: number; subjects: Subject[] }>('/subjects/defaults', {
       method: 'POST',
