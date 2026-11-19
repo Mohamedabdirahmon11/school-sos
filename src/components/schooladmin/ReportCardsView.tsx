@@ -149,7 +149,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           {blocks.percentage && (
             <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] font-semibold text-[#475569]">Yearly average: {result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</span>
           )}
-          <span className={`px-2.5 py-1 rounded-full font-semibold ${!result.annualComplete ? 'bg-amber-50 text-amber-800' : result.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+          <span className={`px-2.5 py-1 rounded-full font-semibold ${!result.annualComplete || !result.annualPublished ? 'bg-amber-50 text-amber-800' : result.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
             {!result.annualComplete ? 'NOT FINAL — BOTH SEMESTERS REQUIRED' : !result.annualPublished ? 'APPROVED — AWAITING SCHOOL PUBLICATION' : result.isPass ? 'PUBLISHED — PASS' : 'PUBLISHED — BELOW PASS MARK'}
           </span>
         </div>
@@ -352,7 +352,7 @@ export const ReportCardsView: React.FC = () => {
                 setIsBulkPrintMode(false);
               }, 300);
             }}
-            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualComplete)}
+            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualComplete || !result.annualPublished)}
             className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
           >
             <Layers className="w-3.5 h-3.5" />
@@ -367,7 +367,7 @@ export const ReportCardsView: React.FC = () => {
             <Printer className="w-3.5 h-3.5" />
             Print Student Report Card
           </button>
-          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId))} disabled={!selectedStudentResult?.annualComplete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Download PDF</button>
+          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId))} disabled={!selectedStudentResult?.annualComplete || !selectedStudentResult?.annualPublished} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Download PDF</button>
         </div>
       </div>
 
