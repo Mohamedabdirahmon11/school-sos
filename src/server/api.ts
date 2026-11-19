@@ -10242,6 +10242,34 @@ apiRouter.put('/term-marks/structures', requireAuth, requireSchoolAdminOrSuperAd
   res.json(data);
 });
 
+apiRouter.get('/term-marks/assignments', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school=(req as any).school as School;
+  const user=(req as any).user as User;
+  if(user.role!=='teacher'){res.status(403).json({error:'Macallimiinta oo keliya ayaa arki kara qoondeyntooda.'});return;}
+  const termId=String(req.query.termId||'');
+  if(!termId){res.status(400).json({error:'Dooro term-ka.'});return;}
+  const client=termMarksServiceClient(res);if(!client)return;
+  const {data:teacher}=await client.from('teachers').select('id').eq('school_id',school.id).eq('user_id',user.id).maybeSingle();
+  const {data:term}=await client.from('terms').select('academic_year_id').eq('school_id',school.id).eq('id',termId).maybeSingle();
+  if(!teacher||!term){res.status(403).json({error:'Macallinka ama term-ka lama xaqiijin.'});return;}
+  const {data:assignments,error}=await client.from('teacher_class_subject_assignments')
+    .select('class_id,subject_id,section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
+    .eq('academic_year_id',term.academic_year_id).or(`term_id.is.null,term_id.eq.${termId}`);
+  if(error){res.status(503).json({error:error.message});return;}
+  const classIds=[...new Set((assignments||[]).map((a:any)=>a.class_id))];
+  const subjectIds=[...new Set((assignments||[]).map((a:any)=>a.subject_id))];
+  const [{data:classes},{data:subjects}]=await Promise.all([
+    classIds.length?client.from('classes').select('id,name,section').eq('school_id',school.id).in('id',classIds):Promise.resolve({data:[] as any[]}),
+    subjectIds.length?client.from('subjects').select('id,name,code').eq('school_id',school.id).in('id',subjectIds):Promise.resolve({data:[] as any[]})
+  ]);
+  const classById=new Map((classes||[]).map((row:any)=>[row.id,row]));
+  const subjectById=new Map((subjects||[]).map((row:any)=>[row.id,row]));
+  res.json((assignments||[]).map((row:any)=>({
+    classId:row.class_id,subjectId:row.subject_id,sectionId:row.section_id,
+    class:classById.get(row.class_id)||null,subject:subjectById.get(row.subject_id)||null
+  })).filter((row:any)=>row.class&&row.subject));
+});
+
 apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
