@@ -29,6 +29,13 @@ ALTER TABLE public.academic_years
 
 ALTER TABLE public.exam_periods
   ADD COLUMN IF NOT EXISTS results_publish_date date;
+ALTER TABLE public.exam_periods
+  DROP CONSTRAINT IF EXISTS exam_periods_results_publish_after_exam_check;
+ALTER TABLE public.exam_periods
+  ADD CONSTRAINT exam_periods_results_publish_after_exam_check
+  CHECK (results_publish_date IS NULL OR results_publish_date >= end_date) NOT VALID;
+ALTER TABLE public.exam_periods
+  VALIDATE CONSTRAINT exam_periods_results_publish_after_exam_check;
 
 -- Serialize year changes per school and prevent overlapping academic-year ranges.
 CREATE OR REPLACE FUNCTION public.schoolos_guard_academic_year_dates()
@@ -96,6 +103,22 @@ BEGIN
       AND daterange(t.start_date, t.end_date, '[]') && daterange(NEW.start_date, NEW.end_date, '[]')
   ) THEN
     RAISE EXCEPTION 'Semester dates overlap another semester in this academic year.';
+  END IF;
+  IF NEW.name = 'Semester 1' AND EXISTS (
+    SELECT 1 FROM public.terms t
+     WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id
+       AND t.name='Semester 2' AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)
+       AND NEW.end_date >= t.start_date
+  ) THEN
+    RAISE EXCEPTION 'Semester 1 must end before Semester 2 begins.';
+  END IF;
+  IF NEW.name = 'Semester 2' AND EXISTS (
+    SELECT 1 FROM public.terms t
+     WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id
+       AND t.name='Semester 1' AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)
+       AND NEW.start_date <= t.end_date
+  ) THEN
+    RAISE EXCEPTION 'Semester 2 must begin after Semester 1 ends.';
   END IF;
   RETURN NEW;
 END;
@@ -379,9 +402,31 @@ AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
+  v_term_start date;
+  v_term_end date;
 BEGIN
-  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
-  ELSE v_school_id:=NEW.school_id; v_term_id:=NEW.term_id; END IF;
+  IF TG_OP='DELETE' THEN
+    v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
+  ELSE
+    v_school_id:=NEW.school_id; v_term_id:=NEW.term_id;
+    SELECT start_date,end_date INTO v_term_start,v_term_end
+      FROM public.terms WHERE id=v_term_id AND school_id=v_school_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Exam period must belong to a valid school semester.'; END IF;
+    IF NEW.start_date > NEW.end_date OR NEW.start_date < v_term_start OR NEW.end_date > v_term_end THEN
+      RAISE EXCEPTION 'Examination dates must fall within the semester dates.';
+    END IF;
+    IF NEW.results_publish_date IS NOT NULL AND NEW.results_publish_date < NEW.end_date THEN
+      RAISE EXCEPTION 'Results cannot be published before the examination period ends.';
+    END IF;
+    IF TG_OP='UPDATE' AND OLD.status='published' AND (
+      NEW.start_date IS DISTINCT FROM OLD.start_date OR
+      NEW.end_date IS DISTINCT FROM OLD.end_date OR
+      NEW.results_publish_date IS DISTINCT FROM OLD.results_publish_date OR
+      NEW.status IS DISTINCT FROM OLD.status
+    ) THEN
+      RAISE EXCEPTION 'Published examination periods are locked.';
+    END IF;
+  END IF;
   IF EXISTS (
     SELECT 1 FROM public.term_status ts
      WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
@@ -392,11 +437,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
-CREATE TRIGGER exam_periods_closed_term_guard
-BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
-FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_exam_period();
-
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_student_marks() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_component_marks() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_attendance() FROM PUBLIC, anon, authenticated;
