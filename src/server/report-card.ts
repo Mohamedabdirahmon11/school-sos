@@ -70,7 +70,7 @@ interface ReportCardResult {
   subjectResults: Array<{
     subject: { name: string; code?: string };
     sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string } | null;
-    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number } | null;
+    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string } | null;
     sem1Percentage: number | null;
     sem2Percentage: number | null;
     yearlyPercentage: number | null;
