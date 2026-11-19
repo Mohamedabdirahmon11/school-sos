@@ -74,7 +74,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   ]).values()], [teacherAssignments, formTeacherClasses]);
   const subjects: Subject[] = [...new Map(teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
-  const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
+  const isFormTeacher = formTeacherClasses.some(klass => klass.id === selectedClassId);
   const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
   const allClassSubjects = uniqueSubjects(classAssignments);
   // Every teacher may enter marks only for subjects explicitly assigned to them.
