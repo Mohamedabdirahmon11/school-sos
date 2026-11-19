@@ -6630,6 +6630,27 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
   }
 });
 
+apiRouter.delete('/exams/term-periods/:periodId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: period, error: lookupError } = await client.from('exam_periods').select('id,name,status')
+      .eq('id', req.params.periodId).eq('school_id', school.id).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!period) { res.status(404).json({ error: 'Muddada imtixaanka lagama helin dugsigan.' }); return; }
+    if (period.status !== 'draft') { res.status(409).json({ error: 'Jadwal imtixaan oo la daabacay lama tirtiri karo.' }); return; }
+    const { error: deleteError } = await client.from('exam_periods').delete()
+      .eq('id', period.id).eq('school_id', school.id).eq('status', 'draft');
+    if (deleteError) throw deleteError;
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_CANCELLED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Cancelled draft term exam period ' + period.name + '.', severity: 'warning' });
+    res.json({ success: true, periodId: period.id });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to cancel term exam timetable.' });
+  }
+});
+
 apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
