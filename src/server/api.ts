@@ -6329,12 +6329,47 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
     if (sessions.error) throw sessions.error;
     if (schedules.error) throw schedules.error;
     const sessionIds = (sessions.data || []).map((session: any) => session.id);
-    const invigilators = sessionIds.length
-      ? await client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
-      : { data: [], error: null };
+    const scheduleIds = (schedules.data || []).map((schedule: any) => schedule.id);
+    const [invigilators, seatRows] = await Promise.all([
+      sessionIds.length
+        ? client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
+        : Promise.resolve({ data: [], error: null }),
+      scheduleIds.length
+        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number').eq('school_id', school.id).in('schedule_id', scheduleIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
     if (invigilators.error) throw invigilators.error;
+    if (seatRows.error) throw seatRows.error;
+    const usedRoomIds = [...new Set((seatRows.data || []).map((seat: any) => seat.room_id).filter(Boolean))];
+    const roomResult = usedRoomIds.length
+      ? await client.from('exam_rooms').select('id,name,capacity').eq('school_id', school.id).in('id', usedRoomIds)
+      : { data: [], error: null };
+    if (roomResult.error) throw roomResult.error;
+    const roomById = new Map((roomResult.data || []).map((room: any) => [room.id, room]));
+    const roomAssignments = new Map<string, any>();
+    for (const schedule of schedules.data || []) {
+      for (const seat of (seatRows.data || []).filter((row: any) => row.schedule_id === schedule.id)) {
+        const key = schedule.exam_session_id + ':' + seat.room_id;
+        const entry = roomAssignments.get(key) || {
+          sessionId: schedule.exam_session_id, roomId: seat.room_id,
+          roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
+          capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
+          studentCount: 0, classRanges: new Map<string, any>()
+        };
+        entry.studentCount += 1;
+        const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
+        range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
+        range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
+        range.studentCount += 1;
+        entry.classRanges.set(seat.class_id, range);
+        roomAssignments.set(key, entry);
+      }
+    }
+    const roomAssignmentRows = [...roomAssignments.values()].map((entry: any) => ({
+      ...entry, classRanges: [...entry.classRanges.values()]
+    }));
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [] });
+    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load term exam timetable.' });
   }
