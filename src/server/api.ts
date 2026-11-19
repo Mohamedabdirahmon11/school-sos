@@ -6742,26 +6742,20 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,subject_id')
       : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
     const ownSubjectIds = new Set(assigned.items.map((item: any) => item.subjectId));
-    const classAssignments = isFormTeacher
-      ? await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,subject_id,teacher_id')
-      : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
-    const editableSubjectIds = new Set([
-      ...ownSubjectIds,
-      ...(isFormTeacher ? classAssignments.items.map((item: any) => item.subjectId) : [])
-    ]);
     if (!isFormTeacher && ownSubjectIds.size === 0) {
       res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Form Teacher.' });
       return;
     }
-    if (subjectId && !editableSubjectIds.has(String(subjectId))) {
-      res.status(403).json({ error: 'You may only access subjects assigned to you, or subjects in your Form Teacher class.' });
+    // Form Teachers may review the whole class register, but subject teachers
+    // may only read their own assigned subjects. This is read-only access.
+    if (subjectId && !isFormTeacher && !ownSubjectIds.has(String(subjectId))) {
+      res.status(403).json({ error: 'You may only access subjects assigned to you.' });
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
-    res.json(classMarks.filter(mark =>
-      editableSubjectIds.has(mark.subjectId) ||
-      (isFormTeacher && (mark.status === 'submitted' || mark.status === 'form_teacher_submitted'))
-    ));
+    res.json(isFormTeacher
+      ? classMarks
+      : classMarks.filter(mark => ownSubjectIds.has(mark.subjectId)));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
@@ -6806,10 +6800,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
-    if (!assignment.total && !mayFillFormTeacherSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may enter marks only for a subject explicitly assigned to your teacher profile. Form Teacher access is review-only.' });
       return;
     }
   }
