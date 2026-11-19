@@ -6525,9 +6525,14 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
     })));
     const { data: savedSessions, error: sessionError } = await client.from('exam_sessions').insert(sessionRows).select();
     if (sessionError) throw sessionError;
+    const dayDateById = new Map((days || []).map((day: any) => [day.id, day.exam_date]));
+    const orderedSessions = [...(savedSessions || [])].sort((a: any, b: any) =>
+      String(dayDateById.get(a.exam_day_id) || '').localeCompare(String(dayDateById.get(b.exam_day_id) || '')) ||
+      Number(a.seq) - Number(b.seq)
+    );
     const sessionsByShift = {
-      morning: (savedSessions || []).filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
-      afternoon: (savedSessions || []).filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
+      morning: orderedSessions.filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
+      afternoon: orderedSessions.filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
     };
     const classById = new Map(classes.map(klass => [klass.id, klass]));
     const scheduleRows: any[] = [];
