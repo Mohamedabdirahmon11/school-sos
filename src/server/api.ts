@@ -3363,8 +3363,35 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
 });
 
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
- const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
- if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
+ const school=(req as any).school as School;
+ const client=classGroupsClient();
+ const {data:groups,error}=await client.from('class_groups')
+   .select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)')
+   .eq('school_id',school.id).order('sort_order').order('name');
+ if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;}
+ const sections=(groups||[]).flatMap((group:any)=>group.class_sections||[]);
+ const legacyIds=[...new Set(sections.map((section:any)=>section.legacy_class_id).filter(Boolean))];
+ const classRows=legacyIds.length
+   ? await client.from('classes').select('id,class_teacher_id,capacity').eq('school_id',school.id).in('id',legacyIds)
+   : {data:[],error:null};
+ if(classRows.error){res.status(503).json({error:'Macallimiinta fasallada iyo awooddooda lama akhrin karin.'});return;}
+ const countEntries=await Promise.all(legacyIds.map(async (classId:string)=>{
+   const result=await client.from('students').select('id',{count:'exact',head:true})
+     .eq('school_id',school.id).eq('class_id',classId).eq('status','active');
+   return {classId,count:result.count||0,error:result.error};
+ }));
+ if(countEntries.some(item=>item.error)){res.status(503).json({error:'Tirada ardayda fasallada lama akhrin karin.'});return;}
+ const classById=new Map((classRows.data||[]).map((row:any)=>[row.id,row]));
+ const countById=new Map(countEntries.map(item=>[item.classId,item.count]));
+ res.json((groups||[]).map((group:any)=>({
+   ...group,
+   class_sections:(group.class_sections||[]).map((section:any)=>{
+     const legacy=(classById.get(section.legacy_class_id) as any)||{};
+     const capacity=Number(section.max_students||legacy.capacity||40);
+     const studentCount=Number(countById.get(section.legacy_class_id)||0);
+     return {...section,class_teacher_id:legacy.class_teacher_id||null,capacity,student_count:studentCount,available_seats:Math.max(0,capacity-studentCount)};
+   })
+ })));
 });
 apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School; const name=typeof req.body?.name==='string'?req.body.name.trim():''; const sections=Array.isArray(req.body?.sections)?req.body.sections:[];
@@ -3376,15 +3403,52 @@ apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, req
  const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
 });
 apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
- const {data,error}=await classGroupsClient().from('class_groups').update({name,updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('school_id',school.id).select().maybeSingle();
- if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Magacan fasal kale ayaa leh.':'Fasalka lama beddeli karin.'});return;}if(!data){res.status(404).json({error:'Fasalka lama helin.'});return;}res.json(data);
+ const school=(req as any).school as School;
+ const updates:any={updated_at:new Date().toISOString()};
+ if(typeof req.body?.name==='string'){
+   const name=req.body.name.trim();
+   if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
+   updates.name=name;
+ }
+ if(req.body?.sortOrder!==undefined){
+   const sortOrder=Number(req.body.sortOrder);
+   if(!Number.isInteger(sortOrder)||sortOrder<0||sortOrder>100000){res.status(400).json({error:'Kala horreynta fasalku sax ma aha.'});return;}
+   updates.sort_order=sortOrder;
+ }
+ if(Object.keys(updates).length===1){res.status(400).json({error:'Magac ama kala horreyn cusub geli.'});return;}
+ const {data,error}=await classGroupsClient().from('class_groups').update(updates).eq('id',req.params.id).eq('school_id',school.id).select().maybeSingle();
+ if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Magacan fasal kale ayaa leh.':'Fasalka lama beddeli karin.'});return;}
+ if(!data){res.status(404).json({error:'Fasalka lama helin.'});return;}res.json(data);
 });
 apiRouter.post('/class-groups/:id/sections', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>80){res.status(400).json({error:'Magaca qaybtu waa inuu ahaadaa 1 ilaa 80 xaraf.'});return;}
  const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
  const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
 });
+apiRouter.put('/class-sections/:id/configuration', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ const client=classGroupsClient();
+ const name=typeof req.body?.name==='string'?req.body.name.trim():'';
+ const maxStudents=Number(req.body?.maxStudents);
+ const teacherId=req.body?.teacherId ? String(req.body.teacherId) : null;
+ if(!name||name.length>80||!Number.isInteger(maxStudents)||maxStudents<1||maxStudents>1000){
+   res.status(400).json({error:'Geli magaca qaybta iyo awood u dhexeysa 1 ilaa 1000 arday.'});return;
+ }
+ const {data:section}=await client.from('class_sections').select('id,legacy_class_id')
+   .eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section){res.status(404).json({error:'Qaybta lagama helin dugsigan.'});return;}
+ const {data,error}=await client.rpc('schoolos_update_class_section_config',{
+   p_school_id:school.id,p_section_id:section.id,p_name:name,p_max_students:maxStudents,p_teacher_user_id:teacherId
+ });
+ if(error){
+   const message=error.message||'Qaybta lama cusboonaysiin karin.';
+   res.status(/capacity|enrollment/i.test(message)?409:400).json({error:message});return;
+ }
+ db.logAudit({action:'CLASS_SECTION_CONFIG_UPDATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:'Updated section '+name+' capacity and Form Teacher.',severity:'info'});
+ res.json(data);
+});
+
 apiRouter.delete('/class-sections/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const client=classGroupsClient();
  const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
