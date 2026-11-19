@@ -61,7 +61,7 @@ export const apiRouter = Router();
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,normal_exam_shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
@@ -6413,7 +6413,7 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
   const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
   try {
     const [termResult, classResult, assignmentResult, studentResult, roomResult] = await Promise.all([
-      client.from('terms').select('id,name,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle(),
+      client.from('terms').select('id,name,start_date,end_date,is_current').eq('school_id', school.id).eq('id', termId).maybeSingle(),
       client.from('classes').select('id,name,academic_year,shift,normal_exam_shift,is_archived').eq('school_id', school.id).eq('is_archived', false),
       client.from('class_subjects').select('class_id,subject_id,teacher_id').eq('school_id', school.id).eq('is_active', true),
       client.from('students').select('id,class_id').eq('school_id', school.id).eq('status', 'active'),
