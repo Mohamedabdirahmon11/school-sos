@@ -130,7 +130,7 @@ export const PlatformSettingsView: React.FC = () => {
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-          Platform Security & System Governance
+          Platform Configuration & Security
         </h1>
         <p className="text-xs text-[#64748B]">
           Global subscription rules, session policies, brute-force lockouts, and synchronized academic calendar
@@ -153,7 +153,7 @@ export const PlatformSettingsView: React.FC = () => {
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <Calendar className="w-4 h-4 text-[#0F766E]" />
-            <span>Academic Calendar & Semester Dates (Universal for All Schools)</span>
+            <span>Platform-wide Academic Calendar & Term Dates</span>
           </h2>
           <p className="text-[11px] text-[#64748B]">
             All tenant schools follow exactly these synchronized dates. Individual schools cannot alter semester timelines.
@@ -220,7 +220,7 @@ export const PlatformSettingsView: React.FC = () => {
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#0F766E]" />
-            <span>Subscription Lifecycle Policies</span>
+            <span>Subscription & Billing Policies</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -280,7 +280,7 @@ export const PlatformSettingsView: React.FC = () => {
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <Shield className="w-4 h-4 text-[#0F766E]" />
-            <span>Security, Rate Limiting & Lockout Rules</span>
+            <span>Security & Login Protection</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -354,7 +354,7 @@ export const PlatformSettingsView: React.FC = () => {
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs">
           <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
             <Languages className="w-4 h-4 text-[#0F766E]" />
-            <span>Supported Languages</span>
+            <span>Available Languages</span>
           </h2>
           <p className="text-[11px] text-[#64748B]">
             English and Somali are available by default. Amharic can be enabled or disabled for the platform.
@@ -392,7 +392,7 @@ export const PlatformSettingsView: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
                 <Database className="w-4 h-4 text-[#0F766E]" />
-                <span>Database Backups & Disaster Recovery</span>
+                <span>Platform Backup & Recovery</span>
               </h2>
               <p className="mt-1 text-[11px] text-[#64748B]">A GitHub Actions workflow can create encrypted off-site backups when all required private Supabase and S3 secrets are configured. The manual JSON export is separate, excludes credentials, and is not a full-platform restore image.</p>
             </div>
