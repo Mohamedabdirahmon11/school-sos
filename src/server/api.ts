@@ -3417,8 +3417,8 @@ apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, req
  const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:sortOrder}).select().single();
  if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
  const unique: string[] = Array.from(new Set<string>((sections as unknown[]).map(value => String(value).trim()).filter(value => value.length > 0)));
- if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
- const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
+ if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order,max_students:school.defaultClassCapacity||40})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
+ const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)').eq('id',group.id).single();res.status(201).json(data);
 });
 apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;
@@ -3441,7 +3441,7 @@ apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
 apiRouter.post('/class-groups/:id/sections', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>80){res.status(400).json({error:'Magaca qaybtu waa inuu ahaadaa 1 ilaa 80 xaraf.'});return;}
  const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
- const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
+ const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name,max_students:school.defaultClassCapacity||40}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
 });
 apiRouter.put('/class-sections/:id/configuration', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;
