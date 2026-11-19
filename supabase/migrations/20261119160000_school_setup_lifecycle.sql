@@ -155,6 +155,7 @@ BEGIN
      SET academic_year = (SELECT name FROM public.academic_years WHERE id = p_year_id AND school_id = p_school_id),
          updated_at = now()
    WHERE id = p_school_id;
+  PERFORM public.schoolos_sync_school_semester_dates(p_school_id, p_year_id);
 END;
 $;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
@@ -186,7 +187,7 @@ BEGIN
   ON CONFLICT (school_id, term_id) DO UPDATE
     SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
 
@@ -212,7 +213,7 @@ BEGIN
      updated_at = now()
    WHERE s.id = p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) TO service_role;
 
@@ -257,7 +258,7 @@ BEGIN
   END IF;
   PERFORM public.schoolos_sync_school_semester_dates(p_school_id, v_year_id);
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
 
@@ -298,7 +299,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS student_marks_closed_term_guard ON public.student_marks;
 CREATE TRIGGER student_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.student_marks
@@ -330,7 +331,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS component_marks_closed_term_guard ON public.component_marks;
 CREATE TRIGGER component_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.component_marks
@@ -363,7 +364,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS attendance_closed_term_guard ON public.attendance_records;
 CREATE TRIGGER attendance_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.attendance_records
@@ -390,7 +391,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
 CREATE TRIGGER exam_periods_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
