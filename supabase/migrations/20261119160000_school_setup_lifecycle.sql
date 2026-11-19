@@ -418,13 +418,16 @@ BEGIN
     IF NEW.results_publish_date IS NOT NULL AND NEW.results_publish_date < NEW.end_date THEN
       RAISE EXCEPTION 'Results cannot be published before the examination period ends.';
     END IF;
-    IF TG_OP='UPDATE' AND OLD.status='published' AND (
-      NEW.start_date IS DISTINCT FROM OLD.start_date OR
-      NEW.end_date IS DISTINCT FROM OLD.end_date OR
-      NEW.results_publish_date IS DISTINCT FROM OLD.results_publish_date OR
-      NEW.status IS DISTINCT FROM OLD.status
-    ) THEN
-      RAISE EXCEPTION 'Published examination periods are locked.';
+    IF TG_OP='UPDATE' THEN
+      IF OLD.status='published' AND (
+        NEW.name IS DISTINCT FROM OLD.name OR
+        NEW.start_date IS DISTINCT FROM OLD.start_date OR
+        NEW.end_date IS DISTINCT FROM OLD.end_date OR
+        NEW.results_publish_date IS DISTINCT FROM OLD.results_publish_date OR
+        NEW.status IS DISTINCT FROM OLD.status
+      ) THEN
+        RAISE EXCEPTION 'Published examination periods are locked.';
+      END IF;
     END IF;
   END IF;
   IF EXISTS (
