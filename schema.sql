@@ -255,11 +255,13 @@ CREATE TABLE IF NOT EXISTS classes (
   monthly_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
   shift SMALLINT NOT NULL DEFAULT 1 CHECK (shift IN (1, 2)),
+  normal_exam_shift TEXT NOT NULL DEFAULT 'morning' CHECK (normal_exam_shift IN ('morning', 'afternoon')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS normal_exam_shift TEXT NOT NULL DEFAULT 'morning';
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_code VARCHAR(40);
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(9);
 ALTER TABLE classes ALTER COLUMN section SET DEFAULT '';
@@ -276,6 +278,21 @@ BEGIN
   END IF;
 END
 $shift_constraint$;
+
+CREATE OR REPLACE FUNCTION public.schoolos_sync_class_normal_exam_shift()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.shift IS DISTINCT FROM OLD.shift THEN
+    NEW.normal_exam_shift := CASE WHEN NEW.shift = 2 THEN 'afternoon' ELSE 'morning' END;
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS classes_sync_normal_exam_shift ON public.classes;
+CREATE TRIGGER classes_sync_normal_exam_shift
+BEFORE INSERT OR UPDATE OF shift ON public.classes
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_sync_class_normal_exam_shift();
 
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(school_id, grade_level);

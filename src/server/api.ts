@@ -55,12 +55,13 @@ import { collectPagedItems } from '../lib/documents/paged-query.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/template-engine.ts';
+import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
 
 export const apiRouter = Router();
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,normal_exam_shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
@@ -6307,6 +6308,396 @@ apiRouter.get('/exams/schedules/:id/seats', requireAuth, requireSchoolAdminOrSup
   });
 });
 
+
+apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: period, error } = await client.from('exam_periods').select('*')
+      .eq('school_id', school.id).eq('term_id', req.params.termId).maybeSingle();
+    if (error) throw error;
+    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [] }); return; }
+    const days = await client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date');
+    if (days.error) throw days.error;
+    const dayIds = (days.data || []).map((day: any) => day.id);
+    const [sessions, schedules, classExamSettings] = await Promise.all([
+      dayIds.length ? client.from('exam_sessions').select('*').eq('school_id', school.id).in('exam_day_id', dayIds).order('seq') : Promise.resolve({ data: [], error: null }),
+      client.from('exam_schedules').select('id,exam_period_id,exam_session_id,subject_id,exam_name,exam_date,start_time,end_time,exam_shift,manhaj_group_key,status,seat_capacity')
+        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time'),
+      client.from('class_exam_settings').select('class_id,exam_shift').eq('school_id', school.id).eq('term_id', req.params.termId)
+    ]);
+    if (sessions.error) throw sessions.error;
+    if (schedules.error) throw schedules.error;
+    if (classExamSettings.error) throw classExamSettings.error;
+    const sessionIds = (sessions.data || []).map((session: any) => session.id);
+    const scheduleIds = (schedules.data || []).map((schedule: any) => schedule.id);
+    const [invigilators, seatRows] = await Promise.all([
+      sessionIds.length
+        ? client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
+        : Promise.resolve({ data: [], error: null }),
+      scheduleIds.length
+        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number').eq('school_id', school.id).in('schedule_id', scheduleIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+    if (invigilators.error) throw invigilators.error;
+    if (seatRows.error) throw seatRows.error;
+    const usedRoomIds = [...new Set((seatRows.data || []).map((seat: any) => seat.room_id).filter(Boolean))];
+    const roomResult = usedRoomIds.length
+      ? await client.from('exam_rooms').select('id,name,capacity').eq('school_id', school.id).in('id', usedRoomIds)
+      : { data: [], error: null };
+    if (roomResult.error) throw roomResult.error;
+    const roomById = new Map((roomResult.data || []).map((room: any) => [room.id, room]));
+    const roomAssignments = new Map<string, any>();
+    for (const schedule of schedules.data || []) {
+      for (const seat of (seatRows.data || []).filter((row: any) => row.schedule_id === schedule.id)) {
+        const key = schedule.exam_session_id + ':' + seat.room_id;
+        const entry = roomAssignments.get(key) || {
+          sessionId: schedule.exam_session_id, roomId: seat.room_id,
+          roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
+          capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
+          studentCount: 0, classRanges: new Map<string, any>()
+        };
+        entry.studentCount += 1;
+        const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
+        range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
+        range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
+        range.studentCount += 1;
+        entry.classRanges.set(seat.class_id, range);
+        roomAssignments.set(key, entry);
+      }
+    }
+    const roomAssignmentRows = [...roomAssignments.values()].map((entry: any) => ({
+      ...entry, classRanges: [...entry.classRanges.values()]
+    }));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows, classExamSettings: classExamSettings.data || [] });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load term exam timetable.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const termId = typeof body.termId === 'string' ? body.termId.trim() : '';
+  const name = typeof body.name === 'string' ? body.name.trim() : 'Term Examination';
+  const startDate = typeof body.startDate === 'string' ? body.startDate : '';
+  const endDate = typeof body.endDate === 'string' ? body.endDate : '';
+  const requestedDays = Array.isArray(body.days) ? body.days.filter((value: unknown) => typeof value === 'string') as string[] : [];
+  const sessionDrafts = Array.isArray(body.sessions) ? body.sessions : [];
+  const shiftOverrides = body.classExamShifts && typeof body.classExamShifts === 'object' ? body.classExamShifts as Record<string, string> : {};
+  if (!termId || !name || name.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate || !sessionDrafts.length || sessionDrafts.length > 8) {
+    res.status(400).json({ error: 'Dooro term, taariikhaha bilowga/dhammaadka iyo ugu yaraan hal session oo sax ah.' }); return;
+  }
+  const sessions = sessionDrafts.map((item: any, index: number) => ({
+    seq: index + 1,
+    name: typeof item?.name === 'string' ? item.name.trim().slice(0, 80) : 'Session ' + (index + 1),
+    start_time: typeof item?.startTime === 'string' ? item.startTime : '',
+    end_time: typeof item?.endTime === 'string' ? item.endTime : '',
+    shift_tag: ['morning','afternoon','all'].includes(item?.shiftTag) ? item.shiftTag : 'all'
+  }));
+  if (sessions.some((item: any) => !item.name || !/^\d{2}:\d{2}$/.test(item.start_time) || !/^\d{2}:\d{2}$/.test(item.end_time) || item.start_time >= item.end_time)) {
+    res.status(400).json({ error: 'Hubi magaca session-ka iyo waqtiga bilowga/dhammaadka.' }); return;
+  }
+  const sessionsOverlap = sessions.some((session: any, index: number) =>
+    sessions.slice(index + 1).some((other: any) => session.start_time < other.end_time && other.start_time < session.end_time)
+  );
+  if (sessionsOverlap) { res.status(400).json({ error: 'Waqtiyada fadhiyada isku maalin ah ma is dul saarmi karaan.' }); return; }
+  const dates = requestedDays.length ? [...new Set(requestedDays)].sort() : (() => {
+    const values: string[] = [];
+    const cursor = new Date(startDate + 'T12:00:00Z');
+    const last = new Date(endDate + 'T12:00:00Z');
+    while (cursor <= last) { values.push(cursor.toISOString().slice(0, 10)); cursor.setUTCDate(cursor.getUTCDate() + 1); }
+    return values;
+  })();
+  if (!dates.length || dates.some((date: string) => date < startDate || date > endDate || !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
+    res.status(400).json({ error: 'Maalmaha imtixaanku waa inay ku jiraan muddada la doortay.' }); return;
+  }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const [termResult, classResult, assignmentResult, studentResult, roomResult] = await Promise.all([
+      client.from('terms').select('id,name,start_date,end_date,is_current').eq('school_id', school.id).eq('id', termId).maybeSingle(),
+      client.from('classes').select('id,name,academic_year,shift,normal_exam_shift,is_archived').eq('school_id', school.id).eq('is_archived', false),
+      client.from('class_subjects').select('class_id,subject_id,teacher_id').eq('school_id', school.id).eq('is_active', true),
+      client.from('students').select('id,class_id').eq('school_id', school.id).eq('status', 'active'),
+      client.from('exam_rooms').select('id,name,capacity,is_active').eq('school_id', school.id).eq('is_active', true).order('name')
+    ]);
+    for (const result of [termResult, classResult, assignmentResult, studentResult, roomResult]) if (result.error) throw result.error;
+    if (!termResult.data) throw new Error('Term-kan lagama helin dugsigan.');
+    const term = termResult.data;
+    const termLabel = String(term.name || '').toLowerCase();
+    const isTermOne = /(?:term|semester)\s*(?:1|one|first)|(?:first|one)\s*(?:term|semester)/.test(termLabel);
+    const isTermTwo = /(?:term|semester)\s*(?:2|two|second)|(?:second|two)\s*(?:term|semester)/.test(termLabel);
+    if (!isTermOne && !isTermTwo) throw new Error('Kaliya Term 1 iyo Term 2 ayaa lagu jadwalayn karaa imtixaanka weyn.');
+    const classes = (classResult.data || []) as any[];
+    const assignments = (assignmentResult.data || []) as any[];
+    const students = (studentResult.data || []) as any[];
+    const rooms = (roomResult.data || []).map((room: any) => ({ id: room.id, name: room.name, capacity: Number(room.capacity) }));
+    if (!classes.length || !assignments.length || !students.length) throw new Error('Fasallo, maaddooyin ama arday firfircoon lama helin.');
+    if (!rooms.length) throw new Error('Marka hore diiwaangeli ugu yaraan hal qol imtixaan.');
+    const assignmentByClass = new Map<string, any[]>();
+    for (const assignment of assignments) {
+      const rows = assignmentByClass.get(assignment.class_id) || [];
+      rows.push(assignment); assignmentByClass.set(assignment.class_id, rows);
+    }
+    const classExamShifts: Record<string, 'morning' | 'afternoon'> = {};
+    for (const klass of classes) {
+      const requested = shiftOverrides[klass.id];
+      classExamShifts[klass.id] = requested === 'morning' || requested === 'afternoon'
+        ? requested : klass.normal_exam_shift === 'morning' || klass.normal_exam_shift === 'afternoon'
+          ? klass.normal_exam_shift : klass.shift === 2 ? 'afternoon' : 'morning';
+    }
+    const groups = buildManhajGroups(classes.map(klass => ({
+      id: klass.id, name: klass.name,
+      subjectIds: (assignmentByClass.get(klass.id) || []).map(row => row.subject_id)
+    })));
+    if (!groups.length) throw new Error('Ma jiraan manhaj groups leh maaddooyin imtixaan.');
+    const studentsByClass = new Map<string, any[]>();
+    for (const student of students) {
+      const rows = studentsByClass.get(student.class_id) || [];
+      rows.push(student); studentsByClass.set(student.class_id, rows);
+    }
+    // Validate session capacity and class-subject placement before replacing any saved draft.
+    const virtualSessions = dates.flatMap((date: string) => sessions.map((session: any) => ({
+      key: date + ':' + session.seq, shift_tag: session.shift_tag
+    })));
+    const virtualByShift = {
+      morning: virtualSessions.filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
+      afternoon: virtualSessions.filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
+    };
+    const virtualRoomUsage = new Map<string, number>();
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      for (const shift of ['morning','afternoon'] as const) {
+        const shiftClasses = group.classIds.filter(classId => classExamShifts[classId] === shift);
+        if (!shiftClasses.length) continue;
+        const eligibleSessions = virtualByShift[shift];
+        if (group.subjectIds.length > eligibleSessions.length) {
+          throw new Error(group.classNames.join(', ') + ' waxay u baahan yihiin ' + group.subjectIds.length + ' sessions, balse shift-ka ' + shift + ' wuxuu leeyahay ' + eligibleSessions.length + '. Ku dar maalmo ama sessions.');
+        }
+        for (let subjectIndex = 0; subjectIndex < group.subjectIds.length; subjectIndex += 1) {
+          const virtualSession = eligibleSessions[(subjectIndex + groupIndex) % eligibleSessions.length];
+          const groupStudents = shiftClasses.flatMap(classId => (studentsByClass.get(classId) || []).map(student => ({ id: student.id, classId })));
+          if (!groupStudents.length) throw new Error('Ma jiraan arday firfircoon oo ku jira fasallada ' + shiftClasses.join(', ') + '.');
+          const remainingRooms = rooms.map(room => ({
+            ...room, capacity: room.capacity - (virtualRoomUsage.get(virtualSession.key + ':' + room.id) || 0)
+          })).filter(room => room.capacity > 0);
+          const allocations = allocateMixedRoomSeating(shiftClasses.map(classId => ({
+            classId, className: (classes.find((item: any) => item.id === classId)?.name || classId),
+            students: groupStudents.filter(student => student.classId === classId).map(student => ({ id: student.id, classId }))
+          })), remainingRooms, subjectIndex + groupIndex);
+          for (const allocation of allocations) {
+            const key = virtualSession.key + ':' + allocation.roomId;
+            virtualRoomUsage.set(key, (virtualRoomUsage.get(key) || 0) + allocation.seats.length);
+          }
+        }
+      }
+    }
+    const { data: existingPeriod, error: periodLookupError } = await client.from('exam_periods').select('*')
+      .eq('school_id', school.id).eq('term_id', termId).maybeSingle();
+    if (periodLookupError) throw periodLookupError;
+    if (existingPeriod?.status === 'published') throw new Error('Muddadan imtixaanka waa la daabacay; lama beddeli karo.');
+    let period = existingPeriod;
+    if (period) {
+      const { error } = await client.from('exam_schedules').delete().eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').eq('status', 'draft');
+      if (error) throw error;
+      const { error: dayDeleteError } = await client.from('exam_days').delete().eq('school_id', school.id).eq('exam_period_id', period.id);
+      if (dayDeleteError) throw dayDeleteError;
+      const { data, error: updateError } = await client.from('exam_periods').update({ name, start_date: startDate, end_date: endDate, status: 'draft', published_by: null, published_at: null, updated_at: new Date().toISOString() })
+        .eq('id', period.id).eq('school_id', school.id).select().single();
+      if (updateError) throw updateError; period = data;
+    } else {
+      const { data, error } = await client.from('exam_periods').insert({
+        school_id: school.id, term_id: termId, name, start_date: startDate, end_date: endDate,
+        status: 'draft', created_by: user.id
+      }).select().single();
+      if (error) throw error; period = data;
+    }
+    const settingsRows = classes.map(klass => ({
+      school_id: school.id, class_id: klass.id, term_id: termId, exam_shift: classExamShifts[klass.id]
+    }));
+    const { error: settingsError } = await client.from('class_exam_settings').upsert(settingsRows, { onConflict: 'school_id,class_id,term_id' });
+    if (settingsError) throw settingsError;
+    const dayRows = dates.map((date: string) => ({ school_id: school.id, exam_period_id: period.id, exam_date: date }));
+    const { data: days, error: dayInsertError } = await client.from('exam_days').insert(dayRows).select();
+    if (dayInsertError) throw dayInsertError;
+    const sessionRows = (days || []).flatMap((day: any) => sessions.map((session: any) => ({
+      school_id: school.id, exam_day_id: day.id, seq: session.seq, name: session.name,
+      start_time: session.start_time, end_time: session.end_time, shift_tag: session.shift_tag
+    })));
+    const { data: savedSessions, error: sessionError } = await client.from('exam_sessions').insert(sessionRows).select();
+    if (sessionError) throw sessionError;
+    const dayDateById = new Map((days || []).map((day: any) => [day.id, day.exam_date]));
+    const orderedSessions = [...(savedSessions || [])].sort((a: any, b: any) =>
+      String(dayDateById.get(a.exam_day_id) || '').localeCompare(String(dayDateById.get(b.exam_day_id) || '')) ||
+      Number(a.seq) - Number(b.seq)
+    );
+    const sessionsByShift = {
+      morning: orderedSessions.filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
+      afternoon: orderedSessions.filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
+    };
+    const classById = new Map(classes.map(klass => [klass.id, klass]));
+    const scheduleRows: any[] = [];
+    const roomUsageBySession = new Map<string, number>();
+    const roomSeatNumberBySession = new Map<string, number>();
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      for (const shift of ['morning','afternoon'] as const) {
+        const shiftClasses = group.classIds.filter(classId => classExamShifts[classId] === shift);
+        if (!shiftClasses.length) continue;
+        const eligibleSessions = sessionsByShift[shift];
+        if (group.subjectIds.length > eligibleSessions.length) {
+          throw new Error(group.classNames.join(', ') + ' waxay u baahan yihiin ' + group.subjectIds.length + ' sessions, balse shift-ka ' + shift + ' wuxuu leeyahay ' + eligibleSessions.length + '. Ku dar maalmo ama sessions.');
+        }
+        for (let subjectIndex = 0; subjectIndex < group.subjectIds.length; subjectIndex += 1) {
+          const subjectId = group.subjectIds[subjectIndex];
+          const session = eligibleSessions[(subjectIndex + groupIndex) % eligibleSessions.length];
+          const day = (days || []).find((item: any) => item.id === session.exam_day_id);
+          const groupStudents = shiftClasses.flatMap(classId => (studentsByClass.get(classId) || []).map(student => ({ id: student.id, classId })));
+          if (!groupStudents.length) throw new Error('Ma jiraan arday firfircoon oo ku jira ' + shiftClasses.map(id => (classById.get(id) as any)?.name || id).join(', ') + '.');
+          const remainingRooms = rooms.map(room => ({
+            ...room, capacity: room.capacity - (roomUsageBySession.get(session.id + ':' + room.id) || 0)
+          })).filter(room => room.capacity > 0);
+          const allocations = allocateMixedRoomSeating(shiftClasses.map(classId => ({
+            classId, className: (classById.get(classId) as any)?.name || classId,
+            students: groupStudents.filter(student => student.classId === classId).map(student => ({ id: student.id, classId }))
+          })), remainingRooms, subjectIndex + groupIndex);
+          for (const allocation of allocations) {
+            const key = session.id + ':' + allocation.roomId;
+            roomUsageBySession.set(key, (roomUsageBySession.get(key) || 0) + allocation.seats.length);
+          }
+          const scheduleId = randomUUID();
+          const schedule = {
+            id: scheduleId, school_id: school.id, class_id: null, subject_id: subjectId,
+            exam_name: name, exam_type: 'term', academic_year: (classById.get(shiftClasses[0]) as any)?.academic_year || school.academicYear || '2026-2027',
+            semester: isTermTwo ? 'Semester 2' : 'Semester 1',
+            exam_date: day.exam_date, start_time: session.start_time, end_time: session.end_time,
+            room_name: 'Mixed rooms', room_id: null, shift_name: shift, seat_capacity: groupStudents.length,
+            status: 'draft', created_by: user.id, exam_period_id: period.id, exam_session_id: session.id,
+            manhaj_group_key: createHash('sha256').update(group.key).digest('hex'), exam_shift: shift
+          };
+          const { error: scheduleError } = await client.from('exam_schedules').insert(schedule);
+          if (scheduleError) throw scheduleError;
+          const cohortRows = groupStudents.map(student => ({
+            id: 'cohort-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
+            student_id: student.id, class_id: student.classId, is_selected: true
+          }));
+          const { error: cohortError } = await client.from('exam_schedule_cohort_students').insert(cohortRows);
+          if (cohortError) throw cohortError;
+          const seatRows = allocations.flatMap(room => room.seats.map(seat => {
+            const roomKey = session.id + ':' + room.roomId;
+            const seatNumber = (roomSeatNumberBySession.get(roomKey) || 0) + 1;
+            roomSeatNumberBySession.set(roomKey, seatNumber);
+            return {
+              id: 'seat-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
+              student_id: seat.studentId, seat_number: seatNumber, room_id: seat.roomId,
+              class_id: seat.classId, exam_number: seat.examNumber, exam_session_id: session.id
+            };
+          }));
+          const { error: seatError } = await client.from('exam_seat_assignments').insert(seatRows);
+          if (seatError) throw seatError;
+          scheduleRows.push({ id: scheduleId, subjectId, examDate: day.exam_date, startTime: session.start_time, endTime: session.end_time, examShift: shift, manhajGroupKey: schedule.manhaj_group_key, studentCount: groupStudents.length, roomAllocations: allocations.map(room => ({ roomId: room.roomId, roomName: room.roomName, studentCount: room.seats.length, classRanges: room.classRanges })) });
+        }
+      }
+    }
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_GENERATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Generated ' + scheduleRows.length + ' term exam subject sessions for ' + name + '.', severity: 'warning' });
+    res.status(201).json({ period, days, sessions: savedSessions || [], schedules: scheduleRows });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to generate term exam timetable.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const assignments = Array.isArray(req.body?.assignments) ? req.body.assignments : [];
+  try {
+    const { data: period, error: periodError } = await client.from('exam_periods').select('id,status')
+      .eq('id', req.params.periodId).eq('school_id', school.id).maybeSingle();
+    if (periodError) throw periodError;
+    if (!period || period.status !== 'draft') throw new Error('Kaliya muddada imtixaanka ee draft-ka ah ayaa la beddeli karaa.');
+    const { data: days, error: daysError } = await client.from('exam_days').select('id')
+      .eq('school_id', school.id).eq('exam_period_id', period.id);
+    if (daysError) throw daysError;
+    const { data: sessions, error: sessionsError } = await client.from('exam_sessions').select('id')
+      .eq('school_id', school.id).in('exam_day_id', (days || []).map((day: any) => day.id));
+    if (sessionsError) throw sessionsError;
+    const sessionIds = (sessions || []).map((session: any) => session.id);
+    if (sessionIds.length) {
+      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
+      if (deleteError) throw deleteError;
+    }
+    const rows = assignments.map((item: any) => ({
+      school_id: school.id, exam_session_id: String(item.sessionId || ''),
+      room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
+    }));
+    if (rows.some((item: any) => !sessionIds.includes(item.exam_session_id) || !item.room_id || !item.teacher_id)) throw new Error('Xogta kormeeraha, session-ka ama qolka waa khaldan tahay.');
+    const teacherSessionKeys = rows.map((item: any) => item.exam_session_id + ':' + item.teacher_id);
+    if (new Set(teacherSessionKeys).size !== teacherSessionKeys.length) throw new Error('Hal macallin laguma qori karo laba qol oo isku session ah.');
+    const teacherIds = [...new Set(rows.map((item: any) => item.teacher_id))];
+    const { data: validTeachers, error: teacherError } = teacherIds.length
+      ? await client.from('teachers').select('id').eq('school_id', school.id).in('id', teacherIds)
+      : { data: [], error: null };
+    if (teacherError) throw teacherError;
+    if ((validTeachers || []).length !== teacherIds.length) throw new Error('Macallin aan dugsigan ka tirsanayn ayaa la doortay.');
+    const { data: periodSchedules, error: scheduleError } = await client.from('exam_schedules')
+      .select('id,exam_session_id,subject_id').eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term');
+    if (scheduleError) throw scheduleError;
+    const periodScheduleIds = (periodSchedules || []).map((item: any) => item.id);
+    const { data: periodSeats, error: seatError } = periodScheduleIds.length
+      ? await client.from('exam_seat_assignments').select('schedule_id,room_id,class_id').eq('school_id', school.id).in('schedule_id', periodScheduleIds)
+      : { data: [], error: null };
+    if (seatError) throw seatError;
+    const { data: teachingRows, error: teachingError } = teacherIds.length
+      ? await client.from('class_subjects').select('class_id,subject_id,teacher_id').eq('school_id', school.id).eq('is_active', true).in('teacher_id', teacherIds)
+      : { data: [], error: null };
+    if (teachingError) throw teachingError;
+    const schedulesById = new Map((periodSchedules || []).map((item: any) => [item.id, item]));
+    for (const row of rows) {
+      const teachesRoomSubject = (periodSeats || []).some((seat: any) => {
+        if (seat.room_id !== row.room_id) return false;
+        const schedule = schedulesById.get(seat.schedule_id) as any;
+        return schedule?.exam_session_id === row.exam_session_id &&
+          (teachingRows || []).some((teaching: any) => teaching.teacher_id === row.teacher_id &&
+            teaching.class_id === seat.class_id && teaching.subject_id === schedule.subject_id);
+      });
+      if (teachesRoomSubject) throw new Error('Macallin ma kormeeri karo fasal iyo maaddo uu isagu dhigo.');
+    }
+    if (sessionIds.length) {
+      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
+      if (deleteError) throw deleteError;
+    }
+    if (rows.length) {
+      const { error } = await client.from('exam_invigilators').insert(rows);
+      if (error) throw error;
+    }
+    res.json({ success: true, assigned: rows.length });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to assign invigilators.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/:periodId/publish', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data, error } = await client.rpc('schoolos_publish_term_exam_period', {
+      p_school_id: school.id, p_period_id: req.params.periodId, p_published_by: user.id
+    });
+    if (error) throw error;
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_PUBLISHED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Published term exam period ' + req.params.periodId + '.', severity: 'warning' });
+    res.json(data);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to publish term exam timetable.' });
+  }
+});
+
 apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -8172,7 +8563,7 @@ apiRouter.post('/school/backup/restore/preview', requireAuth, requireSchoolAdmin
     res.status(400).json({ error: 'This backup version is not supported.' });
     return;
   }
-  const allowed = new Set(["school_branches","classes","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_rooms","exam_schedules","exam_schedule_cohort_students","exam_seat_assignments","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
+  const allowed = new Set(["school_branches","classes","terms","subjects","teachers","students","staff_members","admission_applications","assignments","fee_structures","fee_ranges","fee_receipt_sequences","inventory_items","library_books","transport_routes","school_notices","exam_configs","exam_rooms","exam_periods","class_exam_settings","exam_days","exam_sessions","exam_schedules","exam_schedule_cohort_students","exam_seat_assignments","exam_invigilators","school_health_visits","report_card_templates","school_events","support_tickets","timetable_settings","teacher_unavailability","timetable_slots","class_subjects","fee_payments","attendance_records","student_marks","assignment_submissions","promotions","promotion_history","inventory_transactions","library_loans","bus_assignments","notice_reads","direct_messages","discipline_incidents","payroll_records","school_expenses","bank_statement_entries","bank_statement_allocations","notification_templates"]);
   const counts: Record<string, number> = {};
   for (const [table, rows] of Object.entries(backup.tables as Record<string, unknown>)) {
     if (!allowed.has(table)) continue;
