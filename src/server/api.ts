@@ -6542,6 +6542,7 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
     const classById = new Map(classes.map(klass => [klass.id, klass]));
     const scheduleRows: any[] = [];
     const roomUsageBySession = new Map<string, number>();
+    const roomSeatNumberBySession = new Map<string, number>();
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
       const group = groups[groupIndex];
       for (const shift of ['morning','afternoon'] as const) {
@@ -6586,11 +6587,16 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
           }));
           const { error: cohortError } = await client.from('exam_schedule_cohort_students').insert(cohortRows);
           if (cohortError) throw cohortError;
-          const seatRows = allocations.flatMap(room => room.seats.map(seat => ({
-            id: 'seat-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
-            student_id: seat.studentId, seat_number: seat.seatNumber, room_id: seat.roomId,
-            class_id: seat.classId, exam_number: seat.examNumber
-          })));
+          const seatRows = allocations.flatMap(room => room.seats.map(seat => {
+            const roomKey = session.id + ':' + room.roomId;
+            const seatNumber = (roomSeatNumberBySession.get(roomKey) || 0) + 1;
+            roomSeatNumberBySession.set(roomKey, seatNumber);
+            return {
+              id: 'seat-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
+              student_id: seat.studentId, seat_number: seatNumber, room_id: seat.roomId,
+              class_id: seat.classId, exam_number: seat.examNumber, exam_session_id: session.id
+            };
+          }));
           const { error: seatError } = await client.from('exam_seat_assignments').insert(seatRows);
           if (seatError) throw seatError;
           scheduleRows.push({ id: scheduleId, subjectId, examDate: day.exam_date, startTime: session.start_time, endTime: session.end_time, examShift: shift, manhajGroupKey: schedule.manhaj_group_key, studentCount: groupStudents.length, roomAllocations: allocations.map(room => ({ roomId: room.roomId, roomName: room.roomName, studentCount: room.seats.length, classRanges: room.classRanges })) });
