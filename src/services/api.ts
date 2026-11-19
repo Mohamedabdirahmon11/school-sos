@@ -1217,7 +1217,7 @@ export class ApiClient {
   }
 
   public static unlockAttendanceSession(sessionId: string, reason: string) {
-    return this.request<any>('/attendance/sessions/' + encodeURIComponent(sessionId) + '/unlock', { method: 'POST', body: JSON.stringify({ reason }) });
+    return this.request<any>('/attendance/sessions', { method: 'POST', body: JSON.stringify({ sessionId, reason }) });
   }
 
   public static getAttendanceReport(params: { startDate: string; endDate: string; classId?: string; subjectId?: string }) {
