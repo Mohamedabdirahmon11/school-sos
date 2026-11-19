@@ -1272,6 +1272,28 @@ export class ApiClient {
     return this.request<any[]>('/exams/schedules');
   }
 
+  public static async getTermExamPeriod(termId: string) {
+    return this.request<any>(`/exams/term-periods/${encodeURIComponent(termId)}`);
+  }
+
+  public static async generateTermExamPeriod(data: {
+    termId: string; name: string; startDate: string; endDate: string; days?: string[];
+    sessions: Array<{ name: string; startTime: string; endTime: string; shiftTag: 'morning' | 'afternoon' | 'all' }>;
+    classExamShifts?: Record<string, 'morning' | 'afternoon'>;
+  }) {
+    return this.request<any>('/exams/term-periods/generate', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async assignTermExamInvigilators(periodId: string, assignments: Array<{ sessionId: string; roomId: string; teacherId: string }>) {
+    return this.request<{ success: boolean; assigned: number }>(`/exams/term-periods/${encodeURIComponent(periodId)}/invigilators`, {
+      method: 'POST', body: JSON.stringify({ assignments })
+    });
+  }
+
+  public static async publishTermExamPeriod(periodId: string) {
+    return this.request<any>(`/exams/term-periods/${encodeURIComponent(periodId)}/publish`, { method: 'POST', body: JSON.stringify({}) });
+  }
+
   public static async getPublishedExamSchedules(classId?: string) {
     const path = '/exams/schedules/published' + (classId ? '?classId=' + encodeURIComponent(classId) : '');
     return this.request<any[]>(path);
