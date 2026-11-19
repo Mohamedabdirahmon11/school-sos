@@ -6321,13 +6321,15 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
     const days = await client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date');
     if (days.error) throw days.error;
     const dayIds = (days.data || []).map((day: any) => day.id);
-    const [sessions, schedules] = await Promise.all([
+    const [sessions, schedules, classExamSettings] = await Promise.all([
       dayIds.length ? client.from('exam_sessions').select('*').eq('school_id', school.id).in('exam_day_id', dayIds).order('seq') : Promise.resolve({ data: [], error: null }),
       client.from('exam_schedules').select('id,exam_period_id,exam_session_id,subject_id,exam_name,exam_date,start_time,end_time,exam_shift,manhaj_group_key,status,seat_capacity')
-        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time')
+        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time'),
+      client.from('class_exam_settings').select('class_id,exam_shift').eq('school_id', school.id).eq('term_id', req.params.termId)
     ]);
     if (sessions.error) throw sessions.error;
     if (schedules.error) throw schedules.error;
+    if (classExamSettings.error) throw classExamSettings.error;
     const sessionIds = (sessions.data || []).map((session: any) => session.id);
     const scheduleIds = (schedules.data || []).map((schedule: any) => schedule.id);
     const [invigilators, seatRows] = await Promise.all([
@@ -6369,7 +6371,7 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
       ...entry, classRanges: [...entry.classRanges.values()]
     }));
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows });
+    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows, classExamSettings: classExamSettings.data || [] });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load term exam timetable.' });
   }
@@ -6582,6 +6584,41 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
     }));
     if (rows.some((item: any) => !sessionIds.includes(item.exam_session_id) || !item.room_id || !item.teacher_id)) throw new Error('Xogta kormeeraha, session-ka ama qolka waa khaldan tahay.');
+    const teacherSessionKeys = rows.map((item: any) => item.exam_session_id + ':' + item.teacher_id);
+    if (new Set(teacherSessionKeys).size !== teacherSessionKeys.length) throw new Error('Hal macallin laguma qori karo laba qol oo isku session ah.');
+    const teacherIds = [...new Set(rows.map((item: any) => item.teacher_id))];
+    const { data: validTeachers, error: teacherError } = teacherIds.length
+      ? await client.from('teachers').select('id').eq('school_id', school.id).in('id', teacherIds)
+      : { data: [], error: null };
+    if (teacherError) throw teacherError;
+    if ((validTeachers || []).length !== teacherIds.length) throw new Error('Macallin aan dugsigan ka tirsanayn ayaa la doortay.');
+    const { data: periodSchedules, error: scheduleError } = await client.from('exam_schedules')
+      .select('id,exam_session_id,subject_id').eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term');
+    if (scheduleError) throw scheduleError;
+    const periodScheduleIds = (periodSchedules || []).map((item: any) => item.id);
+    const { data: periodSeats, error: seatError } = periodScheduleIds.length
+      ? await client.from('exam_seat_assignments').select('schedule_id,room_id,class_id').eq('school_id', school.id).in('schedule_id', periodScheduleIds)
+      : { data: [], error: null };
+    if (seatError) throw seatError;
+    const { data: teachingRows, error: teachingError } = teacherIds.length
+      ? await client.from('class_subjects').select('class_id,subject_id,teacher_id').eq('school_id', school.id).eq('is_active', true).in('teacher_id', teacherIds)
+      : { data: [], error: null };
+    if (teachingError) throw teachingError;
+    const schedulesById = new Map((periodSchedules || []).map((item: any) => [item.id, item]));
+    for (const row of rows) {
+      const teachesRoomSubject = (periodSeats || []).some((seat: any) => {
+        if (seat.room_id !== row.room_id) return false;
+        const schedule = schedulesById.get(seat.schedule_id) as any;
+        return schedule?.exam_session_id === row.exam_session_id &&
+          (teachingRows || []).some((teaching: any) => teaching.teacher_id === row.teacher_id &&
+            teaching.class_id === seat.class_id && teaching.subject_id === schedule.subject_id);
+      });
+      if (teachesRoomSubject) throw new Error('Macallin ma kormeeri karo fasal iyo maaddo uu isagu dhigo.');
+    }
+    if (sessionIds.length) {
+      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
+      if (deleteError) throw deleteError;
+    }
     if (rows.length) {
       const { error } = await client.from('exam_invigilators').insert(rows);
       if (error) throw error;
