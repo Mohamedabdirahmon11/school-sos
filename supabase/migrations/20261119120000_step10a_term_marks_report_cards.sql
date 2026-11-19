@@ -211,7 +211,15 @@ CREATE OR REPLACE FUNCTION public.schoolos_check_mark_structure_total()
 RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE v_structure_id uuid; v_school_id text; v_total numeric;
 BEGIN
-  IF TG_OP='DELETE' THEN
+  IF TG_TABLE_NAME='mark_structures' THEN
+    IF TG_OP='DELETE' THEN
+      v_structure_id := OLD.id;
+      v_school_id := OLD.school_id;
+    ELSE
+      v_structure_id := NEW.id;
+      v_school_id := NEW.school_id;
+    END IF;
+  ELSIF TG_OP='DELETE' THEN
     v_structure_id := OLD.structure_id;
     v_school_id := OLD.school_id;
   ELSE
@@ -232,6 +240,11 @@ $$;
 DROP TRIGGER IF EXISTS mark_components_total_check ON public.mark_components;
 CREATE CONSTRAINT TRIGGER mark_components_total_check
 AFTER INSERT OR UPDATE OR DELETE ON public.mark_components
+DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+EXECUTE FUNCTION public.schoolos_check_mark_structure_total();
+DROP TRIGGER IF EXISTS mark_structures_total_check ON public.mark_structures;
+CREATE CONSTRAINT TRIGGER mark_structures_total_check
+AFTER INSERT OR UPDATE ON public.mark_structures
 DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
 EXECUTE FUNCTION public.schoolos_check_mark_structure_total();
 
