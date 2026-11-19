@@ -7927,7 +7927,7 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   const result = rankings.find(row => row.student.id === student.id);
   if (!result) { res.status(404).json({ error: 'Student report card not found.' }); return; }
   if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
-  if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
+  if (!result.annualPublished) {
     res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
   }
   const pages = [buildReportCardPdfPage({
