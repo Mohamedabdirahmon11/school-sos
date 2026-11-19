@@ -5,6 +5,8 @@ BEGIN;
 
 -- Link the existing exam configuration and marks records to the new academic terms.
 -- Legacy columns and values are retained; no existing mark rows are deleted or rewritten.
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_uidx ON public.subjects(id,school_id);
+
 ALTER TABLE public.exam_configs
   ADD COLUMN IF NOT EXISTS term_id uuid,
   ADD COLUMN IF NOT EXISTS class_id varchar(64);
