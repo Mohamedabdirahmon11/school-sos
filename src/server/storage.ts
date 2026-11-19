@@ -3066,6 +3066,7 @@ class StorageEngine {
           totalMarks: mark.totalMarks,
           percentage: mark.percentage,
           status: mark.status,
+          teacherRemarks: mark.teacherRemarks?.trim() || '',
           publishedAt: mark.publishedAt || null
         } : null;
 
