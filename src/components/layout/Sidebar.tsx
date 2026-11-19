@@ -90,6 +90,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Help & Support': { so: 'Caawimaad iyo Taageero', am: 'እገዛ እና ድጋፍ', ar: 'المساعدة والدعم' },
     'Platform workspace': { so: 'Goobta Madasha', am: 'የመድረክ ቦታ', ar: 'مساحة المنصة' },
     'School workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ', ar: 'مساحة المدرسة' },
+    'Platform Management': { so: 'Maamulka Madasha', am: 'የመድረክ አስተዳደር', ar: 'إدارة المنصة' },
+    'Teaching & Learning': { so: 'Waxbarid & Barasho', am: 'ማስተማር እና መማር', ar: 'التدريس والتعلم' },
+    'Parent Portal': { so: 'Bogga Waalidka', am: 'የወላጅ መግቢያ', ar: 'بوابة ولي الأمر' },
+    'Student Portal': { so: 'Bogga Ardayga', am: 'የተማሪ መግቢያ', ar: 'بوابة الطالب' },
+    'Finance Workspace': { so: 'Goobta Maaliyadda', am: 'የፋይናንስ ቦታ', ar: 'مساحة العمل المالي' },
+    'Daily Operations': { so: 'Hawlaha Maalinlaha ah', am: 'ዕለታዊ ሥራዎች', ar: 'العمليات اليومية' },
+    'Finance & Payroll': { so: 'Maaliyadda & Mushaharka', am: 'ፋይናንስ እና ደመወዝ', ar: 'المالية والرواتب' },
+    Overview: { so: 'Guudmar', am: 'አጠቃላይ እይታ', ar: 'نظرة عامة' },
+    'People & Admissions': { so: 'Dadka & Diiwaangelinta', am: 'ሰዎች እና ምዝገባ', ar: 'الأفراد والقبول' },
+    'Academic Management': { so: 'Maamulka Waxbarashada', am: 'የትምህርት አስተዳደር', ar: 'الإدارة الأكاديمية' },
+    Communication: { so: 'Isgaarsiinta', am: 'ግንኙነት', ar: 'التواصل' },
+    'Finance & Billing': { so: 'Maaliyadda & Biilasha', am: 'ፋይናንስ እና ክፍያ', ar: 'المالية والفواتير' },
+    'Reports & Analytics': { so: 'Warbixinno & Falanqayn', am: 'ሪፖርቶች እና ትንታኔ', ar: 'التقارير والتحليلات' },
+    'School Resources': { so: 'Agabka Dugsiga', am: 'የትምህርት ቤት ሀብቶች', ar: 'موارد المدرسة' },
+    'Settings & Support': { so: 'Dejin & Taageero', am: 'ቅንብሮች እና ድጋፍ', ar: 'الإعدادات والدعم' },
+    Classes: { so: 'Fasallada', am: 'ክፍሎች', ar: 'الفصول' },
+    Subjects: { so: 'Maaddooyinka', am: 'የትምህርት ዓይነቶች', ar: 'المواد الدراسية' },
+    'Class Curriculum': { so: 'Manhajka Fasalka', am: 'የክፍል ሥርዓተ ትምህርት', ar: 'منهج الصف' },
+    'Teacher Assignments': { so: 'Qoondeynta Macallimiinta', am: 'የመምህራን ምደባ', ar: 'توزيع المعلمين' },
+    'School Documents': { so: 'Dukumentiyada Dugsiga', am: 'የትምህርት ቤት ሰነዶች', ar: 'مستندات المدرسة' },
+    'Fee Invoices': { so: 'Biilasha Lacagaha', am: 'የክፍያ ደረሰኞች', ar: 'فواتير الرسوم' },
+    'Expenses & Cash Book': { so: 'Kharashaadka & Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ', ar: 'المصروفات ودفتر النقدية' },
+    'Bank Reconciliation': { so: 'Iswaafajinta Bangiga', am: 'የባንክ ማስታረቅ', ar: 'تسوية الحسابات البنكية' },
+    'Student Progression & Alumni': { so: 'U Gudbinta Ardayda & Qalin-jabiyeyaasha', am: 'የተማሪ ደረጃ ማሳደግ እና ተመራቂዎች', ar: 'ترفيع الطلاب والخريجون' },
+    'WhatsApp Parent Alerts': { so: 'Digniinaha Waalidiinta WhatsApp', am: 'የወላጆች WhatsApp ማሳወቂያዎች', ar: 'تنبيهات أولياء الأمور عبر واتساب' },
+    'School Configuration': { so: 'Habaynta Dugsiga', am: 'የትምህርት ቤት ውቅር', ar: 'تهيئة المدرسة' },
+    'Help Centre': { so: 'Xarunta Caawinta', am: 'የእገዛ ማዕከል', ar: 'مركز المساعدة' },
     'Log out': { so: 'Ka bax', am: 'ውጣ', ar: 'تسجيل الخروج' }
   };
   const menuText = (value: string) => menuLanguage === 'en' ? value : menuTranslations[value]?.[menuLanguage] || value;
@@ -126,75 +153,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : menuT('notice_board');
   const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label: menuText(label), icon });
   const groups: NavGroup[] = (() => {
-    if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform', items: [
+    if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform Management', items: [
       item('sa_dashboard', menuT('dashboard'), LayoutDashboard), item('sa_schools', menuT('schools'), Building2),
       item('sa_plans', menuT('plans_billing'), Receipt), item('sa_users', menuT('users'), Users),
       item('sa_analytics', menuT('analytics'), BarChart3), item('sa_broadcasts', menuT('broadcasts'), Radio),
       item('sa_support', menuT('support_audit'), LifeBuoy), item('sa_settings', menuT('platform_settings'), Settings)
     ] }];
-    if (role === 'teacher') return [{ title: 'Teaching', items: [
+    if (role === 'teacher') return [{ title: 'Teaching & Learning', items: [
       item('t_dashboard', menuT('dashboard'), LayoutDashboard), item('t_timetable', menuT('timetable'), CalendarDays),
       item('t_students', menuT('students'), GraduationCap), item('t_attendance', menuT('attendance'), CalendarCheck),
       item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', menuT('assignments'), FileCheck2), item('sch_documents', 'Documents', FileText), item('t_notices', noticeLabel, BellRing),
+      item('t_assignments', menuT('assignments'), FileCheck2), item('sch_documents', 'School Documents', FileText), item('t_notices', noticeLabel, BellRing),
       item('t_messages', menuT('messages'), MessageSquare), item('t_payslips', menuT('payroll_payslip'), Wallet)
     ] }];
-    if (role === 'parent') return [{ title: 'Family', items: [
+    if (role === 'parent') return [{ title: 'Parent Portal', items: [
       item('p_overview', menuT('dashboard'), LayoutDashboard), item('p_attendance', menuT('attendance'), CalendarCheck),
       item('p_results', menuT('exams_results'), FileSpreadsheet), item('p_fees', menuT('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText), item('p_messages', menuT('messages'), MessageSquare)
+      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'School Documents', FileText), item('p_messages', menuT('messages'), MessageSquare)
     ] }];
-    if (role === 'student') return [{ title: 'My learning', items: [
+    if (role === 'student') return [{ title: 'Student Portal', items: [
       item('st_dashboard', menuT('dashboard'), LayoutDashboard), item('st_timetable', menuT('timetable'), CalendarDays),
       item('st_assignments', menuT('assignments'), FileCheck2), item('st_results', menuT('exams_results'), FileSpreadsheet),
-      item('st_attendance', menuT('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'Documents', FileText),
+      item('st_attendance', menuT('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'School Documents', FileText),
       item('st_messages', menuT('messages'), MessageSquare)
     ] }];
     if (role === 'accountant') return [
-      { title: 'Workspace', items: [item('acc_dashboard', menuT('dashboard'), LayoutDashboard), item('sch_documents', 'Documents', FileText)] },
-      { title: 'Daily operations', items: [
+      { title: 'Finance Workspace', items: [item('acc_dashboard', menuT('dashboard'), LayoutDashboard), item('sch_documents', 'School Documents', FileText)] },
+      { title: 'Daily Operations', items: [
         { ...item('sch_fees', menuT('fees_payments'), CreditCard), permission: 'fees_manage' },
-        { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' },
-        { ...item('acc_expenses', 'Expenses & cashbook', Wallet), permission: 'fees_manage' },
-        { ...item('acc_bank_reconciliation', 'Bank reconciliation', Building2), permission: 'fees_manage' }
+        { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' },
+        { ...item('acc_expenses', 'Expenses & Cash Book', Wallet), permission: 'fees_manage' },
+        { ...item('acc_bank_reconciliation', 'Bank Reconciliation', Building2), permission: 'fees_manage' }
       ] },
-      { title: 'Financial management', items: [
+      { title: 'Finance & Payroll', items: [
         { ...item('sch_reports', menuT('reports_export'), BarChart3), permission: 'reports_export' },
         { ...item('sch_payroll', menuT('payroll_management'), Wallet), permission: 'payroll_manage' }
       ] }
     ];
 
     return [
-      { title: 'Dashboard', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
-      { title: 'People', items: [
+      { title: 'Overview', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
+      { title: 'People & Admissions', items: [
         item('sch_students', menuT('students'), GraduationCap), item('sch_teachers', menuT('teachers'), UserCheck),
         item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', menuT('admissions'), UserPlus),
         item('sch_staff', menuT('staff_access'), ShieldCheck)
       ] },
-      { title: 'Academics', items: [
-        item('sch_classes', 'Fasallo', Layers), item('sch_subjects', 'Maaddooyin', BookOpen), item('sch_curriculum', 'Manhaj', BookOpen), item('sch_teacher_assignments', 'Qoondeynta Macallimiinta', UserCheck),
+      { title: 'Academic Management', items: [
+        item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
-        item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
-        item('sch_promotion', 'Promotion & Alumni', Award)
+        item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
+        item('sch_promotion', 'Student Progression & Alumni', Award)
       ] },
       { title: 'Communication', items: [
         item('sch_notices', noticeLabel, BellRing), item('sch_messages', menuT('messages'), MessageSquare),
-        item('sch_whatsapp', 'WhatsApp parent reminders', MessageCircle),
+        item('sch_whatsapp', 'WhatsApp Parent Alerts', MessageCircle),
         item('sch_events', menuT('events_holidays'), CalendarDays)
       ] },
-      { title: 'Finance', items: [
-        { ...item('sch_student_invoices', 'Student invoices', FileText), permission: 'fees_manage' }
+      { title: 'Finance & Billing', items: [
+        { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' }
       ] },
-      { title: 'Reports', items: [
+      { title: 'Reports & Analytics', items: [
         item('sch_reports', menuT('reports_export'), BarChart3)
       ] },
-      { title: 'Resources', items: [
+      { title: 'School Resources', items: [
         item('sch_library', menuT('library'), Library), item('sch_transport', menuT('transport'), Bus),
         item('sch_inventory', menuT('inventory'), Boxes), item('sch_discipline', menuT('discipline'), AlertTriangle),
         item('sch_health', menuT('health_nurse'), HeartPulse)
       ] },
-      { title: 'Settings', items: [
-        item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help & Support', LifeBuoy)
+      { title: 'Settings & Support', items: [
+        item('sch_settings', 'School Configuration', Sliders), item('sch_support', 'Help Centre', LifeBuoy)
       ] }
     ];
   })();
@@ -214,7 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>}
         {school?.sidebarTheme?.showSchoolName !== false && <div className={`min-w-0 max-w-full text-center ${isCollapsed ? 'md:hidden' : ''}`}>
-          <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform workspace' : 'School workspace')}</div>
+          <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform Management' : 'School Workspace')}</div>
           {school && <div style={{ color: "var(--sidebar-text)", opacity: 0.62 }} className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em]">{school.code}</div>}
         </div>}
         <button onClick={onCloseMobile} aria-label="Close menu" style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
