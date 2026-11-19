@@ -332,6 +332,10 @@ DECLARE v_definition TEXT;
 BEGIN
   SELECT pg_get_functiondef('public.schoolos_restore_school_backup_legacy(jsonb)'::regprocedure)
     INTO v_definition;
+  IF position('''terms''' IN v_definition) = 0 THEN
+    v_definition := replace(v_definition, '''school_branches'', ''classes'', ''subjects''',
+      '''school_branches'', ''classes'', ''terms'', ''subjects''');
+  END IF;
   IF position('exam_periods' IN v_definition) = 0 THEN
     v_definition := replace(
       v_definition,
@@ -346,7 +350,7 @@ BEGIN
       '''exam_schedule_cohort_students'', ''exam_seat_assignments'', ''exam_invigilators'''
     );
   END IF;
-  IF position('exam_periods' IN v_definition) = 0 OR position('exam_invigilators' IN v_definition) = 0 THEN
+  IF position('terms' IN v_definition) = 0 OR position('exam_periods' IN v_definition) = 0 OR position('exam_invigilators' IN v_definition) = 0 THEN
     RAISE EXCEPTION 'Could not synchronize term-exam tables in the school backup restore allowlist.';
   END IF;
   EXECUTE v_definition;
