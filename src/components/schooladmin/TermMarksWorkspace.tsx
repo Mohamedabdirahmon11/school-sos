@@ -77,7 +77,8 @@ export const TermMarksWorkspace: React.FC<{classes:SchoolClass[]}> = ({classes})
     try {
       await ApiClient.request(`/term-marks/terms/${termId}/status`,{method:'POST',body:JSON.stringify({status})});
       setTerms(rows=>rows.map(row=>row.id===termId?{...row,status}:row));
-      setNotice(status==='closed'?'Term-ka waa la xiray. Macallimiintu hadda ma gelin karaan dhibco.':'Term-ka dib ayaa loo furay; ficilka waa la diiwaangeliyey.');
+      setNotice(status==='closed'?'Term-ka waa la xiray. Macallimiintu hadda ma gelin karaan dhibco.':'Term-ka dib ayaa loo furay; Report Cards-kii hore si ammaan ah ayaa looga saaray daabacaadda.');
+      if(status==='open') await loadCards();
     } catch(e:any) { setError(e.message||'Xaaladda term-ka lama beddelin.'); }
     finally { setBusy(false); }
   };
