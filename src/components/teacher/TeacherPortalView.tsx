@@ -3,7 +3,7 @@
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
  * 2. Exam marks: school-configured assessment components -> weighted total and percentage
- * 3. Subject teachers submit assigned subjects; Form Teachers manage the full class mark sheet and forward it to Admin.
+ * 3. Subject teachers submit assigned subjects; Form Teachers review the full class mark sheet and forward it to Admin.
  * 4. Personal teaching schedule & notices
  */
 
@@ -81,7 +81,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // Form Teacher status grants class-wide read/review access, never mark-edit permission.
   const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
   const classSubjects: Subject[] = editableClassSubjects;
-  const gradeSubjects: Subject[] = editableClassSubjects;
+  const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
@@ -910,7 +910,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               })}
             </>
           )}
-          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you may complete all subjects for your class. Subject teachers can enter only their assigned subjects. Submitted marks are locked; forwarding sends the completed class sheet to School Admin.</p>}
+          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you can review all subjects in your class, but can enter marks only for subjects personally assigned to you. Other teachers' marks are read-only. Forwarding sends the class sheet to School Admin.</p>}
         </section>
       )}
 
