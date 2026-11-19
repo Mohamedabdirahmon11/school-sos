@@ -6129,6 +6129,27 @@ apiRouter.post('/attendance/sessions/:id/unlock', requireAuth, requireSchoolCont
   res.json({ success: true, session: data });
 });
 
+apiRouter.post('/attendance/sessions', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School; const user = (req as any).user as User;
+  const sessionId = String(req.body?.sessionId || '');
+  const reason = String(req.body?.reason || '').trim();
+  if (!sessionId) { res.status(400).json({ error: 'Kulanka xaadirinta ayaa loo baahan yahay.' }); return; }
+  if (reason.length < 4 || reason.length > 500) { res.status(400).json({ error: 'Sababta furitaanka waa inay u dhexaysaa 4–500 xaraf.' }); return; }
+  const client = documentServiceClient(res); if (!client) return;
+  const { data: before } = await client.from('attendance_sessions').select('*').eq('id', sessionId).eq('school_id', school.id).maybeSingle();
+  if (!before) { res.status(404).json({ error: 'Kulanka xaadirinta lama helin.' }); return; }
+  const now = new Date().toISOString();
+  const { data, error } = await client.from('attendance_sessions').update({
+    is_locked: false, submitted_at: now, unlocked_at: now, unlocked_by: user.id, unlock_reason: reason, updated_at: now
+  }).eq('id', before.id).eq('school_id', school.id).select().single();
+  if (error) { res.status(503).json({ error: 'Kulanka lama furi karin.' }); return; }
+  await client.from('attendance_audit_logs').insert({
+    school_id: school.id, session_id: before.id, entity_type: 'session', entity_id: before.id,
+    action: 'admin_unlocked', before_data: before, after_data: data, changed_by: user.id, details: reason
+  });
+  res.json({ success: true, session: data });
+});
+
 apiRouter.get('/attendance/report', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school as School; const user = (req as any).user as User;
   const startDate = String(req.query.startDate || ''); const endDate = String(req.query.endDate || '');
