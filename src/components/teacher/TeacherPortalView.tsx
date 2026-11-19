@@ -165,7 +165,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
-  const [formTeacherComments, setFormTeacherComments] = useState<Array<{ id: string; studentId: string; comment: string; semester: string }>>([]);
+  const [formTeacherComments, setFormTeacherComments] = useState<Array<{ id: string; studentId: string; comment: string; semester: string; updatedAt: string }>>([]);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savingCommentStudentId, setSavingCommentStudentId] = useState<string | null>(null);
 
