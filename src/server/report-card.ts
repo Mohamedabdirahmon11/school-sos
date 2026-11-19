@@ -69,8 +69,8 @@ interface ReportCardResult {
   student: { firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: Array<{
     subject: { name: string; code?: string };
-    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string } | null;
-    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string } | null;
+    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string; maxMarks?: { small: number; big: number; total: number } } | null;
+    sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string; maxMarks?: { small: number; big: number; total: number } } | null;
     sem1Percentage: number | null;
     sem2Percentage: number | null;
     yearlyPercentage: number | null;
@@ -114,9 +114,9 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
   for (const row of result.subjectResults) {
     lines.push([
       `${row.subject.name}${row.subject.code ? ` (${row.subject.code})` : ''}`,
-      formatReportCardMark(row.sem1Marks, row.maxMarks),
+      formatReportCardMark(row.sem1Marks, row.sem1Marks?.maxMarks || row.maxMarks),
       row.sem1Percentage === null ? '-' : `${row.sem1Percentage}%`,
-      formatReportCardMark(row.sem2Marks, row.maxMarks),
+      formatReportCardMark(row.sem2Marks, row.sem2Marks?.maxMarks || row.maxMarks),
       row.sem2Percentage === null ? '-' : `${row.sem2Percentage}%`,
       row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
       gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
@@ -127,7 +127,18 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
     row.sem2Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 2: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}` : ''
   ].filter(Boolean));
   if (blocks.teacherRemarks && savedTeacherRemarks.length) lines.push('', 'TEACHER REMARKS', ...savedTeacherRemarks);
-  lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
+  const firstSubject = result.subjectResults[0];
+  const semesterOneMaximum = firstSubject?.sem1Marks?.maxMarks || firstSubject?.maxMarks;
+  const semesterTwoMaximum = firstSubject?.sem2Marks?.maxMarks || firstSubject?.maxMarks;
+  if (semesterOneMaximum && semesterTwoMaximum &&
+      (semesterOneMaximum.total !== semesterTwoMaximum.total ||
+       semesterOneMaximum.small !== semesterTwoMaximum.small ||
+       semesterOneMaximum.big !== semesterTwoMaximum.big)) {
+    lines.push('', `Exam maximum marks: Semester 1 ${semesterOneMaximum.small} + ${semesterOneMaximum.big} = ${semesterOneMaximum.total}; Semester 2 ${semesterTwoMaximum.small} + ${semesterTwoMaximum.big} = ${semesterTwoMaximum.total}`);
+  } else {
+    const maximum = semesterOneMaximum || semesterTwoMaximum || { small: 0, big: 0, total: 0 };
+    lines.push('', `Exam maximum marks: Small ${maximum.small} + Big ${maximum.big} = ${maximum.total}`);
+  }
   if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
   lines.push(`Result: ${result.isPass ? 'PASS' : 'BELOW PASS MARK'}`);
   if (blocks.teacherRemarks) {
