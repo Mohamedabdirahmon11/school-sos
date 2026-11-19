@@ -6318,14 +6318,21 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
       .eq('school_id', school.id).eq('term_id', req.params.termId).maybeSingle();
     if (error) throw error;
     if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [] }); return; }
-    const [days, sessions, schedules, invigilators] = await Promise.all([
-      client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date'),
-      client.from('exam_sessions').select('*').eq('school_id', school.id).order('seq'),
+    const days = await client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date');
+    if (days.error) throw days.error;
+    const dayIds = (days.data || []).map((day: any) => day.id);
+    const [sessions, schedules] = await Promise.all([
+      dayIds.length ? client.from('exam_sessions').select('*').eq('school_id', school.id).in('exam_day_id', dayIds).order('seq') : Promise.resolve({ data: [], error: null }),
       client.from('exam_schedules').select('id,exam_period_id,exam_session_id,subject_id,exam_name,exam_date,start_time,end_time,exam_shift,manhaj_group_key,status,seat_capacity')
-        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time'),
-      client.from('exam_invigilators').select('*').eq('school_id', school.id)
+        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time')
     ]);
-    for (const result of [days, sessions, schedules, invigilators]) if (result.error) throw result.error;
+    if (sessions.error) throw sessions.error;
+    if (schedules.error) throw schedules.error;
+    const sessionIds = (sessions.data || []).map((session: any) => session.id);
+    const invigilators = sessionIds.length
+      ? await client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
+      : { data: [], error: null };
+    if (invigilators.error) throw invigilators.error;
     res.setHeader('Cache-Control', 'no-store');
     res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [] });
   } catch (error) {
@@ -6447,6 +6454,7 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
       rows.push(student); studentsByClass.set(student.class_id, rows);
     }
     const scheduleRows: any[] = [];
+    const roomUsageBySession = new Map<string, number>();
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
       const group = groups[groupIndex];
       for (const shift of ['morning','afternoon'] as const) {
@@ -6462,10 +6470,17 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
           const day = (days || []).find((item: any) => item.id === session.exam_day_id);
           const groupStudents = shiftClasses.flatMap(classId => (studentsByClass.get(classId) || []).map(student => ({ id: student.id, classId })));
           if (!groupStudents.length) throw new Error('Ma jiraan arday firfircoon oo ku jira ' + shiftClasses.map(id => (classById.get(id) as any)?.name || id).join(', ') + '.');
+          const remainingRooms = rooms.map(room => ({
+            ...room, capacity: room.capacity - (roomUsageBySession.get(session.id + ':' + room.id) || 0)
+          })).filter(room => room.capacity > 0);
           const allocations = allocateMixedRoomSeating(shiftClasses.map(classId => ({
             classId, className: (classById.get(classId) as any)?.name || classId,
             students: groupStudents.filter(student => student.classId === classId).map(student => ({ id: student.id, classId }))
-          })), rooms, subjectIndex + groupIndex);
+          })), remainingRooms, subjectIndex + groupIndex);
+          for (const allocation of allocations) {
+            const key = session.id + ':' + allocation.roomId;
+            roomUsageBySession.set(key, (roomUsageBySession.get(key) || 0) + allocation.seats.length);
+          }
           const scheduleId = randomUUID();
           const schedule = {
             id: scheduleId, school_id: school.id, class_id: null, subject_id: subjectId,
@@ -6519,8 +6534,10 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       .eq('school_id', school.id).in('exam_day_id', (days || []).map((day: any) => day.id));
     if (sessionsError) throw sessionsError;
     const sessionIds = (sessions || []).map((session: any) => session.id);
-    const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
-    if (deleteError) throw deleteError;
+    if (sessionIds.length) {
+      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
+      if (deleteError) throw deleteError;
+    }
     const rows = assignments.map((item: any) => ({
       school_id: school.id, exam_session_id: String(item.sessionId || ''),
       room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
