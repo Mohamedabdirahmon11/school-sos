@@ -543,7 +543,7 @@ export const ExamsResultsView: React.FC = () => {
   const [cohortCounts, setCohortCounts] = useState<Record<string, number>>({});
   const [cohortStudentIds, setCohortStudentIds] = useState<string[]>([]);
   const [seatSheet, setSeatSheet] = useState<any | null>(null);
-  const [scheduleSection, setScheduleSection] = useState<'timetable' | 'rooms' | 'mixing' | 'term'>('timetable');
+  const [scheduleSection, setScheduleSection] = useState<'timetable' | 'rooms' | 'mixing' | 'term'>('term');
   const [printTitle, setPrintTitle] = useState(school?.examTimetableTitle || '');
   const [printAcademicYearTitle, setPrintAcademicYearTitle] = useState(school?.examTimetableAcademicYearTitle || '');
   const [printClassGroup, setPrintClassGroup] = useState(school?.examTimetableClassGroup || 'DHAMMAAN FASALLADA');
@@ -1481,7 +1481,7 @@ export const ExamsResultsView: React.FC = () => {
       {activeTab === 'schedule' && (
         <div className="space-y-5">
           <div className="flex flex-wrap gap-2 rounded-xl border border-[#E2E8F0] bg-white p-2 shadow-sm">
-            {([['timetable', 'Exam Timetable'], ['rooms', 'Exam Rooms'], ['mixing', 'Student Mixing'], ['term', 'Term Exam 10B']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => { setScheduleSection(key); setEditingSchedule(null); setEditDraft(null); }} className={`rounded-lg px-4 py-2 text-xs font-semibold ${scheduleSection === key ? 'bg-[#0F766E] text-white' : 'text-[#475569] hover:bg-slate-50'}`}>{label}</button>)}
+            {([['term', 'Jadwalka Imtixaanka Term-ka'], ['rooms', 'Exam Rooms']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => { setScheduleSection(key); setEditingSchedule(null); setEditDraft(null); }} className={`rounded-lg px-4 py-2 text-xs font-semibold ${scheduleSection === key ? 'bg-[#0F766E] text-white' : 'text-[#475569] hover:bg-slate-50'}`}>{label}</button>)}
           </div>
           {scheduleError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{scheduleError}</div>}
           {scheduleSection === 'term' && <TermExamSchedulingPanel isReadOnly={isReadOnly} />}
