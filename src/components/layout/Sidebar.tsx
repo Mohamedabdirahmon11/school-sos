@@ -80,17 +80,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Settings: { so: 'Dejinta', am: 'ቅንብሮች', ar: 'الإعدادات' },
     'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'درجات الامتحان' },
     'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'نتائج الامتحانات' },
-    Documents: { so: 'Dukumentiyada', am: 'ሰነዶች', ar: 'المستندات' },
-    'Student invoices': { so: 'Biilasha Ardayda', am: 'የተማሪ ደረሰኞች', ar: 'فواتير الطلاب' },
-    'Expenses & cashbook': { so: 'Kharashaadka iyo Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ', ar: 'المصروفات وسجل النقدية' },
-    'Bank reconciliation': { so: 'Is-waafajinta Bangiga', am: 'የባንክ ማስታረቅ', ar: 'مطابقة البنك' },
-    'Promotion & Alumni': { so: 'Dalacsiinta iyo Qalin-jabiyeyaasha', am: 'ደረጃ ማሳደግ እና ተመራቂዎች', ar: 'الترقية والخريجون' },
-    'WhatsApp parent reminders': { so: 'Xusuusinta Waalidiinta WhatsApp', am: 'የወላጆች WhatsApp ማስታወሻዎች', ar: 'تذكيرات أولياء الأمور عبر واتساب' },
-    'School Settings': { so: 'Dejinta Dugsiga', am: 'የትምህርት ቤት ቅንብሮች', ar: 'إعدادات المدرسة' },
-    'Help & Support': { so: 'Caawimaad iyo Taageero', am: 'እገዛ እና ድጋፍ', ar: 'المساعدة والدعم' },
-    'Platform workspace': { so: 'Goobta Madasha', am: 'የመድረክ ቦታ', ar: 'مساحة المنصة' },
-    'School workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ', ar: 'مساحة المدرسة' },
+
+
+
+
+
+
+
+
+
+
     'Platform Management': { so: 'Maamulka Madasha', am: 'የመድረክ አስተዳደር', ar: 'إدارة المنصة' },
+    'School Workspace': { so: 'Goobta Dugsiga', am: 'የትምህርት ቤት ቦታ', ar: 'مساحة المدرسة' },
     'Teaching & Learning': { so: 'Waxbarid & Barasho', am: 'ማስተማር እና መማር', ar: 'التدريس والتعلم' },
     'Parent Portal': { so: 'Bogga Waalidka', am: 'የወላጅ መግቢያ', ar: 'بوابة ولي الأمر' },
     'Student Portal': { so: 'Bogga Ardayga', am: 'የተማሪ መግቢያ', ar: 'بوابة الطالب' },
@@ -100,7 +101,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Overview: { so: 'Guudmar', am: 'አጠቃላይ እይታ', ar: 'نظرة عامة' },
     'People & Admissions': { so: 'Dadka & Diiwaangelinta', am: 'ሰዎች እና ምዝገባ', ar: 'الأفراد والقبول' },
     'Academic Management': { so: 'Maamulka Waxbarashada', am: 'የትምህርት አስተዳደር', ar: 'الإدارة الأكاديمية' },
-    Communication: { so: 'Isgaarsiinta', am: 'ግንኙነት', ar: 'التواصل' },
     'Finance & Billing': { so: 'Maaliyadda & Biilasha', am: 'ፋይናንስ እና ክፍያ', ar: 'المالية والفواتير' },
     'Reports & Analytics': { so: 'Warbixinno & Falanqayn', am: 'ሪፖርቶች እና ትንታኔ', ar: 'التقارير والتحليلات' },
     'School Resources': { so: 'Agabka Dugsiga', am: 'የትምህርት ቤት ሀብቶች', ar: 'موارد المدرسة' },
