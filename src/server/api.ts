@@ -9663,7 +9663,7 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
     student = (await db.queryPage<Student>('students',{school_id:school.id,class_id:klass.id},1,1,undefined,'*','first_name',true)).items[0] || null;
   }
   if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
-  const klass = await db.getClassById(card.class_id,school.id);
+  const klass = await db.getClassById(student.classId,school.id);
   const teacher = klass?.classTeacherId
     ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0]
     : null;
@@ -10480,7 +10480,7 @@ apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSch
   const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
   if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
   if (card.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay; dugsigu waa inuu dib u sameeyo.' }); return; }
-  const klass = await db.getClassById(student.classId,school.id);
+  const klass = await db.getClassById(card.class_id,school.id);
   sendPdf(res,`term-report-card-${student.studentId}`,[termReportCardPdfPage(school,card,student,`${klass?.name || ''} ${klass?.section || ''}`.trim())]);
 });
 
