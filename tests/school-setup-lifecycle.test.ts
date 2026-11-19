@@ -175,3 +175,10 @@ test('canonical fresh-install schema mirrors the school setup migrations', () =>
   assert.ok(schema.includes('schoolos_update_class_section_config'));
   assert.ok(schema.includes('schoolos_confirm_promotions_with_enrollments'));
 });
+
+test('promotion rankings reload when the school or source year changes', () => {
+  const promotionView = read('../src/components/schooladmin/YearEndPromotionView.tsx');
+  assert.ok(promotionView.includes("status:'draft'|'active'|'closed'"));
+  assert.ok(promotionView.includes('[selectedClassId, sourceAcademicYearId, school?.id]'));
+  assert.ok(promotionView.includes('setYearlyRankings([])'));
+});

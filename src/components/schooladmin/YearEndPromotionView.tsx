@@ -32,7 +32,7 @@ export const YearEndPromotionView: React.FC = () => {
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [topN, setTopN] = useState(3);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
-  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean}>>([]);
+  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean;start_date:string;end_date:string;status:'draft'|'active'|'closed'}>>([]);
   const [sourceAcademicYearId, setSourceAcademicYearId] = useState('');
   const [targetAcademicYearId, setTargetAcademicYearId] = useState('');
 
@@ -47,7 +47,7 @@ export const YearEndPromotionView: React.FC = () => {
 
   // Fetch initial classes and config; expose a retry action when the database is unavailable.
   const loadInitialData = async () => {
-    if (!school) return;
+    if (!school?.id) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
@@ -77,6 +77,17 @@ export const YearEndPromotionView: React.FC = () => {
   };
 
   useEffect(() => {
+    setClasses([]);
+    setSelectedClassId('');
+    setTargetClassId('');
+    setAcademicYears([]);
+    setSourceAcademicYearId('');
+    setTargetAcademicYearId('');
+    setYearlyRankings([]);
+    setDecisionMap({});
+    setHistory([]);
+    setExamConfig(null);
+    setError(null);
     void loadInitialData();
   }, [school?.id]);
 
@@ -109,7 +120,7 @@ export const YearEndPromotionView: React.FC = () => {
 
   useEffect(() => {
     loadClassRankings();
-  }, [selectedClassId]);
+  }, [selectedClassId, sourceAcademicYearId, school?.id]);
 
   const handleDecisionChange = (studentId: string, decision: 'promoted' | 'repeated') => {
     const rank = yearlyRankings.find(row => row.student.id === studentId);
