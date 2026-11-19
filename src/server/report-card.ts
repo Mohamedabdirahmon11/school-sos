@@ -76,6 +76,7 @@ interface ReportCardResult {
     yearlyPercentage: number | null;
     maxMarks: { small: number; big: number; total: number };
   }>;
+  attendanceSummary?: { totalDays: number; present: number; absent: number; late: number; excused: number; attendancePercentage: number } | null;
   annualComplete: boolean;
   yearlyPercentage: number;
   yearlyRank: number;
@@ -107,6 +108,7 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
     `Class: ${className}`
   ];
   if (blocks.rank) lines.push(`Class rank: #${result.yearlyRank} of ${totalStudents}`);
+  if (result.attendanceSummary) lines.push(`Attendance: ${result.attendanceSummary.attendancePercentage}% (${result.attendanceSummary.present} present, ${result.attendanceSummary.absent} absent, ${result.attendanceSummary.late} late, ${result.attendanceSummary.excused} excused; ${result.attendanceSummary.totalDays} recorded days)`);
   lines.push('', 'SUBJECT | SEMESTER 1 MARKS | SEMESTER 1 % | SEMESTER 2 MARKS | SEMESTER 2 % | YEARLY % | GRADE');
   for (const row of result.subjectResults) {
     lines.push([
