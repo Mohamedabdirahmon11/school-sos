@@ -232,7 +232,10 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
 AS $
 DECLARE v_session_shift TEXT;
 BEGIN
-  IF NEW.exam_type <> 'term' OR NEW.exam_session_id IS NULL THEN RETURN NEW; END IF;
+  IF NEW.exam_type <> 'term' THEN RETURN NEW; END IF;
+  IF NEW.exam_session_id IS NULL OR NEW.exam_period_id IS NULL OR NEW.exam_shift IS NULL THEN
+    RAISE EXCEPTION 'Term exam schedules require a period, session and class exam shift.';
+  END IF;
   SELECT shift_tag INTO v_session_shift
     FROM public.exam_sessions
    WHERE id = NEW.exam_session_id AND school_id = NEW.school_id;
