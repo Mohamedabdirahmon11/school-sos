@@ -2056,7 +2056,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     whatsappPhone: typeof whatsappPhone === 'string' && whatsappPhone.trim() ? whatsappPhone.trim() : undefined,
     email: String(email).trim().toLowerCase(),
     brandColor: brandColor || '#0F766E',
-    currency: ['ETB', 'USD', 'SOS'].includes(String(body.currency)) ? body.currency : 'ETB',
+    currency: ['ETB', 'USD', 'SOS', 'KES', 'DJF', 'AED', 'SAR', 'EUR', 'GBP'].includes(String(body.currency)) ? body.currency : 'ETB',
     language: 'en',
     timezone: 'Africa/Addis_Ababa',
     academicYear: settings.academicYearName || '2026-2027',
@@ -3398,12 +3398,12 @@ apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res
  const sections=(groups||[]).flatMap((group:any)=>group.class_sections||[]);
  const legacyIds=[...new Set(sections.map((section:any)=>section.legacy_class_id).filter(Boolean))];
  const classRows=legacyIds.length
-   ? await client.from('classes').select('id,class_teacher_id,capacity').eq('school_id',school.id).in('id',legacyIds)
+   ? await client.from('classes').select('id,class_teacher_id,capacity,is_archived').eq('school_id',school.id).in('id',legacyIds)
    : {data:[],error:null};
  if(classRows.error){res.status(503).json({error:'Macallimiinta fasallada iyo awooddooda lama akhrin karin.'});return;}
  const countEntries=await Promise.all(legacyIds.map(async (classId:string)=>{
    const result=await client.from('students').select('id',{count:'exact',head:true})
-     .eq('school_id',school.id).eq('class_id',classId);
+     .eq('school_id',school.id).eq('class_id',classId).eq('status','active');
    return {classId,count:result.count||0,error:result.error};
  }));
  if(countEntries.some(item=>item.error)){res.status(503).json({error:'Tirada ardayda fasallada lama akhrin karin.'});return;}
@@ -3415,7 +3415,7 @@ apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res
      const legacy=(classById.get(section.legacy_class_id) as any)||{};
      const capacity=Number(section.max_students||legacy.capacity||40);
      const studentCount=Number(countById.get(section.legacy_class_id)||0);
-     return {...section,class_teacher_id:legacy.class_teacher_id||null,capacity,student_count:studentCount,available_seats:Math.max(0,capacity-studentCount)};
+     return {...section,class_teacher_id:legacy.class_teacher_id||null,capacity,is_active:legacy.is_archived!==true,student_count:studentCount,available_seats:Math.max(0,capacity-studentCount)};
    })
  })));
 });
@@ -3477,6 +3477,19 @@ apiRouter.put('/class-sections/:id/configuration', requireAuth, requireSchoolAdm
  }
  db.logAudit({action:'CLASS_SECTION_CONFIG_UPDATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:'Updated section '+name+' capacity and Form Teacher.',severity:'info'});
  res.json(data);
+});
+
+apiRouter.put('/class-sections/:id/active', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School; const user=(req as any).user as User;
+ const isActive=req.body?.isActive;
+ if(typeof isActive!=='boolean'){res.status(400).json({error:'Choose whether the section is active.'});return;}
+ const client=classGroupsClient();
+ const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section?.legacy_class_id){res.status(404).json({error:'Section is not connected to a school class.'});return;}
+ const {error}=await client.from('classes').update({is_archived:!isActive}).eq('id',section.legacy_class_id).eq('school_id',school.id);
+ if(error){res.status(400).json({error:'Section status could not be updated.'});return;}
+ db.logAudit({action:isActive?'CLASS_SECTION_ACTIVATED':'CLASS_SECTION_DEACTIVATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:(isActive?'Activated':'Deactivated')+' section '+req.params.id+'.',severity:'warning'});
+ res.json({success:true,isActive});
 });
 
 apiRouter.delete('/class-sections/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
@@ -5094,10 +5107,13 @@ apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmi
 });
 
 const isAcademicSetupDate = (value: unknown): value is string => {
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(value + 'T00:00:00.000Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
+
+const canonicalSemesterName = (name: string) => name === 'Term 1' ? 'Semester 1' : name === 'Term 2' ? 'Semester 2' : name;
+const legacySemesterName = (name: string) => name === 'Semester 1' ? 'Term 1' : name === 'Semester 2' ? 'Term 2' : name;
 
 const auditAcademicSetup = (school: School, user: User, action: string, details: string, severity: 'info' | 'warning' = 'info') => {
   db.logAudit({
@@ -5214,6 +5230,7 @@ apiRouter.get('/academic-years/:yearId/semesters', requireAuth, requireSchoolCon
   const examByTerm = new Map((exams.data || []).map((row: any) => [row.term_id, row]));
   res.json((terms.data || []).map((term: any) => ({
     ...term,
+    name: canonicalSemesterName(term.name),
     status: (statusById.get(term.id) as any)?.status || 'open',
     closedAt: (statusById.get(term.id) as any)?.closed_at || null,
     examPeriod: examByTerm.get(term.id) || null
@@ -5244,7 +5261,8 @@ apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAd
   const { data: existing, error: existingError } = await client.from('terms').select('id,name')
     .eq('school_id', school.id).eq('academic_year_id', req.params.yearId);
   if (existingError) { res.status(503).json({ error: 'Existing semesters could not be checked.' }); return; }
-  if ((existing || []).length >= 2 || (existing || []).some((row: any) => row.name === name)) {
+  const aliases = [name, legacySemesterName(name)];
+  if ((existing || []).length >= 2 || (existing || []).some((row: any) => aliases.includes(row.name))) {
     res.status(409).json({ error: 'An academic year can contain only Semester 1 and Semester 2, each once.' }); return;
   }
   const { data: term, error } = await client.from('terms').insert({
@@ -5306,11 +5324,11 @@ apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, req
   if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
       startDate < year.start_date || endDate > year.end_date ||
       ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
-      (resultsPublishDate && !isAcademicSetupDate(resultsPublishDate))) {
+      (resultsPublishDate && (!examStartDate || !examEndDate || !isAcademicSetupDate(resultsPublishDate) || resultsPublishDate < examEndDate))) {
     res.status(400).json({ error: 'Enter valid semester dates, examination dates and result publication date.' }); return;
   }
   const { data: duplicate } = await client.from('terms').select('id').eq('school_id', school.id)
-    .eq('academic_year_id', term.academic_year_id).eq('name', name).neq('id', term.id).maybeSingle();
+    .eq('academic_year_id', term.academic_year_id).in('name', [name, legacySemesterName(name)]).neq('id', term.id).maybeSingle();
   if (duplicate) { res.status(409).json({ error: 'This semester already exists in the academic year.' }); return; }
   const { data, error } = await client.from('terms').update({
     name, start_date: startDate, end_date: endDate, updated_at: new Date().toISOString()
@@ -5330,6 +5348,9 @@ apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, req
         }).select().single();
     if (savedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but exam dates could not be updated.' }); return; }
     examPeriod = savedExam.data;
+  } else if (existingExam) {
+    const removedExam = await client.from('exam_periods').delete().eq('id', existingExam.id).eq('school_id', school.id);
+    if (removedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but the previous exam period could not be removed.' }); return; }
   }
   const calendarSync = await client.rpc('schoolos_sync_school_semester_dates', {
     p_school_id: school.id, p_year_id: term.academic_year_id

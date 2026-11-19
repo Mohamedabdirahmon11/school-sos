@@ -44,7 +44,7 @@ export interface SchoolBranch {
 }
 
 export type SchoolLanguage = 'en' | 'so' | 'am' | 'ar';
-export type SchoolCurrency = 'ETB' | 'USD' | 'SOS';
+export type SchoolCurrency = 'ETB' | 'USD' | 'SOS' | 'KES' | 'DJF' | 'AED' | 'SAR' | 'EUR' | 'GBP';
 
 export interface GradingBand {
   minPercentage: number;

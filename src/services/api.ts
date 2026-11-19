@@ -617,6 +617,9 @@ export class ApiClient {
   public static async setClassGroupActive(id:string,isActive:boolean) {
     return this.request<{success:boolean;isActive:boolean}>(`/class-groups/${encodeURIComponent(id)}/status`,{method:'POST',body:JSON.stringify({isActive})});
   }
+  public static async setClassSectionActive(id:string,isActive:boolean) {
+    return this.request(`/class-sections/${encodeURIComponent(id)}/active`,{method:'PUT',body:JSON.stringify({isActive})});
+  }
   public static async updateClassSectionConfiguration(id:string,data:{name:string;maxStudents:number;teacherId:string|null}) {
     return this.request(`/class-sections/${encodeURIComponent(id)}/configuration`,{method:'PUT',body:JSON.stringify(data)});
   }

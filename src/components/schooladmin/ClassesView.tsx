@@ -3,14 +3,14 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { academicText } from '../../lib/academic-translations.ts';
 import { Plus, Pencil, Trash2, X, Check, Layers, RefreshCw, Sparkles, ChevronUp, ChevronDown, Save } from 'lucide-react';
-import { Teacher } from '../../types/index.ts';
+import type { Teacher } from '../../types/index.ts';
 
-type Section = { id:string; name:string; legacy_class_id:string|null; max_students?:number; capacity?:number; class_teacher_id?:string|null; student_count?:number; available_seats?:number };
+type Section = { id:string; name:string; legacy_class_id:string|null; max_students?:number; capacity?:number; class_teacher_id?:string|null; student_count?:number; available_seats?:number; is_active?:boolean };
 type ClassGroup = { id:string; name:string; sort_order:number; is_active:boolean; class_sections:Section[] };
 type SectionDraft = { name:string; maxStudents:string; teacherId:string };
 
 export const ClassesView: React.FC = () => {
-  const { isReadOnly, language } = useAuth();
+  const { isReadOnly, language, school } = useAuth();
   const tx = (key: string, values: Record<string, string | number> = {}) =>
     Object.entries(values).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), academicText(language, key));
   const [rows,setRows] = useState<ClassGroup[]>([]);
@@ -26,24 +26,22 @@ export const ClassesView: React.FC = () => {
   const [notice,setNotice] = useState<{kind:'ok'|'error';text:string}|null>(null);
 
   const load = useCallback(async () => {
+    if (!school?.id) { setRows([]); setTeachers([]); setSectionConfigDraft({}); setLoading(false); return; }
     setLoading(true);
+    setRows([]);
     try {
       const [groups, staff] = await Promise.all([ApiClient.getClassGroups(), ApiClient.getTeachers()]);
       setRows(groups);
       setTeachers(staff.filter(teacher => Boolean(teacher.userId)));
       const drafts:Record<string,SectionDraft> = {};
       groups.forEach(group => (group.class_sections || []).forEach(section => {
-        drafts[section.id] = {
-          name: section.name,
-          maxStudents: String(section.max_students ?? section.capacity ?? 40),
-          teacherId: section.class_teacher_id || ''
-        };
+        drafts[section.id] = { name: section.name, maxStudents: String(section.max_students ?? section.capacity ?? 40), teacherId: section.class_teacher_id || '' };
       }));
       setSectionConfigDraft(drafts);
     }
-    catch { setNotice({kind:'error',text:tx('loadError')}); }
+    catch { setRows([]); setTeachers([]); setSectionConfigDraft({}); setNotice({kind:'error',text:tx('loadError')}); }
     finally { setLoading(false); }
-  },[language]);
+  },[language,school?.id]);
   useEffect(()=>{ void load(); },[load]);
 
   const run = async (action:()=>Promise<any>, success:string) => {
@@ -79,6 +77,11 @@ export const ClassesView: React.FC = () => {
       ()=>ApiClient.updateClassSectionConfiguration(section.id,{name:draft.name.trim(),maxStudents:Number(draft.maxStudents),teacherId:draft.teacherId||null}),
       tx('sectionConfigSaved')
     );
+  };
+
+  const toggleSectionActive = async (section:Section) => {
+    const isActive=section.is_active===false;
+    await run(()=>ApiClient.setClassSectionActive(section.id,isActive),isActive?tx('sectionActivated'):tx('sectionDeactivated'));
   };
 
   const moveClass = async (index:number, direction:-1|1) => {
@@ -132,7 +135,7 @@ export const ClassesView: React.FC = () => {
           const count=Number(sec.student_count||0);
           const capacity=Number(draft.maxStudents||sec.max_students||sec.capacity||40);
           return <div key={sec.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-bold uppercase tracking-wide text-teal-800">{sec.name}</span>{!isReadOnly&&<button onClick={()=>{if(window.confirm(tx('confirmDelete')+' '+sec.name))void run(()=>ApiClient.deleteClassSection(sec.id),tx('sectionDeleted'));}} title={tx('removeSection')} aria-label={tx('removeSection')} className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X size={14}/></button>}</div>
+            <div className="mb-2 flex items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-teal-800">{sec.name}</span><span className={sec.is_active===false?'rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600':'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800'}>{sec.is_active===false?tx('sectionInactive'):tx('sectionActive')}</span>{!sec.class_teacher_id&&<span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{tx('formTeacherRequired')}</span>}</div>{!isReadOnly&&<div className="flex items-center gap-1"><button type="button" onClick={()=>void toggleSectionActive(sec)} disabled={busy} title={sec.is_active===false?tx('activateSection'):tx('deactivateSection')} className="rounded-md px-2 py-1 text-[10px] font-semibold text-teal-700 hover:bg-white">{sec.is_active===false?tx('activateSection'):tx('deactivateSection')}</button><button onClick={()=>{if(window.confirm(tx('confirmDelete')+' '+sec.name))void run(()=>ApiClient.deleteClassSection(sec.id),tx('sectionDeleted'));}} title={tx('removeSection')} aria-label={tx('removeSection')} className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X size={14}/></button></div>}</div>
             {!isReadOnly ? <div className="grid gap-2 sm:grid-cols-2">
               <label className="text-[11px] font-semibold text-slate-600">{tx('sectionName')||tx('newSection')}<input value={draft.name} onChange={e=>setSectionConfigDraft(v=>({...v,[sec.id]:{...draft,name:e.target.value}}))} maxLength={80} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-normal text-slate-800"/></label>
               <label className="text-[11px] font-semibold text-slate-600">{tx('sectionCapacity')}<input type="number" min={1} max={1000} value={draft.maxStudents} onChange={e=>setSectionConfigDraft(v=>({...v,[sec.id]:{...draft,maxStudents:e.target.value}}))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-normal text-slate-800"/></label>
