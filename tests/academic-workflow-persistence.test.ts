@@ -32,14 +32,14 @@ test('School Admin exam results matrix loads every subject for the selected clas
   assert.doesNotMatch(adminExam, /Select Subject to Review/);
 });
 
-test('Form Teacher saves editable subjects for the class in one submission action', () => {
+test('Form Teacher submits only personally assigned subjects and reviews the rest read-only', () => {
   const start = teacher.indexOf('const handleSaveMarks = async');
   const end = teacher.indexOf('const handleForwardClassMarks', start);
   const handler = teacher.slice(start, end);
   assert.match(handler, /editableClassSubjects\.map\(async subject =>/);
   assert.match(handler, /Promise\.all\(/);
   assert.match(handler, /ApiClient\.saveMarks\(selectedClassId, subject\.id, semester, formatted\)/);
-  assert.match(teacher, /As Form Teacher, you may complete all subjects for your class/);
+  assert.match(teacher, /Form Teacher, you can review all subjects in your class, but can enter marks only for subjects personally assigned to you/);
 });
 
 test('Class bulk import template includes KG and backend accepts KG grade zero', () => {
