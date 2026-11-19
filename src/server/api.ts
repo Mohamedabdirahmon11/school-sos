@@ -6641,9 +6641,10 @@ apiRouter.delete('/exams/term-periods/:periodId', requireAuth, requireSchoolAdmi
     if (lookupError) throw lookupError;
     if (!period) { res.status(404).json({ error: 'Muddada imtixaanka lagama helin dugsigan.' }); return; }
     if (period.status !== 'draft') { res.status(409).json({ error: 'Jadwal imtixaan oo la daabacay lama tirtiri karo.' }); return; }
-    const { error: deleteError } = await client.from('exam_periods').delete()
-      .eq('id', period.id).eq('school_id', school.id).eq('status', 'draft');
+    const { data: deletedRows, error: deleteError } = await client.from('exam_periods').delete()
+      .eq('id', period.id).eq('school_id', school.id).eq('status', 'draft').select('id');
     if (deleteError) throw deleteError;
+    if (!deletedRows?.length) { res.status(409).json({ error: 'Jadwalku wuu isbeddelay; dib u cusboonaysii ka hor intaadan joojin.' }); return; }
     db.logAudit({ action: 'TERM_EXAM_TIMETABLE_CANCELLED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Cancelled draft term exam period ' + period.name + '.', severity: 'warning' });
     res.json({ success: true, periodId: period.id });
   } catch (error) {
