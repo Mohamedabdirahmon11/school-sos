@@ -173,7 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       ] },
       { title: 'Academics', items: [
         item('sch_classes', 'Fasallo', Layers), item('sch_subjects', 'Maaddooyin', BookOpen), item('sch_curriculum', 'Manhaj', BookOpen), item('sch_teacher_assignments', 'Qoondeynta Macallimiinta', UserCheck),
-        item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
+        item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', 'Xaadiris Ardayda', CalendarCheck), item('sch_teacher_attendance', 'Macallimiin Imaanshaha', UserCheck),
         item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'Documents', FileText),
         item('sch_promotion', 'Promotion & Alumni', Award)
       ] },

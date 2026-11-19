@@ -54,6 +54,10 @@ export const AttendanceView: React.FC = () => {
   const [page, setPage] = useState(1);
   const [schoolAbsences, setSchoolAbsences] = useState<Array<{ id: string; student: Student; className: string; note?: string }>>([]);
   const [absencesLoading, setAbsencesLoading] = useState(false);
+  const [attendanceDashboard, setAttendanceDashboard] = useState<any>(null);
+  const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
+  const [attendanceSettings, setAttendanceSettings] = useState({ attendanceMode: 'daily' as 'daily' | 'per_period', editWindowHours: 2, lateThresholdMinutes: 15 });
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   const loadClasses = async () => {
     if (!school) return;
@@ -79,8 +83,14 @@ export const AttendanceView: React.FC = () => {
     setAbsencesLoading(true);
     setLoadError(null);
     try {
-      const records = await ApiClient.getSchoolDailyAbsences(date);
+      const [records, dashboard, sessions, settings] = await Promise.all([
+        ApiClient.getSchoolDailyAbsences(date), ApiClient.getAttendanceDashboard(date),
+        ApiClient.getAttendanceSessions(date), ApiClient.getAttendanceSettings()
+      ]);
       setSchoolAbsences(records);
+      setAttendanceDashboard(dashboard);
+      setAttendanceSessions(sessions);
+      setAttendanceSettings(settings);
     } catch (error: any) {
       setLoadError(error?.message || 'Unable to load school-wide absences.');
     } finally {
@@ -203,7 +213,38 @@ export const AttendanceView: React.FC = () => {
           </div>
         </div>
         {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{loadError}</div>}
-        {(calendarStatus.isWeeklyHoliday || calendarStatus.holidayName) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{calendarStatus.isWeeklyHoliday ? 'This date is configured as a weekly school holiday.' : 'School holiday: ' + calendarStatus.holidayName}</p>}
+        {(calendarStatus.isWeeklyHoliday || calendarStatus.holidayName) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{calendarStatus.isWeeklyHoliday ? 'Maalintan waa fasax toddobaadle ah.' : 'Fasax dugsi: ' + calendarStatus.holidayName}</p>}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-teal-200 bg-teal-50 p-4"><p className="text-xs font-medium text-teal-800">Heerka xaadirinta</p><p className="mt-1 text-2xl font-bold text-teal-900">{attendanceDashboard?.attendanceRate ?? 0}%</p></div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Arday maqan</p><p className="mt-1 text-2xl font-bold text-rose-800">{attendanceDashboard?.absentCount ?? schoolAbsences.length}</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Arday la diiwaangeliyey</p><p className="mt-1 text-2xl font-bold text-slate-800">{attendanceDashboard?.recorded ?? 0} / {attendanceDashboard?.totalStudents ?? 0}</p></div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-medium text-amber-800">Fasallo sugaya</p><p className="mt-1 text-2xl font-bold text-amber-900">{attendanceDashboard?.classesNotSubmitted?.length ?? 0}</p></div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-slate-900">Fasallada aan weli xaadirin gudbin</h2>
+          <div className="flex gap-2"><button type="button" onClick={() => void ApiClient.downloadAttendanceReportCsv({ startDate: date, endDate: date })} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Excel / CSV</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">PDF / Daabac</button></div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          {attendanceDashboard?.classesNotSubmitted?.length ? <div className="flex flex-wrap gap-2">{attendanceDashboard.classesNotSubmitted.map((item: any) => <span key={item.id} className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{item.name}{item.section ? ' · ' + item.section : ''}</span>)}</div> : <p className="text-sm text-emerald-700">Dhammaan fasalladu xaadirinta way gudbiyeen ama diiwaan bay leeyihiin.</p>}
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="font-bold text-slate-900">Kulamada xaadirinta iyo furitaanka</h2>
+          <div className="mt-3 space-y-2">{attendanceSessions.length ? attendanceSessions.map(session => {
+            const klass = classes.find(item => item.id === session.class_id);
+            return <div key={session.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3">
+              <div><p className="text-sm font-semibold">{klass?.name || session.class_id} · {session.period_id ? 'Cashar' : 'Maalinle'}</p><p className="text-xs text-slate-500">{session.submitted_at ? new Date(session.submitted_at).toLocaleString() : 'Aan weli la gudbin'}</p></div>
+              <div className="flex items-center gap-2"><span className={'rounded-full px-2 py-1 text-xs font-semibold ' + (session.is_locked ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800')}>{session.is_locked ? 'Xiran' : 'Furan'}</span>{session.is_locked && <button type="button" disabled={isReadOnly} onClick={async () => { const reason = window.prompt('Sababta aad u furayso xaadirintan?'); if (!reason) return; try { await ApiClient.unlockAttendanceSession(session.id, reason); setAttendanceSessions(rows => rows.map(row => row.id === session.id ? { ...row, is_locked: false } : row)); setNotice('Xaadirinta dib ayaa loo furay.'); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Xaadirinta lama furi karin.'); } }} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Fur</button>}</div>
+            </div>;
+          }) : <p className="text-sm text-slate-500">Weli kulan xaadirin lama gudbin taariikhdan.</p>}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Dejinta xaadirinta dugsiga</h2><button type="button" disabled={settingsSaving || isReadOnly} onClick={async () => { setSettingsSaving(true); try { await ApiClient.updateAttendanceSettings(attendanceSettings); setNotice('Dejinta xaadirinta waa la kaydiyey.'); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Dejinta lama kaydin karin.'); } finally { setSettingsSaving(false); } }} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">{settingsSaving ? 'Waa la kaydinayaa…' : 'Kaydi dejinta'}</button></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <label className="text-xs font-semibold text-slate-600">Habka xaadirinta<select value={attendanceSettings.attendanceMode} onChange={e => setAttendanceSettings(old => ({ ...old, attendanceMode: e.target.value as 'daily' | 'per_period' }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900"><option value="daily">Maalinle</option><option value="per_period">Cashar kasta</option></select></label>
+            <label className="text-xs font-semibold text-slate-600">Waqtiga wax-ka-beddelka (saacadood)<input type="number" min="0" max="168" value={attendanceSettings.editWindowHours} onChange={e => setAttendanceSettings(old => ({ ...old, editWindowHours: Number(e.target.value) }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+            <label className="text-xs font-semibold text-slate-600">Xadka daahitaanka (daqiiqo)<input type="number" min="0" max="240" value={attendanceSettings.lateThresholdMinutes} onChange={e => setAttendanceSettings(old => ({ ...old, lateThresholdMinutes: Number(e.target.value) }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Absent students</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
           <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Classes covered</p><p className="mt-1 text-2xl font-bold text-slate-800">{new Set(schoolAbsences.map(row => row.student.classId)).size}</p></div>

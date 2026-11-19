@@ -36,6 +36,8 @@ const CurriculumView = React.lazy(() => import('./components/schooladmin/Curricu
 const TeacherAssignmentsView = React.lazy(() => import('./components/schooladmin/TeacherAssignmentsView.tsx').then(module => ({ default: module.TeacherAssignmentsView })));
 const TimetableView = React.lazy(() => import('./components/schooladmin/TimetableView.tsx').then(module => ({ default: module.TimetableView })));
 const AttendanceView = React.lazy(() => import('./components/schooladmin/AttendanceView.tsx').then(module => ({ default: module.AttendanceView })));
+const AttendanceAdminWorkspace = React.lazy(() => import('./components/schooladmin/AttendanceAdminWorkspace.tsx').then(module => ({ default: module.AttendanceAdminWorkspace })));
+const TeacherAttendanceView = React.lazy(() => import('./components/schooladmin/TeacherAttendanceView.tsx').then(module => ({ default: module.TeacherAttendanceView })));
 const ExamsResultsView = React.lazy(() => import('./components/schooladmin/ExamsResultsView.tsx').then(module => ({ default: module.ExamsResultsView })));
 const FeesLedgerView = React.lazy(() => import('./components/schooladmin/FeesLedgerView.tsx').then(module => ({ default: module.FeesLedgerView })));
 const StudentInvoicesView = React.lazy(() => import('./components/schooladmin/StudentInvoicesView.tsx').then(module => ({ default: module.StudentInvoicesView })));
@@ -57,6 +59,7 @@ const AccountantBankReconciliationView = React.lazy(() => import('./components/a
 const AccountantPayrollView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.AccountantPayrollView })));
 const StaffPayslipsView = React.lazy(() => import('./components/accountant/AccountantPayrollView.tsx').then(module => ({ default: module.StaffPayslipsView })));
 const TeacherPortalView = React.lazy(() => import('./components/teacher/TeacherPortalView.tsx').then(module => ({ default: module.TeacherPortalView })));
+const TeacherAttendanceWorkspace = React.lazy(() => import('./components/teacher/TeacherAttendanceWorkspace.tsx').then(module => ({ default: module.TeacherAttendanceWorkspace })));
 const ParentPortalView = React.lazy(() => import('./components/parent/ParentPortalView.tsx').then(module => ({ default: module.ParentPortalView })));
 const StudentPortalView = React.lazy(() => import('./components/student/StudentPortalView.tsx').then(module => ({ default: module.StudentPortalView })));
 
@@ -271,8 +274,9 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_timetable' && (
               <TimetableView />
             )}
+            {activeView === 'sch_teacher_attendance' && <TeacherAttendanceView />}
             {activeView === 'sch_attendance' && (
-              <AttendanceView />
+              <AttendanceAdminWorkspace />
             )}
             {activeView === 'sch_exams' && (
               <ExamsResultsView />
@@ -351,7 +355,8 @@ const AppContent: React.FC = () => {
             {/* TEACHER ROUTING */}
             {activeView === 't_payslips' && <StaffPayslipsView />}
             {activeView === 't_messages' && <MessagesView />}
-            {activeView.startsWith('t_') && activeView !== 't_payslips' && activeView !== 't_messages' && (
+            {activeView === 't_attendance' && <TeacherAttendanceWorkspace />}
+            {activeView.startsWith('t_') && activeView !== 't_payslips' && activeView !== 't_messages' && activeView !== 't_attendance' && (
               <TeacherPortalView
                 initialTab={activeView.replace('t_', '') as any}
               />

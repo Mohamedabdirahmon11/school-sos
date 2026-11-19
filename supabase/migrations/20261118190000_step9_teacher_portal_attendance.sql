@@ -1,0 +1,536 @@
+-- Step 9: extend the existing daily attendance register; preserve all existing rows.
+BEGIN;
+
+ALTER TABLE public.attendance_records
+  ADD COLUMN IF NOT EXISTS section_id uuid,
+  ADD COLUMN IF NOT EXISTS period_id uuid,
+  ADD COLUMN IF NOT EXISTS subject_id varchar,
+  ADD COLUMN IF NOT EXISTS marked_by varchar,
+  ADD COLUMN IF NOT EXISTS marked_at timestamptz,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz;
+
+UPDATE public.attendance_records
+SET marked_by = COALESCE(marked_by, recorded_by),
+    marked_at = COALESCE(marked_at, recorded_at),
+    updated_at = COALESCE(updated_at, recorded_at, now())
+WHERE marked_by IS NULL OR marked_at IS NULL OR updated_at IS NULL;
+
+ALTER TABLE public.attendance_records
+  ADD CONSTRAINT attendance_records_period_fk
+    FOREIGN KEY (period_id) REFERENCES public.periods(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT attendance_records_section_fk
+    FOREIGN KEY (section_id) REFERENCES public.class_sections(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT attendance_records_subject_fk
+    FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE RESTRICT;
+
+-- The previous uniqueness rule was once per class/student/day. A nullable period
+-- now distinguishes daily attendance (NULL) from lesson attendance.
+DROP INDEX IF EXISTS public.idx_attendance_unique_day;
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_records_student_period_day_uidx
+  ON public.attendance_records
+    (school_id, date, student_id, COALESCE(period_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+CREATE INDEX IF NOT EXISTS attendance_records_school_class_date_idx
+  ON public.attendance_records (school_id, class_id, date);
+CREATE INDEX IF NOT EXISTS attendance_records_school_subject_date_idx
+  ON public.attendance_records (school_id, subject_id, date)
+  WHERE subject_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.attendance_settings (
+  school_id varchar PRIMARY KEY REFERENCES public.schools(id) ON DELETE CASCADE,
+  attendance_mode varchar NOT NULL DEFAULT 'daily'
+    CHECK (attendance_mode IN ('daily', 'per_period')),
+  edit_window_hours integer NOT NULL DEFAULT 2
+    CHECK (edit_window_hours BETWEEN 0 AND 168),
+  late_threshold_minutes integer NOT NULL DEFAULT 15
+    CHECK (late_threshold_minutes BETWEEN 0 AND 240),
+  updated_by varchar,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO public.attendance_settings (school_id)
+SELECT id FROM public.schools
+ON CONFLICT (school_id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION private.ensure_school_attendance_settings()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO public.attendance_settings (school_id)
+  VALUES (NEW.id)
+  ON CONFLICT (school_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS schools_create_attendance_settings ON public.schools;
+CREATE TRIGGER schools_create_attendance_settings
+AFTER INSERT ON public.schools
+FOR EACH ROW EXECUTE FUNCTION private.ensure_school_attendance_settings();
+
+CREATE UNIQUE INDEX IF NOT EXISTS teachers_id_school_uidx ON public.teachers (id, school_id);
+
+CREATE TABLE IF NOT EXISTS public.attendance_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  date date NOT NULL,
+  class_id varchar NOT NULL,
+  section_id uuid,
+  period_id uuid,
+  subject_id varchar,
+  teacher_id varchar NOT NULL,
+  submitted_at timestamptz,
+  is_locked boolean NOT NULL DEFAULT false,
+  unlocked_at timestamptz,
+  unlocked_by varchar,
+  unlock_reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT attendance_sessions_class_school_fk
+    FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT attendance_sessions_teacher_school_fk
+    FOREIGN KEY (teacher_id, school_id) REFERENCES public.teachers(id, school_id) ON DELETE RESTRICT,
+  CONSTRAINT attendance_sessions_section_fk
+    FOREIGN KEY (section_id) REFERENCES public.class_sections(id) ON DELETE RESTRICT,
+  CONSTRAINT attendance_sessions_period_fk
+    FOREIGN KEY (period_id) REFERENCES public.periods(id) ON DELETE RESTRICT,
+  CONSTRAINT attendance_sessions_subject_fk
+    FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_sessions_once_per_class_period_day_uidx
+  ON public.attendance_sessions
+    (school_id, class_id, date, COALESCE(period_id, '00000000-0000-0000-0000-000000000000'::uuid));
+CREATE INDEX IF NOT EXISTS attendance_sessions_school_date_idx
+  ON public.attendance_sessions (school_id, date, class_id);
+CREATE INDEX IF NOT EXISTS attendance_sessions_teacher_date_idx
+  ON public.attendance_sessions (school_id, teacher_id, date);
+
+-- Preserve existing teacher-marked attendance as read-only session history.
+WITH legacy_teacher_sessions AS (
+  SELECT DISTINCT ON (ar.school_id, ar.class_id, ar.date, ar.period_id)
+    ar.school_id, ar.date, ar.class_id, ar.section_id, ar.period_id, ar.subject_id,
+    t.id AS teacher_id, ar.marked_at
+  FROM public.attendance_records ar
+  JOIN public.teachers t
+    ON t.user_id = COALESCE(ar.marked_by, ar.recorded_by)
+   AND t.school_id = ar.school_id
+  ORDER BY ar.school_id, ar.class_id, ar.date, ar.period_id, ar.marked_at DESC NULLS LAST, ar.id
+)
+INSERT INTO public.attendance_sessions
+  (school_id, date, class_id, section_id, period_id, subject_id, teacher_id, submitted_at, is_locked)
+SELECT school_id, date, class_id, section_id, period_id, subject_id, teacher_id,
+       COALESCE(marked_at, now()), false
+FROM legacy_teacher_sessions
+ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.teacher_attendance (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  teacher_id varchar NOT NULL,
+  date date NOT NULL,
+  status varchar NOT NULL CHECK (status IN ('present', 'absent', 'late', 'on_leave')),
+  check_in timestamptz,
+  check_out timestamptz,
+  note text,
+  marked_by varchar NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT teacher_attendance_teacher_school_fk
+    FOREIGN KEY (teacher_id, school_id) REFERENCES public.teachers(id, school_id) ON DELETE CASCADE,
+  CONSTRAINT teacher_attendance_one_per_day UNIQUE (school_id, teacher_id, date),
+  CONSTRAINT teacher_attendance_check_times CHECK (check_out IS NULL OR check_in IS NULL OR check_out >= check_in)
+);
+CREATE INDEX IF NOT EXISTS teacher_attendance_school_date_idx
+  ON public.teacher_attendance (school_id, date, status);
+
+CREATE TABLE IF NOT EXISTS public.attendance_audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  session_id uuid REFERENCES public.attendance_sessions(id) ON DELETE SET NULL,
+  attendance_record_id varchar,
+  entity_type varchar NOT NULL CHECK (entity_type IN ('student', 'teacher', 'session', 'settings')),
+  entity_id varchar NOT NULL,
+  action varchar NOT NULL,
+  before_data jsonb,
+  after_data jsonb,
+  changed_by varchar NOT NULL,
+  changed_at timestamptz NOT NULL DEFAULT now(),
+  details text
+);
+CREATE INDEX IF NOT EXISTS attendance_audit_school_changed_idx
+  ON public.attendance_audit_logs (school_id, changed_at DESC);
+
+-- One server-side authorization predicate is shared by attendance RLS and APIs.
+-- It supports current-year assignments, legacy class_subjects, Form Teachers
+-- for daily attendance, and date-limited substitute lessons.
+CREATE OR REPLACE FUNCTION private.auth_can_mark_attendance(
+  target_school_id varchar,
+  target_class_id varchar,
+  target_section_id uuid,
+  target_subject_id varchar,
+  target_period_id uuid,
+  target_date date
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users u
+    JOIN public.teachers t ON t.user_id = u.id AND t.school_id = target_school_id
+    WHERE u.id = private.auth_user_id()
+      AND u.role = 'teacher'
+      AND u.school_id = target_school_id
+      AND t.status = 'active'
+      AND (target_section_id IS NULL OR EXISTS (SELECT 1 FROM public.class_sections sec WHERE sec.id = target_section_id AND sec.school_id = target_school_id AND sec.legacy_class_id = target_class_id))
+      AND (
+        (
+          target_period_id IS NULL
+          AND target_subject_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM public.classes c
+            WHERE c.id = target_class_id
+              AND c.school_id = target_school_id
+              AND c.class_teacher_id = u.id
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.teacher_class_subject_assignments a
+          JOIN public.academic_years ay
+            ON ay.id = a.academic_year_id
+           AND ay.school_id = a.school_id
+           AND ay.is_current = true
+          WHERE a.school_id = target_school_id
+            AND a.class_id = target_class_id
+            AND a.teacher_id = t.id
+            AND (target_subject_id IS NULL OR a.subject_id = target_subject_id)
+            AND (a.section_id IS NULL OR a.section_id = target_section_id)
+            AND (a.term_id IS NULL OR a.term_id = (
+              SELECT tr.id FROM public.terms tr
+              WHERE tr.school_id = target_school_id AND tr.is_current = true
+            ))
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.class_subjects cs
+          WHERE cs.school_id = target_school_id
+            AND cs.class_id = target_class_id
+            AND cs.teacher_id = t.id
+            AND cs.is_active = true
+            AND (target_subject_id IS NULL OR cs.subject_id = target_subject_id)
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.timetable_substitutions sub
+          JOIN public.timetable_slots slot
+            ON slot.id = sub.entry_id
+           AND slot.school_id = sub.school_id
+          JOIN public.periods p
+            ON p.school_id = slot.school_id
+           AND p.number = slot.period_number
+          WHERE sub.school_id = target_school_id
+            AND sub.substitute_teacher_id = t.id
+            AND sub.substitute_date = target_date
+            AND slot.class_id = target_class_id
+            AND slot.is_active = true
+            AND (slot.section_id IS NULL OR slot.section_id = target_section_id)
+            AND (target_period_id IS NULL OR p.id = target_period_id)
+            AND (target_subject_id IS NULL OR slot.subject_id = target_subject_id)
+            AND trim(to_char(target_date, 'Day')) = slot.day_of_week
+        )
+      )
+  );
+$$;
+
+
+-- Keep existing student/class RLS aligned with Step 6's canonical assignments.
+CREATE OR REPLACE FUNCTION private.auth_can_access_student(target_student_id varchar)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.students s
+    JOIN public.users u ON u.id = private.auth_user_id()
+    WHERE s.id = target_student_id AND (
+      u.role = 'super_admin'
+      OR (u.school_id = s.school_id AND u.role IN ('school_admin','accountant'))
+      OR (u.school_id = s.school_id AND u.role = 'teacher' AND (
+        EXISTS (
+          SELECT 1 FROM public.enrollments e
+          JOIN public.teachers t ON t.user_id = u.id AND t.school_id = e.school_id
+          JOIN public.teacher_class_subject_assignments a
+            ON a.teacher_id = t.id AND a.school_id = t.school_id
+           AND a.class_id = e.class_id
+           AND (a.section_id IS NULL OR a.section_id = e.section_id)
+          JOIN public.academic_years ay
+            ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+          WHERE e.student_id = s.id AND e.school_id = s.school_id AND e.status = 'active'
+            AND a.academic_year_id = e.academic_year_id
+            AND (a.term_id IS NULL OR a.term_id = (
+              SELECT tr.id FROM public.terms tr
+              WHERE tr.school_id = e.school_id AND tr.is_current = true
+            ))
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.enrollments e
+          JOIN public.teachers t ON t.user_id = u.id AND t.school_id = e.school_id
+          JOIN public.class_subjects cs ON cs.teacher_id = t.id AND cs.school_id = t.school_id
+            AND cs.class_id = e.class_id AND cs.is_active = true
+          JOIN public.academic_years ay
+            ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+          WHERE e.student_id = s.id AND e.school_id = s.school_id AND e.status = 'active'
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.enrollments e
+          JOIN public.classes c ON c.id = e.class_id AND c.school_id = e.school_id
+          JOIN public.academic_years ay
+            ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+          WHERE e.student_id = s.id AND e.school_id = s.school_id AND e.status = 'active'
+            AND c.class_teacher_id = u.id
+        )
+      ))
+      OR (u.school_id = s.school_id AND u.role = 'parent' AND (
+        s.id = ANY(u.linked_student_ids) OR s.father_phone = u.phone OR s.mother_phone = u.phone
+        OR s.father_phone = u.parent_phone OR s.mother_phone = u.parent_phone
+      ))
+      OR (u.school_id = s.school_id AND u.role = 'student'
+        AND (u.student_id = s.student_id OR u.id = 'usr-student-' || s.id))
+    )
+  );
+$$;
+
+
+CREATE OR REPLACE FUNCTION private.auth_can_access_class(target_class_id varchar)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.classes c
+    JOIN public.users u ON u.id = private.auth_user_id()
+    WHERE c.id = target_class_id AND (
+      u.role = 'super_admin'
+      OR (u.school_id = c.school_id AND u.role IN ('school_admin','accountant'))
+      OR (u.school_id = c.school_id AND u.role = 'teacher' AND (
+        c.class_teacher_id = u.id
+        OR EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.teacher_class_subject_assignments a
+            ON a.teacher_id = t.id AND a.school_id = t.school_id
+          JOIN public.academic_years ay
+            ON ay.id = a.academic_year_id AND ay.school_id = a.school_id AND ay.is_current = true
+          WHERE t.user_id = u.id AND t.school_id = c.school_id AND a.class_id = c.id
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.teachers t
+          JOIN public.class_subjects cs ON cs.teacher_id = t.id AND cs.school_id = t.school_id
+          WHERE t.user_id = u.id AND t.school_id = c.school_id
+            AND cs.class_id = c.id AND cs.is_active = true
+        )
+      ))
+      OR (u.school_id = c.school_id AND u.role IN ('parent','student') AND EXISTS (
+        SELECT 1 FROM public.students s
+        WHERE s.class_id = c.id AND private.auth_can_access_student(s.id)
+      ))
+    )
+  );
+$$;
+
+-- Replace the old tenant-wide ALL policy for attendance with role/assignment checks.
+DROP POLICY IF EXISTS tenant_scope_v2 ON public.attendance_records;
+DROP POLICY IF EXISTS attendance_role_read ON public.attendance_records;
+DROP POLICY IF EXISTS attendance_admin_all ON public.attendance_records;
+DROP POLICY IF EXISTS attendance_teacher_read_assigned ON public.attendance_records;
+DROP POLICY IF EXISTS attendance_teacher_insert_assigned ON public.attendance_records;
+DROP POLICY IF EXISTS attendance_teacher_update_assigned ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_insert ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_update ON public.attendance_records;
+DROP POLICY IF EXISTS parent_student_block_delete ON public.attendance_records;
+
+CREATE POLICY attendance_admin_all ON public.attendance_records
+  FOR ALL TO authenticated
+  USING (
+    (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id())
+    AND private.auth_user_role() IN ('school_admin', 'super_admin')
+  )
+  WITH CHECK (
+    (private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id())
+    AND private.auth_user_role() IN ('school_admin', 'super_admin')
+  );
+
+CREATE POLICY attendance_teacher_read_assigned ON public.attendance_records
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
+  );
+
+DROP POLICY IF EXISTS attendance_accountant_read ON public.attendance_records;
+CREATE POLICY attendance_accountant_read ON public.attendance_records
+  FOR SELECT TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'accountant');
+
+DROP POLICY IF EXISTS attendance_parent_student_read_own ON public.attendance_records;
+CREATE POLICY attendance_parent_student_read_own ON public.attendance_records
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND private.auth_user_role() IN ('parent', 'student')
+    AND private.auth_can_access_student(student_id)
+  );
+
+CREATE POLICY attendance_teacher_insert_assigned ON public.attendance_records
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    school_id = private.auth_school_id()
+    AND marked_by = private.auth_user_id()
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.attendance_sessions s
+      WHERE s.school_id = attendance_records.school_id
+        AND s.class_id = attendance_records.class_id
+        AND s.date = attendance_records.date
+        AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.subject_id IS NOT DISTINCT FROM attendance_records.subject_id
+        AND s.section_id IS NOT DISTINCT FROM attendance_records.section_id
+        AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
+        AND s.is_locked = false
+    )
+  );
+
+DROP POLICY IF EXISTS attendance_teacher_update_assigned ON public.attendance_records;
+CREATE POLICY attendance_teacher_update_assigned ON public.attendance_records
+  FOR UPDATE TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND marked_by = private.auth_user_id()
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.attendance_sessions s
+      JOIN public.attendance_settings cfg ON cfg.school_id = s.school_id
+      WHERE s.school_id = attendance_records.school_id
+        AND s.class_id = attendance_records.class_id
+        AND s.date = attendance_records.date
+        AND s.period_id IS NOT DISTINCT FROM attendance_records.period_id
+        AND s.subject_id IS NOT DISTINCT FROM attendance_records.subject_id
+        AND s.section_id IS NOT DISTINCT FROM attendance_records.section_id
+        AND s.teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = attendance_records.school_id)
+        AND s.is_locked = false
+        AND s.submitted_at IS NOT NULL
+        AND now() <= s.submitted_at + make_interval(hours => cfg.edit_window_hours)
+    )
+  )
+  WITH CHECK (
+    school_id = private.auth_school_id()
+    AND marked_by = private.auth_user_id()
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+    AND EXISTS (
+      SELECT 1 FROM public.enrollments e
+      JOIN public.academic_years ay
+        ON ay.id = e.academic_year_id AND ay.school_id = e.school_id AND ay.is_current = true
+      WHERE e.student_id = attendance_records.student_id
+        AND e.school_id = attendance_records.school_id
+        AND e.class_id = attendance_records.class_id
+        AND (attendance_records.section_id IS NULL OR e.section_id = attendance_records.section_id)
+        AND e.status = 'active'
+    )
+  );
+
+ALTER TABLE public.attendance_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_audit_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS attendance_settings_admin_all ON public.attendance_settings;
+CREATE POLICY attendance_settings_admin_all ON public.attendance_settings
+  FOR ALL TO authenticated
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
+  WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
+DROP POLICY IF EXISTS attendance_settings_teacher_read ON public.attendance_settings;
+CREATE POLICY attendance_settings_teacher_read ON public.attendance_settings
+  FOR SELECT TO authenticated
+  USING (school_id = private.auth_school_id() AND private.auth_user_role() = 'teacher');
+
+DROP POLICY IF EXISTS attendance_sessions_admin_all ON public.attendance_sessions;
+CREATE POLICY attendance_sessions_admin_all ON public.attendance_sessions
+  FOR ALL TO authenticated
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
+  WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
+DROP POLICY IF EXISTS attendance_sessions_teacher_read ON public.attendance_sessions;
+CREATE POLICY attendance_sessions_teacher_read ON public.attendance_sessions
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND private.auth_can_mark_attendance(school_id, class_id, section_id, subject_id, period_id, date)
+  );
+-- Teacher session writes are performed by the authenticated Express API after
+-- edit-window and lock checks. Direct client writes are intentionally not granted.
+
+DROP POLICY IF EXISTS teacher_attendance_admin_all ON public.teacher_attendance;
+CREATE POLICY teacher_attendance_admin_all ON public.teacher_attendance
+  FOR ALL TO authenticated
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
+  WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
+DROP POLICY IF EXISTS teacher_attendance_self_read ON public.teacher_attendance;
+CREATE POLICY teacher_attendance_self_read ON public.teacher_attendance
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND teacher_id IN (SELECT id FROM public.teachers WHERE user_id = private.auth_user_id() AND school_id = private.auth_school_id())
+  );
+
+DROP POLICY IF EXISTS attendance_audit_admin_all ON public.attendance_audit_logs;
+CREATE POLICY attendance_audit_admin_all ON public.attendance_audit_logs
+  FOR ALL TO authenticated
+  USING ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'))
+  WITH CHECK ((private.auth_user_role() = 'super_admin' OR school_id = private.auth_school_id()) AND private.auth_user_role() IN ('school_admin','super_admin'));
+DROP POLICY IF EXISTS attendance_audit_teacher_read_own ON public.attendance_audit_logs;
+CREATE POLICY attendance_audit_teacher_read_own ON public.attendance_audit_logs
+  FOR SELECT TO authenticated
+  USING (
+    school_id = private.auth_school_id()
+    AND changed_by = private.auth_user_id()
+    AND private.auth_user_role() = 'teacher'
+  );
+
+REVOKE ALL ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.auth_can_mark_attendance(varchar, varchar, uuid, varchar, uuid, date) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.auth_can_access_student(varchar) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.auth_can_access_class(varchar) TO authenticated, service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_records TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.attendance_sessions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.teacher_attendance TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_audit_logs TO authenticated;
+
+COMMIT;
