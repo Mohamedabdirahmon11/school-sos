@@ -98,8 +98,7 @@ BEGIN
   IF NEW.marks IS NOT NULL AND (NEW.marks<0 OR NEW.marks>v_max) THEN
     RAISE EXCEPTION 'Dhibcuhu waa inay u dhexeeyaan 0 iyo %.',v_max;
   END IF;
-  IF (NEW.status='present' AND NEW.marks IS NULL)
-     OR (NEW.status IN ('absent','excused') AND NEW.marks IS NOT NULL) THEN
+  IF NEW.status IN ('absent','excused') AND NEW.marks IS NOT NULL THEN
     RAISE EXCEPTION 'Xaaladda ardayga iyo dhibcihiisu isma waafaqaan.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.term_status ts WHERE ts.school_id=NEW.school_id
