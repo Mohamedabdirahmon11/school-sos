@@ -13,6 +13,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
+const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
 
 test('exam schedule schema is tenant-scoped and protects room and seat allocations', () => {
   assert.match(migration, /ALTER TABLE public\.exam_schedules ENABLE ROW LEVEL SECURITY/);
@@ -99,9 +100,14 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(ui.includes('Save draft changes'));
   assert.ok(ui.includes('Mixed-class student group'));
   assert.ok(ui.includes('Shift for generated sessions'));
-  assert.ok(ui.includes("setScheduleSection('timetable')") || ui.includes("'Exam Timetable'"));
+  assert.ok(ui.includes("'Jadwalka Imtixaanka Term-ka'"));
   assert.ok(ui.includes("'Exam Rooms'"));
-  assert.ok(ui.includes("'Student Mixing'"));
+  assert.ok(!ui.includes("['mixing', 'Student Mixing']"));
+  assert.ok(ui.includes("TermExamSchedulingPanel"));
+  assert.ok(termUi.includes('Term 1 iyo Term 2'));
+  assert.ok(termUi.includes('Samee jadwalka term-ka'));
+  assert.ok(termUi.includes('Kormeerayaasha'));
+  assert.ok(termUi.includes('Daabac A4'));
   assert.ok(ui.includes('Register exam room'));
   assert.ok(ui.includes('Registered exam rooms'));
   assert.ok(ui.includes('Add exam room'));
