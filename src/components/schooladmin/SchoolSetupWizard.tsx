@@ -31,7 +31,7 @@ const STEPS = [
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
 
-export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
+export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) => {
   const { school } = useAuth();
   const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
   const [step, setStep] = useState(1);
@@ -40,7 +40,48 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistItems, setChecklistItems] = useState<Array<{id:string;title:string;description:string;complete:boolean;view:string}>>([]);
   const [timetable, setTimetable] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
+
+  const loadChecklist = async (completedSteps: number[] = saved) => {
+    if (!school?.id) return;
+    setChecklistLoading(true);
+    try {
+      const [years, groups, subjects] = await Promise.all([
+        ApiClient.getAcademicYears(), ApiClient.getClassGroups(), ApiClient.getSubjects()
+      ]);
+      const activeYear = years.find((year: any) => year.status === 'active' || year.is_current) || null;
+      const semesters = activeYear ? await ApiClient.getAcademicYearSemesters(activeYear.id).catch(() => []) : [];
+      const sections = groups.flatMap((group: any) => group.sections || []);
+      let teacherData: any = { curriculum: [], assignments: [], totalClassSubjects: 0, unassignedCount: 0 };
+      if (activeYear) {
+        try {
+          teacherData = await ApiClient.request<any>(`/teacher-assignments?academicYearId=${encodeURIComponent(activeYear.id)}&termId=all`);
+        } catch { /* Keep the remaining setup checks visible if teacher data is unavailable. */ }
+      }
+      const curriculumCount = Number(teacherData.totalClassSubjects ?? teacherData.curriculum?.length ?? 0);
+      const unassignedCount = Number(teacherData.unassignedCount ?? 0);
+      const semesterNames = new Set(semesters.map((semester: any) => semester.name));
+      const classesComplete = groups.length > 0 && groups.every((group: any) => (group.sections || []).length > 0);
+      const formTeachersComplete = sections.length > 0 && sections.every((section: any) => Boolean(section.class_teacher_id));
+      setChecklistItems([
+        { id: 'profile', title: 'School Profile & Settings', description: 'School identity, contacts, logo and preferences are saved.', complete: completedSteps.includes(1), view: 'sch_settings' },
+        { id: 'year', title: 'Academic Year', description: 'One academic year is active for this school.', complete: Boolean(activeYear), view: 'sch_setup_academics' },
+        { id: 'semesters', title: 'Two Semesters', description: 'Semester 1 and Semester 2 are configured for the active year.', complete: semesters.length === 2 && semesterNames.has('Semester 1') && semesterNames.has('Semester 2'), view: 'sch_setup_academics' },
+        { id: 'classes', title: 'Classes & Sections', description: 'Classes have been created and each class has at least one section.', complete: classesComplete, view: 'sch_classes' },
+        { id: 'form-teachers', title: 'Form Teachers', description: 'Every active section has its required form teacher.', complete: formTeachersComplete, view: 'sch_classes' },
+        { id: 'subjects', title: 'Subjects', description: 'The school has selected or created its subjects.', complete: subjects.length > 0, view: 'sch_subjects' },
+        { id: 'curriculum', title: 'Class–Subject Curriculum', description: 'Subjects are mapped to the classes that study them.', complete: curriculumCount > 0, view: 'sch_curriculum' },
+        { id: 'teacher-assignments', title: 'Teacher Assignments', description: 'Every curriculum subject has a teacher assigned for the active year.', complete: curriculumCount > 0 && unassignedCount === 0, view: 'sch_teacher_assignments' }
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load the School Setup checklist.');
+    } finally {
+      setChecklistLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -71,6 +112,10 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
       });
       setSaved(incoming.completedSteps || []);
       setStep(Math.min(5, Math.max(1, result.progress?.currentStep || 1)));
+      if ((incoming.completedSteps || []).length >= 5 || result.progress?.completed) {
+        setShowChecklist(true);
+        void loadChecklist(incoming.completedSteps || []);
+      }
     }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load school setup.'))
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -152,7 +197,10 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
       }
       const result = await ApiClient.saveSchoolSetupStep(step, section);
       setData(result.data); setSaved(result.data.completedSteps || []);
-      if (result.completed) await onComplete();
+      if (result.completed) {
+        setShowChecklist(true);
+        await loadChecklist(result.data.completedSteps || []);
+      }
       else if (advance && step < 5) setStep(step + 1);
     } catch (err) { setError(err instanceof Error ? err.message : 'This setup step could not be saved.'); }
     finally { setSaving(false); }
@@ -249,5 +297,27 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         <div className="flex flex-wrap gap-2"><button type="button" disabled={saving || logoUploading} onClick={() => void saveStep(false)} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50"><Save size={16} /> Save and exit later</button><button type="button" disabled={saving || logoUploading} onClick={() => void saveStep(true)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : step === 5 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}{step === 5 ? 'Complete setup' : 'Save and continue'}</button></div>
       </footer>
     </section>
+
+    {showChecklist && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
+        <section className="w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div><p className="text-xs font-bold uppercase tracking-widest text-teal-700">SCHOOL SETUP</p><h2 className="mt-1 text-2xl font-bold text-slate-900">Setup progress</h2><p className="mt-2 text-sm text-slate-600">The five onboarding steps are saved. Complete the remaining school modules below; you can open each module directly.</p></div>
+            <button type="button" onClick={() => void loadChecklist()} disabled={checklistLoading} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">{checklistLoading ? 'Refreshing…' : 'Refresh status'}</button>
+          </div>
+          {checklistLoading && checklistItems.length === 0 ? <div className="py-12 text-center text-sm text-slate-500">Checking setup modules…</div> : (
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {checklistItems.map(item => (
+                <article key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
+                  <div className={item.complete ? 'mt-0.5 text-emerald-600' : 'mt-0.5 text-amber-500'}>{item.complete ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}</div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-bold text-slate-900">{item.title}</h3><span className={item.complete ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700'}>{item.complete ? 'Complete' : 'Incomplete'}</span></div><p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p><button type="button" onClick={() => onNavigate(item.view)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900">Open module <ArrowRight size={13} /></button></div>
+                </article>
+              ))}
+            </div>
+          )}
+          <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={() => void onComplete()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800">Finish and go to dashboard</button></div>
+        </section>
+      </div>
+    )}
   </main>;
 };

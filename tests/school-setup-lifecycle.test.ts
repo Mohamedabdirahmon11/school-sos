@@ -99,3 +99,11 @@ test('canonical fresh-install schema mirrors the school setup migrations', () =>
   assert.ok(schema.includes('schoolos_update_class_section_config'));
   assert.ok(schema.includes('schoolos_confirm_promotions_with_enrollments'));
 });
+
+test('setup wizard shows completion status for all school modules', () => {
+  const wizard = read('../src/components/schooladmin/SchoolSetupWizard.tsx');
+  assert.ok(wizard.includes('Setup progress'));
+  assert.ok(wizard.includes('Class–Subject Curriculum'));
+  assert.ok(wizard.includes('Teacher Assignments'));
+  assert.ok(wizard.includes('onNavigate(item.view)'));
+});
