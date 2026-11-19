@@ -2,25 +2,29 @@
  * Official Student Yearly Report Cards & Class Bulk Generator
  * Strictly follows rules:
  * 1. Combines Semester 1 + Semester 2 for final yearly percentage and class rank
- * 2. Percentages only (no letter grades, no GPA)
- * 3. Does NOT show attendance
- * 4. Shows school logo, name, student info, subjects (Sem 1 marks/%, Sem 2 marks/%, Yearly %), teacher & admin comments, signatures, and stamp
- * 5. Uses school's configured Report Card Design (template, colors, images, uploaded background)
- * 6. Supports Single Student Print and Bulk Class PDF printing
+ * 2. Uses the school's configured grade labels; no GPA is calculated.
+ * 3. Report-card printing is blocked until both semesters have been published by the school.
+ * 4. Includes attendance when the school's academic-term dates and attendance records are available.
+ * 5. Shows school branding, student info, semester marks, yearly grades, saved teacher remarks, signatures, and stamp.
+ * 6. Uses the school's configured Report Card Design (template, colors, images, uploaded background).
+ * 7. Supports Single Student Print and Bulk Class PDF printing.
  */
 
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { School, SchoolBranch, SchoolClass, ExamConfig, ReportCardDesign } from '../../types/index.ts';
-import { adminRemark, formatReportCardMark, initialsFor, teacherRemark } from '../../lib/report-card.ts';
+import { adminRemark, formatReportCardMark, gradeLabelForPercentage, initialsFor, teacherRemark } from '../../lib/report-card.ts';
 import {
   FileText,
   Printer,
   Search,
   Trophy,
   Layers,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  X,
+  Save
 } from 'lucide-react';
 
 interface ReportCardMark {
@@ -29,6 +33,7 @@ interface ReportCardMark {
   totalMarks: number;
   percentage: number;
   status?: string;
+  teacherRemarks?: string;
 }
 
 interface ReportCardSubjectResult {
@@ -42,9 +47,11 @@ interface ReportCardSubjectResult {
 }
 
 interface ReportCardResult {
+  attendanceSummary?: { totalDays: number; present: number; absent: number; late: number; excused: number; attendancePercentage: number } | null;
   student: { id: string; firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: ReportCardSubjectResult[];
   annualComplete: boolean;
+  annualPublished: boolean;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -140,6 +147,20 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           )}
         </div>
 
+        {result.attendanceSummary && (
+          <div className="rounded-xl border border-[#E2E8F0] p-3 space-y-2">
+            <p className="font-semibold text-[#334155]">Attendance Summary</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
+              <div><span className="text-[#64748B]">Attendance rate (excused excluded)</span><p className="font-bold text-[#0F766E]">{result.attendanceSummary.attendancePercentage}%</p></div>
+              <div><span className="text-[#64748B]">Present</span><p className="font-semibold">{result.attendanceSummary.present}</p></div>
+              <div><span className="text-[#64748B]">Absent</span><p className="font-semibold">{result.attendanceSummary.absent}</p></div>
+              <div><span className="text-[#64748B]">Late</span><p className="font-semibold">{result.attendanceSummary.late}</p></div>
+              <div><span className="text-[#64748B]">Excused</span><p className="font-semibold">{result.attendanceSummary.excused}</p></div>
+            </div>
+            <p className="text-[10px] text-[#94A3B8]">Based on {result.attendanceSummary.totalDays} recorded school days.</p>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <span className="px-2.5 py-1 rounded-full font-semibold" style={{ backgroundColor: `${primaryColor}14`, color: primaryColor }}>
             Exam maximums: Small {result.subjectResults[0]?.maxMarks.small ?? 0} + Big {result.subjectResults[0]?.maxMarks.big ?? 0} = {result.subjectResults[0]?.maxMarks.total ?? 0}
@@ -147,8 +168,8 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           {blocks.percentage && (
             <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] font-semibold text-[#475569]">Yearly average: {result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</span>
           )}
-          <span className={`px-2.5 py-1 rounded-full font-semibold ${!result.annualComplete ? 'bg-amber-50 text-amber-800' : result.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-            {!result.annualComplete ? 'NOT FINAL — BOTH SEMESTERS REQUIRED' : result.isPass ? 'PASS' : 'BELOW PASS MARK'}
+          <span className={`px-2.5 py-1 rounded-full font-semibold ${!result.annualComplete || !result.annualPublished ? 'bg-amber-50 text-amber-800' : result.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+            {!result.annualComplete ? 'NOT FINAL — BOTH SEMESTERS REQUIRED' : !result.annualPublished ? 'APPROVED — AWAITING SCHOOL PUBLICATION' : result.isPass ? 'PUBLISHED — PASS' : 'PUBLISHED — BELOW PASS MARK'}
           </span>
         </div>
 
@@ -162,12 +183,13 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <th className="py-2.5 px-3 text-center">Semester 2 Marks</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 %</th>
                 <th className="py-2.5 px-3 text-right font-bold">Yearly Result (%)</th>
+                <th className="py-2.5 px-3 text-center">Grade</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
               {result.subjectResults.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
+                  <td colSpan={7} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
                 </tr>
               ) : result.subjectResults.map(row => (
                 <tr key={row.subject.id} className="hover:bg-[#F8FAFC]">
@@ -177,6 +199,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{formatReportCardMark(row.sem2Marks, row.maxMarks)}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem2Percentage !== null ? `${row.sem2Percentage}%` : '-'}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-bold" style={{ color: primaryColor }}>{row.yearlyPercentage !== null ? `${row.yearlyPercentage}%` : '-'}</td>
+                  <td className="py-2.5 px-3 text-center font-bold text-[#475569]">{gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)}</td>
                 </tr>
               ))}
             </tbody>
@@ -185,6 +208,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Combined Yearly Academic Average</td>
                 <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] text-[#64748B]">Exam maximums shown per subject</td>
                 <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</td>
+                <td className="py-2.5 px-3 text-center">{result.annualComplete ? gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale) : '-'}</td>
               </tr>
             </tfoot>
           </table>
@@ -194,8 +218,19 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
-                <p className="font-semibold text-[#475569] mb-1">Class Teacher Remarks:</p>
-                <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
+                <p className="font-semibold text-[#475569] mb-1">Teacher Remarks:</p>
+                {result.subjectResults.some(row => row.sem1Marks?.teacherRemarks?.trim() || row.sem2Marks?.teacherRemarks?.trim()) ? (
+                  <ul className="space-y-1 text-[#334155]">
+                    {result.subjectResults.flatMap(row => [
+                      row.sem1Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s1`, label: `${row.subject.name} · Semester 1`, comment: row.sem1Marks.teacherRemarks.trim() } : null,
+                      row.sem2Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s2`, label: `${row.subject.name} · Semester 2`, comment: row.sem2Marks.teacherRemarks.trim() } : null
+                    ].filter((item): item is { key: string; label: string; comment: string } => Boolean(item))).map(item => (
+                      <li key={item.key}><span className="font-semibold">{item.label}:</span> {item.comment}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
+                )}
               </div>
             )}
             {blocks.adminRemarks && (
@@ -239,7 +274,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
 };
 
 export const ReportCardsView: React.FC = () => {
-  const { school, t } = useAuth();
+  const { school, user, currentRole, t } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [branches, setBranches] = useState<SchoolBranch[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
@@ -252,6 +287,8 @@ export const ReportCardsView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSavingDesign, setIsSavingDesign] = useState(false);
+  const [designMessage, setDesignMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!school) return;
@@ -295,6 +332,44 @@ export const ReportCardsView: React.FC = () => {
   const filteredRankings = yearlyRankings.filter(r =>
     `${r.student.firstName} ${r.student.lastName} ${r.student.studentId}`.toLowerCase().includes(search.toLowerCase())
   );
+
+
+  const canManageDesign = currentRole === 'school_admin' || currentRole === 'super_admin' || user?.role === 'school_admin' || user?.role === 'super_admin';
+
+  const saveOwnDesign = async (imageData: string) => {
+    if (!design) return;
+    setIsSavingDesign(true);
+    setError(null);
+    setDesignMessage(null);
+    try {
+      const updated = await ApiClient.updateReportCardDesign({ ownDesignImageUrl: imageData });
+      setDesign(updated);
+      setDesignMessage(imageData ? 'Your school report card design has been saved.' : 'Custom report card design removed. Default design is active.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The school report card design could not be saved.');
+    } finally {
+      setIsSavingDesign(false);
+    }
+  };
+
+  const handleOwnDesignUpload = (file?: File) => {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Upload a PNG, JPG or WebP report card design.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('The report card design must be 2 MB or smaller.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') void saveOwnDesign(reader.result);
+      else setError('The selected design could not be read.');
+    };
+    reader.onerror = () => setError('The selected design could not be read.');
+    reader.readAsDataURL(file);
+  };
 
   const download = async (action: () => Promise<void>) => {
     setError(null);
@@ -340,7 +415,7 @@ export const ReportCardsView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
             ))}
           </select>
-          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualComplete) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
+          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualComplete || !result.annualPublished) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
           <button
             type="button"
             onClick={() => {
@@ -350,7 +425,7 @@ export const ReportCardsView: React.FC = () => {
                 setIsBulkPrintMode(false);
               }, 300);
             }}
-            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualComplete)}
+            disabled={yearlyRankings.length === 0 || yearlyRankings.some(result => !result.annualComplete || !result.annualPublished)}
             className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
           >
             <Layers className="w-3.5 h-3.5" />
@@ -359,13 +434,13 @@ export const ReportCardsView: React.FC = () => {
           <button
             type="button"
             onClick={() => window.print()}
-            disabled={!selectedStudentResult?.annualComplete}
+            disabled={!selectedStudentResult?.annualComplete || !selectedStudentResult?.annualPublished}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
             Print Student Report Card
           </button>
-          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId))} disabled={!selectedStudentResult?.annualComplete} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Download PDF</button>
+          <button type="button" onClick={() => selectedStudentId && void download(() => ApiClient.downloadReportCardPdf(selectedStudentId))} disabled={!selectedStudentResult?.annualComplete || !selectedStudentResult?.annualPublished} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-white border border-teal-200 rounded-lg disabled:opacity-50">Download PDF</button>
         </div>
       </div>
 
@@ -374,6 +449,52 @@ export const ReportCardsView: React.FC = () => {
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
+      )}
+
+      {design && canManageDesign && (
+        <section className="no-print rounded-xl border border-[#DCE5E4] bg-white p-4 md:p-5 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-[#132A29]">School-specific Report Card Design</h2>
+              <p className="mt-1 text-xs text-[#64748B] max-w-2xl">Upload your school’s official report-card background or stationery. It will be used for this school’s student report cards and class PDF exports only.</p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700 border border-teal-100">This school only</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-4 items-start">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white cursor-pointer hover:bg-[#0D655E]">
+                  <Upload className="w-4 h-4" />
+                  {design.ownDesignImageUrl ? 'Replace school design' : 'Upload school design'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isSavingDesign} onChange={event => {
+                    const file = event.target.files?.[0];
+                    handleOwnDesignUpload(file);
+                    event.currentTarget.value = '';
+                  }} />
+                </label>
+                {design.ownDesignImageUrl && (
+                  <button type="button" onClick={() => void saveOwnDesign('')} disabled={isSavingDesign} className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                    <X className="w-4 h-4" /> Remove custom design
+                  </button>
+                )}
+                {isSavingDesign && <span className="inline-flex items-center gap-2 text-xs text-[#64748B]"><Save className="w-4 h-4 animate-pulse" /> Saving design…</span>}
+              </div>
+              <p className="text-[11px] leading-5 text-[#64748B]">Accepted formats: PNG, JPG or WebP · Maximum size: 2 MB. Use a portrait A4 page (2480 × 3508 px recommended) with your school header, borders and watermark. Student marks and details remain generated by SchoolOS on top.</p>
+              {designMessage && <p className="text-xs font-medium text-emerald-700">{designMessage}</p>}
+            </div>
+            <div className="rounded-lg border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-2">
+              {design.ownDesignImageUrl ? (
+                <img src={design.ownDesignImageUrl} alt="Uploaded school report card design preview" className="w-full aspect-[210/297] object-contain rounded bg-white" />
+              ) : (
+                <div className="aspect-[210/297] flex flex-col items-center justify-center gap-2 text-center text-[#94A3B8]">
+                  <FileText className="w-8 h-8" />
+                  <span className="text-[11px] font-medium">Default SchoolOS report card</span>
+                </div>
+              )}
+              <p className="pt-2 text-center text-[10px] font-medium text-[#64748B]">{design.ownDesignImageUrl ? 'Current school design' : 'No custom background uploaded'}</p>
+            </div>
+          </div>
+        </section>
       )}
 
       {design && (
@@ -428,9 +549,9 @@ export const ReportCardsView: React.FC = () => {
                       <p className="text-[11px] text-[#64748B] font-mono">{r.student.studentId}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono font-bold">{r.annualComplete ? `${r.yearlyPercentage}%` : 'Pending'}</span>
+                      <span className="font-mono font-bold">{r.annualComplete && r.annualPublished ? `${r.yearlyPercentage}%` : 'Pending publication'}</span>
                       <p className="text-[10px] text-[#64748B] flex items-center justify-end gap-1">
-                        {r.annualComplete && r.isTopThree && <Trophy className="w-3 h-3 text-amber-500" />} {r.annualComplete ? `Rank #${r.yearlyRank}` : 'Awaiting both semesters'}
+                        {r.annualComplete && r.annualPublished && r.isTopThree && <Trophy className="w-3 h-3 text-amber-500" />} {r.annualComplete ? (r.annualPublished ? `Rank #${r.yearlyRank}` : 'Awaiting school publication') : 'Awaiting both semesters'}
                       </p>
                     </div>
                   </div>
