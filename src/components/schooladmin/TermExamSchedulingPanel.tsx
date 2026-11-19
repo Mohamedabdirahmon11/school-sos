@@ -38,8 +38,8 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
     let active = true;
     setLoading(true);
     Promise.all([
-      ApiClient.getTimetableTerms(), ApiClient.getClasses(), ApiClient.getSubjects(),
-      ApiClient.getTeachers(), ApiClient.getExamRooms(true)
+      ApiClient.getTimetableTerms(), ApiClient.request<any[]>('/classes?page=1&pageSize=100'), ApiClient.request<any[]>('/subjects?page=1&pageSize=100'),
+      ApiClient.getTeachers({ page: 1, pageSize: 100 })
     ]).then(([termRows, classRows, subjectRows, teacherRows]) => {
       if (!active) return;
       const availableTerms = Array.isArray(termRows) ? termRows : [];
