@@ -684,4 +684,5 @@ pm run dev and apply migrations 001-014.
 - ADDED: invigilator uniqueness and teaching-conflict validation, non-overlapping sessions, atomic period publication validation, and backup/restore allowlist coverage.
 - ADDED: School Admin Term Exam workspace with configurable sessions, normal/term class shifts, room mix summaries, invigilator assignment, A4 timetable printing, and publish controls. The term workspace is now the default exam-scheduling view; the legacy room registry remains available.
 - ADDED: unit tests in `tests/term-exam-scheduling.test.ts` for curriculum grouping, mixed seating, class exam numbering, shift compatibility, capacity validation, and invigilator conflicts.
-- NOT VERIFIED YET: TypeScript checks, full tests, route/RLS audits, production build, live Supabase migration application, and end-to-end authenticated School Admin flows. Run the repository CI checks before merging; apply the migration only after review and against the intended Supabase project.
+- VERIFIED: GitHub Actions run 44494116498 passed TypeScript checks, all 466 tests, route parity audit, RLS source audit, and production build.
+- NOT LIVE VERIFIED: the migration has not been applied to Supabase, and authenticated School Admin end-to-end flows still need a controlled staging-school test. Apply the migration only after review against the intended Supabase project.
