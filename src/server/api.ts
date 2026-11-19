@@ -13,7 +13,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { db } from './storage.ts';
 import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
-import { createPdf, PdfPageInput } from './pdf.ts';
+import { createPdf, type PdfImageAsset, type PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
 import { User, UserRole, School, SchoolClass, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
@@ -58,6 +58,33 @@ import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/te
 import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
 
 export const apiRouter = Router();
+async function getSchoolLogoPdfImage(school: School, storageClient: any): Promise<PdfImageAsset | undefined> {
+  const logoUrl = typeof school.logoUrl === 'string' ? school.logoUrl.trim() : '';
+  if (!logoUrl || !supabaseUrl) return undefined;
+  let objectPath = '';
+  try {
+    const parsed = new URL(logoUrl);
+    if (parsed.origin !== new URL(supabaseUrl).origin) return undefined;
+    const marker = `/storage/v1/object/public/${SCHOOL_LOGO_BUCKET}/`;
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return undefined;
+    objectPath = decodeURIComponent(parsed.pathname.slice(markerIndex + marker.length));
+  } catch {
+    return undefined;
+  }
+  if (!objectPath.startsWith(`${school.id}/`) || objectPath.split('/').some(part => part === '.' || part === '..')) return undefined;
+  const { data, error } = await storageClient.storage.from(SCHOOL_LOGO_BUCKET).download(objectPath);
+  if (error || !data) return undefined;
+  const bytes = Buffer.from(await data.arrayBuffer());
+  const image = detectSchoolLogoImage(bytes, data.type);
+  if (!image || image.extension === 'webp') return undefined;
+  return {
+    dataUrl: `data:${image.contentType};base64,${bytes.toString('base64')}`,
+    x: 500, y: 755, width: 48, height: 48
+  };
+}
+
+
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
@@ -8426,17 +8453,21 @@ apiRouter.get('/student-invoices/:id/pdf', requireAuth, requireSchoolContext, as
   const [student,items]=await Promise.all([db.getStudentById(invoice.student_id,school.id),client.from('student_invoice_items').select('*').eq('school_id',school.id).eq('invoice_id',invoice.id)]);
   if(items.error){res.status(503).json({error:'Invoice items could not be loaded.'});return;}
   const klass=student?await db.getClassById(student.classId,school.id):null;
-  const pages:PdfPageInput[]=[[
-    school.name,school.address||'',school.phone||'','STUDENT INVOICE',
-    `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
-    `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
-    `Student ID: ${student?.studentId||invoice.student_id}`,`Class: ${klass?.name||''} ${klass?.section||''}`,`Billing period: ${invoice.billing_period}`,'',
-    ...(items.data||[]).map((line:any)=>`${line.description}  x${line.quantity}  ${formatMoney(Number(line.line_total),invoice.currency)}`),
-    '',`Subtotal: ${formatMoney(Number(invoice.subtotal),invoice.currency)}`,`Discount: ${formatMoney(Number(invoice.discount_amount),invoice.currency)}`,
-    `Total: ${formatMoney(Number(invoice.total_amount),invoice.currency)}`,`Paid: ${formatMoney(Number(invoice.amount_paid),invoice.currency)}`,
-    `Balance due: ${formatMoney(Number(invoice.balance_due),invoice.currency)}`,`Status: ${invoice.status}`,
-    ...(invoice.notes?[ '',invoice.notes]:[])
-  ]];
+  const logoImage = await getSchoolLogoPdfImage(school, client);
+  const pages:PdfPageInput[]=[{
+    lines:[
+      school.name,school.address||'',school.phone||'','STUDENT INVOICE',
+      `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
+      `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
+      `Student ID: ${student?.studentId||invoice.student_id}`,`Class: ${klass?.name||''} ${klass?.section||''}`,`Billing period: ${invoice.billing_period}`,'',
+      ...(items.data||[]).map((line:any)=>`${line.description}  x${line.quantity}  ${formatMoney(Number(line.line_total),invoice.currency)}`),
+      '',`Subtotal: ${formatMoney(Number(invoice.subtotal),invoice.currency)}`,`Discount: ${formatMoney(Number(invoice.discount_amount),invoice.currency)}`,
+      `Total: ${formatMoney(Number(invoice.total_amount),invoice.currency)}`,`Paid: ${formatMoney(Number(invoice.amount_paid),invoice.currency)}`,
+      `Balance due: ${formatMoney(Number(invoice.balance_due),invoice.currency)}`,`Status: ${invoice.status}`,
+      ...(invoice.notes?[ '',invoice.notes]:[])
+    ],
+    images: logoImage ? [logoImage] : []
+  }];
   sendPdf(res,`invoice-${invoice.invoice_number}`,pages);
 });
 
@@ -8535,16 +8566,22 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
+  const client = studentInvoiceServiceClient(res);
+  if (!client) return;
+  const logoImage = await getSchoolLogoPdfImage(school, client);
   const feeName = payment.feeStructureId ? feeStructures.find(item => item.id === payment.feeStructureId)?.name : undefined;
-  sendPdf(res, `receipt-${payment.receiptNumber}`, [[
-    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
-    `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
-    `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
-    `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
-    `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
-    `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
-    ...(school.receiptFooter ? ['', school.receiptFooter] : [])
-  ]]);
+  sendPdf(res, `receipt-${payment.receiptNumber}`, [{
+    lines:[
+      school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
+      `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
+      `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
+      `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
+      `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
+      `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
+      ...(school.receiptFooter ? ['', school.receiptFooter] : [])
+    ],
+    images: logoImage ? [logoImage] : []
+  }]);
 });
 
 // ==============================================================================

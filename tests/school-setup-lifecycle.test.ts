@@ -7,6 +7,7 @@ const api = read('../src/server/api.ts');
 const storage = read('../src/server/storage.ts');
 const schoolSettings = read('../src/server/school-settings.ts');
 const settingsView = read('../src/components/schooladmin/SchoolSettingsView.tsx');
+const idCard = read('../src/components/common/PrintIDCardModal.tsx');
 const classesView = read('../src/components/schooladmin/ClassesView.tsx');
 const lifecycle = read('../supabase/migrations/20261119160000_school_setup_lifecycle.sql');
 const classConfig = read('../supabase/migrations/20261119162000_class_section_configuration.sql');
@@ -66,4 +67,11 @@ test('student promotions and enrollments use one atomic, school-scoped RPC', () 
   assert.ok(promotionMigration.includes('public.schoolos_promote_enrollments'));
   assert.ok(promotionMigration.includes('public.promotion_history'));
   assert.ok(promotionMigration.includes('academic_year_id = p_target_year AND e.status = \'active\''));
+});
+
+test('saved school logo is used in ID cards, invoices and receipts', () => {
+  assert.ok(idCard.includes('school?.logoUrl ?'));
+  assert.ok(api.includes('getSchoolLogoPdfImage(school, client)'));
+  assert.ok(api.includes('images: logoImage ? [logoImage] : []'));
+  assert.ok(api.includes('SCHOOL_LOGO_BUCKET'));
 });

@@ -60,10 +60,10 @@ export const YearEndPromotionView: React.FC = () => {
       setClasses(clsList);
       setHistory(archived);
       setAcademicYears(years);
-      const currentYear = years.find(year => year.is_current) || years[0];
-      const nextYear = years.find(year => year.id !== currentYear?.id && year.start_date > (currentYear?.start_date || ''));
-      setSourceAcademicYearId(value => value || currentYear?.id || '');
-      setTargetAcademicYearId(value => value || nextYear?.id || '');
+      const currentYear = years.find(year => year.status === 'active' || year.is_current) || years[0];
+      const nextYear = years.filter(year => year.status === 'draft' && year.id !== currentYear?.id && year.start_date > (currentYear?.end_date || currentYear?.start_date || '')).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+      setSourceAcademicYearId(value => value && years.some(year => year.id === value && year.status === 'active') ? value : currentYear?.id || '');
+      setTargetAcademicYearId(value => value && years.some(year => year.id === value && year.status === 'draft') ? value : nextYear?.id || '');
       if (clsList.length > 0) {
         setSelectedClassId(current => current || clsList[0].id);
         if (clsList.length > 1) setTargetClassId(current => current || clsList[1].id);
