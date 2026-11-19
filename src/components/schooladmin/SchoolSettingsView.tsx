@@ -612,7 +612,6 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           </section>
         </div>
       </div>
-      </div>
 
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
