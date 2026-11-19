@@ -973,7 +973,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                           const input = marksInput[key] || { scores: {}, remarks: '' };
                           const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                           const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
-                          const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
+                          const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked && !isSemesterLocked;
                           const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
                           return <tr key={student.id} className="hover:bg-slate-50">
                             <td className="whitespace-nowrap px-3 py-3"><strong className="text-slate-800">{student.firstName} {student.middleName} {student.lastName}</strong><span className="mt-0.5 block text-[10px] text-slate-400">{student.studentId}</span></td>
