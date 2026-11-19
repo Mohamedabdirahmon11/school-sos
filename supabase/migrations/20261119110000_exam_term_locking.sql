@@ -14,3 +14,5 @@ begin
       check (locked_semesters <@ array['Semester 1', 'Semester 2']::text[]);
   end if;
 end $$;
+
+notify pgrst, 'reload schema';
