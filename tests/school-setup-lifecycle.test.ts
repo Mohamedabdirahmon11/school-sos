@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const api = read('../src/server/api.ts');
+const storage = read('../src/server/storage.ts');
 const schoolSettings = read('../src/server/school-settings.ts');
 const settingsView = read('../src/components/schooladmin/SchoolSettingsView.tsx');
 const classesView = read('../src/components/schooladmin/ClassesView.tsx');
@@ -55,4 +56,14 @@ test('class sections are school-aware and include capacity and Form Teacher cont
 test('section capacity cannot be reduced below active enrollment', () => {
   assert.ok(classConfig.includes('Capacity cannot be lower than the current enrollment'));
   assert.ok(classConfig.includes("status='active'"));
+});
+
+test('student promotions and enrollments use one atomic, school-scoped RPC', () => {
+  const promotionMigration = read('../supabase/migrations/20261119164000_atomic_student_promotion_and_enrollment.sql');
+  assert.ok(storage.includes("schoolos_confirm_promotions_with_enrollments"));
+  assert.ok(api.includes('confirmed.promotions.length'));
+  assert.ok(!api.includes("client.rpc('schoolos_promote_enrollments'"));
+  assert.ok(promotionMigration.includes('public.schoolos_promote_enrollments'));
+  assert.ok(promotionMigration.includes('public.promotion_history'));
+  assert.ok(promotionMigration.includes('academic_year_id = p_target_year AND e.status = \'active\''));
 });
