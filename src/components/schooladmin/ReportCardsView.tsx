@@ -3,10 +3,11 @@
  * Strictly follows rules:
  * 1. Combines Semester 1 + Semester 2 for final yearly percentage and class rank
  * 2. Percentages only (no letter grades, no GPA)
- * 3. Does NOT show attendance
- * 4. Shows school logo, name, student info, subjects (Sem 1 marks/%, Sem 2 marks/%, Yearly %), teacher & admin comments, signatures, and stamp
- * 5. Uses school's configured Report Card Design (template, colors, images, uploaded background)
- * 6. Supports Single Student Print and Bulk Class PDF printing
+ * 3. Report-card printing is blocked until both semesters have been published by the school.
+ * 4. Attendance is not currently included in this report-card data contract.
+ * 5. Shows school branding, student info, semester marks and yearly percentages, generated remarks, signatures, and stamp.
+ * 6. Uses the school's configured Report Card Design (template, colors, images, uploaded background).
+ * 7. Supports Single Student Print and Bulk Class PDF printing.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -45,6 +46,7 @@ interface ReportCardResult {
   student: { id: string; firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: ReportCardSubjectResult[];
   annualComplete: boolean;
+  annualPublished: boolean;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -148,7 +150,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] font-semibold text-[#475569]">Yearly average: {result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</span>
           )}
           <span className={`px-2.5 py-1 rounded-full font-semibold ${!result.annualComplete ? 'bg-amber-50 text-amber-800' : result.isPass ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-            {!result.annualComplete ? 'NOT FINAL — BOTH SEMESTERS REQUIRED' : result.isPass ? 'PASS' : 'BELOW PASS MARK'}
+            {!result.annualComplete ? 'NOT FINAL — BOTH SEMESTERS REQUIRED' : !result.annualPublished ? 'APPROVED — AWAITING SCHOOL PUBLICATION' : result.isPass ? 'PUBLISHED — PASS' : 'PUBLISHED — BELOW PASS MARK'}
           </span>
         </div>
 
@@ -340,7 +342,7 @@ export const ReportCardsView: React.FC = () => {
               <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
             ))}
           </select>
-          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualComplete) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
+          <button type="button" onClick={() => void download(() => ApiClient.downloadClassReportCardsPdf(selectedClassId))} disabled={!yearlyRankings.length || yearlyRankings.some(result => !result.annualComplete || !result.annualPublished) || !selectedClassId} className="px-3 py-2 text-xs font-semibold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors disabled:opacity-50">Download Class PDF</button>
           <button
             type="button"
             onClick={() => {
@@ -359,7 +361,7 @@ export const ReportCardsView: React.FC = () => {
           <button
             type="button"
             onClick={() => window.print()}
-            disabled={!selectedStudentResult?.annualComplete}
+            disabled={!selectedStudentResult?.annualComplete || !selectedStudentResult?.annualPublished}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] rounded-lg transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -428,9 +430,9 @@ export const ReportCardsView: React.FC = () => {
                       <p className="text-[11px] text-[#64748B] font-mono">{r.student.studentId}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono font-bold">{r.annualComplete ? `${r.yearlyPercentage}%` : 'Pending'}</span>
+                      <span className="font-mono font-bold">{r.annualComplete && r.annualPublished ? `${r.yearlyPercentage}%` : 'Pending publication'}</span>
                       <p className="text-[10px] text-[#64748B] flex items-center justify-end gap-1">
-                        {r.annualComplete && r.isTopThree && <Trophy className="w-3 h-3 text-amber-500" />} {r.annualComplete ? `Rank #${r.yearlyRank}` : 'Awaiting both semesters'}
+                        {r.annualComplete && r.annualPublished && r.isTopThree && <Trophy className="w-3 h-3 text-amber-500" />} {r.annualComplete ? (r.annualPublished ? `Rank #${r.yearlyRank}` : 'Awaiting school publication') : 'Awaiting both semesters'}
                       </p>
                     </div>
                   </div>
