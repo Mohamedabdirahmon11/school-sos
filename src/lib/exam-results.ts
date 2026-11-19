@@ -27,3 +27,36 @@ export function getMarkSchemeMaximums(
     .reduce((sum, component) => sum + (Number.isFinite(component.maxMarks) ? Math.max(0, Number(component.maxMarks)) : 0), 0);
   return { small, big, total: small + big };
 }
+
+export interface SemesterRankCandidate {
+  isComplete: boolean;
+  averagePercentage: number;
+  rank: number;
+  isTopThree: boolean;
+}
+
+/** Competition ranking: ties share a rank; incomplete rows remain unranked. */
+export function assignSemesterRanks<T extends SemesterRankCandidate>(rows: T[]): T[] {
+  const ordered = [...rows].sort((a, b) =>
+    Number(b.isComplete) - Number(a.isComplete) ||
+    b.averagePercentage - a.averagePercentage
+  );
+  let completed = 0;
+  let previousAverage: number | null = null;
+  let previousRank = 0;
+  for (const row of ordered) {
+    row.rank = 0;
+    row.isTopThree = false;
+    if (!row.isComplete) continue;
+    completed += 1;
+    if (previousAverage !== null && row.averagePercentage === previousAverage) {
+      row.rank = previousRank;
+    } else {
+      row.rank = completed;
+      previousRank = completed;
+      previousAverage = row.averagePercentage;
+    }
+    row.isTopThree = row.rank > 0 && row.rank <= 3;
+  }
+  return ordered;
+}
