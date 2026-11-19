@@ -35,8 +35,9 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
         terms.some((t: any) => !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) {
       return 'Configure exactly Semester 1 and Semester 2 with valid start/end dates.';
     }
-    const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
-    if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
+    if (terms[0].startDate >= terms[1].startDate || terms[0].endDate >= terms[1].startDate) {
+      return 'Semester 1 must finish before Semester 2 begins.';
+    }
     const academicYear = existingData?.academicYear;
     if (academicYear && validIsoDate(academicYear.startDate) && validIsoDate(academicYear.endDate)) {
       if (terms.some((term: any) => term.startDate < academicYear.startDate || term.endDate > academicYear.endDate)) return 'Each term must fall within the selected academic year.';
