@@ -285,6 +285,40 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     setExamConfig({ ...examConfig, assessmentComponents: examConfig.assessmentComponents.map(component => component.id === id ? { ...component, ...updates } : component) });
   };
 
+  const setFinalExamMaximum = (maximum: 50 | 60) => {
+    if (!examConfig) return;
+    const continuous = examConfig.assessmentComponents.filter(component => component.category === 'continuous');
+    const final = examConfig.assessmentComponents.find(component => component.category === 'final');
+    if (!final || !continuous.length) return;
+    const total = 100 - maximum;
+    const base = Math.floor(total / continuous.length);
+    const remainder = total % continuous.length;
+    setExamConfig({
+      ...examConfig,
+      assessmentComponents: [
+        ...continuous.map((component, index) => ({ ...component, maxMarks: base + (index < remainder ? 1 : 0) })),
+        { ...final, maxMarks: maximum }
+      ]
+    });
+  };
+
+  const removeExamQuiz = (id: string) => {
+    if (!examConfig) return;
+    const continuous = examConfig.assessmentComponents.filter(component => component.category === 'continuous' && component.id !== id);
+    const final = examConfig.assessmentComponents.find(component => component.category === 'final');
+    if (!final || !continuous.length) return;
+    const total = 100 - final.maxMarks;
+    const base = Math.floor(total / continuous.length);
+    const remainder = total % continuous.length;
+    setExamConfig({
+      ...examConfig,
+      assessmentComponents: [
+        ...continuous.map((component, index) => ({ ...component, maxMarks: base + (index < remainder ? 1 : 0), order: index + 1 })),
+        { ...final, order: continuous.length + 1 }
+      ]
+    });
+  };
+
   const addExamQuiz = () => {
     if (!examConfig) return;
     const continuous = examConfig.assessmentComponents.filter(component => component.category === 'continuous');
@@ -948,8 +982,10 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                     {examConfig.assessmentComponents.slice().sort((a,b) => a.order-b.order).map(component => (
                       <div key={component.id} className="grid grid-cols-[1fr_100px_auto] items-center gap-2">
                         <input aria-label="Assessment component name" value={component.name} onChange={e => updateExamComponent(component.id,{name:e.target.value})} className="min-w-0 rounded-lg border border-slate-300 px-3 py-2" />
-                        <input aria-label={component.name + ' maximum marks'} type="number" min={1} max={100} value={component.maxMarks} onChange={e => updateExamComponent(component.id,{maxMarks:Number(e.target.value)})} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-right font-mono" />
-                        <span className="text-[10px] font-semibold text-slate-500">{component.category === 'final' ? 'FINAL' : 'QUIZ'}</span>
+                        {component.category === 'final'
+                          ? <select aria-label="Final examination maximum" value={component.maxMarks} onChange={e => setFinalExamMaximum(Number(e.target.value) as 50 | 60)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-right font-mono"><option value={50}>50</option><option value={60}>60</option></select>
+                          : <input aria-label={component.name + ' maximum marks'} type="number" min={1} max={100} value={component.maxMarks} onChange={e => updateExamComponent(component.id,{maxMarks:Number(e.target.value)})} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-right font-mono" />}
+                        {component.category === 'final' ? <span className="text-[10px] font-semibold text-slate-500">FINAL</span> : <button type="button" disabled={examConfig.assessmentComponents.filter(item => item.category === 'continuous').length <= 1} onClick={() => removeExamQuiz(component.id)} className="text-[10px] font-semibold text-rose-600 disabled:opacity-30" aria-label="Remove quiz">Remove</button>}
                       </div>
                     ))}
                   </div>
