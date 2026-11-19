@@ -80,6 +80,7 @@ interface ReportCardResult {
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
+  formTeacherComments?: Array<{ semester: string; comment: string }>;
 }
 
 export interface ReportCardPdfContext {
@@ -122,7 +123,11 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
   lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
   if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
   lines.push(`Result: ${result.isPass ? 'PASS' : 'BELOW PASS MARK'}`);
-  if (blocks.teacherRemarks) lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
+  if (blocks.teacherRemarks) {
+    const comments = (result.formTeacherComments || []).filter(item => item.comment?.trim());
+    if (comments.length) lines.push('', ...comments.map(item => `Form Teacher comment (${item.semester}): ${item.comment}`));
+    else lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
+  }
   if (blocks.adminRemarks) lines.push(`Administrator remarks: ${adminRemark(result.isPass)}`);
   if (blocks.signatures) lines.push('', `Teacher: ${design.signatureTitleLeft || 'Class Teacher'}`, `Administrator: ${design.signatureTitleRight || 'Principal'}`);
   if (blocks.stamp) lines.push('Official School Seal');
