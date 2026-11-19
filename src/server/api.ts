@@ -3391,7 +3391,7 @@ apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res
  if(classRows.error){res.status(503).json({error:'Macallimiinta fasallada iyo awooddooda lama akhrin karin.'});return;}
  const countEntries=await Promise.all(legacyIds.map(async (classId:string)=>{
    const result=await client.from('students').select('id',{count:'exact',head:true})
-     .eq('school_id',school.id).eq('class_id',classId).eq('status','active');
+     .eq('school_id',school.id).eq('class_id',classId);
    return {classId,count:result.count||0,error:result.error};
  }));
  if(countEntries.some(item=>item.error)){res.status(503).json({error:'Tirada ardayda fasallada lama akhrin karin.'});return;}
@@ -3410,7 +3410,11 @@ apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res
 apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School; const name=typeof req.body?.name==='string'?req.body.name.trim():''; const sections=Array.isArray(req.body?.sections)?req.body.sections:[];
  if(!name||name.length>120||sections.some((s:unknown)=>typeof s!=='string'||!String(s).trim()||String(s).trim().length>80)){res.status(400).json({error:'Geli magaca fasalka iyo qaybaha saxda ah.'});return;}
- const client=classGroupsClient(); const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:Number(req.body?.sortOrder)||0}).select().single();
+ const client=classGroupsClient();
+ const {data:latestOrder}=await client.from('class_groups').select('sort_order').eq('school_id',school.id).order('sort_order',{ascending:false}).limit(1);
+ const requestedOrder=Number(req.body?.sortOrder);
+ const sortOrder=Number.isInteger(requestedOrder)&&requestedOrder>=0?requestedOrder:(Number(latestOrder?.[0]?.sort_order||0)+100);
+ const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:sortOrder}).select().single();
  if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
  const unique: string[] = Array.from(new Set<string>((sections as unknown[]).map(value => String(value).trim()).filter(value => value.length > 0)));
  if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
@@ -3505,7 +3509,7 @@ apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperA
  const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','KG 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
  const {data:existing,error:readError}=await client.from('class_groups').select('name').eq('school_id',school.id);if(readError){res.status(500).json({error:'Fasallada lama hubin karin.'});return;}
  const names=new Set((existing||[]).map((r:any)=>String(r.name).trim().toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
- const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
+ const {error}=await client.from('class_groups').insert(missing.map(name=>({school_id:school.id,name,sort_order:defaults.indexOf(name)*100})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
 apiRouter.get('/subject-catalog', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const client = documentServiceClient(res);
