@@ -6450,6 +6450,47 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
       subjectIds: (assignmentByClass.get(klass.id) || []).map(row => row.subject_id)
     })));
     if (!groups.length) throw new Error('Ma jiraan manhaj groups leh maaddooyin imtixaan.');
+    const studentsByClass = new Map<string, any[]>();
+    for (const student of students) {
+      const rows = studentsByClass.get(student.class_id) || [];
+      rows.push(student); studentsByClass.set(student.class_id, rows);
+    }
+    // Validate session capacity and class-subject placement before replacing any saved draft.
+    const virtualSessions = dates.flatMap((date: string) => sessions.map((session: any) => ({
+      key: date + ':' + session.seq, shift_tag: session.shift_tag
+    })));
+    const virtualByShift = {
+      morning: virtualSessions.filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
+      afternoon: virtualSessions.filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
+    };
+    const virtualRoomUsage = new Map<string, number>();
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      for (const shift of ['morning','afternoon'] as const) {
+        const shiftClasses = group.classIds.filter(classId => classExamShifts[classId] === shift);
+        if (!shiftClasses.length) continue;
+        const eligibleSessions = virtualByShift[shift];
+        if (group.subjectIds.length > eligibleSessions.length) {
+          throw new Error(group.classNames.join(', ') + ' waxay u baahan yihiin ' + group.subjectIds.length + ' sessions, balse shift-ka ' + shift + ' wuxuu leeyahay ' + eligibleSessions.length + '. Ku dar maalmo ama sessions.');
+        }
+        for (let subjectIndex = 0; subjectIndex < group.subjectIds.length; subjectIndex += 1) {
+          const virtualSession = eligibleSessions[(subjectIndex + groupIndex) % eligibleSessions.length];
+          const groupStudents = shiftClasses.flatMap(classId => (studentsByClass.get(classId) || []).map(student => ({ id: student.id, classId })));
+          if (!groupStudents.length) throw new Error('Ma jiraan arday firfircoon oo ku jira fasallada ' + shiftClasses.join(', ') + '.');
+          const remainingRooms = rooms.map(room => ({
+            ...room, capacity: room.capacity - (virtualRoomUsage.get(virtualSession.key + ':' + room.id) || 0)
+          })).filter(room => room.capacity > 0);
+          const allocations = allocateMixedRoomSeating(shiftClasses.map(classId => ({
+            classId, className: (classes.find((item: any) => item.id === classId)?.name || classId),
+            students: groupStudents.filter(student => student.classId === classId).map(student => ({ id: student.id, classId }))
+          })), remainingRooms, subjectIndex + groupIndex);
+          for (const allocation of allocations) {
+            const key = virtualSession.key + ':' + allocation.roomId;
+            virtualRoomUsage.set(key, (virtualRoomUsage.get(key) || 0) + allocation.seats.length);
+          }
+        }
+      }
+    }
     const { data: existingPeriod, error: periodLookupError } = await client.from('exam_periods').select('*')
       .eq('school_id', school.id).eq('term_id', termId).maybeSingle();
     if (periodLookupError) throw periodLookupError;
@@ -6489,11 +6530,6 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
       afternoon: (savedSessions || []).filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
     };
     const classById = new Map(classes.map(klass => [klass.id, klass]));
-    const studentsByClass = new Map<string, any[]>();
-    for (const student of students) {
-      const rows = studentsByClass.get(student.class_id) || [];
-      rows.push(student); studentsByClass.set(student.class_id, rows);
-    }
     const scheduleRows: any[] = [];
     const roomUsageBySession = new Map<string, number>();
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
