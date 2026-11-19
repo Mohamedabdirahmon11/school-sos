@@ -395,14 +395,11 @@ BEGIN
         AND a.subject_id=p_subject_id AND (a.section_id IS NULL OR a.section_id=v_enrollment.section_id)) THEN
       RAISE EXCEPTION 'Macallinku fasalkan iyo maaddadan looma qoondeyn.';
     END IF;
-    IF v_status='present' AND v_score IS NULL THEN
-      CONTINUE;
-    END IF;
     INSERT INTO public.component_marks(school_id,component_id,class_id,subject_id,student_id,marks,status,entered_by)
     VALUES(p_school_id,p_component_id,p_class_id,p_subject_id,v_student_id,v_score,v_status,p_actor_id)
     ON CONFLICT(component_id,subject_id,student_id) DO UPDATE SET
       marks=EXCLUDED.marks,status=EXCLUDED.status,entered_by=EXCLUDED.entered_by,entered_at=now();
-    v_count:=v_count+1;
+    IF v_status IN ('absent','excused') OR v_score IS NOT NULL THEN v_count:=v_count+1; END IF;
   END LOOP;
   RETURN jsonb_build_object('saved_count',v_count,'term_id',v_term_id,'component_id',p_component_id);
 END;
