@@ -6783,6 +6783,103 @@ CREATE TRIGGER schoolos_structured_template_audit
 
 
 
+-- STEP 1-9 table foundations required by the additive Step 10A snapshot.
+CREATE TABLE IF NOT EXISTS public.academic_years (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  name varchar(40) NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  is_current boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(id,school_id)
+);
+CREATE TABLE IF NOT EXISTS public.terms (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  academic_year_id uuid NOT NULL,
+  name varchar(80) NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  is_current boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(id,school_id),
+  UNIQUE(id,academic_year_id,school_id),
+  FOREIGN KEY(academic_year_id,school_id) REFERENCES public.academic_years(id,school_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS public.class_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  name varchar(120) NOT NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.class_sections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  class_id uuid NOT NULL REFERENCES public.class_groups(id) ON DELETE CASCADE,
+  name varchar(80) NOT NULL,
+  legacy_class_id varchar REFERENCES public.classes(id) ON DELETE SET NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  max_students integer CHECK(max_students IS NULL OR max_students>0),
+  UNIQUE(id,school_id)
+);
+CREATE TABLE IF NOT EXISTS public.teacher_class_subject_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  academic_year_id uuid NOT NULL,
+  term_id uuid,
+  class_id varchar(64) NOT NULL,
+  section_id uuid,
+  subject_id varchar(64) NOT NULL,
+  teacher_id varchar(64) NOT NULL,
+  qualification_override boolean NOT NULL DEFAULT false,
+  created_by varchar(64) NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY(class_id,school_id) REFERENCES public.classes(id,school_id) ON DELETE CASCADE,
+  FOREIGN KEY(school_id,class_id,subject_id) REFERENCES public.class_subjects(school_id,class_id,subject_id) ON DELETE CASCADE,
+  FOREIGN KEY(section_id,school_id) REFERENCES public.class_sections(id,school_id) ON DELETE CASCADE,
+  FOREIGN KEY(subject_id,school_id) REFERENCES public.subjects(id,school_id) ON DELETE CASCADE,
+  FOREIGN KEY(teacher_id,school_id) REFERENCES public.teachers(id,school_id) ON DELETE RESTRICT,
+  FOREIGN KEY(academic_year_id,school_id) REFERENCES public.academic_years(id,school_id) ON DELETE CASCADE,
+  FOREIGN KEY(term_id,academic_year_id,school_id) REFERENCES public.terms(id,academic_year_id,school_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS public.enrollments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  student_id varchar(64) NOT NULL,
+  academic_year_id uuid NOT NULL,
+  class_id varchar(64) NOT NULL,
+  section_id uuid,
+  roll_number text,
+  status text NOT NULL DEFAULT 'active' CHECK(status IN ('active','promoted','repeated','transferred','withdrawn')),
+  enrolled_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY(student_id,school_id) REFERENCES public.students(id,school_id) ON DELETE RESTRICT,
+  FOREIGN KEY(class_id,school_id) REFERENCES public.classes(id,school_id) ON DELETE RESTRICT,
+  FOREIGN KEY(academic_year_id,school_id) REFERENCES public.academic_years(id,school_id) ON DELETE RESTRICT,
+  FOREIGN KEY(section_id,school_id) REFERENCES public.class_sections(id,school_id) ON DELETE RESTRICT,
+  CHECK((status='active' AND left_at IS NULL) OR status<>'active')
+);
+CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_uidx ON public.academic_years(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS terms_id_school_uidx ON public.terms(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS terms_id_year_school_uidx ON public.terms(id,academic_year_id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_uidx ON public.classes(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS students_id_school_uidx ON public.students(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_uidx ON public.subjects(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_uidx ON public.class_sections(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS teachers_id_school_uidx ON public.teachers(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS enrollments_one_active_per_student_year_uidx
+  ON public.enrollments(school_id,student_id,academic_year_id) WHERE status='active';
+
+
 -- BEGIN STEP 10A TERM MARKS SCHEMA SNAPSHOT
 -- STEP 10A: term-based assessment components, mark entry, term closure and yearly report cards.
 -- Additive migration: legacy exam_configs/student_marks and their data are untouched.
