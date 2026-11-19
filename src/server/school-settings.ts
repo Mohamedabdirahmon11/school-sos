@@ -240,8 +240,14 @@ const examConfigSchema = z.object({
   if (new Set(ids).size !== ids.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component IDs must be unique.' });
   if (new Set(orders).size !== orders.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ['assessmentComponents'], message: 'Assessment component order values must be unique.' });
   const continuousTotal = value.assessmentComponents.filter(item => item.category === 'continuous').reduce((sum, item) => sum + item.maxMarks, 0);
-  const finalTotal = value.assessmentComponents.filter(item => item.category === 'final').reduce((sum, item) => sum + item.maxMarks, 0);
+  const finalComponents = value.assessmentComponents.filter(item => item.category === 'final');
+  const finalTotal = finalComponents.reduce((sum, item) => sum + item.maxMarks, 0);
   const total = continuousTotal + finalTotal;
+  if (finalComponents.length !== 1 || ![50, 60].includes(finalTotal)) context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['assessmentComponents'],
+    message: 'Exactly one final examination worth 50 or 60 marks is required.'
+  });
   if (total !== 100) context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ['assessmentComponents'],
