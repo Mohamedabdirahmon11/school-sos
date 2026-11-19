@@ -10356,6 +10356,10 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
       .eq('class_id',classId).eq('academic_year_id',term?.academic_year_id || '').eq('status','active')
   ]);
   const sectionByStudent = new Map((enrollments||[]).map((row:any)=>[row.student_id,row.section_id]));
+  const getAssignedTeacherName=(assignment:any):string=>{
+    const relation:any=assignment.teachers;
+    return (Array.isArray(relation)?relation[0]?.full_name:relation?.full_name)||'Macallin';
+  };
   const missing = new Map<string,{subjectId:string;teacherId:string;teacherName:string;missing:number}>();
   for (const row of rows) for (const subject of row.subjects || []) {
     const count=Math.max(0,Number(subject.required||0)-Number(subject.entered||0));
@@ -10370,7 +10374,7 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
       item.missing+=count;missing.set(key,item);
     }else for(const assignment of matching){
       const key=assignment.teacher_id+':'+subject.subject_id;
-      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:(Array.isArray(assignment.teachers)?assignment.teachers[0]?.full_name:assignment.teachers?.full_name)||'Macallin',missing:0};
+      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:getAssignedTeacherName(assignment),missing:0};
       item.missing+=count;missing.set(key,item);
     }
   }
