@@ -375,7 +375,7 @@ GRANT EXECUTE ON FUNCTION public.schoolos_save_component_marks(text,text,uuid,te
 CREATE OR REPLACE FUNCTION public.schoolos_set_term_status(
   p_school_id text,p_term_id uuid,p_status text,p_actor_id text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_old public.term_status%ROWTYPE;
+DECLARE v_old public.term_status%ROWTYPE; v_previous text;
 BEGIN
   IF p_status NOT IN ('open','closed') THEN RAISE EXCEPTION 'Xaaladda term-ku waa inay noqotaa open ama closed.'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id=p_actor_id
@@ -385,6 +385,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.terms WHERE id=p_term_id AND school_id=p_school_id) THEN
     RAISE EXCEPTION 'Term-kan dugsigan kama tirsana.';
   END IF;
+  SELECT status INTO v_previous FROM public.term_status WHERE school_id=p_school_id AND term_id=p_term_id;
+  v_previous:=COALESCE(v_previous,'open');
   INSERT INTO public.term_status(school_id,term_id,status,closed_by,closed_at,updated_at)
   VALUES(p_school_id,p_term_id,p_status,CASE WHEN p_status='closed' THEN p_actor_id END,
     CASE WHEN p_status='closed' THEN now() END,now())
@@ -393,7 +395,7 @@ BEGIN
   RETURNING * INTO v_old;
   INSERT INTO public.marks_audit(school_id,entity_type,entity_id,old_value,new_value,changed_by)
   VALUES(p_school_id,'term_status',p_term_id,
-    jsonb_build_object('status',CASE WHEN p_status='closed' THEN 'open' ELSE 'closed' END),
+    jsonb_build_object('status',v_previous),
     jsonb_build_object('status',p_status),p_actor_id);
   RETURN jsonb_build_object('term_id',p_term_id,'status',p_status,'closed_at',v_old.closed_at);
 END;
@@ -470,6 +472,14 @@ BEGIN
     RAISE EXCEPTION 'Sanad-dugsiyeedkan waa inuu leeyahay laba term oo keliya.';
   END IF;
   v_term1:=v_terms[1]; v_term2:=v_terms[2];
+  IF NOT EXISTS (SELECT 1 FROM public.enrollments WHERE school_id=p_school_id
+      AND class_id=p_class_id AND academic_year_id=p_academic_year_id AND status='active') THEN
+    RAISE EXCEPTION 'Fasalkan ma laha arday firfircoon oo diiwaangashan.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.class_subjects WHERE school_id=p_school_id
+      AND class_id=p_class_id AND is_active=true) THEN
+    RAISE EXCEPTION 'Fasalkan ma laha maaddooyin firfircoon.';
+  END IF;
   IF (SELECT count(*) FROM public.term_status WHERE school_id=p_school_id
       AND term_id=ANY(v_terms) AND status='closed')<>2 THEN
     RAISE EXCEPTION 'Report Card lama samayn karo ilaa labada term la xiro.';
