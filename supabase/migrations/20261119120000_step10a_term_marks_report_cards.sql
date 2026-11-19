@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS component_marks_student_idx
 
 
 CREATE OR REPLACE FUNCTION public.schoolos_guard_component_mark()
-RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
 DECLARE v_max numeric; v_term uuid; v_year uuid;
 BEGIN
   SELECT mc.max_marks,ms.term_id,t.academic_year_id INTO v_max,v_term,v_year
