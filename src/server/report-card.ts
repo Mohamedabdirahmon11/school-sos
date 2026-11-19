@@ -69,7 +69,7 @@ interface ReportCardResult {
   student: { firstName: string; middleName?: string; lastName: string; studentId: string };
   subjectResults: Array<{
     subject: { name: string; code?: string };
-    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number } | null;
+    sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string } | null;
     sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number } | null;
     sem1Percentage: number | null;
     sem2Percentage: number | null;
@@ -118,6 +118,8 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
       row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
       gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
     ].join(' | '));
+    if (row.sem1Marks?.teacherRemarks?.trim()) lines.push(`  Semester 1 teacher remark: ${row.sem1Marks.teacherRemarks.trim().slice(0, 500)}`);
+    if (row.sem2Marks?.teacherRemarks?.trim()) lines.push(`  Semester 2 teacher remark: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}`);
   }
   lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
   if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
