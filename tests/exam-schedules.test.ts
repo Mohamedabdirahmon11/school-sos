@@ -15,6 +15,7 @@ const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
+const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
 
 test('exam schedule schema is tenant-scoped and protects room and seat allocations', () => {
   assert.match(migration, /ALTER TABLE public\.exam_schedules ENABLE ROW LEVEL SECURITY/);
@@ -110,6 +111,10 @@ test('Step 10B empty periods return complete data and invigilator replacement va
   assert.ok(client.includes('deleteTermExamPeriod'));
   assert.ok(termUi.includes('Jooji draft-ka'));
   assert.ok(termUi.includes('data.period.start_date'));
+  assert.ok(api.includes("apiRouter.get('/teacher/exam-invigilation'"));
+  assert.ok(client.includes('getTeacherExamInvigilation'));
+  assert.ok(teacherUi.includes('My Exam Invigilation Duties'));
+  assert.ok(teacherUi.includes('ApiClient.getTeacherExamInvigilation'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
