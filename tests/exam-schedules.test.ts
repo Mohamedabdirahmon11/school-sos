@@ -88,6 +88,21 @@ test('Step 10B uses term-only group schedules, room-scoped seats, and school-sco
   assert.match(api, /Kaliya Term 1 iyo Term 2/);
 });
 
+test('Step 10B empty periods return complete data and invigilator replacement validates before deleting', () => {
+  assert.match(api, /if \(!period\) \{ res\.json\(\{ period: null, days: \[\], sessions: \[\], schedules: \[\], invigilators: \[\], roomAssignments: \[\], classExamSettings: \[\] \}\); return; \}/);
+
+  const routeStart = api.indexOf("apiRouter.post('/exams/term-periods/:periodId/invigilators'");
+  const routeEnd = api.indexOf("apiRouter.post('/exams/term-periods/:periodId/publish'", routeStart);
+  assert.ok(routeStart >= 0 && routeEnd > routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  const rowsIndex = route.indexOf('const rows = assignments.map');
+  const validationIndex = route.indexOf('usedRoomSessionKeys');
+  const deleteIndex = route.indexOf("from('exam_invigilators').delete()");
+  assert.ok(rowsIndex >= 0 && validationIndex > rowsIndex && deleteIndex > validationIndex);
+  assert.equal((route.match(/from\('exam_invigilators'\)\.delete\(\)/g) || []).length, 1);
+  assert.ok(route.includes('Kormeeraha waxaa lagu xiri karaa oo keliya qol dhab ahaan loo isticmaalayo session-kan.'));
+});
+
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
   assert.ok(storage.includes('schoolos_publish_exam_schedule'));
   assert.ok(storage.includes('getExamScheduleSeats'));
