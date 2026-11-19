@@ -5130,7 +5130,7 @@ apiRouter.post('/academic-years', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const startDate = req.body?.startDate;
   const endDate = req.body?.endDate;
   if (!isAcademicYearName(name) || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
-    res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
+    res.status(400).json({ error: 'Enter a consecutive academic year name (for example, 2026-2027) and valid start/end dates.' }); return;
   }
   const { data, error } = await client.from('academic_years').insert({
     school_id: school.id, name, start_date: startDate, end_date: endDate,
