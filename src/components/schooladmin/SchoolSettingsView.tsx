@@ -447,7 +447,9 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
       const saved = editingBranch
         ? await ApiClient.updateBranch(editingBranch.id, payload)
         : await ApiClient.createBranch(payload);
-      setBranches(prev => sortBranches((editingBranch ? prev.map(item => item.id === saved.id ? saved : item) : [...prev, saved]).map(item => item.id === saved.id ? saved : saved.isMain && item.isMain ? { ...item, isMain: false } : item)));      setShowAddBranch(false);      setEditingBranch(null);
+      setBranches(prev => sortBranches((editingBranch ? prev.map(item => item.id === saved.id ? saved : item) : [...prev, saved]).map(item => item.id === saved.id ? saved : saved.isMain && item.isMain ? { ...item, isMain: false } : item)));
+      setShowAddBranch(false);
+      setEditingBranch(null);
       setBranchForm({ ...emptyBranchForm });
       setNotice(editingBranch ? 'Campus branch updated successfully!' : 'New campus branch created successfully!');
       setTimeout(() => setNotice(null), 3000);
@@ -609,6 +611,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             </div>
           </section>
         </div>
+      </div>
       </div>
 
       {notice && (
@@ -863,6 +866,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           </form>
         </div>
       )}
+
       {/* TAB 2: ACADEMICS & RULES */}
       {activeTab === 'academics' && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
@@ -898,7 +902,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="font-semibold text-[#334155]">{t('settings_grading_scale')}</label>
                 <button type="button" onClick={() => setGradingScale(prev => [...prev, { minPercentage: 0, label: '', remark: '' }])} className="px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] text-[11px] font-semibold text-[#334155] hover:bg-slate-50">Add grade band</button>
               </div>
-              <p className="text-[11px] text-[#64748B]">Minimum percentages must decrease and the final band must start at 0%.</p>              {gradingScale.map((band, index) => (
+              <p className="text-[11px] text-[#64748B]">Minimum percentages must decrease and the final band must start at 0%.</p>
+              {gradingScale.map((band, index) => (
                 <div key={index} className="grid grid-cols-[72px_72px_1fr_32px] gap-2 items-center">
                   <input type="number" min={0} max={100} required value={band.minPercentage} onChange={e => setGradingScale(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, minPercentage: Number(e.target.value) } : item))} className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded-lg font-mono" title="Minimum percentage" />
                   <input type="text" required maxLength={20} value={band.label} onChange={e => setGradingScale(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, label: e.target.value } : item))} className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold" placeholder="Grade" title="Grade label" />
@@ -1311,6 +1316,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           )}
         </div>
       )}
+
       {/* TAB 3: REPORT CARD DESIGNER */}
       {activeTab === 'designer' && design && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1347,7 +1353,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Header Title Text</label>
                 <input
-                  type="text"                  value={design.titleText}
+                  type="text"
+                  value={design.titleText}
                   onChange={e => setDesign({ ...design, titleText: e.target.value })}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 />
