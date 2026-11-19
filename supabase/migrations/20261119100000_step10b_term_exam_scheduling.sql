@@ -9,7 +9,7 @@ ALTER TABLE public.classes
   ADD COLUMN IF NOT EXISTS normal_exam_shift TEXT NOT NULL DEFAULT 'morning';
 UPDATE public.classes
    SET normal_exam_shift = CASE WHEN shift = 2 THEN 'afternoon' ELSE 'morning' END
- WHERE normal_exam_shift IS NULL OR normal_exam_shift NOT IN ('morning','afternoon');
+;
 ALTER TABLE public.classes
   DROP CONSTRAINT IF EXISTS classes_normal_exam_shift_check;
 ALTER TABLE public.classes
