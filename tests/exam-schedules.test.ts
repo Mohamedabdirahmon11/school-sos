@@ -8,6 +8,7 @@ const shiftMigration = readFileSync(new URL('../supabase/migrations/060_exam_sch
 const cohortMigration = readFileSync(new URL('../supabase/migrations/061_exam_schedule_mixed_class_groups.sql', import.meta.url), 'utf8');
 const randomizedSeatMigration = readFileSync(new URL('../supabase/migrations/062_exam_schedule_randomized_seating.sql', import.meta.url), 'utf8');
 const roomRegistryMigration = readFileSync(new URL('../supabase/migrations/063_exam_room_registry.sql', import.meta.url), 'utf8');
+const termExamMigration = readFileSync(new URL('../supabase/migrations/20261119100000_step10b_term_exam_scheduling.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
@@ -69,6 +70,22 @@ test('exam schedule API is school-admin scoped and validates schedule inputs', (
   assert.ok(api.includes("roomName !== 'Room not assigned'"));
   assert.ok(api.includes('Choose an active exam room belonging to this school'));
   assert.ok(api.includes('allowedCohortScheduleIds'));
+});
+
+test('Step 10B uses term-only group schedules, room-scoped seats, and school-scoped invigilators', () => {
+  assert.match(termExamMigration, /CREATE TABLE IF NOT EXISTS public\.exam_periods/);
+  assert.match(termExamMigration, /CREATE TABLE IF NOT EXISTS public\.exam_days/);
+  assert.match(termExamMigration, /CREATE TABLE IF NOT EXISTS public\.exam_sessions/);
+  assert.match(termExamMigration, /CREATE TABLE IF NOT EXISTS public\.class_exam_settings/);
+  assert.match(termExamMigration, /CREATE TABLE IF NOT EXISTS public\.exam_invigilators/);
+  assert.match(termExamMigration, /exam_schedules_term_group_subject_uidx/);
+  assert.match(termExamMigration, /exam_seats_term_room_seat_uidx/);
+  assert.match(termExamMigration, /schoolos_guard_exam_invigilator/);
+  assert.match(termExamMigration, /schoolos_publish_term_exam_period/);
+  assert.match(api, /exam_type: 'term'/);
+  assert.match(api, /roomSeatNumberBySession/);
+  assert.match(api, /exam_session_id: session\.id/);
+  assert.match(api, /Kaliya Term 1 iyo Term 2/);
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
