@@ -167,6 +167,12 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
     <div className="term-exam-panel space-y-5">
       <style>{`
         .term-exam-print { display: none; }
+        .dark .term-exam-panel section { background-color: #0f172a !important; border-color: #334155 !important; color: #e2e8f0 !important; }
+        .dark .term-exam-panel h2, .dark .term-exam-panel h3, .dark .term-exam-panel strong { color: #f1f5f9; }
+        .dark .term-exam-panel label, .dark .term-exam-panel p { color: #cbd5e1; }
+        .dark .term-exam-panel input, .dark .term-exam-panel select { background-color: #1e293b !important; border-color: #475569 !important; color: #f1f5f9 !important; }
+        .dark .term-exam-panel .bg-\\[\\#F8FAFC\\], .dark .term-exam-panel .bg-\\[\\#F1F5F9\\] { background-color: #1e293b !important; }
+        .dark .term-exam-panel .border-\\[\\#E2E8F0\\] { border-color: #334155 !important; }
         @media print {
           body * { visibility: hidden !important; }
           .term-exam-print, .term-exam-print * { visibility: visible !important; }
