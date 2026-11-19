@@ -10408,7 +10408,7 @@ apiRouter.get('/term-marks/report-cards', requireAuth, requireSchoolContext, asy
   let query = client.from('report_cards').select('*').eq('school_id', school.id);
   if (user.role === 'parent' || user.role === 'student') {
     if (!studentId || !await canAccessStudentRecord(user, studentId)) { res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto report card-kan.' }); return; }
-    query = query.eq('student_id', studentId).not('published_at','is',null);
+    query = query.eq('student_id', studentId).not('published_at','is',null).eq('is_stale',false);
   } else if (['school_admin','super_admin'].includes(user.role)) {
     if (classId) query = query.eq('class_id', classId);
     if (academicYearId) query = query.eq('academic_year_id', academicYearId);
@@ -10476,7 +10476,7 @@ apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSch
   if (!student || !await canAccessStudentRecord(user, student.id)) { res.status(404).json({ error: 'Report card lama helin.' }); return; }
   const client = termMarksServiceClient(res); if (!client) return;
   let query = client.from('report_cards').select('*').eq('school_id',school.id).eq('student_id',student.id);
-  if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null);
+  if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null).eq('is_stale',false);
   const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
   if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
   if (card.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay; dugsigu waa inuu dib u sameeyo.' }); return; }
