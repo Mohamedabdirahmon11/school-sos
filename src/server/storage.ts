@@ -2666,6 +2666,9 @@ class StorageEngine {
     await this.getMarks(schoolId, classId, subjectId, semester);
     const klass = await this.getClassById(classId, schoolId);
     const config = await this.getExamConfig(schoolId, klass?.academicYear);
+    if ((config.lockedSemesters || []).includes(semester)) {
+      throw new Error(`${semester} is locked by the School Admin. Mark entry is disabled until it is unlocked.`);
+    }
     const academicYear = klass?.academicYear || config.academicYear;
     const components = config.assessmentComponents || [];
     const continuousComponents = components.filter(component => component.category === 'continuous');
