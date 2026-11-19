@@ -365,26 +365,33 @@ DECLARE v_definition TEXT;
 BEGIN
   SELECT pg_get_functiondef('public.schoolos_restore_school_backup_legacy(jsonb)'::regprocedure)
     INTO v_definition;
+
+  -- Keep dependency order: terms -> classes -> exam periods/settings/days/sessions
+  -- -> schedules -> seat assignments -> invigilators.
   IF position('''terms''' IN v_definition) = 0 THEN
-    v_definition := replace(v_definition, '''school_branches'', ''classes'', ''subjects''',
-      '''school_branches'', ''classes'', ''terms'', ''subjects''');
-  END IF;
-  IF position('exam_periods' IN v_definition) = 0 THEN
     v_definition := replace(
       v_definition,
-      '''exam_rooms'', ''exam_schedules''',
-      '''exam_rooms'', ''exam_periods'', ''class_exam_settings'', ''exam_days'', ''exam_sessions'', ''exam_schedules'''
+      $old$ARRAY['school_branches', 'exam_rooms', 'classes', 'subjects'$old$,
+      $new$ARRAY['school_branches', 'terms', 'exam_rooms', 'classes', 'exam_periods', 'class_exam_settings', 'exam_days', 'exam_sessions', 'subjects'$new$
     );
+  END IF;
+  IF position('exam_periods' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not add term-exam tables to the school backup restore allowlist.';
   END IF;
   IF position('exam_invigilators' IN v_definition) = 0 THEN
     v_definition := replace(
       v_definition,
-      '''exam_schedule_cohort_students'', ''exam_seat_assignments''',
-      '''exam_schedule_cohort_students'', ''exam_seat_assignments'', ''exam_invigilators'''
+      $old$'exam_schedule_cohort_students', 'exam_seat_assignments', 'report_card_templates'$old$,
+      $new$'exam_schedule_cohort_students', 'exam_seat_assignments', 'exam_invigilators', 'report_card_templates'$new$
     );
   END IF;
-  IF position('''terms''' IN v_definition) = 0 OR position('exam_periods' IN v_definition) = 0 OR position('exam_invigilators' IN v_definition) = 0 THEN
-    RAISE EXCEPTION 'Could not synchronize term-exam tables in the school backup restore allowlist.';
+  IF position('''terms''' IN v_definition) = 0
+     OR position('exam_periods' IN v_definition) = 0
+     OR position('class_exam_settings' IN v_definition) = 0
+     OR position('exam_days' IN v_definition) = 0
+     OR position('exam_sessions' IN v_definition) = 0
+     OR position('exam_invigilators' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not synchronize all term-exam tables in the school backup restore allowlist.';
   END IF;
   EXECUTE v_definition;
 END
