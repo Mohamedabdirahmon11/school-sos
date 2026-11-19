@@ -202,5 +202,102 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Validate that the class shift is compatible with the selected session. The
+-- session tag 'all' is the full-day option and accepts either normal shift.
+CREATE OR REPLACE FUNCTION public.schoolos_guard_term_exam_shift()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+DECLARE v_session_shift TEXT;
+BEGIN
+  IF NEW.exam_type <> 'term' OR NEW.exam_session_id IS NULL THEN RETURN NEW; END IF;
+  SELECT shift_tag INTO v_session_shift
+    FROM public.exam_sessions
+   WHERE id = NEW.exam_session_id AND school_id = NEW.school_id;
+  IF v_session_shift IS NULL THEN RAISE EXCEPTION 'Select a valid term exam session.'; END IF;
+  IF v_session_shift <> 'all' AND v_session_shift <> NEW.exam_shift THEN
+    RAISE EXCEPTION 'The class exam shift does not match this exam session.';
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS exam_schedule_term_shift_guard ON public.exam_schedules;
+CREATE TRIGGER exam_schedule_term_shift_guard
+BEFORE INSERT OR UPDATE OF exam_type, exam_session_id, exam_shift
+ON public.exam_schedules FOR EACH ROW
+EXECUTE FUNCTION public.schoolos_guard_term_exam_shift();
+
+-- Publish the whole term exam period atomically only after every scheduled
+-- subject has complete room seating and each used room has an invigilator.
+CREATE OR REPLACE FUNCTION public.schoolos_publish_term_exam_period(
+  p_school_id VARCHAR(64),
+  p_period_id UUID,
+  p_published_by VARCHAR(64)
+)
+RETURNS JSONB LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $
+DECLARE
+  v_period public.exam_periods%ROWTYPE;
+  v_schedule_count INTEGER;
+  v_seat_count INTEGER;
+BEGIN
+  SELECT * INTO v_period FROM public.exam_periods
+   WHERE id = p_period_id AND school_id = p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Term exam period was not found in this school.'; END IF;
+  IF v_period.status <> 'draft' THEN RAISE EXCEPTION 'Only draft term exam periods can be published.'; END IF;
+
+  SELECT COUNT(*) INTO v_schedule_count FROM public.exam_schedules
+   WHERE school_id = p_school_id AND exam_period_id = p_period_id AND exam_type = 'term' AND status <> 'cancelled';
+  IF v_schedule_count = 0 THEN RAISE EXCEPTION 'Generate the term exam timetable before publishing.'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.exam_schedules schedule
+     WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
+       AND schedule.exam_type = 'term' AND schedule.status = 'draft'
+       AND NOT EXISTS (SELECT 1 FROM public.exam_seat_assignments seat
+        WHERE seat.school_id = p_school_id AND seat.schedule_id = schedule.id)
+  ) THEN RAISE EXCEPTION 'Every scheduled subject must have students assigned to rooms.'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.exam_seat_assignments seat
+     JOIN public.exam_schedules schedule ON schedule.id = seat.schedule_id AND schedule.school_id = seat.school_id
+     JOIN public.exam_rooms room ON room.id = seat.room_id AND room.school_id = seat.school_id
+     WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
+       AND schedule.exam_type = 'term'
+     GROUP BY seat.schedule_id, seat.room_id, room.capacity
+     HAVING COUNT(*) > room.capacity
+  ) THEN RAISE EXCEPTION 'One or more rooms exceed their registered capacity.'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.exam_seat_assignments seat
+     JOIN public.exam_schedules schedule ON schedule.id = seat.schedule_id AND schedule.school_id = seat.school_id
+     WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
+       AND schedule.exam_type = 'term'
+       AND NOT EXISTS (
+         SELECT 1 FROM public.exam_invigilators inv
+          WHERE inv.school_id = p_school_id
+            AND inv.exam_session_id = schedule.exam_session_id
+            AND inv.room_id = seat.room_id
+       )
+  ) THEN RAISE EXCEPTION 'Assign at least one invigilator to every room used in each session.'; END IF;
+
+  UPDATE public.exam_schedules
+     SET status = 'published', published_by = p_published_by,
+         published_at = now(), updated_at = now()
+   WHERE school_id = p_school_id AND exam_period_id = p_period_id
+     AND exam_type = 'term' AND status = 'draft';
+  GET DIAGNOSTICS v_seat_count = ROW_COUNT;
+
+  UPDATE public.exam_periods
+     SET status = 'published', published_by = p_published_by,
+         published_at = now(), updated_at = now()
+   WHERE id = p_period_id AND school_id = p_school_id;
+
+  RETURN jsonb_build_object('period_id', p_period_id, 'schedule_count', v_schedule_count,
+                            'updated_schedules', v_seat_count, 'status', 'published');
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
