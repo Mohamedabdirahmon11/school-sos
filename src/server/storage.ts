@@ -42,7 +42,8 @@ import {
   UserRole
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
-import { getMarkSchemeMaximums } from '../lib/exam-results.ts';
+import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.ts';
+import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
@@ -3013,33 +3014,45 @@ class StorageEngine {
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
-    const marks = (await this.getMarks(schoolId, classId, undefined, semester)).filter(mark => mark.status === 'approved');
+    const marks = (await this.getMarks(schoolId, classId, undefined, semester))
+      .filter(mark => mark.status === 'approved');
+    const [config, school, assignments] = await Promise.all([
+      this.getExamConfig(schoolId),
+      this.getSchoolById(schoolId),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' })
+    ]);
+    const expectedSubjectIds = [...new Set(assignments.map(row => row.subjectId).filter(Boolean))];
+    // Preserve legacy classes that have approved marks but no curriculum rows.
+    const requiredSubjectIds = expectedSubjectIds.length
+      ? expectedSubjectIds
+      : [...new Set(marks.map(mark => mark.subjectId))];
 
     const rankings = students.map(student => {
-      const studentMarks = marks.filter(m => m.studentId === student.id);
-      const totalPercentage = studentMarks.reduce((acc, m) => acc + (m.percentage || 0), 0);
-      const subjectCount = studentMarks.length;
-      const averagePercentage = subjectCount > 0 ? Math.round((totalPercentage / subjectCount) * 100) / 100 : 0;
+      const studentMarks = marks.filter(mark => mark.studentId === student.id);
+      const markedSubjectIds = new Set(studentMarks.map(mark => mark.subjectId));
+      const isComplete = requiredSubjectIds.length > 0 &&
+        requiredSubjectIds.every(subjectId => markedSubjectIds.has(subjectId));
+      const totalPercentage = studentMarks.reduce((sum, mark) => sum + (mark.percentage || 0), 0);
+      const averagePercentage = isComplete
+        ? Math.round((totalPercentage / requiredSubjectIds.length) * 100) / 100
+        : 0;
 
       return {
         student,
-        subjectCount,
+        subjectCount: studentMarks.length,
+        expectedSubjectCount: requiredSubjectIds.length,
+        isComplete,
         marks: studentMarks,
         averagePercentage,
+        grade: isComplete ? getGradeLabel(averagePercentage, school?.gradingScale) : '—',
+        isPass: isComplete && averagePercentage >= (config.passMarkPercentage || 50),
         rank: 0,
         isTopThree: false
       };
     });
 
-    // Sort descending by average percentage
-    rankings.sort((a, b) => b.averagePercentage - a.averagePercentage);
-
-    rankings.forEach((r, idx) => {
-      r.rank = idx + 1;
-      r.isTopThree = idx < 3 && r.averagePercentage > 0;
-    });
-
-    return rankings;
+    // Competition ranking keeps ties equal and incomplete students unranked.
+    return assignSemesterRanks(rankings);
   }
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
