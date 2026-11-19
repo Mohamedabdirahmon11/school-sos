@@ -10320,23 +10320,35 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
   const { data, error } = await client.rpc('schoolos_term_results', { p_school_id: school.id, p_term_id: termId, p_class_id: classId });
   if (error) { res.status(400).json({ error: error.message }); return; }
   const rows = Array.isArray(data) ? data : [];
-  const missing = new Map<string, { subjectId: string; teacherId: string; missing: number }>();
+  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id',school.id).eq('id',termId).maybeSingle();
+  const [{ data: assignments },{ data: enrollments }] = await Promise.all([
+    client.from('teacher_class_subject_assignments').select('subject_id,teacher_id,section_id,teachers(full_name)')
+      .eq('school_id',school.id).eq('class_id',classId).eq('academic_year_id',term?.academic_year_id || ''),
+    client.from('enrollments').select('student_id,section_id').eq('school_id',school.id)
+      .eq('class_id',classId).eq('academic_year_id',term?.academic_year_id || '').eq('status','active')
+  ]);
+  const sectionByStudent = new Map((enrollments||[]).map((row:any)=>[row.student_id,row.section_id]));
+  const missing = new Map<string,{subjectId:string;teacherId:string;teacherName:string;missing:number}>();
   for (const row of rows) for (const subject of row.subjects || []) {
-    const count = Math.max(0, Number(subject.required || 0) - Number(subject.entered || 0));
-    if (count) {
-      const key = subject.subject_id;
-      const entry = missing.get(key) || { subjectId: key, teacherId: '', missing: 0 };
-      entry.missing += count; missing.set(key, entry);
+    const count=Math.max(0,Number(subject.required||0)-Number(subject.entered||0));
+    if(!count) continue;
+    const sectionId=sectionByStudent.get(row.student_id);
+    const matching=(assignments||[]).filter((a:any)=>a.subject_id===subject.subject_id&&(!a.section_id||a.section_id===sectionId));
+    if(!matching.length){
+      const key='unassigned:'+subject.subject_id;
+      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:'',teacherName:'Macallin aan la aqoonsan',missing:0};
+      item.missing+=count;missing.set(key,item);
+    }else for(const assignment of matching){
+      const key=assignment.teacher_id+':'+subject.subject_id;
+      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:assignment.teachers?.full_name||'Macallin',missing:0};
+      item.missing+=count;missing.set(key,item);
     }
   }
-  const { data: assignments } = await client.from('teacher_class_subject_assignments')
-    .select('subject_id,teacher_id,teachers(full_name)').eq('school_id', school.id).eq('class_id', classId);
-  const teacherBySubject = new Map((assignments || []).map((a: any) => [a.subject_id, { teacherId: a.teacher_id, teacherName: a.teachers?.full_name || '' }]));
   const enriched = rows.map((row: any) => ({
     ...row, grade: termMarksGrade(row.average, school),
     subjects: (row.subjects || []).map((subject: any) => ({ ...subject, grade: termMarksGrade(subject.percentage, school) }))
   }));
-  res.json({ rows: enriched, missingMarks: [...missing.values()].map(item => ({ ...item, ...(teacherBySubject.get(item.subjectId) || {}) })) });
+  res.json({ rows: enriched, missingMarks: [...missing.values()] });
 });
 
 apiRouter.post('/term-marks/report-cards/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
