@@ -105,6 +105,11 @@ test('Step 10B empty periods return complete data and invigilator replacement va
   assert.ok(api.includes('studentName: [student?.first_name, student?.middle_name, student?.last_name]'));
   assert.ok(termUi.includes('Liisaska Fadhiyada Qolalka'));
   assert.ok(termUi.includes('Daabac A4 (jadwalka + liisaska qolalka)'));
+  assert.ok(api.includes("apiRouter.delete('/exams/term-periods/:periodId'"));
+  assert.ok(api.includes("period.status !== 'draft'"));
+  assert.ok(client.includes('deleteTermExamPeriod'));
+  assert.ok(termUi.includes('Jooji draft-ka'));
+  assert.ok(termUi.includes('data.period.start_date'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {
