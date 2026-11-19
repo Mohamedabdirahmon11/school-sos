@@ -3,6 +3,9 @@
 -- attendance and timetable relationships.
 BEGIN;
 
+ALTER TABLE public.class_groups
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
 ALTER TABLE public.class_sections
   ADD COLUMN IF NOT EXISTS max_students integer NOT NULL DEFAULT 40;
 UPDATE public.class_sections SET max_students = 40 WHERE max_students IS NULL;
@@ -116,6 +119,32 @@ END;
 $;
 REVOKE ALL ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_set_class_group_active(
+  p_school_id text, p_group_id uuid, p_is_active boolean
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  PERFORM 1 FROM public.class_groups
+   WHERE id=p_group_id AND school_id=p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Class group not found in this school.'; END IF;
+
+  UPDATE public.class_groups
+     SET is_active=p_is_active, updated_at=now()
+   WHERE id=p_group_id AND school_id=p_school_id;
+
+  UPDATE public.classes c
+     SET is_archived=NOT p_is_active
+    FROM public.class_sections s
+   WHERE s.class_id=p_group_id AND s.school_id=p_school_id
+     AND s.legacy_class_id=c.id AND c.school_id=p_school_id;
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
