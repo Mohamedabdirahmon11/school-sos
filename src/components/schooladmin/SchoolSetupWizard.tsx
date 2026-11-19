@@ -48,7 +48,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
       if (!active) return;
       const incoming = result.data || {};
       const availableYears = await ApiClient.getAcademicYears().catch(() => []);
-      const preferredYear = availableYears.find(year => year.is_current) || availableYears[0] || null;
+      const preferredYear = availableYears.find(year => year.is_current) || availableYears.find(year => year.status === 'draft') || null;
       const canonicalSemesters = preferredYear
         ? await ApiClient.getAcademicYearSemesters(preferredYear.id).catch(() => [])
         : [];
