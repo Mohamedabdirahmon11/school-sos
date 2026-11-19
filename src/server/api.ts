@@ -3362,6 +3362,18 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   }
 });
 
+apiRouter.post('/class-groups/:id/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req,res) => {
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ if(typeof req.body?.isActive!=='boolean'){res.status(400).json({error:'Dooro in fasalka la hawlgeliyo ama la joojiyo.'});return;}
+ const {error}=await classGroupsClient().rpc('schoolos_set_class_group_active',{
+   p_school_id:school.id,p_group_id:req.params.id,p_is_active:req.body.isActive
+ });
+ if(error){res.status(404).json({error:error.message||'Xaaladda fasalka lama beddeli karin.'});return;}
+ db.logAudit({action:req.body.isActive?'CLASS_GROUP_ACTIVATED':'CLASS_GROUP_DEACTIVATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:(req.body.isActive?'Activated':'Deactivated')+' class group '+req.params.id+'.',severity:req.body.isActive?'info':'warning'});
+ res.json({success:true,isActive:req.body.isActive});
+});
+
 apiRouter.post('/class-groups/reorder', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req,res) => {
  const school=(req as any).school as School;
  const user=(req as any).user as User;
@@ -3380,7 +3392,7 @@ apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res
  const school=(req as any).school as School;
  const client=classGroupsClient();
  const {data:groups,error}=await client.from('class_groups')
-   .select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)')
+   .select('id,school_id,name,sort_order,is_active,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)')
    .eq('school_id',school.id).order('sort_order').order('name');
  if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;}
  const sections=(groups||[]).flatMap((group:any)=>group.class_sections||[]);
