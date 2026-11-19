@@ -84,7 +84,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
-  const isSemesterLocked = (examConfig?.lockedSemesters || []).includes(semester);
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
@@ -162,6 +161,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
+  const isSemesterLocked = (examConfig?.lockedSemesters || []).includes(semester);
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
