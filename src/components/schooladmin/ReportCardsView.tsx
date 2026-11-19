@@ -4,8 +4,8 @@
  * 1. Combines Semester 1 + Semester 2 for final yearly percentage and class rank
  * 2. Uses the school's configured grade labels; no GPA is calculated.
  * 3. Report-card printing is blocked until both semesters have been published by the school.
- * 4. Attendance is not currently included in this report-card data contract.
- * 5. Shows school branding, student info, semester marks and yearly percentages, generated remarks, signatures, and stamp.
+ * 4. Includes attendance when the school's academic-term dates and attendance records are available.
+ * 5. Shows school branding, student info, semester marks, yearly grades, saved teacher remarks, signatures, and stamp.
  * 6. Uses the school's configured Report Card Design (template, colors, images, uploaded background).
  * 7. Supports Single Student Print and Bulk Class PDF printing.
  */
