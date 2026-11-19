@@ -7901,6 +7901,7 @@ apiRouter.put('/report-card/design', requireAuth, requireSchoolAdminOrSuperAdmin
   try {
     const updates = sanitizeReportCardDesign(req.body);
     const updated = await db.updateReportCardDesign(school.id, updates);
+    await db.flush();
     db.logAudit({
       action: 'REPORT_CARD_DESIGN_UPDATED',
       category: 'academics',
