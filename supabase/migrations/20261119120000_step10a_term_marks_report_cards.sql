@@ -164,8 +164,13 @@ CREATE OR REPLACE FUNCTION public.schoolos_check_mark_structure_total()
 RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE v_structure_id uuid; v_school_id text; v_total numeric;
 BEGIN
-  v_structure_id := COALESCE(NEW.structure_id,OLD.structure_id);
-  v_school_id := COALESCE(NEW.school_id,OLD.school_id);
+  IF TG_OP='DELETE' THEN
+    v_structure_id := OLD.structure_id;
+    v_school_id := OLD.school_id;
+  ELSE
+    v_structure_id := NEW.structure_id;
+    v_school_id := NEW.school_id;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM public.mark_structures ms WHERE ms.id=v_structure_id AND ms.school_id=v_school_id) THEN
     RETURN NULL;
   END IF;
@@ -197,9 +202,10 @@ BEGIN
     CASE WHEN TG_OP='DELETE' THEN NULL ELSE jsonb_build_object('marks',NEW.marks,'status',NEW.status) END,
     COALESCE(NEW.entered_by,OLD.entered_by,'system')
   );
-  RETURN COALESCE(NEW,OLD);
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END;
-$$;
+$;
 DROP TRIGGER IF EXISTS component_marks_audit ON public.component_marks;
 CREATE TRIGGER component_marks_audit
 AFTER INSERT OR UPDATE OR DELETE ON public.component_marks
@@ -346,14 +352,14 @@ BEGIN
       WHERE e.school_id=p_school_id AND e.student_id=v_student_id AND e.class_id=p_class_id
         AND e.academic_year_id=v_year_id AND e.status='active' LIMIT 1;
     IF NOT FOUND THEN RAISE EXCEPTION 'Ardaygu fasalkan kuma jiro diiwaanka term-kan.'; END IF;
-    IF v_status='present' AND v_score IS NULL THEN
-      CONTINUE;
-    END IF;
     IF NOT EXISTS (SELECT 1 FROM public.teacher_class_subject_assignments a
       WHERE a.school_id=p_school_id AND a.teacher_id=v_teacher_id AND a.academic_year_id=v_year_id
         AND (a.term_id IS NULL OR a.term_id=v_term_id) AND a.class_id=p_class_id
         AND a.subject_id=p_subject_id AND (a.section_id IS NULL OR a.section_id=v_enrollment.section_id)) THEN
       RAISE EXCEPTION 'Macallinku fasalkan iyo maaddadan looma qoondeyn.';
+    END IF;
+    IF v_status='present' AND v_score IS NULL THEN
+      CONTINUE;
     END IF;
     INSERT INTO public.component_marks(school_id,component_id,class_id,subject_id,student_id,marks,status,entered_by)
     VALUES(p_school_id,p_component_id,p_class_id,p_subject_id,v_student_id,v_score,v_status,p_actor_id)
@@ -691,10 +697,10 @@ USING (
 REVOKE ALL ON public.mark_structures,public.mark_components,public.component_marks,
   public.term_status,public.marks_audit,public.report_cards FROM anon;
 GRANT SELECT ON public.mark_structures,public.mark_components,public.component_marks,public.term_status,public.report_cards TO authenticated;
-GRANT INSERT,UPDATE,DELETE ON public.mark_structures,public.mark_components TO authenticated;
+GRANT INSERT,UPDATE ON public.mark_structures,public.mark_components TO authenticated;
 GRANT INSERT,UPDATE ON public.component_marks TO authenticated;
 GRANT SELECT ON public.marks_audit TO authenticated;
-GRANT INSERT,UPDATE,DELETE ON public.report_cards TO authenticated;
+GRANT INSERT,UPDATE ON public.report_cards TO authenticated;
 GRANT ALL ON public.mark_structures,public.mark_components,public.component_marks,
   public.term_status,public.marks_audit,public.report_cards TO service_role;
 
