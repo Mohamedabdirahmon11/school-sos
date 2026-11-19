@@ -3046,7 +3046,23 @@ class StorageEngine {
     const students = await this.getStudents(schoolId, classId);
     const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
     const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
-    const config = await this.getExamConfig(schoolId);
+    const [config, school] = await Promise.all([this.getExamConfig(schoolId), this.getSchoolById(schoolId)]);
+    const attendanceWindowStart = school?.terms
+      ? [school.terms.semester1Start, school.terms.semester2Start].filter(Boolean).sort()[0]
+      : undefined;
+    const attendanceWindowEnd = school?.terms
+      ? [school.terms.semester1End, school.terms.semester2End].filter(Boolean).sort().slice(-1)[0]
+      : undefined;
+    const attendanceRows = attendanceWindowStart && attendanceWindowEnd
+      ? await this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId })
+      : [];
+    const attendanceByStudent = new Map<string, AttendanceRecord[]>();
+    for (const record of attendanceRows) {
+      if (record.date < attendanceWindowStart! || record.date > attendanceWindowEnd!) continue;
+      const records = attendanceByStudent.get(record.studentId) || [];
+      records.push(record);
+      attendanceByStudent.set(record.studentId, records);
+    }
     const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' });
     const expectedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const expectedSubjectIdSet = new Set(expectedSubjectIds);
@@ -3074,6 +3090,7 @@ class StorageEngine {
           totalMarks: mark.totalMarks,
           percentage: mark.percentage,
           status: mark.status,
+          teacherRemarks: mark.teacherRemarks?.trim() || '',
           publishedAt: mark.publishedAt || null
         } : null;
 
@@ -3105,9 +3122,21 @@ class StorageEngine {
         : 0;
       const isPass = annualComplete && yearlyAvg >= (config.passMarkPercentage || 50);
 
+      const studentAttendance = attendanceByStudent.get(student.id) || [];
+      const attendanceTotal = studentAttendance.length;
+      const attendanceSummary = attendanceTotal > 0 ? {
+        totalDays: attendanceTotal,
+        present: studentAttendance.filter(record => record.status === 'present').length,
+        absent: studentAttendance.filter(record => record.status === 'absent').length,
+        late: studentAttendance.filter(record => record.status === 'late').length,
+        excused: studentAttendance.filter(record => record.status === 'excused').length,
+        attendancePercentage: Math.round(((studentAttendance.filter(record => record.status === 'present' || record.status === 'late').length / Math.max(1, studentAttendance.filter(record => record.status !== 'excused').length)) * 100) * 100) / 100
+      } : null;
+
       return {
         student,
         subjectResults,
+        attendanceSummary,
         annualComplete,
         annualPublished,
         yearlyPercentage: yearlyAvg,
