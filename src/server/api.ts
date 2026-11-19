@@ -10360,7 +10360,7 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
     const relation:any=assignment.teachers;
     return (Array.isArray(relation)?relation[0]?.full_name:relation?.full_name)||'Macallin';
   };
-  const missing = new Map<string,{subjectId:string;teacherId:string;teacherName:string;missing:number}>();
+  const missing = new Map<string,{subjectId:string;subjectName:string;teacherId:string;teacherName:string;missing:number}>();
   for (const row of rows) for (const subject of row.subjects || []) {
     const count=Math.max(0,Number(subject.required||0)-Number(subject.entered||0));
     if(!count) continue;
@@ -10370,11 +10370,11 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
     const matching=sectionSpecific.length?sectionSpecific:wholeClass;
     if(!matching.length){
       const key='unassigned:'+subject.subject_id;
-      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:'',teacherName:'Macallin aan la aqoonsan',missing:0};
+      const item=missing.get(key)||{subjectId:subject.subject_id,subjectName:subject.subject,teacherId:'',teacherName:'Macallin aan la aqoonsan',missing:0};
       item.missing+=count;missing.set(key,item);
     }else for(const assignment of matching){
       const key=assignment.teacher_id+':'+subject.subject_id;
-      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:getAssignedTeacherName(assignment),missing:0};
+      const item=missing.get(key)||{subjectId:subject.subject_id,subjectName:subject.subject,teacherId:assignment.teacher_id,teacherName:getAssignedTeacherName(assignment),missing:0};
       item.missing+=count;missing.set(key,item);
     }
   }
