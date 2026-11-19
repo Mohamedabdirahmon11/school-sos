@@ -763,6 +763,7 @@ DROP POLICY IF EXISTS report_cards_parent_published_read ON public.report_cards;
 CREATE POLICY report_cards_parent_published_read ON public.report_cards FOR SELECT TO authenticated
 USING (
   published_at IS NOT NULL
+  AND is_stale=false
   AND private.auth_user_role() IN ('parent','student')
   AND private.auth_can_access_student(student_id)
 );
