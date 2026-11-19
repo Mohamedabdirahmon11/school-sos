@@ -3459,10 +3459,12 @@ apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, a
     const { data: sessions, error: sessionError } = await client.from('exam_sessions').select('id,exam_day_id,name,start_time,end_time,shift_tag')
       .eq('school_id', school.id).in('id', sessionIds);
     if (sessionError) throw sessionError;
+    if (!(sessions || []).length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
     const dayIds = [...new Set((sessions || []).map((row: any) => row.exam_day_id))];
     const { data: days, error: dayError } = await client.from('exam_days').select('id,exam_period_id,exam_date')
       .eq('school_id', school.id).in('id', dayIds);
     if (dayError) throw dayError;
+    if (!(days || []).length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
     const periodIds = [...new Set((days || []).map((row: any) => row.exam_period_id))];
     const { data: periods, error: periodError } = await client.from('exam_periods').select('id,name,term_id,status')
       .eq('school_id', school.id).in('id', periodIds).eq('status', 'published');
