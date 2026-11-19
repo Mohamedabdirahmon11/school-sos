@@ -25,7 +25,8 @@ const fixtures: Array<[string, Record<string, unknown>]> = [
   ['staff_members', { id: 'sm1', schoolId: 's1', userId: 'u1', fullName: 'Test Staff', roleTitle: 'Accountant', email: 'a@example.test', phone: '123', monthlySalary: 0, joinedDate: '2026-09-01', status: 'active', permissions: [] }],
   ['classes', { id: 'c1', schoolId: 's1', name: 'Grade 1', classCode: 'G1-A-2026', academicYear: '2026-2027', gradeLevel: 1, section: 'A', capacity: 40, monthlyFee: 0 }],
   ['subjects', { id: 'sb1', schoolId: 's1', name: 'Math', code: 'MATH1', creditUnits: 3, assignedTeacherIds: [] }],
-  ['exam_configs', { id: 'ec1', schoolId: 's1', academicYear: '2026-2027', smallExamName: 'Continuous Assessment', smallExamMax: 40, bigExamName: 'Final Examination', bigExamMax: 60, assessmentComponents: [{ id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 }], passMarkPercentage: 50 }],
+  ['exam_configs', { id: 'ec1', schoolId: 's1', academicYear: '2026-2027', smallExamName: 'Continuous Assessment', smallExamMax: 40, bigExamName: 'Final Examination', bigExamMax: 60, assessmentComponents: [{ id: 'test-1', name: 'Test 1', maxMarks: 10, category: 'continuous', order: 1 }], passMarkPercentage: 50, lockedSemesters: [] }],
+  ['form_teacher_comments', { id: 'ftc1', schoolId: 's1', classId: 'c1', studentId: 'st1', teacherUserId: 'u1', academicYear: '2026-2027', semester: 'Semester 1', comment: 'Good progress', createdAt: '2026-11-19T00:00:00Z', updatedAt: '2026-11-19T00:00:00Z' }],
   ['student_marks', { id: 'mark1', schoolId: 's1', classId: 'c1', subjectId: 'sb1', studentId: 'st1', academicYear: '2026-2027', semester: 'Semester 1', smallExamMarks: 10, bigExamMarks: 50, assessmentScores: { 'test-1': 10 }, totalMarks: 60, percentage: 60, status: 'draft' }],
   ['school_notices', { id: 'n1', schoolId: 's1', title: 'Notice', content: 'Text', audience: 'class', classId: 'c1', isActive: true, isPinned: false, publishDate: '2026-09-01', authorName: 'Admin', authorRole: 'school_admin' }],
   ['direct_messages', { id: 'm1', schoolId: 's1', senderId: 'u1', senderName: 'Teacher', senderRole: 'teacher', recipientId: 'u2', recipientName: 'Parent', recipientRole: 'parent', content: 'Hello', timestamp: '2026-09-01T00:00:00Z', isRead: false }],
@@ -60,6 +61,8 @@ test('schema checks exercised by student, teacher, fee and messaging writes are 
   assert.ok(definitions.has('bank_statement_entries'), 'bank reconciliation persistence is represented in the schema');
   assert.ok(definitions.has('inventory_items'), 'inventory item persistence is represented in the schema');
   assert.ok(definitions.has('inventory_transactions'), 'inventory stock ledger is represented in the schema');
+  assert.ok(definitions.has('form_teacher_comments'), 'Form Teacher report comments are represented in the schema');
+  assert.ok(definitions.get('exam_configs')?.has('locked_semesters'), 'exam configurations persist semester locks');
   assert.match(sql, /schoolos_adjust_inventory/i);
   assert.match(sql, /schoolos_claim_communication_queue/i);
   assert.match(sql, /schoolos_complete_communication_queue/i);

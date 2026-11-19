@@ -3504,7 +3504,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   if (!teacher) { res.json([]); return; }
 
   const assignments = await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
-  const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
+  const [allClasses, allSubjects, allTeachers] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id), db.getTeachers(school.id)]);
+  const teacherNameById = new Map(allTeachers.map((row: any) => [row.id, row.fullName]));
   // A Form Teacher is explicitly assigned on the class record. assignedClasses
   // describes teaching scope and must not grant whole-class Form Teacher privileges.
   const formTeacherClasses = allClasses.filter((klass: any) => klass.classTeacherId === user.id);
@@ -3520,7 +3521,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     if (!klass || !subject) continue;
     const key = `${klass.id}:${subject.id}`;
     assignedPairs.add(key);
-    result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
+    result.push({ ...item, subject, class: klass, teacherName: teacherNameById.get(item.teacherId) || 'Unassigned', isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
   // A Form Teacher is responsible for the complete class mark sheet.
@@ -3544,6 +3545,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         subjectId: subject.id,
         subject,
         class: klass,
+        teacherId: assignment.teacherId,
+        teacherName: teacherNameById.get(assignment.teacherId) || 'Unassigned',
         periodsPerWeek: 0,
         smallExamEnabled: true,
         bigExamEnabled: true,
@@ -3554,6 +3557,52 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     }
   }
   res.json(result);
+});
+
+apiRouter.get('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const semester = req.query.semester;
+  if (normalizeRole(user.role) !== 'teacher' || !classId || !['Semester 1', 'Semester 2'].includes(String(semester))) {
+    res.status(400).json({ error: 'A Form Teacher class and valid semester are required.' }); return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the assigned Form Teacher may review comments for this class.' }); return; }
+  const client = teacherAssignmentClient();
+  const { data, error } = await client.from('form_teacher_comments').select('id,student_id,semester,comment,teacher_user_id,updated_at')
+    .eq('school_id', school.id).eq('class_id', classId).eq('academic_year', klass.academicYear || school.academicYear).eq('semester', semester);
+  if (error) { res.status(503).json({ error: 'Form Teacher comments could not be loaded. Apply the report-comment migration first.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json((data || []).map((row: any) => ({ id: row.id, studentId: row.student_id, semester: row.semester, comment: row.comment, teacherUserId: row.teacher_user_id, updatedAt: row.updated_at })));
+});
+
+apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const { classId, studentId, semester } = req.body || {};
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : null;
+  if (normalizeRole(user.role) !== 'teacher' || typeof classId !== 'string' || typeof studentId !== 'string' ||
+      !['Semester 1', 'Semester 2'].includes(semester) || comment === null || comment.length > 1500) {
+    res.status(400).json({ error: 'A class, student, semester and comment of at most 1,500 characters are required.' }); return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  const student = await db.getStudentById(studentId, school.id);
+  if (!klass || klass.classTeacherId !== user.id || !student || student.classId !== classId) {
+    res.status(403).json({ error: 'Only the assigned Form Teacher may comment on a student in this class.' }); return;
+  }
+  const client = teacherAssignmentClient();
+  const payload = {
+    school_id: school.id, class_id: classId, student_id: studentId, teacher_user_id: user.id,
+    academic_year: klass.academicYear || school.academicYear, semester, comment,
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await client.from('form_teacher_comments')
+    .upsert(payload, { onConflict: 'school_id,student_id,academic_year,semester' })
+    .select('id,student_id,semester,comment,teacher_user_id,updated_at').single();
+  if (error || !data) { res.status(503).json({ error: 'Form Teacher comment could not be saved. Apply the report-comment migration first.' }); return; }
+  db.logAudit({ action: 'FORM_TEACHER_COMMENT_SAVED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved a report-card comment for student ' + student.studentId + ' in ' + semester + '.', severity: 'info' });
+  res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
@@ -6856,26 +6905,20 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,subject_id')
       : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
     const ownSubjectIds = new Set(assigned.items.map((item: any) => item.subjectId));
-    const classAssignments = isFormTeacher
-      ? await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,subject_id,teacher_id')
-      : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
-    const editableSubjectIds = new Set([
-      ...ownSubjectIds,
-      ...(isFormTeacher ? classAssignments.items.map((item: any) => item.subjectId) : [])
-    ]);
     if (!isFormTeacher && ownSubjectIds.size === 0) {
       res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Form Teacher.' });
       return;
     }
-    if (subjectId && !editableSubjectIds.has(String(subjectId))) {
-      res.status(403).json({ error: 'You may only access subjects assigned to you, or subjects in your Form Teacher class.' });
+    // Form Teachers may review the whole class register, but subject teachers
+    // may only read their own assigned subjects. This is read-only access.
+    if (subjectId && !isFormTeacher && !ownSubjectIds.has(String(subjectId))) {
+      res.status(403).json({ error: 'You may only access subjects assigned to you.' });
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
-    res.json(classMarks.filter(mark =>
-      editableSubjectIds.has(mark.subjectId) ||
-      (isFormTeacher && (mark.status === 'submitted' || mark.status === 'form_teacher_submitted'))
-    ));
+    res.json(isFormTeacher
+      ? classMarks
+      : classMarks.filter(mark => ownSubjectIds.has(mark.subjectId)));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
@@ -6920,10 +6963,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
-    if (!assignment.total && !mayFillFormTeacherSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may enter marks only for a subject explicitly assigned to your teacher profile. Form Teacher access is review-only.' });
       return;
     }
   }
@@ -8045,6 +8086,9 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   if (!result.annualPublished) {
     res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
   }
+  const commentRows = await classGroupsClient().from('form_teacher_comments').select('semester,comment')
+    .eq('school_id', school.id).eq('student_id', student.id).eq('academic_year', klass?.academicYear || school.academicYear);
+  Object.assign(result, { formTeacherComments: commentRows.error ? [] : (commentRows.data || []) });
   const pages = [buildReportCardPdfPage({
     school,
     design,
@@ -8063,6 +8107,15 @@ apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAd
   if (!rankings.length) { res.status(404).json({ error: 'No students were found in this class.' }); return; }
   if (rankings.some(result => !result.annualComplete)) { res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return; }
   if (rankings.some(result => !result.annualPublished)) { res.status(409).json({ error: 'Class annual report cards cannot be downloaded until the School Admin has published every student result for both semesters.' }); return; }
+  const commentRows = await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment')
+    .eq('school_id', school.id).eq('class_id', klass.id).eq('academic_year', klass.academicYear || school.academicYear);
+  const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+  for (const row of commentRows.error ? [] : (commentRows.data || [])) {
+    const list = commentsByStudent.get(row.student_id) || [];
+    list.push({ semester: row.semester, comment: row.comment });
+    commentsByStudent.set(row.student_id, list);
+  }
+  for (const result of rankings) Object.assign(result, { formTeacherComments: commentsByStudent.get(result.student.id) || [] });
   const pages = rankings.map(result => buildReportCardPdfPage({
     school,
     design,

@@ -357,6 +357,8 @@ export interface ExamConfig {
   /** Monotonically increasing school/year mark-scheme revision. */
   schemeVersion?: number;
   passMarkPercentage: number;
+  /** Semesters whose mark entry is locked by the School Admin. */
+  lockedSemesters?: ('Semester 1' | 'Semester 2')[];
   updatedAt: string;
 }
 

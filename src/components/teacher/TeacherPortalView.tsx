@@ -3,7 +3,7 @@
  * Rules Enforced:
  * 1. Daily Attendance taken ONCE PER DAY (Present, Absent, Late, Excused)
  * 2. Exam marks: school-configured assessment components -> weighted total and percentage
- * 3. Subject teachers submit assigned subjects; Form Teachers manage the full class mark sheet and forward it to Admin.
+ * 3. Subject teachers submit assigned subjects; Form Teachers review the full class mark sheet and forward it to Admin.
  * 4. Personal teaching schedule & notices
  */
 
@@ -76,13 +76,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   ]).values()], [teacherAssignments, formTeacherClasses]);
   const subjects: Subject[] = [...new Map(teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => [assignment.subject.id, assignment.subject])).values()] as Subject[];
   const classAssignments = teacherAssignments.filter((assignment: any) => assignment.classId === selectedClassId);
-  const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
+  const isFormTeacher = formTeacherClasses.some(klass => klass.id === selectedClassId);
   const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
   const allClassSubjects = uniqueSubjects(classAssignments);
-  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher || assignment.canEditMarks === true));
-  // Homework is limited to subjects the teacher personally teaches.
-  // Form Teacher's wider subject access applies to the class mark sheet only.
-  const classSubjects: Subject[] = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
+  // Every teacher may enter marks only for subjects explicitly assigned to them.
+  // Form Teacher status grants class-wide read/review access, never mark-edit permission.
+  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
+  const classSubjects: Subject[] = editableClassSubjects;
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
@@ -163,9 +163,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Marks state (Small Exam + Big Exam)
   const [semester, setSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
+  const isSemesterLocked = (examConfig?.lockedSemesters || []).includes(semester);
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
+  const [formTeacherComments, setFormTeacherComments] = useState<Array<{ id: string; studentId: string; comment: string; semester: string; updatedAt: string }>>([]);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [savingCommentStudentId, setSavingCommentStudentId] = useState<string | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -281,6 +285,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
     return () => { cancelled = true; };
   }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
+  useEffect(() => {
+    if (activeTab !== 'grades' || !isFormTeacher || !selectedClassId) {
+      setFormTeacherComments([]);
+      setCommentDrafts({});
+      return;
+    }
+    let cancelled = false;
+    ApiClient.getFormTeacherComments(selectedClassId, semester).then(rows => {
+      if (cancelled) return;
+      setFormTeacherComments(rows);
+      setCommentDrafts(Object.fromEntries(rows.map(row => [row.studentId, row.comment || ''])));
+    }).catch(error => {
+      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load Form Teacher comments.');
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, isFormTeacher, selectedClassId, semester, school?.id]);
+
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
     if (isReadOnly || isLoadingClassData || !selectedClassId || !students.length) return;
@@ -303,7 +324,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    if (isReadOnly || isSemesterLocked || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     if (status === 'submitted') {
       const incompleteSubject = editableClassSubjects.find(subject => {
         const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
@@ -349,6 +370,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveFormTeacherComment = async (studentId: string) => {
+    if (isReadOnly || !isFormTeacher || !selectedClassId || savingCommentStudentId) return;
+    setSavingCommentStudentId(studentId);
+    try {
+      const saved = await ApiClient.saveFormTeacherComment(selectedClassId, studentId, semester, commentDrafts[studentId] || '');
+      setFormTeacherComments(current => [...current.filter(row => row.studentId !== studentId), saved.comment]);
+      setNotice('Report-card comment saved.');
+      setTimeout(() => setNotice(null), 3000);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Report-card comment could not be saved.');
+    } finally { setSavingCommentStudentId(null); }
   };
 
   const handleForwardClassMarks = async () => {
@@ -791,10 +825,46 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
             </div>
           </div>
+
+          {isSemesterLocked && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">This semester is locked by the School Admin. Mark entry and submission are disabled until it is unlocked.</div>}
+
+          {isFormTeacher && (
+            <div className="space-y-4 rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
+              <div><h2 className="text-sm font-bold text-teal-950">Form Teacher review · {semester}</h2><p className="mt-1 text-xs text-teal-800">Review every subject's submission status. Missing or draft marks must be completed by the assigned subject teacher; you cannot edit their marks.</p></div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {allClassSubjects.map(subject => {
+                  const rows = classMarks.filter(mark => mark.subjectId === subject.id);
+                  const missingCount = students.filter(student => {
+                    const mark = rows.find(item => item.studentId === student.id);
+                    return !mark || !['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status);
+                  }).length;
+                  const assignment = classAssignments.find((item: any) => item.subjectId === subject.id && !item.isFormTeacher);
+                  const status = !students.length || missingCount === students.length ? 'Missing' : missingCount ? 'Incomplete' : 'Submitted';
+                  return <div key={subject.id} className="rounded-xl border border-teal-100 bg-white p-3">
+                    <p className="font-bold text-slate-800">{subject.name}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">Teacher: {assignment?.teacherName || 'Not assigned'}</p>
+                    <p className={`mt-2 text-xs font-bold ${missingCount ? 'text-amber-700' : 'text-teal-700'}`}>{status}{missingCount ? ` · ${missingCount} student(s) missing` : ''}</p>
+                  </div>;
+                })}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-teal-950">Report-card comments</h3>
+                <p className="text-[11px] text-teal-800">Add a separate Form Teacher comment for each student. This is not the subject teacher's mark remark.</p>
+                {students.map(student => {
+                  const saved = formTeacherComments.find(row => row.studentId === student.id);
+                  return <div key={student.id} className="rounded-xl border border-teal-100 bg-white p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[10px] text-slate-500">{student.studentId}</p></div><span className="text-[10px] text-slate-400">{saved?.updatedAt ? 'Saved' : 'Not saved'}</span></div>
+                    <textarea maxLength={1500} rows={2} value={commentDrafts[student.id] ?? saved?.comment ?? ''} onChange={event => setCommentDrafts(current => ({ ...current, [student.id]: event.target.value }))} placeholder="Write this student's report-card comment..." className="w-full rounded-lg border border-slate-300 p-2 text-xs" />
+                    <div className="mt-2 flex justify-end"><button type="button" disabled={isReadOnly || savingCommentStudentId === student.id} onClick={() => void handleSaveFormTeacherComment(student.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{savingCommentStudentId === student.id ? 'Saving…' : 'Save comment'}</button></div>
+                  </div>;
+                })}
+              </div>
+            </div>
+          )}
 
           {classMarks.some(mark => Boolean(mark.correctionReason) && gradeSubjects.some(subject => subject.id === mark.subjectId)) && (
             <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
@@ -883,7 +953,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         const input = marksInput[key] || { scores: {}, remarks: '' };
                         const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                         const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
-                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
+                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked && !isSemesterLocked;
                         const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
@@ -922,7 +992,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               })}
             </>
           )}
-          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you may complete all subjects for your class. Subject teachers can enter only their assigned subjects. Submitted marks are locked; forwarding sends the completed class sheet to School Admin.</p>}
+          {isFormTeacher && <p className="text-[11px] text-slate-500">As Form Teacher, you can review all subjects in your class, but can enter marks only for subjects personally assigned to you. Other teachers' marks are read-only. Forwarding sends the class sheet to School Admin.</p>}
         </section>
       )}
 
