@@ -732,7 +732,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_menu_appearance: 'Muuqaalka Menu-ga',
     settings_backup_export: 'Kaydinta & Dhoofinta Xogta',
     settings_page_title: 'Dejinta Dugsiga',
-    settings_page_description: 'Halkaan ka maamul xogta dugsiga, waxbarashada, jadwalka, laamaha, ogeysiisyada, naqshadda natiijooyinka iyo kaydka xogta.'
+    settings_page_description: 'Halkaan ka maamul xogta dugsiga, waxbarashada, jadwalka, laamaha, ogeysiisyada, naqshadda natiijooyinka iyo kaydka xogta.',
     settings_academics: 'Jadwalka Waxbarashada & Qiimeynta',
     settings_documents: 'Dukumentiyada & Ogeysiisyada',
     settings_branches: 'Xarumaha & Laamaha',
@@ -986,7 +986,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_menu_appearance: 'የምናሌ ገጽታ',
     settings_backup_export: 'የውሂብ ምትኬና ማውጣት',
     settings_page_title: 'የትምህርት ቤት ቅንብሮች',
-    settings_page_description: 'የትምህርት ቤቱን መገለጫ፣ የትምህርት ደንቦች፣ የጊዜ ሰሌዳ፣ ቅርንጫፎች፣ ማሳወቂያዎችና የውጤት ካርድ ንድፍ እዚህ ያስተዳድሩ።'
+    settings_page_description: 'የትምህርት ቤቱን መገለጫ፣ የትምህርት ደንቦች፣ የጊዜ ሰሌዳ፣ ቅርንጫፎች፣ ማሳወቂያዎችና የውጤት ካርድ ንድፍ እዚህ ያስተዳድሩ።',
     settings_academics: 'Academic Calendar & Assessment',
     settings_documents: 'Documents & Notifications',
     settings_branches: 'Campuses & Branches',
@@ -1160,7 +1160,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_menu_appearance: 'مظهر القائمة',
     settings_backup_export: 'نسخ البيانات وتصديرها',
     settings_page_title: 'إعدادات المدرسة',
-    settings_page_description: 'أدر ملف المدرسة وقواعد التعليم والجدول والفروع والإشعارات وتصميم كشف الدرجات والنسخ الاحتياطي من مكان واحد.'
+    settings_page_description: 'أدر ملف المدرسة وقواعد التعليم والجدول والفروع والإشعارات وتصميم كشف الدرجات والنسخ الاحتياطي من مكان واحد.',
     settings_academics: 'الشؤون الأكاديمية والقواعد',
     settings_documents: 'المستندات والتنبيهات',
     settings_language: 'اللغة الافتراضية',
