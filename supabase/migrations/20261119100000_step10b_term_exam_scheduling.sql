@@ -158,19 +158,25 @@ ALTER TABLE public.exam_schedules
 ALTER TABLE public.exam_seat_assignments
   ADD COLUMN IF NOT EXISTS room_id VARCHAR(64),
   ADD COLUMN IF NOT EXISTS class_id VARCHAR(64),
-  ADD COLUMN IF NOT EXISTS exam_number INTEGER;
+  ADD COLUMN IF NOT EXISTS exam_number INTEGER,
+  ADD COLUMN IF NOT EXISTS exam_session_id UUID;
 ALTER TABLE public.exam_seat_assignments
   ADD CONSTRAINT exam_seats_room_school_fk
     FOREIGN KEY (room_id, school_id) REFERENCES public.exam_rooms(id, school_id) ON DELETE RESTRICT,
   ADD CONSTRAINT exam_seats_class_school_fk
     FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE,
   ADD CONSTRAINT exam_seats_exam_number_check
-    CHECK (exam_number IS NULL OR exam_number > 0);
+    CHECK (exam_number IS NULL OR exam_number > 0),
+  ADD CONSTRAINT exam_seats_session_school_fk
+    FOREIGN KEY (exam_session_id, school_id) REFERENCES public.exam_sessions(id, school_id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS exam_seats_term_class_number_uidx
   ON public.exam_seat_assignments(school_id, schedule_id, class_id, exam_number)
   WHERE exam_number IS NOT NULL;
 CREATE INDEX IF NOT EXISTS exam_seats_term_room_idx
   ON public.exam_seat_assignments(school_id, schedule_id, room_id, class_id, exam_number);
+CREATE UNIQUE INDEX IF NOT EXISTS exam_seats_term_room_seat_uidx
+  ON public.exam_seat_assignments(school_id, exam_session_id, room_id, seat_number)
+  WHERE exam_session_id IS NOT NULL AND room_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.exam_invigilators (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -297,9 +303,18 @@ BEGIN
     SELECT 1 FROM public.exam_schedules schedule
      WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
        AND schedule.exam_type = 'term' AND schedule.status = 'draft'
-       AND NOT EXISTS (SELECT 1 FROM public.exam_seat_assignments seat
-        WHERE seat.school_id = p_school_id AND seat.schedule_id = schedule.id)
-  ) THEN RAISE EXCEPTION 'Every scheduled subject must have students assigned to rooms.'; END IF;
+       AND (SELECT COUNT(*) FROM public.exam_seat_assignments seat
+        WHERE seat.school_id = p_school_id AND seat.schedule_id = schedule.id) <> schedule.seat_capacity
+  ) THEN RAISE EXCEPTION 'Every scheduled subject must have its full student seat allocation.'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.exam_seat_assignments seat
+     JOIN public.exam_schedules schedule ON schedule.id = seat.schedule_id AND schedule.school_id = seat.school_id
+     WHERE schedule.school_id = p_school_id AND schedule.exam_period_id = p_period_id
+       AND schedule.exam_type = 'term'
+       AND (seat.room_id IS NULL OR seat.class_id IS NULL OR seat.exam_number IS NULL
+         OR seat.exam_session_id IS DISTINCT FROM schedule.exam_session_id)
+  ) THEN RAISE EXCEPTION 'Term exam seating rows require a room, class, exam number and matching session.'; END IF;
 
   IF EXISTS (
     SELECT 1 FROM public.exam_seat_assignments seat
