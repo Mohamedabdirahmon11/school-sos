@@ -18,7 +18,11 @@ const blankSemester = {
   name: 'Semester 1' as 'Semester 1' | 'Semester 2',
   startDate: '', endDate: '', examStartDate: '', examEndDate: '', resultsPublishDate: ''
 };
-const dateLabel = (value?: string) => value ? new Date(value + 'T00:00:00').toLocaleDateString() : '—';
+const dateLabel = (value?: string, format: 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd' = 'dd/MM/yyyy') => {
+  if (!value) return '—';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return format === 'MM/dd/yyyy' ? month + '/' + day + '/' + year : format === 'yyyy-MM-dd' ? year + '-' + month + '-' + day : day + '/' + month + '/' + year;
+};
 
 export const AcademicYearManagementView: React.FC = () => {
   const { school, isReadOnly } = useAuth();
@@ -190,7 +194,7 @@ export const AcademicYearManagementView: React.FC = () => {
                     className="flex w-full items-start justify-between gap-3 text-left">
                     <span className="min-w-0">
                       <span className="block font-semibold text-slate-900">{year.name}</span>
-                      <span className="mt-1 block text-xs text-slate-500">{dateLabel(year.start_date)} – {dateLabel(year.end_date)}</span>
+                      <span className="mt-1 block text-xs text-slate-500">{dateLabel(year.start_date, school?.dateFormat)} – {dateLabel(year.end_date, school?.dateFormat)}</span>
                     </span>
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${year.status === 'active' ? 'bg-emerald-100 text-emerald-800' : year.status === 'closed' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>
                       {year.status === 'active' ? 'Active' : year.status === 'closed' ? 'Closed' : 'Draft'}
@@ -233,12 +237,12 @@ export const AcademicYearManagementView: React.FC = () => {
             {semesters.map(semester => (
               <article key={semester.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div><h4 className="font-semibold text-slate-900">{semester.name}</h4><p className="mt-1 text-xs text-slate-500">{dateLabel(semester.start_date)} – {dateLabel(semester.end_date)}</p></div>
+                  <div><h4 className="font-semibold text-slate-900">{semester.name}</h4><p className="mt-1 text-xs text-slate-500">{dateLabel(semester.start_date, school?.dateFormat)} – {dateLabel(semester.end_date, school?.dateFormat)}</p></div>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${semester.status === 'closed' ? 'bg-slate-100 text-slate-600' : semester.is_current ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'}`}>{semester.status === 'closed' ? 'Closed' : semester.is_current ? 'Active' : 'Open'}</span>
                 </div>
                 {semester.examPeriod && <div className="mt-3 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
-                  <p>Exam: {dateLabel(semester.examPeriod.start_date)} – {dateLabel(semester.examPeriod.end_date)}</p>
-                  <p>Results publish: {dateLabel(semester.examPeriod.results_publish_date || '')}</p>
+                  <p>Exam: {dateLabel(semester.examPeriod.start_date, school?.dateFormat)} – {dateLabel(semester.examPeriod.end_date, school?.dateFormat)}</p>
+                  <p>Results publish: {dateLabel(semester.examPeriod.results_publish_date || '', school?.dateFormat)}</p>
                 </div>}
                 {canEdit && <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                   {semester.status !== 'closed' && <button type="button" disabled={saving} onClick={() => editSemester(semester)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50">Edit</button>}
