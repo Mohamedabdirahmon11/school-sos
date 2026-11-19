@@ -622,12 +622,32 @@ CREATE TABLE IF NOT EXISTS exam_configs (
   ]'::jsonb,
   scheme_version INTEGER NOT NULL DEFAULT 1 CHECK (scheme_version > 0),
   pass_mark_percentage NUMERIC(5, 2) NOT NULL DEFAULT 50.00,
+  locked_semesters TEXT[] NOT NULL DEFAULT '{}'::text[] CHECK (locked_semesters <@ ARRAY['Semester 1', 'Semester 2']::text[]),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(school_id, academic_year)
 );
 
 -- 17. STUDENT MARKS (COMPONENT SCORES AND PERCENTAGE TOTALS)
+CREATE TABLE IF NOT EXISTS form_teacher_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  class_id VARCHAR(64) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  student_id VARCHAR(64) NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  teacher_user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  academic_year VARCHAR(50) NOT NULL,
+  semester VARCHAR(50) NOT NULL CHECK (semester IN ('Semester 1', 'Semester 2')),
+  comment TEXT NOT NULL DEFAULT '' CHECK (char_length(comment) <= 1500),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (school_id, student_id, academic_year, semester)
+);
+
+CREATE INDEX IF NOT EXISTS idx_form_teacher_comments_class_term
+  ON form_teacher_comments (school_id, class_id, academic_year, semester);
+
+ALTER TABLE form_teacher_comments ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE IF NOT EXISTS student_marks (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
