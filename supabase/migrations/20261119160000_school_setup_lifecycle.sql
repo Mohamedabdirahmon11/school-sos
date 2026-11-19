@@ -77,6 +77,18 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Academic year does not belong to this school.';
   END IF;
+  IF NEW.name NOT IN ('Semester 1','Semester 2','Term 1','Term 2') THEN
+    RAISE EXCEPTION 'Only Semester 1 and Semester 2 are supported.';
+  END IF;
+  IF (SELECT count(*) FROM public.terms t WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)) >= 2 THEN
+    RAISE EXCEPTION 'An academic year can contain only two semesters.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.terms t WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id
+    AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)
+    AND (CASE WHEN t.name IN ('Semester 1','Term 1') THEN 'Semester 1' ELSE 'Semester 2' END)
+      = (CASE WHEN NEW.name IN ('Semester 1','Term 1') THEN 'Semester 1' ELSE 'Semester 2' END)) THEN
+    RAISE EXCEPTION 'Semester 1 and Semester 2 can each be configured only once.';
+  END IF;
   IF NEW.start_date > NEW.end_date
      OR NEW.start_date < v_year.start_date
      OR NEW.end_date > v_year.end_date THEN
@@ -102,7 +114,7 @@ END;
 $$;
 DROP TRIGGER IF EXISTS terms_guard_dates ON public.terms;
 CREATE TRIGGER terms_guard_dates
-BEFORE INSERT OR UPDATE OF school_id, academic_year_id, start_date, end_date
+BEFORE INSERT OR UPDATE OF school_id, academic_year_id, name, start_date, end_date
 ON public.terms
 FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_term_dates();
 
@@ -120,6 +132,12 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'School not found.'; END IF;
   PERFORM 1 FROM public.academic_years
    WHERE id = p_year_id AND school_id = p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
+  IF (SELECT count(*) FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id) <> 2
+     OR NOT EXISTS (SELECT 1 FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id AND name IN ('Semester 1','Term 1'))
+     OR NOT EXISTS (SELECT 1 FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id AND name IN ('Semester 2','Term 2')) THEN
+    RAISE EXCEPTION 'Configure Semester 1 and Semester 2 before activating the academic year.';
+  END IF;
   IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
 
   UPDATE public.academic_years
@@ -156,7 +174,7 @@ BEGIN
          updated_at = now()
    WHERE id = p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) TO service_role;
 
@@ -186,7 +204,7 @@ BEGIN
   ON CONFLICT (school_id, term_id) DO UPDATE
     SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
 
@@ -196,23 +214,23 @@ CREATE OR REPLACE FUNCTION public.schoolos_sync_school_semester_dates(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   UPDATE public.schools s
      SET terms = jsonb_build_object(
-       'semester1Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 1'),
-       'semester1End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 1'),
-       'semester2Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 2'),
-       'semester2End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 2')
+       'semester1Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 1','Term 1') ORDER BY CASE WHEN t.name='Semester 1' THEN 0 ELSE 1 END LIMIT 1),
+       'semester1End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 1','Term 1') ORDER BY CASE WHEN t.name='Semester 1' THEN 0 ELSE 1 END LIMIT 1),
+       'semester2Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 2','Term 2') ORDER BY CASE WHEN t.name='Semester 2' THEN 0 ELSE 1 END LIMIT 1),
+       'semester2End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 2','Term 2') ORDER BY CASE WHEN t.name='Semester 2' THEN 0 ELSE 1 END LIMIT 1)
      ),
      current_semester = COALESCE(
-       (SELECT t.name FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.is_current=true LIMIT 1),
+       (SELECT CASE WHEN t.name='Term 1' THEN 'Semester 1' WHEN t.name='Term 2' THEN 'Semester 2' ELSE t.name END FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.is_current=true LIMIT 1),
        s.current_semester
      ),
      updated_at = now()
    WHERE s.id = p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) TO service_role;
 
@@ -257,7 +275,7 @@ BEGIN
   END IF;
   PERFORM public.schoolos_sync_school_semester_dates(p_school_id, v_year_id);
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
 
@@ -268,7 +286,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
@@ -286,7 +304,10 @@ BEGIN
     SELECT t.id INTO v_term_id
       FROM public.terms t
       JOIN public.academic_years ay ON ay.id=t.academic_year_id AND ay.school_id=t.school_id
-     WHERE t.school_id=v_school_id AND t.name=v_semester AND ay.name=v_academic_year
+     WHERE t.school_id=v_school_id
+       AND (CASE WHEN t.name='Term 1' THEN 'Semester 1' WHEN t.name='Term 2' THEN 'Semester 2' ELSE t.name END)
+         = (CASE WHEN v_semester='Term 1' THEN 'Semester 1' WHEN v_semester='Term 2' THEN 'Semester 2' ELSE v_semester END)
+       AND ay.name=v_academic_year
      LIMIT 1;
   END IF;
   IF v_term_id IS NOT NULL AND EXISTS (
@@ -298,7 +319,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS student_marks_closed_term_guard ON public.student_marks;
 CREATE TRIGGER student_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.student_marks
@@ -309,7 +330,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_component_id uuid;
@@ -330,7 +351,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS component_marks_closed_term_guard ON public.component_marks;
 CREATE TRIGGER component_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.component_marks
@@ -341,7 +362,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_date date;
@@ -363,7 +384,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS attendance_closed_term_guard ON public.attendance_records;
 CREATE TRIGGER attendance_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.attendance_records
@@ -374,7 +395,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
@@ -390,7 +411,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
 CREATE TRIGGER exam_periods_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
@@ -400,6 +421,37 @@ REVOKE ALL ON FUNCTION public.schoolos_guard_closed_student_marks() FROM PUBLIC,
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_component_marks() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_attendance() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.schoolos_guard_closed_exam_period() FROM PUBLIC, anon, authenticated;
+
+
+-- Remove permissive tenant ALL policies: PostgreSQL ORs permissive policies together.
+ALTER TABLE public.academic_years ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.terms ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS academic_years_admin_delete ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_insert ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_update ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_tenant_scope ON public.academic_years;
+CREATE POLICY academic_years_admin_select ON public.academic_years FOR SELECT TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_insert ON public.academic_years FOR INSERT TO authenticated
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_update ON public.academic_years FOR UPDATE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()))
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_delete ON public.academic_years FOR DELETE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+DROP POLICY IF EXISTS terms_admin_delete ON public.terms;
+DROP POLICY IF EXISTS terms_admin_insert ON public.terms;
+DROP POLICY IF EXISTS terms_admin_update ON public.terms;
+DROP POLICY IF EXISTS terms_tenant_scope ON public.terms;
+CREATE POLICY terms_admin_select ON public.terms FOR SELECT TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_insert ON public.terms FOR INSERT TO authenticated
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_update ON public.terms FOR UPDATE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()))
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_delete ON public.terms FOR DELETE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
