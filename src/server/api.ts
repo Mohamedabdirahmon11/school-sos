@@ -10242,6 +10242,44 @@ apiRouter.put('/term-marks/structures', requireAuth, requireSchoolAdminOrSuperAd
   res.json(data);
 });
 
+apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (user.role !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya ayaa arki kara gelinta dhibcaha.' }); return; }
+  const termId = String(req.query.termId || '');
+  const classId = String(req.query.classId || '');
+  const subjectId = String(req.query.subjectId || '');
+  const componentId = String(req.query.componentId || '');
+  if (!termId || !classId || !subjectId || !componentId) { res.status(400).json({ error: 'Dooro term, fasal, maaddo iyo qayb.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data: teacher } = await client.from('teachers').select('id').eq('school_id',school.id).eq('user_id',user.id).maybeSingle();
+  if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id',school.id).eq('id',termId).maybeSingle();
+  if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
+  const { data: assignments } = await client.from('teacher_class_subject_assignments')
+    .select('section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
+    .eq('academic_year_id',term.academic_year_id).eq('class_id',classId).eq('subject_id',subjectId)
+    .or(`term_id.is.null,term_id.eq.${termId}`);
+  if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  const { data: component } = await client.from('mark_components').select('id,structure_id,max_marks')
+    .eq('school_id',school.id).eq('id',componentId).maybeSingle();
+  if (!component) { res.status(404).json({ error: 'Qaybtan dhibcaha lama helin.' }); return; }
+  const { data: structure } = await client.from('mark_structures').select('term_id')
+    .eq('school_id',school.id).eq('id',component.structure_id).maybeSingle();
+  if (!structure || structure.term_id !== termId) { res.status(400).json({ error: 'Qaybtani term-kan kama tirsana.' }); return; }
+  const { data: enrollments } = await client.from('enrollments').select('student_id,section_id')
+    .eq('school_id',school.id).eq('academic_year_id',term.academic_year_id)
+    .eq('class_id',classId).eq('status','active');
+  const allowedSections = new Set(assignments.map((a:any)=>a.section_id).filter(Boolean));
+  const allowedStudentIds = (enrollments||[]).filter((e:any)=>!allowedSections.size||allowedSections.has(e.section_id)).map((e:any)=>e.student_id);
+  const { data: marks, error } = await client.from('component_marks').select('student_id,marks,status')
+    .eq('school_id',school.id).eq('component_id',componentId).eq('class_id',classId).eq('subject_id',subjectId)
+    .in('student_id',allowedStudentIds.length?allowedStudentIds:['__none__']);
+  if (error) { res.status(503).json({ error: error.message }); return; }
+  const { data: status } = await client.from('term_status').select('status').eq('school_id',school.id).eq('term_id',termId).maybeSingle();
+  res.json({ allowedStudentIds, marks: marks||[], maxMarks: component.max_marks, termStatus: status?.status||'open' });
+});
+
 apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
