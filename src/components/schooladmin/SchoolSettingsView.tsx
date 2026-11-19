@@ -572,7 +572,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            Identity & Branding
+            {t('settings_identity')}
           </button>
           <button
             type="button"
