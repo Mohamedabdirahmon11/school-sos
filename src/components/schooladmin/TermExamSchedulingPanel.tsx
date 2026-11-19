@@ -76,6 +76,7 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
     }
     const data = await ApiClient.getTermExamPeriod(termId);
     setPeriodData(data);
+    setClassShifts(Object.fromEntries((data.classExamSettings || []).map((row: any) => [row.class_id, row.exam_shift])));
     const next: Record<string, string> = {};
     for (const row of data.invigilators || []) next[row.exam_session_id + ':' + row.room_id] = row.teacher_id;
     setInvigilators(next);
