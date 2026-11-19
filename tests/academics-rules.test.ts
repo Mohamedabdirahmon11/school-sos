@@ -330,3 +330,5 @@ test('submitted marks can be returned with an audit reason and only complete app
   assert.equal(classYearMarks.length, 1, 'class results must not mix marks from another academic year');
   assert.equal(classYearMarks[0].academicYear, '2026-2027');
 });
+
+// semester-lock-test-marker
