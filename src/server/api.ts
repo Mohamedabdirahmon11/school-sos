@@ -6422,6 +6422,10 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
     for (const result of [termResult, classResult, assignmentResult, studentResult, roomResult]) if (result.error) throw result.error;
     if (!termResult.data) throw new Error('Term-kan lagama helin dugsigan.');
     const term = termResult.data;
+    const termLabel = String(term.name || '').toLowerCase();
+    const isTermOne = /(?:term|semester)\\s*(?:1|one|first)|(?:first|one)\\s*(?:term|semester)/.test(termLabel);
+    const isTermTwo = /(?:term|semester)\\s*(?:2|two|second)|(?:second|two)\\s*(?:term|semester)/.test(termLabel);
+    if (!isTermOne && !isTermTwo) throw new Error('Kaliya Term 1 iyo Term 2 ayaa lagu jadwalayn karaa imtixaanka weyn.');
     const classes = (classResult.data || []) as any[];
     const assignments = (assignmentResult.data || []) as any[];
     const students = (studentResult.data || []) as any[];
@@ -6520,7 +6524,7 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
           const schedule = {
             id: scheduleId, school_id: school.id, class_id: null, subject_id: subjectId,
             exam_name: name, exam_type: 'term', academic_year: (classById.get(shiftClasses[0]) as any)?.academic_year || school.academicYear || '2026-2027',
-            semester: String(term.name || '').toLowerCase().includes('2') ? 'Semester 2' : 'Semester 1',
+            semester: isTermTwo ? 'Semester 2' : 'Semester 1',
             exam_date: day.exam_date, start_time: session.start_time, end_time: session.end_time,
             room_name: 'Mixed rooms', room_id: null, shift_name: shift, seat_capacity: groupStudents.length,
             status: 'draft', created_by: user.id, exam_period_id: period.id, exam_session_id: session.id,
