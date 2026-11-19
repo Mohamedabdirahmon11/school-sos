@@ -112,6 +112,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
+  const [examConfigError, setExamConfigError] = useState<string | null>(null);
+  const [isLoadingExamConfig, setIsLoadingExamConfig] = useState(true);
   const [timetableSettings, setTimetableSettings] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
   const [closingTime, setClosingTime] = useState(school?.setupData?.workingHours?.closingTime || '16:00');
 
@@ -140,7 +142,12 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
       .catch((err: any) => setBranchError(err.message || 'Failed to load campus branches.'));
     ApiClient.getReportCardDesign().then(setDesign);
-    ApiClient.getExamConfig().then(setExamConfig).catch(() => setExamConfig(null));
+    setIsLoadingExamConfig(true);
+    setExamConfigError(null);
+    ApiClient.getExamConfig()
+      .then(config => { setExamConfig(config); setExamConfigError(null); })
+      .catch((err: any) => { setExamConfig(null); setExamConfigError(err.message || 'Exam settings could not be loaded. Please refresh and try again.'); })
+      .finally(() => setIsLoadingExamConfig(false));
     ApiClient.getTimetableSettings().then(settings => setTimetableSettings({
       shiftCount: settings.shiftCount === 2 ? 2 : 1,
       firstPeriodStart: settings.firstPeriodStart,
@@ -575,7 +582,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            {t('settings_academics')}
+            Academic & Exam Settings
           </button>
           <button
             type="button"
@@ -968,7 +975,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           </form>
 
           <div className="space-y-6">
-            {examConfig && (
+            {examConfig ? (
               <form onSubmit={handleSaveExamRules} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4 text-xs">
                 <div>
                   <h2 className="text-base font-bold text-[#132A29]">{t('settings_exam_marks')}</h2>
@@ -1009,6 +1016,11 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                   </button>
                 </div>
               </form>
+            ) : (
+              <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+                <strong>Exam Settings</strong>
+                <p className="mt-1">{isLoadingExamConfig ? 'Loading exam settings…' : examConfigError || 'Exam settings are not available right now.'}</p>
+              </div>
             )}
 
           </div>
