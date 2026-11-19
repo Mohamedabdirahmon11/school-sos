@@ -585,17 +585,11 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
   const klass = classPage.items[0] as any;
   if (!klass) { res.status(404).json({ error: 'Class not found in this school.' }); return false; }
   if (normalizeRole(user.role) === 'teacher' && klass.classTeacherId !== user.id) {
-    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id, status: 'active' }, 1, 1, undefined, 'id');
-    const teacherId = String((teacherPage.items[0] as any)?.id || '');
-    const yearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
-    const yearId = String((yearPage.items[0] as any)?.id || '');
-    const currentAssignment = teacherId && yearId
-      ? await db.queryPage('teacher_class_subject_assignments', { school_id: school.id, class_id: classId, teacher_id: teacherId, academic_year_id: yearId }, 1, 1, undefined, 'id')
-      : { items: [] as any[] };
-    const legacyAssignment = teacherId
-      ? await db.queryPage('class_subjects', { school_id: school.id, class_id: classId, teacher_id: teacherId, is_active: 'true' }, 1, 1, undefined, 'id')
-      : { items: [] as any[] };
-    if (!currentAssignment.items.length && !legacyAssignment.items.length) {
+    const legacyAssignment = await db.queryPage('class_subjects', {
+      school_id: school.id, class_id: classId, is_active: 'true',
+      'teachers.user_id': user.id, 'teachers.school_id': school.id
+    }, 1, 1, undefined, 'id,teachers!class_subjects_teacher_id_fkey!inner(user_id)');
+    if (!legacyAssignment.items.length) {
       res.status(403).json({ error: 'You may only access classes assigned to you as a subject teacher or form teacher.' });
       return false;
     }
@@ -5443,7 +5437,10 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
   }
   const attendanceClass = await db.getClassById(normalizedClassId, school.id);
   if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
-  if (!await canAccessTeachingClass(req, res, normalizedClassId)) return;
+  if (normalizeRole(user.role) === 'teacher' && attendanceClass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can submit daily class attendance.' });
+    return;
+  }
   const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   if (date > localToday) { res.status(400).json({ error: 'Attendance cannot be recorded for a future date.' }); return; }
   const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00.000Z`));
