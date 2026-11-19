@@ -1303,6 +1303,10 @@ export class ApiClient {
     return this.request<any[]>(path);
   }
 
+  public static async getTeacherExamInvigilation() {
+    return this.request<any[]>('/teacher/exam-invigilation');
+  }
+
   public static async createExamSchedule(schedule: {
     examName: string; classId?: string; subjectId: string; cohortStudentIds?: string[]; examType: 'small' | 'big';
     semester: 'Semester 1' | 'Semester 2'; examDate: string; startTime: string;
