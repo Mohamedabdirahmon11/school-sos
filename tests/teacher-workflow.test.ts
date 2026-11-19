@@ -28,13 +28,14 @@ test('teachers enter exam marks and school administrators only review and approv
   assert.match(api, /form-teacher-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
 
-test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
+test('Form Teachers review all homeroom subjects but can edit only assigned subjects', () => {
   const api = read('../src/server/api.ts');
-  assert.ok(api.includes('formTeacherClassIds = formTeacherClasses.items.map'));
-  assert.ok(api.includes("'users.role': 'teacher'"));
-  assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
-  assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
+  assert.match(api, /klass\.classTeacherId === user\.id/);
+  assert.match(api, /queryAllRows\('class_subjects', \{ school_id: school\.id, class_id: formTeacherClasses\.map/);
+  assert.match(api, /isFormTeacherClass: true/);
+  assert.match(api, /isFormTeacher: true/);
   assert.match(api, /canEditMarks: true/);
+  assert.match(api, /You may enter marks only for a subject explicitly assigned to your teacher profile/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
@@ -197,7 +198,7 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
   assert.match(teacher, /mark\.bigExamMarks/);
 });
 
-test('Form Teacher exam register includes every active class subject while subject teachers stay within assigned subjects', () => {
+test('Form Teacher exam register reviews every active class subject while edits stay assigned', () => {
   const api = read('../src/server/api.ts');
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   const routeStart = api.indexOf("apiRouter.get('/teacher/subject-assignments'");
@@ -208,7 +209,7 @@ test('Form Teacher exam register includes every active class subject while subje
   assert.ok(route.includes("isFormTeacher: true"));
   assert.match(teacher, /const gradeSubjects: Subject\[\] = isFormTeacher \? allClassSubjects : editableClassSubjects/);
   assert.match(teacher, /const allClassSubjects = uniqueSubjects\(classAssignments\)/);
-  assert.match(teacher, /const editableClassSubjects = uniqueSubjects\(classAssignments\.filter\(\(assignment: any\) => !assignment\.isFormTeacher \|\| assignment\.canEditMarks === true\)\)/);
+  assert.match(teacher, /const editableClassSubjects = uniqueSubjects\(classAssignments\.filter\(\(assignment: any\) => !assignment\.isFormTeacher\)\)/);
   assert.match(teacher, /const examRegisterRows = useMemo/);
 });
 
