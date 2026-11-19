@@ -3450,7 +3450,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   if (!teacher) { res.json([]); return; }
 
   const assignments = await queryAllRows('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, LIST_QUERY_COLUMNS.class_subjects);
-  const [allClasses, allSubjects] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id)]);
+  const [allClasses, allSubjects, allTeachers] = await Promise.all([db.getClasses(school.id), db.getSubjects(school.id), db.getTeachers(school.id)]);
+  const teacherNameById = new Map(allTeachers.map((row: any) => [row.id, row.fullName]));
   // A Form Teacher is explicitly assigned on the class record. assignedClasses
   // describes teaching scope and must not grant whole-class Form Teacher privileges.
   const formTeacherClasses = allClasses.filter((klass: any) => klass.classTeacherId === user.id);
@@ -3466,7 +3467,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     if (!klass || !subject) continue;
     const key = `${klass.id}:${subject.id}`;
     assignedPairs.add(key);
-    result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
+    result.push({ ...item, subject, class: klass, teacherName: teacherNameById.get(item.teacherId) || 'Unassigned', isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
   // A Form Teacher is responsible for the complete class mark sheet.
@@ -3490,6 +3491,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         subjectId: subject.id,
         subject,
         class: klass,
+        teacherId: assignment.teacherId,
+        teacherName: teacherNameById.get(assignment.teacherId) || 'Unassigned',
         periodsPerWeek: 0,
         smallExamEnabled: true,
         bigExamEnabled: true,
@@ -3500,6 +3503,52 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     }
   }
   res.json(result);
+});
+
+apiRouter.get('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const semester = req.query.semester;
+  if (normalizeRole(user.role) !== 'teacher' || !classId || !['Semester 1', 'Semester 2'].includes(String(semester))) {
+    res.status(400).json({ error: 'A Form Teacher class and valid semester are required.' }); return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.classTeacherId !== user.id) { res.status(403).json({ error: 'Only the assigned Form Teacher may review comments for this class.' }); return; }
+  const client = teacherAssignmentClient();
+  const { data, error } = await client.from('form_teacher_comments').select('id,student_id,semester,comment,teacher_user_id,updated_at')
+    .eq('school_id', school.id).eq('class_id', classId).eq('academic_year', klass.academicYear || school.academicYear).eq('semester', semester);
+  if (error) { res.status(503).json({ error: 'Form Teacher comments could not be loaded. Apply the report-comment migration first.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json((data || []).map((row: any) => ({ id: row.id, studentId: row.student_id, semester: row.semester, comment: row.comment, teacherUserId: row.teacher_user_id, updatedAt: row.updated_at })));
+});
+
+apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const { classId, studentId, semester } = req.body || {};
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : null;
+  if (normalizeRole(user.role) !== 'teacher' || typeof classId !== 'string' || typeof studentId !== 'string' ||
+      !['Semester 1', 'Semester 2'].includes(semester) || comment === null || comment.length > 1500) {
+    res.status(400).json({ error: 'A class, student, semester and comment of at most 1,500 characters are required.' }); return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  const student = await db.getStudentById(studentId, school.id);
+  if (!klass || klass.classTeacherId !== user.id || !student || student.classId !== classId) {
+    res.status(403).json({ error: 'Only the assigned Form Teacher may comment on a student in this class.' }); return;
+  }
+  const client = teacherAssignmentClient();
+  const payload = {
+    school_id: school.id, class_id: classId, student_id: studentId, teacher_user_id: user.id,
+    academic_year: klass.academicYear || school.academicYear, semester, comment,
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await client.from('form_teacher_comments')
+    .upsert(payload, { onConflict: 'school_id,student_id,academic_year,semester' })
+    .select('id,student_id,semester,comment,teacher_user_id,updated_at').single();
+  if (error || !data) { res.status(503).json({ error: 'Form Teacher comment could not be saved. Apply the report-comment migration first.' }); return; }
+  db.logAudit({ action: 'FORM_TEACHER_COMMENT_SAVED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Saved a report-card comment for student ' + student.studentId + ' in ' + semester + '.', severity: 'info' });
+  res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
