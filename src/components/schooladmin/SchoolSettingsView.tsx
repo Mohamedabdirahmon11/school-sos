@@ -1,9 +1,9 @@
 /**
- * Comprehensive School Settings Hub
+ * Comprehensive School Configuration Hub
  * Features:
- * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
+ * 1. Institution {t('settings_identity')} (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
- * 3. Report Card Designer (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
+ * 3. Report Card Design (Template picker, color schemes, logo position, blocks visibility, stamp/signature, live preview)
  * 4. Administrator WhatsApp contact (manual parent messaging; no SMS provider)
  * 5. School Backup & Data Safety (Full JSON backup download, CSV exports)
  */
@@ -558,7 +558,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             School Settings
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Manage your school profile, academic calendar, school shifts, branches, documents, report cards, and backups in one place.
+            Manage your school profile, academic rules, timetable, campuses, documents, report cards, and data backups in one place.
           </p>
         </div>
 
@@ -582,7 +582,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            Academic & Exam Settings
+            {t('settings_academics')}
           </button>
           <button
             type="button"
@@ -592,7 +592,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            School Shifts
+            {t('settings_timetable')}
           </button>
           <button
             type="button"
@@ -630,7 +630,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 activeTab === 'appearance' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
               }`}>
               <Palette className="w-3.5 h-3.5" />
-              Appearance
+              Navigation Appearance
             </button>
           )}
           <button
@@ -641,7 +641,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            Backup & Export
+            Backup & Data Export
           </button>
         </div>
       </div>
@@ -1156,7 +1156,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm">
             <div>
-              <h2 className="text-sm font-bold text-[#132A29]">Campus Branches & Locations</h2>
+              <h2 className="text-sm font-bold text-[#132A29]">Campuses & Branches</h2>
               <p className="text-xs text-[#64748B]">
                 Manage multiple school campuses, contact details, and the main campus.
               </p>
@@ -1355,7 +1355,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           {/* Controls Panel */}
           <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-5">
             <div>
-              <h2 className="text-base font-bold text-[#132A29]">Report Card Layout & Styles</h2>
+              <h2 className="text-base font-bold text-[#132A29]">Report Card Design & Layout</h2>
               <p className="text-xs text-[#64748B] mt-0.5">
                 Customize templates, brand accents, visible blocks, and administrative signatures.
               </p>
@@ -1645,7 +1645,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
       {activeTab === 'backup' && (
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm max-w-2xl space-y-5">
           <div>
-            <h2 className="text-base font-bold text-[#132A29]">Data Safety, Backups & Exports</h2>
+            <h2 className="text-base font-bold text-[#132A29]">Data Backup & Export</h2>
             <p className="text-xs text-[#64748B] mt-0.5">
               Generate full point-in-time backups and export raw tabular CSV files for external audits.
             </p>
@@ -1654,7 +1654,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl space-y-2">
             <h4 className="font-bold text-xs text-teal-900 flex items-center gap-1.5">
               <Database className="w-4 h-4 text-teal-600" />
-              Complete School Database Snapshot (JSON)
+              Full School Data Snapshot (JSON)
             </h4>
             <p className="text-[11px] text-teal-800">
               Downloads all classes, subjects, teachers, students, daily attendance, examination marks, and cash fee receipts for this institution.
