@@ -120,13 +120,16 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
       row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
       gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
     ].join(' | '));
-    if (row.sem1Marks?.teacherRemarks?.trim()) lines.push(`  Semester 1 teacher remark: ${row.sem1Marks.teacherRemarks.trim().slice(0, 500)}`);
-    if (row.sem2Marks?.teacherRemarks?.trim()) lines.push(`  Semester 2 teacher remark: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}`);
   }
+  const savedTeacherRemarks = result.subjectResults.flatMap(row => [
+    row.sem1Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 1: ${row.sem1Marks.teacherRemarks.trim().slice(0, 500)}` : '',
+    row.sem2Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 2: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}` : ''
+  ].filter(Boolean));
+  if (blocks.teacherRemarks && savedTeacherRemarks.length) lines.push('', 'TEACHER REMARKS', ...savedTeacherRemarks);
   lines.push('', `Exam maximum marks: Small ${result.subjectResults[0]?.maxMarks.small ?? 0} + Big ${result.subjectResults[0]?.maxMarks.big ?? 0} = ${result.subjectResults[0]?.maxMarks.total ?? 0}`);
   if (blocks.percentage) lines.push(`Yearly average: ${result.yearlyPercentage}% | Grade: ${gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale)}`);
   lines.push(`Result: ${result.isPass ? 'PASS' : 'BELOW PASS MARK'}`);
-  if (blocks.teacherRemarks) lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
+  if (blocks.teacherRemarks && !savedTeacherRemarks.length) lines.push('', `Teacher remarks: ${teacherRemark(result.yearlyPercentage)}`);
   if (blocks.adminRemarks) lines.push(`Administrator remarks: ${adminRemark(result.isPass)}`);
   if (blocks.signatures) lines.push('', `Teacher: ${design.signatureTitleLeft || 'Class Teacher'}`, `Administrator: ${design.signatureTitleRight || 'Principal'}`);
   if (blocks.stamp) lines.push('Official School Seal');
