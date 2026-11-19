@@ -100,7 +100,7 @@ DECLARE
 BEGIN
   IF p_ordered_ids IS NULL THEN RAISE EXCEPTION 'Class order is required.'; END IF;
   SELECT count(*) INTO v_total FROM public.class_groups WHERE school_id = p_school_id;
-  SELECT count(DISTINCT value) INTO v_distinct FROM unnest(p_ordered_ids) AS value;
+  SELECT count(DISTINCT x.id) INTO v_distinct FROM unnest(p_ordered_ids) AS x(id);
   IF cardinality(p_ordered_ids) <> v_total OR v_distinct <> v_total THEN
     RAISE EXCEPTION 'The class order must include every class exactly once.';
   END IF;
