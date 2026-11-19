@@ -164,6 +164,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const [examType, setExamType] = useState<'small' | 'big'>('small');
   const [marksInput, setMarksInput] = useState<Record<string, { scores: Record<string, number>; remarks: string }>>({});
   const [classMarks, setClassMarks] = useState<StudentMark[]>([]);
+  const [formTeacherComments, setFormTeacherComments] = useState<Array<{ id: string; studentId: string; comment: string; semester: string }>>([]);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [savingCommentStudentId, setSavingCommentStudentId] = useState<string | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -279,6 +282,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
     return () => { cancelled = true; };
   }, [activeTab, selectedClassId, attendanceDate, semester, teacherAssignments, formTeacherClasses, examConfig]);
+  useEffect(() => {
+    if (activeTab !== 'grades' || !isFormTeacher || !selectedClassId) {
+      setFormTeacherComments([]);
+      setCommentDrafts({});
+      return;
+    }
+    let cancelled = false;
+    ApiClient.getFormTeacherComments(selectedClassId, semester).then(rows => {
+      if (cancelled) return;
+      setFormTeacherComments(rows);
+      setCommentDrafts(Object.fromEntries(rows.map(row => [row.studentId, row.comment || ''])));
+    }).catch(error => {
+      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Unable to load Form Teacher comments.');
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, isFormTeacher, selectedClassId, semester, school?.id]);
+
   // Save Attendance (Once per day)
   const handleSaveAttendance = async () => {
     if (isReadOnly || isLoadingClassData || !selectedClassId || !students.length) return;
@@ -347,6 +367,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveFormTeacherComment = async (studentId: string) => {
+    if (isReadOnly || !isFormTeacher || !selectedClassId || savingCommentStudentId) return;
+    setSavingCommentStudentId(studentId);
+    try {
+      const saved = await ApiClient.saveFormTeacherComment(selectedClassId, studentId, semester, commentDrafts[studentId] || '');
+      setFormTeacherComments(current => [...current.filter(row => row.studentId !== studentId), saved.comment]);
+      setNotice('Report-card comment saved.');
+      setTimeout(() => setNotice(null), 3000);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Report-card comment could not be saved.');
+    } finally { setSavingCommentStudentId(null); }
   };
 
   const handleForwardClassMarks = async () => {
@@ -783,6 +816,40 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
             </div>
           </div>
+
+          {isFormTeacher && (
+            <div className="space-y-4 rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
+              <div><h2 className="text-sm font-bold text-teal-950">Form Teacher review · {semester}</h2><p className="mt-1 text-xs text-teal-800">Review every subject's submission status. Missing or draft marks must be completed by the assigned subject teacher; you cannot edit their marks.</p></div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {allClassSubjects.map(subject => {
+                  const rows = classMarks.filter(mark => mark.subjectId === subject.id);
+                  const missingCount = students.filter(student => {
+                    const mark = rows.find(item => item.studentId === student.id);
+                    return !mark || !['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status);
+                  }).length;
+                  const assignment = classAssignments.find((item: any) => item.subjectId === subject.id && !item.isFormTeacher);
+                  const status = !students.length || missingCount === students.length ? 'Missing' : missingCount ? 'Incomplete' : 'Submitted';
+                  return <div key={subject.id} className="rounded-xl border border-teal-100 bg-white p-3">
+                    <p className="font-bold text-slate-800">{subject.name}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">Teacher: {assignment?.teacherName || 'Not assigned'}</p>
+                    <p className={`mt-2 text-xs font-bold ${missingCount ? 'text-amber-700' : 'text-teal-700'}`}>{status}{missingCount ? ` · ${missingCount} student(s) missing` : ''}</p>
+                  </div>;
+                })}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-teal-950">Report-card comments</h3>
+                <p className="text-[11px] text-teal-800">Add a separate Form Teacher comment for each student. This is not the subject teacher's mark remark.</p>
+                {students.map(student => {
+                  const saved = formTeacherComments.find(row => row.studentId === student.id);
+                  return <div key={student.id} className="rounded-xl border border-teal-100 bg-white p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[10px] text-slate-500">{student.studentId}</p></div><span className="text-[10px] text-slate-400">{saved?.updatedAt ? 'Saved' : 'Not saved'}</span></div>
+                    <textarea maxLength={1500} rows={2} value={commentDrafts[student.id] ?? saved?.comment ?? ''} onChange={event => setCommentDrafts(current => ({ ...current, [student.id]: event.target.value }))} placeholder="Write this student's report-card comment..." className="w-full rounded-lg border border-slate-300 p-2 text-xs" />
+                    <div className="mt-2 flex justify-end"><button type="button" disabled={isReadOnly || savingCommentStudentId === student.id} onClick={() => void handleSaveFormTeacherComment(student.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{savingCommentStudentId === student.id ? 'Saving…' : 'Save comment'}</button></div>
+                  </div>;
+                })}
+              </div>
+            </div>
+          )}
 
           {classMarks.some(mark => Boolean(mark.correctionReason) && gradeSubjects.some(subject => subject.id === mark.subjectId)) && (
             <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
