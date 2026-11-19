@@ -208,6 +208,15 @@ export interface TranslationDict {
   payroll_error: string;
   payroll_summary: string;
   settings_identity: string;
+  settings_group_school: string;
+  settings_page_title: string;
+  settings_page_description: string;
+  settings_group_academics: string;
+  settings_group_communication: string;
+  settings_group_appearance_data: string;
+  settings_report_design: string;
+  settings_menu_appearance: string;
+  settings_backup_export: string;
   settings_academics: string;
   settings_documents: string;
   settings_branches: string;
@@ -458,6 +467,24 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     payroll_draft: 'Draft', payroll_approved: 'Approved', payroll_paid: 'Paid', payroll_approve: 'Approve', payroll_mark_paid: 'Mark paid',
     payroll_payslip: 'Download payslip', payroll_empty: 'No payroll records for this month.', payroll_loading: 'Loading payroll…', payroll_error: 'Payroll could not be loaded or saved.', payroll_summary: 'Summary',
     settings_identity: 'School Profile & Branding',
+    settings_group_school: 'የትምህርት ቤት መሠረታዊ መረጃ',
+    settings_page_title: 'የትምህርት ቤት ቅንብሮች',
+    settings_page_description: 'የትምህርት ቤቱን መገለጫ፣ የትምህርት ደንቦች፣ የጊዜ ሰሌዳ፣ ቅርንጫፎች፣ ማሳወቂያዎችና የውጤት ካርድ ንድፍ እዚህ ያስተዳድሩ።
+    settings_group_academics: 'ትምህርትና ማስተማር',
+    settings_group_communication: 'ሰነዶችና ግንኙነት',
+    settings_group_appearance_data: 'ገጽታና ውሂብ',
+    settings_report_design: 'የውጤት ካርድ ንድፍ',
+    settings_menu_appearance: 'የምናሌ ገጽታ',
+    settings_backup_export: 'የውሂብ ምትኬና ማውጣት',
+    settings_group_school: 'School basics',
+    settings_page_title: 'School settings',
+    settings_page_description: 'Manage your school profile, learning rules, timetable, branches, notices, report card design, and data safely in one place.',
+    settings_group_academics: 'Teaching & learning',
+    settings_group_communication: 'Documents & communication',
+    settings_group_appearance_data: 'Appearance & data',
+    settings_report_design: 'Report card design',
+    settings_menu_appearance: 'Menu appearance',
+    settings_backup_export: 'Data backup & export',
     settings_academics: 'Academic Calendar & Assessment',
     settings_documents: 'Documents & Notifications',
     settings_branches: 'Campuses & Branches',
@@ -706,6 +733,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     payroll_draft: 'Qabyo', payroll_approved: 'La ansixiyay', payroll_paid: 'La bixiyay', payroll_approve: 'Ansixi', payroll_mark_paid: 'Calaamadee in la bixiyay',
     payroll_payslip: 'Soo dejiso warqadda mushaharka', payroll_empty: 'Ma jiro diiwaan mushahar bishan.', payroll_loading: 'Mushaharka waa la rarayaa…', payroll_error: 'Mushaharka lama soo dejin ama lama kaydin karin.', payroll_summary: 'Soo koobid',
     settings_identity: 'Xogta Dugsiga & Summaddiisa',
+    settings_group_school: 'Aasaaska Dugsiga',
+    settings_page_title: 'Dejinta Dugsiga',
+    settings_page_description: 'Halkaan ka maamul xogta dugsiga, waxbarashada, jadwalka, laamaha, ogeysiisyada, naqshadda natiijooyinka iyo kaydka xogta.',
+    settings_group_academics: 'Waxbarashada',
+    settings_group_communication: 'Dukumentiyada & Isgaarsiinta',
+    settings_group_appearance_data: 'Muuqaalka & Xogta',
+    settings_report_design: 'Naqshadda Warqadda Natiijada',
+    settings_menu_appearance: 'Muuqaalka Menu-ga',
+    settings_backup_export: 'Kaydinta & Dhoofinta Xogta',
     settings_academics: 'Jadwalka Waxbarashada & Qiimeynta',
     settings_documents: 'Dukumentiyada & Ogeysiisyada',
     settings_branches: 'Xarumaha & Laamaha',
@@ -1116,6 +1152,15 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     academic_year: 'السنة الدراسية',
     semester: 'الفصل الدراسي',
     settings_identity: 'هوية المدرسة والعلامة التجارية',
+    settings_group_school: 'أساسيات المدرسة',
+    settings_page_title: 'إعدادات المدرسة',
+    settings_page_description: 'أدر ملف المدرسة وقواعد التعليم والجدول والفروع والإشعارات وتصميم كشف الدرجات والنسخ الاحتياطي من مكان واحد.',
+    settings_group_academics: 'التعليم والتعلّم',
+    settings_group_communication: 'المستندات والتواصل',
+    settings_group_appearance_data: 'المظهر والبيانات',
+    settings_report_design: 'تصميم كشف الدرجات',
+    settings_menu_appearance: 'مظهر القائمة',
+    settings_backup_export: 'نسخ البيانات وتصديرها',
     settings_academics: 'الشؤون الأكاديمية والقواعد',
     settings_documents: 'المستندات والتنبيهات',
     settings_language: 'اللغة الافتراضية',
