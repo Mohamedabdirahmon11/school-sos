@@ -148,7 +148,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           <div className="rounded-xl border border-[#E2E8F0] p-3 space-y-2">
             <p className="font-semibold text-[#334155]">Attendance Summary</p>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
-              <div><span className="text-[#64748B]">Attendance rate</span><p className="font-bold text-[#0F766E]">{result.attendanceSummary.attendancePercentage}%</p></div>
+              <div><span className="text-[#64748B]">Attendance rate (excused excluded)</span><p className="font-bold text-[#0F766E]">{result.attendanceSummary.attendancePercentage}%</p></div>
               <div><span className="text-[#64748B]">Present</span><p className="font-semibold">{result.attendanceSummary.present}</p></div>
               <div><span className="text-[#64748B]">Absent</span><p className="font-semibold">{result.attendanceSummary.absent}</p></div>
               <div><span className="text-[#64748B]">Late</span><p className="font-semibold">{result.attendanceSummary.late}</p></div>
