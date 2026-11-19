@@ -4971,15 +4971,276 @@ apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmi
   }).send(pdf);
 });
 
+const isAcademicSetupDate = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + 'T00:00:00.000Z');
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+const auditAcademicSetup = (school: School, user: User, action: string, details: string, severity: 'info' | 'warning' = 'info') => {
+  db.logAudit({
+    action, category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role, details, severity
+  });
+};
+
 apiRouter.get('/students/academic-years', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const client = documentServiceClient(res);
   if (!client) return;
   const { data, error } = await client.from('academic_years')
-    .select('id,name,is_current,start_date,end_date').eq('school_id', school.id)
-    .order('start_date', { ascending: false }).limit(50);
+    .select('id,name,is_current,start_date,end_date,status,closed_at,closed_by,created_at,updated_at')
+    .eq('school_id', school.id).order('start_date', { ascending: false }).limit(50);
   if (error) { res.status(503).json({ error: 'Academic years could not be loaded.' }); return; }
   res.json(data || []);
+});
+
+apiRouter.post('/academic-years', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+    res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
+  }
+  const { data, error } = await client.from('academic_years').insert({
+    school_id: school.id, name, start_date: startDate, end_date: endDate,
+    is_current: false, status: 'draft'
+  }).select('id,name,is_current,start_date,end_date,status,closed_at,created_at').single();
+  if (error) {
+    res.status(error.code === '23505' ? 409 : 400).json({
+      error: error.code === '23P01' || /overlap/i.test(error.message || '')
+        ? 'Academic year dates overlap another year for this school.'
+        : error.code === '23505' ? 'This academic year already exists.' : 'Academic year could not be created.'
+    }); return;
+  }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_CREATED', 'Created academic year ' + name + '.', 'info');
+  res.status(201).json(data);
+});
+
+apiRouter.put('/academic-years/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: current, error: readError } = await client.from('academic_years')
+    .select('id,name,status').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
+  if (readError || !current) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (current.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+    res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
+  }
+  const { data, error } = await client.from('academic_years').update({
+    name, start_date: startDate, end_date: endDate, updated_at: new Date().toISOString()
+  }).eq('id', req.params.id).eq('school_id', school.id)
+    .select('id,name,is_current,start_date,end_date,status,closed_at,updated_at').maybeSingle();
+  if (error || !data) { res.status(error?.code === '23505' ? 409 : 400).json({ error: /overlap/i.test(error?.message || '') ? 'Academic year dates overlap another year.' : 'Academic year could not be updated.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_UPDATED', 'Updated academic year ' + name + '.', 'info');
+  res.json(data);
+});
+
+apiRouter.post('/academic-years/:id/activate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_activate_academic_year', {
+    p_school_id: school.id, p_year_id: req.params.id, p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Academic year could not be activated.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_ACTIVATED', 'Activated academic year ' + req.params.id + '.');
+  const { data } = await client.from('academic_years').select('id,name,is_current,start_date,end_date,status,closed_at')
+    .eq('id', req.params.id).eq('school_id', school.id).single();
+  res.json(data);
+});
+
+apiRouter.post('/academic-years/:id/close', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_close_academic_year', {
+    p_school_id: school.id, p_year_id: req.params.id, p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Academic year could not be closed.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_CLOSED', 'Closed academic year ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
+});
+
+apiRouter.get('/academic-years/:yearId/semesters', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: year, error: yearError } = await client.from('academic_years').select('id')
+    .eq('id', req.params.yearId).eq('school_id', school.id).maybeSingle();
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  const [terms, statuses, exams] = await Promise.all([
+    client.from('terms').select('id,school_id,academic_year_id,name,start_date,end_date,is_current,created_at,updated_at')
+      .eq('school_id', school.id).eq('academic_year_id', req.params.yearId).order('start_date'),
+    client.from('term_status').select('term_id,status,closed_at,closed_by,updated_at').eq('school_id', school.id),
+    client.from('exam_periods').select('id,term_id,name,start_date,end_date,status,results_publish_date,published_at')
+      .eq('school_id', school.id)
+  ]);
+  if (terms.error || statuses.error || exams.error) { res.status(503).json({ error: 'Semester details could not be loaded.' }); return; }
+  const statusById = new Map((statuses.data || []).map((row: any) => [row.term_id, row]));
+  const examByTerm = new Map((exams.data || []).map((row: any) => [row.term_id, row]));
+  res.json((terms.data || []).map((term: any) => ({
+    ...term,
+    status: (statusById.get(term.id) as any)?.status || 'open',
+    closedAt: (statusById.get(term.id) as any)?.closed_at || null,
+    examPeriod: examByTerm.get(term.id) || null
+  })));
+});
+
+apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: year, error: yearError } = await client.from('academic_years')
+    .select('id,start_date,end_date,status').eq('id', req.params.yearId).eq('school_id', school.id).maybeSingle();
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (year.status === 'closed') { res.status(409).json({ error: 'Closed academic years cannot receive new semesters.' }); return; }
+  const name = req.body?.name === 'Semester 1' || req.body?.name === 'Semester 2' ? req.body.name : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  const examStartDate = req.body?.examStartDate;
+  const examEndDate = req.body?.examEndDate;
+  const resultsPublishDate = req.body?.resultsPublishDate;
+  if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
+      startDate < year.start_date || endDate > year.end_date ||
+      ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
+      (resultsPublishDate && !isAcademicSetupDate(resultsPublishDate))) {
+    res.status(400).json({ error: 'Enter valid Semester 1/2 dates within the academic year and a valid exam/result date range.' }); return;
+  }
+  const { data: existing, error: existingError } = await client.from('terms').select('id,name')
+    .eq('school_id', school.id).eq('academic_year_id', req.params.yearId);
+  if (existingError) { res.status(503).json({ error: 'Existing semesters could not be checked.' }); return; }
+  if ((existing || []).length >= 2 || (existing || []).some((row: any) => row.name === name)) {
+    res.status(409).json({ error: 'An academic year can contain only Semester 1 and Semester 2, each once.' }); return;
+  }
+  const { data: term, error } = await client.from('terms').insert({
+    school_id: school.id, academic_year_id: req.params.yearId, name,
+    start_date: startDate, end_date: endDate, is_current: false
+  }).select('id,school_id,academic_year_id,name,start_date,end_date,is_current').single();
+  if (error || !term) { res.status(error?.code === '23505' ? 409 : 400).json({ error: /overlap/i.test(error?.message || '') ? 'Semester dates overlap another semester.' : 'Semester could not be created.' }); return; }
+  let examPeriod: any = null;
+  if (examStartDate && examEndDate) {
+    const result = await client.from('exam_periods').insert({
+      school_id: school.id, term_id: term.id, name: name + ' Examination',
+      start_date: examStartDate, end_date: examEndDate, results_publish_date: resultsPublishDate || null,
+      status: 'draft', created_by: user.id
+    }).select('id,term_id,name,start_date,end_date,status,results_publish_date,published_at').single();
+    if (result.error) {
+      await client.from('terms').delete().eq('id', term.id).eq('school_id', school.id);
+      res.status(400).json({ error: 'Semester exam dates could not be saved.' }); return;
+    }
+    examPeriod = result.data;
+  }
+  const { error: statusError } = await client.from('term_status').upsert({
+    school_id: school.id, term_id: term.id, status: 'open', updated_at: new Date().toISOString()
+  }, { onConflict: 'school_id,term_id' });
+  if (statusError) {
+    await client.from('terms').delete().eq('id', term.id).eq('school_id', school.id);
+    res.status(503).json({ error: 'Semester status could not be initialized.' }); return;
+  }
+  auditAcademicSetup(school, user, 'SEMESTER_CREATED', 'Created ' + name + ' in academic year ' + req.params.yearId + '.');
+  res.status(201).json({ ...term, status: 'open', examPeriod });
+});
+
+apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: term, error: termError } = await client.from('terms')
+    .select('id,academic_year_id,name,start_date,end_date').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
+  if (termError || !term) { res.status(404).json({ error: 'Semester was not found.' }); return; }
+  const { data: year } = await client.from('academic_years').select('status,start_date,end_date')
+    .eq('id', term.academic_year_id).eq('school_id', school.id).maybeSingle();
+  if (year?.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  const name = req.body?.name === 'Semester 1' || req.body?.name === 'Semester 2' ? req.body.name : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  const examStartDate = req.body?.examStartDate;
+  const examEndDate = req.body?.examEndDate;
+  const resultsPublishDate = req.body?.resultsPublishDate;
+  if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
+      startDate < year.start_date || endDate > year.end_date ||
+      ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
+      (resultsPublishDate && !isAcademicSetupDate(resultsPublishDate))) {
+    res.status(400).json({ error: 'Enter valid semester dates, examination dates and result publication date.' }); return;
+  }
+  const { data: duplicate } = await client.from('terms').select('id').eq('school_id', school.id)
+    .eq('academic_year_id', term.academic_year_id).eq('name', name).neq('id', term.id).maybeSingle();
+  if (duplicate) { res.status(409).json({ error: 'This semester already exists in the academic year.' }); return; }
+  const { data, error } = await client.from('terms').update({
+    name, start_date: startDate, end_date: endDate, updated_at: new Date().toISOString()
+  }).eq('id', term.id).eq('school_id', school.id)
+    .select('id,school_id,academic_year_id,name,start_date,end_date,is_current').single();
+  if (error || !data) { res.status(400).json({ error: /overlap/i.test(error?.message || '') ? 'Semester dates overlap another semester.' : 'Semester could not be updated.' }); return; }
+  let examPeriod: any = null;
+  if (examStartDate && examEndDate) {
+    const { data: currentExam } = await client.from('exam_periods').select('id')
+      .eq('school_id', school.id).eq('term_id', term.id).maybeSingle();
+    const values = {
+      school_id: school.id, term_id: term.id, name: name + ' Examination',
+      start_date: examStartDate, end_date: examEndDate, results_publish_date: resultsPublishDate || null,
+      status: 'draft', created_by: user.id
+    };
+    const savedExam = currentExam
+      ? await client.from('exam_periods').update({ ...values, updated_at: new Date().toISOString() }).eq('id', currentExam.id).eq('school_id', school.id).select().single()
+      : await client.from('exam_periods').insert(values).select().single();
+    if (savedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but exam dates could not be updated.' }); return; }
+    examPeriod = savedExam.data;
+  }
+  auditAcademicSetup(school, user, 'SEMESTER_UPDATED', 'Updated ' + name + ' in academic year ' + term.academic_year_id + '.');
+  res.json({ ...data, examPeriod });
+});
+
+apiRouter.post('/semesters/:id/activate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'open', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be activated.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_ACTIVATED', 'Activated semester ' + req.params.id + '.');
+  res.json({ success: true });
+});
+
+apiRouter.post('/semesters/:id/close', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'closed', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be closed.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_CLOSED', 'Closed semester ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
+});
+
+apiRouter.post('/semesters/:id/reopen', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'open', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be reopened.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_REOPENED', 'Reopened semester ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
 });
 
 apiRouter.get('/students/:id/guardians', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
