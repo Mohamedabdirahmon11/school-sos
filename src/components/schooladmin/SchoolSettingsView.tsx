@@ -135,6 +135,21 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   useEffect(() => {
     if (!school) return;
+    setName(school.name || '');
+    setLogoUrl(school.logoUrl || '');
+    setAddress(school.address || '');
+    setPhone(school.phone || '');
+    setWhatsappPhone(school.whatsappPhone || '');
+    setEmail(school.email || '');
+    setCurrency(school.currency || 'ETB');
+    setLanguage(school.language || 'en');
+    setTimezone(school.timezone || 'Africa/Addis_Ababa');
+    setDateFormat(school.dateFormat || 'dd/MM/yyyy');
+    setStudentAccessEnabled(school.studentAccessEnabled === true);
+    setDefaultClassCapacity(String(school.defaultClassCapacity ?? 40));
+    setGradingScale(school.gradingScale?.length ? school.gradingScale : defaultGradingScale);
+    setAttendanceRules(school.attendanceRules || defaultAttendanceRules);
+    setClassLevels(school.classLevels?.length ? school.classLevels : defaultClassLevels);
     setClosingTime(school.setupData?.workingHours?.closingTime || '16:00');
     ApiClient.getBranches()
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
