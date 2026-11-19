@@ -6337,7 +6337,7 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
         ? client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
         : Promise.resolve({ data: [], error: null }),
       scheduleIds.length
-        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number').eq('school_id', school.id).in('schedule_id', scheduleIds)
+        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number,seat_number,student_id').eq('school_id', school.id).in('schedule_id', scheduleIds)
         : Promise.resolve({ data: [], error: null })
     ]);
     if (invigilators.error) throw invigilators.error;
@@ -6347,28 +6347,48 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
       ? await client.from('exam_rooms').select('id,name,capacity').eq('school_id', school.id).in('id', usedRoomIds)
       : { data: [], error: null };
     if (roomResult.error) throw roomResult.error;
+    const studentIds = [...new Set((seatRows.data || []).map((seat: any) => seat.student_id).filter(Boolean))];
+    const studentResult = studentIds.length
+      ? await client.from('students').select('id,student_id,roll_number,first_name,middle_name,last_name').eq('school_id', school.id).in('id', studentIds)
+      : { data: [], error: null };
+    if (studentResult.error) throw studentResult.error;
+    const studentById = new Map((studentResult.data || []).map((student: any) => [student.id, student]));
+    const scheduleById = new Map((schedules.data || []).map((schedule: any) => [schedule.id, schedule]));
     const roomById = new Map((roomResult.data || []).map((room: any) => [room.id, room]));
     const roomAssignments = new Map<string, any>();
-    for (const schedule of schedules.data || []) {
-      for (const seat of (seatRows.data || []).filter((row: any) => row.schedule_id === schedule.id)) {
-        const key = schedule.exam_session_id + ':' + seat.room_id;
-        const entry = roomAssignments.get(key) || {
-          sessionId: schedule.exam_session_id, roomId: seat.room_id,
-          roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
-          capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
-          studentCount: 0, classRanges: new Map<string, any>()
-        };
-        entry.studentCount += 1;
-        const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
-        range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
-        range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
-        range.studentCount += 1;
-        entry.classRanges.set(seat.class_id, range);
-        roomAssignments.set(key, entry);
-      }
+    for (const seat of seatRows.data || []) {
+      const schedule = scheduleById.get(seat.schedule_id) as any;
+      if (!schedule || !seat.room_id) continue;
+      const key = schedule.exam_session_id + ':' + seat.room_id;
+      const entry = roomAssignments.get(key) || {
+        sessionId: schedule.exam_session_id, roomId: seat.room_id,
+        roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
+        capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
+        studentCount: 0, classRanges: new Map<string, any>(), seats: []
+      };
+      const student = studentById.get(seat.student_id) as any;
+      entry.studentCount += 1;
+      const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
+      range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
+      range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
+      range.studentCount += 1;
+      entry.classRanges.set(seat.class_id, range);
+      entry.seats.push({
+        seatNumber: seat.seat_number,
+        examNumber: seat.exam_number,
+        studentId: student?.student_id || seat.student_id,
+        rollNumber: student?.roll_number || '',
+        studentName: [student?.first_name, student?.middle_name, student?.last_name].filter(Boolean).join(' '),
+        classId: seat.class_id,
+        subjectId: schedule.subject_id,
+        examDate: schedule.exam_date
+      });
+      roomAssignments.set(key, entry);
     }
     const roomAssignmentRows = [...roomAssignments.values()].map((entry: any) => ({
-      ...entry, classRanges: [...entry.classRanges.values()]
+      ...entry,
+      classRanges: [...entry.classRanges.values()],
+      seats: entry.seats.sort((a: any, b: any) => Number(a.seatNumber) - Number(b.seatNumber))
     }));
     res.setHeader('Cache-Control', 'no-store');
     res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows, classExamSettings: classExamSettings.data || [] });
