@@ -8083,7 +8083,7 @@ apiRouter.get('/report-cards/:studentId/pdf', requireAuth, requireSchoolContext,
   const result = rankings.find(row => row.student.id === student.id);
   if (!result) { res.status(404).json({ error: 'Student report card not found.' }); return; }
   if (!result.annualComplete) { res.status(409).json({ error: 'The annual report card is not ready. Both semesters must have approved marks for every assigned subject.' }); return; }
-  if (['parent', 'student'].includes(normalizeRole(user.role) || '') && !result.annualPublished) {
+  if (!result.annualPublished) {
     res.status(409).json({ error: 'The annual report card has not been published by the School Admin yet.' }); return;
   }
   const commentRows = await classGroupsClient().from('form_teacher_comments').select('semester,comment')
@@ -8106,6 +8106,7 @@ apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAd
   const [rankings, design] = await Promise.all([db.getClassYearlyRankings(school.id, klass.id), db.getReportCardDesign(school.id)]);
   if (!rankings.length) { res.status(404).json({ error: 'No students were found in this class.' }); return; }
   if (rankings.some(result => !result.annualComplete)) { res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return; }
+  if (rankings.some(result => !result.annualPublished)) { res.status(409).json({ error: 'Class annual report cards cannot be downloaded until the School Admin has published every student result for both semesters.' }); return; }
   const commentRows = await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment')
     .eq('school_id', school.id).eq('class_id', klass.id).eq('academic_year', klass.academicYear || school.academicYear);
   const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
