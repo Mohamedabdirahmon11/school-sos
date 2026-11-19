@@ -36,6 +36,8 @@ export const StudentPortalView: React.FC = () => {
   const examSchedulesState = useApi(() => studentRecord?.classId ? ApiClient.getPublishedExamSchedules(studentRecord.classId) : Promise.resolve([]), [studentRecord?.classId, school?.id], Boolean(studentRecord));
   const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
   const marksState = useApi(() => studentRecord ? ApiClient.getStudentMarks(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
+  const termReportCardsState = useApi(() => studentRecord ? ApiClient.request<any[]>(`/term-marks/report-cards?studentId=${encodeURIComponent(studentRecord.id)}`) : Promise.resolve([]), [studentRecord?.id,school?.id], Boolean(studentRecord));
+  const termReportCards: any[] = Array.isArray(termReportCardsState.data) ? termReportCardsState.data : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const attendanceState = useApi(() => studentRecord ? ApiClient.getStudentAttendance(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
   const noticesState = useApi(() => ApiClient.getNotices({ pageSize: 50 }), [school?.id, user?.id], Boolean(school && user));
@@ -157,6 +159,13 @@ export const StudentPortalView: React.FC = () => {
             <FileSpreadsheet className="w-4 h-4 text-[#0F766E]" />
             <span>Approved Academic Results</span>
           </h2>
+
+          {termReportCardsState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : termReportCards.length > 0 ? termReportCards.map((card:any) => (
+            <div key={card.id} className="rounded-xl border border-teal-200 bg-teal-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div><button type="button" onClick={()=>studentRecord&&ApiClient.downloadTermReportCardPdf(studentRecord.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Download PDF</button></div>
+              <div className="mt-2 space-y-1">{(card.subject_results||[]).map((subject:any)=><p key={subject.subject_id} className="text-[11px] text-teal-950">{subject.subject}: T1 {subject.term1} · T2 {subject.term2} · Sanad {subject.yearly} · {subject.grade||''}</p>)}</div>
+            </div>
+          )) : <p className="text-[#64748B]">Report Card-ka sannadlaha wali lama daabicin.</p>}
 
           {marksState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : marksState.error ? <ErrorState error={marksState.error} onRetry={marksState.retry} /> : marks.length === 0 ? <p className="text-[#64748B]">No approved results have been published yet.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{marks.map(mark => {
             const band = gradeFor(mark.percentage || 0);

@@ -38,6 +38,12 @@ export const ParentPortalView: React.FC = () => {
     [currentChild?.id, school?.id],
     Boolean(currentChild)
   );
+  const termReportCardsState = useApi(
+    () => currentChild ? ApiClient.request<any[]>(`/term-marks/report-cards?studentId=${encodeURIComponent(currentChild.id)}`) : Promise.resolve([]),
+    [currentChild?.id, school?.id],
+    Boolean(currentChild)
+  );
+  const termReportCards: any[] = Array.isArray(termReportCardsState.data) ? termReportCardsState.data : [];
   const timetableState = useApi(
     () => ApiClient.getTimetable({ classId: currentChild?.classId }),
     [currentChild?.id, currentChild?.classId, school?.id],
@@ -55,6 +61,19 @@ export const ParentPortalView: React.FC = () => {
   const handleSelectChild = (idx: number) => {
     setSelectedChildIndex(idx);
     setReportCardDownloadError('');
+  };
+
+  const handleDownloadTermReportCard = async () => {
+    if (!currentChild || reportCardDownloading) return;
+    setReportCardDownloading(true);
+    setReportCardDownloadError('');
+    try {
+      await ApiClient.downloadTermReportCardPdf(currentChild.id);
+    } catch (error) {
+      setReportCardDownloadError(error instanceof Error ? error.message : 'Report Card-ka sannadlaha lama heli karo weli.');
+    } finally {
+      setReportCardDownloading(false);
+    }
   };
 
   const handleDownloadAnnualReportCard = async () => {
@@ -170,6 +189,15 @@ export const ParentPortalView: React.FC = () => {
           </div>
           {reportCardDownloadError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-[11px] text-rose-700">{reportCardDownloadError}</p>}
           <div className="space-y-2">
+            {termReportCardsState.loading ? <div className="h-12 animate-pulse rounded-lg bg-slate-100" /> : termReportCards.length > 0 ? termReportCards.map((card:any) => (
+              <div key={card.id} className="rounded-lg border border-teal-200 bg-teal-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div>
+                  <button type="button" onClick={handleDownloadTermReportCard} disabled={reportCardDownloading} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">{reportCardDownloading?'Diyaarinaya…':'Download Report Card PDF'}</button>
+                </div>
+                <div className="mt-2 space-y-1">{(card.subject_results||[]).map((subject:any)=><p key={subject.subject_id} className="text-[11px] text-teal-950">{subject.subject}: T1 {subject.term1} · T2 {subject.term2} · Sanad {subject.yearly} · {subject.grade||''}</p>)}</div>
+              </div>
+            )) : <p className="text-[#64748B]">Report Card-ka sannadlaha wali lama daabicin. Marka dugsigu daabaco ayuu halkan ka muuqanayaa.</p>}
             {(Array.isArray(childData?.marks) ? childData.marks : []).length ? childData?.marks?.map((mark: any) => (
               <div key={mark.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex justify-between"><span>{mark.subjectId} · {mark.semester}</span><span className="font-mono font-bold">{Number(mark.percentage).toFixed(1)}%</span></div>
             )) : <p className="text-[#64748B]">No published results are available yet. The School Admin will publish the approved results here.</p>}

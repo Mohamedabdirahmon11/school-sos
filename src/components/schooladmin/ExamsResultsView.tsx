@@ -18,6 +18,7 @@ import { ExamTimetablePrint, formatSomaliExamDate, printExamTimetable } from '..
 // The date picker now uses Somali weekday labels instead of weekday: 'long'.
 import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { AcademicResultsWorkspace } from './AcademicResultsWorkspace.tsx';
+import { TermMarksWorkspace } from './TermMarksWorkspace.tsx';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
   FileSpreadsheet, 
@@ -482,7 +483,7 @@ export const ExamsResultsView: React.FC = () => {
   const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule' | 'term_structure'>('overview');
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
@@ -1165,8 +1166,17 @@ export const ExamsResultsView: React.FC = () => {
             <Sliders className="w-3.5 h-3.5" />
             Exam Config
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('term_structure')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${activeTab === 'term_structure' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
+          >
+            Qaabka dhibcaha
+          </button>
         </div>
       </div>
+
+      {activeTab === 'term_structure' && <TermMarksWorkspace classes={classes} />}
 
       {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => void (classes.length && subjects.length ? loadClassData() : loadExamSetup())} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {notice && (

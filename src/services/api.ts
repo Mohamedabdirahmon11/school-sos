@@ -63,6 +63,14 @@ export class ApiClient {
     return this.downloadPdf(`/report-cards/classes/${encodeURIComponent(classId)}/pdf`, `class-report-cards-${classId}.pdf`);
   }
 
+  public static downloadTermReportCardPdf(studentId: string) {
+    return this.downloadPdf(`/term-marks/report-cards/${encodeURIComponent(studentId)}/pdf`, `term-report-card-${studentId}.pdf`);
+  }
+
+  public static downloadTermReportCardsPdf(classId: string, academicYearId: string) {
+    return this.downloadPdf(`/term-marks/report-cards/classes/${encodeURIComponent(classId)}/pdf?academicYearId=${encodeURIComponent(academicYearId)}`, `term-report-cards-${classId}.pdf`);
+  }
+
   public static downloadReceiptPdf(paymentId: string) {
     return this.downloadPdf(`/fees/payments/${encodeURIComponent(paymentId)}/receipt.pdf`, `receipt-${paymentId}.pdf`);
   }
