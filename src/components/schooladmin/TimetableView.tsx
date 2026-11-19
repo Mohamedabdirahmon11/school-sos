@@ -452,7 +452,7 @@ export const TimetableView: React.FC = () => {
       ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id && (slot.roomId === selectedRoomId || (!slot.roomId && slot.roomNumber === rooms.find(room => room.id === selectedRoomId)?.name))))
       : viewMode === 'school'
         ? orderedClasses.filter(klass => timetable.some(slot => slot.classId === klass.id))
-        : orderedClasses.filter(klass => displayClassIds.includes(klass.id)).slice(0, 5);
+        : orderedClasses.filter(klass => klass.id === selectedClassId);
   const printClasses = orderedClasses.filter(klass => printClassIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id)).slice(0, 5);
   const runTimetablePrint = (classIds: string[], mode: 'single' | 'multiple' = 'multiple', teacherId?: string) => {
     const matchingClasses = orderedClasses.filter(klass => classIds.includes(klass.id) && timetable.some(slot => slot.classId === klass.id && (!teacherId || slot.teacherId === teacherId)));
@@ -485,7 +485,7 @@ export const TimetableView: React.FC = () => {
           <p>{loadError}</p><button type="button" onClick={() => void fetchData()} className="mt-2 font-bold underline">Retry loading timetable</button>
         </div>}
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex w-full flex-wrap items-end gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm self-start sm:self-auto">
           {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>}
@@ -710,7 +710,7 @@ export const TimetableView: React.FC = () => {
           </div>
         </div>
       )}
-      <style>{`@page { size: A4 landscape; margin: 5mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 3mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; } .timetable-print-class h2 { font-size: 7pt; margin-bottom: 1mm; } .timetable-print-class table { font-size: 5pt; } .timetable-print-class th, .timetable-print-class td { padding: 0.7mm !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-grid { display: block !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-class { width: 100%; } .timetable-print-all[data-print-mode='single'] .timetable-print-class h2 { font-size: 14pt; margin-bottom: 3mm; } .timetable-print-all[data-print-mode='single'] .timetable-print-class table { font-size: 10pt; table-layout: auto; } .timetable-print-all[data-print-mode='single'] .timetable-print-class th, .timetable-print-all[data-print-mode='single'] .timetable-print-class td { padding: 2mm !important; line-height: 1.3; } }`}</style>
+      <style>{`@page { size: A4 landscape; margin: 8mm; } @media print { body * { visibility: hidden !important; } .timetable-print-all, .timetable-print-all * { visibility: visible !important; } .timetable-print-all { display: block !important; position: absolute; inset: 0; width: 100%; padding: 0; background: white; } .timetable-print-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6mm; align-items: start; } .timetable-print-class { break-inside: avoid; page-break-inside: avoid; margin: 0 !important; min-height: 0; overflow: hidden; border: 0.25mm solid #CBD5E1; border-radius: 2mm; padding: 3mm; } .timetable-print-class h2 { font-size: 8pt; margin-bottom: 2mm; } .timetable-print-class table { font-size: 6pt; } .timetable-print-class th, .timetable-print-class td { padding: 1.4mm !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-grid { display: block !important; } .timetable-print-all[data-print-mode='single'] .timetable-print-class { width: 100%; } .timetable-print-all[data-print-mode='single'] .timetable-print-class h2 { font-size: 14pt; margin-bottom: 3mm; } .timetable-print-all[data-print-mode='single'] .timetable-print-class table { font-size: 10pt; table-layout: auto; } .timetable-print-all[data-print-mode='single'] .timetable-print-class th, .timetable-print-all[data-print-mode='single'] .timetable-print-class td { padding: 2mm !important; line-height: 1.3; } }`}</style>
       {printAllClasses && <section className="timetable-print-all hidden" data-print-mode={printMode}>
         <h1 className="mb-1 text-lg font-bold">{school?.name || 'School'} · Timetables</h1>
         <p className="mb-2 text-[9px]">{printTeacherId ? 'Teacher timetable · ' + (teachers.find(teacher => teacher.id === printTeacherId)?.fullName || printTeacherId) : printClasses.length === 1 ? 'Individual class timetable' : `${printClasses.length} class timetables · one A4 sheet`}</p>
@@ -731,29 +731,7 @@ export const TimetableView: React.FC = () => {
         </div>
       </section>}
 
-      {viewMode !== 'teacher' && (
-        <section className="rounded-xl border border-[#E2E8F0] bg-white p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-[#132A29]">Fasallada shaashadda ka muuqda</h2>
-              <p className="text-xs text-[#64748B]">Dooro ugu badnaan 5 fasal. Jadwal kasta si gooni ah ayaa loo muujinayaa.</p>
-            </div>
-            <span className="text-xs font-semibold text-[#0F766E]">{displayClassIds.length}/5 selected</span>
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {orderedClasses.map(klass => (
-              <label key={klass.id} className="inline-flex items-center gap-2 text-xs text-[#334155]">
-                <input type="checkbox" checked={displayClassIds.includes(klass.id)} disabled={!displayClassIds.includes(klass.id) && displayClassIds.length >= 5}
-                  onChange={event => setDisplayClassIds(current => event.target.checked ? [...current, klass.id].slice(0, 5) : current.filter(id => id !== klass.id))}
-                />
-                {klass.name}{klass.section ? ` · ${klass.section}` : ''}
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <section className="grid grid-cols-1 gap-4">
         {displayedClasses.map(klass => (
           <article key={klass.id} className="min-w-0 overflow-hidden rounded-xl border border-[#DCE7E4] bg-white shadow-sm">
             <header className="flex items-center justify-between gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3">
@@ -776,7 +754,7 @@ export const TimetableView: React.FC = () => {
                     <tr key={day} className={day === todayName ? 'bg-[#F0FDFA]' : ''}>
                       <th className="border-b border-r bg-[#FAFAFA] p-2 text-left font-semibold">{day.slice(0, 3)}</th>
                       {periods.map(period => {
-                        const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period);
+                        const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (viewMode !== 'class' || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId));
                         const subject = subjects.find(item => item.id === slot?.subjectId);
                         const teacher = teachers.find(item => item.id === slot?.teacherId);
                         const registeredRoom = rooms.find(item => item.id === slot?.roomId);
