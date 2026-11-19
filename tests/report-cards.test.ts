@@ -196,3 +196,24 @@ test('report card design sanitizer rejects invalid templates, colors, blocks, an
   assert.throws(() => sanitizeReportCardDesign({ signatureImageUrl: 'data:image/svg+xml;base64,AAAA' }), /signatureImageUrl/);
   assert.throws(() => sanitizeReportCardDesign([] as any), /must be an object/);
 });
+
+
+test('report card prefers dedicated Form Teacher comments over generated teacher remarks', () => {
+  const page = buildReportCardPdfPage({
+    school,
+    design,
+    className: 'Grade 10 A',
+    result: {
+      ...result,
+      formTeacherComments: [
+        { semester: 'Semester 1', comment: 'Consistent effort and excellent participation.' },
+        { semester: 'Semester 2', comment: 'Shows strong progress in all subjects.' }
+      ]
+    },
+    totalStudents: 24
+  });
+  const text = page.lines.join('\n');
+  assert.ok(text.includes('Form Teacher comment (Semester 1): Consistent effort and excellent participation.'));
+  assert.ok(text.includes('Form Teacher comment (Semester 2): Shows strong progress in all subjects.'));
+  assert.ok(!text.includes('Teacher remarks:'));
+});
