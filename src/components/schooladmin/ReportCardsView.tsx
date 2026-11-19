@@ -30,6 +30,7 @@ interface ReportCardMark {
   totalMarks: number;
   percentage: number;
   status?: string;
+  teacherRemarks?: string;
 }
 
 interface ReportCardSubjectResult {
@@ -196,8 +197,19 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
-                <p className="font-semibold text-[#475569] mb-1">Class Teacher Remarks:</p>
-                <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
+                <p className="font-semibold text-[#475569] mb-1">Teacher Remarks:</p>
+                {result.subjectResults.some(row => row.sem1Marks?.teacherRemarks?.trim() || row.sem2Marks?.teacherRemarks?.trim()) ? (
+                  <ul className="space-y-1 text-[#334155]">
+                    {result.subjectResults.flatMap(row => [
+                      row.sem1Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s1`, label: `${row.subject.name} · Semester 1`, comment: row.sem1Marks.teacherRemarks.trim() } : null,
+                      row.sem2Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s2`, label: `${row.subject.name} · Semester 2`, comment: row.sem2Marks.teacherRemarks.trim() } : null
+                    ].filter((item): item is { key: string; label: string; comment: string } => Boolean(item))).map(item => (
+                      <li key={item.key}><span className="font-semibold">{item.label}:</span> {item.comment}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
+                )}
               </div>
             )}
             {blocks.adminRemarks && (
