@@ -6695,6 +6695,21 @@ apiRouter.delete('/exams/term-periods/:periodId', requireAuth, requireSchoolAdmi
     if (lookupError) throw lookupError;
     if (!period) { res.status(404).json({ error: 'Muddada imtixaanka lagama helin dugsigan.' }); return; }
     if (period.status !== 'draft') { res.status(409).json({ error: 'Jadwal imtixaan oo la daabacay lama tirtiri karo.' }); return; }
+    // Remove dependent term schedules first: their session FK is RESTRICT, while
+    // the period also cascades through days/sessions. This ordering avoids a
+    // cascade-order FK failure when a draft period is deleted.
+    const { data: periodSchedules, error: schedulesError } = await client.from('exam_schedules')
+      .select('id,status').eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term');
+    if (schedulesError) throw schedulesError;
+    if ((periodSchedules || []).some((schedule: any) => schedule.status === 'published')) {
+      res.status(409).json({ error: 'Jadwalku wuxuu leeyahay imtixaan la daabacay; lama tirtiri karo.' }); return;
+    }
+    const scheduleIds = (periodSchedules || []).map((schedule: any) => schedule.id);
+    if (scheduleIds.length) {
+      const { error: scheduleDeleteError } = await client.from('exam_schedules').delete()
+        .eq('school_id', school.id).in('id', scheduleIds);
+      if (scheduleDeleteError) throw scheduleDeleteError;
+    }
     const { data: deletedRows, error: deleteError } = await client.from('exam_periods').delete()
       .eq('id', period.id).eq('school_id', school.id).eq('status', 'draft').select('id');
     if (deleteError) throw deleteError;
