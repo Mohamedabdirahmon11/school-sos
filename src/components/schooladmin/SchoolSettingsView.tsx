@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
+import { AcademicYearManagementView } from './AcademicYearManagementView.tsx';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
@@ -61,7 +62,6 @@ const defaultGradingScale: GradingBand[] = [
   { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
   { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
 ];
-const defaultTerms = { semester1Start: '', semester1End: '', semester2Start: '', semester2End: '' };
 const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, requireExcusedReason: true, allowParentExcuses: false };
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -105,9 +105,6 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [defaultClassCapacity, setDefaultClassCapacity] = useState(String(school?.defaultClassCapacity ?? 40));
 
   // Academic Rules State
-  const [academicYear, setAcademicYear] = useState(school?.academicYear || '2026-2027');
-  const [currentSemester, setCurrentSemester] = useState<'Semester 1' | 'Semester 2'>(school?.currentSemester || 'Semester 1');
-  const [terms, setTerms] = useState(school?.terms || defaultTerms);
   const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : defaultGradingScale);
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
@@ -227,24 +224,17 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     e.preventDefault();
     if (isReadOnly) return;
     setError(null);
-    if (!/^\d{4}-\d{4}$/.test(academicYear)) { setError('Academic year must use YYYY-YYYY.'); return; }
     if (!classLevels.length) { setError('Select at least one class level.'); return; }
     if (!gradingScale.length) { setError('Add at least one grade band.'); return; }
     const sortedBands = [...gradingScale].sort((a, b) => b.minPercentage - a.minPercentage);
     if (sortedBands[sortedBands.length - 1].minPercentage !== 0) { setError('The final grade band must start at 0%.'); return; }
     if (sortedBands.some((band, index) => index > 0 && band.minPercentage >= sortedBands[index - 1].minPercentage)) { setError('Grade bands must use strictly descending minimum percentages.'); return; }
     if (sortedBands.some(band => !band.label.trim())) { setError('Each grade band needs a label.'); return; }
-    if (terms.semester1Start && terms.semester1End && terms.semester1Start > terms.semester1End) { setError('Semester 1 start date must be on or before its end date.'); return; }
-    if (terms.semester2Start && terms.semester2End && terms.semester2Start > terms.semester2End) { setError('Semester 2 start date must be on or before its end date.'); return; }
-    if (terms.semester1End && terms.semester2Start && terms.semester1End > terms.semester2Start) { setError('Semester 2 must start after Semester 1 ends.'); return; }
     await saveSchoolSection('academics', {
-      academicYear,
-      currentSemester,
-      terms,
       gradingScale: sortedBands,
       attendanceRules,
       classLevels
-    }, 'Academic year, terms, grading, attendance, and class levels saved successfully!');
+    }, 'Grading, attendance, and class-level settings saved successfully!');
   };
 
   const handleSaveExamRules = async (e: React.FormEvent) => {
@@ -901,33 +891,16 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
       {/* TAB 2: ACADEMICS & RULES */}
       {activeTab === 'academics' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <div className="space-y-6">
+          <AcademicYearManagementView />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           <form onSubmit={handleSaveAcademics} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-5 text-xs">
             <div>
               <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#0F766E]" /> {t('settings_academic_calendar')}</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Each school keeps its own academic calendar, class levels, grading scale, and attendance rules.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-semibold text-[#334155] mb-1">Academic Year</label>
-                <input type="text" required value={academicYear} onChange={e => setAcademicYear(e.target.value)} placeholder="2026-2027" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#334155] mb-1">Current Term</label>
-                <select value={currentSemester} onChange={e => setCurrentSemester(e.target.value as 'Semester 1' | 'Semester 2')} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
-                  <option value="Semester 1">Semester 1</option>
-                  <option value="Semester 2">Semester 2</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 starts</span><input type="date" value={terms.semester1Start} onChange={e => setTerms(prev => ({ ...prev, semester1Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 ends</span><input type="date" value={terms.semester1End} onChange={e => setTerms(prev => ({ ...prev, semester1End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 starts</span><input type="date" value={terms.semester2Start} onChange={e => setTerms(prev => ({ ...prev, semester2Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 ends</span><input type="date" value={terms.semester2End} onChange={e => setTerms(prev => ({ ...prev, semester2End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-            </div>
+            <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-3 text-xs text-teal-900">Academic years, Semester 1 and Semester 2 dates, examination periods and result publication dates are managed in the Academic Years & Semesters panel above. This form only saves grading, attendance and class-level preferences.</div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -1023,7 +996,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               </div>
             )}
 
-          </div>
+            </div>
         </div>
       )}
 
