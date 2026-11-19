@@ -647,6 +647,9 @@ CREATE INDEX IF NOT EXISTS idx_form_teacher_comments_class_term
   ON form_teacher_comments (school_id, class_id, academic_year, semester);
 
 ALTER TABLE form_teacher_comments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS form_teacher_comments_service_role ON form_teacher_comments;
+CREATE POLICY form_teacher_comments_service_role ON form_teacher_comments
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE TABLE IF NOT EXISTS student_marks (
   id VARCHAR(64) PRIMARY KEY,
