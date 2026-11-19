@@ -162,7 +162,7 @@ export const StudentPortalView: React.FC = () => {
 
           {termReportCardsState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : termReportCards.length > 0 ? termReportCards.map((card:any) => (
             <div key={card.id} className="rounded-xl border border-teal-200 bg-teal-50 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div><button type="button" onClick={()=>ApiClient.downloadTermReportCardPdf(studentRecord.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Download PDF</button></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div><button type="button" onClick={()=>studentRecord&&ApiClient.downloadTermReportCardPdf(studentRecord.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Download PDF</button></div>
               <div className="mt-2 space-y-1">{(card.subject_results||[]).map((subject:any)=><p key={subject.subject_id} className="text-[11px] text-teal-950">{subject.subject}: T1 {subject.term1} · T2 {subject.term2} · Sanad {subject.yearly} · {subject.grade||''}</p>)}</div>
             </div>
           )) : <p className="text-[#64748B]">Report Card-ka sannadlaha wali lama daabicin.</p>}
