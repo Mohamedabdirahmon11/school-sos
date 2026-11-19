@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CheckCircle2, Clock3, Lock, Plus, RefreshCw, Save, X } from 'lucide-react';
+import { CalendarDays, Clock3, Lock, Plus, RefreshCw, Save, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 
@@ -117,7 +117,7 @@ export const AcademicYearManagementView: React.FC = () => {
     if (!selectedYearId || !canEdit) return;
     setSaving(true); setError(''); setNotice('');
     const payload = {
-      name: semesterForm.name, startDate: semesterForm.startDate, endDate: semesterForm.endDate,
+      name: selectedSemesterName, startDate: semesterForm.startDate, endDate: semesterForm.endDate,
       ...(semesterForm.examStartDate && semesterForm.examEndDate ? {
         examStartDate: semesterForm.examStartDate, examEndDate: semesterForm.examEndDate
       } : {}),
@@ -159,6 +159,7 @@ export const AcademicYearManagementView: React.FC = () => {
 
   const existingNames = new Set(semesters.map(item => item.name));
   const availableName = (name: 'Semester 1' | 'Semester 2') => !existingNames.has(name) || semesters.some(item => item.id === editingSemesterId && item.name === name);
+  const selectedSemesterName = availableName(semesterForm.name) ? semesterForm.name : (existingNames.has('Semester 1') ? 'Semester 2' : 'Semester 1');
 
   return (
     <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
@@ -250,10 +251,10 @@ export const AcademicYearManagementView: React.FC = () => {
           </div>}
       </div>
 
-      {canEdit && semesters.length < 2 && <form onSubmit={submitSemester} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      {canEdit && (semesters.length < 2 || Boolean(editingSemesterId)) && <form onSubmit={submitSemester} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex items-center justify-between gap-2"><h3 className="font-semibold text-slate-800">{editingSemesterId ? 'Edit semester' : 'Add semester'}</h3>{editingSemesterId && <button type="button" onClick={resetSemester} className="text-slate-500" aria-label="Cancel semester edit"><X size={17}/></button>}</div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <label className="block space-y-1 text-sm"><span className="font-medium text-slate-700">Semester</span><select value={semesterForm.name} onChange={e => setSemesterForm(v => ({...v,name:e.target.value as 'Semester 1'|'Semester 2'}))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <label className="block space-y-1 text-sm"><span className="font-medium text-slate-700">Semester</span><select value={selectedSemesterName} onChange={e => setSemesterForm(v => ({...v,name:e.target.value as 'Semester 1'|'Semester 2'}))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
             {(['Semester 1','Semester 2'] as const).filter(availableName).map(name => <option key={name}>{name}</option>)}
           </select></label>
           <label className="block space-y-1 text-sm"><span className="font-medium text-slate-700">Start date</span><input required type="date" value={semesterForm.startDate} onChange={e => setSemesterForm(v => ({...v,startDate:e.target.value}))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"/></label>
