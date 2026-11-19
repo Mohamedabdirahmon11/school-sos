@@ -5116,7 +5116,7 @@ apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAd
   if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
       startDate < year.start_date || endDate > year.end_date ||
       ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
-      (resultsPublishDate && !isAcademicSetupDate(resultsPublishDate))) {
+      (resultsPublishDate && (!isAcademicSetupDate(resultsPublishDate) || (examEndDate && resultsPublishDate < examEndDate)))) {
     res.status(400).json({ error: 'Enter valid Semester 1/2 dates within the academic year and a valid exam/result date range.' }); return;
   }
   const { data: existing, error: existingError } = await client.from('terms').select('id,name')
@@ -5166,9 +5166,15 @@ apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const { data: term, error: termError } = await client.from('terms')
     .select('id,academic_year_id,name,start_date,end_date').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
   if (termError || !term) { res.status(404).json({ error: 'Semester was not found.' }); return; }
-  const { data: year } = await client.from('academic_years').select('status,start_date,end_date')
+  const { data: year, error: yearError } = await client.from('academic_years').select('status,start_date,end_date')
     .eq('id', term.academic_year_id).eq('school_id', school.id).maybeSingle();
-  if (year?.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (year.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  const { data: existingExam } = await client.from('exam_periods').select('id,status')
+    .eq('school_id', school.id).eq('term_id', term.id).maybeSingle();
+  if (existingExam?.status === 'published') {
+    res.status(409).json({ error: 'This semester has a published examination period. Its dates and results publication schedule are locked.' }); return;
+  }
   const name = req.body?.name === 'Semester 1' || req.body?.name === 'Semester 2' ? req.body.name : '';
   const startDate = req.body?.startDate;
   const endDate = req.body?.endDate;
@@ -5191,16 +5197,15 @@ apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, req
   if (error || !data) { res.status(400).json({ error: /overlap/i.test(error?.message || '') ? 'Semester dates overlap another semester.' : 'Semester could not be updated.' }); return; }
   let examPeriod: any = null;
   if (examStartDate && examEndDate) {
-    const { data: currentExam } = await client.from('exam_periods').select('id')
-      .eq('school_id', school.id).eq('term_id', term.id).maybeSingle();
     const values = {
-      school_id: school.id, term_id: term.id, name: name + ' Examination',
-      start_date: examStartDate, end_date: examEndDate, results_publish_date: resultsPublishDate || null,
-      status: 'draft', created_by: user.id
+      name: name + ' Examination', start_date: examStartDate, end_date: examEndDate,
+      results_publish_date: resultsPublishDate || null, updated_at: new Date().toISOString()
     };
-    const savedExam = currentExam
-      ? await client.from('exam_periods').update({ ...values, updated_at: new Date().toISOString() }).eq('id', currentExam.id).eq('school_id', school.id).select().single()
-      : await client.from('exam_periods').insert(values).select().single();
+    const savedExam = existingExam
+      ? await client.from('exam_periods').update(values).eq('id', existingExam.id).eq('school_id', school.id).select().single()
+      : await client.from('exam_periods').insert({
+          ...values, school_id: school.id, term_id: term.id, status: 'draft', created_by: user.id
+        }).select().single();
     if (savedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but exam dates could not be updated.' }); return; }
     examPeriod = savedExam.data;
   }
