@@ -232,7 +232,7 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {classes.map(klass => <label key={klass.id} className="flex items-center justify-between gap-3 rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs">
               <span className="font-semibold text-[#334155]">{klass.name}</span>
-              <select value={classShifts[klass.id] || ((klass.normalExamShift ?? klass.normal_exam_shift) === 'afternoon' || klass.shift === 2 ? 'afternoon' : 'morning')} onChange={event => setClassShifts(current => ({ ...current, [klass.id]: event.target.value as 'morning' | 'afternoon' }))} className="rounded-md border border-[#CBD5E1] bg-white px-2 py-1.5">
+              <select value={classShifts[klass.id] || ((klass.normalExamShift ?? klass.normal_exam_shift) === 'morning' || (klass.normalExamShift ?? klass.normal_exam_shift) === 'afternoon' ? (klass.normalExamShift ?? klass.normal_exam_shift) : klass.shift === 2 ? 'afternoon' : 'morning')} onChange={event => setClassShifts(current => ({ ...current, [klass.id]: event.target.value as 'morning' | 'afternoon' }))} className="rounded-md border border-[#CBD5E1] bg-white px-2 py-1.5">
                 <option value="morning">Subax</option><option value="afternoon">Galab</option>
               </select>
             </label>)}
