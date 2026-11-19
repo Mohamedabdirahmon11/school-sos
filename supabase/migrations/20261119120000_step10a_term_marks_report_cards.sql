@@ -442,18 +442,21 @@ BEGIN
     jsonb_build_object('status',v_previous),
     jsonb_build_object('status',p_status),p_actor_id);
   IF p_status='open' AND v_previous='closed' THEN
-    WITH revoked AS (
-      UPDATE public.report_cards SET published_at=NULL,published_by=NULL,updated_at=now()
+    WITH old_cards AS (
+      SELECT id,student_id,published_at FROM public.report_cards
       WHERE school_id=p_school_id
         AND academic_year_id=(SELECT academic_year_id FROM public.terms WHERE id=p_term_id AND school_id=p_school_id)
         AND published_at IS NOT NULL
-      RETURNING id,student_id,published_at
+    ), revoked AS (
+      UPDATE public.report_cards SET published_at=NULL,published_by=NULL,updated_at=now()
+      WHERE id IN (SELECT id FROM old_cards)
+      RETURNING id
     )
     INSERT INTO public.marks_audit(school_id,entity_type,entity_id,student_id,old_value,new_value,changed_by)
-    SELECT p_school_id,'report_card',id,student_id,
-      jsonb_build_object('published_at',published_at),
+    SELECT p_school_id,'report_card',old_cards.id,old_cards.student_id,
+      jsonb_build_object('published_at',old_cards.published_at),
       jsonb_build_object('published_at',NULL),p_actor_id
-    FROM revoked;
+    FROM old_cards JOIN revoked USING(id);
   END IF;
   RETURN jsonb_build_object('term_id',p_term_id,'status',p_status,'closed_at',v_old.closed_at);
 END;
