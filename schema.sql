@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS schools (
   currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   language VARCHAR(5) NOT NULL DEFAULT 'en',
   timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Addis_Ababa',
+  date_format VARCHAR(20) NOT NULL DEFAULT 'dd/MM/yyyy' CHECK (date_format IN ('dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd')),
   academic_year VARCHAR(50) NOT NULL DEFAULT '2026-2027',
   current_semester VARCHAR(50) NOT NULL DEFAULT 'Semester 1',
   setup_progress JSONB NOT NULL DEFAULT '{"currentStep": 1, "completedSteps": [], "skippedSteps": [], "completedAt": null}'::JSONB,
