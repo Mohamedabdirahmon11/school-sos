@@ -608,6 +608,12 @@ export class ApiClient {
   public static async renameClassGroup(id:string,name:string) {
     return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({name})});
   }
+  public static async updateClassGroupOrder(id:string,sortOrder:number) {
+    return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({sortOrder})});
+  }
+  public static async updateClassSectionConfiguration(id:string,data:{name:string;maxStudents:number;teacherId:string|null}) {
+    return this.request(`/class-sections/${encodeURIComponent(id)}/configuration`,{method:'PUT',body:JSON.stringify(data)});
+  }
   public static async deleteClassGroup(id:string) {
     return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'DELETE'});
   }
