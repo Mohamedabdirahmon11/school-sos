@@ -17,7 +17,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const DEFAULT_DATA: SchoolSetupData = {
   schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' },
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
-  terms: [{ name: 'Term 1', startDate: '', endDate: '' }, { name: 'Term 2', startDate: '', endDate: '' }],
+  terms: [{ name: 'Semester 1', startDate: '', endDate: '' }, { name: 'Semester 2', startDate: '', endDate: '' }],
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' },
   workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 },
   completedSteps: []
@@ -26,7 +26,7 @@ const DEFAULT_DATA: SchoolSetupData = {
 const STEPS = [
   { title: 'School Information', description: 'Confirm the official details and contact information for this school.' },
   { title: 'Academic Year', description: 'Set the academic year and its official start and end dates.' },
-  { title: 'Terms / Semesters', description: 'Create one, two, or three terms for the academic year.' },
+  { title: 'Two Semesters', description: 'Configure Semester 1 and Semester 2 for the selected academic year.' },
   { title: 'Academic Calendar', description: 'Choose working days, holidays, and the calendar display used by your school.' },
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
@@ -44,14 +44,27 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
 
   useEffect(() => {
     let active = true;
-    ApiClient.getSchoolSetupData().then(result => {
+    ApiClient.getSchoolSetupData().then(async result => {
       if (!active) return;
       const incoming = result.data || {};
+      const availableYears = await ApiClient.getAcademicYears().catch(() => []);
+      const preferredYear = availableYears.find(year => year.is_current) || availableYears[0] || null;
+      const canonicalSemesters = preferredYear
+        ? await ApiClient.getAcademicYearSemesters(preferredYear.id).catch(() => [])
+        : [];
+      const savedTerms = canonicalSemesters.length ? canonicalSemesters : (Array.isArray(incoming.terms) ? incoming.terms : []);
+      const normalizedSemesters = DEFAULT_DATA.terms.map((fallback, index) => {
+        const matched = savedTerms.find((item: any) => item.name === fallback.name) || savedTerms[index] || {};
+        return { name: fallback.name, startDate: matched.startDate || matched.start_date || '', endDate: matched.endDate || matched.end_date || '' };
+      });
       setData({
         ...DEFAULT_DATA, ...incoming,
         schoolInformation: { ...DEFAULT_DATA.schoolInformation, ...result.school, ...(incoming.schoolInformation || {}) },
-        academicYear: { ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}) },
-        terms: incoming.terms?.length ? incoming.terms : DEFAULT_DATA.terms,
+        academicYear: {
+          ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}),
+          ...(preferredYear ? { name: preferredYear.name, startDate: preferredYear.start_date, endDate: preferredYear.end_date, isCurrent: preferredYear.is_current } : {})
+        },
+        terms: normalizedSemesters,
         calendar: { ...DEFAULT_DATA.calendar, ...(incoming.calendar || {}) },
         workingHours: { ...DEFAULT_DATA.workingHours, ...(incoming.workingHours || {}), periodsPerDay: Math.min(8, Math.max(1, Number(incoming.workingHours?.periodsPerDay || DEFAULT_DATA.workingHours.periodsPerDay))) },
         completedSteps: incoming.completedSteps || []
@@ -88,9 +101,38 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
     try {
       const section: Partial<SchoolSetupData> = step === 1 ? { schoolInformation: data.schoolInformation }
         : step === 2 ? { academicYear: data.academicYear }
-        : step === 3 ? { terms: data.terms }
+        : step === 3 ? { terms: data.terms.map((term, index) => ({ ...term, name: index === 0 ? 'Semester 1' : 'Semester 2' })) }
         : step === 4 ? { calendar: data.calendar }
         : { workingHours: data.workingHours };
+
+      if (step === 2) {
+        const name = data.academicYear.name.trim();
+        const existingYears = await ApiClient.getAcademicYears();
+        const existingYear = existingYears.find(year => year.name.trim().toLowerCase() === name.toLowerCase());
+        const payload = { name, startDate: data.academicYear.startDate, endDate: data.academicYear.endDate };
+        const savedYear = existingYear
+          ? await ApiClient.updateAcademicYear(existingYear.id, payload)
+          : await ApiClient.createAcademicYear(payload);
+        if (data.academicYear.isCurrent) await ApiClient.activateAcademicYear(savedYear.id);
+      }
+
+      if (step === 3) {
+        const existingYears = await ApiClient.getAcademicYears();
+        const selectedYear = existingYears.find(year => year.name.trim().toLowerCase() === data.academicYear.name.trim().toLowerCase());
+        if (!selectedYear) throw new Error('Save or select the academic year before configuring its semesters.');
+        const existingSemesters = await ApiClient.getAcademicYearSemesters(selectedYear.id);
+        const semesterInputs = data.terms.slice(0, 2).map((term, index) => ({
+          ...term, name: index === 0 ? 'Semester 1' as const : 'Semester 2' as const
+        }));
+        for (let index = 0; index < semesterInputs.length; index += 1) {
+          const semester = semesterInputs[index];
+          const current = existingSemesters.find(item => item.name === semester.name) || existingSemesters[index];
+          const payload = { name: semester.name, startDate: semester.startDate, endDate: semester.endDate };
+          if (current) await ApiClient.updateAcademicSemester(current.id, payload);
+          else await ApiClient.createAcademicSemester(selectedYear.id, payload);
+        }
+      }
+
       // Convert logos saved by the older Base64 flow into Storage on the next Step 1 save.
       if (step === 1 && typeof data.schoolInformation.logoUrl === 'string' && data.schoolInformation.logoUrl.startsWith('data:image/')) {
         const legacyBlob = await fetch(data.schoolInformation.logoUrl).then(response => response.blob());
@@ -153,14 +195,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-medium text-slate-700"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={e => patch('academicYear', { ...data.academicYear, isCurrent: e.target.checked })} className="h-4 w-4 accent-teal-700" /> Set as the current academic year</label>
       </div>}
 
-      {step === 3 && <div className="space-y-4">
-        {data.terms.map((term, index) => <div key={index} className="grid gap-3 rounded-2xl border border-slate-200 p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-          {field('Term name', term.name, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, name: v } : t)))}
-          {field('Start date', term.startDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, startDate: v } : t)), 'date')}
-          {field('End date', term.endDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, endDate: v } : t)), 'date')}
-          <button type="button" disabled={data.terms.length <= 1} onClick={() => patch('terms', data.terms.filter((_, i) => i !== index))} className="rounded-lg border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 disabled:opacity-30">Remove</button>
+      {step === 3 && <div className="grid gap-4 md:grid-cols-2">
+        {data.terms.slice(0, 2).map((term, index) => <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+          <div><h3 className="font-bold text-slate-900">{index === 0 ? 'Semester 1' : 'Semester 2'}</h3><p className="mt-1 text-xs text-slate-500">Set the actual dates used by this school. Ethiopian calendar dates are supported through the school's calendar preference.</p></div>
+          {field('Start date', term.startDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, name: index === 0 ? 'Semester 1' : 'Semester 2', startDate: v } : t)), 'date')}
+          {field('End date', term.endDate, v => patch('terms', data.terms.map((t, i) => i === index ? { ...t, name: index === 0 ? 'Semester 1' : 'Semester 2', endDate: v } : t)), 'date')}
         </div>)}
-        <button type="button" disabled={data.terms.length >= 3} onClick={() => patch('terms', [...data.terms, { name: 'Term ' + (data.terms.length + 1), startDate: '', endDate: '' }])} className="rounded-xl border border-dashed border-teal-400 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-40">+ Add term (maximum 3)</button>
       </div>}
 
       {step === 4 && <div className="space-y-6">
