@@ -125,7 +125,7 @@ export const SidebarAppearanceSettings: React.FC = () => {
       setStatus('saved');
     } catch (cause) {
       setStatus(navigator.onLine ? 'idle' : 'offline');
-      setError(cause instanceof Error ? cause.message : 'Sidebar appearance could not be saved.');
+      setError(cause instanceof Error ? cause.message : 'Navigation appearance could not be saved.');
     } finally {
       setSaving(false);
     }
@@ -141,7 +141,7 @@ export const SidebarAppearanceSettings: React.FC = () => {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><Palette size={19}/> Sidebar appearance</h2>
-          <p className="mt-1 text-sm text-slate-500">Customize the navigation style for everyone in this school. Changes are saved to this school only.</p>
+          <p className="mt-1 text-sm text-slate-500">Customize the sidebar layout, colors, and navigation style for everyone in this school. Changes are saved to this school only.</p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">School-wide</span>
       </header>
