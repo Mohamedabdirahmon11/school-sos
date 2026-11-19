@@ -185,7 +185,7 @@ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
 EXECUTE FUNCTION public.schoolos_check_mark_structure_total();
 
 CREATE OR REPLACE FUNCTION public.schoolos_audit_component_mark()
-RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
 BEGIN
   INSERT INTO public.marks_audit(
     school_id,entity_type,entity_id,component_id,class_id,subject_id,student_id,
@@ -226,7 +226,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
       AND u.role='teacher' AND u.school_id=p_school_id
       AND a.class_id=p_class_id AND a.subject_id=p_subject_id
       AND (a.term_id IS NULL OR a.term_id=p_term_id)
-      AND (a.section_id IS NULL OR (p_student_id IS NOT NULL AND a.section_id=e.section_id))
+      AND (p_student_id IS NULL OR a.section_id IS NULL OR a.section_id=e.section_id)
   );
 $$;
 REVOKE ALL ON FUNCTION private.auth_has_term_assignment(text,text,text,uuid,text) FROM PUBLIC,anon;
@@ -340,7 +340,6 @@ BEGIN
     v_status:=COALESCE(v_item->>'status','present');
     v_score:=NULLIF(v_item->>'marks','')::numeric;
     IF v_student_id IS NULL OR v_status NOT IN ('present','absent','excused')
-      OR (v_status='present' AND v_score IS NULL)
       OR (v_score IS NOT NULL AND (v_score<0 OR v_score>v_component.max_marks)) THEN
       RAISE EXCEPTION 'Dhibcuhu waa inay u dhexeeyaan 0 iyo %; xaaladdana si sax ah u dooro.',v_component.max_marks;
     END IF;
@@ -348,6 +347,9 @@ BEGIN
       WHERE e.school_id=p_school_id AND e.student_id=v_student_id AND e.class_id=p_class_id
         AND e.academic_year_id=v_year_id AND e.status='active' LIMIT 1;
     IF NOT FOUND THEN RAISE EXCEPTION 'Ardaygu fasalkan kuma jiro diiwaanka term-kan.'; END IF;
+    IF v_status='present' AND v_score IS NULL THEN
+      CONTINUE;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM public.teacher_class_subject_assignments a
       WHERE a.school_id=p_school_id AND a.teacher_id=v_teacher_id AND a.academic_year_id=v_year_id
         AND (a.term_id IS NULL OR a.term_id=v_term_id) AND a.class_id=p_class_id
@@ -417,7 +419,7 @@ BEGIN
   ), totals AS (
     SELECT st.student_id,su.subject_id,su.subject_name,
       COALESCE(sum(CASE WHEN cm.status='present' THEN cm.marks ELSE 0 END),0) AS total,
-      count(cm.id) AS entered_count,count(mc.id) AS component_count
+      count(cm.id) FILTER (WHERE cm.marks IS NOT NULL OR cm.status IN ('absent','excused')) AS entered_count,count(mc.id) AS component_count
     FROM students st CROSS JOIN subjects su CROSS JOIN chosen ch
     JOIN public.mark_components mc ON mc.structure_id=ch.id AND mc.school_id=p_school_id
     LEFT JOIN public.component_marks cm ON cm.school_id=p_school_id AND cm.component_id=mc.id
@@ -468,6 +470,12 @@ BEGIN
       AND term_id=ANY(v_terms) AND status='closed')<>2 THEN
     RAISE EXCEPTION 'Report Card lama samayn karo ilaa labada term la xiro.';
   END IF;
+  IF EXISTS (SELECT 1 FROM unnest(v_terms) tr(id)
+    WHERE NOT EXISTS (SELECT 1 FROM public.mark_structures ms
+      WHERE ms.school_id=p_school_id AND ms.term_id=tr.id
+        AND (ms.class_id IS NULL OR ms.class_id=p_class_id))) THEN
+    RAISE EXCEPTION 'Qaabka dhibcaha wali looma dejin labada term ee fasalkan.';
+  END IF;
   WITH enrolled AS (
     SELECT e.student_id,e.section_id FROM public.enrollments e
     WHERE e.school_id=p_school_id AND e.class_id=p_class_id
@@ -490,7 +498,7 @@ BEGIN
   FROM enrolled e CROSS JOIN subjects s CROSS JOIN term_components tc
   LEFT JOIN public.component_marks cm ON cm.school_id=p_school_id AND cm.component_id=tc.component_id
     AND cm.class_id=p_class_id AND cm.subject_id=s.subject_id AND cm.student_id=e.student_id
-  WHERE cm.id IS NULL;
+  WHERE cm.id IS NULL OR (cm.status='present' AND cm.marks IS NULL);
   IF v_missing>0 THEN RAISE EXCEPTION 'Report Card lama samayn karo: % dhibcood ayaa maqan.',v_missing; END IF;
 
   WITH enrolled AS (
@@ -526,7 +534,10 @@ BEGIN
   ), per_student AS (
     SELECT student_id,avg(yearly_total)::numeric(6,2) AS yearly_average,
       jsonb_agg(jsonb_build_object('subject_id',subject_id,'subject',subject_name,
-        'term1',term1_total,'term2',term2_total,'yearly',yearly_total)
+        'term1',term1_total,'term2',term2_total,'yearly',yearly_total,
+        'grade',(SELECT band->>'label' FROM public.schools sc,LATERAL jsonb_array_elements(sc.grading_scale) band
+          WHERE sc.id=p_school_id AND (band->>'minPercentage')::numeric<=yearly_total
+          ORDER BY (band->>'minPercentage')::numeric DESC LIMIT 1))
         ORDER BY subject_name) AS subject_results
     FROM per_subject GROUP BY student_id
   ), ranked AS (
