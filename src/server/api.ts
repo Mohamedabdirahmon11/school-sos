@@ -10271,7 +10271,8 @@ apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSch
     .eq('school_id',school.id).eq('academic_year_id',term.academic_year_id)
     .eq('class_id',classId).eq('status','active');
   const allowedSections = new Set(assignments.map((a:any)=>a.section_id).filter(Boolean));
-  const allowedStudentIds = (enrollments||[]).filter((e:any)=>!allowedSections.size||allowedSections.has(e.section_id)).map((e:any)=>e.student_id);
+  const hasWholeClassAssignment = assignments.some((a:any)=>!a.section_id);
+  const allowedStudentIds = (enrollments||[]).filter((e:any)=>hasWholeClassAssignment||!allowedSections.size||allowedSections.has(e.section_id)).map((e:any)=>e.student_id);
   const { data: marks, error } = await client.from('component_marks').select('student_id,marks,status')
     .eq('school_id',school.id).eq('component_id',componentId).eq('class_id',classId).eq('subject_id',subjectId)
     .in('student_id',allowedStudentIds.length?allowedStudentIds:['__none__']);
@@ -10419,7 +10420,6 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
     .eq('school_id',school.id).eq('class_id',req.params.classId).eq('academic_year_id',academicYearId)
     .order('rank_in_class',{ascending:true});
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
-  if (cards.some((card: any) => !card.published_at)) { res.status(409).json({ error: 'Fasalka waxaa ku jira report cards aan weli la daabicin.' }); return; }
   const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
   const klass = await db.getClassById(req.params.classId,school.id);
   const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
