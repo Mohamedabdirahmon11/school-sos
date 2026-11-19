@@ -69,7 +69,7 @@ export const TermMarksTeacherWorkspace:React.FC<{
       const raw=values[student.id];
       return {studentId:student.id,status,marks:status==='present'?(raw===''||raw===undefined?null:Number(raw)):null};
     });
-    if(payload.some(row=>row.status==='present'&&(row.marks===null||!Number.isFinite(row.marks)||row.marks<0||row.marks>maxMarks))){
+    if(payload.some(row=>row.status==='present'&&row.marks!==null&&(!Number.isFinite(row.marks)||row.marks<0||row.marks>maxMarks))){
       setError(`Dhibcaha geli inta u dhexeysa 0 iyo ${maxMarks}.`);return;
     }
     setBusy(true);setError('');setMessage('');
