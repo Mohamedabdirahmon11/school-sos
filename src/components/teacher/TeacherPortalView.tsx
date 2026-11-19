@@ -84,6 +84,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
+  const isSemesterLocked = (examConfig?.lockedSemesters || []).includes(semester);
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
@@ -321,7 +322,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   // Save all editable subject rows for this teacher in one operation.
   const handleSaveMarks = async (status: 'draft' | 'submitted') => {
-    if (isReadOnly || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
+    if (isReadOnly || isSemesterLocked || isLoadingClassData || !selectedClassId || !editableClassSubjects.length || !students.length) return;
     if (status === 'submitted') {
       const incompleteSubject = editableClassSubjects.find(subject => {
         const lockedIds = new Set(classMarks.filter(mark => mark.subjectId === subject.id && ['submitted', 'form_teacher_submitted', 'approved'].includes(mark.status)).map(mark => mark.studentId));
@@ -812,10 +813,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
               <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
             </div>
           </div>
+
+          {isSemesterLocked && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">This semester is locked by the School Admin. Mark entry and submission are disabled until it is unlocked.</div>}
 
           {isFormTeacher && (
             <div className="space-y-4 rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
@@ -938,7 +941,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         const input = marksInput[key] || { scores: {}, remarks: '' };
                         const mark = classMarks.find(item => item.studentId === student.id && item.subjectId === subject.id);
                         const locked = ['submitted', 'form_teacher_submitted', 'approved'].includes(mark?.status || '');
-                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked;
+                        const editable = editableClassSubjects.some(item => item.id === subject.id) && !locked && !isSemesterLocked;
                         const examTotal = subjectComponents.reduce((sum, component) => sum + Number(input.scores[component.id] ?? mark?.assessmentScores?.[component.id] ?? 0), 0);
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
