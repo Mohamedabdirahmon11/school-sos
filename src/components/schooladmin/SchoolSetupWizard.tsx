@@ -52,7 +52,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
       const canonicalSemesters = preferredYear
         ? await ApiClient.getAcademicYearSemesters(preferredYear.id).catch(() => [])
         : [];
-      const savedTerms = canonicalSemesters.length ? canonicalSemesters : (Array.isArray(incoming.terms) ? incoming.terms : []);
+      const legacyYear = availableYears.length === 0 ? incoming.academicYear : null;
+      const sameStoredYear = Boolean(preferredYear && String(incoming.academicYear?.name || '').replace('/', '-') === preferredYear.name.replace('/', '-'));
+      const savedTerms = canonicalSemesters.length ? canonicalSemesters : ((sameStoredYear || legacyYear) && Array.isArray(incoming.terms) ? incoming.terms : []);
       const normalizedSemesters = DEFAULT_DATA.terms.map((fallback, index) => {
         const matched = savedTerms.find((item: any) => item.name === fallback.name) || savedTerms[index] || {};
         return { name: fallback.name, startDate: matched.startDate || matched.start_date || '', endDate: matched.endDate || matched.end_date || '' };
@@ -61,7 +63,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
         ...DEFAULT_DATA, ...incoming,
         schoolInformation: { ...DEFAULT_DATA.schoolInformation, ...result.school, ...(incoming.schoolInformation || {}) },
         academicYear: {
-          ...DEFAULT_DATA.academicYear, ...(incoming.academicYear || {}),
+          ...DEFAULT_DATA.academicYear, ...(legacyYear || {}),
           ...(preferredYear ? { name: preferredYear.name, startDate: preferredYear.start_date, endDate: preferredYear.end_date, isCurrent: preferredYear.is_current } : {})
         },
         terms: normalizedSemesters,
