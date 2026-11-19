@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { School, SchoolBranch, SchoolClass, ExamConfig, ReportCardDesign } from '../../types/index.ts';
-import { adminRemark, formatReportCardMark, initialsFor, teacherRemark } from '../../lib/report-card.ts';
+import { adminRemark, formatReportCardMark, gradeLabelForPercentage, initialsFor, teacherRemark } from '../../lib/report-card.ts';
 import {
   FileText,
   Printer,
@@ -165,12 +165,13 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <th className="py-2.5 px-3 text-center">Semester 2 Marks</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 %</th>
                 <th className="py-2.5 px-3 text-right font-bold">Yearly Result (%)</th>
+                <th className="py-2.5 px-3 text-center">Grade</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
               {result.subjectResults.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
+                  <td colSpan={7} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
                 </tr>
               ) : result.subjectResults.map(row => (
                 <tr key={row.subject.id} className="hover:bg-[#F8FAFC]">
@@ -180,6 +181,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{formatReportCardMark(row.sem2Marks, row.maxMarks)}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem2Percentage !== null ? `${row.sem2Percentage}%` : '-'}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-bold" style={{ color: primaryColor }}>{row.yearlyPercentage !== null ? `${row.yearlyPercentage}%` : '-'}</td>
+                  <td className="py-2.5 px-3 text-center font-bold text-[#475569]">{gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)}</td>
                 </tr>
               ))}
             </tbody>
@@ -188,6 +190,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Combined Yearly Academic Average</td>
                 <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] text-[#64748B]">Exam maximums shown per subject</td>
                 <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</td>
+                <td className="py-2.5 px-3 text-center">{result.annualComplete ? gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale) : '-'}</td>
               </tr>
             </tfoot>
           </table>
