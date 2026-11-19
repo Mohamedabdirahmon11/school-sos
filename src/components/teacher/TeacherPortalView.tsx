@@ -77,11 +77,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const isFormTeacher = classAssignments.some((assignment: any) => assignment.isFormTeacherClass === true);
   const uniqueSubjects = (rows: any[]) => [...new Map(rows.map(row => [row.subject.id, row.subject])).values()] as Subject[];
   const allClassSubjects = uniqueSubjects(classAssignments);
-  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher || assignment.canEditMarks === true));
-  // Homework is limited to subjects the teacher personally teaches.
-  // Form Teacher's wider subject access applies to the class mark sheet only.
-  const classSubjects: Subject[] = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
-  const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
+  // Every teacher may enter marks only for subjects explicitly assigned to them.
+  // Form Teacher status grants class-wide read/review access, never mark-edit permission.
+  const editableClassSubjects = uniqueSubjects(classAssignments.filter((assignment: any) => !assignment.isFormTeacher));
+  const classSubjects: Subject[] = editableClassSubjects;
+  const gradeSubjects: Subject[] = editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
   const examConfig = examConfigData as ExamConfig | null;
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
