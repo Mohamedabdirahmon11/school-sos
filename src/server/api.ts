@@ -10442,6 +10442,7 @@ apiRouter.patch('/term-marks/report-cards/:id', requireAuth, requireSchoolAdminO
 apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
+  if (!['school_admin','super_admin','parent','student'].includes(user.role)) { res.status(403).json({ error: 'Ma lihid oggolaansho aad u daabacdo Report Card.' }); return; }
   const student = await db.getStudentById(req.params.studentId, school.id);
   if (!student || !await canAccessStudentRecord(user, student.id)) { res.status(404).json({ error: 'Report card lama helin.' }); return; }
   const client = termMarksServiceClient(res); if (!client) return;
