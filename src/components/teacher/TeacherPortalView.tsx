@@ -64,6 +64,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
   const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
   const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
+  const examInvigilationState = useApi(() => ApiClient.getTeacherExamInvigilation(), [school?.id, user?.id], Boolean(school && user?.role === 'teacher'));
+  const examInvigilationRows = Array.isArray(examInvigilationState.data) ? examInvigilationState.data : [];
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
@@ -631,6 +633,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
           {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={[...new Set(publishedExamSchedules.map((exam: any) => exam.className).filter(Boolean))].join(" / ") || school?.examTimetableClassGroup} />}
+        </section>
+
+        <section className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm space-y-3">
+          <div><h2 className="text-sm font-bold text-[#132A29]">My Exam Invigilation Duties</h2><p className="mt-1 text-xs text-[#64748B]">Published term-exam sessions where you are assigned as an invigilator.</p></div>
+          {examInvigilationState.loading ? <div className="h-14 animate-pulse rounded-lg bg-slate-100" /> : examInvigilationState.error ? <ErrorState error={examInvigilationState.error} onRetry={examInvigilationState.retry} /> : examInvigilationRows.length ? <div className="divide-y divide-[#E2E8F0]">
+            {examInvigilationRows.map((item: any, index: number) => <div key={item.examDate + ':' + item.sessionName + ':' + item.roomName + ':' + index} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs">
+              <div><strong className="text-[#132A29]">{item.periodName}</strong><p className="mt-1 text-[#64748B]">{item.examDate} · {item.sessionName} · {String(item.startTime).slice(0,5)}–{String(item.endTime).slice(0,5)}</p></div>
+              <div className="text-right"><span className="font-semibold text-[#0F766E]">{item.roomName}</span><p className="mt-1 text-[10px] text-[#64748B]">{item.shiftTag === 'morning' ? 'Morning' : item.shiftTag === 'afternoon' ? 'Afternoon' : 'All-day'}</p></div>
+            </div>)}
+          </div> : <p className="rounded-lg bg-[#F8FAFC] p-3 text-xs text-[#64748B]">No published invigilation duties have been assigned to you.</p>}
         </section>
 
         </section>

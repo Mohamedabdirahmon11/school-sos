@@ -15,6 +15,7 @@ const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
+const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
 
 test('exam schedule schema is tenant-scoped and protects room and seat allocations', () => {
   assert.match(migration, /ALTER TABLE public\.exam_schedules ENABLE ROW LEVEL SECURITY/);
@@ -86,6 +87,37 @@ test('Step 10B uses term-only group schedules, room-scoped seats, and school-sco
   assert.match(api, /roomSeatNumberBySession/);
   assert.match(api, /exam_session_id: session\.id/);
   assert.match(api, /Kaliya Term 1 iyo Term 2/);
+});
+
+test('Step 10B empty periods return complete data and invigilator replacement validates before deleting', () => {
+  assert.match(api, /if \(!period\) \{ res\.json\(\{ period: null, days: \[\], sessions: \[\], schedules: \[\], invigilators: \[\], roomAssignments: \[\], classExamSettings: \[\] \}\); return; \}/);
+
+  const routeStart = api.indexOf("apiRouter.post('/exams/term-periods/:periodId/invigilators'");
+  const routeEnd = api.indexOf("apiRouter.post('/exams/term-periods/:periodId/publish'", routeStart);
+  assert.ok(routeStart >= 0 && routeEnd > routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  const rowsIndex = route.indexOf('const rows = assignments.map');
+  const validationIndex = route.indexOf('usedRoomSessionKeys');
+  const deleteIndex = route.indexOf("from('exam_invigilators').delete()");
+  assert.ok(rowsIndex >= 0 && validationIndex > rowsIndex && deleteIndex > validationIndex);
+  assert.equal((route.match(/from\('exam_invigilators'\)\.delete\(\)/g) || []).length, 1);
+  assert.ok(route.includes('Kormeeraha waxaa lagu xiri karaa oo keliya qol dhab ahaan loo isticmaalayo session-kan.'));
+  assert.ok(api.includes("select('schedule_id,room_id,class_id,exam_number,seat_number,student_id')"));
+  assert.ok(api.includes('studentName: [student?.first_name, student?.middle_name, student?.last_name]'));
+  assert.ok(termUi.includes('Liisaska Fadhiyada Qolalka'));
+  assert.ok(termUi.includes('Daabac A4 (jadwalka + liisaska qolalka)'));
+  assert.ok(api.includes("apiRouter.delete('/exams/term-periods/:periodId'"));
+  assert.ok(api.includes("period.status !== 'draft'"));
+  assert.ok(api.includes("exam_schedules').delete()"));
+  assert.ok(api.indexOf("exam_schedules').delete()") < api.indexOf("exam_periods').delete()"));
+  assert.ok(api.includes("schedule.status === 'published'"));
+  assert.ok(client.includes('deleteTermExamPeriod'));
+  assert.ok(termUi.includes('Jooji draft-ka'));
+  assert.ok(termUi.includes('data.period.start_date'));
+  assert.ok(api.includes("apiRouter.get('/teacher/exam-invigilation'"));
+  assert.ok(client.includes('getTeacherExamInvigilation'));
+  assert.ok(teacherUi.includes('My Exam Invigilation Duties'));
+  assert.ok(teacherUi.includes('ApiClient.getTeacherExamInvigilation'));
 });
 
 test('exam schedule storage, client, and UI expose draft, publish, and print seating workflow', () => {

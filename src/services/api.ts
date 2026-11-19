@@ -1294,9 +1294,17 @@ export class ApiClient {
     return this.request<any>(`/exams/term-periods/${encodeURIComponent(periodId)}/publish`, { method: 'POST', body: JSON.stringify({}) });
   }
 
+  public static async deleteTermExamPeriod(periodId: string) {
+    return this.request<{ success: boolean; periodId: string }>(`/exams/term-periods/${encodeURIComponent(periodId)}`, { method: 'DELETE' });
+  }
+
   public static async getPublishedExamSchedules(classId?: string) {
     const path = '/exams/schedules/published' + (classId ? '?classId=' + encodeURIComponent(classId) : '');
     return this.request<any[]>(path);
+  }
+
+  public static async getTeacherExamInvigilation() {
+    return this.request<any[]>('/teacher/exam-invigilation');
   }
 
   public static async createExamSchedule(schedule: {
