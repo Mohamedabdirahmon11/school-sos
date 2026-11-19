@@ -3441,6 +3441,60 @@ apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext
   const classes = await db.getClasses(school.id);
   res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
 });
+apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Exam invigilation requires the configured Supabase database.' }); return; }
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+  const teacher = teacherPage.items[0] as any;
+  if (!teacher) { res.json([]); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: assignments, error } = await client.from('exam_invigilators').select('exam_session_id,room_id')
+      .eq('school_id', school.id).eq('teacher_id', teacher.id);
+    if (error) throw error;
+    const sessionIds = [...new Set((assignments || []).map((row: any) => row.exam_session_id))];
+    if (!sessionIds.length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
+    const { data: sessions, error: sessionError } = await client.from('exam_sessions').select('id,exam_day_id,name,start_time,end_time,shift_tag')
+      .eq('school_id', school.id).in('id', sessionIds);
+    if (sessionError) throw sessionError;
+    if (!(sessions || []).length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
+    const dayIds = [...new Set((sessions || []).map((row: any) => row.exam_day_id))];
+    const { data: days, error: dayError } = await client.from('exam_days').select('id,exam_period_id,exam_date')
+      .eq('school_id', school.id).in('id', dayIds);
+    if (dayError) throw dayError;
+    if (!(days || []).length) { res.setHeader('Cache-Control', 'no-store'); res.json([]); return; }
+    const periodIds = [...new Set((days || []).map((row: any) => row.exam_period_id))];
+    const { data: periods, error: periodError } = await client.from('exam_periods').select('id,name,term_id,status')
+      .eq('school_id', school.id).in('id', periodIds).eq('status', 'published');
+    if (periodError) throw periodError;
+    const roomIds = [...new Set((assignments || []).map((row: any) => row.room_id))];
+    const { data: rooms, error: roomError } = await client.from('exam_rooms').select('id,name')
+      .eq('school_id', school.id).in('id', roomIds);
+    if (roomError) throw roomError;
+    const sessionById = new Map((sessions || []).map((row: any) => [row.id, row]));
+    const dayById = new Map((days || []).map((row: any) => [row.id, row]));
+    const periodById = new Map((periods || []).map((row: any) => [row.id, row]));
+    const roomById = new Map((rooms || []).map((row: any) => [row.id, row]));
+    const result = (assignments || []).flatMap((assignment: any) => {
+      const session = sessionById.get(assignment.exam_session_id) as any;
+      const day = session ? dayById.get(session.exam_day_id) as any : null;
+      const period = day ? periodById.get(day.exam_period_id) as any : null;
+      if (!session || !day || !period) return [];
+      return [{
+        periodName: period.name, examDate: day.exam_date, sessionName: session.name,
+        startTime: session.start_time, endTime: session.end_time, shiftTag: session.shift_tag,
+        roomName: (roomById.get(assignment.room_id) as any)?.name || assignment.room_id
+      }];
+    }).sort((a: any, b: any) => String(a.examDate).localeCompare(String(b.examDate)) || String(a.startTime).localeCompare(String(b.startTime)));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load teacher invigilation assignments.' });
+  }
+});
+
 apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -6366,7 +6420,7 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
     const { data: period, error } = await client.from('exam_periods').select('*')
       .eq('school_id', school.id).eq('term_id', req.params.termId).maybeSingle();
     if (error) throw error;
-    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [] }); return; }
+    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [], roomAssignments: [], classExamSettings: [] }); return; }
     const days = await client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date');
     if (days.error) throw days.error;
     const dayIds = (days.data || []).map((day: any) => day.id);
@@ -6386,7 +6440,7 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
         ? client.from('exam_invigilators').select('*').eq('school_id', school.id).in('exam_session_id', sessionIds)
         : Promise.resolve({ data: [], error: null }),
       scheduleIds.length
-        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number').eq('school_id', school.id).in('schedule_id', scheduleIds)
+        ? client.from('exam_seat_assignments').select('schedule_id,room_id,class_id,exam_number,seat_number,student_id').eq('school_id', school.id).in('schedule_id', scheduleIds)
         : Promise.resolve({ data: [], error: null })
     ]);
     if (invigilators.error) throw invigilators.error;
@@ -6396,28 +6450,48 @@ apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSu
       ? await client.from('exam_rooms').select('id,name,capacity').eq('school_id', school.id).in('id', usedRoomIds)
       : { data: [], error: null };
     if (roomResult.error) throw roomResult.error;
+    const studentIds = [...new Set((seatRows.data || []).map((seat: any) => seat.student_id).filter(Boolean))];
+    const studentResult = studentIds.length
+      ? await client.from('students').select('id,student_id,roll_number,first_name,middle_name,last_name').eq('school_id', school.id).in('id', studentIds)
+      : { data: [], error: null };
+    if (studentResult.error) throw studentResult.error;
+    const studentById = new Map((studentResult.data || []).map((student: any) => [student.id, student]));
+    const scheduleById = new Map((schedules.data || []).map((schedule: any) => [schedule.id, schedule]));
     const roomById = new Map((roomResult.data || []).map((room: any) => [room.id, room]));
     const roomAssignments = new Map<string, any>();
-    for (const schedule of schedules.data || []) {
-      for (const seat of (seatRows.data || []).filter((row: any) => row.schedule_id === schedule.id)) {
-        const key = schedule.exam_session_id + ':' + seat.room_id;
-        const entry = roomAssignments.get(key) || {
-          sessionId: schedule.exam_session_id, roomId: seat.room_id,
-          roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
-          capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
-          studentCount: 0, classRanges: new Map<string, any>()
-        };
-        entry.studentCount += 1;
-        const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
-        range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
-        range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
-        range.studentCount += 1;
-        entry.classRanges.set(seat.class_id, range);
-        roomAssignments.set(key, entry);
-      }
+    for (const seat of seatRows.data || []) {
+      const schedule = scheduleById.get(seat.schedule_id) as any;
+      if (!schedule || !seat.room_id) continue;
+      const key = schedule.exam_session_id + ':' + seat.room_id;
+      const entry = roomAssignments.get(key) || {
+        sessionId: schedule.exam_session_id, roomId: seat.room_id,
+        roomName: (roomById.get(seat.room_id) as any)?.name || seat.room_id,
+        capacity: Number((roomById.get(seat.room_id) as any)?.capacity || 0),
+        studentCount: 0, classRanges: new Map<string, any>(), seats: []
+      };
+      const student = studentById.get(seat.student_id) as any;
+      entry.studentCount += 1;
+      const range = entry.classRanges.get(seat.class_id) || { classId: seat.class_id, fromNumber: seat.exam_number, toNumber: seat.exam_number, studentCount: 0 };
+      range.fromNumber = Math.min(range.fromNumber, Number(seat.exam_number));
+      range.toNumber = Math.max(range.toNumber, Number(seat.exam_number));
+      range.studentCount += 1;
+      entry.classRanges.set(seat.class_id, range);
+      entry.seats.push({
+        seatNumber: seat.seat_number,
+        examNumber: seat.exam_number,
+        studentId: student?.student_id || seat.student_id,
+        rollNumber: student?.roll_number || '',
+        studentName: [student?.first_name, student?.middle_name, student?.last_name].filter(Boolean).join(' '),
+        classId: seat.class_id,
+        subjectId: schedule.subject_id,
+        examDate: schedule.exam_date
+      });
+      roomAssignments.set(key, entry);
     }
     const roomAssignmentRows = [...roomAssignments.values()].map((entry: any) => ({
-      ...entry, classRanges: [...entry.classRanges.values()]
+      ...entry,
+      classRanges: [...entry.classRanges.values()],
+      seats: entry.seats.sort((a: any, b: any) => Number(a.seatNumber) - Number(b.seatNumber))
     }));
     res.setHeader('Cache-Control', 'no-store');
     res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [], roomAssignments: roomAssignmentRows, classExamSettings: classExamSettings.data || [] });
@@ -6659,6 +6733,43 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
   }
 });
 
+apiRouter.delete('/exams/term-periods/:periodId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: period, error: lookupError } = await client.from('exam_periods').select('id,name,status')
+      .eq('id', req.params.periodId).eq('school_id', school.id).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!period) { res.status(404).json({ error: 'Muddada imtixaanka lagama helin dugsigan.' }); return; }
+    if (period.status !== 'draft') { res.status(409).json({ error: 'Jadwal imtixaan oo la daabacay lama tirtiri karo.' }); return; }
+    // Remove dependent term schedules first: their session FK is RESTRICT, while
+    // the period also cascades through days/sessions. This ordering avoids a
+    // cascade-order FK failure when a draft period is deleted.
+    const { data: periodSchedules, error: schedulesError } = await client.from('exam_schedules')
+      .select('id,status').eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term');
+    if (schedulesError) throw schedulesError;
+    if ((periodSchedules || []).some((schedule: any) => schedule.status === 'published')) {
+      res.status(409).json({ error: 'Jadwalku wuxuu leeyahay imtixaan la daabacay; lama tirtiri karo.' }); return;
+    }
+    const scheduleIds = (periodSchedules || []).map((schedule: any) => schedule.id);
+    if (scheduleIds.length) {
+      const { error: scheduleDeleteError } = await client.from('exam_schedules').delete()
+        .eq('school_id', school.id).in('id', scheduleIds);
+      if (scheduleDeleteError) throw scheduleDeleteError;
+    }
+    const { data: deletedRows, error: deleteError } = await client.from('exam_periods').delete()
+      .eq('id', period.id).eq('school_id', school.id).eq('status', 'draft').select('id');
+    if (deleteError) throw deleteError;
+    if (!deletedRows?.length) { res.status(409).json({ error: 'Jadwalku wuu isbeddelay; dib u cusboonaysii ka hor intaadan joojin.' }); return; }
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_CANCELLED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Cancelled draft term exam period ' + period.name + '.', severity: 'warning' });
+    res.json({ success: true, periodId: period.id });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to cancel term exam timetable.' });
+  }
+});
+
 apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
@@ -6676,10 +6787,6 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       .eq('school_id', school.id).in('exam_day_id', (days || []).map((day: any) => day.id));
     if (sessionsError) throw sessionsError;
     const sessionIds = (sessions || []).map((session: any) => session.id);
-    if (sessionIds.length) {
-      const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
-      if (deleteError) throw deleteError;
-    }
     const rows = assignments.map((item: any) => ({
       school_id: school.id, exam_session_id: String(item.sessionId || ''),
       room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
@@ -6706,6 +6813,13 @@ apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requir
       : { data: [], error: null };
     if (teachingError) throw teachingError;
     const schedulesById = new Map((periodSchedules || []).map((item: any) => [item.id, item]));
+    const usedRoomSessionKeys = new Set((periodSeats || []).map((seat: any) => {
+      const schedule = schedulesById.get(seat.schedule_id) as any;
+      return schedule ? schedule.exam_session_id + ':' + seat.room_id : '';
+    }));
+    if (rows.some((row: any) => !usedRoomSessionKeys.has(row.exam_session_id + ':' + row.room_id))) {
+      throw new Error('Kormeeraha waxaa lagu xiri karaa oo keliya qol dhab ahaan loo isticmaalayo session-kan.');
+    }
     for (const row of rows) {
       const teachesRoomSubject = (periodSeats || []).some((seat: any) => {
         if (seat.room_id !== row.room_id) return false;
@@ -7942,6 +8056,7 @@ apiRouter.put('/report-card/design', requireAuth, requireSchoolAdminOrSuperAdmin
   try {
     const updates = sanitizeReportCardDesign(req.body);
     const updated = await db.updateReportCardDesign(school.id, updates);
+    await db.flush();
     db.logAudit({
       action: 'REPORT_CARD_DESIGN_UPDATED',
       category: 'academics',
