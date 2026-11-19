@@ -6827,7 +6827,6 @@ CREATE TRIGGER schoolos_structured_template_audit
 
 -- School Setup lifecycle: managed academic years, exactly two configured semesters,
 -- exam windows and result publication dates. Existing history is retained.
-BEGIN;
 
 ALTER TABLE public.academic_years
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'closed',
@@ -6863,7 +6862,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   PERFORM 1 FROM public.schools WHERE id = NEW.school_id FOR UPDATE;
   IF NEW.start_date > NEW.end_date THEN
@@ -6879,7 +6878,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS academic_years_guard_dates ON public.academic_years;
 CREATE TRIGGER academic_years_guard_dates
 BEFORE INSERT OR UPDATE OF school_id, start_date, end_date
@@ -6893,7 +6892,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_year public.academic_years%ROWTYPE;
 BEGIN
@@ -6938,7 +6937,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS terms_guard_dates ON public.terms;
 CREATE TRIGGER terms_guard_dates
 BEFORE INSERT OR UPDATE OF school_id, academic_year_id, name, start_date, end_date
@@ -6953,7 +6952,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_activate_academic_year(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   PERFORM 1 FROM public.schools WHERE id = p_school_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'School not found.'; END IF;
@@ -7001,7 +7000,7 @@ BEGIN
          updated_at = now()
    WHERE id = p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) TO service_role;
 
@@ -7011,7 +7010,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_close_academic_year(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   PERFORM 1 FROM public.schools WHERE id = p_school_id FOR UPDATE;
   UPDATE public.academic_years
@@ -7031,7 +7030,7 @@ BEGIN
   ON CONFLICT (school_id, term_id) DO UPDATE
     SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
 
@@ -7041,7 +7040,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_sync_school_semester_dates(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   UPDATE public.schools s
      SET terms = jsonb_build_object(
@@ -7057,7 +7056,7 @@ BEGIN
      updated_at = now()
    WHERE s.id = p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) TO service_role;
 
@@ -7070,7 +7069,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_set_semester_status(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE v_year_id uuid;
 BEGIN
   IF p_status NOT IN ('open','closed') THEN RAISE EXCEPTION 'Invalid semester status.'; END IF;
@@ -7102,7 +7101,7 @@ BEGIN
   END IF;
   PERFORM public.schoolos_sync_school_semester_dates(p_school_id, v_year_id);
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
 
@@ -7113,7 +7112,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
@@ -7146,7 +7145,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS student_marks_closed_term_guard ON public.student_marks;
 CREATE TRIGGER student_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.student_marks
@@ -7157,7 +7156,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_component_id uuid;
@@ -7178,7 +7177,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS component_marks_closed_term_guard ON public.component_marks;
 CREATE TRIGGER component_marks_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.component_marks
@@ -7189,7 +7188,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_date date;
@@ -7211,7 +7210,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS attendance_closed_term_guard ON public.attendance_records;
 CREATE TRIGGER attendance_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.attendance_records
@@ -7222,7 +7221,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_school_id text;
   v_term_id uuid;
@@ -7238,7 +7237,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
 CREATE TRIGGER exam_periods_closed_term_guard
 BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
@@ -7256,6 +7255,7 @@ ALTER TABLE public.terms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS academic_years_admin_delete ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_admin_insert ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_admin_update ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_select ON public.academic_years;
 DROP POLICY IF EXISTS academic_years_tenant_scope ON public.academic_years;
 CREATE POLICY academic_years_admin_select ON public.academic_years FOR SELECT TO authenticated
  USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
@@ -7269,6 +7269,7 @@ CREATE POLICY academic_years_admin_delete ON public.academic_years FOR DELETE TO
 DROP POLICY IF EXISTS terms_admin_delete ON public.terms;
 DROP POLICY IF EXISTS terms_admin_insert ON public.terms;
 DROP POLICY IF EXISTS terms_admin_update ON public.terms;
+DROP POLICY IF EXISTS terms_admin_select ON public.terms;
 DROP POLICY IF EXISTS terms_tenant_scope ON public.terms;
 CREATE POLICY terms_admin_select ON public.terms FOR SELECT TO authenticated
  USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
@@ -7282,7 +7283,6 @@ CREATE POLICY terms_admin_delete ON public.terms FOR DELETE TO authenticated
 
 -- Shared subject catalog with school-owned selections. Existing school subjects
 -- and all historical subject references remain unchanged.
-BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.subject_catalog (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -7349,7 +7349,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_select_subject_catalog(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_item record;
   v_existing_id varchar(64);
@@ -7428,14 +7428,13 @@ BEGIN
     'skippedCount', v_skipped
   );
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_select_subject_catalog(text, uuid[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_select_subject_catalog(text, uuid[]) TO service_role;
 
 -- Complete section setup: configurable capacity and Form Teacher assignment.
 -- The existing legacy classes remain the source of truth for student, exam,
 -- attendance and timetable relationships.
-BEGIN;
 
 ALTER TABLE public.class_groups
   ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
@@ -7467,7 +7466,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_update_class_section_config(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_section public.class_sections%ROWTYPE;
   v_class public.classes%ROWTYPE;
@@ -7526,7 +7525,7 @@ BEGIN
     'capacity', p_max_students
   );
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) TO service_role;
 
@@ -7536,7 +7535,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_reorder_class_groups(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_total integer;
   v_distinct integer;
@@ -7556,7 +7555,7 @@ BEGIN
   GET DIAGNOSTICS v_updated = ROW_COUNT;
   IF v_updated <> v_total THEN RAISE EXCEPTION 'One or more classes do not belong to this school.'; END IF;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) TO service_role;
 
@@ -7566,7 +7565,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_set_class_group_active(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   PERFORM 1 FROM public.class_groups
    WHERE id=p_group_id AND school_id=p_school_id FOR UPDATE;
@@ -7582,12 +7581,11 @@ BEGIN
    WHERE s.class_id=p_group_id AND s.school_id=p_school_id
      AND s.legacy_class_id=c.id AND c.school_id=p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) TO service_role;
 
 -- Per-school date display preference. Existing dates and records are unchanged.
-BEGIN;
 
 ALTER TABLE public.schools
   ADD COLUMN IF NOT EXISTS date_format varchar(20) NOT NULL DEFAULT 'dd/MM/yyyy';
@@ -7603,7 +7601,6 @@ ALTER TABLE public.schools
 -- The existing schoolos_promote_enrollments RPC remains the single source of truth
 -- for enrollment capacity checks and student/class updates; this wrapper adds the
 -- promotion ledger in the same PostgreSQL transaction.
-BEGIN;
 
 CREATE OR REPLACE FUNCTION public.schoolos_confirm_promotions_with_enrollments(
   p_school_id text,
@@ -7803,4 +7800,4 @@ REVOKE ALL ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text,
 REVOKE ALL ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text, uuid, uuid, text, text, jsonb) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text, uuid, uuid, text, text, jsonb) TO service_role;
 
--- END: School Setup Batch 1 canonical fresh-install schema.
+-- END: School Setup Batch 1 canonical fresh-install schema..

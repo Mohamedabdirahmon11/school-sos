@@ -138,7 +138,6 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id AND name IN ('Semester 2','Term 2')) THEN
     RAISE EXCEPTION 'Configure Semester 1 and Semester 2 before activating the academic year.';
   END IF;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
 
   UPDATE public.academic_years
      SET is_current = false,
