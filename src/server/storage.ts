@@ -42,6 +42,7 @@ import {
   UserRole
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
+import { getMarkSchemeMaximums } from '../lib/exam-results.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
@@ -3091,7 +3092,10 @@ class StorageEngine {
           percentage: mark.percentage,
           status: mark.status,
           teacherRemarks: mark.teacherRemarks?.trim() || '',
-          publishedAt: mark.publishedAt || null
+          publishedAt: mark.publishedAt || null,
+          // Use the immutable scheme saved with this mark. Admin changes to a
+          // later scheme must never change the denominator shown for old marks.
+          maxMarks: getMarkSchemeMaximums(mark.schemeSnapshot, config.smallExamMax, config.bigExamMax)
         } : null;
 
         return {
