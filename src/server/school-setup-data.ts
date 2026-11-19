@@ -25,9 +25,8 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   }
   if (step === 2) {
     const y = data.academicYear;
-    if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
-    const years = String(y.name).split('/').map(Number);
-    if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
+    const yearMatch = String(y?.name || '').match(/^(\\d{4})[-/](\\d{4})$/);
+    if (!y || typeof y.isCurrent !== 'boolean' || !yearMatch || Number(yearMatch[2]) !== Number(yearMatch[1]) + 1 || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid consecutive academic year and an ordered start/end date, such as 2026-2027.';
   }
   if (step === 3) {
     const terms = data.terms;
