@@ -11,7 +11,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { AcademicYearManagementView } from './AcademicYearManagementView.tsx';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
@@ -62,6 +61,7 @@ const defaultGradingScale: GradingBand[] = [
   { minPercentage: 60, label: 'D', remark: 'Satisfactory' },
   { minPercentage: 0, label: 'F', remark: 'Below pass mark' }
 ];
+const defaultTerms = { semester1Start: '', semester1End: '', semester2Start: '', semester2End: '' };
 const defaultAttendanceRules = { lateAfterMinutes: 15, absentAfterMinutes: 0, requireExcusedReason: true, allowParentExcuses: false };
 const defaultNotificationPreferences = { email: true, sms: false, inApp: true, attendanceAlerts: true, feeReminders: true, examResults: true };
 const defaultClassLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -79,6 +79,7 @@ const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPe
 const periodLengthForFinish = (start: string, finish: string, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
   Math.round((timeToMinutes(finish) - timeToMinutes(start) - (periods > breakAfterPeriod ? breakMinutes : 0)) / periods);
 
+import { AcademicYearManagementView } from './AcademicYearManagementView.tsx';
 export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance' }> = ({ initialTab = 'identity' }) => {
   const { school, user, isReadOnly, t, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance'>(initialTab);
@@ -106,6 +107,9 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   const [defaultClassCapacity, setDefaultClassCapacity] = useState(String(school?.defaultClassCapacity ?? 40));
 
   // Academic Rules State
+  const [academicYear, setAcademicYear] = useState(school?.academicYear || '2026-2027');
+  const [currentSemester, setCurrentSemester] = useState<'Semester 1' | 'Semester 2'>(school?.currentSemester || 'Semester 1');
+  const [terms, setTerms] = useState(school?.terms || defaultTerms);
   const [gradingScale, setGradingScale] = useState<GradingBand[]>(school?.gradingScale?.length ? school.gradingScale : defaultGradingScale);
   const [attendanceRules, setAttendanceRules] = useState(school?.attendanceRules || defaultAttendanceRules);
   const [classLevels, setClassLevels] = useState<number[]>(school?.classLevels?.length ? school.classLevels : defaultClassLevels);
@@ -136,8 +140,11 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   useEffect(() => {
     if (!school) return;
     setName(school.name || '');
+    setNameArabic(school.nameArabic || '');
+    setBrandColor(school.brandColor || '#0F766E');
     setLogoUrl(school.logoUrl || '');
     setAddress(school.address || '');
+    setCity(school.city || '');
     setPhone(school.phone || '');
     setWhatsappPhone(school.whatsappPhone || '');
     setEmail(school.email || '');
@@ -145,11 +152,6 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     setLanguage(school.language || 'en');
     setTimezone(school.timezone || 'Africa/Addis_Ababa');
     setDateFormat(school.dateFormat || 'dd/MM/yyyy');
-    setStudentAccessEnabled(school.studentAccessEnabled === true);
-    setDefaultClassCapacity(String(school.defaultClassCapacity ?? 40));
-    setGradingScale(school.gradingScale?.length ? school.gradingScale : defaultGradingScale);
-    setAttendanceRules(school.attendanceRules || defaultAttendanceRules);
-    setClassLevels(school.classLevels?.length ? school.classLevels : defaultClassLevels);
     setClosingTime(school.setupData?.workingHours?.closingTime || '16:00');
     ApiClient.getBranches()
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
@@ -241,17 +243,24 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     e.preventDefault();
     if (isReadOnly) return;
     setError(null);
+    if (!/^\d{4}-\d{4}$/.test(academicYear)) { setError('Academic year must use YYYY-YYYY.'); return; }
     if (!classLevels.length) { setError('Select at least one class level.'); return; }
     if (!gradingScale.length) { setError('Add at least one grade band.'); return; }
     const sortedBands = [...gradingScale].sort((a, b) => b.minPercentage - a.minPercentage);
     if (sortedBands[sortedBands.length - 1].minPercentage !== 0) { setError('The final grade band must start at 0%.'); return; }
     if (sortedBands.some((band, index) => index > 0 && band.minPercentage >= sortedBands[index - 1].minPercentage)) { setError('Grade bands must use strictly descending minimum percentages.'); return; }
     if (sortedBands.some(band => !band.label.trim())) { setError('Each grade band needs a label.'); return; }
+    if (terms.semester1Start && terms.semester1End && terms.semester1Start > terms.semester1End) { setError('Semester 1 start date must be on or before its end date.'); return; }
+    if (terms.semester2Start && terms.semester2End && terms.semester2Start > terms.semester2End) { setError('Semester 2 start date must be on or before its end date.'); return; }
+    if (terms.semester1End && terms.semester2Start && terms.semester1End > terms.semester2Start) { setError('Semester 2 must start after Semester 1 ends.'); return; }
     await saveSchoolSection('academics', {
+      academicYear,
+      currentSemester,
+      terms,
       gradingScale: sortedBands,
       attendanceRules,
       classLevels
-    }, 'Grading, attendance, and class-level settings saved successfully!');
+    }, 'Academic year, terms, grading, attendance, and class levels saved successfully!');
   };
 
   const handleSaveExamRules = async (e: React.FormEvent) => {
@@ -562,94 +571,61 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
-            School Settings
+            {t('settings_page_title')}
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Manage your school profile, academic rules, timetable, campuses, documents, report cards, and data backups in one place.
+            {t('settings_page_description')}
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#DCE7E4] bg-[#F5F8F7] p-2 text-xs shadow-sm sm:grid-cols-3 lg:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('identity')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'identity' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            {t('settings_identity')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('academics')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'academics' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            {t('settings_academics')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('shifts')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'shifts' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            {t('settings_timetable')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('documents')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'documents' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            {t('settings_documents')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('branches')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'branches' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            {t('settings_branches')} ({branches.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('designer')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'designer' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Report Card Designer
-          </button>
-          {user?.role === 'school_admin' && (
-            <button type="button" onClick={() => setActiveTab('appearance')}
-              className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-                activeTab === 'appearance' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-              }`}>
-              <Palette className="w-3.5 h-3.5" />
-              Navigation Appearance
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setActiveTab('backup')}
-            className={`w-full justify-center px-3 py-3 rounded-xl font-medium transition-colors flex items-center gap-1.5 text-center ${
-              activeTab === 'backup' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            Backup & Data Export
-          </button>
+        {/* Organized settings navigation: grouped by purpose, with stable tab IDs. */}
+        <div className="grid w-full grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_school')}</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('identity')} aria-current={activeTab === 'identity' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'identity' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Building2 className="h-4 w-4 shrink-0" /><span>{t('settings_identity')}</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('branches')} aria-current={activeTab === 'branches' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'branches' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <GitBranch className="h-4 w-4 shrink-0" /><span>{t('settings_branches')}</span><span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px]">{branches.length}</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_academics')}</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('academics')} aria-current={activeTab === 'academics' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'academics' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <CalendarDays className="h-4 w-4 shrink-0" /><span>{t('settings_academics')}</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('shifts')} aria-current={activeTab === 'shifts' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'shifts' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Clock className="h-4 w-4 shrink-0" /><span>{t('settings_timetable')}</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_communication')}</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <button type="button" onClick={() => setActiveTab('documents')} aria-current={activeTab === 'documents' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'documents' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Bell className="h-4 w-4 shrink-0" /><span>{t('settings_documents')}</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('designer')} aria-current={activeTab === 'designer' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'designer' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <FileText className="h-4 w-4 shrink-0" /><span>{t('settings_report_design')}</span>
+              </button>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_appearance_data')}</h2>
+            <div className="grid grid-cols-1 gap-2">
+              {user?.role === 'school_admin' && (
+                <button type="button" onClick={() => setActiveTab('appearance')} aria-current={activeTab === 'appearance' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'appearance' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                  <Palette className="h-4 w-4 shrink-0" /><span>{t('settings_menu_appearance')}</span>
+                </button>
+              )}
+              <button type="button" onClick={() => setActiveTab('backup')} aria-current={activeTab === 'backup' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'backup' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <Database className="h-4 w-4 shrink-0" /><span>{t('settings_backup_export')}</span>
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 
@@ -759,7 +735,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Campus City</label>
                 <input
@@ -817,17 +793,23 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="block font-semibold text-[#334155] mb-1">School Currency</label>
                 <select
                   value={currency}
-                  onChange={e => setCurrency(e.target.value as 'ETB' | 'USD' | 'SOS')}
+                  onChange={e => setCurrency(e.target.value)}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
                   <option value="USD">USD ($)</option>
                   <option value="SOS">SOS (Somali Shilling)</option>
                   <option value="ETB">ETB (Ethiopian Birr)</option>
+                  <option value="KES">KES (Kenyan Shilling)</option>
+                  <option value="DJF">DJF (Djiboutian Franc)</option>
+                  <option value="AED">AED (UAE Dirham)</option>
+                  <option value="SAR">SAR (Saudi Riyal)</option>
+                  <option value="EUR">EUR (Euro)</option>
+                  <option value="GBP">GBP (Pound Sterling)</option>
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">{t('settings_language')}</label>
                 <select
@@ -863,9 +845,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Date Format</label>
                 <select value={dateFormat} onChange={e => setDateFormat(e.target.value as 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd')} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
-                  <option value="dd/MM/yyyy">DD/MM/YYYY (19/11/2026)</option>
-                  <option value="MM/dd/yyyy">MM/DD/YYYY (11/19/2026)</option>
-                  <option value="yyyy-MM-dd">YYYY-MM-DD (2026-11-19)</option>
+                  <option value="dd/MM/yyyy">DD/MM/YYYY</option><option value="MM/dd/yyyy">MM/DD/YYYY</option><option value="yyyy-MM-dd">YYYY-MM-DD</option>
                 </select>
               </div>
               <div>
