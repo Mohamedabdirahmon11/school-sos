@@ -6423,8 +6423,8 @@ apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOr
     if (!termResult.data) throw new Error('Term-kan lagama helin dugsigan.');
     const term = termResult.data;
     const termLabel = String(term.name || '').toLowerCase();
-    const isTermOne = /(?:term|semester)\\s*(?:1|one|first)|(?:first|one)\\s*(?:term|semester)/.test(termLabel);
-    const isTermTwo = /(?:term|semester)\\s*(?:2|two|second)|(?:second|two)\\s*(?:term|semester)/.test(termLabel);
+    const isTermOne = /(?:term|semester)\s*(?:1|one|first)|(?:first|one)\s*(?:term|semester)/.test(termLabel);
+    const isTermTwo = /(?:term|semester)\s*(?:2|two|second)|(?:second|two)\s*(?:term|semester)/.test(termLabel);
     if (!isTermOne && !isTermTwo) throw new Error('Kaliya Term 1 iyo Term 2 ayaa lagu jadwalayn karaa imtixaanka weyn.');
     const classes = (classResult.data || []) as any[];
     const assignments = (assignmentResult.data || []) as any[];
