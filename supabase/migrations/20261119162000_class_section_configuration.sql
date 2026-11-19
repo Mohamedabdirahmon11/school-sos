@@ -86,5 +86,35 @@ $$;
 REVOKE ALL ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) TO service_role;
 
+CREATE OR REPLACE FUNCTION public.schoolos_reorder_class_groups(
+  p_school_id text, p_ordered_ids uuid[]
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_total integer;
+  v_distinct integer;
+  v_updated integer;
+BEGIN
+  IF p_ordered_ids IS NULL THEN RAISE EXCEPTION 'Class order is required.'; END IF;
+  SELECT count(*) INTO v_total FROM public.class_groups WHERE school_id = p_school_id;
+  SELECT count(DISTINCT value) INTO v_distinct FROM unnest(p_ordered_ids) AS value;
+  IF cardinality(p_ordered_ids) <> v_total OR v_distinct <> v_total THEN
+    RAISE EXCEPTION 'The class order must include every class exactly once.';
+  END IF;
+  UPDATE public.class_groups g
+     SET sort_order = ordered.ordinality::integer * 100,
+         updated_at = now()
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS ordered(id, ordinality)
+   WHERE g.id = ordered.id AND g.school_id = p_school_id;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  IF v_updated <> v_total THEN RAISE EXCEPTION 'One or more classes do not belong to this school.'; END IF;
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
