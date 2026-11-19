@@ -82,6 +82,12 @@ BEGIN
      OR NEW.end_date > v_year.end_date THEN
     RAISE EXCEPTION 'Semester dates must be valid and fall within the academic year.';
   END IF;
+  IF TG_OP = 'UPDATE' AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=NEW.school_id AND ts.term_id=NEW.id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Closed semesters are read-only. Reopen the semester before changing its dates.';
+  END IF;
   IF EXISTS (
     SELECT 1 FROM public.terms t
     WHERE t.school_id = NEW.school_id
@@ -129,12 +135,28 @@ BEGIN
          closed_at = NULL, closed_by = NULL, updated_at = now()
    WHERE id = p_year_id AND school_id = p_school_id;
 
+  UPDATE public.terms t
+     SET is_current = false, updated_at = now()
+   WHERE t.school_id = p_school_id
+     AND t.is_current = true
+     AND EXISTS (SELECT 1 FROM public.academic_years ay WHERE ay.id=t.academic_year_id AND ay.school_id=p_school_id AND ay.status='closed');
+
+  INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+  SELECT t.school_id, t.id, 'closed', p_actor_id, now(), now()
+    FROM public.terms t
+    JOIN public.academic_years ay ON ay.id=t.academic_year_id AND ay.school_id=t.school_id
+    LEFT JOIN public.term_status ts ON ts.school_id=t.school_id AND ts.term_id=t.id
+   WHERE t.school_id=p_school_id AND ay.status='closed'
+     AND COALESCE(ts.status,'open') <> 'closed'
+  ON CONFLICT (school_id, term_id) DO UPDATE
+    SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
+
   UPDATE public.schools
      SET academic_year = (SELECT name FROM public.academic_years WHERE id = p_year_id AND school_id = p_school_id),
          updated_at = now()
    WHERE id = p_school_id;
 END;
-$$;
+$;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) TO service_role;
 
@@ -152,8 +174,19 @@ BEGIN
          closed_at = now(), closed_by = p_actor_id, updated_at = now()
    WHERE id = p_year_id AND school_id = p_school_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
+
+  UPDATE public.terms SET is_current=false, updated_at=now()
+   WHERE school_id=p_school_id AND academic_year_id=p_year_id AND is_current=true;
+  INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+  SELECT t.school_id, t.id, 'closed', p_actor_id, now(), now()
+    FROM public.terms t
+    LEFT JOIN public.term_status ts ON ts.school_id=t.school_id AND ts.term_id=t.id
+   WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id
+     AND COALESCE(ts.status,'open') <> 'closed'
+  ON CONFLICT (school_id, term_id) DO UPDATE
+    SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
 END;
-$$;
+$;
 REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
 
@@ -227,6 +260,146 @@ END;
 $;
 REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
+
+-- Closed semesters protect marks, attendance and exam-period configuration
+-- at the database boundary, including service-role writes from backend APIs.
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_student_marks()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $
+DECLARE
+  v_school_id text;
+  v_term_id uuid;
+  v_academic_year text;
+  v_semester text;
+BEGIN
+  IF TG_OP='DELETE' THEN
+    v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
+    v_academic_year:=OLD.academic_year; v_semester:=OLD.semester;
+  ELSE
+    v_school_id:=NEW.school_id; v_term_id:=NEW.term_id;
+    v_academic_year:=NEW.academic_year; v_semester:=NEW.semester;
+  END IF;
+  IF v_term_id IS NULL THEN
+    SELECT t.id INTO v_term_id
+      FROM public.terms t
+      JOIN public.academic_years ay ON ay.id=t.academic_year_id AND ay.school_id=t.school_id
+     WHERE t.school_id=v_school_id AND t.name=v_semester AND ay.name=v_academic_year
+     LIMIT 1;
+  END IF;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Marks cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS student_marks_closed_term_guard ON public.student_marks;
+CREATE TRIGGER student_marks_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.student_marks
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_student_marks();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_component_marks()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $
+DECLARE
+  v_school_id text;
+  v_component_id uuid;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_component_id:=OLD.component_id;
+  ELSE v_school_id:=NEW.school_id; v_component_id:=NEW.component_id; END IF;
+  SELECT ms.term_id INTO v_term_id
+    FROM public.mark_components mc
+    JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
+   WHERE mc.id=v_component_id AND mc.school_id=v_school_id;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Component marks cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS component_marks_closed_term_guard ON public.component_marks;
+CREATE TRIGGER component_marks_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.component_marks
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_component_marks();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_attendance()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $
+DECLARE
+  v_school_id text;
+  v_date date;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_date:=OLD.date;
+  ELSE v_school_id:=NEW.school_id; v_date:=NEW.date; END IF;
+  SELECT t.id INTO v_term_id
+    FROM public.terms t
+   WHERE t.school_id=v_school_id AND v_date BETWEEN t.start_date AND t.end_date
+   ORDER BY t.start_date DESC
+   LIMIT 1;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Attendance cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS attendance_closed_term_guard ON public.attendance_records;
+CREATE TRIGGER attendance_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.attendance_records
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_attendance();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_exam_period()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $
+DECLARE
+  v_school_id text;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
+  ELSE v_school_id:=NEW.school_id; v_term_id:=NEW.term_id; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Exam periods cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
+CREATE TRIGGER exam_periods_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_exam_period();
+
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_student_marks() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_component_marks() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_attendance() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_exam_period() FROM PUBLIC, anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
