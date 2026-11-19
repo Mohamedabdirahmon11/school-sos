@@ -77,7 +77,6 @@ CREATE TABLE IF NOT EXISTS public.component_marks (
   CONSTRAINT component_marks_student_school_fk FOREIGN KEY (student_id,school_id)
     REFERENCES public.students(id,school_id) ON DELETE CASCADE,
   CONSTRAINT component_marks_score_check CHECK (marks IS NULL OR marks >= 0),
-  CONSTRAINT component_marks_status_score_check CHECK ((status='present' AND marks IS NOT NULL) OR (status IN ('absent','excused') AND marks IS NULL)),
   UNIQUE (component_id,subject_id,student_id)
 );
 CREATE INDEX IF NOT EXISTS component_marks_class_subject_idx
