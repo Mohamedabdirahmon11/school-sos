@@ -72,6 +72,8 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
   const loadPeriod = async (termId: string) => {
     if (!termId) {
       setPeriodData({ period: null, days: [], sessions: [], schedules: [], invigilators: [], roomAssignments: [] });
+      setClassShifts({});
+      setInvigilators({});
       return;
     }
     const data = await ApiClient.getTermExamPeriod(termId);
