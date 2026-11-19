@@ -95,7 +95,7 @@ export const TermMarksTeacherWorkspace:React.FC<{
     setBusy(true);setError('');setMessage('');
     try{
       const result=await ApiClient.request<any>('/term-marks/entry',{method:'POST',body:JSON.stringify({componentId,classId:selectedClassId,subjectId,marks:payload})});
-      setSavedCount(result.saved_count||payload.length);setMessage(`Waa la kaydiyey ${result.saved_count||payload.length} arday.`);
+      setSavedCount(result.saved_count??payload.length);setMessage(`Waa la kaydiyey ${result.saved_count||payload.length} arday.`);
     }catch(e:any){setError(e.message||'Dhibcaha lama kaydin.');}
     finally{setBusy(false);}
   };
