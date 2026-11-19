@@ -982,6 +982,7 @@ class StorageEngine {
       currency: schoolData.currency || 'ETB',
       language: schoolData.language || 'en',
       timezone: schoolData.timezone || 'Africa/Addis_Ababa',
+      dateFormat: schoolData.dateFormat || 'dd/MM/yyyy',
       currentSemester: schoolData.currentSemester || 'Semester 1',
       academicYear: schoolData.academicYear || this.data.settings.academicYearName || '2026-2027',
       terms: schoolData.terms || { ...DEFAULT_TERMS },
