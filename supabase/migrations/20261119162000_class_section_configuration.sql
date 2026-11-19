@@ -63,6 +63,7 @@ BEGIN
 
   UPDATE public.classes
      SET capacity = p_max_students,
+         section = btrim(p_name),
          class_teacher_id = p_teacher_user_id
    WHERE id = v_class.id AND school_id = p_school_id;
 
