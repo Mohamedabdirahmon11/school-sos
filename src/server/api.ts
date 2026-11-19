@@ -10370,7 +10370,7 @@ apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin
       item.missing+=count;missing.set(key,item);
     }else for(const assignment of matching){
       const key=assignment.teacher_id+':'+subject.subject_id;
-      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:assignment.teachers?.full_name||'Macallin',missing:0};
+      const item=missing.get(key)||{subjectId:subject.subject_id,teacherId:assignment.teacher_id,teacherName:(Array.isArray(assignment.teachers)?assignment.teachers[0]?.full_name:assignment.teachers?.full_name)||'Macallin',missing:0};
       item.missing+=count;missing.set(key,item);
     }
   }
