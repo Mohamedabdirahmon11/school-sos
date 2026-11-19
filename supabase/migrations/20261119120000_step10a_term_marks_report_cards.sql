@@ -125,14 +125,21 @@ CREATE INDEX IF NOT EXISTS component_marks_student_idx
 
 CREATE OR REPLACE FUNCTION public.schoolos_guard_component_mark()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $guard$
-DECLARE v_max numeric; v_term uuid; v_year uuid;
+DECLARE v_max numeric; v_term uuid; v_year uuid; v_structure_class text;
 BEGIN
-  SELECT mc.max_marks,ms.term_id,t.academic_year_id INTO v_max,v_term,v_year
+  SELECT mc.max_marks,ms.term_id,t.academic_year_id,ms.class_id INTO v_max,v_term,v_year,v_structure_class
   FROM public.mark_components mc
   JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
   JOIN public.terms t ON t.id=ms.term_id AND t.school_id=ms.school_id
   WHERE mc.id=NEW.component_id AND mc.school_id=NEW.school_id;
   IF v_max IS NULL THEN RAISE EXCEPTION 'Qaybta dhibcaha lama helin.'; END IF;
+  IF v_structure_class IS NOT NULL AND v_structure_class<>NEW.class_id THEN
+    RAISE EXCEPTION 'Qaybtan dhibcaha fasalkan looma dejin.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.class_subjects cs WHERE cs.school_id=NEW.school_id
+    AND cs.class_id=NEW.class_id AND cs.subject_id=NEW.subject_id AND cs.is_active=true) THEN
+    RAISE EXCEPTION 'Maaddadani fasalkan kama diiwaangashana.';
+  END IF;
   IF NEW.marks IS NOT NULL AND (NEW.marks<0 OR NEW.marks>v_max) THEN
     RAISE EXCEPTION 'Dhibcuhu waa inay u dhexeeyaan 0 iyo %.',v_max;
   END IF;
@@ -686,6 +693,7 @@ DROP POLICY IF EXISTS component_marks_teacher_insert ON public.component_marks;
 CREATE POLICY component_marks_teacher_insert ON public.component_marks FOR INSERT TO authenticated
 WITH CHECK (
   private.auth_user_role()='teacher'
+  AND component_marks.entered_by=private.auth_user_id()
   AND EXISTS (SELECT 1 FROM public.mark_components mc
     JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
     JOIN public.term_status ts ON ts.school_id=ms.school_id AND ts.term_id=ms.term_id AND ts.status='open'
@@ -706,6 +714,7 @@ USING (
 )
 WITH CHECK (
   private.auth_user_role()='teacher'
+  AND component_marks.entered_by=private.auth_user_id()
   AND EXISTS (SELECT 1 FROM public.mark_components mc
     JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
     JOIN public.term_status ts ON ts.school_id=ms.school_id AND ts.term_id=ms.term_id AND ts.status='open'
