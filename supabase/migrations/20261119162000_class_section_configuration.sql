@@ -96,7 +96,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_reorder_class_groups(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_total integer;
   v_distinct integer;
@@ -116,7 +116,7 @@ BEGIN
   GET DIAGNOSTICS v_updated = ROW_COUNT;
   IF v_updated <> v_total THEN RAISE EXCEPTION 'One or more classes do not belong to this school.'; END IF;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) TO service_role;
 
@@ -126,7 +126,7 @@ CREATE OR REPLACE FUNCTION public.schoolos_set_class_group_active(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   PERFORM 1 FROM public.class_groups
    WHERE id=p_group_id AND school_id=p_school_id FOR UPDATE;
@@ -142,7 +142,7 @@ BEGIN
    WHERE s.class_id=p_group_id AND s.school_id=p_school_id
      AND s.legacy_class_id=c.id AND c.school_id=p_school_id;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) TO service_role;
 
