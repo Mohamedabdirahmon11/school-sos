@@ -134,6 +134,7 @@ export const AcademicYearManagementView: React.FC = () => {
   };
 
   const editSemester = (semester: Semester) => {
+    if (semester.status === 'closed') return;
     setEditingSemesterId(semester.id);
     setSemesterForm({
       name: semester.name, startDate: semester.start_date, endDate: semester.end_date,
@@ -240,7 +241,7 @@ export const AcademicYearManagementView: React.FC = () => {
                   <p>Results publish: {dateLabel(semester.examPeriod.results_publish_date || '')}</p>
                 </div>}
                 {canEdit && <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  <button type="button" disabled={saving} onClick={() => editSemester(semester)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50">Edit</button>
+                  {semester.status !== 'closed' && <button type="button" disabled={saving} onClick={() => editSemester(semester)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50">Edit</button>}
                   {semester.status === 'closed'
                     ? <button type="button" disabled={saving} onClick={() => void changeSemesterStatus(semester,'reopen')} className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-800 disabled:opacity-50">Reopen</button>
                     : <><button type="button" disabled={saving || semester.is_current} onClick={() => void changeSemesterStatus(semester,'activate')} className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Activate</button><button type="button" disabled={saving} onClick={() => void changeSemesterStatus(semester,'close')} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50">Close</button></>}
