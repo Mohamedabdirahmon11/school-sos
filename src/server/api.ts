@@ -55,6 +55,7 @@ import { collectPagedItems } from '../lib/documents/paged-query.ts';
 import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variables.ts';
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/template-engine.ts';
+import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
 
 export const apiRouter = Router();
 
@@ -6305,6 +6306,251 @@ apiRouter.get('/exams/schedules/:id/seats', requireAuth, requireSchoolAdminOrSup
     schedule,
     seats: await db.getExamScheduleSeats(school.id, schedule.id)
   });
+});
+
+
+apiRouter.get('/exams/term-periods/:termId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data: period, error } = await client.from('exam_periods').select('*')
+      .eq('school_id', school.id).eq('term_id', req.params.termId).maybeSingle();
+    if (error) throw error;
+    if (!period) { res.json({ period: null, days: [], sessions: [], schedules: [], invigilators: [] }); return; }
+    const [days, sessions, schedules, invigilators] = await Promise.all([
+      client.from('exam_days').select('*').eq('school_id', school.id).eq('exam_period_id', period.id).order('exam_date'),
+      client.from('exam_sessions').select('*').eq('school_id', school.id).order('seq'),
+      client.from('exam_schedules').select('id,exam_period_id,exam_session_id,subject_id,exam_name,exam_date,start_time,end_time,exam_shift,manhaj_group_key,status,seat_capacity')
+        .eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').order('exam_date').order('start_time'),
+      client.from('exam_invigilators').select('*').eq('school_id', school.id)
+    ]);
+    for (const result of [days, sessions, schedules, invigilators]) if (result.error) throw result.error;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ period, days: days.data || [], sessions: sessions.data || [], schedules: schedules.data || [], invigilators: invigilators.data || [] });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to load term exam timetable.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const termId = typeof body.termId === 'string' ? body.termId.trim() : '';
+  const name = typeof body.name === 'string' ? body.name.trim() : 'Term Examination';
+  const startDate = typeof body.startDate === 'string' ? body.startDate : '';
+  const endDate = typeof body.endDate === 'string' ? body.endDate : '';
+  const requestedDays = Array.isArray(body.days) ? body.days.filter((value: unknown) => typeof value === 'string') as string[] : [];
+  const sessionDrafts = Array.isArray(body.sessions) ? body.sessions : [];
+  const shiftOverrides = body.classExamShifts && typeof body.classExamShifts === 'object' ? body.classExamShifts as Record<string, string> : {};
+  if (!termId || !name || name.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate || !sessionDrafts.length || sessionDrafts.length > 8) {
+    res.status(400).json({ error: 'Dooro term, taariikhaha bilowga/dhammaadka iyo ugu yaraan hal session oo sax ah.' }); return;
+  }
+  const sessions = sessionDrafts.map((item: any, index: number) => ({
+    seq: index + 1,
+    name: typeof item?.name === 'string' ? item.name.trim().slice(0, 80) : 'Session ' + (index + 1),
+    start_time: typeof item?.startTime === 'string' ? item.startTime : '',
+    end_time: typeof item?.endTime === 'string' ? item.endTime : '',
+    shift_tag: ['morning','afternoon','all'].includes(item?.shiftTag) ? item.shiftTag : 'all'
+  }));
+  if (sessions.some((item: any) => !item.name || !/^\d{2}:\d{2}$/.test(item.start_time) || !/^\d{2}:\d{2}$/.test(item.end_time) || item.start_time >= item.end_time)) {
+    res.status(400).json({ error: 'Hubi magaca session-ka iyo waqtiga bilowga/dhammaadka.' }); return;
+  }
+  const dates = requestedDays.length ? [...new Set(requestedDays)].sort() : (() => {
+    const values: string[] = [];
+    const cursor = new Date(startDate + 'T12:00:00Z');
+    const last = new Date(endDate + 'T12:00:00Z');
+    while (cursor <= last) { values.push(cursor.toISOString().slice(0, 10)); cursor.setUTCDate(cursor.getUTCDate() + 1); }
+    return values;
+  })();
+  if (!dates.length || dates.some((date: string) => date < startDate || date > endDate || !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
+    res.status(400).json({ error: 'Maalmaha imtixaanku waa inay ku jiraan muddada la doortay.' }); return;
+  }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const [termResult, classResult, assignmentResult, studentResult, roomResult] = await Promise.all([
+      client.from('terms').select('id,name,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle(),
+      client.from('classes').select('id,name,academic_year,shift,normal_exam_shift,is_archived').eq('school_id', school.id).eq('is_archived', false),
+      client.from('class_subjects').select('class_id,subject_id,teacher_id').eq('school_id', school.id).eq('is_active', true),
+      client.from('students').select('id,class_id').eq('school_id', school.id).eq('status', 'active'),
+      client.from('exam_rooms').select('id,name,capacity,is_active').eq('school_id', school.id).eq('is_active', true).order('name')
+    ]);
+    for (const result of [termResult, classResult, assignmentResult, studentResult, roomResult]) if (result.error) throw result.error;
+    if (!termResult.data) throw new Error('Term-kan lagama helin dugsigan.');
+    const term = termResult.data;
+    const classes = (classResult.data || []) as any[];
+    const assignments = (assignmentResult.data || []) as any[];
+    const students = (studentResult.data || []) as any[];
+    const rooms = (roomResult.data || []).map((room: any) => ({ id: room.id, name: room.name, capacity: Number(room.capacity) }));
+    if (!classes.length || !assignments.length || !students.length) throw new Error('Fasallo, maaddooyin ama arday firfircoon lama helin.');
+    if (!rooms.length) throw new Error('Marka hore diiwaangeli ugu yaraan hal qol imtixaan.');
+    const assignmentByClass = new Map<string, any[]>();
+    for (const assignment of assignments) {
+      const rows = assignmentByClass.get(assignment.class_id) || [];
+      rows.push(assignment); assignmentByClass.set(assignment.class_id, rows);
+    }
+    const classExamShifts: Record<string, 'morning' | 'afternoon'> = {};
+    for (const klass of classes) {
+      const requested = shiftOverrides[klass.id];
+      classExamShifts[klass.id] = requested === 'morning' || requested === 'afternoon'
+        ? requested : klass.normal_exam_shift === 'afternoon' || klass.shift === 2 ? 'afternoon' : 'morning';
+    }
+    const groups = buildManhajGroups(classes.map(klass => ({
+      id: klass.id, name: klass.name,
+      subjectIds: (assignmentByClass.get(klass.id) || []).map(row => row.subject_id)
+    })));
+    if (!groups.length) throw new Error('Ma jiraan manhaj groups leh maaddooyin imtixaan.');
+    const { data: existingPeriod, error: periodLookupError } = await client.from('exam_periods').select('*')
+      .eq('school_id', school.id).eq('term_id', termId).maybeSingle();
+    if (periodLookupError) throw periodLookupError;
+    if (existingPeriod?.status === 'published') throw new Error('Muddadan imtixaanka waa la daabacay; lama beddeli karo.');
+    let period = existingPeriod;
+    if (period) {
+      const { error } = await client.from('exam_schedules').delete().eq('school_id', school.id).eq('exam_period_id', period.id).eq('exam_type', 'term').eq('status', 'draft');
+      if (error) throw error;
+      const { error: dayDeleteError } = await client.from('exam_days').delete().eq('school_id', school.id).eq('exam_period_id', period.id);
+      if (dayDeleteError) throw dayDeleteError;
+      const { data, error: updateError } = await client.from('exam_periods').update({ name, start_date: startDate, end_date: endDate, status: 'draft', published_by: null, published_at: null, updated_at: new Date().toISOString() })
+        .eq('id', period.id).eq('school_id', school.id).select().single();
+      if (updateError) throw updateError; period = data;
+    } else {
+      const { data, error } = await client.from('exam_periods').insert({
+        school_id: school.id, term_id: termId, name, start_date: startDate, end_date: endDate,
+        status: 'draft', created_by: user.id
+      }).select().single();
+      if (error) throw error; period = data;
+    }
+    const settingsRows = classes.map(klass => ({
+      school_id: school.id, class_id: klass.id, term_id: termId, exam_shift: classExamShifts[klass.id]
+    }));
+    const { error: settingsError } = await client.from('class_exam_settings').upsert(settingsRows, { onConflict: 'school_id,class_id,term_id' });
+    if (settingsError) throw settingsError;
+    const dayRows = dates.map((date: string) => ({ school_id: school.id, exam_period_id: period.id, exam_date: date }));
+    const { data: days, error: dayInsertError } = await client.from('exam_days').insert(dayRows).select();
+    if (dayInsertError) throw dayInsertError;
+    const sessionRows = (days || []).flatMap((day: any) => sessions.map((session: any) => ({
+      school_id: school.id, exam_day_id: day.id, seq: session.seq, name: session.name,
+      start_time: session.start_time, end_time: session.end_time, shift_tag: session.shift_tag
+    })));
+    const { data: savedSessions, error: sessionError } = await client.from('exam_sessions').insert(sessionRows).select();
+    if (sessionError) throw sessionError;
+    const sessionsByShift = {
+      morning: (savedSessions || []).filter((session: any) => session.shift_tag === 'morning' || session.shift_tag === 'all'),
+      afternoon: (savedSessions || []).filter((session: any) => session.shift_tag === 'afternoon' || session.shift_tag === 'all')
+    };
+    const classById = new Map(classes.map(klass => [klass.id, klass]));
+    const studentsByClass = new Map<string, any[]>();
+    for (const student of students) {
+      const rows = studentsByClass.get(student.class_id) || [];
+      rows.push(student); studentsByClass.set(student.class_id, rows);
+    }
+    const scheduleRows: any[] = [];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      for (const shift of ['morning','afternoon'] as const) {
+        const shiftClasses = group.classIds.filter(classId => classExamShifts[classId] === shift);
+        if (!shiftClasses.length) continue;
+        const eligibleSessions = sessionsByShift[shift];
+        if (group.subjectIds.length > eligibleSessions.length) {
+          throw new Error(group.classNames.join(', ') + ' waxay u baahan yihiin ' + group.subjectIds.length + ' sessions, balse shift-ka ' + shift + ' wuxuu leeyahay ' + eligibleSessions.length + '. Ku dar maalmo ama sessions.');
+        }
+        for (let subjectIndex = 0; subjectIndex < group.subjectIds.length; subjectIndex += 1) {
+          const subjectId = group.subjectIds[subjectIndex];
+          const session = eligibleSessions[(subjectIndex + groupIndex) % eligibleSessions.length];
+          const day = (days || []).find((item: any) => item.id === session.exam_day_id);
+          const groupStudents = shiftClasses.flatMap(classId => (studentsByClass.get(classId) || []).map(student => ({ id: student.id, classId })));
+          if (!groupStudents.length) throw new Error('Ma jiraan arday firfircoon oo ku jira ' + shiftClasses.map(id => (classById.get(id) as any)?.name || id).join(', ') + '.');
+          const allocations = allocateMixedRoomSeating(shiftClasses.map(classId => ({
+            classId, className: (classById.get(classId) as any)?.name || classId,
+            students: groupStudents.filter(student => student.classId === classId).map(student => ({ id: student.id, classId }))
+          })), rooms, subjectIndex + groupIndex);
+          const scheduleId = randomUUID();
+          const schedule = {
+            id: scheduleId, school_id: school.id, class_id: null, subject_id: subjectId,
+            exam_name: name, exam_type: 'term', academic_year: (classById.get(shiftClasses[0]) as any)?.academic_year || school.academicYear || '2026-2027',
+            semester: String(term.name || '').toLowerCase().includes('2') ? 'Semester 2' : 'Semester 1',
+            exam_date: day.exam_date, start_time: session.start_time, end_time: session.end_time,
+            room_name: 'Mixed rooms', room_id: null, shift_name: shift, seat_capacity: groupStudents.length,
+            status: 'draft', created_by: user.id, exam_period_id: period.id, exam_session_id: session.id,
+            manhaj_group_key: createHash('sha256').update(group.key).digest('hex'), exam_shift: shift
+          };
+          const { error: scheduleError } = await client.from('exam_schedules').insert(schedule);
+          if (scheduleError) throw scheduleError;
+          const cohortRows = groupStudents.map(student => ({
+            id: 'cohort-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
+            student_id: student.id, class_id: student.classId, is_selected: true
+          }));
+          const { error: cohortError } = await client.from('exam_schedule_cohort_students').insert(cohortRows);
+          if (cohortError) throw cohortError;
+          const seatRows = allocations.flatMap(room => room.seats.map(seat => ({
+            id: 'seat-' + randomUUID(), school_id: school.id, schedule_id: scheduleId,
+            student_id: seat.studentId, seat_number: seat.seatNumber, room_id: seat.roomId,
+            class_id: seat.classId, exam_number: seat.examNumber
+          })));
+          const { error: seatError } = await client.from('exam_seat_assignments').insert(seatRows);
+          if (seatError) throw seatError;
+          scheduleRows.push({ id: scheduleId, subjectId, examDate: day.exam_date, startTime: session.start_time, endTime: session.end_time, examShift: shift, manhajGroupKey: schedule.manhaj_group_key, studentCount: groupStudents.length, roomAllocations: allocations.map(room => ({ roomId: room.roomId, roomName: room.roomName, studentCount: room.seats.length, classRanges: room.classRanges })) });
+        }
+      }
+    }
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_GENERATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Generated ' + scheduleRows.length + ' term exam subject sessions for ' + name + '.', severity: 'warning' });
+    res.status(201).json({ period, days, sessions: savedSessions || [], schedules: scheduleRows });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to generate term exam timetable.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/:periodId/invigilators', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const assignments = Array.isArray(req.body?.assignments) ? req.body.assignments : [];
+  try {
+    const { data: period, error: periodError } = await client.from('exam_periods').select('id,status')
+      .eq('id', req.params.periodId).eq('school_id', school.id).maybeSingle();
+    if (periodError) throw periodError;
+    if (!period || period.status !== 'draft') throw new Error('Kaliya muddada imtixaanka ee draft-ka ah ayaa la beddeli karaa.');
+    const { data: days, error: daysError } = await client.from('exam_days').select('id')
+      .eq('school_id', school.id).eq('exam_period_id', period.id);
+    if (daysError) throw daysError;
+    const { data: sessions, error: sessionsError } = await client.from('exam_sessions').select('id')
+      .eq('school_id', school.id).in('exam_day_id', (days || []).map((day: any) => day.id));
+    if (sessionsError) throw sessionsError;
+    const sessionIds = (sessions || []).map((session: any) => session.id);
+    const { error: deleteError } = await client.from('exam_invigilators').delete().eq('school_id', school.id).in('exam_session_id', sessionIds);
+    if (deleteError) throw deleteError;
+    const rows = assignments.map((item: any) => ({
+      school_id: school.id, exam_session_id: String(item.sessionId || ''),
+      room_id: String(item.roomId || ''), teacher_id: String(item.teacherId || '')
+    }));
+    if (rows.some((item: any) => !sessionIds.includes(item.exam_session_id) || !item.room_id || !item.teacher_id)) throw new Error('Xogta kormeeraha, session-ka ama qolka waa khaldan tahay.');
+    if (rows.length) {
+      const { error } = await client.from('exam_invigilators').insert(rows);
+      if (error) throw error;
+    }
+    res.json({ success: true, assigned: rows.length });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to assign invigilators.' });
+  }
+});
+
+apiRouter.post('/exams/term-periods/:periodId/publish', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (!isSupabaseConfigured) { res.status(503).json({ error: 'Term exam scheduling requires the configured Supabase database.' }); return; }
+  const client = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  try {
+    const { data, error } = await client.rpc('schoolos_publish_term_exam_period', {
+      p_school_id: school.id, p_period_id: req.params.periodId, p_published_by: user.id
+    });
+    if (error) throw error;
+    db.logAudit({ action: 'TERM_EXAM_TIMETABLE_PUBLISHED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Published term exam period ' + req.params.periodId + '.', severity: 'warning' });
+    res.json(data);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Unable to publish term exam timetable.' });
+  }
 });
 
 apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res) => {
