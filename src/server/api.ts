@@ -9604,6 +9604,7 @@ apiRouter.get('/school/transport', requireAuth, requireSchoolContext, requireSch
 async function getSchoolSetupState(school: School) {
   const [
     classes,
+    classSubjects,
     subjects,
     teachers,
     students,
@@ -9612,7 +9613,8 @@ async function getSchoolSetupState(school: School) {
     examConfigs,
     feeStructures
   ] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
+    queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived,class_teacher_id'),
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,class_id,subject_id'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
     queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
@@ -9626,8 +9628,22 @@ async function getSchoolSetupState(school: School) {
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
+  const activeClasses = classes.filter((item: any) => item.isArchived !== true);
+  const subjectCountsByClass = new Map<string, number>();
+  classSubjects.forEach((assignment: any) => {
+    const classId = String(assignment.classId || '');
+    if (classId) subjectCountsByClass.set(classId, (subjectCountsByClass.get(classId) || 0) + 1);
+  });
   const checklist = buildSchoolSetupChecklist(school, {
-    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    classNames: activeClasses.map((item: any) => String(item.name || '')),
+    classSections: activeClasses.map((item: any) => ({
+      name: String(item.name || ''),
+      formTeacherAssigned: Boolean(item.classTeacherId)
+    })),
+    classSubjectCoverage: activeClasses.map((item: any) => ({
+      classId: String(item.id),
+      subjectCount: subjectCountsByClass.get(String(item.id)) || 0
+    })),
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
