@@ -441,6 +441,20 @@ BEGIN
   VALUES(p_school_id,'term_status',p_term_id,
     jsonb_build_object('status',v_previous),
     jsonb_build_object('status',p_status),p_actor_id);
+  IF p_status='open' AND v_previous='closed' THEN
+    WITH revoked AS (
+      UPDATE public.report_cards SET published_at=NULL,published_by=NULL,updated_at=now()
+      WHERE school_id=p_school_id
+        AND academic_year_id=(SELECT academic_year_id FROM public.terms WHERE id=p_term_id AND school_id=p_school_id)
+        AND published_at IS NOT NULL
+      RETURNING id,student_id,published_at
+    )
+    INSERT INTO public.marks_audit(school_id,entity_type,entity_id,student_id,old_value,new_value,changed_by)
+    SELECT p_school_id,'report_card',id,student_id,
+      jsonb_build_object('published_at',published_at),
+      jsonb_build_object('published_at',NULL),p_actor_id
+    FROM revoked;
+  END IF;
   RETURN jsonb_build_object('term_id',p_term_id,'status',p_status,'closed_at',v_old.closed_at);
 END;
 $$;
