@@ -770,7 +770,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         <section className="space-y-4">
           <TermMarksTeacherWorkspace
             classes={classes}
-            assignments={teacherAssignments}
             students={students}
             selectedClassId={selectedClassId}
             onClassChange={setSelectedClassId}
