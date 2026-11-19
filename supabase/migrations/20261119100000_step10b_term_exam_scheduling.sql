@@ -299,5 +299,33 @@ $;
 REVOKE ALL ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_publish_term_exam_period(VARCHAR, UUID, VARCHAR) TO service_role;
 
+
+-- Include all new term-exam rows in the existing school backup/restore pipeline.
+DO $term_exam_restore$
+DECLARE v_definition TEXT;
+BEGIN
+  SELECT pg_get_functiondef('public.schoolos_restore_school_backup_legacy(jsonb)'::regprocedure)
+    INTO v_definition;
+  IF position('exam_periods' IN v_definition) = 0 THEN
+    v_definition := replace(
+      v_definition,
+      '''exam_rooms'', ''exam_schedules''',
+      '''exam_rooms'', ''exam_periods'', ''class_exam_settings'', ''exam_days'', ''exam_sessions'', ''exam_schedules'''
+    );
+  END IF;
+  IF position('exam_invigilators' IN v_definition) = 0 THEN
+    v_definition := replace(
+      v_definition,
+      '''exam_schedule_cohort_students'', ''exam_seat_assignments''',
+      '''exam_schedule_cohort_students'', ''exam_seat_assignments'', ''exam_invigilators'''
+    );
+  END IF;
+  IF position('exam_periods' IN v_definition) = 0 OR position('exam_invigilators' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not synchronize term-exam tables in the school backup restore allowlist.';
+  END IF;
+  EXECUTE v_definition;
+END
+$term_exam_restore$;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
