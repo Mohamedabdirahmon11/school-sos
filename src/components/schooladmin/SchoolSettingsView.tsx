@@ -244,23 +244,59 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
     e.preventDefault();
     if (isReadOnly || !examConfig) return;
     setError(null);
-    if ([examConfig.smallExamMax, examConfig.bigExamMax].some(value => !Number.isFinite(value) || value < 1)) { setError('Exam maximum marks must be at least 1.'); return; }
+    const components = examConfig.assessmentComponents || [];
+    const total = components.reduce((sum, item) => sum + Number(item.maxMarks || 0), 0);
+    const finalComponents = components.filter(item => item.category === 'final');
+    const finalTotal = finalComponents.reduce((sum, item) => sum + Number(item.maxMarks || 0), 0);
+    if (total !== 100 || ![50, 60].includes(finalTotal) || finalComponents.length !== 1 || components.length < 1 || components.length > 6) {
+      setError('Assessment components must total exactly 100, with one final examination worth 50 or 60 marks.');
+      return;
+    }
     if (!Number.isFinite(examConfig.passMarkPercentage) || examConfig.passMarkPercentage < 0 || examConfig.passMarkPercentage > 100) { setError('Pass mark must be between 0 and 100.'); return; }
     setSavingSection('exams');
     try {
-      const updated = await ApiClient.updateExamConfig({
-        smallExamMax: examConfig.smallExamMax,
-        bigExamMax: examConfig.bigExamMax,
-        passMarkPercentage: examConfig.passMarkPercentage
-      });
+      const updated = await ApiClient.updateExamConfig({ assessmentComponents: components, passMarkPercentage: examConfig.passMarkPercentage });
       setExamConfig(updated);
-      setNotice('Exam maximum marks and pass mark saved successfully!');
+      setNotice('Assessment scheme and pass mark saved successfully!');
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to save exam rules.');
-    } finally {
-      setSavingSection(null);
-    }
+    } finally { setSavingSection(null); }
+  };
+
+  const handleToggleSemesterLock = async (semester: 'Semester 1' | 'Semester 2') => {
+    if (isReadOnly || !examConfig || savingSection === 'exams') return;
+    setError(null);
+    setSavingSection('exams');
+    const current = examConfig.lockedSemesters || [];
+    const next = current.includes(semester) ? current.filter(item => item !== semester) : [...current, semester];
+    try {
+      const updated = await ApiClient.updateExamConfig({ lockedSemesters: next });
+      setExamConfig(updated);
+      setNotice(next.includes(semester) ? semester + ' mark entry locked.' : semester + ' mark entry unlocked.');
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Semester lock setting could not be saved.');
+    } finally { setSavingSection(null); }
+  };
+
+  const updateExamComponent = (id: string, updates: Partial<ExamConfig['assessmentComponents'][number]>) => {
+    if (!examConfig) return;
+    setExamConfig({ ...examConfig, assessmentComponents: examConfig.assessmentComponents.map(component => component.id === id ? { ...component, ...updates } : component) });
+  };
+
+  const addExamQuiz = () => {
+    if (!examConfig) return;
+    const continuous = examConfig.assessmentComponents.filter(component => component.category === 'continuous');
+    const final = examConfig.assessmentComponents.find(component => component.category === 'final');
+    if (!final || continuous.length >= 5 || examConfig.assessmentComponents.length >= 6) return;
+    const totalContinuous = 100 - final.maxMarks;
+    const count = continuous.length + 1;
+    const base = Math.floor(totalContinuous / count);
+    const remainder = totalContinuous % count;
+    const nextContinuous = [...continuous, { id: 'quiz-' + Date.now().toString(36), name: 'Quiz ' + count, maxMarks: 1, category: 'continuous' as const, order: count }]
+      .map((component, index) => ({ ...component, maxMarks: base + (index < remainder ? 1 : 0), order: index + 1 }));
+    setExamConfig({ ...examConfig, assessmentComponents: [...nextContinuous, { ...final, order: count + 1 }] });
   };
 
   const handleSaveTimetable = async (e: React.FormEvent) => {
@@ -904,12 +940,33 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                   <h2 className="text-base font-bold text-[#132A29]">{t('settings_exam_marks')}</h2>
                   <p className="text-xs text-[#64748B] mt-0.5">These values drive marks entry, report cards, and year-end promotion for this school.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="space-y-1"><span className="font-semibold text-[#334155]">Small Exam Maximum</span><input type="number" min={1} max={1000} required value={examConfig.smallExamMax} onChange={e => setExamConfig({ ...examConfig, smallExamMax: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                  <label className="space-y-1"><span className="font-semibold text-[#334155]">Big Exam Maximum</span><input type="number" min={1} max={1000} required value={examConfig.bigExamMax} onChange={e => setExamConfig({ ...examConfig, bigExamMax: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
+                <div className="rounded-xl border border-slate-200 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-800">Assessment components</h3><p className="text-[11px] text-slate-500">Use one continuous assessment or multiple quizzes, plus one final exam worth 50 or 60. Total must equal 100.</p></div>
+                    <button type="button" disabled={isReadOnly || examConfig.assessmentComponents.filter(item => item.category === 'continuous').length >= 5 || examConfig.assessmentComponents.length >= 6} onClick={addExamQuiz} className="rounded-lg border border-teal-700 px-3 py-2 font-semibold text-teal-800 disabled:opacity-40">+ Add quiz</button>
+                  </div>
+                  <div className="space-y-2">
+                    {examConfig.assessmentComponents.slice().sort((a,b) => a.order-b.order).map(component => (
+                      <div key={component.id} className="grid grid-cols-[1fr_100px_auto] items-center gap-2">
+                        <input aria-label="Assessment component name" value={component.name} onChange={e => updateExamComponent(component.id,{name:e.target.value})} className="min-w-0 rounded-lg border border-slate-300 px-3 py-2" />
+                        <input aria-label={component.name + ' maximum marks'} type="number" min={1} max={100} value={component.maxMarks} onChange={e => updateExamComponent(component.id,{maxMarks:Number(e.target.value)})} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-right font-mono" />
+                        <span className="text-[10px] font-semibold text-slate-500">{component.category === 'final' ? 'FINAL' : 'QUIZ'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-600">Continuous: {examConfig.assessmentComponents.filter(item => item.category === 'continuous').reduce((sum,item) => sum + Number(item.maxMarks || 0),0)} · Final: {examConfig.assessmentComponents.filter(item => item.category === 'final').reduce((sum,item) => sum + Number(item.maxMarks || 0),0)} · Total: <strong>{examConfig.assessmentComponents.reduce((sum,item) => sum + Number(item.maxMarks || 0),0)}/100</strong></p>
                 </div>
                 <label className="block space-y-1"><span className="font-semibold text-[#334155]">Minimum Pass Mark (%)</span><input type="number" min={0} max={100} required value={examConfig.passMarkPercentage} onChange={e => setExamConfig({ ...examConfig, passMarkPercentage: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" /></label>
-                <p className="text-[11px] text-[#64748B]">Combined maximum score: <span className="font-mono font-bold text-[#132A29]">{examConfig.smallExamMax + examConfig.bigExamMax}</span></p>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-2">
+                  <h3 className="font-bold text-slate-800">Semester mark-entry lock</h3>
+                  <p className="text-[11px] text-slate-600">Locking prevents teachers from saving or submitting marks for that semester. Unlock to resume entry.</p>
+                  {(['Semester 1','Semester 2'] as const).map(term => {
+                    const locked = (examConfig.lockedSemesters || []).includes(term);
+                    return <div key={term} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+                      <span className="font-semibold">{term} · {locked ? 'Locked' : 'Open'}</span>
+                      <button type="button" disabled={isReadOnly || savingSection === 'exams'} onClick={() => void handleToggleSemesterLock(term)} className={`rounded-lg px-3 py-2 text-[11px] font-bold disabled:opacity-40 ${locked ? 'bg-teal-700 text-white' : 'border border-amber-500 text-amber-800'}`}>{locked ? 'Unlock' : 'Lock'}</button>
+                    </div>;
+                  })}
+                </div>
                 <div className="flex justify-end">
                   <button type="submit" disabled={isReadOnly || savingSection === 'exams'} className="px-4 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-50">
                     <Save className="w-3.5 h-3.5" /> {savingSection === 'exams' ? '...' : t('settings_save_exam')}
