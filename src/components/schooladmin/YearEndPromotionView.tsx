@@ -85,7 +85,8 @@ export const YearEndPromotionView: React.FC = () => {
     if (!selectedClassId) return;
     setLoading(true);
     try {
-      const rankings = await ApiClient.getYearlyRankings(selectedClassId);
+      if (!sourceAcademicYearId) throw new Error('Choose an active source academic year.');
+      const rankings = await ApiClient.getYearlyRankings(selectedClassId, sourceAcademicYearId);
       setYearlyRankings(rankings);
 
       const map: Record<string, { decision: 'promoted' | 'repeated'; notes: string; adminOverride: boolean }> = {};
@@ -236,7 +237,7 @@ export const YearEndPromotionView: React.FC = () => {
             Source Academic Year
           </label>
           <select value={sourceAcademicYearId} onChange={e=>setSourceAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
-            {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
+            {academicYears.filter(year=>year.status==='active').map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
           </select>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
             Current Class (Completing Academic Year)
@@ -266,7 +267,7 @@ export const YearEndPromotionView: React.FC = () => {
             Target Academic Year
           </label>
           <select value={targetAcademicYearId} onChange={e=>setTargetAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
-            {academicYears.filter(year=>year.id!==sourceAcademicYearId).map(year=><option key={year.id} value={year.id}>{year.name}</option>)}
+            {academicYears.filter(year=>year.status==='draft'&&year.id!==sourceAcademicYearId).map(year=><option key={year.id} value={year.id}>{year.name}</option>)}
           </select>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
             Target Class (For Promoted Cohort)

@@ -1479,8 +1479,8 @@ export class ApiClient {
     return this.request<any[]>(`/exams/rankings/semester?classId=${classId}&semester=${encodeURIComponent(semester)}`);
   }
 
-  public static async getYearlyRankings(classId: string) {
-    return this.request<any[]>(`/exams/rankings/yearly?classId=${classId}`);
+  public static async getYearlyRankings(classId: string, sourceAcademicYearId: string) {
+    return this.request<any[]>(`/exams/rankings/yearly?classId=${encodeURIComponent(classId)}&sourceAcademicYearId=${encodeURIComponent(sourceAcademicYearId)}`);
   }
 
   public static async getPromotionHistory() {

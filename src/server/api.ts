@@ -7590,13 +7590,19 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { classId } = req.query;
-  if (!classId || typeof classId !== 'string') {
-    res.status(400).json({ error: 'classId is required.' });
+  const { classId, sourceAcademicYearId } = req.query;
+  if (!classId || typeof classId !== 'string' || typeof sourceAcademicYearId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sourceAcademicYearId)) {
+    res.status(400).json({ error: 'classId and a valid sourceAcademicYearId are required.' });
     return;
   }
   if (!await canReadClassResults(req, res, classId)) return;
-  res.json(await db.getClassYearlyRankings(school.id, classId));
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: sourceYear, error } = await client.from('academic_years').select('id,name,status').eq('id', sourceAcademicYearId).eq('school_id', school.id).maybeSingle();
+  if (error || !sourceYear || sourceYear.status !== 'active') { res.status(400).json({ error: 'Choose the active academic year for this school.' }); return; }
+  const sourceClass = await db.getClassById(classId, school.id);
+  if (!sourceClass || sourceClass.academicYear !== sourceYear.name) { res.status(400).json({ error: 'The selected class does not belong to the source academic year.' }); return; }
+  res.json(await db.getClassYearlyRankings(school.id, classId, sourceYear.name));
 });
 
 // Year-End Promotion Confirmation
@@ -7608,38 +7614,14 @@ apiRouter.get('/promotions/history', requireAuth, requireSchoolContext, requireS
 apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const { promotions, classId, topN = 3 } = req.body;
-
-  if (!Array.isArray(promotions) || typeof classId !== 'string') {
-    res.status(400).json({ error: 'classId and promotions array are required.' });
+  const { promotions, classId, topN = 3, sourceAcademicYearId, targetAcademicYearId } = req.body || {};
+  if (!Array.isArray(promotions) || typeof classId !== 'string' || !/^[0-9a-f-]{36}$/i.test(String(sourceAcademicYearId || '')) || !/^[0-9a-f-]{36}$/i.test(String(targetAcademicYearId || ''))) {
+    res.status(400).json({ error: 'classId, promotions, source academic year and target academic year are required.' });
     return;
   }
-
   try {
-    const confirmed = await db.confirmYearEndPromotions(school.id, classId, Number(topN), promotions, user.id);
-    const sourceAcademicYearId = typeof req.body?.sourceAcademicYearId === 'string' ? req.body.sourceAcademicYearId : '';
-    const targetAcademicYearId = typeof req.body?.targetAcademicYearId === 'string' ? req.body.targetAcademicYearId : '';
-    if (sourceAcademicYearId && targetAcademicYearId) {
-      if (!/^[0-9a-f-]{36}$/i.test(sourceAcademicYearId) || !/^[0-9a-f-]{36}$/i.test(targetAcademicYearId)) {
-        res.status(400).json({ error: 'Choose valid source and target academic years.' }); return;
-      }
-      const client = documentServiceClient(res);
-      if (!client) return;
-      const decisions = promotions.map((item: any) => ({
-        studentId: String(item.studentId || ''),
-        decision: item.decision,
-        targetClassId: item.decision === 'promoted' ? String(item.classToId || '') : classId
-      }));
-      const { data, error } = await client.rpc('schoolos_promote_enrollments', {
-        p_school_id: school.id, p_source_year: sourceAcademicYearId,
-        p_target_year: targetAcademicYearId, p_class_id: classId,
-        p_decisions: decisions, p_actor_id: user.id
-      });
-      if (error) { res.status(409).json({ error: error.message || 'Enrollment history could not be updated.' }); return; }
-      res.json({ success: true, count: confirmed.length, enrollmentCount: data });
-      return;
-    }
-    res.json({ success: true, count: confirmed.length });
+    const confirmed = await db.confirmYearEndPromotions(school.id, classId, Number(topN), promotions, user.id, sourceAcademicYearId, targetAcademicYearId);
+    res.json({ success: true, count: confirmed.promotions.length, enrollmentCount: confirmed.enrollmentCount });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Promotion confirmation failed.' });
   }

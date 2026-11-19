@@ -2648,9 +2648,9 @@ class StorageEngine {
     }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
   }
 
-  public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
+  public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2', academicYearOverride?: string): Promise<StudentMark[]> {
     const klass = await this.getClassById(classId, schoolId);
-    const academicYear = klass?.academicYear;
+    const academicYear = academicYearOverride || klass?.academicYear;
     return this.queryRows<StudentMark>('student_marks', {
       school_id: schoolId, class_id: classId, subject_id: subjectId, semester,
       academic_year: academicYear
@@ -3057,11 +3057,11 @@ class StorageEngine {
   }
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
-  public async getClassYearlyRankings(schoolId: string, classId: string) {
+  public async getClassYearlyRankings(schoolId: string, classId: string, academicYearName?: string) {
     const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
-    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
-    const [config, school] = await Promise.all([this.getExamConfig(schoolId), this.getSchoolById(schoolId)]);
+    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1', academicYearName)).filter(mark => mark.status === 'approved');
+    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2', academicYearName)).filter(mark => mark.status === 'approved');
+    const [config, school] = await Promise.all([this.getExamConfig(schoolId, academicYearName), this.getSchoolById(schoolId)]);
     const attendanceWindowStart = school?.terms
       ? [school.terms.semester1Start, school.terms.semester2Start].filter(Boolean).sort()[0]
       : undefined;
@@ -3201,12 +3201,23 @@ class StorageEngine {
     classId: string,
     topN: number,
     promotions: { studentId: string; classFromId: string; classToId?: string; yearlyPercentage: number; yearlyRank: number; decision: 'promoted' | 'repeated'; notes?: string; adminOverride?: boolean }[],
-    processedBy: string
-  ): Promise<PromotionRecord[]> {
+    processedBy: string,
+    sourceAcademicYearId: string,
+    targetAcademicYearId: string
+  ): Promise<{ promotions: PromotionRecord[]; enrollmentCount: number }> {
     if (!Number.isInteger(topN) || topN < 1) throw new Error('topN must be a positive whole number.');
     const sourceClass = await this.getClassById(classId, schoolId);
     if (!sourceClass || sourceClass.isArchived) throw new Error('Promotion source class was not found or is archived in this school.');
-    const rankings = await this.getClassYearlyRankings(schoolId, classId);
+    const sourceYearRows = await this.queryRows<any>('academic_years', { school_id: schoolId, id: sourceAcademicYearId });
+    const targetYearRows = await this.queryRows<any>('academic_years', { school_id: schoolId, id: targetAcademicYearId });
+    const sourceYear = sourceYearRows[0];
+    const targetYear = targetYearRows[0];
+    if (!sourceYear || sourceYear.status !== 'active') throw new Error('Promotion source must be the active academic year for this school.');
+    if (!targetYear || targetYear.status !== 'draft') throw new Error('Promotion target must be a draft academic year for this school.');
+    if (!sourceYear.name || !targetYear.name || sourceClass.academicYear !== sourceYear.name) throw new Error('The selected class does not belong to the selected source academic year.');
+    const [startYear, endYear] = String(sourceYear.name).split('-').map(Number);
+    if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || targetYear.name !== `${startYear + 1}-${endYear + 1}`) throw new Error('Choose the next consecutive academic year as the promotion target.');
+    const rankings = await this.getClassYearlyRankings(schoolId, classId, sourceYear.name);
     if (rankings.some(row => !row.annualComplete)) {
       throw new Error('Annual results cannot be finalized until every enrolled student has approved marks for every assigned subject in both semesters.');
     }
@@ -3233,7 +3244,6 @@ class StorageEngine {
       }
       promotion.yearlyPercentage = rank.yearlyPercentage;
       promotion.yearlyRank = rank.rank;
-      if (promotion.adminOverride) promotion.notes = `ADMIN OVERRIDE: ${promotion.notes!.trim()}`;
     }
 
     // Fast user-facing capacity validation; the database RPC repeats this under row locks.
@@ -3253,46 +3263,31 @@ class StorageEngine {
       }
     }
 
-    const config = await this.getExamConfig(schoolId);
-    const yrFrom = config.academicYear;
-    const [startYr, endYr] = yrFrom.split('-').map(Number);
-    if (!Number.isInteger(startYr) || !Number.isInteger(endYr)) throw new Error('The school academic year is not configured correctly.');
-    const yrTo = `${startYr + 1}-${endYr + 1}`;
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic year-end promotion is unavailable.');
     const startedAt = performance.now();
-    const { data, error } = await client.rpc('schoolos_confirm_year_end_promotions', {
+    const { data, error } = await client.rpc('schoolos_confirm_promotions_with_enrollments', {
       p_school_id: schoolId,
+      p_source_year: sourceAcademicYearId,
+      p_target_year: targetAcademicYearId,
       p_class_id: classId,
-      p_academic_year_from: yrFrom,
-      p_academic_year_to: yrTo,
-      p_processed_by: processedBy,
+      p_actor_id: processedBy,
       p_promotions: promotions.map(p => ({
-        student_id: p.studentId,
-        class_to_id: p.decision === 'promoted' ? p.classToId : null,
+        studentId: p.studentId,
+        targetClassId: p.decision === 'promoted' ? p.classToId : classId,
         decision: p.decision,
-        yearly_percentage: p.yearlyPercentage,
-        yearly_rank: p.yearlyRank,
+        yearlyPercentage: p.yearlyPercentage,
+        yearlyRank: p.yearlyRank,
         notes: p.notes || null,
-        admin_override: p.adminOverride === true
+        adminOverride: p.adminOverride === true
       }))
     });
-    this.recordQuery('rpc:schoolos_confirm_year_end_promotions', 'call', startedAt);
-    if (error) throw new Error(error.message || 'Year-end promotions could not be saved atomically.');
-    if (!Array.isArray(data) || data.length !== promotions.length) throw new Error('Database returned an incomplete promotion confirmation.');
-    const created = data.map((row: Record<string, any>) => fromSupabaseRow(row, 'promotions') as PromotionRecord);
-    this.logAudit({
-      action: 'YEAR_END_PROMOTION_CONFIRMED',
-      category: 'academics',
-      schoolId,
-      userId: processedBy,
-      userName: 'School Administrator',
-      userRole: 'school_admin',
-      details: `Processed year-end promotions for ${created.length} students from ${yrFrom} to ${yrTo}.`,
-      severity: 'info'
-    });
-    await this.flush();
-    return created;
+    this.recordQuery('rpc:schoolos_confirm_promotions_with_enrollments', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Promotion and enrollment history could not be saved atomically.');
+    const result = data as { enrollmentCount?: number; promotions?: Record<string, any>[] } | null;
+    if (!result || !Array.isArray(result.promotions) || result.promotions.length !== promotions.length) throw new Error('Database returned an incomplete promotion confirmation.');
+    const created = result.promotions.map(row => fromSupabaseRow(row, 'promotions') as PromotionRecord);
+    return { promotions: created, enrollmentCount: Number(result.enrollmentCount || 0) };
   }
 
   // -------------------------------------------------------------
