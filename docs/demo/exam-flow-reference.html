@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Habka Imtixaanka: Teacher, Form Teacher, Report Card</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f3f4f8;--card:#fff;--fg:#1c2230;--mut:#6b7280;--line:#dde1ea;--pri:#2563eb;--ok:#15803d;--bad:#b91c1c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151c;--card:#1b202b;--fg:#e8ebf2;--mut:#98a1b3;--line:#2b3242;--pri:#6d9bff;--ok:#4ade80;--bad:#f87171}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,Arial,sans-serif;padding:12px}
+.w{max-width:960px;margin:auto}
+h1{font-size:19px;margin:0 0 8px}
+.bar,.tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.bar label{display:flex;gap:4px;align-items:center;color:var(--mut)}
+select,input{padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit}
+input[type=number]{width:70px;text-align:center}
+.btn,.tabs button{background:var(--pri);color:#fff;border:0;padding:8px 12px;border-radius:9px;cursor:pointer;font:inherit}
+.btn.g,.tabs button{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.note{color:var(--mut);font-size:12.5px;margin:4px 0 8px}
+.sc{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{border-bottom:1px solid var(--line);padding:5px;text-align:center}
+td.l{text-align:left}
+td.miss{background:color-mix(in srgb,var(--bad) 18%,transparent)}
+input.bad{border-color:var(--bad);outline:2px solid var(--bad)}
+.pill{display:inline-block;padding:1px 9px;border-radius:99px;border:1px solid var(--line);font-size:12px;margin:2px}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.bad{color:var(--bad);border-color:var(--bad)}
+.row{display:flex;gap:6px;margin:4px 0}.row input:first-child{flex:1}
+.x{border:0;background:none;color:var(--bad);cursor:pointer;font-size:15px}
+.chk{display:inline-block;margin:3px 10px 3px 0}
+#er{color:var(--bad);margin-left:8px}
+.paper{background:#fff;color:#000;padding:14px;border:1px solid #bbb;font-family:Arial,sans-serif}
+.paper table{min-width:0}.paper th,.paper td{border:1px solid #000;padding:4px}
+.paper h2{text-align:center;margin:0 0 6px;font-size:18px}
+.big{font-weight:700;background:#f1f1f1}
+.sig{display:flex;justify-content:space-between;gap:10px;margin-top:22px;font-size:12px}.sig span{border-top:1px solid #000;padding-top:3px;flex:1;text-align:center}
+[contenteditable]:hover{outline:1px dashed #2563eb}
+#paper{display:none}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));background:#1c2230;color:#fff;padding:8px 14px;border-radius:10px;display:none;z-index:9}
+@media print{.bar,.tabs,.noP,.x,#toast,h1,.nt{display:none!important}body{background:#fff;padding:0}.card{border:0;padding:0}
+body[data-p=paper] #main{display:none}body[data-p=paper] #paper{display:block;color:#000;background:#fff}
+#paper th,#paper td{border:1px solid #000;padding:6px;height:8mm}}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>Habka imtixaanka: Teacher, Form Teacher, Report Card</h1>
+<div class="bar">
+<label>Doorka <select id="role"><option value="admin">School Admin</option><option value="teacher">Macallin (maaddo)</option><option value="form">Form Teacher</option></select></label>
+<label id="tw" hidden>Macallin <select id="tch"></select></label>
+<label>Term <select id="term"><option value="1">Term 1</option><option value="2">Term 2</option></select></label>
+<button class="btn g" id="rst">Dib u celi tusaalaha</button>
+</div>
+<div class="tabs" id="tabs"></div>
+<div id="main"></div>
+<div id="paper"></div>
+</div>
+<div id="toast"></div>
+<script>
+var $=function(i){return document.getElementById(i)};
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function fmt(x){return Number.isInteger(x)?String(x):x.toFixed(1)}
+function toast(m){var t=$("toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(function(){t.style.display="none"},2400)}
+var ST=["Ikraan Cali","Ismaaciil Ibraahim","Ixsaan Axmed","Jamaal Cabdilaahi","Khaalid Cismaan","Kowsar Maxamuud","Layla Ibraahim","Madar Cali","Maryam Yuusuf","Masna Siciid"];
+var SUBS=[["Soomaali","Macallin Cali",1],["Amxaari","Macallin Faadumo",1],["Ingiriis","Macallin Yuusuf",1],["Xisaab","Macallin Axmed",1],["Science","Macallin Hodan",1],["Carabi","Macallin Maryan",1],["Cilmi Bulsho","Macallin Xasan",0],["Civic","Macallin Xasan",0],["Isboorti","Macallin Xasan",0],["Dabeecad","Macallin Mukhtaar",1]].map(function(x){return{n:x[0],t:x[1],on:x[2]}});
+var TCH=["Macallin Cali","Macallin Faadumo","Macallin Yuusuf","Macallin Axmed","Macallin Hodan","Macallin Maryan"];
+var P1=[{n:"Shaqo",m:10},{n:"Quiz",m:10},{n:"Mid-test",m:10},{n:"Hawlgal",m:10},{n:"Imtixaan weyn",m:60}];
+var R={role:"admin",me:"",term:1,tab:0,st:0},H={sch:"Dugsiga Al-Nuur"},S,DR;
+function seed(parts){S={parts:parts,M:{1:[],2:[]},SUB:{1:{},2:{}},LK:{1:false,2:false},FT:{1:false,2:false},rm:{1:"V. Good",2:"V. Good"}};
+[1,2].forEach(function(t){SUBS.forEach(function(s,si){S.M[t][si]=ST.map(function(n,i){if(!s.on)return null;var b=.6+((i*37)%35)/100;b=b*(si%3==0?.93:1)+t*.02+(((i*7+si*13+t*5)%11)-5)/100;return parts.map(function(p,k){var q=Math.max(.3,Math.min(1,b+(((i+k*3+si)%7)-3)/60));return Math.round(p.m*q)})});S.SUB[t][si]=t==1&&si!=5&&s.on})})}
+function actv(){var a=[];SUBS.forEach(function(s,i){if(s.on)a.push(i)});return a}
+function scoreOf(t,si,i){var a=S.M[t][si][i];if(!a||a.some(function(v){return v===null}))return null;return a.reduce(function(x,y){return x+y},0)}
+function termStats(t,i){var tot=0,c=0;actv().forEach(function(si){var v=scoreOf(t,si,i);if(v!==null){tot+=v;c++}});return{tot:tot,avg:c?tot/c:0}}
+function rank(t,i){var m=termStats(t,i).tot;return 1+ST.filter(function(n,j){return termStats(t,j).tot>m}).length}
+function finTot(i){var s=0;actv().forEach(function(si){s+=((scoreOf(1,si,i)||0)+(scoreOf(2,si,i)||0))/2});return s}
+function rankF(i){var m=finTot(i);return 1+ST.filter(function(n,j){return finTot(j)>m}).length}
+function mySubs(){var r=[];SUBS.forEach(function(s,i){if(s.on&&s.t===R.me)r.push(i)});return r}
+function canEdit(si,t){return(R.role=="teacher"||R.role=="form")&&SUBS[si].t===R.me&&!S.SUB[t][si]&&!S.LK[t]}
+function tabsFor(){return R.role=="admin"?[["Qaabka",tabScheme],["Fasalka",tabClass],["Report card",tabCard]]:R.role=="teacher"?[["Marks",tabMarks]]:[["Marks",tabMarks],["Fasalka",tabClass],["Report card",tabCard]]}
+function render(){var T=tabsFor();if(R.tab>=T.length)R.tab=0;$("tabs").innerHTML=T.map(function(x,i){return'<button data-tab="'+i+'" class="'+(i==R.tab?"on":"")+'">'+x[0]+"</button>"}).join("");$("main").innerHTML=T[R.tab][1]();if($("sv"))chk()}
+function tabScheme(){var sum=DR.reduce(function(a,p){return a+p.m},0);
+return'<div class="card"><b>Qaabka 100-ka (iskuul kasta wuu kala duwan yahay)</b><p class="note">Dooro qaab diyaar ah ama samee kaaga. Wadarta waa inay noqotaa 100, haddii kale lama kaydin karo.</p><button class="btn" data-a="preset" data-v="1">10+10+10+10+60</button> <button class="btn" data-a="preset" data-v="2">40+60</button><p class="note">Beddelidda qaabka waxay dib u abuurtaa xogta tusaalaha.</p>'+DR.map(function(p,k){return'<div class="row"><input data-a="dn" data-k="'+k+'" value="'+esc(p.n)+'" maxlength="24"><input type="number" data-a="dm" data-k="'+k+'" min="1" max="100" value="'+p.m+'"><button class="x" data-a="delp" data-k="'+k+'">×</button></div>'}).join("")+'<button class="btn g" data-a="addp">+ Qayb</button> <b id="sm">Wadar: '+sum+'</b><span id="er"></span><br><br><button class="btn" id="sv" data-a="savep">Kaydi qaabka</button></div><div class="card"><b>Maaddooyinka la dhigo</b><p class="note">Maaddo aan la dhigin lama tirinayo, lamana codsado marks.</p>'+SUBS.map(function(s,i){return'<label class="chk"><input type="checkbox" data-a="sub" data-i="'+i+'"'+(s.on?" checked":"")+'> '+esc(s.n)+'</label>'}).join("")+'</div>'}
+function chk(){var s=DR.reduce(function(a,p){return a+p.m},0),ok=s===100&&DR.every(function(p){return p.m>=1&&p.n.trim()});$("sm").textContent="Wadar: "+s;$("er").textContent=ok?"":(s!==100?"Wadarta waa inay noqotaa 100 (hadda "+s+")":"Magac iyo dhibco ha madhnaadan");$("sv").disabled=!ok}
+function tabMarks(){var m=mySubs();if(!m.length)return'<div class="card">Ma jiraan maaddo kuu xidhan.</div>';var si=m[0],t=R.term,ed=canEdit(si,t),pa=S.parts;
+var h='<div class="card"><b>'+esc(SUBS[si].n)+'</b> · Term '+t+' · Fasalka 5aad '+(S.SUB[t][si]?'<span class="pill ok">La gudbiyay</span>':'<span class="pill">Draft</span>')+(S.LK[t]?' <span class="pill bad">Term xidhan</span>':'')+'<p class="note">'+esc(R.me)+' wuxuu arkaa oo gelin karaa maaddadiisa kaliya. Qayb kasta waxay leedahay xadkeeda; wadarta waxay noqonaysaa 100.</p><div class="sc"><table><tr><th>#</th><th>Arday</th>'+pa.map(function(p){return'<th>'+esc(p.n)+'<br><small>/'+p.m+'</small></th>'}).join("")+'<th>Wadar<br><small>/100</small></th></tr>';
+ST.forEach(function(n,i){var a=S.M[t][si][i],v=scoreOf(t,si,i);h+='<tr><td>'+(i+1)+'</td><td class="l">'+esc(n)+'</td>'+pa.map(function(p,k){return'<td><input type="number" step="any" min="0" max="'+p.m+'" data-a="mk" data-i="'+i+'" data-k="'+k+'" value="'+(a[k]===null?"":a[k])+'"'+(ed?"":" disabled")+'></td>'}).join("")+'<td><b id="tt'+i+'">'+(v===null?"-":v)+'</b></td></tr>'});
+return h+'</table></div><p>'+(ed?'<button class="btn" data-a="submit">Gudbi Form Teacher</button> ':'')+'<button class="btn g" data-a="paper">Daabac warqad madhan</button></p></div>'}
+function tabClass(){var t=R.term,act=actv(),all=act.every(function(i){return S.SUB[t][i]});
+var h='<div class="card"><b>Fasalka 5aad · Term '+t+'</b> '+(S.LK[t]?'<span class="pill ok">Published</span>':'<span class="pill">Aan la daabicin</span>')+'<div>'+act.map(function(i){return'<span class="pill '+(S.SUB[t][i]?"ok":"")+'">'+esc(SUBS[i].n)+(S.SUB[t][i]?" ✓":" ⏳")+(S.SUB[t][i]&&!S.LK[t]&&(R.role=="admin"||(R.role=="form"&&!S.FT[t]))?' <button class="x" data-a="unsub" data-s="'+i+'" title="Fur">↺</button>':"")+'</span>'}).join("")+'</div>';
+var ord=ST.map(function(n,i){return i}).sort(function(a,b){return termStats(t,b).tot-termStats(t,a).tot||ST[a].localeCompare(ST[b])});
+h+='<div class="sc"><table><tr><th>Kaalin</th><th>Arday</th>'+act.map(function(i){return'<th>'+esc(SUBS[i].n)+'</th>'}).join("")+'<th>Wadar</th><th>Celcelis</th></tr>'+ord.map(function(i){var s=termStats(t,i);return'<tr><td>'+(all?rank(t,i):"-")+'</td><td class="l">'+esc(ST[i])+'</td>'+act.map(function(si){var v=scoreOf(t,si,i);return'<td'+(v===null?' class="miss"':"")+'>'+(v===null?"-":v)+'</td>'}).join("")+'<td><b>'+s.tot+'</b></td><td>'+fmt(s.avg)+'</td></tr>'}).join("")+'</table></div><p>';
+var ft=S.FT[t],adm=R.role=="admin",st2=S.LK[t]?'<span class="pill ok">La daabacay (Published)</span>':ft?'<span class="pill">Form Teacher wuu gudbiyay Admin, sugaya hubin</span>':'<span class="pill">Form Teacher weli ma gudbin</span>';h+='<span class="noP">'+st2+' ';
+if(S.LK[t])h+=adm?'<button class="btn g" data-a="unlock">Celi daabacaadda</button> ':'';
+else if(ft)h+=adm?'<button class="btn g" data-a="printList">Daabac liiska</button> <button class="btn" data-a="lock">Publish natiijada</button> <button class="btn g" data-a="ret">Soo celi Form Teacher</button> ':'';
+else if(!adm)h+='<button class="btn" data-a="toAdmin"'+(all?"":" disabled")+'>Gudbi Admin</button> ';
+h+='</span>';
+if(R.role=="admin"&&!all)h+=' <button class="btn g" data-a="subAll">Gudbi dhammaan (tijaabo degdeg ah)</button>';
+return h+(all?"":' <span class="note">Maaddooyinka oo dhan weli lama gudbin, kaalintu way sugaysaa.</span>')+'</p></div>'}
+function tabCard(){var i=R.st,l1=S.LK[1],l2=S.LK[2],fin=l1&&l2,act=actv(),n=ST.length;
+var h='<div class="card noP"><label>Arday <select data-a="stud">'+ST.map(function(x,j){return'<option value="'+j+'"'+(j==i?" selected":"")+'>'+esc(x)+'</option>'}).join("")+'</select></label> <button class="btn" data-a="print">Daabac</button>'+(fin?"":' <span class="note">Natiijadu waxay muuqataa marka Admin Publish sameeyo.</span>')+'</div><div class="paper"><h2 contenteditable data-a="sch">'+esc(H.sch)+'</h2><p><b>Report Card</b> · Ardayga: '+esc(ST[i])+' · Fasalka 5aad</p><div class="sc"><table><tr><th>Maadada</th><th>Term 1</th><th>Term 2</th><th>Celcelis</th></tr>';
+SUBS.forEach(function(s,si){var a=null,b=null,c="";if(s.on){a=l1?scoreOf(1,si,i):null;b=l2?scoreOf(2,si,i):null;h+='<tr><td class="l">'+esc(s.n)+'</td><td>'+(l1?fmt(a):"—")+'</td><td>'+(l2?fmt(b):"—")+'</td><td>'+(fin?fmt((a+b)/2):"—")+'</td></tr>'}else h+='<tr><td class="l">'+esc(s.n)+'</td><td></td><td></td><td></td></tr>'});
+var ft=finTot(i),c1=termStats(1,i),c2=termStats(2,i),cnt=act.length;
+h+='<tr class="big"><td class="l">Wadar</td><td>'+(l1?fmt(c1.tot):"—")+'</td><td>'+(l2?fmt(c2.tot):"—")+'</td><td>'+(fin?fmt(ft):"—")+'</td></tr><tr><td class="l">Celcelis (÷ '+cnt+' maaddo)</td><td>'+(l1?fmt(c1.avg):"—")+'</td><td>'+(l2?fmt(c2.avg):"—")+'</td><td>'+(fin?fmt(ft/cnt):"—")+'</td></tr><tr><td class="l">Daraja / Rank</td><td>'+(l1?rank(1,i)+"/"+n:"—")+'</td><td>'+(l2?rank(2,i)+"/"+n:"—")+'</td><td>'+(fin?rankF(i)+"/"+n:"—")+'</td></tr></table></div>';
+h+='<p>Faallo Term 1: <span contenteditable data-a="rm1">'+esc(S.rm[1])+'</span><br>Faallo Term 2: <span contenteditable data-a="rm2">'+esc(S.rm[2])+'</span></p><div class="sig"><span>Form Teacher</span><span>Waalidka</span><span>Maamulaha</span></div></div>';return h}
+function paperHtml(){var si=mySubs()[0],pa=S.parts;return'<h2>'+esc(H.sch)+'</h2><p>Warqadda marks · <b>'+esc(SUBS[si].n)+'</b> · Fasalka 5aad · Term '+R.term+' · '+esc(SUBS[si].t)+'</p><table style="width:100%;border-collapse:collapse"><tr><th>#</th><th>Arday</th>'+pa.map(function(p){return'<th>'+esc(p.n)+' /'+p.m+'</th>'}).join("")+'<th>Wadar /100</th></tr>'+ST.map(function(n,i){return'<tr><td>'+(i+1)+'</td><td style="text-align:left">'+esc(n)+'</td>'+pa.map(function(){return"<td></td>"}).join("")+'<td></td></tr>'}).join("")+'</table><p>Saxiixa macallinka: ____________</p>'}
+function prn(p){document.body.dataset.p=p;setTimeout(function(){window.print();delete document.body.dataset.p},60)}
+$("tabs").onclick=function(e){var b=e.target.closest("[data-tab]");if(b){R.tab=Number(b.dataset.tab);render()}};
+$("main").onclick=function(e){var a=e.target.closest("[data-a]");if(!a||a.tagName=="INPUT"||a.tagName=="SELECT"||a.isContentEditable)return;var x=a.dataset.a,t=R.term;
+if(x=="preset"){DR=a.dataset.v=="1"?JSON.parse(JSON.stringify(P1)):[{n:"Shaqada sannadka",m:40},{n:"Imtixaan weyn",m:60}];seed(JSON.parse(JSON.stringify(DR)));toast("Qaabka waa la kaydiyay");render()}
+else if(x=="addp"){if(DR.length>=6){toast("Ugu badnaan 6 qaybood");return}DR.push({n:"Qayb",m:0});render()}
+else if(x=="delp"){if(DR.length>1)DR.splice(Number(a.dataset.k),1);render()}
+else if(x=="savep"){var s=DR.reduce(function(q,p){return q+p.m},0);if(s!==100){toast("Wadarta waa inay noqotaa 100");return}seed(JSON.parse(JSON.stringify(DR)));toast("Qaabka cusub waa la kaydiyay");render()}
+else if(x=="submit"){var si=mySubs()[0];if(!canEdit(si,t)){toast("Ma haysatid ogolaansho");return}if(ST.some(function(n,i){return scoreOf(t,si,i)===null})){toast("Marks-ka oo dhan lama gelin");return}S.SUB[t][si]=true;toast("Waa la gudbiyay Form Teacher-ka");render()}
+else if(x=="paper"){$("paper").innerHTML=paperHtml();prn("paper")}
+else if(x=="toAdmin"){if(R.role!="form"){toast("Ma haysatid ogolaansho");return}if(!actv().every(function(i){return S.SUB[t][i]})){toast("Maaddooyinka oo dhan lama gudbin");return}S.FT[t]=true;toast("Waa la gudbiyay Admin-ka");render()}
+else if(x=="ret"){if(R.role!="admin")return;S.FT[t]=false;toast("Waa lagu celiyay Form Teacher");render()}
+else if(x=="printList")window.print();
+else if(x=="lock"){if(R.role!="admin"||!S.FT[t]){toast("Ma haysatid ogolaansho");return}S.LK[t]=true;toast("Term "+t+" waa la daabacay (Published), kaalintii waa la dejiyay");render()}
+else if(x=="unlock"){if(R.role!="admin")return;S.LK[t]=false;render()}
+else if(x=="unsub"){if(R.role=="teacher"||S.LK[t]||(R.role=="form"&&S.FT[t]))return;S.SUB[t][Number(a.dataset.s)]=false;render()}
+else if(x=="subAll"){actv().forEach(function(i){S.SUB[t][i]=true});render()}
+else if(x=="print")window.print()};
+$("main").onchange=function(e){var a=e.target,x=a.dataset.a,t=R.term;
+if(x=="mk"){var m=mySubs(),si=m[0];if(si===undefined||!canEdit(si,t)){toast("Ma haysatid ogolaansho");return}var i=Number(a.dataset.i),k=Number(a.dataset.k),mx=S.parts[k].m,v=a.value.trim();
+if(v===""){S.M[t][si][i][k]=null;a.classList.remove("bad")}else if(!/^\d+(\.\d+)?$/.test(v)||Number(v)>mx){a.classList.add("bad");toast("Khalad: gali 0 ilaa "+mx);a.value=S.M[t][si][i][k]===null?"":S.M[t][si][i][k];return}else{S.M[t][si][i][k]=Number(v);a.classList.remove("bad")}
+var sc=scoreOf(t,si,i);$("tt"+i).textContent=sc===null?"-":sc}
+else if(x=="sub"){SUBS[Number(a.dataset.i)].on=a.checked;seed(JSON.parse(JSON.stringify(S.parts)));toast("Maaddooyinka waa la beddelay")}
+else if(x=="stud"){R.st=Number(a.value);render()}};
+$("main").oninput=function(e){var a=e.target,x=a.dataset.a;if(x=="dn"){DR[Number(a.dataset.k)].n=a.value;chk()}else if(x=="dm"){DR[Number(a.dataset.k)].m=Number(a.value)||0;chk()}};
+$("main").addEventListener("focusout",function(e){var a=e.target,x=a.dataset&&a.dataset.a;if(x=="sch")H.sch=a.textContent;else if(x=="rm1")S.rm[1]=a.textContent;else if(x=="rm2")S.rm[2]=a.textContent});
+$("tch").innerHTML=TCH.map(function(x){return'<option>'+x+"</option>"}).join("");
+$("role").onchange=function(){R.role=this.value;R.me=R.role=="form"?"Macallin Mukhtaar":R.role=="teacher"?$("tch").value:"";$("tw").hidden=R.role!="teacher";R.tab=0;render()};
+$("tch").onchange=function(){R.me=this.value;render()};
+$("term").onchange=function(){R.term=Number(this.value);render()};
+$("rst").onclick=function(){DR=JSON.parse(JSON.stringify(P1));seed(JSON.parse(JSON.stringify(P1)));SUBS.forEach(function(s,i){s.on=i<6||i==9});render();toast("Tusaalihii waa la soo celiyay")};
+DR=JSON.parse(JSON.stringify(P1));seed(JSON.parse(JSON.stringify(P1)));render();
+</script>
+</body>
+</html>

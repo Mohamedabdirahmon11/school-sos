@@ -509,6 +509,7 @@ export const ExamsResultsView: React.FC = () => {
   const [correctionReason, setCorrectionReason] = useState('');
   const [isReturningMarks, setIsReturningMarks] = useState(false);
   const [isPublishingResults, setIsPublishingResults] = useState(false);
+  const [isUnpublishingResults, setIsUnpublishingResults] = useState(false);
 
   // Exam timetable, room allocation, and seat list state
   const [examSchedules, setExamSchedules] = useState<any[]>([]);
@@ -738,6 +739,21 @@ export const ExamsResultsView: React.FC = () => {
       setNotice(error instanceof Error ? error.message : 'Results could not be published.');
     } finally {
       setIsPublishingResults(false);
+    }
+  };
+
+  const handleUnpublishResults = async () => {
+    if (isReadOnly || !selectedClassId || !allClassMarksPublished) return;
+    if (!window.confirm('Withdraw these published results from Parent and Student portals?')) return;
+    setIsUnpublishingResults(true);
+    try {
+      const result = await ApiClient.unpublishExamResults(selectedClassId, selectedSemester);
+      setNotice(`Withdrawn ${result.unpublishedCount} ${selectedSemester} result records from Parent and Student portals.`);
+      await loadClassData();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Published results could not be withdrawn.');
+    } finally {
+      setIsUnpublishingResults(false);
     }
   };
 
@@ -1164,7 +1180,7 @@ export const ExamsResultsView: React.FC = () => {
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            Exam Config
+            {t('exam_scheme')}
           </button>
         </div>
       </div>
@@ -1220,7 +1236,9 @@ export const ExamsResultsView: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={handleApproveAll} disabled={isReadOnly || !pendingClassMarkCount} className="rounded-lg bg-[#0B2B2A] px-3 py-2 font-semibold text-white disabled:opacity-50"><Lock className="mr-1 inline h-3.5 w-3.5"/>Approve & Lock All</button>
-                <button type="button" onClick={handlePublishResultsToParents} disabled={isReadOnly || !allClassMarksApproved || allClassMarksPublished || isPublishingResults} className="rounded-lg bg-emerald-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{isPublishingResults ? 'Publishing…' : allClassMarksPublished ? 'Published to Parents' : 'Publish to Parents'}</button>
+                {allClassMarksPublished
+                  ? <button type="button" onClick={() => void handleUnpublishResults()} disabled={isReadOnly || isUnpublishingResults} className="rounded-lg border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-800 disabled:opacity-50">{isUnpublishingResults ? 'Withdrawing…' : t('exam_withdraw_results')}</button>
+                  : <button type="button" onClick={handlePublishResultsToParents} disabled={isReadOnly || !allClassMarksApproved || isPublishingResults} className="rounded-lg bg-emerald-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{isPublishingResults ? 'Publishing…' : t('exam_publish_results')}</button>}
               </div>
             </div>
             {pendingClassMarkCount > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">

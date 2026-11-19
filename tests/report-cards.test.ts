@@ -49,24 +49,32 @@ const result = {
   subjectResults: [
     {
       subject: { id: 'subject-math', name: 'Mathematics', code: 'MATH' },
-      sem1Marks: { smallExamMarks: 10, bigExamMarks: 40, totalMarks: 50, percentage: 100 },
-      sem2Marks: { smallExamMarks: 8, bigExamMarks: 32, totalMarks: 40, percentage: 80 },
+      isActive: true,
+      sem1Marks: { smallExamMarks: 10, bigExamMarks: 40, totalMarks: 50, percentage: 100, teacherRemarks: 'Excellent work' },
+      sem2Marks: { smallExamMarks: 8, bigExamMarks: 32, totalMarks: 40, percentage: 80, teacherRemarks: 'Good progress' },
       sem1Percentage: 100,
       sem2Percentage: 80,
+      yearlyMarks: 45,
       yearlyPercentage: 90,
       maxMarks: { small: 10, big: 40, total: 50 }
     },
     {
       subject: { id: 'subject-bio', name: 'Biology', code: 'BIO' },
+      isActive: false,
       sem1Marks: null,
       sem2Marks: null,
       sem1Percentage: null,
       sem2Percentage: null,
+      yearlyMarks: null,
       yearlyPercentage: null,
       maxMarks: { small: 10, big: 40, total: 50 }
     }
   ],
   annualComplete: true,
+  annualPublished: true,
+  semester1Rank: 1,
+  semester2Rank: 2,
+  yearlyTotal: 45,
   yearlyPercentage: 90,
   yearlyRank: 1,
   isPass: true
@@ -78,17 +86,21 @@ test('report card page includes student, subject marks, percentages, max marks, 
   assert.ok(text.includes('Ahmed Hassan Ali'));
   assert.ok(text.includes('A-001'));
   assert.ok(text.includes('Grade 10 A'));
-  assert.ok(text.includes('Class rank: #1 of 24'));
+  assert.ok(text.includes('Term 1 rank: #1 of 24'));
+  assert.ok(text.includes('Term 2 rank: #2 of 24'));
+  assert.ok(text.includes('Final class rank: #1 of 24'));
   assert.ok(text.includes('Mathematics (MATH)'));
   assert.ok(text.includes('10 + 40 = 50/50'));
   assert.ok(text.includes('100%'));
   assert.ok(text.includes('40/50'));
+  assert.ok(text.includes('Final total: 45 | average: 90'));
   assert.ok(text.includes('80%'));
   assert.ok(text.includes('90%'));
   assert.ok(text.includes('Exam maximum marks: Small 10 + Big 40 = 50'));
   assert.ok(text.includes('Yearly average: 90%'));
   assert.ok(text.includes('Result: PASS'));
-  assert.ok(text.includes('Teacher remarks:'));
+  assert.ok(text.includes('Term 1 teacher comments: Mathematics: Excellent work'));
+  assert.ok(text.includes('Term 2 teacher comments: Mathematics: Good progress'));
   assert.ok(text.includes('Administrator remarks:'));
   assert.ok(text.includes('Class Teacher'));
   assert.ok(text.includes('Principal'));
@@ -130,8 +142,9 @@ test('hidden report card blocks remove text and images while invalid image URLs 
   };
   const page = buildReportCardPdfPage({ school, design: hidden, className: 'Grade 10 A', result, totalStudents: 24 });
   const text = page.lines.join('\n');
-  assert.ok(!text.includes('Class rank:'));
-  assert.ok(!text.includes('Teacher remarks:'));
+  assert.ok(!text.includes('Final class rank:'));
+  assert.ok(!text.includes('Term 1 teacher comments:'));
+  assert.ok(!text.includes('Term 2 teacher comments:'));
   assert.ok(!text.includes('Administrator remarks:'));
   assert.ok(!text.includes('Yearly average:'));
   assert.ok(!text.includes('Official School Seal'));
@@ -195,4 +208,11 @@ test('report card design sanitizer rejects invalid templates, colors, blocks, an
   assert.throws(() => sanitizeReportCardDesign({ stampImageUrl: 'javascript:alert(1)' }), /stampImageUrl/);
   assert.throws(() => sanitizeReportCardDesign({ signatureImageUrl: 'data:image/svg+xml;base64,AAAA' }), /signatureImageUrl/);
   assert.throws(() => sanitizeReportCardDesign([] as any), /must be an object/);
+});
+
+
+test('report card PDF is blocked until both terms have been published', () => {
+  assert.throws(() => buildReportCardPdfPage({
+    school, design, className: 'Grade 10 A', result: { ...result, annualPublished: false }, totalStudents: 24
+  }), /publishes both complete semesters/);
 });

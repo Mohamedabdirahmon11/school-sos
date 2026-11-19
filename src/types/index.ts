@@ -365,6 +365,8 @@ export type MarkStatus = 'draft' | 'submitted' | 'form_teacher_submitted' | 'app
 /**
  * Marks are strictly Percentage-Based from Small Exam + Big Exam.
  */
+export type ExamScoreValue = number | 'ABS' | 'LB';
+
 export interface StudentMark {
   id: string;
   schoolId: string;
@@ -376,7 +378,7 @@ export interface StudentMark {
   smallExamMarks: number;
   bigExamMarks: number;
   /** Per-assessment raw scores keyed by ExamAssessmentComponent.id. */
-  assessmentScores?: Record<string, number>;
+  assessmentScores?: Record<string, ExamScoreValue>;
   /** Immutable scheme revision and component snapshot used when these marks were entered. */
   schemeVersion?: number;
   schemeSnapshot?: ExamAssessmentComponent[];

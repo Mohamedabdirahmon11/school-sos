@@ -1353,6 +1353,13 @@ export class ApiClient {
     });
   }
 
+  public static async reopenClassSubjectMarks(classId: string, subjectId: string, semester: string) {
+    return this.request<{ success: boolean; reopenedCount: number }>('/exams/reopen-subject', {
+      method: 'POST',
+      body: JSON.stringify({ classId, subjectId, semester })
+    });
+  }
+
   public static async forwardClassMarks(classId: string, semester: string) {
     return this.request<{ success: boolean; forwardedCount: number }>('/exams/forward-class', {
       method: 'POST',
@@ -1376,6 +1383,13 @@ export class ApiClient {
 
   public static async publishExamResults(classId: string, semester: string) {
     return this.request<{ success: boolean; publishedCount: number; publishedAt: string | null; alreadyPublished?: boolean; notificationCreated?: boolean }>('/exams/publish', {
+      method: 'POST',
+      body: JSON.stringify({ classId, semester })
+    });
+  }
+
+  public static async unpublishExamResults(classId: string, semester: string) {
+    return this.request<{ success: boolean; unpublishedCount: number }>('/exams/unpublish', {
       method: 'POST',
       body: JSON.stringify({ classId, semester })
     });

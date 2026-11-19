@@ -3469,9 +3469,8 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
     result.push({ ...item, subject, class: klass, isFormTeacher: false, isFormTeacherClass: formTeacherClasses.some((row: any) => row.id === klass.id), canEditMarks: true });
   }
 
-  // A Form Teacher is responsible for the complete class mark sheet.
-  // Subject teachers retain their own class/subject scope; the Form Teacher
-  // may complete any subject in their homeroom class before forwarding it.
+  // Form Teachers can review the whole class, but marks entry remains limited
+  // to the subject actually assigned to their teacher profile.
   for (const klass of formTeacherClasses) {
     const classSubjects = formTeacherClassAssignments.filter((item: any) => item.classId === klass.id);
     for (const assignment of classSubjects) {
@@ -3495,7 +3494,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
         bigExamEnabled: true,
         isFormTeacher: true,
         isFormTeacherClass: true,
-        canEditMarks: true
+        canEditMarks: assignment.teacherId === teacher.id
       });
     }
   }
@@ -6758,10 +6757,9 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       return;
     }
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
-    res.json(classMarks.filter(mark =>
-      editableSubjectIds.has(mark.subjectId) ||
-      (isFormTeacher && (mark.status === 'submitted' || mark.status === 'form_teacher_submitted'))
-    ));
+    // The assigned Form Teacher has class-wide review scope, including after Admin approval.
+    // Subject teachers remain restricted to their own active class-subject assignments.
+    res.json(isFormTeacher ? classMarks : classMarks.filter(mark => editableSubjectIds.has(mark.subjectId)));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
@@ -6806,10 +6804,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       teacher_id: teacherRecord.id,
       is_active: 'true'
     }, 1, 1, undefined, 'id');
-    const classSubject = await db.queryPage('class_subjects', { school_id: school.id, class_id: String(classId), subject_id: String(subjectId), is_active: 'true' }, 1, 1, undefined, 'id,teacher_id');
-    const mayFillFormTeacherSubject = isFormTeacher && classSubject.items.length > 0;
-    if (!assignment.total && !mayFillFormTeacherSubject) {
-      res.status(403).json({ error: 'You may enter marks only for your assigned subject, or any subject in your Form Teacher class.' });
+    if (!assignment.total) {
+      res.status(403).json({ error: 'You may enter marks only for the subject assigned to your teacher profile.' });
       return;
     }
   }
@@ -6845,6 +6841,39 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 });
 
+apiRouter.post('/exams/reopen-subject', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can reopen a subject before forwarding.' });
+    return;
+  }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const subjectId = typeof req.body?.subjectId === 'string' ? req.body.subjectId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !subjectId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class, subject, and valid semester.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  if (klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can reopen a subject.' });
+    return;
+  }
+  try {
+    const reopenedCount = await db.reopenClassSubjectMarks(
+      school.id, classId, subjectId, semester, user.id, user.fullName, user.role
+    );
+    res.json({ success: true, reopenedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Subject marks could not be reopened.' });
+  }
+});
+
 apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -6863,7 +6892,7 @@ apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requir
   }
 });
 
-apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { markIds } = req.body;
@@ -6886,7 +6915,7 @@ apiRouter.post('/exams/approve', requireAuth, requireSchoolContext, requireSchoo
   res.json({ success: true, approvedCount: approved.length });
 });
 
-apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const markIds = req.body?.markIds;
@@ -6911,7 +6940,7 @@ apiRouter.post('/exams/return', requireAuth, requireSchoolContext, requireSchool
   }
 });
 
-apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
@@ -6974,6 +7003,36 @@ apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoo
     });
   } catch (error) {
     res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be published.' });
+  }
+});
+
+apiRouter.post('/exams/unpublish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class and valid semester before withdrawing results.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  try {
+    const unpublishedCount = await db.unpublishClassSemesterResults(
+      school.id, classId, semester, user.id, user.fullName, user.role
+    );
+    const noticeTitle = `Exam results published · ${semester}`;
+    const notices = (await db.getNotices(school.id)).filter(notice =>
+      notice.classId === classId && notice.title === noticeTitle && notice.isActive !== false
+    );
+    for (const notice of notices) await db.archiveNotice(notice.id, school.id);
+    await db.flush();
+    res.json({ success: true, unpublishedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be withdrawn.' });
   }
 });
 

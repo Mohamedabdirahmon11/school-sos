@@ -330,3 +330,60 @@ test('submitted marks can be returned with an audit reason and only complete app
   assert.equal(classYearMarks.length, 1, 'class results must not mix marks from another academic year');
   assert.equal(classYearMarks[0].academicYear, '2026-2027');
 });
+
+
+test('semester and yearly ranks share ties and report cards retain inactive subjects as blank rows', async () => {
+  const memory = new InMemorySupabase();
+  const storage = await import('../src/server/storage.ts');
+  storage.installTestSupabaseClient(memory);
+  await storage.initializeStorage();
+  const db = storage.db;
+  const school = db.createSchool({
+    name: 'Tie Ranking School', code: 'TIERANK', address: '', city: '', phone: '', email: 'tie-rank@example.test', currency: 'ETB',
+    academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const klass = db.createClass({ schoolId: school.id, name: 'Grade 5', gradeLevel: 5, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
+  const subjects = [
+    db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any),
+    db.createSubject({ schoolId: school.id, name: 'English', code: 'ENG', category: 'core', isActive: true } as any),
+    db.createSubject({ schoolId: school.id, name: 'Art', code: 'ART', category: 'optional', isActive: false } as any)
+  ];
+  const students = ['Amina', 'Bilal', 'Cali'].map((name, index) => db.createStudent({
+    schoolId: school.id, studentId: `TIE-${index + 1}`, firstName: name, middleName: '', lastName: 'Pupil', gender: 'female',
+    admissionDate: '2026-01-01', fatherPhone: '', classId: klass.id, status: 'active'
+  } as any));
+  await memory.from('class_subjects').insert(subjects.map((subject, index) => ({
+    id: `tie-class-subject-${index}`, school_id: school.id, class_id: klass.id,
+    subject_id: subject.id, teacher_id: `teacher-${index}`, periods_per_week: 3,
+    small_exam_enabled: true, big_exam_enabled: true, is_active: index < 2
+  })));
+  await db.flush();
+  const subjectScores = [[90, 80, 70], [80, 90, 80]];
+  const allMarks: Record<'Semester 1' | 'Semester 2', string[]> = { 'Semester 1': [], 'Semester 2': [] };
+  for (const semester of ['Semester 1', 'Semester 2'] as const) {
+    for (let subjectIndex = 0; subjectIndex < 2; subjectIndex++) {
+      const saved = await db.saveStudentMarks(school.id, klass.id, subjects[subjectIndex].id, semester,
+        students.map((student, studentIndex) => {
+          const score = subjectScores[subjectIndex][studentIndex];
+          return { studentId: student.id, smallExamMarks: score * 0.4, bigExamMarks: score * 0.6, status: 'submitted' as const };
+        }), `teacher-${subjectIndex}`);
+      allMarks[semester].push(...saved.map(mark => mark.id));
+    }
+    await db.forwardClassMarks(school.id, klass.id, semester, 'form-teacher');
+    db.approveMarks(school.id, allMarks[semester], 'school-admin');
+  }
+  await db.flush();
+
+  const semesterRanks = await db.getClassSemesterRankings(school.id, klass.id, 'Semester 1');
+  assert.deepEqual(semesterRanks.map(row => row.rank), [1, 1, 3]);
+  const yearly = await db.getClassYearlyRankings(school.id, klass.id);
+  assert.deepEqual(yearly.map(row => row.yearlyRank), [1, 1, 3]);
+  assert.deepEqual(yearly.map(row => row.yearlyPercentage), [85, 85, 75]);
+  assert.equal(yearly[0].subjectResults.length, 3);
+  const inactive = yearly[0].subjectResults.find(row => row.subject.id === subjects[2].id);
+  assert.equal(inactive?.isActive, false);
+  assert.equal(inactive?.sem1Marks, null);
+  assert.equal(inactive?.sem2Marks, null);
+  assert.equal(inactive?.yearlyPercentage, null);
+});

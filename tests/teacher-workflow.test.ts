@@ -28,13 +28,20 @@ test('teachers enter exam marks and school administrators only review and approv
   assert.match(api, /form-teacher-\$\{klass\.id\}-\$\{subject\.id\}/);
 });
 
-test('Form Teachers see every student and can complete every subject in their homeroom class', () => {
+test('Form Teachers review every class subject but enter marks only for their assigned subject', () => {
   const api = read('../src/server/api.ts');
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const storage = read('../src/server/storage.ts');
   assert.ok(api.includes('formTeacherClassIds = formTeacherClasses.items.map'));
   assert.ok(api.includes("'users.role': 'teacher'"));
   assert.match(api, /isFormTeacher \? classAssignments\.items\.map\(\(item: any\) => item\.subjectId\)/);
-  assert.match(api, /mayFillFormTeacherSubject = isFormTeacher && classSubject\.items\.length > 0/);
-  assert.match(api, /canEditMarks: true/);
+  assert.match(api, /canEditMarks: assignment\.teacherId === teacher\.id/);
+  assert.match(api, /if \(!assignment\.total\)/);
+  assert.doesNotMatch(api, /mayFillFormTeacherSubject/);
+  assert.match(api, /subject assigned to your teacher profile/);
+  assert.match(api, /res\.json\(isFormTeacher \? classMarks : classMarks\.filter\(mark => editableSubjectIds\.has\(mark\.subjectId\)\)\)/);
+  assert.match(teacher, /placeholder="0 \/ ABS \/ LB"/);
+  assert.match(storage, /value !== 'ABS' && value !== 'LB'/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
@@ -54,17 +61,20 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /activeTab === 'students'/);
   assert.match(teacher, /activeTab === 'attendance'/);
   assert.match(teacher, /activeTab === 'grades'/);
-  assert.match(teacher, /Class examination register/);
-  assert.match(teacher, /Student name \/ ID/);
+  assert.match(teacher, /t\('exam_class_review'\)/);
+  assert.match(teacher, /t\('exam_enter_component_marks'\)/);
+  assert.match(teacher, /Student \/ Roll No\./);
   assert.match(teacher, /examRegisterRows/);
-  assert.match(teacher, /let currentRank = 0/);
-  assert.match(teacher, /Enter individual assessment components/);
+  assert.match(teacher, /rankExamStudentResults/);
+  assert.match(teacher, /allClassMarksSubmitted/);
+  assert.match(teacher, /t\('exam_waiting_for_all_subjects'\)/);
+  assert.match(teacher, /t\('exam_enter_component_marks'\)/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
   assert.match(teacher, /activeTab === 'notices'/);
   assert.match(teacher, /setActiveTab\(initialTab\)/);
-  assert.match(teacher, /Small Exam/);
-  assert.match(teacher, /Big Exam/);
+  assert.match(teacher, /t\('exam_small_exam'\)/);
+  assert.match(teacher, /t\('exam_big_exam'\)/);
   assert.match(teacher, /EXAM RESULTS — READ ONLY/);
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
@@ -73,8 +83,8 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
-  assert.match(teacher, /Submit marks/);
-  assert.match(teacher, /Forward class to Admin/);
+  assert.match(teacher, /t\('exam_submit_marks'\)/);
+  assert.match(teacher, /t\('exam_forward_to_admin'\)/);
 });
 
 test('teacher appointment supports optional multiple profile tags and one-time school credentials', () => {
@@ -154,7 +164,7 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
   assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
-  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !editableClassSubjects\.length \|\| !students\.length\}/);
 });
 
 
@@ -303,8 +313,8 @@ test('teacher workflows provide mobile student cards, searchable registers, and 
   assert.match(teacher, /Search attendance students/);
   assert.match(teacher, /md:hidden/);
   assert.match(teacher, /min-h-11 rounded-lg/);
-  assert.match(teacher, /Search students for marks/);
-  assert.match(teacher, /Search student name or ID/);
+  assert.match(teacher, /t\('exam_search_student'\)/);
+  assert.match(teacher, /t\('exam_search_student'\)/);
 });
 
 test('teacher mobile quick navigation prioritizes daily teaching actions while the full menu retains other sections', () => {
@@ -317,4 +327,47 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(sidebar, /item\('t_assignments'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
+});
+
+
+test('Form Teacher rankings and class totals stay hidden until every active subject is submitted', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const calculations = read('../src/lib/exam-calculations.ts');
+  assert.match(teacher, /allClassMarksSubmitted = isFormTeacher/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted \|\| classAlreadyForwarded\}/);
+  assert.match(teacher, /row\.total\.toFixed\(1\).*row\.max/);
+  assert.match(teacher, /t\('exam_drafts_autosaved'\)/);
+  assert.match(teacher, /row\.student\.rollNumber \|\| row\.student\.studentId/);
+  assert.match(calculations, /row\.total !== previousTotal/);
+});
+
+test('Form Teacher review uses full 100-point subject totals rather than one exam half', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /calculateExamSubjectTotal\(scores, assessmentComponents\)/);
+  assert.match(teacher, /row\.total\.toFixed\(1\).*row\.max/);
+  assert.doesNotMatch(teacher.slice(teacher.indexOf('const examRegisterRows'), teacher.indexOf('if (initialData.loading')), /assessmentComponents\.filter\(component => component\.category/);
+});
+
+
+test('Form Teacher class review is a separate read-only workflow with controlled subject reopening', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  const api = read('../src/server/api.ts');
+  const storage = read('../src/server/storage.ts');
+  assert.match(teacher, /activeTab === 'exam_results' && isFormTeacher/);
+  assert.match(teacher, /editableClassSubjects\.map\(subject =>/);
+  assert.match(teacher, /handleReopenSubjectMarks/);
+  assert.match(teacher, /!allClassMarksSubmitted/);
+  assert.match(api, /apiRouter\.post\('\/exams\/reopen-subject'/);
+  assert.match(api, /klass\.classTeacherId !== user\.id/);
+  assert.match(storage, /reopenClassSubjectMarks/);
+  assert.match(storage, /mark\.status !== 'submitted'/);
+});
+
+
+test('only School Admin can approve, return, publish, or withdraw exam results', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /apiRouter\.post\('\/exams\/approve', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/return', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/publish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
+  assert.match(api, /apiRouter\.post\('\/exams\/unpublish', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin/);
 });
