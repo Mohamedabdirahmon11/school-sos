@@ -3122,7 +3122,7 @@ class StorageEngine {
         absent: studentAttendance.filter(record => record.status === 'absent').length,
         late: studentAttendance.filter(record => record.status === 'late').length,
         excused: studentAttendance.filter(record => record.status === 'excused').length,
-        attendancePercentage: Math.round(((studentAttendance.filter(record => record.status === 'present' || record.status === 'late').length / attendanceTotal) * 100) * 100) / 100
+        attendancePercentage: Math.round(((studentAttendance.filter(record => record.status === 'present' || record.status === 'late').length / Math.max(1, studentAttendance.filter(record => record.status !== 'excused').length)) * 100) * 100) / 100
       } : null;
 
       return {
