@@ -9663,7 +9663,7 @@ apiRouter.post('/documents/preview', requireAuth, requireSchoolContext, requireS
     student = (await db.queryPage<Student>('students',{school_id:school.id,class_id:klass.id},1,1,undefined,'*','first_name',true)).items[0] || null;
   }
   if (!student) { res.status(404).json({ error: 'Arday tijaabo ah lagama helin fasalka ama aqoonsiga la doortay.' }); return; }
-  const klass = await db.getClassById(student.classId,school.id);
+  const klass = await db.getClassById(card.class_id,school.id);
   const teacher = klass?.classTeacherId
     ? (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0]
     : null;
