@@ -210,6 +210,9 @@ CREATE INDEX IF NOT EXISTS report_cards_parent_published_idx ON public.report_ca
 CREATE OR REPLACE FUNCTION public.schoolos_check_mark_structure_total()
 RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE v_structure_id uuid; v_school_id text; v_total numeric;
+  v_structure public.mark_structures%ROWTYPE;
+  v_exam_count integer; v_exam_value numeric; v_single_count integer; v_single_value numeric;
+  v_quiz_count integer; v_quiz_min numeric; v_quiz_max numeric;
 BEGIN
   IF TG_TABLE_NAME='mark_structures' THEN
     IF TG_OP='DELETE' THEN
@@ -226,13 +229,29 @@ BEGIN
     v_structure_id := NEW.structure_id;
     v_school_id := NEW.school_id;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.mark_structures ms WHERE ms.id=v_structure_id AND ms.school_id=v_school_id) THEN
-    RETURN NULL;
-  END IF;
-  SELECT COALESCE(sum(mc.max_marks),0) INTO v_total
+  SELECT * INTO v_structure FROM public.mark_structures ms
+    WHERE ms.id=v_structure_id AND ms.school_id=v_school_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT COALESCE(sum(mc.max_marks),0),
+    count(*) FILTER(WHERE mc.kind='exam'),max(mc.max_marks) FILTER(WHERE mc.kind='exam'),
+    count(*) FILTER(WHERE mc.kind='single'),max(mc.max_marks) FILTER(WHERE mc.kind='single'),
+    count(*) FILTER(WHERE mc.kind='quiz'),min(mc.max_marks) FILTER(WHERE mc.kind='quiz'),
+    max(mc.max_marks) FILTER(WHERE mc.kind='quiz')
+  INTO v_total,v_exam_count,v_exam_value,v_single_count,v_single_value,
+    v_quiz_count,v_quiz_min,v_quiz_max
   FROM public.mark_components mc WHERE mc.structure_id=v_structure_id AND mc.school_id=v_school_id;
-  IF v_total <> 100 THEN
-    RAISE EXCEPTION 'Wadarta qaybaha dhibcuhu waa inay noqotaa 100; hadda waa %.',v_total;
+  IF v_total<>100 OR v_exam_count<>1 OR v_exam_value<>v_structure.exam_max THEN
+    RAISE EXCEPTION 'Qaabka dhibcuhu waa inuu noqdaa 100, imtixaankuna waa inuu la mid noqdaa dejinta.';
+  END IF;
+  IF v_structure.rest_mode='single' AND
+    (v_single_count<>1 OR v_single_value<>(100-v_structure.exam_max) OR v_quiz_count<>0) THEN
+    RAISE EXCEPTION 'Qiimaynta keliya waa inay qaadataa dhammaan dhibcaha haray.';
+  END IF;
+  IF v_structure.rest_mode='quizzes' AND
+    (v_single_count<>0 OR v_quiz_count<>v_structure.quiz_count
+      OR v_quiz_min<>(100-v_structure.exam_max)/v_structure.quiz_count
+      OR v_quiz_max<>(100-v_structure.exam_max)/v_structure.quiz_count) THEN
+    RAISE EXCEPTION 'Quizzes-ku waa inay isle''eg u qaybsamaan dhibcaha haray.';
   END IF;
   RETURN NULL;
 END;
