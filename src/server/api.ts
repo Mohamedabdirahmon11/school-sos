@@ -10134,4 +10134,260 @@ apiRouter.post('/teacher-assignments/copy', requireAuth, requireSchoolAdminOrSup
   } catch (error: any) { res.status(503).json({ error: error?.message || 'Qoondeynta lama koobiyeeyn karin.' }); }
 });
 
+
+/* =============================================================================
+ * STEP 10A — TERM MARKS, QUIZZES, CLOSURE AND YEARLY REPORT CARDS
+ * This is additive; legacy /exams and /student_marks endpoints remain available.
+ * ============================================================================= */
+function termMarksServiceClient(res: Response) {
+  if (!isSupabaseConfigured || !supabaseUrl || !supabaseKey) {
+    res.status(503).json({ error: 'Kaydka dhibcaha term-ka lama diyaarin.' });
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+function termMarksGrade(percentage: number | null | undefined, school: School): string {
+  if (percentage === null || percentage === undefined || !Number.isFinite(Number(percentage))) return '—';
+  const bands = [...(school.gradingScale || [])].sort((a, b) => b.minPercentage - a.minPercentage);
+  return bands.find(band => Number(percentage) >= band.minPercentage)?.label || '—';
+}
+
+function termReportCardPdfPage(school: School, card: any, student: any, className: string): PdfPageInput {
+  const lines = [
+    school.name,
+    school.reportCardHeader || '',
+    'REPORT CARD / KAARKA NATIIJADA',
+    `Academic year: ${card.academic_year_id}`,
+    `Student: ${[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')}`,
+    `Student ID: ${student.studentId || ''}`,
+    `Class: ${className}`,
+    '',
+    'SUBJECT | TERM 1 /100 | TERM 2 /100 | YEARLY /100 | GRADE'
+  ];
+  for (const row of Array.isArray(card.subject_results) ? card.subject_results : []) {
+    lines.push(`${row.subject || row.subject_name || ''} | ${row.term1 ?? '—'} | ${row.term2 ?? '—'} | ${row.yearly ?? '—'} | ${row.grade || termMarksGrade(row.yearly, school)}`);
+  }
+  lines.push('', `Overall average: ${card.yearly_average}/100`, `Grade: ${card.overall_grade || termMarksGrade(card.yearly_average, school)}`, `Class rank: ${card.rank_in_class}`);
+  if (card.teacher_comment) lines.push('', `Teacher comment: ${card.teacher_comment}`);
+  if (card.head_comment) lines.push(`Head comment: ${card.head_comment}`);
+  lines.push('', 'Class Teacher signature: ____________________', 'School Head signature: ____________________');
+  if (school.reportCardFooter) lines.push('', school.reportCardFooter);
+  return { lines };
+}
+
+apiRouter.get('/term-marks/terms', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data: terms, error } = await client.from('terms')
+    .select('id,name,academic_year_id,start_date,end_date,is_current')
+    .eq('school_id', school.id).order('start_date', { ascending: true });
+  if (error) { res.status(503).json({ error: error.message }); return; }
+  const ids = (terms || []).map((term: any) => term.id);
+  const { data: statuses } = ids.length
+    ? await client.from('term_status').select('term_id,status,closed_by,closed_at').eq('school_id', school.id).in('term_id', ids)
+    : { data: [] as any[] };
+  const statusByTerm = new Map((statuses || []).map((row: any) => [row.term_id, row]));
+  res.json((terms || []).map((term: any) => ({ ...term, status: statusByTerm.get(term.id)?.status || 'open', closedAt: statusByTerm.get(term.id)?.closed_at || null })));
+});
+
+apiRouter.get('/term-marks/structures', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const termId = String(req.query.termId || '');
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  if (!termId) { res.status(400).json({ error: 'Dooro term-ka.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data: structures, error } = await client.from('mark_structures')
+    .select('*').eq('school_id', school.id).eq('term_id', termId);
+  if (error) { res.status(503).json({ error: error.message }); return; }
+  let visible = structures || [];
+  if (user.role === 'teacher') {
+    const { data: teacher } = await client.from('teachers').select('id').eq('school_id', school.id).eq('user_id', user.id).maybeSingle();
+    if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+    let assignmentsQuery = client.from('teacher_class_subject_assignments').select('class_id,subject_id,term_id')
+      .eq('school_id', school.id).eq('teacher_id', teacher.id);
+    assignmentsQuery = assignmentsQuery.or(`term_id.is.null,term_id.eq.${termId}`);
+    const { data: assignments } = await assignmentsQuery;
+    const allowed = new Set((assignments || []).filter((a: any) => !classId || a.class_id === classId).map((a: any) => a.class_id));
+    visible = visible.filter((row: any) => row.class_id ? allowed.has(row.class_id) : allowed.size > 0);
+  } else if (!['school_admin','super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto qaabka dhibcaha.' }); return;
+  }
+  const ids = visible.map((row: any) => row.id);
+  const { data: components } = ids.length
+    ? await client.from('mark_components').select('*').eq('school_id', school.id).in('structure_id', ids).order('seq')
+    : { data: [] as any[] };
+  res.json(visible.map((row: any) => ({ ...row, components: (components || []).filter((component: any) => component.structure_id === row.id) })));
+});
+
+apiRouter.put('/term-marks/structures', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const { termId, classId = null, examMax, restMode, quizCount = 1 } = req.body || {};
+  if (typeof termId !== 'string' || !termId || ![50,60].includes(Number(examMax))
+    || !['single','quizzes'].includes(restMode) || !Number.isInteger(Number(quizCount))
+    || Number(quizCount) < 1 || Number(quizCount) > 20
+    || (restMode === 'single' && Number(quizCount) !== 1)
+    || (100-Number(examMax)) % (restMode === 'single' ? 1 : Number(quizCount)) !== 0) {
+    res.status(400).json({ error: 'Qaabka dhibcaha sax ma aha. Imtixaanku waa 50 ama 60; qaybaha kale waa inay si isle’eg u noqdaan 100.' }); return;
+  }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.rpc('schoolos_save_mark_structure', {
+    p_school_id: school.id, p_term_id: termId, p_class_id: classId,
+    p_exam_max: Number(examMax), p_rest_mode: restMode,
+    p_quiz_count: Number(quizCount), p_actor_id: user.id
+  });
+  if (error) { res.status(400).json({ error: error.message }); return; }
+  res.json(data);
+});
+
+apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (user.role !== 'teacher') { res.status(403).json({ error: 'Macallinka loo qoondeeyey oo keliya ayaa geli kara dhibcaha.' }); return; }
+  const { componentId, classId, subjectId, marks } = req.body || {};
+  if (typeof componentId !== 'string' || typeof classId !== 'string' || typeof subjectId !== 'string' || !Array.isArray(marks)) {
+    res.status(400).json({ error: 'Dooro qaybta, fasalka, maaddada iyo liiska ardayda.' }); return;
+  }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.rpc('schoolos_save_component_marks', {
+    p_school_id: school.id, p_actor_id: user.id, p_component_id: componentId,
+    p_class_id: classId, p_subject_id: subjectId, p_marks: marks
+  });
+  if (error) { res.status(400).json({ error: error.message }); return; }
+  res.json(data);
+});
+
+apiRouter.post('/term-marks/terms/:termId/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const status = req.body?.status;
+  if (!['open','closed'].includes(status)) { res.status(400).json({ error: 'Xaalad sax ah dooro.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.rpc('schoolos_set_term_status', {
+    p_school_id: school.id, p_term_id: req.params.termId, p_status: status, p_actor_id: user.id
+  });
+  if (error) { res.status(400).json({ error: error.message }); return; }
+  res.json(data);
+});
+
+apiRouter.get('/term-marks/results', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const termId = String(req.query.termId || '');
+  const classId = String(req.query.classId || '');
+  if (!termId || !classId) { res.status(400).json({ error: 'Dooro term iyo fasal.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.rpc('schoolos_term_results', { p_school_id: school.id, p_term_id: termId, p_class_id: classId });
+  if (error) { res.status(400).json({ error: error.message }); return; }
+  const rows = Array.isArray(data) ? data : [];
+  const missing = new Map<string, { subjectId: string; teacherId: string; missing: number }>();
+  for (const row of rows) for (const subject of row.subjects || []) {
+    const count = Math.max(0, Number(subject.required || 0) - Number(subject.entered || 0));
+    if (count) {
+      const key = subject.subject_id;
+      const entry = missing.get(key) || { subjectId: key, teacherId: '', missing: 0 };
+      entry.missing += count; missing.set(key, entry);
+    }
+  }
+  const { data: assignments } = await client.from('teacher_class_subject_assignments')
+    .select('subject_id,teacher_id,teachers(full_name)').eq('school_id', school.id).eq('class_id', classId);
+  const teacherBySubject = new Map((assignments || []).map((a: any) => [a.subject_id, { teacherId: a.teacher_id, teacherName: a.teachers?.full_name || '' }]));
+  const enriched = rows.map((row: any) => ({
+    ...row, grade: termMarksGrade(row.average, school),
+    subjects: (row.subjects || []).map((subject: any) => ({ ...subject, grade: termMarksGrade(subject.percentage, school) }))
+  }));
+  res.json({ rows: enriched, missingMarks: [...missing.values()].map(item => ({ ...item, ...(teacherBySubject.get(item.subjectId) || {}) })) });
+});
+
+apiRouter.post('/term-marks/report-cards/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const { academicYearId, classId } = req.body || {};
+  if (typeof academicYearId !== 'string' || typeof classId !== 'string') { res.status(400).json({ error: 'Dooro sanad-dugsiyeed iyo fasal.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.rpc('schoolos_generate_term_report_cards', {
+    p_school_id: school.id, p_academic_year_id: academicYearId, p_class_id: classId, p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message }); return; }
+  res.json(data);
+});
+
+apiRouter.get('/term-marks/report-cards', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = termMarksServiceClient(res); if (!client) return;
+  const studentId = typeof req.query.studentId === 'string' ? req.query.studentId : '';
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+  const academicYearId = typeof req.query.academicYearId === 'string' ? req.query.academicYearId : '';
+  let query = client.from('report_cards').select('*').eq('school_id', school.id);
+  if (user.role === 'parent' || user.role === 'student') {
+    if (!studentId || !await canAccessStudentRecord(user, studentId)) { res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto report card-kan.' }); return; }
+    query = query.eq('student_id', studentId).not('published_at','is',null);
+  } else if (['school_admin','super_admin'].includes(user.role)) {
+    if (classId) query = query.eq('class_id', classId);
+    if (academicYearId) query = query.eq('academic_year_id', academicYearId);
+    if (studentId) query = query.eq('student_id', studentId);
+  } else { res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto report cards.' }); return; }
+  const { data, error } = await query.order('rank_in_class',{ascending:true});
+  if (error) { res.status(503).json({ error: error.message }); return; }
+  const studentIds = [...new Set((data || []).map((row: any) => row.student_id))];
+  const { data: students } = studentIds.length
+    ? await client.from('students').select('id,student_id,first_name,middle_name,last_name,class_id').eq('school_id',school.id).in('id',studentIds)
+    : { data: [] as any[] };
+  const byStudent = new Map((students || []).map((student: any) => [student.id,student]));
+  res.json((data || []).map((row: any) => ({ ...row, student: byStudent.get(row.student_id) || null })));
+});
+
+apiRouter.patch('/term-marks/report-cards/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (typeof req.body?.teacherComment === 'string') updates.teacher_comment = req.body.teacherComment.slice(0,2000);
+  if (typeof req.body?.headComment === 'string') updates.head_comment = req.body.headComment.slice(0,2000);
+  if (typeof req.body?.published === 'boolean') {
+    updates.published_at = req.body.published ? new Date().toISOString() : null;
+    updates.published_by = req.body.published ? user.id : null;
+  }
+  if (Object.keys(updates).length === 1) { res.status(400).json({ error: 'Wax isbeddel ah lama helin.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data, error } = await client.from('report_cards').update(updates)
+    .eq('school_id',school.id).eq('id',req.params.id).select('*').maybeSingle();
+  if (error) { res.status(400).json({ error: error.message }); return; }
+  if (!data) { res.status(404).json({ error: 'Report card lama helin dugsigan.' }); return; }
+  res.json(data);
+});
+
+apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(req.params.studentId, school.id);
+  if (!student || !await canAccessStudentRecord(user, student.id)) { res.status(404).json({ error: 'Report card lama helin.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  let query = client.from('report_cards').select('*').eq('school_id',school.id).eq('student_id',student.id);
+  if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null);
+  const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
+  const klass = await db.getClassById(student.classId,school.id);
+  sendPdf(res,`term-report-card-${student.studentId}`,[termReportCardPdfPage(school,card,student,`${klass?.name || ''} ${klass?.section || ''}`.trim())]);
+});
+
+apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const academicYearId = String(req.query.academicYearId || '');
+  if (!academicYearId) { res.status(400).json({ error: 'Dooro sanad-dugsiyeedka.' }); return; }
+  const client = termMarksServiceClient(res); if (!client) return;
+  const { data: cards, error } = await client.from('report_cards').select('*')
+    .eq('school_id',school.id).eq('class_id',req.params.classId).eq('academic_year_id',academicYearId)
+    .order('rank_in_class',{ascending:true});
+  if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
+  if (cards.some((card: any) => !card.published_at)) { res.status(409).json({ error: 'Fasalka waxaa ku jira report cards aan weli la daabicin.' }); return; }
+  const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
+  const klass = await db.getClassById(req.params.classId,school.id);
+  const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
+  if (!pages.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
+  sendPdf(res,`term-report-cards-${klass?.name || 'class'}`,pages);
+});
+
+
 forwardAsyncErrors(apiRouter);
