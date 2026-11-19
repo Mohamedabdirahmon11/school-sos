@@ -1,6 +1,6 @@
 # Supabase migration source audit
 
-Audited against the live Supabase project **school management 3** on 2026-11-10.
+Audited against the live Supabase project **school management 3** on 2026-11-19.
 This document records source/history mismatches; it does not authorize applying,
 replaying, deleting, or rewriting production migrations.
 
@@ -15,6 +15,7 @@ but the original SQL source is not present in this repository:
 | `20261104073439` | `harden_support_tickets` | Security-sensitive; do not approximate or replay. |
 | `20261104073643` | `communication_default_channel` | Related to legacy communication settings; provider-based delivery is disabled in the current app. |
 | `20261106144438` | `school_calendar_preference` | Recover exact source and compare with the live `schools.calendar_type` field before future migration work. |
+| `20261118114750` | `school_academic_setup` | Live `academic_years`, `terms`, and `term_status` schemas were inspected; original SQL source is still missing. Do not reconstruct or replay it. New lifecycle changes are additive only. |
 
 ## Restored applied migration sources
 
@@ -46,6 +47,22 @@ newer than the latest applied migration if they are still needed, tested, and
 reviewed before deployment. The setup wizard migration
 `20261110052158_school_setup_wizard_progress.sql` has since been applied and
 is recorded in the live history.
+
+## New additive School Setup migrations on the feature branch
+
+The following migrations are committed to
+`feature/school-setup-complete-batch-1-2026-11-19` and have **not** been
+applied to the live Supabase project:
+
+- `20261119160000_school_setup_lifecycle.sql`
+- `20261119161000_global_subject_catalog.sql`
+- `20261119162000_class_section_configuration.sql`
+- `20261119163000_school_date_format.sql`
+
+They depend on the already-existing live academic, class, subject, teacher,
+marks, attendance, and exam tables. Review and test them on a non-production
+Supabase branch before deployment. No production migrations or data were
+changed as part of this feature branch.
 
 ## Safe reconciliation procedure
 
