@@ -636,8 +636,19 @@ export class ApiClient {
     return this.request<SchoolClass[]>('/teacher/form-teacher-classes');
   }
 
+  public static async getFormTeacherComments(classId: string, semester: string) {
+    return this.request<Array<{ id: string; studentId: string; semester: string; comment: string; teacherUserId: string; updatedAt: string }>>('/teacher/form-teacher-comments?' + new URLSearchParams({ classId, semester }).toString());
+  }
+
+  public static async saveFormTeacherComment(classId: string, studentId: string, semester: string, comment: string) {
+    return this.request<{ success: boolean; comment: { id: string; studentId: string; semester: string; comment: string; teacherUserId: string; updatedAt: string } }>('/teacher/form-teacher-comments', {
+      method: 'PUT',
+      body: JSON.stringify({ classId, studentId, semester, comment })
+    });
+  }
+
   public static async getTeacherSubjectAssignments() {
-    return this.request<Array<{ classId: string; subjectId: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; isFormTeacher?: boolean; isFormTeacherClass?: boolean; canEditMarks?: boolean }>>('/teacher/subject-assignments');
+    return this.request<Array<{ classId: string; subjectId: string; teacherId?: string; teacherName?: string; subject: Subject; class: SchoolClass; periodsPerWeek: number; smallExamEnabled: boolean; bigExamEnabled: boolean; isFormTeacher?: boolean; isFormTeacherClass?: boolean; canEditMarks?: boolean }>>('/teacher/subject-assignments');
   }
 
   public static async createSubject(subData: Partial<Subject>, schoolId?: string) {
