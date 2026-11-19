@@ -231,6 +231,7 @@ const examConfigSchema = z.object({
   bigExamName: z.string().trim().min(1, 'Final examination name is required.').max(100).optional(),
   bigExamMax: z.number().min(0).max(1000).optional(),
   assessmentComponents: z.array(examAssessmentComponentSchema).min(1).max(6).optional(),
+  lockedSemesters: z.array(z.enum(['Semester 1', 'Semester 2'])).max(2).optional(),
   passMarkPercentage: z.number().min(0, 'Pass mark must be between 0 and 100.').max(100).optional()
 }).superRefine((value, context) => {
   if (!value.assessmentComponents) return;
