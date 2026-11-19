@@ -6,6 +6,8 @@ export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
 
 export interface SchoolSetupEvidence {
   classNames: string[];
+  classSections: Array<{ name: string; formTeacherAssigned: boolean }>;
+  classSubjectCoverage: Array<{ classId: string; subjectCount: number }>;
   subjectCount: number;
   teachers: Array<{ staffId?: string; userId?: string; hasLogin: boolean }>;
   studentCount: number;
@@ -54,6 +56,8 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
   const yearReady = /^\d{4}-\d{4}$/.test(String(school.academicYear || ''));
   const normalizedNames = evidence.classNames.map(name => name.trim()).filter(Boolean);
   const hasActiveClass = normalizedNames.length > 0;
+  const allActiveSectionsHaveFormTeachers = evidence.classSections.length > 0 && evidence.classSections.every(section => section.formTeacherAssigned);
+  const allActiveClassesHaveSubjects = evidence.classSubjectCoverage.length > 0 && evidence.classSubjectCoverage.every(item => item.subjectCount > 0);
   const profileReady = Boolean(
     school.name?.trim() && school.address?.trim() && school.city?.trim()
     && school.email?.trim() && school.phone?.trim() && normalizeWhatsAppNumber(school.whatsappPhone)
@@ -64,8 +68,8 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
   return {
     1: step(yearReady && datesReady, false, 'Set a valid academic year and complete start/end dates for both semesters.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
-    3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
-    4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
+    3: step(hasActiveClass && allActiveSectionsHaveFormTeachers, false, 'Create active class sections and assign a Form Teacher to every active section.'),
+    4: step(evidence.subjectCount > 0 && allActiveClassesHaveSubjects, false, 'Select school subjects and assign at least one subject to every active class.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
     7: step(evidence.timetableSlotCount > 0, true, 'Create at least one active timetable period, or skip and configure the timetable later.'),
