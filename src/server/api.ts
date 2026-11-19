@@ -5226,7 +5226,7 @@ apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAd
   if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
       startDate < year.start_date || endDate > year.end_date ||
       ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
-      (resultsPublishDate && (!isAcademicSetupDate(resultsPublishDate) || (examEndDate && resultsPublishDate < examEndDate)))) {
+      (resultsPublishDate && (!isAcademicSetupDate(resultsPublishDate) || !examEndDate || resultsPublishDate < examEndDate))) {
     res.status(400).json({ error: 'Enter valid Semester 1/2 dates within the academic year and a valid exam/result date range.' }); return;
   }
   const { data: existing, error: existingError } = await client.from('terms').select('id,name')
