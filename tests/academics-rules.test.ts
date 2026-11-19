@@ -331,4 +331,37 @@ test('submitted marks can be returned with an audit reason and only complete app
   assert.equal(classYearMarks[0].academicYear, '2026-2027');
 });
 
-// semester-lock-test-marker
+
+test('School Admin semester locks block mark writes until the semester is unlocked', async () => {
+  const memory = new InMemorySupabase();
+  const storage = await import('../src/server/storage.ts');
+  storage.installTestSupabaseClient(memory);
+  await storage.initializeStorage();
+  const db = storage.db;
+  const school = db.createSchool({
+    name: 'Semester Lock', code: 'LOCK', address: '', city: '', phone: '', email: 'lock@example.test', currency: 'ETB',
+    academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const klass = db.createClass({ schoolId: school.id, name: 'Grade 5', gradeLevel: 5, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
+  const subject = db.createSubject({ schoolId: school.id, name: 'English', code: 'ENG', category: 'core', isActive: true } as any);
+  const student = db.createStudent({
+    schoolId: school.id, studentId: 'LOCK-001', firstName: 'Test', middleName: '', lastName: 'Student', gender: 'female',
+    admissionDate: '2026-01-01', fatherPhone: '', classId: klass.id, status: 'active'
+  } as any);
+  await db.updateExamConfig(school.id, { lockedSemesters: ['Semester 1'] });
+  await assert.rejects(
+    () => db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+      studentId: student.id, assessmentScores: { 'test-1': 5 }, status: 'draft'
+    }], 'teacher-1'),
+    /locked by the School Admin/
+  );
+  await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 2', [{
+    studentId: student.id, assessmentScores: { 'test-1': 5 }, status: 'draft'
+  }], 'teacher-1');
+  await db.updateExamConfig(school.id, { lockedSemesters: [] });
+  const saved = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{
+    studentId: student.id, assessmentScores: { 'test-1': 5 }, status: 'draft'
+  }], 'teacher-1');
+  assert.equal(saved.length, 1);
+});
