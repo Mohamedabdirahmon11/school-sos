@@ -128,6 +128,11 @@ BEGIN
      SET is_current = true, status = 'active',
          closed_at = NULL, closed_by = NULL, updated_at = now()
    WHERE id = p_year_id AND school_id = p_school_id;
+
+  UPDATE public.schools
+     SET academic_year = (SELECT name FROM public.academic_years WHERE id = p_year_id AND school_id = p_school_id),
+         updated_at = now()
+   WHERE id = p_school_id;
 END;
 $$;
 REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
@@ -151,6 +156,32 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_sync_school_semester_dates(
+  p_school_id text, p_year_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  UPDATE public.schools s
+     SET terms = jsonb_build_object(
+       'semester1Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 1'),
+       'semester1End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 1'),
+       'semester2Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 2'),
+       'semester2End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name='Semester 2')
+     ),
+     current_semester = COALESCE(
+       (SELECT t.name FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.is_current=true LIMIT 1),
+       s.current_semester
+     ),
+     updated_at = now()
+   WHERE s.id = p_school_id;
+END;
+$;
+REVOKE ALL ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) TO service_role;
 
 -- A semester's open/closed state remains in term_status, the existing source of
 -- truth used by exam/result workflows. Activation also enforces one current
@@ -191,8 +222,9 @@ BEGIN
     ON CONFLICT (school_id, term_id) DO UPDATE
       SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
   END IF;
+  PERFORM public.schoolos_sync_school_semester_dates(p_school_id, v_year_id);
 END;
-$$;
+$;
 REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
 
