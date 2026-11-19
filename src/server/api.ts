@@ -3488,7 +3488,7 @@ apiRouter.delete('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmi
  } catch { res.status(500).json({error:'Xogta ku xiran fasalka lama hubin karin. Isku day mar kale.'}); }
 });
 apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8'];
+ const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','KG 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
  const {data:existing,error:readError}=await client.from('class_groups').select('name').eq('school_id',school.id);if(readError){res.status(500).json({error:'Fasallada lama hubin karin.'});return;}
  const names=new Set((existing||[]).map((r:any)=>String(r.name).trim().toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
  const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
