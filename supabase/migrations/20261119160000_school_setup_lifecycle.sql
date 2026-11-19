@@ -267,7 +267,7 @@ GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, 
 CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_student_marks()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
@@ -308,7 +308,7 @@ FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_student_marks();
 CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_component_marks()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
@@ -340,7 +340,7 @@ FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_component_marks();
 CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_attendance()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
@@ -373,7 +373,7 @@ FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_attendance();
 CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_exam_period()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
