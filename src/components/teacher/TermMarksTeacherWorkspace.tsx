@@ -71,7 +71,7 @@ export const TermMarksTeacherWorkspace:React.FC<{
       setAllowedIds(data.allowedStudentIds||[]);setMaxMarks(Number(data.maxMarks||0));
       const nextValues:Record<string,string>={};const nextStatuses:Record<string,'present'|'absent'|'excused'>={};
       for(const row of data.marks||[]){nextValues[row.student_id]=row.marks===null?'':String(row.marks);nextStatuses[row.student_id]=row.status;}
-      setValues(nextValues);setStatuses(nextStatuses);setSavedCount((data.marks||[]).length);
+      setValues(nextValues);setStatuses(nextStatuses);setSavedCount((data.marks||[]).filter((row:any)=>row.status!=='present'||row.marks!==null).length);
     }catch(e:any){setError(e.message||'Dhibcaha ardayda lama soo gelin.');}
     finally{setBusy(false);}
   };
