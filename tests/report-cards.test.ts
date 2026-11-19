@@ -113,8 +113,9 @@ test('report card includes configured attendance and saved subject teacher remar
   });
   const text = page.lines.join('\\n');
   assert.ok(text.includes('Attendance: 91.67% (160 present, 10 absent, 5 late, 5 excused; 180 recorded days)'));
-  assert.ok(text.includes('Semester 1 teacher remark: Excellent class participation.'));
-  assert.ok(text.includes('Semester 2 teacher remark: Keep improving problem solving.'));
+  assert.ok(text.includes('TEACHER REMARKS'));
+  assert.ok(text.includes('Mathematics · Semester 1: Excellent class participation.'));
+  assert.ok(text.includes('Mathematics · Semester 2: Keep improving problem solving.'));
 });
 
 test('report card prints school headers, footers, and configured grade labels', () => {
