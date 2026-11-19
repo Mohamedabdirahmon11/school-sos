@@ -77,12 +77,47 @@ CREATE TABLE IF NOT EXISTS public.component_marks (
   CONSTRAINT component_marks_student_school_fk FOREIGN KEY (student_id,school_id)
     REFERENCES public.students(id,school_id) ON DELETE CASCADE,
   CONSTRAINT component_marks_score_check CHECK (marks IS NULL OR marks >= 0),
+  CONSTRAINT component_marks_status_score_check CHECK ((status='present' AND marks IS NOT NULL) OR (status IN ('absent','excused') AND marks IS NULL)),
   UNIQUE (component_id,subject_id,student_id)
 );
 CREATE INDEX IF NOT EXISTS component_marks_class_subject_idx
   ON public.component_marks(school_id,class_id,subject_id,component_id);
 CREATE INDEX IF NOT EXISTS component_marks_student_idx
   ON public.component_marks(school_id,student_id,component_id);
+
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_component_mark()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $
+DECLARE v_max numeric; v_term uuid; v_year uuid;
+BEGIN
+  SELECT mc.max_marks,ms.term_id,t.academic_year_id INTO v_max,v_term,v_year
+  FROM public.mark_components mc
+  JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
+  JOIN public.terms t ON t.id=ms.term_id AND t.school_id=ms.school_id
+  WHERE mc.id=NEW.component_id AND mc.school_id=NEW.school_id;
+  IF v_max IS NULL THEN RAISE EXCEPTION 'Qaybta dhibcaha lama helin.'; END IF;
+  IF NEW.marks IS NOT NULL AND (NEW.marks<0 OR NEW.marks>v_max) THEN
+    RAISE EXCEPTION 'Dhibcuhu waa inay u dhexeeyaan 0 iyo %.',v_max;
+  END IF;
+  IF (NEW.status='present' AND NEW.marks IS NULL)
+     OR (NEW.status IN ('absent','excused') AND NEW.marks IS NOT NULL) THEN
+    RAISE EXCEPTION 'Xaaladda ardayga iyo dhibcihiisu isma waafaqaan.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.term_status ts WHERE ts.school_id=NEW.school_id
+    AND ts.term_id=v_term AND ts.status='open') THEN
+    RAISE EXCEPTION 'Term-kan waa xiran yahay; dhibco lama beddeli karo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.enrollments e WHERE e.school_id=NEW.school_id
+    AND e.student_id=NEW.student_id AND e.class_id=NEW.class_id
+    AND e.academic_year_id=v_year AND e.status='active') THEN
+    RAISE EXCEPTION 'Ardaygu fasalkan kuma jiro diiwaanka term-kan.';
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS component_marks_guard ON public.component_marks;
+CREATE TRIGGER component_marks_guard BEFORE INSERT OR UPDATE ON public.component_marks
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_component_mark();
 
 CREATE TABLE IF NOT EXISTS public.marks_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -546,10 +581,13 @@ DROP POLICY IF EXISTS mark_structures_read ON public.mark_structures;
 CREATE POLICY mark_structures_read ON public.mark_structures FOR SELECT TO authenticated
 USING (
   private.auth_user_role() IN ('school_admin','super_admin')
-  OR (class_id IS NOT NULL AND private.auth_has_term_assignment(school_id,class_id,
-      (SELECT a.subject_id FROM public.teacher_class_subject_assignments a
-       WHERE a.school_id=mark_structures.school_id AND a.class_id=mark_structures.class_id
-       AND (a.term_id IS NULL OR a.term_id=mark_structures.term_id) LIMIT 1),term_id,NULL))
+  OR EXISTS (
+    SELECT 1 FROM public.teacher_class_subject_assignments a
+    WHERE a.school_id=mark_structures.school_id
+      AND (mark_structures.class_id IS NULL OR a.class_id=mark_structures.class_id)
+      AND (a.term_id IS NULL OR a.term_id=mark_structures.term_id)
+      AND private.auth_has_term_assignment(a.school_id,a.class_id,a.subject_id,mark_structures.term_id,NULL)
+  )
 );
 DROP POLICY IF EXISTS mark_structures_admin_write ON public.mark_structures;
 CREATE POLICY mark_structures_admin_write ON public.mark_structures FOR ALL TO authenticated
@@ -561,10 +599,13 @@ CREATE POLICY mark_components_read ON public.mark_components FOR SELECT TO authe
 USING (private.auth_user_role() IN ('school_admin','super_admin') OR EXISTS (
   SELECT 1 FROM public.mark_structures ms
   WHERE ms.id=mark_components.structure_id AND ms.school_id=mark_components.school_id
-    AND (ms.class_id IS NULL OR private.auth_has_term_assignment(ms.school_id,ms.class_id,
-      (SELECT a.subject_id FROM public.teacher_class_subject_assignments a
-       WHERE a.school_id=ms.school_id AND a.class_id=ms.class_id
-       AND (a.term_id IS NULL OR a.term_id=ms.term_id) LIMIT 1),ms.term_id,NULL))
+    AND EXISTS (
+      SELECT 1 FROM public.teacher_class_subject_assignments a
+      WHERE a.school_id=ms.school_id
+        AND (ms.class_id IS NULL OR a.class_id=ms.class_id)
+        AND (a.term_id IS NULL OR a.term_id=ms.term_id)
+        AND private.auth_has_term_assignment(a.school_id,a.class_id,a.subject_id,ms.term_id,NULL)
+    )
 ));
 DROP POLICY IF EXISTS mark_components_admin_write ON public.mark_components;
 CREATE POLICY mark_components_admin_write ON public.mark_components FOR ALL TO authenticated
