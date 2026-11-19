@@ -10436,10 +10436,35 @@ apiRouter.patch('/term-marks/report-cards/:id', requireAuth, requireSchoolAdminO
   }
   if (Object.keys(updates).length === 1) { res.status(400).json({ error: 'Wax isbeddel ah lama helin.' }); return; }
   const client = termMarksServiceClient(res); if (!client) return;
+  const { data: before, error: beforeError } = await client.from('report_cards').select('*')
+    .eq('school_id',school.id).eq('id',req.params.id).maybeSingle();
+  if (beforeError || !before) { res.status(404).json({ error: 'Report card lama helin dugsigan.' }); return; }
+  if (req.body?.published===true) {
+    if (before.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay. Marka hore dib u samee Report Cards-ka fasalka.' }); return; }
+    const { data: yearTerms } = await client.from('terms').select('id')
+      .eq('school_id',school.id).eq('academic_year_id',before.academic_year_id);
+    const termIds=(yearTerms||[]).map((row:any)=>row.id);
+    const { data: statuses } = termIds.length
+      ? await client.from('term_status').select('term_id,status').eq('school_id',school.id).in('term_id',termIds)
+      : { data: [] as any[] };
+    if (termIds.length!==2 || (statuses||[]).filter((row:any)=>row.status==='closed').length!==2) {
+      res.status(409).json({ error: 'Report Card lama daabici karo ilaa labada term la xiro.' }); return;
+    }
+  }
   const { data, error } = await client.from('report_cards').update(updates)
     .eq('school_id',school.id).eq('id',req.params.id).select('*').maybeSingle();
   if (error) { res.status(400).json({ error: error.message }); return; }
   if (!data) { res.status(404).json({ error: 'Report card lama helin dugsigan.' }); return; }
+  const oldValue:Record<string,any>={}; const newValue:Record<string,any>={};
+  for (const key of Object.keys(updates)) {
+    if (key==='updated_at') continue;
+    oldValue[key]=before[key]; newValue[key]=data[key];
+  }
+  const { error: auditError } = await client.from('marks_audit').insert({
+    school_id:school.id,entity_type:'report_card',entity_id:data.id,student_id:data.student_id,
+    old_value:oldValue,new_value:newValue,changed_by:user.id
+  });
+  if (auditError) { res.status(503).json({ error: 'Report Card-ka waa la beddelay, balse audit log lama kaydin: '+auditError.message }); return; }
   res.json(data);
 });
 
@@ -10454,6 +10479,7 @@ apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSch
   if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null);
   const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
   if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
+  if (card.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay; dugsigu waa inuu dib u sameeyo.' }); return; }
   const klass = await db.getClassById(student.classId,school.id);
   sendPdf(res,`term-report-card-${student.studentId}`,[termReportCardPdfPage(school,card,student,`${klass?.name || ''} ${klass?.section || ''}`.trim())]);
 });
@@ -10467,6 +10493,7 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
     .eq('school_id',school.id).eq('class_id',req.params.classId).eq('academic_year_id',academicYearId)
     .order('rank_in_class',{ascending:true});
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
+  if (cards.some((card:any)=>card.is_stale)) { res.status(409).json({ error: 'Report Cards-ka fasalkan waa duugoobeen; dib u samee ka hor PDF.' }); return; }
   const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
   const klass = await db.getClassById(req.params.classId,school.id);
   const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
