@@ -7947,6 +7947,7 @@ apiRouter.get('/report-cards/classes/:classId/pdf', requireAuth, requireSchoolAd
   const [rankings, design] = await Promise.all([db.getClassYearlyRankings(school.id, klass.id), db.getReportCardDesign(school.id)]);
   if (!rankings.length) { res.status(404).json({ error: 'No students were found in this class.' }); return; }
   if (rankings.some(result => !result.annualComplete)) { res.status(409).json({ error: 'Class annual report cards are not ready. Every enrolled student needs approved marks for every assigned subject in both semesters.' }); return; }
+  if (rankings.some(result => !result.annualPublished)) { res.status(409).json({ error: 'Class annual report cards cannot be downloaded until the School Admin has published every student result for both semesters.' }); return; }
   const pages = rankings.map(result => buildReportCardPdfPage({
     school,
     design,
