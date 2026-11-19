@@ -8,7 +8,7 @@ type PeriodData = {
   sessions: any[];
   schedules: any[];
   invigilators: any[];
-  roomAssignments: Array<{ sessionId: string; roomId: string; roomName: string; capacity: number; studentCount: number; classRanges: Array<{ classId: string; fromNumber: number; toNumber: number; studentCount: number }> }>;
+  roomAssignments: Array<{ sessionId: string; roomId: string; roomName: string; capacity: number; studentCount: number; classRanges: Array<{ classId: string; fromNumber: number; toNumber: number; studentCount: number }>; seats: Array<{ seatNumber: number; examNumber: number; studentId: string; rollNumber: string; studentName: string; classId: string; subjectId: string; examDate: string }> }>;
 };
 
 const defaultSessions: SessionDraft[] = [
@@ -267,7 +267,7 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
           })}
         </div>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={printTimetable} className="rounded-lg border border-[#CBD5E1] px-4 py-2.5 text-xs font-bold text-[#334155]">Daabac A4</button>
+          <button type="button" onClick={printTimetable} className="rounded-lg border border-[#CBD5E1] px-4 py-2.5 text-xs font-bold text-[#334155]">Daabac A4 (jadwalka + liisaska qolalka)</button>
           <button type="button" onClick={() => void handlePublish()} disabled={isReadOnly || saving || periodData.period.status === 'published' || !periodData.schedules.length} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">Daabac jadwalka (Publish)</button>
         </div>
       </section>}
@@ -292,6 +292,25 @@ export const TermExamSchedulingPanel: React.FC<{ isReadOnly?: boolean }> = ({ is
             return <tr key={schedule.id}><td>{schedule.exam_date}</td><td>{session?.name || '—'}</td><td>{String(schedule.start_time).slice(0,5)}–{String(schedule.end_time).slice(0,5)}</td><td>{subjectNames.get(schedule.subject_id) || schedule.subject_id}</td><td>{schedule.exam_shift}</td></tr>;
           })}</tbody>
         </table>
+      </section>
+      <section className="term-exam-print">
+        <h1>{periodName} — Liisaska Fadhiyada Qolalka</h1>
+        <h2>{terms.find(term => term.id === selectedTermId)?.name || 'Term Exam'}</h2>
+        {periodData.sessions.map(session => {
+          const roomRows = usedRoomsBySession.get(session.id) || [];
+          if (!roomRows.length) return null;
+          const examDay = periodData.days.find(day => day.id === session.exam_day_id);
+          return roomRows.map(room => <div key={session.id + ':' + room.roomId} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
+            <h2>{examDay?.exam_date || ''} · {session.name} · {String(session.start_time).slice(0,5)}–{String(session.end_time).slice(0,5)}</h2>
+            <h3>{room.roomName} — {room.studentCount}/{room.capacity} arday</h3>
+            <table><thead><tr><th>Kursi</th><th>Exam No.</th><th>Student ID</th><th>Roll No.</th><th>Magaca ardayga</th><th>Fasal</th><th>Maaddo</th></tr></thead>
+              <tbody>{room.seats.map(seat => <tr key={seat.studentId + ':' + seat.subjectId}>
+                <td>{seat.seatNumber}</td><td>{seat.examNumber}</td><td>{seat.studentId}</td><td>{seat.rollNumber || '—'}</td>
+                <td>{seat.studentName || '—'}</td><td>{classNames.get(seat.classId) || seat.classId}</td><td>{subjectNames.get(seat.subjectId) || seat.subjectId}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>);
+        })}
       </section>
     </div>
   );
