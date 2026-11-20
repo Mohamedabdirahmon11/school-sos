@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
+import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage, SchoolCurrency } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { SidebarAppearanceSettings } from './SidebarAppearanceSettings.tsx';
@@ -99,7 +99,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   const [whatsappPhone, setWhatsappPhone] = useState(school?.whatsappPhone || '');
   const [email, setEmail] = useState(school?.email || '');
-  const [currency, setCurrency] = useState(school?.currency || 'ETB');
+  const [currency, setCurrency] = useState<SchoolCurrency>(school?.currency || 'ETB');
   const [language, setLanguage] = useState(school?.language || 'en');
   const [timezone, setTimezone] = useState(school?.timezone || 'Africa/Addis_Ababa');
   const [dateFormat, setDateFormat] = useState<'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd'>(school?.dateFormat || 'dd/MM/yyyy');
@@ -793,7 +793,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="block font-semibold text-[#334155] mb-1">School Currency</label>
                 <select
                   value={currency}
-                  onChange={e => setCurrency(e.target.value)}
+                  onChange={e => setCurrency(e.target.value as SchoolCurrency)}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
                   <option value="USD">USD ($)</option>
