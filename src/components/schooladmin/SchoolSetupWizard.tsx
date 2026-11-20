@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolSetupData } from '../../types/index.ts';
+import { SchoolSetupData, SchoolSetupState } from '../../types/index.ts';
 import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
@@ -15,7 +15,7 @@ const updateDurationForFinish = (start: string, finish: string, breakAfter: numb
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DEFAULT_DATA: SchoolSetupData = {
-  schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' },
+  schoolInformation: { name: '', logoUrl: '', address: '', city: '', phone: '', email: '', whatsappPhone: '', schoolType: 'combined' },
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
   terms: [{ name: 'Semester 1', startDate: '', endDate: '' }, { name: 'Semester 2', startDate: '', endDate: '' }],
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' },
@@ -31,6 +31,18 @@ const STEPS = [
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
 
+const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; coreSteps?: number[]; optional?: boolean; views?: Array<{ label: string; view: string }> }> = [
+  { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the active academic year and configure Semester 1 and Semester 2.', coreSteps: [2, 3] },
+  { id: 2, title: 'School Information & WhatsApp', description: 'Save the school identity, city, contact details and administration WhatsApp number.', coreSteps: [1] },
+  { id: 3, title: 'Classes & Grades', description: 'Create classes and sections, including KG 1 and KG 2 when offered.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
+  { id: 4, title: 'Subjects', description: 'Select or create the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Class curriculum', view: 'sch_curriculum' }] },
+  { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific Teacher IDs and PIN/password logins.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }, { label: 'Teacher assignments', view: 'sch_teacher_assignments' }] },
+  { id: 6, title: 'Students & Parents', description: 'Register students and parents; use bulk import and bulk PIN tools where needed.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
+  { id: 7, title: 'Timetable', description: 'Create the timetable now or explicitly skip it and return later.', optional: true, coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
+  { id: 8, title: 'Attendance & Exams', description: 'Review attendance rules and configure examinations before opening the dashboard.', views: [{ label: 'Open Attendance', view: 'sch_attendance' }, { label: 'Open Exams', view: 'sch_exams' }] },
+  { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; review optional school modules.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
+];
+
 export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) => {
   const { school } = useAuth();
   const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
@@ -40,49 +52,51 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
-  const [showChecklist, setShowChecklist] = useState(false);
-  const [checklistLoading, setChecklistLoading] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<Array<{id:string;title:string;description:string;complete:boolean;view:string}>>([]);
+  const [showChecklist, setShowChecklist] = useState(true);
+  const [returnToChecklist, setReturnToChecklist] = useState(false);
+  const [setupState, setSetupState] = useState<SchoolSetupState | null>(null);
+  const [checklistLoading, setChecklistLoading] = useState(true);
   const [timetable, setTimetable] = useState<TimetableSettings>({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 });
 
-  const loadChecklist = async (completedSteps: number[] = saved) => {
-    if (!school?.id) return;
+  const refreshSetupProgress = async () => {
     setChecklistLoading(true);
     try {
-      const [years, groups, subjects] = await Promise.all([
-        ApiClient.getAcademicYears(), ApiClient.getClassGroups(), ApiClient.getSubjects()
-      ]);
-      const activeYear = years.find((year: any) => year.status === 'active' || year.is_current) || null;
-      const semesters = activeYear ? await ApiClient.getAcademicYearSemesters(activeYear.id).catch(() => []) : [];
-      const sections = groups.flatMap((group: any) => group.sections || []);
-      let teacherData: any = { curriculum: [], assignments: [], totalClassSubjects: 0, unassignedCount: 0 };
-      if (activeYear) {
-        try {
-          teacherData = await ApiClient.request<any>(`/teacher-assignments?academicYearId=${encodeURIComponent(activeYear.id)}&termId=all`);
-        } catch { /* Keep the remaining setup checks visible if teacher data is unavailable. */ }
-      }
-      const curriculumCount = Number(teacherData.totalClassSubjects ?? teacherData.curriculum?.length ?? 0);
-      const unassignedCount = Number(teacherData.unassignedCount ?? 0);
-      const semesterNames = new Set(semesters.map((semester: any) => semester.name));
-      const classesComplete = groups.length > 0 && groups.every((group: any) => (group.sections || []).length > 0);
-      const formTeachersComplete = sections.length > 0 && sections.every((section: any) => Boolean(section.class_teacher_id));
-      setChecklistItems([
-        { id: 'profile', title: 'School Profile & Settings', description: 'School identity, contacts, logo and preferences are saved.', complete: completedSteps.includes(1), view: 'sch_settings' },
-        { id: 'year', title: 'Academic Year', description: 'One academic year is active for this school.', complete: Boolean(activeYear), view: 'sch_setup_academics' },
-        { id: 'semesters', title: 'Two Semesters', description: 'Semester 1 and Semester 2 are configured for the active year.', complete: semesters.length === 2 && semesterNames.has('Semester 1') && semesterNames.has('Semester 2'), view: 'sch_setup_academics' },
-        { id: 'classes', title: 'Classes & Sections', description: 'Classes have been created and each class has at least one section.', complete: classesComplete, view: 'sch_classes' },
-        { id: 'form-teachers', title: 'Form Teachers', description: 'Every active section has its required form teacher.', complete: formTeachersComplete, view: 'sch_classes' },
-        { id: 'subjects', title: 'Subjects', description: 'The school has selected or created its subjects.', complete: subjects.length > 0, view: 'sch_subjects' },
-        { id: 'curriculum', title: 'Class–Subject Curriculum', description: 'Subjects are mapped to the classes that study them.', complete: curriculumCount > 0, view: 'sch_curriculum' },
-        { id: 'teacher-assignments', title: 'Teacher Assignments', description: 'Every curriculum subject has a teacher assigned for the active year.', complete: curriculumCount > 0 && unassignedCount === 0, view: 'sch_teacher_assignments' }
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load the School Setup checklist.');
-    } finally {
-      setChecklistLoading(false);
-    }
+      const current = await ApiClient.getSchoolSetupProgress();
+      if (current.progress.completedAt) { setSetupState(current); return; }
+      const skippedSteps = current.progress.skippedSteps.filter(id => !current.checklist[id]?.ready);
+      const completedSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(id => current.checklist[id]?.ready && !skippedSteps.includes(id));
+      const currentStep = [1, 2, 3, 4, 5, 6, 7, 8, 9].find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) || 10;
+      const unchanged = current.progress.currentStep === currentStep
+        && JSON.stringify(current.progress.completedSteps) === JSON.stringify(completedSteps)
+        && JSON.stringify(current.progress.skippedSteps) === JSON.stringify(skippedSteps);
+      setSetupState(unchanged ? current : await ApiClient.updateSchoolSetupProgress({ currentStep, completedSteps, skippedSteps }));
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load the School Setup checklist.'); }
+    finally { setChecklistLoading(false); }
   };
 
+  const skipOptionalStep = async (stepId: number) => {
+    if (!setupState || ![7, 9].includes(stepId)) return;
+    setSaving(true); setError(null);
+    try {
+      const skippedSteps = [...new Set([...setupState.progress.skippedSteps, stepId])].sort((a, b) => a - b);
+      const completedSteps = setupState.progress.completedSteps.filter(id => id !== stepId);
+      const currentStep = [1, 2, 3, 4, 5, 6, 7, 8, 9].find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) || 10;
+      setSetupState(await ApiClient.updateSchoolSetupProgress({ currentStep, completedSteps, skippedSteps }));
+    } catch (err) { setError(err instanceof Error ? err.message : 'This optional setup step could not be skipped.'); }
+    finally { setSaving(false); }
+  };
+
+  const finishSetup = async () => {
+    if (!setupState?.canFinish) return;
+    setSaving(true); setError(null);
+    try {
+      await ApiClient.updateSchoolSetupProgress({ currentStep: 10, completedSteps: setupState.progress.completedSteps, skippedSteps: setupState.progress.skippedSteps, complete: true });
+      await onComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The final setup checks did not pass. Please review the checklist.');
+      await refreshSetupProgress();
+    } finally { setSaving(false); }
+  };
   useEffect(() => {
     let active = true;
     ApiClient.getSchoolSetupData().then(async result => {
@@ -113,11 +127,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
         completedSteps: incoming.completedSteps || []
       });
       setSaved(incoming.completedSteps || []);
-      setStep(Math.min(5, Math.max(1, result.progress?.currentStep || 1)));
-      if ((incoming.completedSteps || []).length >= 5 || Boolean(result.progress?.completedAt)) {
-        setShowChecklist(true);
-        void loadChecklist(incoming.completedSteps || []);
-      }
+      const nextCoreStep = [1, 2, 3, 4, 5].find(id => !(incoming.completedSteps || []).includes(id)) || 5;
+      setStep(nextCoreStep);
+      void refreshSetupProgress();
     }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load school setup.'))
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -199,11 +211,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
       }
       const result = await ApiClient.saveSchoolSetupStep(step, section);
       setData(result.data); setSaved(result.data.completedSteps || []);
-      if (result.completed) {
+      if (result.completed) await onComplete();
+      else if (result.coreSetupCompleted || returnToChecklist) {
         setShowChecklist(true);
-        await loadChecklist(result.data.completedSteps || []);
-      }
-      else if (advance && step < 5) setStep(step + 1);
+        setReturnToChecklist(false);
+        await refreshSetupProgress();
+      } else if (advance && step < 5) setStep(step + 1);
     } catch (err) { setError(err instanceof Error ? err.message : 'This setup step could not be saved.'); }
     finally { setSaving(false); }
   };
@@ -217,9 +230,56 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
 
   if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
 
+  if (showChecklist) return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <header className="rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
+      <p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · FIRST-TIME SETUP</p>
+      <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Complete your school setup</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Your progress is saved to this school. Open a section, save it, then return here to refresh its readiness check. The Dashboard stays locked until the required steps are verified.</p>
+      <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
+    </header>
+    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
+    {checklistLoading && !setupState && <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading school readiness checks…</div>}
+    <section className="space-y-3">
+      {CHECKLIST_STEPS.map(item => {
+        const evidence = setupState?.checklist[item.id];
+        const completed = Boolean(setupState?.progress.completedSteps.includes(item.id));
+        const skipped = Boolean(setupState?.progress.skippedSteps.includes(item.id));
+        return <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800">{item.id}</span>
+                <h2 className="font-bold text-slate-900">{item.title}</h2>
+                {completed && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Verified</span>}
+                {skipped && <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Skipped</span>}
+                {!completed && !skipped && setupState?.progress.currentStep === item.id && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}
+              </div>
+              <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+              {!completed && !skipped && evidence?.reason && <p className="mt-2 text-xs text-amber-700">{evidence.reason}</p>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setReturnToChecklist(true); setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 1 ? 'School profile' : coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : coreStep === 4 ? 'Academic calendar' : 'Working hours'}</button>)}
+              {item.views?.map(target => <button key={target.view} type="button" onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{target.label}</button>)}
+              {item.optional && !completed && !skipped && <button type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
+            </div>
+          </div>
+        </article>;
+      })}
+    </section>
+    <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-5">
+      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">10. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
+      <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete steps 1–6 and 8. Timetable and Fees can be completed now or explicitly skipped.'}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
+        <button type="button" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Finishing…' : 'Finish setup and open Dashboard'}</button>
+        <button type="button" onClick={() => { setReturnToChecklist(false); setShowChecklist(false); setStep(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Open all school settings</button>
+      </div>
+    </section>
+  </main>;
+
   return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
     <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · SCHOOL ADMIN</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">School Setup Wizard</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Complete these five essential steps. Each step is saved immediately, so you can leave and continue later.</p></div><div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-right"><div className="text-2xl font-bold">{saved.length}/5</div><div className="text-xs text-teal-100">Steps saved</div></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · SCHOOL ADMIN</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">School Setup Wizard</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Complete the school profile and schedule settings. Your progress is saved immediately, so you can leave and continue later.</p></div><div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-right"><div className="text-2xl font-bold">{saved.length}/5</div><div className="text-xs text-teal-100">Steps saved</div></div></div>
       <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-teal-300 transition-all" style={{ width: (saved.length / 5 * 100) + '%' }} /></div>
       <div className="mt-5 grid grid-cols-5 gap-2">{STEPS.map((s, i) => <button key={s.title} type="button" onClick={() => { if (i + 1 <= step || saved.includes(i + 1)) setStep(i + 1); }} className={'rounded-xl px-2 py-2 text-left text-xs transition ' + (step === i + 1 ? 'bg-white text-teal-900' : saved.includes(i + 1) ? 'bg-teal-300/20 text-white' : 'bg-white/10 text-teal-100')}><span className="flex items-center gap-1.5 font-bold">{saved.includes(i + 1) ? <CheckCircle2 size={14} /> : <span>{i + 1}</span>}<span className="hidden sm:inline">STEP {i + 1}</span></span><span className="mt-1 hidden sm:block">{s.title}</span></button>)}</div>
     </header>
@@ -233,7 +293,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
         {field('School name', data.schoolInformation.name, v => patch('schoolInformation', { ...data.schoolInformation, name: v }))}
         <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School logo (PNG, JPEG or WebP · max 1.5 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={logoUploading} onChange={e => { const input = e.currentTarget; const file = input.files?.[0]; if (!file) return; if (file.size > 1_572_864 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setError('Choose a PNG, JPEG or WebP logo smaller than 1.5 MB.'); input.value = ''; return; } setLogoUploading(true); setError(null); void ApiClient.uploadSchoolLogo(file).then(result => setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: result.logoUrl } }))).catch(err => setError(err instanceof Error ? err.message : 'The school logo could not be uploaded.')).finally(() => { setLogoUploading(false); input.value = ''; }); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50" />{logoUploading && <span className="text-xs text-teal-700">Uploading logo securely to Supabase Storage…</span>}{!logoUploading && data.schoolInformation.logoUrl && <div className="flex items-center gap-3 text-xs text-teal-700"><img src={data.schoolInformation.logoUrl} alt="School logo preview" className="h-12 w-12 rounded-lg border border-slate-200 object-contain" />Logo uploaded and ready to save.</div>}</label>
         {field('School address', data.schoolInformation.address, v => patch('schoolInformation', { ...data.schoolInformation, address: v }))}
+        {field('City', data.schoolInformation.city, v => patch('schoolInformation', { ...data.schoolInformation, city: v }))}
         {field('Phone number', data.schoolInformation.phone, v => patch('schoolInformation', { ...data.schoolInformation, phone: v }), 'tel')}
+        {field('Administration WhatsApp (+country code)', data.schoolInformation.whatsappPhone, v => patch('schoolInformation', { ...data.schoolInformation, whatsappPhone: v }), 'tel', '+251...')}
         {field('Email address', data.schoolInformation.email, v => patch('schoolInformation', { ...data.schoolInformation, email: v }), 'email')}
         {select('School type', data.schoolInformation.schoolType, [['primary', 'Primary'], ['secondary', 'Secondary'], ['combined', 'Combined']], v => patch('schoolInformation', { ...data.schoolInformation, schoolType: v as any }))}
       </div>}
@@ -300,26 +362,6 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
       </footer>
     </section>
 
-    {showChecklist && (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
-        <section className="w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><p className="text-xs font-bold uppercase tracking-widest text-teal-700">SCHOOL SETUP</p><h2 className="mt-1 text-2xl font-bold text-slate-900">Setup progress</h2><p className="mt-2 text-sm text-slate-600">The five onboarding steps are saved. Complete the remaining school modules below; you can open each module directly.</p></div>
-            <button type="button" onClick={() => void loadChecklist()} disabled={checklistLoading} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">{checklistLoading ? 'Refreshing…' : 'Refresh status'}</button>
-          </div>
-          {checklistLoading && checklistItems.length === 0 ? <div className="py-12 text-center text-sm text-slate-500">Checking setup modules…</div> : (
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {checklistItems.map(item => (
-                <article key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
-                  <div className={item.complete ? 'mt-0.5 text-emerald-600' : 'mt-0.5 text-amber-500'}>{item.complete ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}</div>
-                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-bold text-slate-900">{item.title}</h3><span className={item.complete ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700'}>{item.complete ? 'Complete' : 'Incomplete'}</span></div><p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p><button type="button" onClick={() => onNavigate(item.view)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900">Open module <ArrowRight size={13} /></button></div>
-                </article>
-              ))}
-            </div>
-          )}
-          <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={() => void onComplete()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800">Finish and go to dashboard</button></div>
-        </section>
-      </div>
-    )}
+
   </main>;
 };
