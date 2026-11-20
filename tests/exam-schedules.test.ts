@@ -109,7 +109,7 @@ test('Step 10B empty periods return complete data and invigilator replacement va
   assert.ok(api.includes("apiRouter.delete('/exams/term-periods/:periodId'"));
   assert.ok(api.includes("period.status !== 'draft'"));
   const deleteStart = api.indexOf("apiRouter.delete('/exams/term-periods/:periodId'");
-  const deleteEnd = api.indexOf("\\n});", deleteStart);
+  const deleteEnd = api.indexOf('\n});', deleteStart);
   const deleteRoute = api.slice(deleteStart, deleteEnd);
   assert.ok(deleteRoute.includes("from('exam_schedules').delete()"));
   assert.ok(deleteRoute.indexOf("from('exam_schedules').delete()") < deleteRoute.indexOf("from('exam_periods').delete()"));
