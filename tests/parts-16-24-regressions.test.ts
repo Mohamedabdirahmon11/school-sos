@@ -33,7 +33,12 @@ test('year-end promotion uses one database transaction and maps the history sche
   assert.match(migration, /already been processed/);
   assert.match(migration, /INSERT INTO public\.promotions/);
   assert.match(migration, /INSERT INTO public\.promotion_history/);
-  assert.match(migration, /UPDATE public\.students/);
+  // Student/class/enrollment updates are delegated to the existing atomic enrollment RPC.
+  // This wrapper writes the promotion ledger in the same transaction instead of duplicating student updates.
+  assert.match(migration, /public\.schoolos_promote_enrollments\(/);
+  assert.match(migration, /^BEGIN;/m);
+  assert.match(migration, /^COMMIT;/m);
+  assert.doesNotMatch(migration, /UPDATE public\.students/);
   assert.match(migration, /REVOKE ALL ON FUNCTION/);
 });
 
