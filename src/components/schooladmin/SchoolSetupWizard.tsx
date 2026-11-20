@@ -172,7 +172,6 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
         const savedYear = existingYear
           ? await ApiClient.updateAcademicYear(existingYear.id, payload)
           : await ApiClient.createAcademicYear(payload);
-        if (data.academicYear.isCurrent) await ApiClient.activateAcademicYear(savedYear.id);
       }
 
       if (step === 3) {
@@ -190,6 +189,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
           if (current) await ApiClient.updateAcademicSemester(current.id, payload);
           else await ApiClient.createAcademicSemester(selectedYear.id, payload);
         }
+        // Activation requires both semesters to exist; never activate during the Academic Year step.
+        if (data.academicYear.isCurrent) await ApiClient.activateAcademicYear(selectedYear.id);
       }
 
       // Convert logos saved by the older Base64 flow into Storage on the next Step 1 save.
