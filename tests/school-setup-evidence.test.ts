@@ -12,7 +12,7 @@ test('school setup readiness counts only active teachers and students', () => {
   const setup = api.slice(start, end);
   assert.ok(setup.includes("queryAllRows('teachers', { school_id: school.id, status: 'active' }"));
   assert.ok(setup.includes("db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id')"));
-  assert.ok(setup.includes("db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id')"));
+  assert.ok(setup.includes("db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'and(father_phone.not.is.null,father_phone.neq.),and(mother_phone.not.is.null,mother_phone.neq.)', 'id')"));
 });
 
 test('school settings are flushed before the onboarding form receives success', () => {
