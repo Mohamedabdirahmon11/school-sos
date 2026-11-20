@@ -18,6 +18,12 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
     subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
   } as any);
+  const sourceAcademicYearId = '00000000-0000-4000-8000-000000000001';
+  const targetAcademicYearId = '00000000-0000-4000-8000-000000000002';
+  await memory.from('academic_years').insert([
+    { id: sourceAcademicYearId, school_id: school.id, name: '2026-2027', start_date: '2026-09-01', end_date: '2027-06-30', is_current: true, status: 'active' },
+    { id: targetAcademicYearId, school_id: school.id, name: '2027-2028', start_date: '2027-09-01', end_date: '2028-06-30', is_current: false, status: 'draft' }
+  ]);
   const source = db.createClass({ schoolId: school.id, name: 'Grade 1', gradeLevel: 1, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const target = db.createClass({ schoolId: school.id, name: 'Grade 2', gradeLevel: 2, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
@@ -67,12 +73,12 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     yearlyPercentage: row.yearlyPercentage, yearlyRank: row.yearlyRank, decision: index < 3 ? 'promoted' as const : 'repeated' as const,
     adminOverride: index === 2, notes: index === 2 ? 'School board decision' : `Rank ${row.yearlyRank}`
   }));
-  await assert.rejects(() => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, adminOverride: false })), 'admin-1'), /reason is required/);
+  await assert.rejects(() => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, adminOverride: false })), 'admin-1', sourceAcademicYearId, targetAcademicYearId), /reason is required/);
   await assert.rejects(
-    () => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, classToId: row.decision === 'promoted' ? undersizedTarget.id : row.classToId })), 'admin-1'),
+    () => db.confirmYearEndPromotions(school.id, source.id, 2, payload.map(row => ({ ...row, classToId: row.decision === 'promoted' ? undersizedTarget.id : row.classToId })), 'admin-1', sourceAcademicYearId, targetAcademicYearId),
     /does not have enough capacity/
   );
-  const confirmed = await db.confirmYearEndPromotions(school.id, source.id, 2, payload, 'admin-1');
+  const confirmed = await db.confirmYearEndPromotions(school.id, source.id, 2, payload, 'admin-1', sourceAcademicYearId, targetAcademicYearId);
   assert.equal(confirmed.length, 4);
   assert.equal(confirmed[2].yearlyPercentage, 60);
   assert.match(confirmed[2].notes || '', /^ADMIN OVERRIDE:/);
@@ -159,6 +165,12 @@ test('yearly report cards do not treat one approved semester as the full-year av
     academicYear: '2026-2027', currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
     subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: '2026-01-01', validUntil: '2099-01-01', graceDays: 7, pricePaid: 0, autoRenew: false }
   } as any);
+  const sourceAcademicYearId = '00000000-0000-4000-8000-000000000001';
+  const targetAcademicYearId = '00000000-0000-4000-8000-000000000002';
+  await memory.from('academic_years').insert([
+    { id: sourceAcademicYearId, school_id: school.id, name: '2026-2027', start_date: '2026-09-01', end_date: '2027-06-30', is_current: true, status: 'active' },
+    { id: targetAcademicYearId, school_id: school.id, name: '2027-2028', start_date: '2027-09-01', end_date: '2028-06-30', is_current: false, status: 'draft' }
+  ]);
   const klass = db.createClass({ schoolId: school.id, name: 'Grade 8', gradeLevel: 8, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
   const student = db.createStudent({
@@ -190,7 +202,7 @@ test('yearly report cards do not treat one approved semester as the full-year av
   assert.equal(yearly[0].isPass, false);
   await assert.rejects(() => db.confirmYearEndPromotions(school.id, klass.id, 3, [{
     studentId: student.id, classFromId: klass.id, yearlyPercentage: 0, yearlyRank: 0, decision: 'repeated'
-  }], 'admin-incomplete'), /both semesters/);
+  }], 'admin-incomplete', sourceAcademicYearId, targetAcademicYearId), /both semesters/);
 });
 
 test('school admin can choose five 10-mark tests and the final exam adjusts to 50', async () => {
