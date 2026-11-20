@@ -8567,9 +8567,9 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
-  const client = studentInvoiceServiceClient(res);
-  if (!client) return;
-  const logoImage = await getSchoolLogoPdfImage(school, client);
+  const client = school.logoUrl ? studentInvoiceServiceClient(res) : null;
+  if (school.logoUrl && !client) return;
+  const logoImage = school.logoUrl && client ? await getSchoolLogoPdfImage(school, client) : null;
   const feeName = payment.feeStructureId ? feeStructures.find(item => item.id === payment.feeStructureId)?.name : undefined;
   sendPdf(res, `receipt-${payment.receiptNumber}`, [{
     lines:[
