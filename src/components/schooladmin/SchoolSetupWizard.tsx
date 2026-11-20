@@ -38,7 +38,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 4, title: 'Subjects', description: 'Select or create the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Class curriculum', view: 'sch_curriculum' }] },
   { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific Teacher IDs and PIN/password logins.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }, { label: 'Teacher assignments', view: 'sch_teacher_assignments' }] },
   { id: 6, title: 'Students & Parents', description: 'Register students and parents; use bulk import and bulk PIN tools where needed.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
-  { id: 7, title: 'Timetable', description: 'Create the timetable now or explicitly skip it and return later.', optional: true, coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
+  { id: 7, title: 'Timetable & School Hours', description: 'Set the school calendar and daily hours, then create the active class timetable.', coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
   { id: 8, title: 'Attendance & Exams', description: 'Review attendance rules and configure examinations before opening the dashboard.', views: [{ label: 'Open Attendance', view: 'sch_attendance' }, { label: 'Open Exams', view: 'sch_exams' }] },
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; review optional school modules.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
@@ -75,7 +75,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
   };
 
   const skipOptionalStep = async (stepId: number) => {
-    if (!setupState || ![7, 9].includes(stepId)) return;
+    if (!setupState || stepId !== 9) return;
     setSaving(true); setError(null);
     try {
       const skippedSteps = [...new Set([...setupState.progress.skippedSteps, stepId])].sort((a, b) => a - b);
@@ -268,7 +268,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
     </section>
     <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-5">
       <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">10. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
-      <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete steps 1–6 and 8. Timetable and Fees can be completed now or explicitly skipped.'}</p>
+      <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete steps 1–8. Fees and extra modules can be completed now or explicitly skipped.'}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
         <button type="button" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Finishing…' : 'Finish setup and open Dashboard'}</button>
