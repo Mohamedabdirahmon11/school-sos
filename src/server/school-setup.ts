@@ -1,5 +1,6 @@
 import { School, SchoolSetupChecklistItem, SchoolSetupProgress, SchoolSetupProgressUpdate } from '../types/index.ts';
 import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
+import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 
 export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 6, 8] as const;
 export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
@@ -16,22 +17,19 @@ export interface SchoolSetupEvidence {
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
-  const source = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-  const validSteps = (input: unknown) => Array.isArray(input)
-    ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 1 && Number(step) <= 10))]
-    : [];
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const validSteps = (input: unknown) => Array.isArray(input) ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 1 && Number(step) <= 10))] : [];
   const skippedSteps = validSteps(source.skippedSteps).filter(step => OPTIONAL_SCHOOL_SETUP_STEPS.includes(step as 7 | 9));
-  const completedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
+  const rawCompletedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
+  const rawCompletedAt = typeof source.completedAt === 'string' && source.completedAt.trim() ? source.completedAt : null;
+  const fullyComplete = isSchoolSetupProgressComplete({ completedAt: rawCompletedAt, completedSteps: rawCompletedSteps, skippedSteps });
+  const completedSteps = rawCompletedSteps.filter(step => step !== 10 || fullyComplete);
   const rawCurrentStep = Number(source.currentStep);
-  const currentStep = Number.isInteger(rawCurrentStep) ? Math.min(10, Math.max(1, rawCurrentStep)) : 1;
-  const completedAt = typeof source.completedAt === 'string' && source.completedAt.trim()
-    ? source.completedAt
-    : null;
-  return { currentStep, completedSteps, skippedSteps, completedAt };
+  const currentStep = fullyComplete ? 10 : Number.isInteger(rawCurrentStep)
+    ? Math.min(10, Math.max(1, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 6 : rawCurrentStep))
+    : 1;
+  return { currentStep, completedSteps, skippedSteps, completedAt: fullyComplete ? rawCompletedAt : null };
 }
-
 function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(value + 'T00:00:00.000Z');
