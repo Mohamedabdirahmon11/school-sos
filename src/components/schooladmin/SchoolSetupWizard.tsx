@@ -96,7 +96,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
       const savedTerms = canonicalSemesters.length ? canonicalSemesters : (Array.isArray(incoming.terms) ? incoming.terms : []);
       const normalizedSemesters = DEFAULT_DATA.terms.map((fallback, index) => {
         const matched = savedTerms.find((item: any) => item.name === fallback.name) || savedTerms[index] || {};
-        return { name: fallback.name, startDate: matched.startDate || matched.start_date || '', endDate: matched.endDate || matched.end_date || '' };
+        const startDate = 'startDate' in matched ? matched.startDate : ('start_date' in matched ? matched.start_date : '');
+        const endDate = 'endDate' in matched ? matched.endDate : ('end_date' in matched ? matched.end_date : '');
+        return { name: fallback.name, startDate, endDate };
       });
       setData({
         ...DEFAULT_DATA, ...incoming,
@@ -112,7 +114,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
       });
       setSaved(incoming.completedSteps || []);
       setStep(Math.min(5, Math.max(1, result.progress?.currentStep || 1)));
-      if ((incoming.completedSteps || []).length >= 5 || result.progress?.completed) {
+      if ((incoming.completedSteps || []).length >= 5 || Boolean(result.progress?.completedAt)) {
         setShowChecklist(true);
         void loadChecklist(incoming.completedSteps || []);
       }
