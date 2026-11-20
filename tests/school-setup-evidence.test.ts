@@ -28,8 +28,8 @@ test('school settings are flushed before the onboarding form receives success', 
 test('frontend and backend dashboard access require the complete ten-step setup record', () => {
   assert.ok(app.includes('!isSchoolSetupProgressComplete(school?.setupProgress)'));
   assert.ok(api.includes('!isSchoolSetupProgressComplete(school.setupProgress)'));
-  assert.ok(setupNavigation.includes('const required = [1, 2, 3, 4, 5, 6, 8, 10]'));
-  assert.ok(setupNavigation.includes('[7, 9].every(step => completed.has(step) || skipped.has(step))'));
+  assert.ok(setupNavigation.includes('const required = [1, 2, 3, 4, 5, 6, 7, 8, 10]'));
+  assert.ok(setupNavigation.includes('[9].every(step => completed.has(step) || skipped.has(step))'));
 });
 
 test('the legacy five-section setup endpoint never writes a dashboard completion timestamp', () => {
