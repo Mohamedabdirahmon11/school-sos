@@ -79,9 +79,10 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     /does not have enough capacity/
   );
   const confirmed = await db.confirmYearEndPromotions(school.id, source.id, 2, payload, 'admin-1', sourceAcademicYearId, targetAcademicYearId);
-  assert.equal(confirmed.length, 4);
-  assert.equal(confirmed[2].yearlyPercentage, 60);
-  assert.match(confirmed[2].notes || '', /^ADMIN OVERRIDE:/);
+  assert.equal(confirmed.promotions.length, 4);
+  assert.equal(confirmed.enrollmentCount, 4);
+  assert.equal(confirmed.promotions[2].yearlyPercentage, 60);
+  assert.match(confirmed.promotions[2].notes || '', /^ADMIN OVERRIDE:/);
   await db.flush();
   assert.deepEqual((await db.getStudents(school.id, target.id)).map(student => student.id).sort(), [students[0].id, students[1].id, students[2].id].sort());
   assert.equal(memory.rows('promotions').length, 4);
