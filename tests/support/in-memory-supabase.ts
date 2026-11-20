@@ -200,6 +200,7 @@ export class InMemorySupabase {
         joined_at: now
       }));
       this.rows('enrollments').push(...enrollmentRows);
+      this.rows('audit_logs').push({ id: `audit-test-${Date.now()}`, school_id: args.p_school_id, actor_id: args.p_actor_id, action: 'YEAR_END_PROMOTION_CONFIRMED', entity_type: 'promotion_batch', entity_id: args.p_class_id, created_at: now });
       return { data: { promotions: created, enrollmentCount: enrollmentRows.length }, error: null };
     }
     if (name === 'schoolos_sync_student_guardian') {
