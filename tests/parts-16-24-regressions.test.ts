@@ -26,7 +26,7 @@ test('finance, payroll, admissions, inventory, grades and reports enforce staff 
 
 test('year-end promotion uses one database transaction and maps the history schema correctly', () => {
   const storage = read('../src/server/storage.ts');
-  const migration = read('../supabase/schema.sql');
+  const migration = read('../supabase/migrations/20261119164000_atomic_student_promotion_and_enrollment.sql');
   assert.match(storage, /rpc\('schoolos_confirm_promotions_with_enrollments'/);
   assert.match(storage, /promotion_history.*classFromId|classFromId.*promotion_history/);
   assert.match(migration, /FOR UPDATE/);
