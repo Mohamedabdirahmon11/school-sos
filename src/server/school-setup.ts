@@ -105,7 +105,7 @@ export function sanitizeSchoolSetupProgressUpdate(body: unknown): SchoolSetupPro
   const completedSteps = parseSteps(source.completedSteps, 'Completed steps');
   const skippedSteps = parseSteps(source.skippedSteps, 'Skipped steps');
   if (skippedSteps.some(id => !OPTIONAL_SCHOOL_SETUP_STEPS.includes(id as 9))) {
-    throw new Error('Only timetable and fees/modules may be skipped.');
+    throw new Error('Only fees and extra modules may be skipped.');
   }
   return { currentStep, completedSteps, skippedSteps, complete: source.complete === true };
 }
@@ -120,8 +120,8 @@ export function applySchoolSetupProgressUpdate(
   if (update.completedSteps.some(id => update.skippedSteps.includes(id))) {
     throw new Error('A setup step cannot be both completed and skipped.');
   }
-  if (update.skippedSteps.some(id => !OPTIONAL_SCHOOL_SETUP_STEPS.includes(id as 7 | 9))) {
-    throw new Error('Only timetable and fees/modules may be skipped.');
+  if (update.skippedSteps.some(id => !OPTIONAL_SCHOOL_SETUP_STEPS.includes(id as 9))) {
+    throw new Error('Only fees and extra modules may be skipped.');
   }
   for (const id of update.completedSteps) {
     if (!checklist[id]?.ready) {
