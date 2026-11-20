@@ -13,7 +13,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { db } from './storage.ts';
 import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
-import { createPdf, PdfPageInput } from './pdf.ts';
+import { createPdf, type PdfImageAsset, type PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
 import { User, UserRole, School, SchoolClass, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
@@ -49,6 +49,7 @@ import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/sub
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
+import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
@@ -58,6 +59,33 @@ import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/te
 import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
 
 export const apiRouter = Router();
+async function getSchoolLogoPdfImage(school: School, storageClient: any): Promise<PdfImageAsset | undefined> {
+  const logoUrl = typeof school.logoUrl === 'string' ? school.logoUrl.trim() : '';
+  if (!logoUrl || !supabaseUrl) return undefined;
+  let objectPath = '';
+  try {
+    const parsed = new URL(logoUrl);
+    if (parsed.origin !== new URL(supabaseUrl).origin) return undefined;
+    const marker = `/storage/v1/object/public/${SCHOOL_LOGO_BUCKET}/`;
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return undefined;
+    objectPath = decodeURIComponent(parsed.pathname.slice(markerIndex + marker.length));
+  } catch {
+    return undefined;
+  }
+  if (!objectPath.startsWith(`${school.id}/`) || objectPath.split('/').some(part => part === '.' || part === '..')) return undefined;
+  const { data, error } = await storageClient.storage.from(SCHOOL_LOGO_BUCKET).download(objectPath);
+  if (error || !data) return undefined;
+  const bytes = Buffer.from(await data.arrayBuffer());
+  const image = detectSchoolLogoImage(bytes, data.type);
+  if (!image || image.extension === 'webp') return undefined;
+  return {
+    dataUrl: `data:${image.contentType};base64,${bytes.toString('base64')}`,
+    x: 500, y: 755, width: 48, height: 48
+  };
+}
+
+
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
@@ -2056,7 +2084,7 @@ apiRouter.post('/superadmin/schools', requireAuth, requireSuperAdmin, async (req
     whatsappPhone: typeof whatsappPhone === 'string' && whatsappPhone.trim() ? whatsappPhone.trim() : undefined,
     email: String(email).trim().toLowerCase(),
     brandColor: brandColor || '#0F766E',
-    currency: ['ETB', 'USD', 'SOS'].includes(String(body.currency)) ? body.currency : 'ETB',
+    currency: ['ETB', 'USD', 'SOS', 'KES', 'DJF', 'AED', 'SAR', 'EUR', 'GBP'].includes(String(body.currency)) ? body.currency : 'ETB',
     language: 'en',
     timezone: 'Africa/Addis_Ababa',
     academicYear: settings.academicYearName || '2026-2027',
@@ -2851,7 +2879,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
   }
   try {
     const school = (req as any).school as School;
-    if (role === 'school_admin' && !school.setupProgress?.completedAt) {
+    if (role === 'school_admin' && !isSchoolSetupProgressComplete(school.setupProgress)) {
       res.status(423).json({
         error: 'Complete the first-time school setup before opening the dashboard.',
         code: 'SCHOOL_SETUP_REQUIRED'
@@ -3362,29 +3390,136 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   }
 });
 
+apiRouter.post('/class-groups/:id/status', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req,res) => {
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ if(typeof req.body?.isActive!=='boolean'){res.status(400).json({error:'Dooro in fasalka la hawlgeliyo ama la joojiyo.'});return;}
+ const {error}=await classGroupsClient().rpc('schoolos_set_class_group_active',{
+   p_school_id:school.id,p_group_id:req.params.id,p_is_active:req.body.isActive
+ });
+ if(error){res.status(404).json({error:error.message||'Xaaladda fasalka lama beddeli karin.'});return;}
+ db.logAudit({action:req.body.isActive?'CLASS_GROUP_ACTIVATED':'CLASS_GROUP_DEACTIVATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:(req.body.isActive?'Activated':'Deactivated')+' class group '+req.params.id+'.',severity:req.body.isActive?'info':'warning'});
+ res.json({success:true,isActive:req.body.isActive});
+});
+
+apiRouter.post('/class-groups/reorder', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req,res) => {
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ const ids=Array.isArray(req.body?.orderedIds)?req.body.orderedIds.map((value:unknown)=>String(value)):[];
+ const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ if(ids.length>500||ids.some((id:string)=>!uuidPattern.test(id))||new Set(ids).size!==ids.length){
+   res.status(400).json({error:'Liiska kala horreynta fasalladu sax ma aha.'});return;
+ }
+ const {error}=await classGroupsClient().rpc('schoolos_reorder_class_groups',{p_school_id:school.id,p_ordered_ids:ids});
+ if(error){res.status(409).json({error:error.message||'Kala horreynta fasallada lama kaydin karin.'});return;}
+ db.logAudit({action:'CLASS_GROUPS_REORDERED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:'Reordered school class groups.',severity:'info'});
+ res.json({success:true});
+});
+
 apiRouter.get('/class-groups', requireAuth, requireSchoolContext, async (req,res) => {
- const school=(req as any).school as School; const {data,error}=await classGroupsClient().from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('school_id',school.id).order('sort_order').order('name');
- if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;} res.json(data||[]);
+ const school=(req as any).school as School;
+ const client=classGroupsClient();
+ const {data:groups,error}=await client.from('class_groups')
+   .select('id,school_id,name,sort_order,is_active,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)')
+   .eq('school_id',school.id).order('sort_order').order('name');
+ if(error){res.status(500).json({error:'Fasallada lama soo qaadi karin.'});return;}
+ const sections=(groups||[]).flatMap((group:any)=>group.class_sections||[]);
+ const legacyIds=[...new Set(sections.map((section:any)=>section.legacy_class_id).filter(Boolean))];
+ const classRows=legacyIds.length
+   ? await client.from('classes').select('id,class_teacher_id,capacity,is_archived').eq('school_id',school.id).in('id',legacyIds)
+   : {data:[],error:null};
+ if(classRows.error){res.status(503).json({error:'Macallimiinta fasallada iyo awooddooda lama akhrin karin.'});return;}
+ const countEntries=await Promise.all(legacyIds.map(async (classId:string)=>{
+   const result=await client.from('students').select('id',{count:'exact',head:true})
+     .eq('school_id',school.id).eq('class_id',classId).eq('status','active');
+   return {classId,count:result.count||0,error:result.error};
+ }));
+ if(countEntries.some(item=>item.error)){res.status(503).json({error:'Tirada ardayda fasallada lama akhrin karin.'});return;}
+ const classById=new Map((classRows.data||[]).map((row:any)=>[row.id,row]));
+ const countById=new Map(countEntries.map(item=>[item.classId,item.count]));
+ res.json((groups||[]).map((group:any)=>({
+   ...group,
+   class_sections:(group.class_sections||[]).map((section:any)=>{
+     const legacy=(classById.get(section.legacy_class_id) as any)||{};
+     const capacity=Number(section.max_students||legacy.capacity||40);
+     const studentCount=Number(countById.get(section.legacy_class_id)||0);
+     return {...section,class_teacher_id:legacy.class_teacher_id||null,capacity,is_active:legacy.is_archived!==true,student_count:studentCount,available_seats:Math.max(0,capacity-studentCount)};
+   })
+ })));
 });
 apiRouter.post('/class-groups', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School; const name=typeof req.body?.name==='string'?req.body.name.trim():''; const sections=Array.isArray(req.body?.sections)?req.body.sections:[];
  if(!name||name.length>120||sections.some((s:unknown)=>typeof s!=='string'||!String(s).trim()||String(s).trim().length>80)){res.status(400).json({error:'Geli magaca fasalka iyo qaybaha saxda ah.'});return;}
- const client=classGroupsClient(); const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:Number(req.body?.sortOrder)||0}).select().single();
+ const client=classGroupsClient();
+ const {data:latestOrder}=await client.from('class_groups').select('sort_order').eq('school_id',school.id).order('sort_order',{ascending:false}).limit(1);
+ const requestedOrder=Number(req.body?.sortOrder);
+ const sortOrder=Number.isInteger(requestedOrder)&&requestedOrder>=0?requestedOrder:(Number(latestOrder?.[0]?.sort_order||0)+100);
+ const {data:group,error}=await client.from('class_groups').insert({school_id:school.id,name,sort_order:sortOrder}).select().single();
  if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Fasalkan horay ayuu u jiray.':'Fasalka lama kaydin.'});return;}
  const unique: string[] = Array.from(new Set<string>((sections as unknown[]).map(value => String(value).trim()).filter(value => value.length > 0)));
- if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
- const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id)').eq('id',group.id).single();res.status(201).json(data);
+ if(unique.length){const {error:e}=await client.from('class_sections').insert(unique.map((name:string,sort_order:number)=>({school_id:school.id,class_id:group.id,name,sort_order,max_students:school.defaultClassCapacity||40})));if(e){await client.from('class_groups').delete().eq('id',group.id).eq('school_id',school.id);res.status(400).json({error:'Qaybaha fasalka lama kaydin; hubi magacyada.'});return;}}
+ const {data}=await client.from('class_groups').select('id,school_id,name,sort_order,class_sections!class_sections_class_school_fkey(id,name,sort_order,legacy_class_id,max_students)').eq('id',group.id).single();res.status(201).json(data);
 });
 apiRouter.put('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
- const {data,error}=await classGroupsClient().from('class_groups').update({name,updated_at:new Date().toISOString()}).eq('id',req.params.id).eq('school_id',school.id).select().maybeSingle();
- if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Magacan fasal kale ayaa leh.':'Fasalka lama beddeli karin.'});return;}if(!data){res.status(404).json({error:'Fasalka lama helin.'});return;}res.json(data);
+ const school=(req as any).school as School;
+ const updates:any={updated_at:new Date().toISOString()};
+ if(typeof req.body?.name==='string'){
+   const name=req.body.name.trim();
+   if(!name||name.length>120){res.status(400).json({error:'Magaca fasalku waa inuu ahaadaa 1 ilaa 120 xaraf.'});return;}
+   updates.name=name;
+ }
+ if(req.body?.sortOrder!==undefined){
+   const sortOrder=Number(req.body.sortOrder);
+   if(!Number.isInteger(sortOrder)||sortOrder<0||sortOrder>100000){res.status(400).json({error:'Kala horreynta fasalku sax ma aha.'});return;}
+   updates.sort_order=sortOrder;
+ }
+ if(Object.keys(updates).length===1){res.status(400).json({error:'Magac ama kala horreyn cusub geli.'});return;}
+ const {data,error}=await classGroupsClient().from('class_groups').update(updates).eq('id',req.params.id).eq('school_id',school.id).select().maybeSingle();
+ if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Magacan fasal kale ayaa leh.':'Fasalka lama beddeli karin.'});return;}
+ if(!data){res.status(404).json({error:'Fasalka lama helin.'});return;}res.json(data);
 });
 apiRouter.post('/class-groups/:id/sections', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const name=typeof req.body?.name==='string'?req.body.name.trim():'';if(!name||name.length>80){res.status(400).json({error:'Magaca qaybtu waa inuu ahaadaa 1 ilaa 80 xaraf.'});return;}
  const client=classGroupsClient();const {data:group}=await client.from('class_groups').select('id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();if(!group){res.status(404).json({error:'Fasalka lama helin.'});return;}
- const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
+ const {data,error}=await client.from('class_sections').insert({school_id:school.id,class_id:group.id,name,max_students:school.defaultClassCapacity||40}).select().single();if(error){res.status(error.code==='23505'?409:500).json({error:error.code==='23505'?'Qaybtan horay ayay fasalkan uga jirtay.':'Qaybta lama kaydin.'});return;}res.status(201).json(data);
 });
+apiRouter.put('/class-sections/:id/configuration', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School;
+ const user=(req as any).user as User;
+ const client=classGroupsClient();
+ const name=typeof req.body?.name==='string'?req.body.name.trim():'';
+ const maxStudents=Number(req.body?.maxStudents);
+ const teacherId=req.body?.teacherId ? String(req.body.teacherId) : null;
+ if(!name||name.length>80||!Number.isInteger(maxStudents)||maxStudents<1||maxStudents>1000){
+   res.status(400).json({error:'Geli magaca qaybta iyo awood u dhexeysa 1 ilaa 1000 arday.'});return;
+ }
+ const {data:section}=await client.from('class_sections').select('id,legacy_class_id')
+   .eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section){res.status(404).json({error:'Qaybta lagama helin dugsigan.'});return;}
+ const {data,error}=await client.rpc('schoolos_update_class_section_config',{
+   p_school_id:school.id,p_section_id:section.id,p_name:name,p_max_students:maxStudents,p_teacher_user_id:teacherId
+ });
+ if(error){
+   const message=error.message||'Qaybta lama cusboonaysiin karin.';
+   res.status(/capacity|enrollment/i.test(message)?409:400).json({error:message});return;
+ }
+ db.logAudit({action:'CLASS_SECTION_CONFIG_UPDATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:'Updated section '+name+' capacity and Form Teacher.',severity:'info'});
+ res.json(data);
+});
+
+apiRouter.put('/class-sections/:id/active', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
+ const school=(req as any).school as School; const user=(req as any).user as User;
+ const isActive=req.body?.isActive;
+ if(typeof isActive!=='boolean'){res.status(400).json({error:'Choose whether the section is active.'});return;}
+ const client=classGroupsClient();
+ const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
+ if(!section?.legacy_class_id){res.status(404).json({error:'Section is not connected to a school class.'});return;}
+ const {error}=await client.from('classes').update({is_archived:!isActive}).eq('id',section.legacy_class_id).eq('school_id',school.id);
+ if(error){res.status(400).json({error:'Section status could not be updated.'});return;}
+ db.logAudit({action:isActive?'CLASS_SECTION_ACTIVATED':'CLASS_SECTION_DEACTIVATED',category:'school',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:(isActive?'Activated':'Deactivated')+' section '+req.params.id+'.',severity:'warning'});
+ res.json({success:true,isActive});
+});
+
 apiRouter.delete('/class-sections/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
  const school=(req as any).school as School;const client=classGroupsClient();
  const {data:section}=await client.from('class_sections').select('id,legacy_class_id').eq('id',req.params.id).eq('school_id',school.id).maybeSingle();
@@ -3424,11 +3559,39 @@ apiRouter.delete('/class-groups/:id', requireAuth, requireSchoolAdminOrSuperAdmi
  } catch { res.status(500).json({error:'Xogta ku xiran fasalka lama hubin karin. Isku day mar kale.'}); }
 });
 apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async(req,res)=>{
- const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8'];
+ const school=(req as any).school as School;const client=classGroupsClient();const defaults=['KG 1','KG 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
  const {data:existing,error:readError}=await client.from('class_groups').select('name').eq('school_id',school.id);if(readError){res.status(500).json({error:'Fasallada lama hubin karin.'});return;}
  const names=new Set((existing||[]).map((r:any)=>String(r.name).trim().toLowerCase()));const missing=defaults.filter(n=>!names.has(n.toLowerCase()));if(!missing.length){res.json({created:0,skipped:defaults.length});return;}
- const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
+ const {error}=await client.from('class_groups').insert(missing.map(name=>({school_id:school.id,name,sort_order:defaults.indexOf(name)*100})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
+apiRouter.get('/subject-catalog', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data, error } = await client.from('subject_catalog')
+    .select('id,name,code,description,sort_order').eq('is_active', true)
+    .order('sort_order').order('name');
+  if (error) { res.status(503).json({ error: 'The shared subject catalog could not be loaded.' }); return; }
+  res.json(data || []);
+});
+
+apiRouter.post('/subjects/catalog-selection', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const ids = Array.isArray(req.body?.catalogIds) ? req.body.catalogIds.map((value: unknown) => String(value)) : [];
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!ids.length || ids.length > 100 || ids.some((id: string) => !uuidPattern.test(id)) || new Set(ids).size !== ids.length) {
+    res.status(400).json({ error: 'Select between 1 and 100 valid, unique catalog subjects.' }); return;
+  }
+  const { data, error } = await client.rpc('schoolos_select_subject_catalog', {
+    p_school_id: school.id, p_catalog_ids: ids
+  });
+  if (error) { res.status(400).json({ error: error.message || 'Catalog subjects could not be added to this school.' }); return; }
+  auditAcademicSetup(school, user, 'SCHOOL_SUBJECTS_SELECTED', 'Selected shared catalog subjects for the school.');
+  res.json(data || { createdCount: 0, linkedCount: 0, skippedCount: 0 });
+});
+
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
@@ -4971,15 +5134,297 @@ apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmi
   }).send(pdf);
 });
 
+const isAcademicSetupDate = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + 'T00:00:00.000Z');
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+const canonicalSemesterName = (name: string) => name === 'Term 1' ? 'Semester 1' : name === 'Term 2' ? 'Semester 2' : name;
+const legacySemesterName = (name: string) => name === 'Semester 1' ? 'Term 1' : name === 'Semester 2' ? 'Term 2' : name;
+
+const auditAcademicSetup = (school: School, user: User, action: string, details: string, severity: 'info' | 'warning' = 'info') => {
+  db.logAudit({
+    action, category: 'school', schoolId: school.id, schoolName: school.name,
+    userId: user.id, userName: user.fullName, userRole: user.role, details, severity
+  });
+};
+
 apiRouter.get('/students/academic-years', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const client = documentServiceClient(res);
   if (!client) return;
   const { data, error } = await client.from('academic_years')
-    .select('id,name,is_current,start_date,end_date').eq('school_id', school.id)
-    .order('start_date', { ascending: false }).limit(50);
+    .select('id,name,is_current,start_date,end_date,status,closed_at,closed_by,created_at,updated_at')
+    .eq('school_id', school.id).order('start_date', { ascending: false }).limit(50);
   if (error) { res.status(503).json({ error: 'Academic years could not be loaded.' }); return; }
   res.json(data || []);
+});
+
+apiRouter.post('/academic-years', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+    res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
+  }
+  const { data, error } = await client.from('academic_years').insert({
+    school_id: school.id, name, start_date: startDate, end_date: endDate,
+    is_current: false, status: 'draft'
+  }).select('id,name,is_current,start_date,end_date,status,closed_at,created_at').single();
+  if (error) {
+    res.status(error.code === '23505' ? 409 : 400).json({
+      error: error.code === '23P01' || /overlap/i.test(error.message || '')
+        ? 'Academic year dates overlap another year for this school.'
+        : error.code === '23505' ? 'This academic year already exists.' : 'Academic year could not be created.'
+    }); return;
+  }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_CREATED', 'Created academic year ' + name + '.', 'info');
+  res.status(201).json(data);
+});
+
+apiRouter.put('/academic-years/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: current, error: readError } = await client.from('academic_years')
+    .select('id,name,status').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
+  if (readError || !current) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (current.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  if (!name || name.length > 40 || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate) {
+    res.status(400).json({ error: 'Enter an academic year name and valid start/end dates.' }); return;
+  }
+  const { data, error } = await client.from('academic_years').update({
+    name, start_date: startDate, end_date: endDate, updated_at: new Date().toISOString()
+  }).eq('id', req.params.id).eq('school_id', school.id)
+    .select('id,name,is_current,start_date,end_date,status,closed_at,updated_at').maybeSingle();
+  if (error || !data) { res.status(error?.code === '23505' ? 409 : 400).json({ error: /overlap/i.test(error?.message || '') ? 'Academic year dates overlap another year.' : 'Academic year could not be updated.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_UPDATED', 'Updated academic year ' + name + '.', 'info');
+  res.json(data);
+});
+
+apiRouter.post('/academic-years/:id/activate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_activate_academic_year', {
+    p_school_id: school.id, p_year_id: req.params.id, p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Academic year could not be activated.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_ACTIVATED', 'Activated academic year ' + req.params.id + '.');
+  const { data } = await client.from('academic_years').select('id,name,is_current,start_date,end_date,status,closed_at')
+    .eq('id', req.params.id).eq('school_id', school.id).single();
+  res.json(data);
+});
+
+apiRouter.post('/academic-years/:id/close', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_close_academic_year', {
+    p_school_id: school.id, p_year_id: req.params.id, p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Academic year could not be closed.' }); return; }
+  auditAcademicSetup(school, user, 'ACADEMIC_YEAR_CLOSED', 'Closed academic year ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
+});
+
+apiRouter.get('/academic-years/:yearId/semesters', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
+  const school = (req as any).school as School;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: year, error: yearError } = await client.from('academic_years').select('id')
+    .eq('id', req.params.yearId).eq('school_id', school.id).maybeSingle();
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  const [terms, statuses, exams] = await Promise.all([
+    client.from('terms').select('id,school_id,academic_year_id,name,start_date,end_date,is_current,created_at,updated_at')
+      .eq('school_id', school.id).eq('academic_year_id', req.params.yearId).order('start_date'),
+    client.from('term_status').select('term_id,status,closed_at,closed_by,updated_at').eq('school_id', school.id),
+    client.from('exam_periods').select('id,term_id,name,start_date,end_date,status,results_publish_date,published_at')
+      .eq('school_id', school.id)
+  ]);
+  if (terms.error || statuses.error || exams.error) { res.status(503).json({ error: 'Semester details could not be loaded.' }); return; }
+  const statusById = new Map((statuses.data || []).map((row: any) => [row.term_id, row]));
+  const examByTerm = new Map((exams.data || []).map((row: any) => [row.term_id, row]));
+  res.json((terms.data || []).map((term: any) => ({
+    ...term,
+    name: canonicalSemesterName(term.name),
+    status: (statusById.get(term.id) as any)?.status || 'open',
+    closedAt: (statusById.get(term.id) as any)?.closed_at || null,
+    examPeriod: examByTerm.get(term.id) || null
+  })));
+});
+
+apiRouter.post('/academic-years/:yearId/semesters', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: year, error: yearError } = await client.from('academic_years')
+    .select('id,start_date,end_date,status').eq('id', req.params.yearId).eq('school_id', school.id).maybeSingle();
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (year.status === 'closed') { res.status(409).json({ error: 'Closed academic years cannot receive new semesters.' }); return; }
+  const name = req.body?.name === 'Semester 1' || req.body?.name === 'Semester 2' ? req.body.name : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  const examStartDate = req.body?.examStartDate;
+  const examEndDate = req.body?.examEndDate;
+  const resultsPublishDate = req.body?.resultsPublishDate;
+  if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
+      startDate < year.start_date || endDate > year.end_date ||
+      ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
+      (resultsPublishDate && (!isAcademicSetupDate(resultsPublishDate) || !examEndDate || resultsPublishDate < examEndDate))) {
+    res.status(400).json({ error: 'Enter valid Semester 1/2 dates within the academic year and a valid exam/result date range.' }); return;
+  }
+  const { data: existing, error: existingError } = await client.from('terms').select('id,name')
+    .eq('school_id', school.id).eq('academic_year_id', req.params.yearId);
+  if (existingError) { res.status(503).json({ error: 'Existing semesters could not be checked.' }); return; }
+  const aliases = [name, legacySemesterName(name)];
+  if ((existing || []).length >= 2 || (existing || []).some((row: any) => aliases.includes(row.name))) {
+    res.status(409).json({ error: 'An academic year can contain only Semester 1 and Semester 2, each once.' }); return;
+  }
+  const { data: term, error } = await client.from('terms').insert({
+    school_id: school.id, academic_year_id: req.params.yearId, name,
+    start_date: startDate, end_date: endDate, is_current: false
+  }).select('id,school_id,academic_year_id,name,start_date,end_date,is_current').single();
+  if (error || !term) { res.status(error?.code === '23505' ? 409 : 400).json({ error: /overlap/i.test(error?.message || '') ? 'Semester dates overlap another semester.' : 'Semester could not be created.' }); return; }
+  let examPeriod: any = null;
+  if (examStartDate && examEndDate) {
+    const result = await client.from('exam_periods').insert({
+      school_id: school.id, term_id: term.id, name: name + ' Examination',
+      start_date: examStartDate, end_date: examEndDate, results_publish_date: resultsPublishDate || null,
+      status: 'draft', created_by: user.id
+    }).select('id,term_id,name,start_date,end_date,status,results_publish_date,published_at').single();
+    if (result.error) {
+      await client.from('terms').delete().eq('id', term.id).eq('school_id', school.id);
+      res.status(400).json({ error: 'Semester exam dates could not be saved.' }); return;
+    }
+    examPeriod = result.data;
+  }
+  const { error: statusError } = await client.from('term_status').upsert({
+    school_id: school.id, term_id: term.id, status: 'open', updated_at: new Date().toISOString()
+  }, { onConflict: 'school_id,term_id' });
+  if (statusError) {
+    await client.from('terms').delete().eq('id', term.id).eq('school_id', school.id);
+    res.status(503).json({ error: 'Semester status could not be initialized.' }); return;
+  }
+  const calendarSync = await client.rpc('schoolos_sync_school_semester_dates', {
+    p_school_id: school.id, p_year_id: req.params.yearId
+  });
+  if (calendarSync.error) { res.status(503).json({ error: 'Semester was saved, but school calendar settings could not be synchronized.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_CREATED', 'Created ' + name + ' in academic year ' + req.params.yearId + '.');
+  res.status(201).json({ ...term, status: 'open', examPeriod });
+});
+
+apiRouter.put('/semesters/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: term, error: termError } = await client.from('terms')
+    .select('id,academic_year_id,name,start_date,end_date').eq('id', req.params.id).eq('school_id', school.id).maybeSingle();
+  if (termError || !term) { res.status(404).json({ error: 'Semester was not found.' }); return; }
+  const { data: year, error: yearError } = await client.from('academic_years').select('status,start_date,end_date')
+    .eq('id', term.academic_year_id).eq('school_id', school.id).maybeSingle();
+  if (yearError || !year) { res.status(404).json({ error: 'Academic year was not found.' }); return; }
+  if (year.status === 'closed') { res.status(409).json({ error: 'Closed academic years are read-only.' }); return; }
+  const { data: existingExam } = await client.from('exam_periods').select('id,status')
+    .eq('school_id', school.id).eq('term_id', term.id).maybeSingle();
+  if (existingExam?.status === 'published') {
+    res.status(409).json({ error: 'This semester has a published examination period. Its dates and results publication schedule are locked.' }); return;
+  }
+  const name = req.body?.name === 'Semester 1' || req.body?.name === 'Semester 2' ? req.body.name : '';
+  const startDate = req.body?.startDate;
+  const endDate = req.body?.endDate;
+  const examStartDate = req.body?.examStartDate;
+  const examEndDate = req.body?.examEndDate;
+  const resultsPublishDate = req.body?.resultsPublishDate;
+  if (!name || !isAcademicSetupDate(startDate) || !isAcademicSetupDate(endDate) || startDate >= endDate ||
+      startDate < year.start_date || endDate > year.end_date ||
+      ((examStartDate || examEndDate) && (!isAcademicSetupDate(examStartDate) || !isAcademicSetupDate(examEndDate) || examStartDate >= examEndDate || examStartDate < startDate || examEndDate > endDate)) ||
+      (resultsPublishDate && (!examStartDate || !examEndDate || !isAcademicSetupDate(resultsPublishDate) || resultsPublishDate < examEndDate))) {
+    res.status(400).json({ error: 'Enter valid semester dates, examination dates and result publication date.' }); return;
+  }
+  const { data: duplicate } = await client.from('terms').select('id').eq('school_id', school.id)
+    .eq('academic_year_id', term.academic_year_id).in('name', [name, legacySemesterName(name)]).neq('id', term.id).maybeSingle();
+  if (duplicate) { res.status(409).json({ error: 'This semester already exists in the academic year.' }); return; }
+  const { data, error } = await client.from('terms').update({
+    name, start_date: startDate, end_date: endDate, updated_at: new Date().toISOString()
+  }).eq('id', term.id).eq('school_id', school.id)
+    .select('id,school_id,academic_year_id,name,start_date,end_date,is_current').single();
+  if (error || !data) { res.status(400).json({ error: /overlap/i.test(error?.message || '') ? 'Semester dates overlap another semester.' : 'Semester could not be updated.' }); return; }
+  let examPeriod: any = null;
+  if (examStartDate && examEndDate) {
+    const values = {
+      name: name + ' Examination', start_date: examStartDate, end_date: examEndDate,
+      results_publish_date: resultsPublishDate || null, updated_at: new Date().toISOString()
+    };
+    const savedExam = existingExam
+      ? await client.from('exam_periods').update(values).eq('id', existingExam.id).eq('school_id', school.id).select().single()
+      : await client.from('exam_periods').insert({
+          ...values, school_id: school.id, term_id: term.id, status: 'draft', created_by: user.id
+        }).select().single();
+    if (savedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but exam dates could not be updated.' }); return; }
+    examPeriod = savedExam.data;
+  } else if (existingExam) {
+    const removedExam = await client.from('exam_periods').delete().eq('id', existingExam.id).eq('school_id', school.id);
+    if (removedExam.error) { res.status(400).json({ error: 'Semester dates were saved, but the previous exam period could not be removed.' }); return; }
+  }
+  const calendarSync = await client.rpc('schoolos_sync_school_semester_dates', {
+    p_school_id: school.id, p_year_id: term.academic_year_id
+  });
+  if (calendarSync.error) { res.status(503).json({ error: 'Semester was saved, but school calendar settings could not be synchronized.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_UPDATED', 'Updated ' + name + ' in academic year ' + term.academic_year_id + '.');
+  res.json({ ...data, examPeriod });
+});
+
+apiRouter.post('/semesters/:id/activate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'open', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be activated.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_ACTIVATED', 'Activated semester ' + req.params.id + '.');
+  res.json({ success: true });
+});
+
+apiRouter.post('/semesters/:id/close', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'closed', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be closed.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_CLOSED', 'Closed semester ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
+});
+
+apiRouter.post('/semesters/:id/reopen', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { error } = await client.rpc('schoolos_set_semester_status', {
+    p_school_id: school.id, p_term_id: req.params.id, p_status: 'open', p_actor_id: user.id
+  });
+  if (error) { res.status(409).json({ error: error.message || 'Semester could not be reopened.' }); return; }
+  auditAcademicSetup(school, user, 'SEMESTER_REOPENED', 'Reopened semester ' + req.params.id + '.', 'warning');
+  res.json({ success: true });
 });
 
 apiRouter.get('/students/:id/guardians', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
@@ -7173,13 +7618,19 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { classId } = req.query;
-  if (!classId || typeof classId !== 'string') {
-    res.status(400).json({ error: 'classId is required.' });
+  const { classId, sourceAcademicYearId } = req.query;
+  if (!classId || typeof classId !== 'string' || typeof sourceAcademicYearId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sourceAcademicYearId)) {
+    res.status(400).json({ error: 'classId and a valid sourceAcademicYearId are required.' });
     return;
   }
   if (!await canReadClassResults(req, res, classId)) return;
-  res.json(await db.getClassYearlyRankings(school.id, classId));
+  const client = documentServiceClient(res);
+  if (!client) return;
+  const { data: sourceYear, error } = await client.from('academic_years').select('id,name,status').eq('id', sourceAcademicYearId).eq('school_id', school.id).maybeSingle();
+  if (error || !sourceYear || sourceYear.status !== 'active') { res.status(400).json({ error: 'Choose the active academic year for this school.' }); return; }
+  const sourceClass = await db.getClassById(classId, school.id);
+  if (!sourceClass || sourceClass.academicYear !== sourceYear.name) { res.status(400).json({ error: 'The selected class does not belong to the source academic year.' }); return; }
+  res.json(await db.getClassYearlyRankings(school.id, classId, sourceYear.name));
 });
 
 // Year-End Promotion Confirmation
@@ -7191,38 +7642,14 @@ apiRouter.get('/promotions/history', requireAuth, requireSchoolContext, requireS
 apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const { promotions, classId, topN = 3 } = req.body;
-
-  if (!Array.isArray(promotions) || typeof classId !== 'string') {
-    res.status(400).json({ error: 'classId and promotions array are required.' });
+  const { promotions, classId, topN = 3, sourceAcademicYearId, targetAcademicYearId } = req.body || {};
+  if (!Array.isArray(promotions) || typeof classId !== 'string' || !/^[0-9a-f-]{36}$/i.test(String(sourceAcademicYearId || '')) || !/^[0-9a-f-]{36}$/i.test(String(targetAcademicYearId || ''))) {
+    res.status(400).json({ error: 'classId, promotions, source academic year and target academic year are required.' });
     return;
   }
-
   try {
-    const confirmed = await db.confirmYearEndPromotions(school.id, classId, Number(topN), promotions, user.id);
-    const sourceAcademicYearId = typeof req.body?.sourceAcademicYearId === 'string' ? req.body.sourceAcademicYearId : '';
-    const targetAcademicYearId = typeof req.body?.targetAcademicYearId === 'string' ? req.body.targetAcademicYearId : '';
-    if (sourceAcademicYearId && targetAcademicYearId) {
-      if (!/^[0-9a-f-]{36}$/i.test(sourceAcademicYearId) || !/^[0-9a-f-]{36}$/i.test(targetAcademicYearId)) {
-        res.status(400).json({ error: 'Choose valid source and target academic years.' }); return;
-      }
-      const client = documentServiceClient(res);
-      if (!client) return;
-      const decisions = promotions.map((item: any) => ({
-        studentId: String(item.studentId || ''),
-        decision: item.decision,
-        targetClassId: item.decision === 'promoted' ? String(item.classToId || '') : classId
-      }));
-      const { data, error } = await client.rpc('schoolos_promote_enrollments', {
-        p_school_id: school.id, p_source_year: sourceAcademicYearId,
-        p_target_year: targetAcademicYearId, p_class_id: classId,
-        p_decisions: decisions, p_actor_id: user.id
-      });
-      if (error) { res.status(409).json({ error: error.message || 'Enrollment history could not be updated.' }); return; }
-      res.json({ success: true, count: confirmed.length, enrollmentCount: data });
-      return;
-    }
-    res.json({ success: true, count: confirmed.length });
+    const confirmed = await db.confirmYearEndPromotions(school.id, classId, Number(topN), promotions, user.id, sourceAcademicYearId, targetAcademicYearId);
+    res.json({ success: true, count: confirmed.promotions.length, enrollmentCount: confirmed.enrollmentCount });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Promotion confirmation failed.' });
   }
@@ -8027,17 +8454,21 @@ apiRouter.get('/student-invoices/:id/pdf', requireAuth, requireSchoolContext, as
   const [student,items]=await Promise.all([db.getStudentById(invoice.student_id,school.id),client.from('student_invoice_items').select('*').eq('school_id',school.id).eq('invoice_id',invoice.id)]);
   if(items.error){res.status(503).json({error:'Invoice items could not be loaded.'});return;}
   const klass=student?await db.getClassById(student.classId,school.id):null;
-  const pages:PdfPageInput[]=[[
-    school.name,school.address||'',school.phone||'','STUDENT INVOICE',
-    `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
-    `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
-    `Student ID: ${student?.studentId||invoice.student_id}`,`Class: ${klass?.name||''} ${klass?.section||''}`,`Billing period: ${invoice.billing_period}`,'',
-    ...(items.data||[]).map((line:any)=>`${line.description}  x${line.quantity}  ${formatMoney(Number(line.line_total),invoice.currency)}`),
-    '',`Subtotal: ${formatMoney(Number(invoice.subtotal),invoice.currency)}`,`Discount: ${formatMoney(Number(invoice.discount_amount),invoice.currency)}`,
-    `Total: ${formatMoney(Number(invoice.total_amount),invoice.currency)}`,`Paid: ${formatMoney(Number(invoice.amount_paid),invoice.currency)}`,
-    `Balance due: ${formatMoney(Number(invoice.balance_due),invoice.currency)}`,`Status: ${invoice.status}`,
-    ...(invoice.notes?[ '',invoice.notes]:[])
-  ]];
+  const logoImage = await getSchoolLogoPdfImage(school, client);
+  const pages:PdfPageInput[]=[{
+    lines:[
+      school.name,school.address||'',school.phone||'','STUDENT INVOICE',
+      `Invoice number: ${invoice.invoice_number}`,`Issue date: ${invoice.issue_date}`,`Due date: ${invoice.due_date}`,
+      `Student: ${student?[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' '):invoice.student_id}`,
+      `Student ID: ${student?.studentId||invoice.student_id}`,`Class: ${klass?.name||''} ${klass?.section||''}`,`Billing period: ${invoice.billing_period}`,'',
+      ...(items.data||[]).map((line:any)=>`${line.description}  x${line.quantity}  ${formatMoney(Number(line.line_total),invoice.currency)}`),
+      '',`Subtotal: ${formatMoney(Number(invoice.subtotal),invoice.currency)}`,`Discount: ${formatMoney(Number(invoice.discount_amount),invoice.currency)}`,
+      `Total: ${formatMoney(Number(invoice.total_amount),invoice.currency)}`,`Paid: ${formatMoney(Number(invoice.amount_paid),invoice.currency)}`,
+      `Balance due: ${formatMoney(Number(invoice.balance_due),invoice.currency)}`,`Status: ${invoice.status}`,
+      ...(invoice.notes?[ '',invoice.notes]:[])
+    ],
+    images: logoImage ? [logoImage] : []
+  }];
   sendPdf(res,`invoice-${invoice.invoice_number}`,pages);
 });
 
@@ -8136,16 +8567,22 @@ apiRouter.get('/fees/payments/:paymentId/receipt.pdf', requireAuth, requireSchoo
   const student = await db.getStudentById(payment.studentId, school.id);
   if (!student) { res.status(404).json({ error: 'Receipt student not found.' }); return; }
   const [klass, feeStructures] = await Promise.all([db.getClassById(student.classId, school.id), db.getFeeStructures(school.id)]);
+  const client = school.logoUrl ? studentInvoiceServiceClient(res) : null;
+  if (school.logoUrl && !client) return;
+  const logoImage = school.logoUrl && client ? await getSchoolLogoPdfImage(school, client) : null;
   const feeName = payment.feeStructureId ? feeStructures.find(item => item.id === payment.feeStructureId)?.name : undefined;
-  sendPdf(res, `receipt-${payment.receiptNumber}`, [[
-    school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
-    `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
-    `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
-    `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
-    `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
-    `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
-    ...(school.receiptFooter ? ['', school.receiptFooter] : [])
-  ]]);
+  sendPdf(res, `receipt-${payment.receiptNumber}`, [{
+    lines:[
+      school.receiptHeader || '', school.name, school.address || '', school.phone ? `Tel: ${school.phone}` : '', payment.voidedAt ? `VOIDED RECEIPT — ${payment.voidReason || 'No reason recorded'}` : 'OFFICIAL FEE RECEIPT',
+      `Receipt number: ${payment.receiptNumber}`, `Date: ${payment.date}`, `Student: ${student.firstName} ${student.lastName}`,
+      `Student ID: ${student.studentId}`, `Class: ${klass?.name || ''} ${klass?.section || ''}`, `Billing period: ${payment.month}`,
+      `Fee type: ${feeName || payment.feeType}`, `Amount due: ${formatMoney(payment.amountDue, school.currency)}`,
+      `Amount received: ${formatMoney(payment.amountPaid, school.currency)}`, `Balance: ${formatMoney(payment.remainingAmount, school.currency)}`,
+      `Payment channel: ${payment.paymentMethod}`, '', 'Cashier signature: ____________________', 'Official School Stamp: ____________________',
+      ...(school.receiptFooter ? ['', school.receiptFooter] : [])
+    ],
+    images: logoImage ? [logoImage] : []
+  }]);
 });
 
 // ==============================================================================
@@ -9204,6 +9641,8 @@ apiRouter.get('/school/transport', requireAuth, requireSchoolContext, requireSch
 async function getSchoolSetupState(school: School) {
   const [
     classes,
+    classGroups,
+    classSections,
     subjects,
     teachers,
     students,
@@ -9213,10 +9652,12 @@ async function getSchoolSetupState(school: School) {
     feeStructures
   ] = await Promise.all([
     queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
+    queryAllRows('class_groups', { school_id: school.id, is_active: 'true' }, 'id,name,is_active'),
+    queryAllRows('class_sections', { school_id: school.id }, 'id,class_id'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
     queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
-    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'and(father_phone.not.is.null,father_phone.neq.),and(mother_phone.not.is.null,mother_phone.neq.)', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
     db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
@@ -9226,8 +9667,11 @@ async function getSchoolSetupState(school: School) {
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
+  const sectionGroupIds = new Set(classSections.map((section: any) => String(section.classId || section.class_id || '')));
+  const groupedClassNames = classGroups.filter((group: any) => group.isActive !== false && sectionGroupIds.has(String(group.id))).map((group: any) => String(group.name || ''));
+  const legacyClassNames = classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || ''));
   const checklist = buildSchoolSetupChecklist(school, {
-    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    classNames: [...new Set([...groupedClassNames, ...legacyClassNames])],
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
@@ -9283,8 +9727,8 @@ apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requ
 
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
-  res.json({ data: current, school: { name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: school.setupProgress || { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } });
+  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, ...((school.setupData as any)?.schoolInformation || {}), name: school.name, address: school.address, city: school.city, phone: school.phone, email: school.email, whatsappPhone: school.whatsappPhone || '', schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
+  res.json({ data: current, school: { name: school.name, address: school.address, city: school.city, phone: school.phone, email: school.email, whatsappPhone: school.whatsappPhone || '', schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: normalizeSchoolSetupProgress(school.setupProgress) });
 });
 
 apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -9293,7 +9737,7 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (!Number.isInteger(step) || step < 1 || step > 5) { res.status(400).json({ error: 'Setup step must be between 1 and 5.' }); return; }
   const existing = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}) } as any;
   const completedBefore = Array.isArray(existing.completedSteps) ? existing.completedSteps : [];
-  if (step > 1 && !completedBefore.includes(step) && !completedBefore.includes(step - 1)) {
+  if (step > 1 && step !== 2 && !completedBefore.includes(step) && !completedBefore.includes(step - 1)) {
     res.status(409).json({ error: 'Complete the previous setup step before saving this step.' });
     return;
   }
@@ -9301,8 +9745,9 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (validationError) { res.status(400).json({ error: validationError }); return; }
   const submitted = req.body.data;
   const nextData: any = { ...existing, ...submitted, completedSteps: [...new Set([...(existing.completedSteps || []), step])].sort((a: number, b: number) => a - b), updatedAt: new Date().toISOString() };
-  const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
-  const progress = { currentStep: allDone ? 5 : Math.min(5, step + 1), completedSteps: allDone ? [1, 2, 3, 4, 5, 10] : nextData.completedSteps, skippedSteps: [], completedAt: allDone ? new Date().toISOString() : null };
+  const coreSetupCompleted = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
+  // The five profile sections are only the core form; the ten-step checklist alone can unlock the dashboard.
+  const progress = normalizeSchoolSetupProgress(school.setupProgress);
   const updates = buildSchoolSetupSchoolUpdates(step, nextData, school, progress);
   let updated: School | null;
   try {
@@ -9313,7 +9758,7 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   }
   if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
   try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
-  res.json({ data: nextData, progress, completed: allDone });
+  res.json({ data: nextData, progress, completed: isSchoolSetupProgressComplete(progress), coreSetupCompleted });
 });
 
 apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {

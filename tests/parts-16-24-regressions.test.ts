@@ -26,14 +26,19 @@ test('finance, payroll, admissions, inventory, grades and reports enforce staff 
 
 test('year-end promotion uses one database transaction and maps the history schema correctly', () => {
   const storage = read('../src/server/storage.ts');
-  const migration = read('../supabase/migrations/20261109112121_atomic_year_end_promotions_and_history.sql');
-  assert.match(storage, /rpc\('schoolos_confirm_year_end_promotions'/);
+  const migration = read('../supabase/migrations/20261119164000_atomic_student_promotion_and_enrollment.sql');
+  assert.match(storage, /rpc\('schoolos_confirm_promotions_with_enrollments'/);
   assert.match(storage, /promotion_history.*classFromId|classFromId.*promotion_history/);
   assert.match(migration, /FOR UPDATE/);
   assert.match(migration, /already been processed/);
   assert.match(migration, /INSERT INTO public\.promotions/);
   assert.match(migration, /INSERT INTO public\.promotion_history/);
-  assert.match(migration, /UPDATE public\.students/);
+  // Student/class/enrollment updates are delegated to the existing atomic enrollment RPC.
+  // This wrapper writes the promotion ledger in the same transaction instead of duplicating student updates.
+  assert.match(migration, /public\.schoolos_promote_enrollments\(/);
+  assert.match(migration, /^BEGIN;/m);
+  assert.match(migration, /^COMMIT;/m);
+  assert.doesNotMatch(migration, /UPDATE public\.students/);
   assert.match(migration, /REVOKE ALL ON FUNCTION/);
 });
 

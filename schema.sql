@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS schools (
   currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
   language VARCHAR(5) NOT NULL DEFAULT 'en',
   timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Addis_Ababa',
+  date_format VARCHAR(20) NOT NULL DEFAULT 'dd/MM/yyyy' CHECK (date_format IN ('dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd')),
   academic_year VARCHAR(50) NOT NULL DEFAULT '2026-2027',
   current_semester VARCHAR(50) NOT NULL DEFAULT 'Semester 1',
   setup_progress JSONB NOT NULL DEFAULT '{"currentStep": 1, "completedSteps": [], "skippedSteps": [], "completedAt": null}'::JSONB,
@@ -6819,3 +6820,984 @@ CREATE TRIGGER schoolos_structured_template_audit
 
 
 -- END: structured document templates
+
+-- BEGIN: School Setup Batch 1 canonical fresh-install schema.
+-- These statements mirror the source-backed migrations 20261119160000–20261119164000.
+-- Existing projects must apply the reviewed migrations, not this bootstrap snapshot.
+
+-- School Setup lifecycle: managed academic years, exactly two configured semesters,
+-- exam windows and result publication dates. Existing history is retained.
+
+ALTER TABLE public.academic_years
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'closed',
+  ADD COLUMN IF NOT EXISTS closed_at timestamptz,
+  ADD COLUMN IF NOT EXISTS closed_by varchar(64);
+
+UPDATE public.academic_years
+SET status = CASE WHEN is_current THEN 'active' ELSE 'closed' END
+WHERE status = 'closed' OR status IS NULL;
+
+ALTER TABLE public.academic_years
+  DROP CONSTRAINT IF EXISTS academic_years_status_check;
+ALTER TABLE public.academic_years
+  ADD CONSTRAINT academic_years_status_check
+  CHECK (status IN ('draft','active','closed')) NOT VALID;
+ALTER TABLE public.academic_years
+  VALIDATE CONSTRAINT academic_years_status_check;
+
+ALTER TABLE public.academic_years
+  DROP CONSTRAINT IF EXISTS academic_years_valid_dates_check;
+ALTER TABLE public.academic_years
+  ADD CONSTRAINT academic_years_valid_dates_check
+  CHECK (start_date <= end_date) NOT VALID;
+ALTER TABLE public.academic_years
+  VALIDATE CONSTRAINT academic_years_valid_dates_check;
+
+ALTER TABLE public.exam_periods
+  ADD COLUMN IF NOT EXISTS results_publish_date date;
+
+-- Serialize year changes per school and prevent overlapping academic-year ranges.
+CREATE OR REPLACE FUNCTION public.schoolos_guard_academic_year_dates()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.schools WHERE id = NEW.school_id FOR UPDATE;
+  IF NEW.start_date > NEW.end_date THEN
+    RAISE EXCEPTION 'Academic year start date must be on or before its end date.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.academic_years ay
+    WHERE ay.school_id = NEW.school_id
+      AND ay.id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      AND daterange(ay.start_date, ay.end_date, '[]') && daterange(NEW.start_date, NEW.end_date, '[]')
+  ) THEN
+    RAISE EXCEPTION 'Academic year dates overlap another academic year for this school.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS academic_years_guard_dates ON public.academic_years;
+CREATE TRIGGER academic_years_guard_dates
+BEFORE INSERT OR UPDATE OF school_id, start_date, end_date
+ON public.academic_years
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_academic_year_dates();
+
+-- Semesters may not overlap within the same academic year. Existing terms are
+-- not rewritten; the guard applies to future inserts and date changes.
+CREATE OR REPLACE FUNCTION public.schoolos_guard_term_dates()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_year public.academic_years%ROWTYPE;
+BEGIN
+  SELECT * INTO v_year
+  FROM public.academic_years
+  WHERE id = NEW.academic_year_id AND school_id = NEW.school_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Academic year does not belong to this school.';
+  END IF;
+  IF NEW.name NOT IN ('Semester 1','Semester 2','Term 1','Term 2') THEN
+    RAISE EXCEPTION 'Only Semester 1 and Semester 2 are supported.';
+  END IF;
+  IF (SELECT count(*) FROM public.terms t WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)) >= 2 THEN
+    RAISE EXCEPTION 'An academic year can contain only two semesters.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.terms t WHERE t.school_id=NEW.school_id AND t.academic_year_id=NEW.academic_year_id
+    AND t.id<>COALESCE(NEW.id,'00000000-0000-0000-0000-000000000000'::uuid)
+    AND (CASE WHEN t.name IN ('Semester 1','Term 1') THEN 'Semester 1' ELSE 'Semester 2' END)
+      = (CASE WHEN NEW.name IN ('Semester 1','Term 1') THEN 'Semester 1' ELSE 'Semester 2' END)) THEN
+    RAISE EXCEPTION 'Semester 1 and Semester 2 can each be configured only once.';
+  END IF;
+  IF NEW.start_date > NEW.end_date
+     OR NEW.start_date < v_year.start_date
+     OR NEW.end_date > v_year.end_date THEN
+    RAISE EXCEPTION 'Semester dates must be valid and fall within the academic year.';
+  END IF;
+  IF TG_OP = 'UPDATE' AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=NEW.school_id AND ts.term_id=NEW.id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Closed semesters are read-only. Reopen the semester before changing its dates.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.terms t
+    WHERE t.school_id = NEW.school_id
+      AND t.academic_year_id = NEW.academic_year_id
+      AND t.id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      AND daterange(t.start_date, t.end_date, '[]') && daterange(NEW.start_date, NEW.end_date, '[]')
+  ) THEN
+    RAISE EXCEPTION 'Semester dates overlap another semester in this academic year.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS terms_guard_dates ON public.terms;
+CREATE TRIGGER terms_guard_dates
+BEFORE INSERT OR UPDATE OF school_id, academic_year_id, name, start_date, end_date
+ON public.terms
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_term_dates();
+
+-- Atomic year activation: one active year per school, with the previous year
+-- closed rather than deleted.
+CREATE OR REPLACE FUNCTION public.schoolos_activate_academic_year(
+  p_school_id text, p_year_id uuid, p_actor_id text DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.schools WHERE id = p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'School not found.'; END IF;
+  PERFORM 1 FROM public.academic_years
+   WHERE id = p_year_id AND school_id = p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
+  IF (SELECT count(*) FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id) <> 2
+     OR NOT EXISTS (SELECT 1 FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id AND name IN ('Semester 1','Term 1'))
+     OR NOT EXISTS (SELECT 1 FROM public.terms WHERE school_id=p_school_id AND academic_year_id=p_year_id AND name IN ('Semester 2','Term 2')) THEN
+    RAISE EXCEPTION 'Configure Semester 1 and Semester 2 before activating the academic year.';
+  END IF;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
+
+  UPDATE public.academic_years
+     SET is_current = false,
+         status = 'closed',
+         closed_at = COALESCE(closed_at, now()),
+         closed_by = COALESCE(closed_by, p_actor_id),
+         updated_at = now()
+   WHERE school_id = p_school_id AND is_current = true AND id <> p_year_id;
+
+  UPDATE public.academic_years
+     SET is_current = true, status = 'active',
+         closed_at = NULL, closed_by = NULL, updated_at = now()
+   WHERE id = p_year_id AND school_id = p_school_id;
+
+  UPDATE public.terms t
+     SET is_current = false, updated_at = now()
+   WHERE t.school_id = p_school_id
+     AND t.is_current = true
+     AND EXISTS (SELECT 1 FROM public.academic_years ay WHERE ay.id=t.academic_year_id AND ay.school_id=p_school_id AND ay.status='closed');
+
+  INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+  SELECT t.school_id, t.id, 'closed', p_actor_id, now(), now()
+    FROM public.terms t
+    JOIN public.academic_years ay ON ay.id=t.academic_year_id AND ay.school_id=t.school_id
+    LEFT JOIN public.term_status ts ON ts.school_id=t.school_id AND ts.term_id=t.id
+   WHERE t.school_id=p_school_id AND ay.status='closed'
+     AND COALESCE(ts.status,'open') <> 'closed'
+  ON CONFLICT (school_id, term_id) DO UPDATE
+    SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
+
+  UPDATE public.schools
+     SET academic_year = (SELECT name FROM public.academic_years WHERE id = p_year_id AND school_id = p_school_id),
+         updated_at = now()
+   WHERE id = p_school_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_activate_academic_year(text, uuid, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_close_academic_year(
+  p_school_id text, p_year_id uuid, p_actor_id text DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.schools WHERE id = p_school_id FOR UPDATE;
+  UPDATE public.academic_years
+     SET is_current = false, status = 'closed',
+         closed_at = now(), closed_by = p_actor_id, updated_at = now()
+   WHERE id = p_year_id AND school_id = p_school_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Academic year not found in this school.'; END IF;
+
+  UPDATE public.terms SET is_current=false, updated_at=now()
+   WHERE school_id=p_school_id AND academic_year_id=p_year_id AND is_current=true;
+  INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+  SELECT t.school_id, t.id, 'closed', p_actor_id, now(), now()
+    FROM public.terms t
+    LEFT JOIN public.term_status ts ON ts.school_id=t.school_id AND ts.term_id=t.id
+   WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id
+     AND COALESCE(ts.status,'open') <> 'closed'
+  ON CONFLICT (school_id, term_id) DO UPDATE
+    SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_close_academic_year(text, uuid, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_sync_school_semester_dates(
+  p_school_id text, p_year_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.schools s
+     SET terms = jsonb_build_object(
+       'semester1Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 1','Term 1') ORDER BY CASE WHEN t.name='Semester 1' THEN 0 ELSE 1 END LIMIT 1),
+       'semester1End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 1','Term 1') ORDER BY CASE WHEN t.name='Semester 1' THEN 0 ELSE 1 END LIMIT 1),
+       'semester2Start', (SELECT t.start_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 2','Term 2') ORDER BY CASE WHEN t.name='Semester 2' THEN 0 ELSE 1 END LIMIT 1),
+       'semester2End', (SELECT t.end_date::text FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.name IN ('Semester 2','Term 2') ORDER BY CASE WHEN t.name='Semester 2' THEN 0 ELSE 1 END LIMIT 1)
+     ),
+     current_semester = COALESCE(
+       (SELECT CASE WHEN t.name='Term 1' THEN 'Semester 1' WHEN t.name='Term 2' THEN 'Semester 2' ELSE t.name END FROM public.terms t WHERE t.school_id=p_school_id AND t.academic_year_id=p_year_id AND t.is_current=true LIMIT 1),
+       s.current_semester
+     ),
+     updated_at = now()
+   WHERE s.id = p_school_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_sync_school_semester_dates(text, uuid) TO service_role;
+
+-- A semester's open/closed state remains in term_status, the existing source of
+-- truth used by exam/result workflows. Activation also enforces one current
+-- semester per school using the existing partial unique index.
+CREATE OR REPLACE FUNCTION public.schoolos_set_semester_status(
+  p_school_id text, p_term_id uuid, p_status text, p_actor_id text DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE v_year_id uuid;
+BEGIN
+  IF p_status NOT IN ('open','closed') THEN RAISE EXCEPTION 'Invalid semester status.'; END IF;
+  SELECT academic_year_id INTO v_year_id
+    FROM public.terms
+   WHERE id = p_term_id AND school_id = p_school_id
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Semester not found in this school.'; END IF;
+
+  IF p_status = 'open' THEN
+    IF NOT EXISTS (SELECT 1 FROM public.academic_years WHERE id = v_year_id AND school_id = p_school_id AND status = 'active') THEN
+      RAISE EXCEPTION 'Activate the academic year before opening a semester.';
+    END IF;
+    UPDATE public.terms SET is_current = false, updated_at = now()
+     WHERE school_id = p_school_id AND id <> p_term_id AND is_current = true;
+    UPDATE public.terms SET is_current = true, updated_at = now()
+     WHERE id = p_term_id AND school_id = p_school_id;
+    INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+    VALUES (p_school_id, p_term_id, 'open', NULL, NULL, now())
+    ON CONFLICT (school_id, term_id) DO UPDATE
+      SET status='open', closed_by=NULL, closed_at=NULL, updated_at=now();
+  ELSE
+    UPDATE public.terms SET is_current = false, updated_at = now()
+     WHERE id = p_term_id AND school_id = p_school_id;
+    INSERT INTO public.term_status(school_id, term_id, status, closed_by, closed_at, updated_at)
+    VALUES (p_school_id, p_term_id, 'closed', p_actor_id, now(), now())
+    ON CONFLICT (school_id, term_id) DO UPDATE
+      SET status='closed', closed_by=p_actor_id, closed_at=now(), updated_at=now();
+  END IF;
+  PERFORM public.schoolos_sync_school_semester_dates(p_school_id, v_year_id);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_set_semester_status(text, uuid, text, text) TO service_role;
+
+-- Closed semesters protect marks, attendance and exam-period configuration
+-- at the database boundary, including service-role writes from backend APIs.
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_student_marks()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_school_id text;
+  v_term_id uuid;
+  v_academic_year text;
+  v_semester text;
+BEGIN
+  IF TG_OP='DELETE' THEN
+    v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
+    v_academic_year:=OLD.academic_year; v_semester:=OLD.semester;
+  ELSE
+    v_school_id:=NEW.school_id; v_term_id:=NEW.term_id;
+    v_academic_year:=NEW.academic_year; v_semester:=NEW.semester;
+  END IF;
+  IF v_term_id IS NULL THEN
+    SELECT t.id INTO v_term_id
+      FROM public.terms t
+      JOIN public.academic_years ay ON ay.id=t.academic_year_id AND ay.school_id=t.school_id
+     WHERE t.school_id=v_school_id
+       AND (CASE WHEN t.name='Term 1' THEN 'Semester 1' WHEN t.name='Term 2' THEN 'Semester 2' ELSE t.name END)
+         = (CASE WHEN v_semester='Term 1' THEN 'Semester 1' WHEN v_semester='Term 2' THEN 'Semester 2' ELSE v_semester END)
+       AND ay.name=v_academic_year
+     LIMIT 1;
+  END IF;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Marks cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS student_marks_closed_term_guard ON public.student_marks;
+CREATE TRIGGER student_marks_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.student_marks
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_student_marks();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_component_marks()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_school_id text;
+  v_component_id uuid;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_component_id:=OLD.component_id;
+  ELSE v_school_id:=NEW.school_id; v_component_id:=NEW.component_id; END IF;
+  SELECT ms.term_id INTO v_term_id
+    FROM public.mark_components mc
+    JOIN public.mark_structures ms ON ms.id=mc.structure_id AND ms.school_id=mc.school_id
+   WHERE mc.id=v_component_id AND mc.school_id=v_school_id;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Component marks cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS component_marks_closed_term_guard ON public.component_marks;
+CREATE TRIGGER component_marks_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.component_marks
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_component_marks();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_attendance()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_school_id text;
+  v_date date;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_date:=OLD.date;
+  ELSE v_school_id:=NEW.school_id; v_date:=NEW.date; END IF;
+  SELECT t.id INTO v_term_id
+    FROM public.terms t
+   WHERE t.school_id=v_school_id AND v_date BETWEEN t.start_date AND t.end_date
+   ORDER BY t.start_date DESC
+   LIMIT 1;
+  IF v_term_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Attendance cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS attendance_closed_term_guard ON public.attendance_records;
+CREATE TRIGGER attendance_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.attendance_records
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_attendance();
+
+CREATE OR REPLACE FUNCTION public.schoolos_guard_closed_exam_period()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_school_id text;
+  v_term_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN v_school_id:=OLD.school_id; v_term_id:=OLD.term_id;
+  ELSE v_school_id:=NEW.school_id; v_term_id:=NEW.term_id; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.term_status ts
+     WHERE ts.school_id=v_school_id AND ts.term_id=v_term_id AND ts.status='closed'
+  ) THEN
+    RAISE EXCEPTION 'Exam periods cannot be changed while the semester is closed.';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS exam_periods_closed_term_guard ON public.exam_periods;
+CREATE TRIGGER exam_periods_closed_term_guard
+BEFORE INSERT OR UPDATE OR DELETE ON public.exam_periods
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_guard_closed_exam_period();
+
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_student_marks() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_component_marks() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_attendance() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schoolos_guard_closed_exam_period() FROM PUBLIC, anon, authenticated;
+
+
+-- Remove permissive tenant ALL policies: PostgreSQL ORs permissive policies together.
+ALTER TABLE public.academic_years ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.terms ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS academic_years_admin_delete ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_insert ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_update ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_admin_select ON public.academic_years;
+DROP POLICY IF EXISTS academic_years_tenant_scope ON public.academic_years;
+CREATE POLICY academic_years_admin_select ON public.academic_years FOR SELECT TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_insert ON public.academic_years FOR INSERT TO authenticated
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_update ON public.academic_years FOR UPDATE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()))
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY academic_years_admin_delete ON public.academic_years FOR DELETE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+DROP POLICY IF EXISTS terms_admin_delete ON public.terms;
+DROP POLICY IF EXISTS terms_admin_insert ON public.terms;
+DROP POLICY IF EXISTS terms_admin_update ON public.terms;
+DROP POLICY IF EXISTS terms_admin_select ON public.terms;
+DROP POLICY IF EXISTS terms_tenant_scope ON public.terms;
+CREATE POLICY terms_admin_select ON public.terms FOR SELECT TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_insert ON public.terms FOR INSERT TO authenticated
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_update ON public.terms FOR UPDATE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()))
+ WITH CHECK (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+CREATE POLICY terms_admin_delete ON public.terms FOR DELETE TO authenticated
+ USING (private.auth_user_role()='super_admin' OR (private.auth_user_role()='school_admin' AND school_id=private.auth_school_id()));
+
+-- Shared subject catalog with school-owned selections. Existing school subjects
+-- and all historical subject references remain unchanged.
+
+CREATE TABLE IF NOT EXISTS public.subject_catalog (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name varchar(150) NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 150),
+  code varchar(6) NOT NULL CHECK (code = upper(btrim(code)) AND char_length(code) BETWEEN 1 AND 6),
+  description text,
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS subject_catalog_name_ci_uidx
+  ON public.subject_catalog (lower(btrim(name)));
+CREATE UNIQUE INDEX IF NOT EXISTS subject_catalog_code_ci_uidx
+  ON public.subject_catalog (upper(btrim(code)));
+CREATE INDEX IF NOT EXISTS subject_catalog_active_order_idx
+  ON public.subject_catalog (is_active, sort_order, name);
+
+ALTER TABLE public.subjects
+  ADD COLUMN IF NOT EXISTS catalog_subject_id uuid;
+ALTER TABLE public.subjects
+  DROP CONSTRAINT IF EXISTS subjects_catalog_subject_id_fkey;
+ALTER TABLE public.subjects
+  ADD CONSTRAINT subjects_catalog_subject_id_fkey
+  FOREIGN KEY (catalog_subject_id) REFERENCES public.subject_catalog(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_school_catalog_subject_uidx
+  ON public.subjects (school_id, catalog_subject_id)
+  WHERE catalog_subject_id IS NOT NULL;
+
+INSERT INTO public.subject_catalog (name, code, description, sort_order)
+VALUES
+  ('Mathematics','MATH','Mathematics and numeracy',10),
+  ('English','ENG','English language',20),
+  ('Amharic','AMH','Amharic language',30),
+  ('Afaan Oromo','ORO','Afaan Oromo language',40),
+  ('Somali','SOM','Somali language',50),
+  ('Biology','BIO','Biology and life sciences',60),
+  ('Chemistry','CHEM','Chemistry',70),
+  ('Physics','PHYS','Physics',80),
+  ('Geography','GEO','Geography',90),
+  ('History','HIST','History',100),
+  ('Civics','CIV','Civics and citizenship education',110),
+  ('ICT','ICT','Information and communication technology',120),
+  ('Economics','ECON','Economics',130),
+  ('Agriculture','AGRI','Agricultural education',140),
+  ('Environmental Science','ENV','Environmental science',150),
+  ('Physical Education','PE','Physical and health education',160),
+  ('Art','ART','Visual and creative arts',170),
+  ('Business','BUS','Business education',180)
+ON CONFLICT DO NOTHING;
+
+ALTER TABLE public.subject_catalog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subject_catalog FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS subject_catalog_authenticated_read ON public.subject_catalog;
+CREATE POLICY subject_catalog_authenticated_read
+  ON public.subject_catalog FOR SELECT TO authenticated
+  USING (is_active OR private.auth_user_role() = 'super_admin');
+GRANT SELECT ON public.subject_catalog TO authenticated;
+GRANT ALL ON public.subject_catalog TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_select_subject_catalog(
+  p_school_id text, p_catalog_ids uuid[]
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_item record;
+  v_existing_id varchar(64);
+  v_existing_catalog_id uuid;
+  v_code varchar(6);
+  v_created integer := 0;
+  v_linked integer := 0;
+  v_skipped integer := 0;
+  v_rows integer;
+BEGIN
+  IF p_school_id IS NULL OR btrim(p_school_id) = '' OR p_catalog_ids IS NULL
+     OR cardinality(p_catalog_ids) = 0 OR cardinality(p_catalog_ids) > 100 THEN
+    RAISE EXCEPTION 'Select between 1 and 100 catalog subjects.';
+  END IF;
+  PERFORM 1 FROM public.schools WHERE id = p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'School not found.'; END IF;
+
+  FOR v_item IN
+    SELECT id, name, code, description
+      FROM public.subject_catalog
+     WHERE id = ANY(p_catalog_ids) AND is_active = true
+     ORDER BY sort_order, name
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM public.subjects
+       WHERE school_id = p_school_id AND catalog_subject_id = v_item.id
+    ) THEN
+      v_skipped := v_skipped + 1;
+      CONTINUE;
+    END IF;
+
+    SELECT id, catalog_subject_id INTO v_existing_id, v_existing_catalog_id
+      FROM public.subjects
+     WHERE school_id = p_school_id AND lower(btrim(name)) = lower(btrim(v_item.name))
+     LIMIT 1 FOR UPDATE;
+
+    IF FOUND THEN
+      IF v_existing_catalog_id IS NULL THEN
+        v_code := v_item.code;
+        IF EXISTS (SELECT 1 FROM public.subjects
+                    WHERE school_id=p_school_id AND lower(btrim(code))=lower(btrim(v_code))
+                      AND id <> v_existing_id) THEN
+          v_code := '';
+        END IF;
+        UPDATE public.subjects
+           SET catalog_subject_id = v_item.id,
+               code = CASE WHEN NULLIF(btrim(code), '') IS NULL THEN v_code ELSE code END,
+               description = COALESCE(NULLIF(description, ''), v_item.description)
+         WHERE id = v_existing_id AND school_id = p_school_id;
+        v_linked := v_linked + 1;
+      ELSE
+        v_skipped := v_skipped + 1;
+      END IF;
+      CONTINUE;
+    END IF;
+
+    v_code := v_item.code;
+    IF EXISTS (SELECT 1 FROM public.subjects
+                WHERE school_id=p_school_id AND lower(btrim(code))=lower(btrim(v_code))) THEN
+      v_code := '';
+    END IF;
+    INSERT INTO public.subjects (
+      id, school_id, name, code, credit_units, department,
+      assigned_teacher_ids, description, catalog_subject_id
+    ) VALUES (
+      'sub-' || gen_random_uuid()::text, p_school_id, v_item.name, v_code, 0, NULL,
+      ARRAY[]::text[], v_item.description, v_item.id
+    );
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    IF v_rows = 1 THEN v_created := v_created + 1; END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'createdCount', v_created,
+    'linkedCount', v_linked,
+    'skippedCount', v_skipped
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_select_subject_catalog(text, uuid[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_select_subject_catalog(text, uuid[]) TO service_role;
+
+-- Complete section setup: configurable capacity and Form Teacher assignment.
+-- The existing legacy classes remain the source of truth for student, exam,
+-- attendance and timetable relationships.
+
+ALTER TABLE public.class_groups
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
+ALTER TABLE public.class_sections
+  ADD COLUMN IF NOT EXISTS max_students integer NOT NULL DEFAULT 40;
+UPDATE public.class_sections SET max_students = 40 WHERE max_students IS NULL;
+ALTER TABLE public.class_sections
+  ALTER COLUMN max_students SET DEFAULT 40,
+  ALTER COLUMN max_students SET NOT NULL;
+ALTER TABLE public.class_sections
+  DROP CONSTRAINT IF EXISTS class_sections_max_students_check;
+ALTER TABLE public.class_sections
+  ADD CONSTRAINT class_sections_max_students_check
+  CHECK (max_students BETWEEN 1 AND 1000) NOT VALID;
+ALTER TABLE public.class_sections
+  VALIDATE CONSTRAINT class_sections_max_students_check;
+CREATE INDEX IF NOT EXISTS class_sections_school_legacy_class_idx
+  ON public.class_sections (school_id, legacy_class_id)
+  WHERE legacy_class_id IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.schoolos_update_class_section_config(
+  p_school_id text,
+  p_section_id uuid,
+  p_name text,
+  p_max_students integer,
+  p_teacher_user_id text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_section public.class_sections%ROWTYPE;
+  v_class public.classes%ROWTYPE;
+  v_enrolled integer;
+BEGIN
+  IF p_max_students IS NULL OR p_max_students < 1 OR p_max_students > 1000
+     OR p_name IS NULL OR char_length(btrim(p_name)) < 1 OR char_length(btrim(p_name)) > 80 THEN
+    RAISE EXCEPTION 'Enter a section name and a capacity from 1 to 1000.';
+  END IF;
+
+  SELECT * INTO v_section
+    FROM public.class_sections
+   WHERE id = p_section_id AND school_id = p_school_id
+   FOR UPDATE;
+  IF NOT FOUND OR v_section.legacy_class_id IS NULL THEN
+    RAISE EXCEPTION 'Section is not connected to a school class.';
+  END IF;
+
+  SELECT * INTO v_class
+    FROM public.classes
+   WHERE id = v_section.legacy_class_id AND school_id = p_school_id
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Legacy class was not found for this section.'; END IF;
+
+  SELECT count(*) INTO v_enrolled FROM public.students WHERE school_id=p_school_id AND class_id=v_class.id AND status='active';
+  IF v_enrolled > p_max_students THEN
+    RAISE EXCEPTION 'Capacity cannot be lower than the current enrollment of % students.', v_enrolled;
+  END IF;
+
+  IF p_teacher_user_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.teachers
+     WHERE school_id = p_school_id AND user_id = p_teacher_user_id AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'The selected Form Teacher must be an active teacher in this school.';
+  END IF;
+
+  UPDATE public.classes
+     SET capacity = p_max_students,
+         section = btrim(p_name),
+         class_teacher_id = p_teacher_user_id
+   WHERE id = v_class.id AND school_id = p_school_id;
+
+  UPDATE public.class_sections
+     SET name = btrim(p_name),
+         max_students = p_max_students,
+         updated_at = now()
+   WHERE id = v_section.id AND school_id = p_school_id
+   RETURNING * INTO v_section;
+
+  RETURN jsonb_build_object(
+    'id', v_section.id,
+    'name', v_section.name,
+    'legacy_class_id', v_section.legacy_class_id,
+    'max_students', v_section.max_students,
+    'class_teacher_id', p_teacher_user_id,
+    'capacity', p_max_students
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_update_class_section_config(text, uuid, text, integer, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_reorder_class_groups(
+  p_school_id text, p_ordered_ids uuid[]
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_total integer;
+  v_distinct integer;
+  v_updated integer;
+BEGIN
+  IF p_ordered_ids IS NULL THEN RAISE EXCEPTION 'Class order is required.'; END IF;
+  SELECT count(*) INTO v_total FROM public.class_groups WHERE school_id = p_school_id;
+  SELECT count(DISTINCT x.id) INTO v_distinct FROM unnest(p_ordered_ids) AS x(id);
+  IF cardinality(p_ordered_ids) <> v_total OR v_distinct <> v_total THEN
+    RAISE EXCEPTION 'The class order must include every class exactly once.';
+  END IF;
+  UPDATE public.class_groups g
+     SET sort_order = ordered.ordinality::integer * 100,
+         updated_at = now()
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS ordered(id, ordinality)
+   WHERE g.id = ordered.id AND g.school_id = p_school_id;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  IF v_updated <> v_total THEN RAISE EXCEPTION 'One or more classes do not belong to this school.'; END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_reorder_class_groups(text, uuid[]) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.schoolos_set_class_group_active(
+  p_school_id text, p_group_id uuid, p_is_active boolean
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.class_groups
+   WHERE id=p_group_id AND school_id=p_school_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Class group not found in this school.'; END IF;
+
+  UPDATE public.class_groups
+     SET is_active=p_is_active, updated_at=now()
+   WHERE id=p_group_id AND school_id=p_school_id;
+
+  UPDATE public.classes c
+     SET is_archived=NOT p_is_active
+    FROM public.class_sections s
+   WHERE s.class_id=p_group_id AND s.school_id=p_school_id
+     AND s.legacy_class_id=c.id AND c.school_id=p_school_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_set_class_group_active(text, uuid, boolean) TO service_role;
+
+-- Per-school date display preference. Existing dates and records are unchanged.
+
+ALTER TABLE public.schools
+  ADD COLUMN IF NOT EXISTS date_format varchar(20) NOT NULL DEFAULT 'dd/MM/yyyy';
+ALTER TABLE public.schools
+  DROP CONSTRAINT IF EXISTS schools_date_format_check;
+ALTER TABLE public.schools
+  ADD CONSTRAINT schools_date_format_check
+  CHECK (date_format IN ('dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd')) NOT VALID;
+ALTER TABLE public.schools
+  VALIDATE CONSTRAINT schools_date_format_check;
+
+-- Atomic student promotion: enrollment changes, promotion records and history commit together.
+-- The existing schoolos_promote_enrollments RPC remains the single source of truth
+-- for enrollment capacity checks and student/class updates; this wrapper adds the
+-- promotion ledger in the same PostgreSQL transaction.
+
+CREATE OR REPLACE FUNCTION public.schoolos_confirm_promotions_with_enrollments(
+  p_school_id text,
+  p_source_year uuid,
+  p_target_year uuid,
+  p_class_id text,
+  p_actor_id text,
+  p_promotions jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_source_year_name text;
+  v_source_year_status text;
+  v_source_year_end date;
+  v_target_year_name text;
+  v_target_year_status text;
+  v_target_year_start date;
+  v_class_academic_year text;
+  v_expected_count integer;
+  v_received_count integer;
+  v_distinct_count integer;
+  v_decisions jsonb;
+  v_enrollment_count integer;
+  v_created jsonb;
+  v_now timestamptz := now();
+BEGIN
+  IF jsonb_typeof(p_promotions) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'Promotion decisions must be a JSON array.';
+  END IF;
+  v_received_count := jsonb_array_length(p_promotions);
+  IF v_received_count < 1 OR v_received_count > 2000 THEN
+    RAISE EXCEPTION 'Promotion decisions must contain between 1 and 2,000 students.';
+  END IF;
+
+  SELECT name, status, end_date
+    INTO v_source_year_name, v_source_year_status, v_source_year_end
+  FROM public.academic_years
+  WHERE id = p_source_year AND school_id = p_school_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Source academic year does not belong to this school.';
+  END IF;
+  IF v_source_year_status <> 'active' THEN
+    RAISE EXCEPTION 'Only the active academic year can be used as a promotion source.';
+  END IF;
+
+  SELECT name, status, start_date
+    INTO v_target_year_name, v_target_year_status, v_target_year_start
+  FROM public.academic_years
+  WHERE id = p_target_year AND school_id = p_school_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Target academic year does not belong to this school.';
+  END IF;
+  IF v_target_year_status <> 'draft' OR v_target_year_start <= v_source_year_end THEN
+    RAISE EXCEPTION 'Choose a future draft academic year as the promotion target.';
+  END IF;
+
+  SELECT academic_year
+    INTO v_class_academic_year
+  FROM public.classes
+  WHERE id = p_class_id AND school_id = p_school_id AND is_archived = false
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Promotion source class was not found or is archived.';
+  END IF;
+  IF v_class_academic_year IS NOT NULL AND v_class_academic_year <> v_source_year_name THEN
+    RAISE EXCEPTION 'The source class does not belong to the selected academic year.';
+  END IF;
+
+  SELECT count(*) INTO v_expected_count
+  FROM public.enrollments
+  WHERE school_id = p_school_id AND academic_year_id = p_source_year
+    AND class_id = p_class_id AND status = 'active';
+  SELECT count(DISTINCT x."studentId") INTO v_distinct_count
+  FROM jsonb_to_recordset(p_promotions) AS x("studentId" text);
+  IF v_expected_count <> v_received_count OR v_distinct_count <> v_received_count THEN
+    RAISE EXCEPTION 'Promotion confirmation must include every active source-class enrollment exactly once.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.promotions
+    WHERE school_id = p_school_id AND class_from_id = p_class_id
+      AND academic_year_from = v_source_year_name
+  ) THEN
+    RAISE EXCEPTION 'This class has already been processed for the selected academic year.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_to_recordset(p_promotions) AS x(
+      "studentId" text, "targetClassId" text, decision text,
+      "yearlyPercentage" numeric, "yearlyRank" integer, notes text,
+      "adminOverride" boolean
+    )
+    LEFT JOIN public.enrollments e
+      ON e.school_id = p_school_id AND e.student_id = x."studentId"
+     AND e.academic_year_id = p_source_year AND e.class_id = p_class_id
+     AND e.status = 'active'
+    LEFT JOIN public.classes target
+      ON target.id = x."targetClassId" AND target.school_id = p_school_id
+     AND target.is_archived = false
+    WHERE e.id IS NULL
+       OR x.decision NOT IN ('promoted', 'repeated')
+       OR x."yearlyPercentage" IS NULL OR x."yearlyPercentage" < 0 OR x."yearlyPercentage" > 100
+       OR x."yearlyRank" IS NULL OR x."yearlyRank" < 1
+       OR (x.decision = 'promoted' AND (x."targetClassId" IS NULL OR btrim(x."targetClassId") = '' OR target.id IS NULL))
+       OR (x.decision = 'repeated' AND coalesce(x."targetClassId", p_class_id) <> p_class_id)
+       OR (coalesce(x."adminOverride", false) AND coalesce(btrim(x.notes), '') = '')
+  ) THEN
+    RAISE EXCEPTION 'Promotion decisions contain an invalid student, target class, result, rank or override reason.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_to_recordset(p_promotions) AS x("studentId" text)
+    JOIN public.enrollments e
+      ON e.school_id = p_school_id AND e.student_id = x."studentId"
+     AND e.academic_year_id = p_target_year AND e.status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'A student already has an active enrollment in the target academic year.';
+  END IF;
+
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'studentId', x."studentId",
+    'decision', x.decision,
+    'targetClassId', CASE WHEN x.decision = 'promoted' THEN x."targetClassId" ELSE p_class_id END
+  ) ORDER BY x."studentId"), '[]'::jsonb)
+  INTO v_decisions
+  FROM jsonb_to_recordset(p_promotions) AS x(
+    "studentId" text, "targetClassId" text, decision text
+  );
+
+  -- This RPC locks source/target classes, validates capacity, closes source
+  -- enrollments, creates target enrollments, updates students and logs the batch.
+  v_enrollment_count := public.schoolos_promote_enrollments(
+    p_school_id, p_source_year, p_target_year, p_class_id, v_decisions, p_actor_id
+  );
+  IF v_enrollment_count <> v_received_count THEN
+    RAISE EXCEPTION 'Enrollment promotion returned an incomplete student count.';
+  END IF;
+
+  WITH input_rows AS (
+    SELECT * FROM jsonb_to_recordset(p_promotions) AS x(
+      "studentId" text, "targetClassId" text, decision text,
+      "yearlyPercentage" numeric, "yearlyRank" integer, notes text,
+      "adminOverride" boolean
+    )
+  ),
+  inserted AS (
+    INSERT INTO public.promotions (
+      id, school_id, academic_year_from, academic_year_to,
+      class_from_id, class_to_id, student_id, yearly_percentage,
+      yearly_rank, decision, notes, processed_by, processed_at
+    )
+    SELECT
+      'prm-' || pg_catalog.gen_random_uuid()::text,
+      p_school_id, v_source_year_name, v_target_year_name,
+      p_class_id,
+      CASE WHEN x.decision = 'promoted' THEN x."targetClassId" ELSE p_class_id END,
+      x."studentId", x."yearlyPercentage", x."yearlyRank", x.decision,
+      CASE WHEN coalesce(x."adminOverride", false) THEN 'ADMIN OVERRIDE: ' || btrim(x.notes) ELSE x.notes END,
+      p_actor_id, v_now
+    FROM input_rows x
+    RETURNING *
+  ),
+  history_rows AS (
+    INSERT INTO public.promotion_history (
+      id, school_id, academic_year_from, academic_year_to,
+      class_id, student_id, yearly_percentage, yearly_rank,
+      decision, processed_by, processed_at
+    )
+    SELECT
+      'prh-' || pg_catalog.gen_random_uuid()::text,
+      p_school_id, v_source_year_name, v_target_year_name,
+      p_class_id, x."studentId", x."yearlyPercentage", x."yearlyRank",
+      x.decision, p_actor_id, v_now
+    FROM input_rows x
+    RETURNING id
+  )
+  SELECT coalesce(jsonb_agg(to_jsonb(inserted)), '[]'::jsonb)
+    INTO v_created
+  FROM inserted;
+
+  RETURN jsonb_build_object(
+    'enrollmentCount', v_enrollment_count,
+    'promotions', coalesce(v_created, '[]'::jsonb)
+  );
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text, uuid, uuid, text, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text, uuid, uuid, text, text, jsonb) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_confirm_promotions_with_enrollments(text, uuid, uuid, text, text, jsonb) TO service_role;
+
+-- END: School Setup Batch 1 canonical fresh-install schema..

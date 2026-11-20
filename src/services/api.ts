@@ -7,6 +7,7 @@ import {
   UserRole,
   School,
   SchoolBranch,
+  SchoolCurrency,
   User,
   PlanConfig,
   SubscriptionInvoice,
@@ -285,11 +286,11 @@ export class ApiClient {
   }
 
   public static async getSchoolSetupData() {
-    return this.request<{ data: SchoolSetupData; school: { name: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
+    return this.request<{ data: SchoolSetupData; school: { name: string; address: string; city: string; phone: string; email: string; whatsappPhone: string; schoolType: 'primary' | 'secondary' | 'combined'; logoUrl: string }; progress: { currentStep: number; completedSteps: number[]; skippedSteps: number[]; completedAt: string | null } }>('/school/setup-data');
   }
 
   public static async saveSchoolSetupStep(step: number, data: Partial<SchoolSetupData>) {
-    return this.request<{ data: SchoolSetupData; progress: { currentStep: number; completedSteps: number[]; completedAt: string | null }; completed: boolean }>('/school/setup-data', {
+    return this.request<{ data: SchoolSetupData; progress: { currentStep: number; completedSteps: number[]; skippedSteps: number[]; completedAt: string | null }; completed: boolean; coreSetupCompleted: boolean }>('/school/setup-data', {
       method: 'PUT',
       body: JSON.stringify({ step, data })
     });
@@ -403,7 +404,7 @@ export class ApiClient {
   public static async updateSchoolDetails(id: string, details: {
     name: string; email: string; address: string; city: string; country: string; region: string;
     schoolType: 'primary' | 'secondary' | 'combined'; phone: string;
-    whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so' | 'am' | 'ar';
+    whatsappPhone: string; brandColor: string; currency: SchoolCurrency; language: 'en' | 'so' | 'am' | 'ar';
   }) {
     return this.request<School>(`/superadmin/schools/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -600,13 +601,35 @@ export class ApiClient {
   }
 
   public static async getClassGroups() {
-    return this.request<Array<{id:string;name:string;sort_order:number;class_sections:Array<{id:string;name:string;legacy_class_id:string|null}>}>>('/class-groups');
+    return this.request<Array<{
+      id: string; name: string; sort_order: number; is_active: boolean;
+      class_sections: Array<{
+        id: string; name: string; legacy_class_id: string | null; sort_order?: number;
+        max_students?: number; capacity?: number; class_teacher_id?: string | null;
+        student_count?: number; available_seats?: number; is_active?: boolean;
+      }>;
+    }>>('/class-groups');
   }
   public static async createClassGroup(name:string, sections:string[] = []) {
     return this.request('/class-groups',{method:'POST',body:JSON.stringify({name,sections})});
   }
   public static async renameClassGroup(id:string,name:string) {
     return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({name})});
+  }
+  public static async updateClassGroupOrder(id:string,sortOrder:number) {
+    return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({sortOrder})});
+  }
+  public static async reorderClassGroups(orderedIds:string[]) {
+    return this.request<{success:boolean}>('/class-groups/reorder',{method:'POST',body:JSON.stringify({orderedIds})});
+  }
+  public static async setClassGroupActive(id:string,isActive:boolean) {
+    return this.request<{success:boolean;isActive:boolean}>(`/class-groups/${encodeURIComponent(id)}/status`,{method:'POST',body:JSON.stringify({isActive})});
+  }
+  public static async setClassSectionActive(id:string,isActive:boolean) {
+    return this.request(`/class-sections/${encodeURIComponent(id)}/active`,{method:'PUT',body:JSON.stringify({isActive})});
+  }
+  public static async updateClassSectionConfiguration(id:string,data:{name:string;maxStudents:number;teacherId:string|null}) {
+    return this.request(`/class-sections/${encodeURIComponent(id)}/configuration`,{method:'PUT',body:JSON.stringify(data)});
   }
   public static async deleteClassGroup(id:string) {
     return this.request(`/class-groups/${encodeURIComponent(id)}`,{method:'DELETE'});
@@ -623,6 +646,16 @@ export class ApiClient {
 
   public static async getSubjects(params?: any) {
     return this.request<Subject[]>('/subjects');
+  }
+
+  public static async getSubjectCatalog() {
+    return this.request<Array<{ id: string; name: string; code: string; description?: string | null; sort_order: number }>>('/subject-catalog');
+  }
+
+  public static async selectSubjectCatalog(catalogIds: string[]) {
+    return this.request<{ createdCount: number; linkedCount: number; skippedCount: number }>('/subjects/catalog-selection', {
+      method: 'POST', body: JSON.stringify({ catalogIds })
+    });
   }
 
   public static async addDefaultSubjects() {
@@ -1005,7 +1038,57 @@ export class ApiClient {
   }
 
   public static async getAcademicYears() {
-    return this.request<Array<{ id: string; name: string; is_current: boolean; start_date: string; end_date: string }>>('/students/academic-years');
+    return this.request<Array<{ id: string; name: string; is_current: boolean; start_date: string; end_date: string; status: 'draft' | 'active' | 'closed'; closed_at?: string | null }>>('/students/academic-years');
+  }
+
+  public static async createAcademicYear(data: { name: string; startDate: string; endDate: string }) {
+    return this.request<any>('/academic-years', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async updateAcademicYear(id: string, data: { name: string; startDate: string; endDate: string }) {
+    return this.request<any>(`/academic-years/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public static async activateAcademicYear(id: string) {
+    return this.request<any>(`/academic-years/${encodeURIComponent(id)}/activate`, { method: 'POST' });
+  }
+
+  public static async closeAcademicYear(id: string) {
+    return this.request<{ success: boolean }>(`/academic-years/${encodeURIComponent(id)}/close`, { method: 'POST' });
+  }
+
+  public static async getAcademicYearSemesters(yearId: string) {
+    return this.request<Array<{
+      id: string; name: 'Semester 1' | 'Semester 2'; start_date: string; end_date: string;
+      is_current: boolean; status: 'open' | 'closed'; closedAt?: string | null;
+      examPeriod?: { id: string; name: string; start_date: string; end_date: string; status: string; results_publish_date?: string | null } | null;
+    }>>(`/academic-years/${encodeURIComponent(yearId)}/semesters`);
+  }
+
+  public static async createAcademicSemester(yearId: string, data: {
+    name: 'Semester 1' | 'Semester 2'; startDate: string; endDate: string;
+    examStartDate?: string; examEndDate?: string; resultsPublishDate?: string;
+  }) {
+    return this.request<any>(`/academic-years/${encodeURIComponent(yearId)}/semesters`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public static async updateAcademicSemester(id: string, data: {
+    name: 'Semester 1' | 'Semester 2'; startDate: string; endDate: string;
+    examStartDate?: string; examEndDate?: string; resultsPublishDate?: string;
+  }) {
+    return this.request<any>(`/semesters/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public static async activateAcademicSemester(id: string) {
+    return this.request<{ success: boolean }>(`/semesters/${encodeURIComponent(id)}/activate`, { method: 'POST' });
+  }
+
+  public static async closeAcademicSemester(id: string) {
+    return this.request<{ success: boolean }>(`/semesters/${encodeURIComponent(id)}/close`, { method: 'POST' });
+  }
+
+  public static async reopenAcademicSemester(id: string) {
+    return this.request<{ success: boolean }>(`/semesters/${encodeURIComponent(id)}/reopen`, { method: 'POST' });
   }
 
   public static async transferStudent(studentId: string, data: { academicYearId: string; classId?: string; sectionId?: string; rollNumber?: string; action?: 'transfer' | 'withdraw' }) {
@@ -1404,8 +1487,8 @@ export class ApiClient {
     return this.request<any[]>(`/exams/rankings/semester?classId=${classId}&semester=${encodeURIComponent(semester)}`);
   }
 
-  public static async getYearlyRankings(classId: string) {
-    return this.request<any[]>(`/exams/rankings/yearly?classId=${classId}`);
+  public static async getYearlyRankings(classId: string, sourceAcademicYearId: string) {
+    return this.request<any[]>(`/exams/rankings/yearly?classId=${encodeURIComponent(classId)}&sourceAcademicYearId=${encodeURIComponent(sourceAcademicYearId)}`);
   }
 
   public static async getPromotionHistory() {

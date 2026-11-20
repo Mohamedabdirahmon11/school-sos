@@ -8,6 +8,7 @@ import {
   normalizeSchoolSetupProgress,
   sanitizeSchoolSetupProgressUpdate
 } from '../src/server/school-setup.ts';
+import { isSchoolSetupProgressComplete } from '../src/lib/school-setup-navigation.ts';
 
 const school: School = {
   id: 'school-1',
@@ -104,22 +105,22 @@ test('required steps cannot be skipped and cannot be marked complete before thei
   assert.throws(() => applySchoolSetupProgressUpdate(
     normalizeSchoolSetupProgress(null), input, checklist, '2026-11-07T00:00:00.000Z'
   ), /Add at least one school subject/);
-  assert.throws(() => sanitizeSchoolSetupProgressUpdate({ currentStep: 2, completedSteps: [], skippedSteps: [1] }), /Only timetable and fees/);
+  assert.throws(() => sanitizeSchoolSetupProgressUpdate({ currentStep: 2, completedSteps: [], skippedSteps: [1] }), /Only fees and extra modules/);
 });
 
-test('finalization requires steps 1–6 and 8; timetable and fees may be completed or skipped', () => {
+test('finalization requires steps 1–8; fees and extra modules may be completed or skipped', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   const initial = normalizeSchoolSetupProgress(null);
   const requiredWithoutEight = {
     ...initial,
-    completedSteps: [1, 2, 3, 4, 5, 6],
-    skippedSteps: [7, 9]
+    completedSteps: [1, 2, 3, 4, 5, 6, 7],
+    skippedSteps: [9]
   };
   assert.equal(canFinishSchoolSetup(requiredWithoutEight, checklist), false);
   const readyToFinish = sanitizeSchoolSetupProgressUpdate({
     currentStep: 10,
-    completedSteps: [1, 2, 3, 4, 5, 6, 8],
-    skippedSteps: [7, 9]
+    completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
+    skippedSteps: [9]
   });
   assert.equal(canFinishSchoolSetup({
     ...initial,
@@ -131,17 +132,32 @@ test('finalization requires steps 1–6 and 8; timetable and fees may be complet
     complete: true
   }, checklist, '2026-11-07T12:00:00.000Z');
   assert.equal(finished.completedAt, '2026-11-07T12:00:00.000Z');
-  assert.deepEqual(finished.completedSteps, [1, 2, 3, 4, 5, 6, 8, 10]);
+  assert.deepEqual(finished.completedSteps, [1, 2, 3, 4, 5, 6, 7, 8, 10]);
 });
 
 test('setup progress rejects a step that is both completed and skipped', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   const input = sanitizeSchoolSetupProgressUpdate({
     currentStep: 8,
-    completedSteps: [1, 2, 3, 4, 5, 6, 7],
-    skippedSteps: [7, 9]
+    completedSteps: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    skippedSteps: [9]
   });
   assert.throws(() => applySchoolSetupProgressUpdate(
     normalizeSchoolSetupProgress(null), input, checklist, '2026-11-07T00:00:00.000Z'
   ), /both completed and skipped/);
+});
+
+
+test('legacy five-step completion cannot unlock the dashboard', () => {
+  const normalized = normalizeSchoolSetupProgress({ currentStep: 5, completedSteps: [1, 2, 3, 4, 5, 10], skippedSteps: [], completedAt: '2026-11-14T12:00:00.000Z' });
+  assert.equal(normalized.completedAt, null);
+  assert.deepEqual(normalized.completedSteps, [1, 2, 3, 4, 5]);
+  assert.equal(normalized.currentStep, 6);
+  assert.equal(isSchoolSetupProgressComplete(normalized), false);
+});
+
+test('only a complete ten-step record with optional steps completed or skipped unlocks the dashboard', () => {
+  const progress = { currentStep: 10, completedSteps: [1, 2, 3, 4, 5, 6, 7, 8, 10], skippedSteps: [9], completedAt: '2026-11-14T12:00:00.000Z' };
+  assert.equal(isSchoolSetupProgressComplete(progress), true);
+  assert.equal(normalizeSchoolSetupProgress(progress).completedAt, progress.completedAt);
 });

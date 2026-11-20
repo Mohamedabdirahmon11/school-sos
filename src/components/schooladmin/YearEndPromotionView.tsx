@@ -32,7 +32,7 @@ export const YearEndPromotionView: React.FC = () => {
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [topN, setTopN] = useState(3);
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
-  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean}>>([]);
+  const [academicYears, setAcademicYears] = useState<Array<{id:string;name:string;is_current:boolean;start_date:string;end_date:string;status:'draft'|'active'|'closed'}>>([]);
   const [sourceAcademicYearId, setSourceAcademicYearId] = useState('');
   const [targetAcademicYearId, setTargetAcademicYearId] = useState('');
 
@@ -47,7 +47,7 @@ export const YearEndPromotionView: React.FC = () => {
 
   // Fetch initial classes and config; expose a retry action when the database is unavailable.
   const loadInitialData = async () => {
-    if (!school) return;
+    if (!school?.id) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
@@ -60,10 +60,10 @@ export const YearEndPromotionView: React.FC = () => {
       setClasses(clsList);
       setHistory(archived);
       setAcademicYears(years);
-      const currentYear = years.find(year => year.is_current) || years[0];
-      const nextYear = years.find(year => year.id !== currentYear?.id && year.start_date > (currentYear?.start_date || ''));
-      setSourceAcademicYearId(value => value || currentYear?.id || '');
-      setTargetAcademicYearId(value => value || nextYear?.id || '');
+      const currentYear = years.find(year => year.status === 'active' || year.is_current) || years[0];
+      const nextYear = years.filter(year => year.status === 'draft' && year.id !== currentYear?.id && year.start_date > (currentYear?.end_date || currentYear?.start_date || '')).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+      setSourceAcademicYearId(value => value && years.some(year => year.id === value && year.status === 'active') ? value : currentYear?.id || '');
+      setTargetAcademicYearId(value => value && years.some(year => year.id === value && year.status === 'draft') ? value : nextYear?.id || '');
       if (clsList.length > 0) {
         setSelectedClassId(current => current || clsList[0].id);
         if (clsList.length > 1) setTargetClassId(current => current || clsList[1].id);
@@ -77,6 +77,17 @@ export const YearEndPromotionView: React.FC = () => {
   };
 
   useEffect(() => {
+    setClasses([]);
+    setSelectedClassId('');
+    setTargetClassId('');
+    setAcademicYears([]);
+    setSourceAcademicYearId('');
+    setTargetAcademicYearId('');
+    setYearlyRankings([]);
+    setDecisionMap({});
+    setHistory([]);
+    setExamConfig(null);
+    setError(null);
     void loadInitialData();
   }, [school?.id]);
 
@@ -85,7 +96,8 @@ export const YearEndPromotionView: React.FC = () => {
     if (!selectedClassId) return;
     setLoading(true);
     try {
-      const rankings = await ApiClient.getYearlyRankings(selectedClassId);
+      if (!sourceAcademicYearId) throw new Error('Choose an active source academic year.');
+      const rankings = await ApiClient.getYearlyRankings(selectedClassId, sourceAcademicYearId);
       setYearlyRankings(rankings);
 
       const map: Record<string, { decision: 'promoted' | 'repeated'; notes: string; adminOverride: boolean }> = {};
@@ -108,7 +120,7 @@ export const YearEndPromotionView: React.FC = () => {
 
   useEffect(() => {
     loadClassRankings();
-  }, [selectedClassId]);
+  }, [selectedClassId, sourceAcademicYearId, school?.id]);
 
   const handleDecisionChange = (studentId: string, decision: 'promoted' | 'repeated') => {
     const rank = yearlyRankings.find(row => row.student.id === studentId);
@@ -236,7 +248,7 @@ export const YearEndPromotionView: React.FC = () => {
             Source Academic Year
           </label>
           <select value={sourceAcademicYearId} onChange={e=>setSourceAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
-            {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
+            {academicYears.filter(year=>year.status==='active').map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
           </select>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
             Current Class (Completing Academic Year)
@@ -266,7 +278,7 @@ export const YearEndPromotionView: React.FC = () => {
             Target Academic Year
           </label>
           <select value={targetAcademicYearId} onChange={e=>setTargetAcademicYearId(e.target.value)} className="mb-3 w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-lg bg-white">
-            {academicYears.filter(year=>year.id!==sourceAcademicYearId).map(year=><option key={year.id} value={year.id}>{year.name}</option>)}
+            {academicYears.filter(year=>year.status==='draft'&&year.id!==sourceAcademicYearId).map(year=><option key={year.id} value={year.id}>{year.name}</option>)}
           </select>
           <label className="block text-xs font-semibold text-[#475569] mb-1">
             Target Class (For Promoted Cohort)

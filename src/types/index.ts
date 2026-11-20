@@ -44,7 +44,7 @@ export interface SchoolBranch {
 }
 
 export type SchoolLanguage = 'en' | 'so' | 'am' | 'ar';
-export type SchoolCurrency = 'ETB' | 'USD' | 'SOS';
+export type SchoolCurrency = 'ETB' | 'USD' | 'SOS' | 'KES' | 'DJF' | 'AED' | 'SAR' | 'EUR' | 'GBP';
 
 export interface GradingBand {
   minPercentage: number;
@@ -76,7 +76,7 @@ export interface NotificationPreferences {
 }
 
 export interface SchoolSetupData {
-  schoolInformation: { name: string; logoUrl: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined' };
+  schoolInformation: { name: string; logoUrl: string; address: string; city: string; phone: string; email: string; whatsappPhone: string; schoolType: 'primary' | 'secondary' | 'combined' };
   academicYear: { name: string; startDate: string; endDate: string; isCurrent: boolean };
   terms: Array<{ name: string; startDate: string; endDate: string }>;
   calendar: { workingDays: string[]; weeklyHolidays: string[]; nationalHolidays: Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>; schoolHolidays: Array<{ name: string; startDate: string; endDate: string }>; calendarType: 'ethiopian' | 'gregorian' | 'both' };
@@ -153,6 +153,7 @@ export interface School {
   currency: SchoolCurrency; // ETB default, per-school ETB/USD/SOS
   language?: SchoolLanguage; // English default; Somali enabled
   timezone?: string;
+  dateFormat?: 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd';
   academicYear: string; // e.g. "2026-2027"
   currentSemester: 'Semester 1' | 'Semester 2';
   terms?: SchoolTermDates;

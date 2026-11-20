@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const migration = readFileSync(new URL('../supabase/migrations/20261118190000_step8_student_enrollments.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const studentsView = readFileSync(new URL('../src/components/schooladmin/StudentsView.tsx', import.meta.url), 'utf8');
 const promotionView = readFileSync(new URL('../src/components/schooladmin/YearEndPromotionView.tsx', import.meta.url), 'utf8');
@@ -26,7 +27,8 @@ test('Step 8 enrollment transfers validate school ownership and preserve enrollm
   assert.match(migration, /schoolos_promote_enrollments/);
   assert.match(api, /from\('enrollments'\)[\s\S]*?\.eq\('school_id', school\.id\)/);
   assert.match(api, /rpc\('schoolos_transfer_enrollment'/);
-  assert.match(api, /rpc\('schoolos_promote_enrollments'/);
+  assert.match(api, /db\.confirmYearEndPromotions/);
+  assert.match(storage, /rpc\('schoolos_confirm_promotions_with_enrollments'/);
 });
 
 test('Step 8 guardian links store relationship per student and expose profile actions', () => {

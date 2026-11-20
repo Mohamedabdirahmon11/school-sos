@@ -18,6 +18,21 @@ export const SubjectsView: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [catalog, setCatalog] = useState<Array<{ id: string; name: string; code: string; description?: string | null }>>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [selectedCatalogIds, setSelectedCatalogIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!school?.id) { setCatalog([]); return; }
+    setCatalogLoading(true);
+    ApiClient.getSubjectCatalog()
+      .then(items => { if (active) setCatalog(items); })
+      .catch(() => { if (active) setError(tx('catalogLoadError')); })
+      .finally(() => { if (active) setCatalogLoading(false); });
+    return () => { active = false; };
+  }, [school?.id, language]);
 
   useEffect(() => {
     if (!load.error) return;
@@ -28,6 +43,26 @@ export const SubjectsView: React.FC = () => {
   const visible = useMemo(() => subjects.filter(subject =>
     [subject.name, subject.code || ''].some(value => String(value).toLowerCase().includes(search.trim().toLowerCase()))
   ).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })), [subjects, search]);
+
+  const visibleCatalog = useMemo(() => catalog.filter(item =>
+    [item.name, item.code || '', item.description || ''].some(value => String(value).toLowerCase().includes(catalogSearch.trim().toLowerCase()))
+  ), [catalog, catalogSearch]);
+  const isAlreadySelected = (item: { name: string }) => subjects.some(subject =>
+    subject.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+  );
+
+  const addCatalogSelection = async () => {
+    if (!selectedCatalogIds.length || isReadOnly) return;
+    setBusy(true); setError('');
+    try {
+      const result = await ApiClient.selectSubjectCatalog(selectedCatalogIds);
+      await load.retry();
+      setSelectedCatalogIds([]);
+      setNotice(tx('catalogAdded', { created: result.createdCount, linked: result.linkedCount, skipped: result.skippedCount }));
+    } catch {
+      setError(tx('catalogAddError'));
+    } finally { setBusy(false); }
+  };
 
   useEffect(() => {
     if (!notice) return;
@@ -99,6 +134,24 @@ export const SubjectsView: React.FC = () => {
 
       {notice && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      <section className="space-y-4 rounded-2xl border border-teal-100 bg-teal-50/40 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h2 className="text-base font-bold text-[#132A29] dark:text-white">{tx('catalogTitle')}</h2><p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">{tx('catalogDescription')}</p></div>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 dark:bg-slate-800">{tx('catalogSelected',{count:selectedCatalogIds.length})}</span>
+        </div>
+        <label className="relative block max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={catalogSearch} onChange={event => setCatalogSearch(event.target.value)} placeholder={tx('catalogSearch')} aria-label={tx('catalogSearch')} className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
+        {catalogLoading ? <p className="py-3 text-sm text-slate-500">{tx('catalogLoading')}</p> : visibleCatalog.length ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleCatalog.map(item => {
+            const alreadyAdded = isAlreadySelected(item);
+            return <label key={item.id} className={`flex min-w-0 items-start gap-2 rounded-xl border bg-white p-3 text-sm dark:bg-slate-800 ${alreadyAdded ? 'border-emerald-200 opacity-70 dark:border-emerald-900' : 'border-slate-200 dark:border-slate-700'}`}>
+              <input type="checkbox" checked={alreadyAdded || selectedCatalogIds.includes(item.id)} disabled={busy || isReadOnly || alreadyAdded} onChange={event => setSelectedCatalogIds(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} className="mt-0.5 accent-[#0F766E]" />
+              <span className="min-w-0"><span className="block truncate font-semibold text-slate-800 dark:text-slate-100">{item.name}</span><span className="mt-0.5 block text-[11px] text-slate-500">{item.code}{alreadyAdded ? ' · ' + tx('catalogAlreadyAdded') : ''}</span></span>
+            </label>;
+          })}
+        </div> : <p className="py-3 text-sm text-slate-500">{tx('catalogNoResults')}</p>}
+        <div className="flex justify-end"><button type="button" disabled={busy || isReadOnly || !selectedCatalogIds.length} onClick={() => void addCatalogSelection()} className="rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40">{busy ? tx('catalogLoading') : tx('catalogAdd')}</button></div>
+      </section>
 
       <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-700">

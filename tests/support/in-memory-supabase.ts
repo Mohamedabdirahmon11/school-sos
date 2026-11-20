@@ -166,6 +166,43 @@ export class InMemorySupabase {
   failNextBackupRestore() { this.failBackupRestore = true; }
 
   async rpc(name: string, args?: any) {
+    if (name === 'schoolos_confirm_promotions_with_enrollments') {
+      const sourceYear = this.rows('academic_years').find(row => String(row.id) === String(args?.p_source_year));
+      const targetYear = this.rows('academic_years').find(row => String(row.id) === String(args?.p_target_year));
+      const promotions = Array.isArray(args?.p_promotions) ? args.p_promotions : [];
+      if (!sourceYear || !targetYear) return { data: null, error: { message: 'Source and target academic years are required.' } };
+      const legacyResult = await this.rpc('schoolos_confirm_year_end_promotions', {
+        p_school_id: args.p_school_id,
+        p_class_id: args.p_class_id,
+        p_academic_year_from: sourceYear.name,
+        p_academic_year_to: targetYear.name,
+        p_processed_by: args.p_actor_id,
+        p_promotions: promotions.map((row: any) => ({
+          student_id: row.studentId,
+          class_to_id: row.targetClassId,
+          yearly_percentage: row.yearlyPercentage,
+          yearly_rank: row.yearlyRank,
+          decision: row.decision,
+          notes: row.notes,
+          admin_override: row.adminOverride
+        }))
+      });
+      if (legacyResult.error) return legacyResult;
+      const created = Array.isArray(legacyResult.data) ? legacyResult.data : [];
+      const now = new Date().toISOString();
+      const enrollmentRows = promotions.map((row: any, index: number) => ({
+        id: `enrollment-test-${Date.now()}-${index}`,
+        school_id: args.p_school_id,
+        student_id: row.studentId,
+        academic_year_id: args.p_target_year,
+        class_id: row.targetClassId,
+        status: 'active',
+        joined_at: now
+      }));
+      this.rows('enrollments').push(...enrollmentRows);
+      this.rows('audit_logs').push({ id: `audit-test-${Date.now()}`, school_id: args.p_school_id, actor_id: args.p_actor_id, action: 'YEAR_END_PROMOTION_CONFIRMED', entity_type: 'promotion_batch', entity_id: args.p_class_id, created_at: now });
+      return { data: { promotions: created, enrollmentCount: enrollmentRows.length }, error: null };
+    }
     if (name === 'schoolos_sync_student_guardian') {
       const schoolId = String(args?.p_school_id || '');
       const studentId = String(args?.p_student_pk || '');

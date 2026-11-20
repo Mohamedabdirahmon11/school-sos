@@ -1,7 +1,8 @@
 import type { School } from '../types/index.ts';
+import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 
 export const SCHOOL_SETUP_DEFAULTS = {
-  schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' as const },
+  schoolInformation: { name: '', logoUrl: '', address: '', city: '', phone: '', email: '', whatsappPhone: '', schoolType: 'combined' as const },
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
   terms: [] as Array<{ name: string; startDate: string; endDate: string }>,
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [] as Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>, schoolHolidays: [] as Array<{ name: string; startDate: string; endDate: string }>, calendarType: 'both' as const },
@@ -19,7 +20,8 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Setup data must be an object.';
   if (step === 1) {
     const s = data.schoolInformation;
-    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.phone || '').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s.email || ''))) return 'School name, address, phone and a valid email are required.';
+    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.city || '').trim() || !String(s.phone || '').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s.email || ''))) return 'School name, address, city, phone and a valid email are required.';
+    if (!normalizeWhatsAppNumber(s.whatsappPhone)) return 'Enter the administration WhatsApp number in international format, beginning with + or 00.';
     if (!['primary', 'secondary', 'combined'].includes(s.schoolType)) return 'Choose a valid school type.';
     if (s.logoUrl && (String(s.logoUrl).length > 2_000_000 || !/^https:\/\/|^data:image\/(png|jpeg|webp);base64,/i.test(String(s.logoUrl)))) return 'School logo must be a valid HTTPS image URL or PNG, JPEG or WebP image smaller than 1.5 MB.';
   }
@@ -28,12 +30,16 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
-    const existingTerms = existingData?.terms;
-    if (Array.isArray(existingTerms) && existingTerms.some((term: any) => validIsoDate(term.startDate) && validIsoDate(term.endDate) && (term.startDate < y.startDate || term.endDate > y.endDate))) return 'The new academic year would exclude saved terms. Update the term dates first.';
+    const savedTerms = Array.isArray(existingData?.terms) ? existingData.terms : [];
+    if (savedTerms.some((term: any) => validIsoDate(term.startDate) && validIsoDate(term.endDate) && (term.startDate < y.startDate || term.endDate > y.endDate))) return 'The selected academic year would exclude saved terms. Adjust the year or term dates first.';
   }
   if (step === 3) {
     const terms = data.terms;
-    if (!Array.isArray(terms) || terms.length < 1 || terms.length > 3 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Add 1–3 terms with valid names and start/end dates.';
+    if (!Array.isArray(terms) || terms.length !== 2 ||
+        terms[0]?.name !== 'Semester 1' || terms[1]?.name !== 'Semester 2' ||
+        terms.some((t: any) => !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) {
+      return 'Configure exactly Semester 1 and Semester 2 with valid start/end dates.';
+    }
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
@@ -70,8 +76,10 @@ export function buildSchoolSetupSchoolUpdates(
     Object.assign(updates, {
       name: info.name.trim(),
       address: info.address.trim(),
+      city: info.city.trim(),
       phone: info.phone.trim(),
       email: info.email.trim(),
+      whatsappPhone: info.whatsappPhone.trim(),
       schoolType: info.schoolType,
       logoUrl: info.logoUrl || undefined
     });

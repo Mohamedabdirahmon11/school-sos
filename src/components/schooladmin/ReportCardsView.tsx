@@ -279,6 +279,7 @@ export const ReportCardsView: React.FC = () => {
   const [branches, setBranches] = useState<SchoolBranch[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [activeAcademicYearId, setActiveAcademicYearId] = useState('');
   const [yearlyRankings, setYearlyRankings] = useState<ReportCardResult[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [design, setDesign] = useState<ReportCardDesign | null>(null);
@@ -298,8 +299,11 @@ export const ReportCardsView: React.FC = () => {
       ApiClient.getClasses(),
       ApiClient.getReportCardDesign(),
       ApiClient.getBranches(),
-      ApiClient.getExamConfig()
-    ]).then(([cls, dsg, branchList, config]) => {
+      ApiClient.getExamConfig(),
+      ApiClient.getAcademicYears()
+    ]).then(([cls, dsg, branchList, config, years]) => {
+      const activeYear = years.find(year => year.is_current || year.status === 'active');
+      setActiveAcademicYearId(activeYear?.id || '');
       setClasses(cls);
       setBranches(branchList);
       setSelectedClassId(current => current || cls[0]?.id || '');
@@ -314,14 +318,21 @@ export const ReportCardsView: React.FC = () => {
       setSelectedStudentId(null);
       return;
     }
+    if (!activeAcademicYearId) {
+      setYearlyRankings([]);
+      setSelectedStudentId(null);
+      setError('Activate an academic year before generating yearly report cards.');
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     setSelectedStudentId(null);
-    ApiClient.getYearlyRankings(selectedClassId).then(rankings => {
+    ApiClient.getYearlyRankings(selectedClassId, activeAcademicYearId).then(rankings => {
       setYearlyRankings(rankings);
       setSelectedStudentId(rankings[0]?.student.id || null);
     }).catch(err => setError(err instanceof Error ? err.message : 'Class results could not be loaded.')).finally(() => setIsLoading(false));
-  }, [selectedClassId]);
+  }, [selectedClassId, activeAcademicYearId]);
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const selectedStudentResult = yearlyRankings.find(r => r.student.id === selectedStudentId);

@@ -8,7 +8,7 @@ const IMAGE_DATA_URL = /^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i;
 const MAX_LOGO_CHARS = 2_800_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export const ALLOWED_CURRENCIES = ['ETB', 'USD', 'SOS'] as const;
+export const ALLOWED_CURRENCIES = ['ETB', 'USD', 'SOS', 'KES', 'DJF', 'AED', 'SAR', 'EUR', 'GBP'] as const;
 export const DEFAULT_GRADING_SCALE: GradingBand[] = [
   { minPercentage: 90, label: 'A', remark: 'Excellent' },
   { minPercentage: 80, label: 'B', remark: 'Very good' },
@@ -136,9 +136,10 @@ const schoolSettingsSchema = z.object({
   brandColor: z.string().trim().regex(HEX_COLOR, 'Brand color must be a six-digit hex color.').optional(),
   sidebarTheme: sidebarThemeSchema.optional(),
   logoUrl: z.string().optional(),
-  currency: z.enum(ALLOWED_CURRENCIES, 'Currency must be ETB, USD, or SOS.').optional(),
+  currency: z.enum(ALLOWED_CURRENCIES, 'Choose a supported school currency.').optional(),
   language: z.enum(['en', 'so', 'am', 'ar'], 'Choose English, Somali, Amharic, or Arabic.').optional(),
   timezone: z.string().trim().min(1, 'Timezone is required.').max(100, 'Timezone must be 100 characters or fewer.').refine(isValidTimeZone, 'Timezone must be a valid IANA timezone.').optional(),
+  dateFormat: z.enum(['dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd'], 'Choose a supported date format.').optional(),
   academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Academic year must use YYYY-YYYY.').refine(value => {
     const [start, end] = value.split('-').map(Number);
     return end === start + 1;

@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
-import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
+import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage, SchoolCurrency } from '../../types/index.ts';
 import { fileToJpegDataUrl } from '../../lib/image-upload.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { SidebarAppearanceSettings } from './SidebarAppearanceSettings.tsx';
@@ -79,6 +79,7 @@ const calculateShiftFinish = (start: string, periodMinutes: number, breakAfterPe
 const periodLengthForFinish = (start: string, finish: string, breakAfterPeriod: number, breakMinutes: number, periods: number) =>
   Math.round((timeToMinutes(finish) - timeToMinutes(start) - (periods > breakAfterPeriod ? breakMinutes : 0)) / periods);
 
+import { AcademicYearManagementView } from './AcademicYearManagementView.tsx';
 export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance' }> = ({ initialTab = 'identity' }) => {
   const { school, user, isReadOnly, t, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'identity' | 'academics' | 'shifts' | 'documents' | 'branches' | 'designer' | 'backup' | 'appearance'>(initialTab);
@@ -98,9 +99,10 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   const [whatsappPhone, setWhatsappPhone] = useState(school?.whatsappPhone || '');
   const [email, setEmail] = useState(school?.email || '');
-  const [currency, setCurrency] = useState(school?.currency || 'ETB');
+  const [currency, setCurrency] = useState<SchoolCurrency>(school?.currency || 'ETB');
   const [language, setLanguage] = useState(school?.language || 'en');
   const [timezone, setTimezone] = useState(school?.timezone || 'Africa/Addis_Ababa');
+  const [dateFormat, setDateFormat] = useState<'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd'>(school?.dateFormat || 'dd/MM/yyyy');
   const [studentAccessEnabled, setStudentAccessEnabled] = useState(school?.studentAccessEnabled === true);
   const [defaultClassCapacity, setDefaultClassCapacity] = useState(String(school?.defaultClassCapacity ?? 40));
 
@@ -137,6 +139,19 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
   useEffect(() => {
     if (!school) return;
+    setName(school.name || '');
+    setNameArabic(school.nameArabic || '');
+    setBrandColor(school.brandColor || '#0F766E');
+    setLogoUrl(school.logoUrl || '');
+    setAddress(school.address || '');
+    setCity(school.city || '');
+    setPhone(school.phone || '');
+    setWhatsappPhone(school.whatsappPhone || '');
+    setEmail(school.email || '');
+    setCurrency(school.currency || 'ETB');
+    setLanguage(school.language || 'en');
+    setTimezone(school.timezone || 'Africa/Addis_Ababa');
+    setDateFormat(school.dateFormat || 'dd/MM/yyyy');
     setClosingTime(school.setupData?.workingHours?.closingTime || '16:00');
     ApiClient.getBranches()
       .then(items => setBranches([...items].sort((a, b) => Number(b.isMain) - Number(a.isMain) || a.name.localeCompare(b.name))))
@@ -193,6 +208,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           currency,
           language,
           timezone,
+          dateFormat,
           studentAccessEnabled,
           defaultClassCapacity: capacity
         })
@@ -777,17 +793,23 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                 <label className="block font-semibold text-[#334155] mb-1">School Currency</label>
                 <select
                   value={currency}
-                  onChange={e => setCurrency(e.target.value as 'ETB' | 'USD' | 'SOS')}
+                  onChange={e => setCurrency(e.target.value as SchoolCurrency)}
                   className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"
                 >
                   <option value="USD">USD ($)</option>
                   <option value="SOS">SOS (Somali Shilling)</option>
                   <option value="ETB">ETB (Ethiopian Birr)</option>
+                  <option value="KES">KES (Kenyan Shilling)</option>
+                  <option value="DJF">DJF (Djiboutian Franc)</option>
+                  <option value="AED">AED (UAE Dirham)</option>
+                  <option value="SAR">SAR (Saudi Riyal)</option>
+                  <option value="EUR">EUR (Euro)</option>
+                  <option value="GBP">GBP (Pound Sterling)</option>
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">{t('settings_language')}</label>
                 <select
@@ -819,6 +841,12 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
                   <option value="Africa/Djibouti" />
                   <option value="UTC" />
                 </datalist>
+              </div>
+              <div>
+                <label className="block font-semibold text-[#334155] mb-1">Date Format</label>
+                <select value={dateFormat} onChange={e => setDateFormat(e.target.value as 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd')} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
+                  <option value="dd/MM/yyyy">DD/MM/YYYY</option><option value="MM/dd/yyyy">MM/DD/YYYY</option><option value="yyyy-MM-dd">YYYY-MM-DD</option>
+                </select>
               </div>
               <div>
                 <label className="block font-semibold text-[#334155] mb-1">Default Class Capacity</label>
@@ -868,33 +896,16 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
       {/* TAB 2: ACADEMICS & RULES */}
       {activeTab === 'academics' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <div className="space-y-6">
+          <AcademicYearManagementView />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           <form onSubmit={handleSaveAcademics} className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm space-y-5 text-xs">
             <div>
               <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#0F766E]" /> {t('settings_academic_calendar')}</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Each school keeps its own academic calendar, class levels, grading scale, and attendance rules.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-semibold text-[#334155] mb-1">Academic Year</label>
-                <input type="text" required value={academicYear} onChange={e => setAcademicYear(e.target.value)} placeholder="2026-2027" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono" />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#334155] mb-1">Current Term</label>
-                <select value={currentSemester} onChange={e => setCurrentSemester(e.target.value as 'Semester 1' | 'Semester 2')} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg">
-                  <option value="Semester 1">Semester 1</option>
-                  <option value="Semester 2">Semester 2</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 starts</span><input type="date" value={terms.semester1Start} onChange={e => setTerms(prev => ({ ...prev, semester1Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 1 ends</span><input type="date" value={terms.semester1End} onChange={e => setTerms(prev => ({ ...prev, semester1End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 starts</span><input type="date" value={terms.semester2Start} onChange={e => setTerms(prev => ({ ...prev, semester2Start: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-              <label className="space-y-1"><span className="font-semibold text-[#334155]">Semester 2 ends</span><input type="date" value={terms.semester2End} onChange={e => setTerms(prev => ({ ...prev, semester2End: e.target.value }))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg" /></label>
-            </div>
+            <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-3 text-xs text-teal-900">Academic years, Semester 1 and Semester 2 dates, examination periods and result publication dates are managed in the Academic Years & Semesters panel above. This form only saves grading, attendance and class-level preferences.</div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -990,6 +1001,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
               </div>
             )}
 
+            </div>
           </div>
         </div>
       )}

@@ -31,9 +31,11 @@ export const PrintIDCardModal: React.FC<PrintIDCardModalProps> = ({ student, sch
           {/* Top Decorative Stripe */}
           <div className="flex items-center justify-between border-b border-[#143D3B] pb-3 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#0F766E] flex items-center justify-center font-bold text-xs text-white">
-                S
-              </div>
+              {school?.logoUrl ? (
+                <img src={school.logoUrl} alt={`${school.name || 'School'} logo`} className="w-7 h-7 rounded-lg object-contain bg-white p-0.5" />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-[#0F766E] flex items-center justify-center font-bold text-xs text-white">{(school?.name || 'S').trim().charAt(0).toUpperCase()}</div>
+              )}
               <div>
                 <p className="font-bold text-xs leading-none tracking-tight">{school?.name || 'SchoolOS Academy'}</p>
                 <p className="text-[9px] text-[#A0BCBA] font-mono mt-0.5">STUDENT IDENTITY CARD</p>
