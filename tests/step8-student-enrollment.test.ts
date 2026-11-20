@@ -5,7 +5,6 @@ import { test } from 'node:test';
 const migration = readFileSync(new URL('../supabase/migrations/20261118190000_step8_student_enrollments.sql', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
-const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const studentsView = readFileSync(new URL('../src/components/schooladmin/StudentsView.tsx', import.meta.url), 'utf8');
 const promotionView = readFileSync(new URL('../src/components/schooladmin/YearEndPromotionView.tsx', import.meta.url), 'utf8');
