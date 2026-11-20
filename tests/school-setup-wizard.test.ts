@@ -157,7 +157,7 @@ test('legacy five-step completion cannot unlock the dashboard', () => {
 });
 
 test('only a complete ten-step record with optional steps completed or skipped unlocks the dashboard', () => {
-  const progress = { currentStep: 10, completedSteps: [1, 2, 3, 4, 5, 6, 8, 10], skippedSteps: [7, 9], completedAt: '2026-11-14T12:00:00.000Z' };
+  const progress = { currentStep: 10, completedSteps: [1, 2, 3, 4, 5, 6, 7, 8, 10], skippedSteps: [9], completedAt: '2026-11-14T12:00:00.000Z' };
   assert.equal(isSchoolSetupProgressComplete(progress), true);
   assert.equal(normalizeSchoolSetupProgress(progress).completedAt, progress.completedAt);
 });
