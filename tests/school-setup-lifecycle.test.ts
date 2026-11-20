@@ -105,5 +105,5 @@ test('setup wizard shows completion status for all school modules', () => {
   assert.ok(wizard.includes('Setup progress'));
   assert.ok(wizard.includes('Class–Subject Curriculum'));
   assert.ok(wizard.includes('Teacher Assignments'));
-  assert.ok(wizard.includes('onNavigate(item.view)'));
+  assert.ok(wizard.includes('onNavigate(target.view)'));
 });
