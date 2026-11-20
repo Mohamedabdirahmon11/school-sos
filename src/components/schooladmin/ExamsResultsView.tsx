@@ -482,6 +482,7 @@ export const ExamsResultsView: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [activeAcademicYearId, setActiveAcademicYearId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('overview');
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
@@ -556,11 +557,14 @@ export const ExamsResultsView: React.FC = () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [cls, subs, conf] = await Promise.all([
+      const [cls, subs, conf, years] = await Promise.all([
         ApiClient.getClasses(),
         ApiClient.getSubjects(),
-        ApiClient.getExamConfig()
+        ApiClient.getExamConfig(),
+        ApiClient.getAcademicYears()
       ]);
+      const activeYear = years.find(year => year.is_current || year.status === 'active');
+      setActiveAcademicYearId(activeYear?.id || '');
       setClasses(cls);
       if (cls.length > 0) setSelectedClassId(cls[0].id);
       setSubjects(subs);
@@ -624,7 +628,8 @@ export const ExamsResultsView: React.FC = () => {
         const ranks = await ApiClient.getSemesterRankings(selectedClassId, 'Semester 1');
         setSemRankings(ranks);
       } else if (activeTab === 'sem2_yearly') {
-        const yearly = await ApiClient.getYearlyRankings(selectedClassId);
+        if (!activeAcademicYearId) throw new Error('Activate an academic year before viewing yearly rankings.');
+        const yearly = await ApiClient.getYearlyRankings(selectedClassId, activeAcademicYearId);
         setYearlyRankings(yearly);
       }
     } catch (err: any) {
@@ -637,7 +642,7 @@ export const ExamsResultsView: React.FC = () => {
 
   useEffect(() => {
     void loadClassData();
-  }, [selectedClassId, selectedSemester, activeTab]);
+  }, [selectedClassId, selectedSemester, activeTab, activeAcademicYearId]);
 
   // Apply a familiar school scheme without replacing the editable component list.
   const applyExamSchemePreset = (preset: 'four-tests' | 'forty-sixty') => {
