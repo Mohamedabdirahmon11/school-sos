@@ -9657,7 +9657,7 @@ async function getSchoolSetupState(school: School) {
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
     queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
-    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
+    db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'and(father_phone.not.is.null,father_phone.neq.),and(mother_phone.not.is.null,mother_phone.neq.)', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
     db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
@@ -9727,7 +9727,7 @@ apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requ
 
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, city: school.city, phone: school.phone, email: school.email, whatsappPhone: school.whatsappPhone || '', schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
+  const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, ...((school.setupData as any)?.schoolInformation || {}), name: school.name, address: school.address, city: school.city, phone: school.phone, email: school.email, whatsappPhone: school.whatsappPhone || '', schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
   res.json({ data: current, school: { name: school.name, address: school.address, city: school.city, phone: school.phone, email: school.email, whatsappPhone: school.whatsappPhone || '', schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: normalizeSchoolSetupProgress(school.setupProgress) });
 });
 
