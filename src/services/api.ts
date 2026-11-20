@@ -7,6 +7,7 @@ import {
   UserRole,
   School,
   SchoolBranch,
+  SchoolCurrency,
   User,
   PlanConfig,
   SubscriptionInvoice,
@@ -403,7 +404,7 @@ export class ApiClient {
   public static async updateSchoolDetails(id: string, details: {
     name: string; email: string; address: string; city: string; country: string; region: string;
     schoolType: 'primary' | 'secondary' | 'combined'; phone: string;
-    whatsappPhone: string; brandColor: string; currency: 'ETB' | 'USD' | 'SOS'; language: 'en' | 'so' | 'am' | 'ar';
+    whatsappPhone: string; brandColor: string; currency: SchoolCurrency; language: 'en' | 'so' | 'am' | 'ar';
   }) {
     return this.request<School>(`/superadmin/schools/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -600,7 +601,14 @@ export class ApiClient {
   }
 
   public static async getClassGroups() {
-    return this.request<Array<{id:string;name:string;sort_order:number;class_sections:Array<{id:string;name:string;legacy_class_id:string|null}>}>>('/class-groups');
+    return this.request<Array<{
+      id: string; name: string; sort_order: number; is_active: boolean;
+      class_sections: Array<{
+        id: string; name: string; legacy_class_id: string | null; sort_order?: number;
+        max_students?: number; capacity?: number; class_teacher_id?: string | null;
+        student_count?: number; available_seats?: number; is_active?: boolean;
+      }>;
+    }>>('/class-groups');
   }
   public static async createClassGroup(name:string, sections:string[] = []) {
     return this.request('/class-groups',{method:'POST',body:JSON.stringify({name,sections})});
