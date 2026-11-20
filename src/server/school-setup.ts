@@ -2,8 +2,8 @@ import { School, SchoolSetupChecklistItem, SchoolSetupProgress, SchoolSetupProgr
 import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 
-export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 6, 8] as const;
-export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
+export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export const OPTIONAL_SCHOOL_SETUP_STEPS = [9] as const;
 
 export interface SchoolSetupEvidence {
   classNames: string[];
@@ -19,7 +19,7 @@ export interface SchoolSetupEvidence {
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const validSteps = (input: unknown) => Array.isArray(input) ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 1 && Number(step) <= 10))] : [];
-  const skippedSteps = validSteps(source.skippedSteps).filter(step => OPTIONAL_SCHOOL_SETUP_STEPS.includes(step as 7 | 9));
+  const skippedSteps = validSteps(source.skippedSteps).filter(step => OPTIONAL_SCHOOL_SETUP_STEPS.includes(step as 9));
   const rawCompletedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
   const rawCompletedAt = typeof source.completedAt === 'string' && source.completedAt.trim() ? source.completedAt : null;
   const fullyComplete = isSchoolSetupProgressComplete({ completedAt: rawCompletedAt, completedSteps: rawCompletedSteps, skippedSteps });
@@ -66,7 +66,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
-    7: step(evidence.timetableSlotCount > 0, true, 'Create at least one active timetable period, or skip and configure the timetable later.'),
+    7: step(evidence.timetableSlotCount > 0, false, 'Create at least one active timetable period for this school.'),
     8: step(Boolean(school.attendanceRules) && evidence.hasExamConfig, false, 'Review attendance rules and ensure this school has an exam configuration.'),
     9: step(evidence.feeStructureCount > 0, true, 'Create an active fee structure, or skip this step for the Accountant to configure later.')
   };
@@ -104,7 +104,7 @@ export function sanitizeSchoolSetupProgressUpdate(body: unknown): SchoolSetupPro
   }
   const completedSteps = parseSteps(source.completedSteps, 'Completed steps');
   const skippedSteps = parseSteps(source.skippedSteps, 'Skipped steps');
-  if (skippedSteps.some(id => !OPTIONAL_SCHOOL_SETUP_STEPS.includes(id as 7 | 9))) {
+  if (skippedSteps.some(id => !OPTIONAL_SCHOOL_SETUP_STEPS.includes(id as 9))) {
     throw new Error('Only timetable and fees/modules may be skipped.');
   }
   return { currentStep, completedSteps, skippedSteps, complete: source.complete === true };
