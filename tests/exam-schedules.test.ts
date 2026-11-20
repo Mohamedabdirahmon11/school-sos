@@ -108,8 +108,11 @@ test('Step 10B empty periods return complete data and invigilator replacement va
   assert.ok(termUi.includes('Daabac A4 (jadwalka + liisaska qolalka)'));
   assert.ok(api.includes("apiRouter.delete('/exams/term-periods/:periodId'"));
   assert.ok(api.includes("period.status !== 'draft'"));
-  assert.ok(api.includes("exam_schedules').delete()"));
-  assert.ok(api.indexOf("exam_schedules').delete()") < api.indexOf("exam_periods').delete()"));
+  const deleteStart = api.indexOf("apiRouter.delete('/exams/term-periods/:periodId'");
+  const deleteEnd = api.indexOf("\\n});", deleteStart);
+  const deleteRoute = api.slice(deleteStart, deleteEnd);
+  assert.ok(deleteRoute.includes("from('exam_schedules').delete()"));
+  assert.ok(deleteRoute.indexOf("from('exam_schedules').delete()") < deleteRoute.indexOf("from('exam_periods').delete()"));
   assert.ok(api.includes("schedule.status === 'published'"));
   assert.ok(client.includes('deleteTermExamPeriod'));
   assert.ok(termUi.includes('Jooji draft-ka'));
