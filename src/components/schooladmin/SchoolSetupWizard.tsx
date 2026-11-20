@@ -35,8 +35,8 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the active academic year and configure Semester 1 and Semester 2.', coreSteps: [2, 3] },
   { id: 2, title: 'School Information & WhatsApp', description: 'Save the school identity, city, contact details and administration WhatsApp number.', coreSteps: [1] },
   { id: 3, title: 'Classes & Grades', description: 'Create classes and sections, including KG 1 and KG 2 when offered.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
-  { id: 4, title: 'Subjects', description: 'Select or create the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Class curriculum', view: 'sch_curriculum' }] },
-  { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific Teacher IDs and PIN/password logins.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }, { label: 'Teacher assignments', view: 'sch_teacher_assignments' }] },
+  { id: 4, title: 'Subjects', description: 'Select or create the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Class–Subject Curriculum', view: 'sch_curriculum' }] },
+  { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific Teacher IDs and PIN/password logins.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }, { label: 'Teacher Assignments', view: 'sch_teacher_assignments' }] },
   { id: 6, title: 'Students & Parents', description: 'Register students and parents; use bulk import and bulk PIN tools where needed.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
   { id: 7, title: 'Timetable & School Hours', description: 'Set the school calendar and daily hours, then create the active class timetable.', coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
   { id: 8, title: 'Attendance & Exams', description: 'Review attendance rules and configure examinations before opening the dashboard.', views: [{ label: 'Open Attendance', view: 'sch_attendance' }, { label: 'Open Exams', view: 'sch_exams' }] },
@@ -234,6 +234,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete, onNavigate }) =
   if (showChecklist) return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
     <header className="rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
       <p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · FIRST-TIME SETUP</p>
+      <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-teal-100">Setup progress</p>
       <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Complete your school setup</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Your progress is saved to this school. Open a section, save it, then return here to refresh its readiness check. The Dashboard stays locked until the required steps are verified.</p>
       <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
