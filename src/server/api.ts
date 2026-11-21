@@ -3816,6 +3816,73 @@ async function queryAllRows(table: string, filters: Record<string, string | stri
   }
   return rows;
 }
+
+type TeacherTermAssignmentScope = {
+  academicYearId: string;
+  termId: string;
+  allowedSubjectIds: Set<string>;
+  allowedStudentIds: Set<string>;
+};
+
+/** Resolve teacher access from the immutable academic-year/term assignment and enrollment history. */
+async function getTeacherTermAssignmentScope(
+  school: School,
+  userId: string,
+  academicYearName: string,
+  semester: 'Semester 1' | 'Semester 2',
+  classId: string,
+  subjectId?: string,
+  studentId?: string,
+  requireActiveEnrollment = false
+): Promise<TeacherTermAssignmentScope | null> {
+  const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: userId }, 1, 1, undefined, 'id,status');
+  const teacher = teacherPage.items[0] as any;
+  if (!teacher || String(teacher.status || '').toLowerCase() !== 'active') return null;
+
+  const years = await queryAllRows('academic_years', { school_id: school.id, name: academicYearName }, 'id');
+  const academicYear = years[0] as any;
+  if (!academicYear?.id) return null;
+
+  const terms = await queryAllRows('terms', {
+    school_id: school.id, academic_year_id: String(academicYear.id), name: semester
+  }, 'id');
+  const term = terms[0] as any;
+  if (!term?.id) return null;
+
+  const assignmentFilters: Record<string, string | string[] | undefined> = {
+    school_id: school.id,
+    academic_year_id: String(academicYear.id),
+    class_id: classId,
+    teacher_id: String(teacher.id)
+  };
+  if (subjectId) assignmentFilters.subject_id = subjectId;
+  const assignmentRows = await queryAllRows(
+    'teacher_class_subject_assignments', assignmentFilters, 'id,term_id,section_id,subject_id'
+  );
+  const assignments = assignmentRows.filter((item: any) => !item.termId || item.termId === term.id);
+
+  const enrollmentFilters: Record<string, string | string[] | undefined> = {
+    school_id: school.id, academic_year_id: String(academicYear.id), class_id: classId
+  };
+  if (studentId) enrollmentFilters.student_id = studentId;
+  const enrollmentRows = await queryAllRows('enrollments', enrollmentFilters, 'student_id,section_id,status');
+  const eligibleEnrollments = enrollmentRows.filter((item: any) =>
+    !requireActiveEnrollment || item.status === 'active'
+  );
+  const applicableAssignments = assignments.filter((assignment: any) =>
+    !assignment.sectionId || eligibleEnrollments.some((enrollment: any) => enrollment.sectionId === assignment.sectionId)
+  );
+  const allowedEnrollments = eligibleEnrollments.filter((enrollment: any) =>
+    applicableAssignments.some((assignment: any) => !assignment.sectionId || assignment.sectionId === enrollment.sectionId)
+  );
+
+  return {
+    academicYearId: String(academicYear.id),
+    termId: String(term.id),
+    allowedSubjectIds: new Set(applicableAssignments.map((item: any) => String(item.subjectId))),
+    allowedStudentIds: new Set(allowedEnrollments.map((item: any) => String(item.studentId)))
+  };
+}
 const formatSimpleStudentId = (number: number) => `S${String(number).padStart(3, '0')}`;
 
 /** Simple per-school student IDs (S001, S002, ...). Existing IDs are never reused or changed. */
@@ -3962,11 +4029,8 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) 
   const termId = typeof req.query.termId === 'string' ? req.query.termId : '';
   const sectionId = typeof req.query.sectionId === 'string' ? req.query.sectionId : '';
   if (role === 'teacher') {
-    const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,status');
-    if (!own.items.length || String((own.items[0] as any).status || '').toLowerCase() !== 'active') {
-      res.status(403).json({ error: 'An active teacher profile is required to view a teaching timetable.' });
-      return;
-    }
+    const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+    if (!own.items.length) { res.json([]); return; }
     if (String(req.query.scope || '') === 'school') teacherId = '';
     else teacherId = String(own.items[0].id);
   } else if (role === 'parent' || role === 'student') {
@@ -4403,18 +4467,16 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
   if (!termId || !(await db.queryPage('terms', { school_id: school.id, id: termId }, 1, 1, undefined, 'id')).total) { res.status(400).json({ error: 'Dooro term sax ah oo dugsigan ka tirsan.' }); return; }
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
-  const [assignments, allSlots, unavailable, settings, teacherAssignments, rooms, subjectRows, teacherRows] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, teacherAssignments, rooms, subjectRows] = await Promise.all([
     db.queryPage('class_subjects', { school_id: school.id, class_id: classId, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number,shift'),
     db.getTimetableSettings(school.id),
     queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
     queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
-    queryAllRows('subjects', { school_id: school.id }, 'id,name'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,status')
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
   const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
-  const activeTeacherIds = new Set(teacherRows.filter((teacher: any) => String(teacher.status || '').toLowerCase() === 'active').map((teacher: any) => String(teacher.id)));
   const timetableAssignments = assignments.items.flatMap((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
     const exact = matches.filter((candidate: any) => candidate.termId === termId);
@@ -4423,16 +4485,6 @@ apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmi
       ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
       : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
   });
-  const inactiveTeacherAssignments = timetableAssignments.filter((item: any) =>
-    Number(item.periodsPerWeek) > 0 && (!item.teacherId || !activeTeacherIds.has(String(item.teacherId)))
-  );
-  if (inactiveTeacherAssignments.length) {
-    res.status(409).json({
-      error: 'Timetable generation requires an active teacher for every scheduled class subject. Existing timetable was not changed.',
-      unassignedOrInactive: inactiveTeacherAssignments.map((item: any) => ({ classId, subjectId: item.subjectId, teacherId: item.teacherId || null }))
-    });
-    return;
-  }
   const schedulableAssignments = timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0);
   if (!schedulableAssignments.length) {
     res.status(400).json({ error: 'Fasalkan maaddooyin/macallimiin jadwal loo qoondeeyay ma leh. Marka hore Subject Assignments ka dooro maaddooyinka, macallimiinta iyo periods per week. Jadwalkii hore waxba lagama beddelin.' });
@@ -4568,7 +4620,7 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
   const classes = (await db.getClasses(school.id)).filter((klass: any) => !klass.isArchived);
   if (!classes.length) { res.status(400).json({ error: 'No active classes are available for timetable generation.' }); return; }
 
-  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments, rooms, subjectRows, teacherRows] = await Promise.all([
+  const [assignments, allSlots, unavailable, settings, allClassRows, teacherAssignments, rooms, subjectRows] = await Promise.all([
     queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
     queryAllRows('timetable_slots', { school_id: school.id, term_id: termId, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id'),
     queryAllRows('teacher_unavailability', { school_id: school.id }, 'id,teacher_id,day_of_week,period_number,shift'),
@@ -4576,11 +4628,9 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
     queryAllRows('classes', { school_id: school.id }, 'id,shift'),
     queryAllRows('teacher_class_subject_assignments', { school_id: school.id }, 'id,school_id,term_id,class_id,section_id,subject_id,teacher_id'),
     queryAllRows('rooms', { school_id: school.id }, 'id,school_id,name,type,capacity'),
-    queryAllRows('subjects', { school_id: school.id }, 'id,name'),
-    queryAllRows('teachers', { school_id: school.id }, 'id,status')
+    queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
   const subjectNameById = new Map(subjectRows.map((item: any) => [item.id, String(item.name || '')]));
-  const activeTeacherIds = new Set(teacherRows.filter((teacher: any) => String(teacher.status || '').toLowerCase() === 'active').map((teacher: any) => String(teacher.id)));
   const timetableAssignments = assignments.flatMap((item: any) => {
     const matches = teacherAssignments.filter((candidate: any) => candidate.classId === item.classId && candidate.subjectId === item.subjectId && (!candidate.termId || candidate.termId === termId));
     const exact = matches.filter((candidate: any) => candidate.termId === termId);
@@ -4589,16 +4639,6 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
       ? applicable.map((selected: any) => ({ ...item, teacherId: selected.teacherId || '', assignmentId: selected.id, sectionId: selected.sectionId || null }))
       : [{ ...item, teacherId: item.teacherId || '', assignmentId: undefined, sectionId: null }];
   });
-  const inactiveTeacherAssignments = timetableAssignments.filter((item: any) =>
-    Number(item.periodsPerWeek) > 0 && (!item.teacherId || !activeTeacherIds.has(String(item.teacherId)))
-  );
-  if (inactiveTeacherAssignments.length) {
-    res.status(409).json({
-      error: 'Bulk timetable generation requires an active teacher for every scheduled class subject. Existing timetables were not changed.',
-      unassignedOrInactive: inactiveTeacherAssignments.map((item: any) => ({ classId: item.classId, subjectId: item.subjectId, teacherId: item.teacherId || null }))
-    });
-    return;
-  }
   const shiftByClass = new Map(allClassRows.map((klass: any) => [klass.id, Number(klass.shift) === 2 ? 2 : 1]));
   const targetIds = new Set(timetableAssignments.filter((item: any) => Number(item.periodsPerWeek) > 0).map((item: any) => item.classId));
   // Existing timetables for classes without schedulable assignments remain in place
@@ -6962,17 +7002,33 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       marks = marks.filter(mark => Boolean(mark.publishedAt));
     }
     if (normalizeRole(user.role) === 'teacher') {
-      const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
+      const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,status');
       const teacher = teacherPage.items[0] as any;
-      if (!teacher) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
-      const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
-      const student = await db.getStudentById(studentId as string, school.id);
-      const klass = student ? await db.getClassById(student.classId, school.id) : null;
-      const isFormTeacher = Boolean(student && klass && klass.classTeacherId === user.id);
-      if (!isFormTeacher) {
-        const allowedSubjects = new Set(assigned.items.filter((item: any) => item.classId === student?.classId).map((item: any) => item.subjectId));
-        marks = marks.filter(mark => allowedSubjects.has(mark.subjectId));
+      if (!teacher || String(teacher.status || '').toLowerCase() !== 'active') {
+        res.status(403).json({ error: 'An active teacher profile is required to access results.' });
+        return;
       }
+      const student = await db.getStudentById(studentId as string, school.id);
+      const currentClass = student ? await db.getClassById(student.classId, school.id) : null;
+      const scopeCache = new Map<string, Promise<TeacherTermAssignmentScope | null>>();
+      const canReadMark = async (mark: any) => {
+        const markClassId = String(mark.classId || student?.classId || '');
+        if (!markClassId) return false;
+        if (currentClass?.classTeacherId === user.id && markClassId === student?.classId) return true;
+        const yearName = String(mark.academicYear || school.academicYear || '');
+        const termName = String(mark.semester || '');
+        const key = [yearName, termName, markClassId].join('|');
+        if (!scopeCache.has(key)) {
+          scopeCache.set(key, getTeacherTermAssignmentScope(
+            school, user.id, yearName, termName as 'Semester 1' | 'Semester 2',
+            markClassId, undefined, studentId as string, false
+          ));
+        }
+        const scope = await scopeCache.get(key)!;
+        return Boolean(scope && scope.allowedStudentIds.has(studentId as string) && scope.allowedSubjectIds.has(String(mark.subjectId)));
+      };
+      const visibility = await Promise.all(marks.map(canReadMark));
+      marks = marks.filter((_mark, index) => visibility[index]);
     }
     const subjectIds = [...new Set(marks.map(mark => mark.subjectId))];
     const subjects = subjectIds.length
@@ -6984,28 +7040,31 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
   }
   if (!classId) { res.status(400).json({ error: 'classId is required' }); return; }
   if (user.role === 'teacher') {
-    const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-    const teacher = teacherPage.items[0] as any;
     const klass = await db.getClassById(String(classId), school.id);
-    const isFormTeacher = Boolean(teacher && klass && klass.classTeacherId === user.id);
-    const assigned = teacher
-      ? await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, class_id: String(classId), is_active: 'true' }, 1, 100, undefined, 'id,subject_id')
-      : { items: [] as any[], total: 0, page: 1, pageSize: 100 };
-    const ownSubjectIds = new Set(assigned.items.map((item: any) => item.subjectId));
-    if (!isFormTeacher && ownSubjectIds.size === 0) {
-      res.status(403).json({ error: 'You are not assigned to this class as a subject teacher or Form Teacher.' });
+    if (!klass) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
+    const requestedSemester = (semester as string) || school.currentSemester || 'Semester 1';
+    if (!['Semester 1', 'Semester 2'].includes(requestedSemester)) {
+      res.status(400).json({ error: 'Choose a valid semester to review marks.' });
       return;
     }
-    // Form Teachers may review the whole class register, but subject teachers
-    // may only read their own assigned subjects. This is read-only access.
-    if (subjectId && !isFormTeacher && !ownSubjectIds.has(String(subjectId))) {
-      res.status(403).json({ error: 'You may only access subjects assigned to you.' });
+    const isFormTeacher = klass.classTeacherId === user.id;
+    const scope = await getTeacherTermAssignmentScope(
+      school, user.id, String(klass.academicYear || school.academicYear || ''),
+      requestedSemester as 'Semester 1' | 'Semester 2', String(classId),
+      subjectId ? String(subjectId) : undefined
+    );
+    if (!isFormTeacher && (!scope || scope.allowedSubjectIds.size === 0)) {
+      res.status(403).json({ error: 'You are not assigned to this class and term as an active subject teacher or Form Teacher.' });
       return;
     }
-    const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
+    if (subjectId && !isFormTeacher && !scope?.allowedSubjectIds.has(String(subjectId))) {
+      res.status(403).json({ error: 'You may only access subjects assigned to you for this term and section.' });
+      return;
+    }
+    const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, requestedSemester as any);
     res.json(isFormTeacher
       ? classMarks
-      : classMarks.filter(mark => ownSubjectIds.has(mark.subjectId)));
+      : classMarks.filter(mark => scope!.allowedSubjectIds.has(mark.subjectId) && scope!.allowedStudentIds.has(mark.studentId)));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
@@ -7028,32 +7087,23 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     res.status(400).json({ error: 'A class, subject, valid semester, and 1–2,000 student mark rows are required.' });
     return;
   }
-  if (!await canAccessTeachingClass(req, res, classId)) return;
   const subjectResult = await db.queryPage('subjects', { school_id: school.id, id: subjectId }, 1, 1, undefined, 'id');
   if (!subjectResult.items.length) {
     res.status(400).json({ error: 'The selected subject does not belong to this school.' });
     return;
   }
-  if (normalizeRole(user.role) === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
-    if (!teacher.items.length) {
-      res.status(403).json({ error: 'Your teacher profile is not linked to this school.' });
-      return;
-    }
-    const teacherRecord = teacher.items[0] as any;
-    const klass = await db.getClassById(String(classId), school.id);
-    const isFormTeacher = Boolean(klass && klass.classTeacherId === user.id);
-    const assignment = await db.queryPage('class_subjects', {
-      school_id: school.id,
-      class_id: classId,
-      subject_id: subjectId,
-      teacher_id: teacherRecord.id,
-      is_active: 'true'
-    }, 1, 1, undefined, 'id');
-    if (!assignment.total) {
-      res.status(403).json({ error: 'You may enter marks only for a subject explicitly assigned to your teacher profile. Form Teacher access is review-only.' });
-      return;
-    }
+  const klass = await db.getClassById(String(classId), school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  const teacherScope = await getTeacherTermAssignmentScope(
+    school, user.id, String(klass.academicYear || school.academicYear || ''),
+    semester as 'Semester 1' | 'Semester 2', String(classId), subjectId
+  );
+  if (!teacherScope || !teacherScope.allowedSubjectIds.has(String(subjectId))) {
+    res.status(403).json({ error: 'You may submit marks only for a subject and section assigned to your active teacher profile in this academic term. Form Teacher access is review-only.' });
+    return;
   }
   const seenStudentIds = new Set<string>();
   for (const mark of marks) {
@@ -7072,10 +7122,8 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     }
     seenStudentIds.add(mark.studentId);
   }
-  const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
-  const classStudentIds = new Set(classStudents.map((student: any) => student.id));
-  if (marks.some(mark => !classStudentIds.has(mark.studentId))) {
-    res.status(400).json({ error: 'Marks can only be entered for students currently enrolled in the selected class.' });
+  if (marks.some(mark => !teacherScope.allowedStudentIds.has(mark.studentId))) {
+    res.status(403).json({ error: 'Marks can only be entered for students actively enrolled in the assigned class section for this academic year and term.' });
     return;
   }
 
