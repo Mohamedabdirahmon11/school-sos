@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { staffHasPermission } from '../src/lib/staff-permissions.ts';
+import { staffHasPermission, STAFF_PERMISSION_REGISTRY } from '../src/lib/staff-permissions.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -17,7 +17,7 @@ test('finance, payroll, admissions, inventory, grades and reports enforce staff 
   const staffUi = read('../src/components/schooladmin/StaffAccessView.tsx');
   for (const permission of ['fees_manage', 'payroll_manage', 'admissions_manage', 'inventory_manage', 'grades_manage', 'reports_export']) {
     assert.ok(api.includes(`requireSchoolAdminOrStaffPermission('${permission}')`) || api.includes(`requireAccountantOrSuperAdmin('${permission}')`) || api.includes(`'${permission}'`), `API enforces ${permission}`);
-    assert.ok(staffUi.includes(`id: '${permission}'`), `staff UI exposes ${permission}`);
+    assert.ok(STAFF_PERMISSION_REGISTRY.some(entry => entry.id === permission) && staffUi.includes('STAFF_PERMISSION_REGISTRY'), `staff UI exposes ${permission} through the shared registry`);
   }
   assert.match(api, /getStaffForRequest\(req, user\.id, school\.id\), 'fees_manage'/);
   assert.match(api, /requireAccountantOrSuperAdmin\('payroll_manage'\)/);
