@@ -1515,7 +1515,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 /* School Admin-only layout corrections. Keep inspected-school Super Admin views untouched. */
 .school-admin-role {
   --admin-primary: var(--brand-color, #2563eb);
-  --sidebar-width: var(--sidebar-width, 260px);
   min-width: 0;
 }
 .school-admin-role > .flex-1.flex.overflow-hidden {
@@ -1589,7 +1588,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-role main button {
   font-size: 13px;
 }
-.school-admin-role main table {
+ .school-admin-role main table {
   min-width: 0;
 }
 .school-admin-role main .overflow-x-auto {
@@ -1610,6 +1609,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
     padding: 18px 14px calc(28px + env(safe-area-inset-bottom));
   }
   .school-admin-role main h1 { font-size: 20px; }
-  .school-admin-role main table { min-width: 640px; }
+  .school-admin-role main .overflow-x-auto table { min-width: 640px; }
   .school-admin-role header { min-height: 56px; }
 }
