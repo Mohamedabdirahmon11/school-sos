@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { translations, LanguageCode, TranslationDict } from '../../lib/translations.ts';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
-import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
+import { hasStaffNavigationPermission, type StaffPermission } from '../../lib/staff-permissions.ts';
 import {
   LayoutDashboard, Building2, Receipt, Users, BarChart3, Radio, LifeBuoy,
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
@@ -19,7 +19,7 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string; fill?: string }>; permission?: 'fees_manage' | 'payroll_manage' | 'reports_export' };
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string; fill?: string }>; permission?: StaffPermission };
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
