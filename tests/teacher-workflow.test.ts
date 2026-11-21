@@ -351,3 +351,11 @@ test('Form Teachers are restricted to their own parent-contact class and attenda
   assert.match(api, /async function canAccessFormTeacherClass/);
   assert.match(api, /Attendance access is limited to your own Form Teacher class/);
 });
+
+test('Form Teacher student list and direct student reads are limited to current-year Form Teacher classes', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /async function getTeacherFormTeacherClassIds/);
+  assert.match(api, /const ownFormTeacherClasses = await getTeacherFormTeacherClassIds/);
+  assert.match(api, /if \(formTeacherClassIds\.length\) return formTeacherClassIds\.includes\(currentClassId\)/);
+  assert.match(api, /getStudentCurrentClassId\(student\.schoolId, student\.id, student\.classId\)/);
+});

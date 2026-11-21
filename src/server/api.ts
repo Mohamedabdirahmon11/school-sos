@@ -373,6 +373,19 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
   return requestLookup(req, `staff:${schoolId}:${userId}`, () => db.getStaffMemberByUserId(userId, schoolId));
 }
 
+async function getTeacherFormTeacherClassIds(schoolId: string, userId: string): Promise<string[]> {
+  const rows = await queryAllRows('classes', { school_id: schoolId, class_teacher_id: userId, is_archived: 'false' }, 'id');
+  return [...new Set(rows.map((row: any) => String(row.id)))];
+}
+
+async function getStudentCurrentClassId(schoolId: string, studentId: string, fallbackClassId = ''): Promise<string> {
+  const year = await db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
+  const academicYearId = String((year.items[0] as any)?.id || '');
+  if (!academicYearId) return fallbackClassId;
+  const enrollment = await db.queryPage('enrollments', { school_id: schoolId, academic_year_id: academicYearId, student_id: studentId, status: 'active' }, 1, 1, undefined, 'class_id');
+  return String((enrollment.items[0] as any)?.classId || '');
+}
+
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
   // Resolve both subject-teaching and Form Teacher scopes through school-bound
   // joins. This avoids a separate teachers lookup and avoids loading every class.
@@ -622,16 +635,18 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
   if (user.role === 'super_admin' || user.role === 'school_admin' || user.role === 'accountant') return true;
   if (user.role === 'teacher') {
+    const currentClassId = await getStudentCurrentClassId(student.schoolId, student.id, student.classId);
+    if (!currentClassId) return false;
+    const formTeacherClassIds = await getTeacherFormTeacherClassIds(student.schoolId, user.id);
+    // A Form Teacher is confined to their own class even if they also teach other subjects.
+    if (formTeacherClassIds.length) return formTeacherClassIds.includes(currentClassId);
     const teacherPage = await db.queryPage('teachers', { school_id: student.schoolId, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
     const teacher = teacherPage.items[0] as any;
     if (!teacher) return false;
-    const klass = await db.getClassById(student.classId, student.schoolId);
-    if (klass && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
-    )) return true;
+    const klass = await db.getClassById(currentClassId, student.schoolId);
+    if (klass && (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(currentClassId))) return true;
     const assignment = await db.queryPage('class_subjects', {
-      school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, is_active: 'true'
+      school_id: student.schoolId, teacher_id: teacher.id, class_id: currentClassId, is_active: 'true'
     }, 1, 1, undefined, 'id');
     return assignment.items.length > 0;
   }
@@ -4914,7 +4929,8 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   let roleFilter: string | undefined;
   let teacherAssignedClassIds: string[] = [];
   if (user.role === 'teacher') {
-    const assigned = await getTeacherAssignedClassIds(school.id, user.id);
+    const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
+    const assigned = ownFormTeacherClasses.length ? ownFormTeacherClasses : await getTeacherAssignedClassIds(school.id, user.id);
     teacherAssignedClassIds = assigned;
     if (classId && !assigned.includes(classId)) { res.status(403).json({ error: 'Student access is limited to your assigned classes.' }); return; }
     if (!assigned.length) { res.json([]); return; }
