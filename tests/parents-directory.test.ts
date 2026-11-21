@@ -16,7 +16,7 @@ test('parent contacts are derived from active students scoped to the current sch
   assert.ok(route.includes('studentClassFilter = requestedClassId || ownClassIds'))
   assert.ok(route.includes('school_id: school.id'))
   assert.ok(route.includes("status: 'active'"))
-  assert.ok(route.includes('class_id: studentClassFilter'))
+  assert.ok(route.includes('studentFilters.class_id = studentClassFilter'))
 });
 
 test('guardian phone numbers are normalized and deduplicated per school', () => {
