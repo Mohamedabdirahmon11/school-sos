@@ -1511,3 +1511,57 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   .school-admin-design header { min-height:54px; height:54px; padding:8px 12px; }
   .school-admin-design main > div { padding:14px; }
 }
+
+
+/* Phase 3 shared tokens and responsive data-table behavior. */
+:root {
+  --schoolos-font-xs: 0.75rem;
+  --schoolos-font-sm: 0.875rem;
+  --schoolos-font-base: 1rem;
+  --schoolos-space-1: 0.25rem;
+  --schoolos-space-2: 0.5rem;
+  --schoolos-space-3: 0.75rem;
+  --schoolos-space-4: 1rem;
+  --schoolos-space-6: 1.5rem;
+  --schoolos-control-height: 2.75rem;
+  --schoolos-focus-ring: #0f766e;
+}
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--schoolos-focus-ring);
+  outline-offset: 2px;
+}
+:where(button, input, select, textarea) {
+  font: inherit;
+}
+button:disabled, [aria-disabled="true"] {
+  cursor: not-allowed;
+}
+.school-admin-design main .overflow-x-auto,
+.accountant-design main .overflow-x-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.school-admin-design main .overflow-x-auto:focus-visible,
+.accountant-design main .overflow-x-auto:focus-visible {
+  outline: 2px solid var(--schoolos-focus-ring);
+  outline-offset: -2px;
+}
+@media (max-width: 767px) {
+  .school-admin-design main .overflow-x-auto table,
+  .accountant-design main .overflow-x-auto table {
+    min-width: 640px;
+  }
+  .school-admin-design main,
+  .accountant-design main {
+    min-width: 0;
+    width: 100%;
+  }
+}
+@media (max-width: 420px) {
+  .school-admin-design main .overflow-x-auto,
+  .accountant-design main .overflow-x-auto {
+    max-width: calc(100vw - 28px);
+  }
+}
