@@ -1353,7 +1353,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   background:radial-gradient(ellipse at 95% 0%,rgba(37,99,235,.045),transparent 34%),var(--admin-canvas);
   scrollbar-width:thin;scrollbar-color:#c6d3e5 transparent;
 }
-.school-admin-design main > div { width:100%;max-width:1600px;margin-inline:auto;padding:26px clamp(16px,2.4vw,34px) 38px; }
+.school-admin-design main > div { width:100%;max-width:1600px;margin-inline:auto; }
 .school-admin-design main h1 { color:#17264a;font-weight:800;letter-spacing:-.04em; }
 .school-admin-design main h2 { color:#1b3156;font-weight:800; }
 .school-admin-design main :is(.bg-white,[class*="bg-white/"]) { background-color:#fff; }
@@ -1395,7 +1395,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 @media(max-width:767px) {
   .school-admin-design header { min-height:58px;height:58px;padding-inline:12px; }
   .school-admin-design aside { width:min(84vw,310px); }
-  .school-admin-design main > div { padding:20px 14px 28px; }
+
   .school-admin-design .school-admin-metric { min-height:116px;padding:15px!important; }
   .school-admin-design .school-admin-metric .metric-value { font-size:25px; }
 }
