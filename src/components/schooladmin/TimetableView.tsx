@@ -436,6 +436,8 @@ export const TimetableView: React.FC = () => {
     }
   };
 
+  const conflictingSlotIds = new Set(timetable.filter(slot => slot.teacherId && timetable.some(other => other.id !== slot.id && other.teacherId === slot.teacherId && other.dayOfWeek === slot.dayOfWeek && other.periodNumber === slot.periodNumber && (Number(other.shift) === 2 ? 2 : 1) === (Number(slot.shift) === 2 ? 2 : 1))).map(slot => slot.id));
+  const timetableConflictCount = conflictingSlotIds.size;
   const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
   const orderedClasses = [...classes].sort((a, b) => {
@@ -471,11 +473,11 @@ export const TimetableView: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="schoolos-timetable-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            School Timetable
+            Jadwalka
           </h1>
           <p className="text-xs text-[#64748B]">
             Jadwal fasal kasta gooni ayuu u yahay. Waxaa muuqda maaddada iyo waqtiga oo keliya.
@@ -486,13 +488,13 @@ export const TimetableView: React.FC = () => {
         </div>}
 
         <div className="flex w-full flex-wrap items-end gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm self-start sm:self-auto">
-          {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+          {viewMode === 'class' && sections.length > 0 && <select aria-label="Qaybta fasalka" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             {sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>}
-          {terms.length > 0 && <select aria-label="Academic term" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
+          {terms.length > 0 && <select aria-label="Term-ka waxbarashada" value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             {terms.map(term => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? ' · Current' : ''}</option>)}
           </select>}
-          <span className="rounded-full border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-1.5 text-[11px] font-semibold text-[#0F766E]">Coverage {coveragePercent}% · {placedPeriods}/{requiredPeriods || 0} periods</span>
+          <span className="rounded-full border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-1.5 text-[11px] font-semibold text-[#0F766E]">Coverage {coveragePercent}% · {placedPeriods}/{requiredPeriods || 0} periods</span><span role="status" className={timetableConflictCount ? "rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-700" : "rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700"}>{timetableConflictCount ? `${timetableConflictCount} unug oo isku-dhac ah` : "Isku-dhac majiro"}</span>
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
             <option value="class">{t('timetable_view_class')}</option>
             <option value="teacher">{t('timetable_view_teacher')}</option>
@@ -501,6 +503,7 @@ export const TimetableView: React.FC = () => {
           </select>
           <select
             value={selectedClassId}
+            aria-label="Fasal"
             onChange={e => {
               const nextClassId = e.target.value;
               setSelectedClassId(nextClassId);
@@ -522,7 +525,7 @@ export const TimetableView: React.FC = () => {
             <select value={selectedTeacherShift} onChange={e => setSelectedTeacherShift(Number(e.target.value) as 1 | 2)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white"><option value={1}>Shift 1 · Morning</option>{(settings.shiftCount === 2 || classes.some(klass => Number(klass.shift) === 2)) && <option value={2}>Shift 2 · Afternoon</option>}</select>
           </>}
           
-          <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Auto-generate All</button>
+          <button onClick={() => void handleGenerateAll()} disabled={isReadOnly || !classes.length} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"><WandSparkles className="h-3.5 w-3.5" /> Si toos ah u kala firdhi</button>
           <button type="button" onClick={() => void handleClearSelectedClass()} disabled={isReadOnly || !selectedClassId || !selectedTermId} className="px-3 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-700 disabled:opacity-40">Clear class</button>
           {terms.length > 1 && <>
             <select aria-label="Copy timetable from term" value={copySourceTermId} onChange={e => setCopySourceTermId(e.target.value)} className="px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
@@ -756,8 +759,7 @@ export const TimetableView: React.FC = () => {
                       {periods.map(period => {
                         const slot = timetable.find(item => item.classId === klass.id && item.dayOfWeek === day && item.periodNumber === period && (viewMode !== 'class' || !selectedSectionId || !item.sectionId || item.sectionId === selectedSectionId));
                         const subject = subjects.find(item => item.id === slot?.subjectId);
-                        const teacher = teachers.find(item => item.id === slot?.teacherId);
-                        const registeredRoom = rooms.find(item => item.id === slot?.roomId);
+                        const hasTeacherClash = Boolean(slot && conflictingSlotIds.has(slot.id));
                         const isClosedPeriod = !hasConfiguredWorkingDays && day === 'Friday' && period === 6;
                         return (
                           <td key={period} className={`h-14 border-b border-r p-1 text-center align-middle ${!hasConfiguredWorkingDays && day === 'Friday' && period === 6 ? 'hidden' : ''}`}>
@@ -768,15 +770,15 @@ export const TimetableView: React.FC = () => {
                                 onDragEnd={() => setDraggingSlotId('')}
                                 onDragOver={event => { if (draggingSlotId && draggingSlotId !== slot.id) event.preventDefault(); }}
                                 onDrop={event => { event.preventDefault(); const sourceId = event.dataTransfer.getData('text/plain') || draggingSlotId; if (sourceId) void handleSwapSlots(sourceId, slot); }}
-                                className={`rounded-md border border-[#CCFBF1] bg-[#F0FDFA] p-1.5 ${!isReadOnly ? 'cursor-grab hover:border-[#0F766E]' : ''} ${draggingSlotId === slot.id ? 'opacity-50' : ''}`}
+                                className={`rounded-md border p-1.5 ${hasTeacherClash ? "border-rose-400 bg-rose-50" : "border-[#CCFBF1] bg-[#F0FDFA]"} ${!isReadOnly ? 'cursor-grab hover:border-[#0F766E]' : ''} ${draggingSlotId === slot.id ? 'opacity-50' : ''}`}
                                 onClick={() => { if (!isReadOnly) { setSelectedClassId(klass.id); setSelectedSectionId(slot.sectionId || ''); setDayOfWeek(day); setPeriodNumber(period); setStartTime(slot.startTime); setEndTime(slot.endTime); setSubjectId(slot.subjectId); setTeacherId(slot.teacherId || ''); setRoomNumber(slot.roomNumber || klass.roomNumber || ''); setRoomId(slot.roomId || ''); setShowAddModal(true); } }}>
                                 <strong className="block break-words text-[10px] text-[#0F766E]">{subject?.name || 'Subject'}</strong>
                                 <span className="mt-1 block font-mono text-[9px] text-[#64748B]">{slot.startTime}–{slot.endTime}</span>
-                                <span className="mt-1 block text-[9px] text-[#475569]">{teacher?.fullName || 'Macallin lama qoondeyn'}</span>
-                                <span className="block text-[9px] text-[#64748B]">{registeredRoom?.name || slot.roomNumber || 'Qol lama cayimin'}</span>
+                                {hasTeacherClash && <span className="mt-1 block text-[9px] font-bold text-rose-700">Macallin mashquul</span>}
+                                {!slot.teacherId && <span className="mt-1 block text-[9px] font-semibold text-amber-700">Macallin la’aan</span>}
                                 {!isReadOnly && <div className="mt-1 flex items-center justify-center gap-2"><button type="button" onClick={event => { event.stopPropagation(); void handleToggleLock(slot); }} className="text-[9px] font-semibold text-amber-700 underline">{slot.isLocked ? 'Fur casharka' : 'Xir casharka'}</button><button type="button" onClick={event => { event.stopPropagation(); void handleRemovePeriod(slot); }} disabled={slot.isLocked} className="text-[9px] text-rose-700 underline disabled:opacity-40">{t('timetable_remove_period')}</button></div>}
                               </div>
-                            ) : <span className="text-[9px] text-[#CBD5E1]">—</span>}
+                            ) : <span className="inline-flex min-h-10 min-w-12 items-center justify-center rounded-lg border border-dashed border-[#CBD5E1] text-sm text-[#94A3B8]">—</span>}
                           </td>
                         );
                       })}

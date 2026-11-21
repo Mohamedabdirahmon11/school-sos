@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -2005,4 +2006,287 @@ button:disabled, [aria-disabled="true"] {
 @media (max-width: 767px) {
   .school-admin-role { zoom: 1; }
   .school-admin-role .school-dashboard-hero { border-radius: 14px; }
+}
+
+
+/* SchoolOS academic workspace — shared visual tokens (presentation only). */
+:root {
+  --schoolos-font-body: "Inter", system-ui, sans-serif;
+  --schoolos-font-heading: "Space Grotesk", "Inter", sans-serif;
+  --schoolos-accent: #0e6a62;
+  --schoolos-accent-hover: #0a5751;
+  --schoolos-surface: #ffffff;
+  --schoolos-canvas: #f5f8fa;
+  --schoolos-ink: #172b2a;
+  --schoolos-muted: #64748b;
+  --schoolos-line: #dce5e8;
+  --schoolos-control: 40px;
+  --schoolos-radius: 12px;
+  --schoolos-gap: 12px;
+  --schoolos-subject-1: #176b87;
+  --schoolos-subject-2: #7354a5;
+  --schoolos-subject-3: #28744e;
+  --schoolos-subject-4: #a15c19;
+  --schoolos-subject-5: #a13f63;
+  --schoolos-subject-6: #4c61a8;
+}
+.dark {
+  --schoolos-accent: #4cc3b5;
+  --schoolos-accent-hover: #72d5c9;
+  --schoolos-surface: #111d24;
+  --schoolos-canvas: #0b141a;
+  --schoolos-ink: #e6f0f1;
+  --schoolos-muted: #a6b8bd;
+  --schoolos-line: #2b3b42;
+}
+body { font-family: var(--schoolos-font-body); }
+:where(h1,h2,h3,h4,.ds-page-header h1) { font-family: var(--schoolos-font-heading); }
+:where(button,input,select,textarea) { font-family: var(--schoolos-font-body); }
+:where(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline: 2px solid var(--schoolos-accent) !important;
+  outline-offset: 2px;
+}
+.school-admin-role main :where(input,select,textarea,button) { min-height: var(--schoolos-control); }
+.school-admin-role main :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+}
+.school-admin-role main :where(button) { border-radius: 10px; }
+.school-admin-role main :where(.rounded-xl,.rounded-2xl) { border-radius: var(--schoolos-radius); }
+.school-admin-role main :where(.border-slate-200,.border-\\[\\#E2E8F0\\],.border-\\[\\#CBD5E1\\]) { border-color: var(--schoolos-line); }
+.schoolos-assignment-page { color: var(--schoolos-ink); }
+.schoolos-assignment-page > :where(section,div) { min-width: 0; }
+.schoolos-assignment-page .ds-card {
+  border: 1px solid var(--schoolos-line);
+  border-radius: 14px;
+  background: var(--schoolos-surface);
+  box-shadow: 0 2px 10px rgba(20,45,54,.045);
+}
+.schoolos-assignment-page .ds-button { min-height: 40px; border-radius: 10px; }
+.schoolos-assignment-page .ds-button-primary { background: var(--schoolos-accent); }
+.schoolos-assignment-page .ds-button-primary:hover { background: var(--schoolos-accent-hover); }
+.schoolos-assignment-page .ds-pill { border-radius: 999px; }
+.schoolos-assignment-page .overflow-x-auto { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+@media (max-width: 719px) {
+  .schoolos-assignment-page { padding: 14px !important; }
+  .schoolos-assignment-page > .grid { grid-template-columns: 1fr !important; }
+  .schoolos-assignment-page :where(.flex.items-end,.flex.flex-wrap) { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-role * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+
+/* Timetable workspace: compact toolbar and touch-friendly horizontal schedule canvas. */
+.schoolos-timetable-page {
+  width: 100%;
+  min-width: 0;
+  color: var(--schoolos-ink);
+}
+.schoolos-timetable-page > div:first-child h1 {
+  color: var(--schoolos-ink);
+  font-family: var(--schoolos-font-heading);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -.035em;
+}
+.schoolos-timetable-page :where(select,input,button) { min-height: 40px; }
+.schoolos-timetable-page select,
+.schoolos-timetable-page input {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-timetable-page :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-timetable-page :where(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.schoolos-timetable-page :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f2f7f7;
+  color: #365451;
+  font-weight: 700;
+}
+.dark .schoolos-timetable-page :where(thead th) {
+  background: #172a30;
+  color: #c5dcda;
+}
+.schoolos-timetable-page :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-timetable-page :where(button.bg-\\[\\#0F766E\\],button.bg-teal-600,button.bg-teal-700) {
+  background-color: var(--schoolos-accent);
+}
+.schoolos-timetable-page :where(button.bg-\\[\\#0F766E\\],button.bg-teal-600,button.bg-teal-700):hover {
+  background-color: var(--schoolos-accent-hover);
+}
+@media (max-width: 767px) {
+  .schoolos-timetable-page { padding: 14px !important; }
+  .schoolos-timetable-page > div:first-child { align-items: stretch; }
+  .schoolos-timetable-page > div:first-child > div:last-child {
+    width: 100%;
+    align-items: stretch;
+  }
+  .schoolos-timetable-page > div:first-child > div:last-child select { flex: 1 1 145px; }
+  .schoolos-timetable-page :where(table) { min-width: 660px; }
+}
+
+
+/* Marks and academic results: fast-entry friendly, dense but readable controls. */
+.schoolos-marks-page {
+  --exam-teal: var(--schoolos-accent);
+  --exam-line: var(--schoolos-line);
+  color: var(--schoolos-ink);
+}
+.schoolos-marks-page :where(input,select,textarea,button) {
+  min-height: 40px;
+  border-radius: 10px;
+  font-family: var(--schoolos-font-body);
+}
+.schoolos-marks-page :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-marks-page :where(table) { width: 100%; border-collapse: separate; border-spacing: 0; }
+.schoolos-marks-page :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f1f6f6;
+  color: #365451;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .035em;
+}
+.dark .schoolos-marks-page :where(thead th) { background: #172a30; color: #c5dcda; }
+.schoolos-marks-page :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-marks-page :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-marks-page :where(button.bg-teal-600,button.bg-teal-700,button.bg-\\[\\#0F766E\\]) {
+  background-color: var(--schoolos-accent);
+}
+.schoolos-marks-page :where(button.bg-teal-600,button.bg-teal-700,button.bg-\\[\\#0F766E\\]):hover {
+  background-color: var(--schoolos-accent-hover);
+}
+.schoolos-academic-results {
+  min-width: 0;
+  color: var(--schoolos-ink);
+}
+.schoolos-academic-results :where(input,select,button) { min-height: 40px; }
+.schoolos-academic-results :where(input,select) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-academic-results :where(.overflow-x-auto) { max-width: 100%; overflow-x: auto; }
+.schoolos-academic-results :where(table) { min-width: 760px; }
+@media (max-width: 767px) {
+  .schoolos-marks-page { padding: 14px !important; border-radius: 16px; }
+  .schoolos-marks-page :where(table) { min-width: 660px; }
+  .schoolos-academic-results { gap: 14px; }
+}
+@media (max-width: 420px) {
+  .schoolos-marks-page { padding: 12px !important; }
+  .schoolos-marks-page :where(input,select,button) { min-height: 42px; }
+}
+
+
+/* Final alignment for assignment roster, timetable matrix and marks entry surfaces. */
+.schoolos-assignment-toolbar { width: 100%; padding: 14px; border: 1px solid var(--schoolos-line); border-radius: 14px; background: var(--schoolos-surface); }
+.schoolos-teacher-roster { min-width: 0; }
+.schoolos-teacher-row { border-color: var(--schoolos-line) !important; background: var(--schoolos-surface) !important; box-shadow: 0 2px 10px rgba(20,45,54,.035); }
+.schoolos-assignment-chip { border-color: var(--schoolos-line); background: var(--schoolos-canvas); color: var(--schoolos-ink); }
+.schoolos-assignment-chip input { width: 14px; min-height: 14px; accent-color: var(--schoolos-accent); }
+.schoolos-assignment-chip button { min-height: 24px !important; }
+.schoolos-timetable-page :where(table) { min-width: 660px; }
+.schoolos-timetable-page :where(tbody td) { min-width: 82px; }
+.schoolos-timetable-page :where(tbody td > div) { min-height: 54px; }
+.schoolos-timetable-page :where(button,select,input) { min-height: 40px; }
+.schoolos-marks-page :where(label) { line-height: 1.5; }
+.schoolos-marks-page :where(input[type="number"]) { font-variant-numeric: tabular-nums; }
+.schoolos-marks-page :where(button:disabled) { cursor: not-allowed; opacity: .48; }
+.dark .schoolos-assignment-toolbar { background: var(--schoolos-surface); border-color: var(--schoolos-line); }
+.dark .schoolos-assignment-chip { background: #17252b; border-color: #34474d; color: #d7e6e8; }
+.dark .schoolos-timetable-page :where(.bg-white) { background-color: var(--schoolos-surface); }
+.dark .schoolos-marks-page :where(.bg-white) { background-color: var(--schoolos-surface); }
+@media (max-width: 719px) {
+  .schoolos-assignment-toolbar { display: grid; grid-template-columns: minmax(0,1fr); }
+  .schoolos-teacher-roster > div:first-child { display: none; }
+  .schoolos-teacher-row { grid-template-columns: minmax(0,1fr) !important; }
+  .schoolos-teacher-row > div { min-width: 0; }
+}
+@media (min-width: 720px) and (max-width: 1023px) {
+  .schoolos-teacher-row { grid-template-columns: minmax(150px,.8fr) minmax(220px,1.5fr) minmax(130px,.7fr) !important; }
+}
+@media (max-width: 390px) {
+  .schoolos-assignment-page { padding-inline: 10px !important; }
+  .schoolos-timetable-page { padding-inline: 10px !important; }
+  .schoolos-marks-page { padding-inline: 10px !important; }
+}
+
+
+/* Teacher portal mark-entry workspace */
+.schoolos-teacher-portal { min-width: 0; color: var(--schoolos-ink); }
+.schoolos-teacher-portal :where(input,select,textarea,button) { min-height: 40px; font-family: var(--schoolos-font-body); }
+.schoolos-teacher-portal :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-teacher-portal .schoolos-mark-entry-toolbar {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  border-color: var(--schoolos-line);
+  background: var(--schoolos-surface);
+}
+.schoolos-teacher-portal .schoolos-mark-entry-summary {
+  border-color: var(--schoolos-line);
+  background: var(--schoolos-surface);
+}
+.schoolos-teacher-portal :where(table) { border-collapse: separate; border-spacing: 0; }
+.schoolos-teacher-portal :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f1f6f6;
+  color: #365451;
+  font-size: 10px;
+  font-weight: 700;
+}
+.dark .schoolos-teacher-portal :where(thead th) { background: #172a30; color: #c5dcda; }
+.schoolos-teacher-portal :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-teacher-portal :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-teacher-portal :where(input[type="number"]) {
+  min-width: 58px;
+  min-height: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.schoolos-teacher-portal .schoolos-mark-progress { color: var(--schoolos-ink); }
+@media (max-width: 767px) {
+  .schoolos-teacher-portal { padding: 12px !important; }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar { grid-template-columns: minmax(0,1fr); }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar > div { align-items: stretch; }
+  .schoolos-teacher-portal .schoolos-mark-entry-summary { align-items: stretch; }
+}
+@media (max-width: 390px) {
+  .schoolos-teacher-portal { padding: 10px !important; }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar { padding: 12px; }
 }
