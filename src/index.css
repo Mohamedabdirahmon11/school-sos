@@ -12,6 +12,15 @@
   --brand-color: #0F766E;
   --brand-foreground: #FFFFFF;
   --brand-color-dark: color-mix(in srgb, var(--brand-color) 82%, black);
+  --schoolos-space-1: 0.25rem;
+  --schoolos-space-2: 0.5rem;
+  --schoolos-space-3: 0.75rem;
+  --schoolos-space-4: 1rem;
+  --schoolos-space-6: 1.5rem;
+  --schoolos-font-body: 0.875rem;
+  --schoolos-font-label: 0.75rem;
+  --schoolos-control-height: 2.5rem;
+  --schoolos-focus-color: #0F766E;
 }
 
 [class~="bg-[#0F766E]"] { background-color: var(--brand-color) !important; color: var(--brand-foreground) !important; }
@@ -34,6 +43,14 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 [class~="via-[#0F766E]"] { --tw-gradient-via: var(--brand-color) !important; }
 
 @layer base {
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid var(--schoolos-focus-color);
+    outline-offset: 2px;
+  }
+  label {
+    font-size: var(--schoolos-font-label);
+    line-height: 1.4;
+  }
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
@@ -165,6 +182,12 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   .school-admin-design main > div { padding-left: 34px; padding-right: 34px; }
 }
 @media (max-width: 767px) {
+  .school-admin-design main .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
   .school-admin-design header { min-height: 56px; }
   .school-admin-design main > div { padding-left: 16px; padding-right: 16px; }
   .school-admin-design main table { min-width: 680px; }
