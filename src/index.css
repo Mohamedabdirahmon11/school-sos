@@ -1461,3 +1461,12 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+
+/* Respect the school's configured width while keeping the collapsed desktop rail compact. */
+@media (min-width: 768px) {
+  .school-admin-design aside.school-admin-sidebar-collapsed {
+    width: 72px;
+    flex-basis: 72px;
+  }
+}
