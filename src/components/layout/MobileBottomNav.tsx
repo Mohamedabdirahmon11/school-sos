@@ -6,6 +6,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
+import { getNavigationRoute } from '../../lib/navigation-registry.ts';
 import {
   LayoutDashboard,
   Building2,
@@ -30,54 +31,61 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   const { user, t } = useAuth();
   const role = user?.role || 'school_admin';
 
+  const quickTab = (id: string, label: string, icon: React.ComponentType<{ className?: string }>) => {
+    const route = getNavigationRoute(id);
+    return { id: route?.route ?? id, label: label || route?.name || id, icon: route?.icon ?? icon };
+  };
+
   const getQuickTabs = () => {
     if (role === 'super_admin') {
       return [
-        { id: 'sa_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sa_schools', label: t('schools'), icon: Building2 },
-        { id: 'sa_users', label: t('users'), icon: Users },
-        { id: 'sa_settings', label: t('platform_settings'), icon: Settings }
+        quickTab('sa_dashboard', t('dashboard'), LayoutDashboard),
+        quickTab('sa_schools', t('schools'), Building2),
+        quickTab('sa_users', t('users'), Users),
+        quickTab('sa_settings', t('platform_settings'), Settings)
       ];
     }
     if (role === 'teacher') {
       return [
-        { id: 't_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 't_timetable', label: t('timetable'), icon: CalendarCheck },
-        { id: 't_attendance', label: t('attendance'), icon: GraduationCap },
-        { id: 't_grades', label: 'Exam Marks', icon: FileSpreadsheet }
+        quickTab('t_dashboard', t('dashboard'), LayoutDashboard),
+        quickTab('t_timetable', t('timetable'), CalendarCheck),
+        quickTab('t_attendance', t('attendance'), GraduationCap),
+        quickTab('t_grades', 'Exam Marks', FileSpreadsheet)
       ];
     }
     if (role === 'parent') {
       return [
-        { id: 'p_overview', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'p_attendance', label: t('attendance'), icon: CalendarCheck },
-        { id: 'p_fees', label: t('fees_payments'), icon: CreditCard }
+        quickTab('p_overview', t('dashboard'), LayoutDashboard),
+        quickTab('p_attendance', t('attendance'), CalendarCheck),
+        quickTab('p_fees', t('fees_payments'), CreditCard)
       ];
     }
     if (role === 'student') {
       return [
-        { id: 'st_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'st_timetable', label: t('timetable'), icon: CalendarCheck },
-        { id: 'st_results', label: t('exams_results'), icon: FileSpreadsheet }
+        quickTab('st_dashboard', t('dashboard'), LayoutDashboard),
+        quickTab('st_timetable', t('timetable'), CalendarCheck),
+        quickTab('st_results', t('exams_results'), FileSpreadsheet)
       ];
     }
     if (role === 'accountant') {
       return [
-        { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
-        { id: 'acc_expenses', label: 'Expenses', icon: FileText }
+        quickTab('acc_dashboard', t('dashboard'), LayoutDashboard),
+        quickTab('sch_fees', t('fees_payments'), CreditCard),
+        quickTab('acc_expenses', 'Expenses', FileText)
       ];
     }
     // School Admin default
     return [
-      { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-      { id: 'sch_students', label: t('students'), icon: GraduationCap },
-      { id: 'sch_classes', label: t('classes'), icon: Layers },
-      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck }
+      quickTab('sch_dashboard', t('dashboard'), LayoutDashboard),
+      quickTab('sch_students', t('students'), GraduationCap),
+      quickTab('sch_classes', t('classes'), Layers),
+      quickTab('sch_attendance', t('attendance'), CalendarCheck)
     ];
   };
 
   const tabs = getQuickTabs().filter(tab => {
+    const route = getNavigationRoute(tab.id);
+    if (!route || !route.roles.includes(role)) return false;
     if (role !== 'accountant') return true;
     if (tab.id === 'sch_fees' || tab.id === 'acc_expenses') {
       return hasStaffNavigationPermission(user?.permissions, 'fees_manage');
