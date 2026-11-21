@@ -7099,7 +7099,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
   const teacherScope = await getTeacherTermAssignmentScope(
     school, user.id, String(klass.academicYear || school.academicYear || ''),
-    semester as 'Semester 1' | 'Semester 2', String(classId), subjectId
+    semester as 'Semester 1' | 'Semester 2', String(classId), subjectId, undefined, true
   );
   if (!teacherScope || !teacherScope.allowedSubjectIds.has(String(subjectId))) {
     res.status(403).json({ error: 'You may submit marks only for a subject and section assigned to your active teacher profile in this academic term. Form Teacher access is review-only.' });

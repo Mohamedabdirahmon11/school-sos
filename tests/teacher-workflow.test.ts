@@ -23,6 +23,18 @@ test('class teachers submit attendance while administrators review and contact p
   assert.match(api, /Only the assigned class teacher can submit daily attendance/);
 });
 
+test('teacher marks access is scoped by active teacher, academic year, term, section and active enrollment', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /getTeacherTermAssignmentScope/);
+  assert.match(api, /teacher_class_subject_assignments/);
+  assert.match(api, /academic_year_id/);
+  assert.match(api, /termId === term\.id/);
+  assert.match(api, /assignment\.sectionId === enrollment\.sectionId/);
+  assert.match(api, /An active teacher profile is required to access results/);
+  assert.match(api, /actively enrolled in the assigned class section/);
+  assert.doesNotMatch(api.slice(api.indexOf("apiRouter.post('/exams/marks'"), api.indexOf("apiRouter.post('/exams/forward-class'")), /queryPage\('class_subjects'/);
+});
+
 test('teachers enter exam marks and school administrators only review and approve', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   const admin = read('../src/components/schooladmin/ExamsResultsView.tsx');
