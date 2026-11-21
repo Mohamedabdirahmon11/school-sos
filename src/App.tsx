@@ -274,8 +274,8 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_attendance' && (
               <AttendanceView />
             )}
-            {activeView === 'sch_exams' && (
-              <ExamsResultsView />
+            {(activeView === 'sch_marks' || activeView === 'sch_marks_approval') && (
+              <ExamsResultsView initialTab={activeView === 'sch_marks_approval' ? 'approval' : 'marks'} />
             )}
             {activeView === 'sch_fees' && (
               <FeesLedgerView />
