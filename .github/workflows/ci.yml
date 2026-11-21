@@ -44,6 +44,9 @@ jobs:
       - name: Route parity audit
         run: npm run audit:routes
 
+      - name: Navigation registry audit
+        run: npm run audit:navigation
+
       - name: Row-level security source audit
         run: npm run audit:rls
 
