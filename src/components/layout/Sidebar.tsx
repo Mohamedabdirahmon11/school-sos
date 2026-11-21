@@ -65,6 +65,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   }, [school?.id, school?.sidebarTheme]);
   const menuTranslations: Record<string, Partial<Record<Exclude<LanguageCode, 'en'>, string>>> = {
     Platform: { so: 'Madasha Guud', am: 'መድረክ', ar: 'المنصة' },
+    Operations: { so: 'Hawlgalka', am: 'ኦፕሬሽኖች', ar: 'العمليات' },
+    'My workspace': { so: 'Goobtayda Shaqada', am: 'የሥራ ቦታዬ', ar: 'مساحة عملي' },
+    Updates: { so: 'Wararka', am: 'ዝመናዎች', ar: 'التحديثات' },
+    Transactions: { so: 'Macaamillada', am: 'ግብይቶች', ar: 'المعاملات' },
+    'Finance & Reports': { so: 'Maaliyadda & Warbixinnada', am: 'ፋይናንስ እና ሪፖርቶች', ar: 'المالية والتقارير' },
+    'School resources': { so: 'Adeegyada Dugsiga', am: 'የትምህርት ቤት ሀብቶች', ar: 'موارد المدرسة' },
+    Administration: { so: 'Maamulka', am: 'አስተዳደር', ar: 'الإدارة' },
     Teaching: { so: 'Waxbaridda', am: 'ማስተማር', ar: 'التدريس' },
     Family: { so: 'Qoyska', am: 'ቤተሰብ', ar: 'الأسرة' },
     'My learning': { so: 'Waxbarashadayda', am: 'ትምህርቴ', ar: 'تعلمي' },
