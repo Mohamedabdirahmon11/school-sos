@@ -12,6 +12,7 @@ import { LoginView } from './components/auth/LoginView.tsx';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal.tsx';
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
+import { LoadingState } from './components/common/AsyncState.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
@@ -88,18 +89,7 @@ const AppContent: React.FC = () => {
     return () => { active = false; };
   }, [currentView, user?.id]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#0B2B2A] text-white flex items-center justify-center font-bold text-xl animate-pulse">
-            S
-          </div>
-          <p className="text-xs font-semibold text-[#132A29]">Initializing SchoolOS Platform...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
 
   // Not logged in -> Show Multi-Role Login Screen
   if (!user) {
@@ -209,7 +199,7 @@ const AppContent: React.FC = () => {
                 </div>
               </div>
             )}
-            <React.Suspense fallback={<div className="p-6 space-y-4" aria-label="Loading screen"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map(item => <div key={item} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />)}</div><div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>}>
+            <React.Suspense fallback={<LoadingState label="Loading screen…" className="mx-4 my-6" />}>
             {activeView === 'sch_setup' && (
               <SchoolSetupWizard onNavigate={handleNavigate} onComplete={handleSetupComplete} />
             )}
