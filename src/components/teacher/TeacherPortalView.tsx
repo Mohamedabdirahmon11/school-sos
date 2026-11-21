@@ -835,8 +835,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Kaydi qabyo</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Gudbi dhibcaha</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts · Kaydi qabyo</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks · Gudbi dhibcaha</button>
             </div>
           </div>
 
@@ -891,7 +891,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           )}
 
           <div className="schoolos-mark-entry-summary flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
-            <div><p className="text-sm font-bold text-teal-950">Gelinta dhibcaha — maaddo iyo imtixaan</p><p className="mt-1 text-xs text-teal-800">Maaddo kasta waxay leedahay diiwaan u gaar ah. Dhibcaha imtixaanka iyo qiimaynta waxaa lagu kaydiyaa diiwaanka ardayga.</p></div>
+            <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type · Gelinta dhibcaha</p><p className="mt-1 text-xs text-teal-800">Maaddo kasta waxay leedahay diiwaan u gaar ah. Dhibcaha imtixaanka iyo qiimaynta waxaa lagu kaydiyaa diiwaanka ardayga.</p></div>
             <div className="flex flex-wrap gap-2">
               <TeacherMarkEntryPrint
                 schoolName={school?.name || 'School'}
@@ -917,14 +917,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <>
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">Diiwaanka imtixaanka fasalka</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
+                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register · Diiwaanka imtixaanka fasalka</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
                 </div>
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[900px] border-collapse text-xs">
                     <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
                       <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
-                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Arday / Aqoonsi</th>
+                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID · Arday / Aqoonsi</th>
                       {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
                       <th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th>
                     </tr></thead>
@@ -947,7 +947,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </div>
                 {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
               </section>
-              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Geli qaybaha qiimaynta</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components · Geli qaybaha qiimaynta</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
               {gradeSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
             return (
