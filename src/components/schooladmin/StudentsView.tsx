@@ -14,6 +14,7 @@ import { BulkImportWizard } from './BulkImportWizard.tsx';
 import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
 import { getPendingPinSlips } from '../../lib/bulk-pin-results.ts';
 import { useApi } from '../../hooks/useApi.ts';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
@@ -44,6 +45,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [page, setPage] = useState(1);
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [classFilter, setClassFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [studentStatusFilter, setStudentStatusFilter] = useState('all');
@@ -88,10 +90,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [motherPhone, setMotherPhone] = useState('');
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }),
-    ApiClient.getClasses(), ApiClient.getBranches()
-  ]), [school?.id, search, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
+  const studentLoad = useApi(async (signal) => Promise.all([
+    ApiClient.getSchoolStudents({ search: debouncedSearch, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }, signal),
+    ApiClient.getClasses(undefined, signal), ApiClient.getBranches(signal)
+  ]), [school?.id, debouncedSearch, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
   const visibleStudents = students;
