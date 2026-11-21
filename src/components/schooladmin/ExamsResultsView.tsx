@@ -476,7 +476,6 @@ const EXAM_REDESIGN_STYLES = `
 `;
 
 export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> = ({ initialTab = 'marks' }) => {
-  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const { school, isReadOnly, t, refreshUser } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -485,6 +484,7 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule' | 'marks' | 'approval'>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
