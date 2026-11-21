@@ -95,6 +95,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           <button
             key={tab.id}
             onClick={() => onNavigate(tab.id)}
+            aria-current={isActive ? 'page' : undefined}
             className={`
               flex flex-col items-center justify-center min-w-[54px] min-h-[44px] px-2 rounded-md
               transition-colors
