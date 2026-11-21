@@ -165,10 +165,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   }, [user?.id, school?.id, unreadState.retry]);
 
   const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : menuT('notice_board');
-  const item = (id: string, label: string, _icon: NavItem['icon']): NavItem => {
+  const item = (id: string, _label: string, _icon: NavItem['icon']): NavItem => {
     const route = getNavigationRoute(id);
     if (!route) throw new Error(`Navigation route is missing from the shared registry: ${id}`);
-    return { id, label: menuText(label), icon: route.icon, permission: route.permission };
+    const label = route.labelKey ? menuT(route.labelKey as keyof TranslationDict) : menuText(route.label);
+    return { id, label, icon: route.icon, permission: route.permission };
   };
   const groups: NavGroup[] = (() => {
     if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform Management', items: [
