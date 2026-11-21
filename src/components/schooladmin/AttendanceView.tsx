@@ -212,7 +212,7 @@ export const AttendanceView: React.FC = () => {
           {absencesLoading ? <p className="p-8 text-center text-sm text-slate-500">Loading absent students…</p> : schoolAbsences.length === 0 ? (
             <div className="p-10 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-2 font-semibold text-slate-800">No absences recorded</p><p className="mt-1 text-xs text-slate-500">No students have been marked absent for this date.</p></div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" aria-label="Attendance records table. Scroll horizontally to view all columns." tabIndex={0}>
               <table className="w-full min-w-[700px] text-left text-xs">
                 <thead className="border-b bg-[#f6faf8] text-[11px] uppercase tracking-wide text-[#71817d]"><tr><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Parent phone</th><th className="px-4 py-3">Note</th><th className="px-4 py-3">Action</th></tr></thead>
                 <tbody className="divide-y divide-[#edf2f0]">
@@ -334,7 +334,7 @@ export const AttendanceView: React.FC = () => {
             No students found in this class. Add students from the Students view.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" role="region" aria-label="Attendance records table. Scroll horizontally to view all columns." tabIndex={0}>
             <table className="w-full min-w-[760px] text-left text-xs text-[#132A29]">
               <thead className="bg-[#f6faf8] border-b border-[#e6efec] text-[11px] uppercase font-semibold tracking-wide text-[#71817d]">
                 <tr>
