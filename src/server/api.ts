@@ -4923,21 +4923,26 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
   const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
+  const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
+  const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
   const filters: Record<string, string | string[] | undefined> = {
     school_id: school.id,
     class_id: classId,
-    branch_id: branchId
+    branch_id: branchId,
+    gender,
+    status: studentStatus
   };
   const [allStudents, classes] = await Promise.all([
     queryAllRows('students', filters, '*'),
     db.getClasses(school.id)
   ]);
+  const feeStatusMap = feeStatus === 'all' ? new Map<string, string>() : await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const studentClass = classNames.get(student.classId) || student.className || '';
     const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, studentClass]
       .some(value => String(value || '').toLowerCase().includes(search));
-    const matchesFee = feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase();
+    const matchesFee = feeStatus === 'all' || (feeStatusMap.get(student.id) || 'unpaid') === feeStatus.toLowerCase();
     return (!search || searchable) && matchesFee;
   });
   const cell = (value: unknown) => {
@@ -4966,16 +4971,19 @@ apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmi
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
   const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
-  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
+  const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
+  const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId, gender, status: studentStatus };
   const [allStudents, classes] = await Promise.all([
     queryAllRows('students', filters, '*'), db.getClasses(school.id)
   ]);
+  const feeStatusMap = feeStatus === 'all' ? new Map<string, string>() : await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const klass = classNames.get(student.classId) || student.className || '';
     const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, klass]
       .some(value => String(value || '').toLowerCase().includes(search));
-    return (!search || searchable) && (feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase());
+    return (!search || searchable) && (feeStatus === 'all' || (feeStatusMap.get(student.id) || 'unpaid') === feeStatus.toLowerCase());
   });
   const lines = [
     `${school.name} — STUDENT REGISTER`,
@@ -5442,16 +5450,24 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
 apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const subjectId = typeof req.query.subjectId === 'string' ? req.query.subjectId.trim() : '';
   const [teachers, classes, subjects] = await Promise.all([
     queryAllRows('teachers', { school_id: school.id }, '*'),
     queryAllRows('classes', { school_id: school.id }, 'id,name,section'),
     queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
+  let subjectTeacherIds: Set<string> | null = null;
+  if (subjectId) {
+    if (!subjects.some((subject: any) => subject.id === subjectId)) { res.status(400).json({ error: 'Subject does not belong to this school.' }); return; }
+    const links = await queryAllRows('teacher_subjects', { school_id: school.id, subject_id: subjectId, is_active: 'true' }, 'teacher_id');
+    subjectTeacherIds = new Set(links.map((link: any) => String(link.teacherId)));
+  }
   const classNames = new Map(classes.map((item: any) => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const subjectNames = new Map(subjects.map((item: any) => [item.id, item.name]));
   const filtered = teachers.filter((teacher: any) =>
-    !search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
-      .some(value => String(value || '').toLowerCase().includes(search))
+    (!subjectTeacherIds || subjectTeacherIds.has(String(teacher.id))) &&
+    (!search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
+      .some(value => String(value || '').toLowerCase().includes(search)))
   );
   const cell = (value: unknown) => {
     const raw = String(value ?? '');
