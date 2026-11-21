@@ -1,3 +1,12 @@
+export type PrimarySubjectGradeBand = '1-4' | '5-6' | '7-8';
+export type PrimarySubjectTemplates = Record<PrimarySubjectGradeBand, string[]>;
+
+export const PRIMARY_SUBJECT_TEMPLATE_DEFAULTS: PrimarySubjectTemplates = {
+  '1-4': ['Soomaali', 'Ingiriis', 'Xisaab', 'Environmental Science', 'Tarbiyada Islaamka', 'Aesthetic Education', 'Physical Education'],
+  '5-6': ['Soomaali', 'Ingiriis', 'Xisaab', 'General Science', 'Bulsho', 'Civic and Ethical Education', 'ICT', 'Tarbiyada Islaamka', 'Aesthetic Education', 'Physical Education'],
+  '7-8': ['Soomaali', 'Ingiriis', 'Xisaab', 'General Science', 'Bulsho', 'Civic and Ethical Education', 'ICT', 'Agriculture', 'Tarbiyada Islaamka', 'Aesthetic Education', 'Physical Education']
+};
+
 export const DEFAULT_SUBJECT_NAMES = [
   'Soomaali',
   'Carabi',

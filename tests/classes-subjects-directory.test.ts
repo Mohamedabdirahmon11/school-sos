@@ -23,10 +23,12 @@ test('Subjects remain editable with class-specific teacher, periods and exam ass
   assert.match(classesSource, /Credit units and departments are not required/);
 });
 
-test('Teacher directory includes Form Teacher classes as well as profile class assignments', () => {
-  assert.match(teachersSource, /classes\.filter\(klass => klass\.classTeacherId === t\.userId/);
-  assert.match(teachersSource, /displayedClassIds = Array\.from\(new Set/);
-  assert.match(teachersSource, /\(Form Teacher\)/);
+test('Teacher directory separates classes taught from the Form Teacher class', () => {
+  assert.ok(teachersSource.includes('Classes taught'));
+  assert.ok(teachersSource.includes('Form Teacher class'));
+  assert.ok(teachersSource.includes('const displayedClassIds = Array.from(new Set(t.assignedClasses || []))'));
+  assert.ok(teachersSource.includes('const formTeacherClass = classes.find'));
+  assert.ok(!teachersSource.includes('(Form Teacher)'));
 });
 
 
@@ -48,4 +50,19 @@ test('class creation accepts a correctly formatted academic year in the API vali
   assert.match(createClassRoute, /!\/\^\\d\{4\}-\\d\{4\}\$\/.test\(academicYear\)/);
   assert.doesNotMatch(createClassRoute, /!\/\^\\\\d\{4\}-\\\\d\{4\}\$\/.test\(academicYear\)/);
   assert.match(classesSource, /pattern="\[0-9\]\{4\}-\[0-9\]\{4\}"/);
+});
+
+
+test('school curriculum exposes editable grade-band templates and applies them to new primary classes', () => {
+  assert.match(apiSource, /apiRouter\.get\('\/subjects\/templates'/);
+  assert.match(apiSource, /apiRouter\.put\('\/subjects\/templates\/:gradeBand'/);
+  assert.match(apiSource, /applyPrimarySubjectTemplate\(school, newClass\)/);
+  assert.match(apiSource, /apiRouter\.post\('\/curriculum\/classes\/:classId\/apply-template'/);
+});
+
+
+test('new primary class creation reports a curriculum-template attachment warning when needed', () => {
+  assert.match(apiSource, /subjectTemplateWarning = 'The class was created, but its subject template could not be attached/);
+  assert.match(classesSource, /subjectTemplateWarning = String\(\(createdClass as any\)\?\.subjectTemplateWarning/);
+  assert.match(classesSubjectsSource, /setNotice\(subjectTemplateWarning \|\|/);
 });

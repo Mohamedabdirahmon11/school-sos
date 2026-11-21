@@ -11,24 +11,28 @@ test('parent contacts are derived from active students scoped to the current sch
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);
-  assert.match(route, /requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
-  assert.match(route, /school_id: school\.id/);
-  assert.match(route, /status: 'active'/);
-  assert.match(route, /class_id: classId/);
+  assert.ok(route.includes('requireAuth, requireSchoolContext'))
+  assert.ok(route.includes('Only school administrators and the assigned Form Teacher'))
+  assert.ok(route.includes('studentClassFilter = requestedClassId || ownClassIds'))
+  assert.ok(route.includes('school_id: school.id'))
+  assert.ok(route.includes("status: 'active'"))
+  assert.ok(route.includes('studentFilters.class_id = studentClassFilter'))
 });
 
 test('guardian phone numbers are normalized and deduplicated per school', () => {
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);
-  assert.match(route, /phone\.replace\(\/\\D\/g, ''\)/);
-  assert.match(route, /contacts\.get\(normalizedPhone\)/);
-  assert.match(route, /contacts\.set\(normalizedPhone, contact\)/);
-  assert.match(route, /contact\.students\.some\(item => item\.id === child\.id\)/);
-  assert.match(route, /addContact\(student\.motherPhone, '', 'Mother', child\)/);
-  assert.match(route, /guardianLinks/);
-  assert.match(route, /addContact\(guardian\.phone, guardian\.fullName, 'Guardian', child\)/);
+  assert.ok(route.includes("rawPhone.replace(/\\D/g, '')"));
+  assert.ok(route.includes('contacts.get(contactKey)'));
+  assert.ok(route.includes('contacts.set(contactKey, contact)'));
+  assert.ok(route.includes('contact.students.some(item => item.id === child.id)'));
+  assert.ok(route.includes("addContact(student.motherPhone, '', 'Mother', child)"));
+  assert.ok(route.includes('guardianLinks'));
+  assert.ok(route.includes("addContact(guardian.phone, guardian.fullName, 'Guardian', child)"));
 });
+
+
 
 test('unique contacts are searched, sorted, and paginated after deduplication', () => {
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
@@ -48,4 +52,31 @@ test('Parents directory uses the unique contacts endpoint and exposes class All 
   assert.match(view, /controller\.abort\(\)/);
   assert.match(view, /<option value="">All classes<\/option>/);
   assert.match(view, /contact\.students\.map/);
+});
+
+
+test('guardian links are paginated by existing composite-key columns, not a nonexistent id column', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /queryAllRows\('student_guardians',[^\n]*'guardian_id,student_id,relation,is_primary',[^\n]*'guardian_id,student_id'\)/);
+});
+
+test('parents without phone numbers remain visible with a safe placeholder', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /const contactKey = normalizedPhone \|\| `missing:\$\{child\.id\}`/);
+  assert.match(route, /'Phone not provided'/);
+  assert.match(view, /if \(!digits\) return null/);
+});
+
+test('parent contact API returns a retryable service error and the frontend retries transient failures', () => {
+  const api = read('../src/server/api.ts');
+  const view = read('../src/components/schooladmin/ParentsView.tsx');
+  assert.match(api, /PARENT_CONTACTS_UNAVAILABLE/);
+  assert.match(api, /retryable: true/);
+  assert.match(view, /const fetchWithRetry = async/);
+  assert.match(view, /attempt < 3/);
+  assert.match(view, /status >= 500/);
 });
