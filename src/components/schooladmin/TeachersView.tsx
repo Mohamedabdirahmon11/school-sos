@@ -10,6 +10,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil } from 'lucide-react';
 
@@ -192,7 +193,8 @@ export const TeachersView: React.FC = () => {
     }
   };
 
-  if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
+  if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={fetchData} />;
+  if (teacherLoad.loading) return <LoadingState label="Loading teachers" />;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
     <div className="mx-auto max-w-[1680px] space-y-6 p-3 sm:p-5 lg:p-7">
