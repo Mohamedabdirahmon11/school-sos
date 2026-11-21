@@ -115,6 +115,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Staff Roles & Permissions': { so: 'Doorarka Shaqaalaha & Ogolaanshaha', am: 'የሰራተኞች ሚናዎች እና ፈቃዶች', ar: 'أدوار الموظفين والصلاحيات' },
     'Academic Calendar': { so: 'Jadwalka Waxbarashada', am: 'የትምህርት ቀን መቁጠሪያ', ar: 'التقويم الأكاديمي' },
     'Clinic & Health Records': { so: 'Xarunta Caafimaadka & Diiwaannada', am: 'ክሊኒክ እና የጤና መዝገቦች', ar: 'العيادة والسجلات الصحية' },
+    Language: { so: 'Luqad', am: 'ቋንቋ', ar: 'اللغة' },
+    'Search menu': { so: 'Raadi menu-ga', am: 'ምናሌ ፈልግ', ar: 'البحث في القائمة' },
+    'Search navigation menu': { so: 'Raadi qaybaha menu-ga', am: 'የአሰሳ ምናሌን ፈልግ', ar: 'البحث في قائمة التنقل' },
+    'Close navigation': { so: 'Xir menu-ga', am: 'ዝጋ አሰሳ', ar: 'إغلاق التنقل' },
+    'Close menu': { so: 'Xir menu-ga', am: 'ዝጋ ምናሌ', ar: 'إغلاق القائمة' },
+    'Expand sidebar': { so: 'Ballaarin dhinac-mare', am: 'የጎን ምናሌን አስፋ', ar: 'توسيع الشريط الجانبي' },
+    'Collapse sidebar': { so: 'Yaree dhinac-mare', am: 'የጎን ምናሌን አጠብ', ar: 'طي الشريط الجانبي' },
     'Fee Invoices': { so: 'Biilasha Lacagaha', am: 'የክፍያ ደረሰኞች', ar: 'فواتير الرسوم' },
     'Expenses & Cash Book': { so: 'Kharashaadka & Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ', ar: 'المصروفات ودفتر النقدية' },
     'Bank Reconciliation': { so: 'Iswaafajinta Bangiga', am: 'የባንክ ማስታረቅ', ar: 'تسوية الحسابات البنكية' },
@@ -240,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   };
 
   return <>
-    {isOpenMobile && <button aria-label="Close navigation" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
+    {isOpenMobile && <button aria-label={menuText('Close navigation')} onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
     <aside style={{ background: 'var(--sidebar-background, #102c2a)', color: 'var(--sidebar-text, #ffffff)' }} className={`school-admin-sidebar ${isCollapsed ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,276px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,260px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className={`relative flex h-[96px] shrink-0 flex-col items-center justify-center gap-1 border-b border-white/10 ${isCollapsed ? 'px-2' : 'px-5'}`}>
         {school?.sidebarTheme?.showLogo !== false && <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--sidebar-accent)', color: 'var(--sidebar-accent-foreground)' } : undefined}>
@@ -250,16 +257,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform Management' : 'School Workspace')}</div>
           {school && <div style={{ color: "var(--sidebar-text)", opacity: 0.62 }} className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em]">{school.code}</div>}
         </div>}
-        <button onClick={onCloseMobile} aria-label="Close menu" style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
+        <button onClick={onCloseMobile} aria-label={menuText('Close menu')} style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
       <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
-        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!isCollapsed} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} style={{ color: "var(--sidebar-text)" }} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 hover:bg-black/10 md:flex">
+        <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={menuText(isCollapsed ? "Expand sidebar" : "Collapse sidebar")} aria-expanded={!isCollapsed} title={menuText(isCollapsed ? "Expand sidebar" : "Collapse sidebar")} style={{ color: "var(--sidebar-text)" }} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 hover:bg-black/10 md:flex">
           {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
         </button>
         {!isCollapsed && <label style={{ color: "var(--sidebar-text)" }} className="mb-3 flex min-h-10 items-center gap-2 rounded-xl border border-current/10 bg-black/10 px-3">
           <Search size={15} aria-hidden="true" />
-          <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder="Search menu" aria-label="Search navigation menu" style={{ color: "var(--sidebar-text)" }} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-50" />
+          <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder={menuText('Search menu')} aria-label={menuText('Search navigation menu')} style={{ color: "var(--sidebar-text)" }} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-50" />
         </label>}
         {visibleGroups.map(group => <section key={group.title}>
           {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
@@ -287,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 <div className="mt-5 border-t border-white/10 pt-3">
   <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
     <Languages size={15} aria-hidden="true" />
-    <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
+    <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Language')}</span>
     <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
       style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
       <option value="en" className="text-slate-900">English</option>
