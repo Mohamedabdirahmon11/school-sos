@@ -72,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Financial management': { so: 'Maamulka Maaliyadda', am: 'የፋይናንስ አስተዳደር', ar: 'الإدارة المالية' },
     Dashboard: { so: 'Bogga Hore', am: 'ዳሽቦርድ', ar: 'لوحة التحكم' },
     People: { so: 'Dadka', am: 'ሰዎች', ar: 'الأشخاص' },
+    Academic: { so: 'Waxbarashada', am: 'ትምህርት', ar: 'الشؤون الأكاديمية' },
     Academics: { so: 'Waxbarashada', am: 'ትምህርት', ar: 'الشؤون الأكاديمية' },
     Communication: { so: 'Isgaarsiinta', am: 'ግንኙነት', ar: 'التواصل' },
     Finance: { so: 'Maaliyadda', am: 'ፋይናንስ', ar: 'المالية' },
