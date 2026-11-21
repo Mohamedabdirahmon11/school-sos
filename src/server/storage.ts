@@ -595,6 +595,19 @@ class StorageEngine {
     return data;
   }
 
+  public async getTeacherDashboardSummary(schoolId: string, teacherId: string): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Teacher dashboard summary is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc('teacher_dashboard_summary', {
+      p_school_id: schoolId,
+      p_teacher_id: teacherId
+    });
+    this.recordQuery('rpc:teacher_dashboard_summary', 'call', startedAt);
+    if (error) throw new Error('Unable to load teacher dashboard summary.');
+    return data;
+  }
+
   public async getSuperAdminDashboardSummary(): Promise<any> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Super Admin dashboard summary is unavailable.');
