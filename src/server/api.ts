@@ -4833,12 +4833,28 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
 
-  const [students, guardianRows, guardianLinks] = await Promise.all([
-    queryAllRows('students', { school_id: school.id, status: 'active', ...(studentClassFilter ? { class_id: studentClassFilter } : {}) }, LIST_QUERY_COLUMNS.students),
+  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
+  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentEnrollments = currentYearId
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'student_id,class_id,section_id')
+    : [];
+  const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
+  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
+  const studentIdsForFilter = currentYearId && classScope
+    ? [...new Set(currentEnrollments.filter((row: any) => classScope.includes(String(row.classId))).map((row: any) => String(row.studentId)))]
+    : null;
+  const studentFilters: Record<string, string | string[] | undefined> = { school_id: school.id, status: 'active' };
+  if (currentYearId && classScope) studentFilters.id = studentIdsForFilter || [];
+  else if (!currentYearId && studentClassFilter) studentFilters.class_id = studentClassFilter;
+  const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
+  const [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
+    currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
     queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
+    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
+    sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
   ]);
   const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
+  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
   if (classId && !classById.has(classId)) {
     res.status(404).json({ error: 'The selected class was not found in this school.' });
     return;
@@ -4871,10 +4887,13 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
   };
   for (const student of students) {
+    const enrollment = enrollmentByStudent.get(String(student.id));
+    const currentClass = enrollment ? classById.get(String(enrollment.classId)) : currentYearId ? undefined : classById.get(String(student.classId));
+    const currentSection = enrollment?.sectionId ? sectionById.get(String(enrollment.sectionId)) || currentClass?.section || '' : currentClass?.section || '';
     const child = {
       id: student.id, studentId: student.studentId, fullName: studentNameKey(student),
-      className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
-    };
+      className: currentClass ? [currentClass.name, currentSection].filter(Boolean).join(' · ') : 'Not assigned'
+    };;
     studentById.set(String(student.id), child);
     addContact(student.fatherPhone, student.fatherName, 'Father', child);
     addContact(student.motherPhone, '', 'Mother', child);
