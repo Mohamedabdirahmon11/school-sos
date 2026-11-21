@@ -111,6 +111,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Class Curriculum': { so: 'Manhajka Fasalka', am: 'የክፍል ሥርዓተ ትምህርት', ar: 'منهج الصف' },
     'Teacher Assignments': { so: 'Qoondeynta Macallimiinta', am: 'የመምህራን ምደባ', ar: 'توزيع المعلمين' },
     'School Documents': { so: 'Dukumentiyada Dugsiga', am: 'የትምህርት ቤት ሰነዶች', ar: 'مستندات المدرسة' },
+    'Admissions Pipeline': { so: 'Habraaca Diiwaangelinta', am: 'የመግቢያ ሂደት', ar: 'مسار القبول' },
+    'Staff Roles & Permissions': { so: 'Doorarka Shaqaalaha & Ogolaanshaha', am: 'የሰራተኞች ሚናዎች እና ፈቃዶች', ar: 'أدوار الموظفين والصلاحيات' },
+    'Academic Calendar': { so: 'Jadwalka Waxbarashada', am: 'የትምህርት ቀን መቁጠሪያ', ar: 'التقويم الأكاديمي' },
+    'Clinic & Health Records': { so: 'Xarunta Caafimaadka & Diiwaannada', am: 'ክሊኒክ እና የጤና መዝገቦች', ar: 'العيادة والسجلات الصحية' },
     'Fee Invoices': { so: 'Biilasha Lacagaha', am: 'የክፍያ ደረሰኞች', ar: 'فواتير الرسوم' },
     'Expenses & Cash Book': { so: 'Kharashaadka & Buugga Lacagta', am: 'ወጪዎች እና የገንዘብ መዝገብ', ar: 'المصروفات ودفتر النقدية' },
     'Bank Reconciliation': { so: 'Iswaafajinta Bangiga', am: 'የባንክ ማስታረቅ', ar: 'تسوية الحسابات البنكية' },
@@ -197,8 +201,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Overview', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
       { title: 'People', items: [
         item('sch_students', menuT('students'), GraduationCap), item('sch_teachers', menuT('teachers'), UserCheck),
-        item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', menuT('admissions'), UserPlus),
-        item('sch_staff', menuT('staff_access'), ShieldCheck)
+        item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', 'Admissions Pipeline', UserPlus),
+        item('sch_staff', 'Staff Roles & Permissions', ShieldCheck)
       ] },
       { title: 'Academic', items: [
         item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
@@ -209,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Communication', items: [
         item('sch_notices', noticeLabel, BellRing), item('sch_messages', menuT('messages'), MessageSquare),
         item('sch_whatsapp', 'WhatsApp Parent Alerts', MessageCircle),
-        item('sch_events', menuT('events_holidays'), CalendarDays)
+        item('sch_events', 'Academic Calendar', CalendarDays)
       ] },
       { title: 'Finance', items: [
         { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' }
@@ -220,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Resources', items: [
         item('sch_library', menuT('library'), Library), item('sch_transport', menuT('transport'), Bus),
         item('sch_inventory', menuT('inventory'), Boxes), item('sch_discipline', menuT('discipline'), AlertTriangle),
-        item('sch_health', menuT('health_nurse'), HeartPulse)
+        item('sch_health', 'Clinic & Health Records', HeartPulse)
       ] },
       { title: 'Settings', items: [
         item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help Centre', LifeBuoy)
