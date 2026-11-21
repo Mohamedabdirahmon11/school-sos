@@ -25,6 +25,7 @@ const validSidebarTheme = {
   iconStyle: 'outline' as const,
   showGroupLabels: true,
   width: 276,
+  zoom: 96,
   defaultCollapsed: false,
   fontSize: 'normal' as const,
   showLogo: true,
@@ -42,8 +43,10 @@ test('sidebar theme settings accept the custom preset', () => {
   assert.equal(result.sidebarTheme?.preset, 'custom');
 });
 
-test('sidebar theme settings reject invalid widths, CSS values, and unreadable contrast', () => {
+test('sidebar theme settings reject invalid widths, zoom levels, CSS values, and unreadable contrast', () => {
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, width: 400 } }), /240|320/);
+  assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, zoom: 80 } }), /90|100/);
+  assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, zoom: 110 } }), /90|100/);
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, backgroundColor: 'url(javascript:alert(1))' } }), /six-digit hex/);
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, backgroundColor: '#ffffff', textColor: '#eeeeee' } }), /WCAG AA/);
   assert.throws(() => sanitizeSchoolSettings({ sidebarTheme: { ...validSidebarTheme, activeStyle: 'arbitrary-css' } }), /Invalid option/);

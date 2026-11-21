@@ -122,6 +122,8 @@ export interface SidebarTheme {
   iconStyle: 'outline' | 'filled';
   showGroupLabels: boolean;
   width: number;
+  /** School-wide workspace zoom percentage (90–100). */
+  zoom: number;
   defaultCollapsed: boolean;
   fontSize: 'small' | 'normal' | 'large';
   showLogo: boolean;
