@@ -2201,3 +2201,37 @@ body { font-family: var(--schoolos-font-body); }
   .schoolos-marks-page { padding: 12px !important; }
   .schoolos-marks-page :where(input,select,button) { min-height: 42px; }
 }
+
+
+/* Final alignment for assignment roster, timetable matrix and marks entry surfaces. */
+.schoolos-assignment-toolbar { width: 100%; padding: 14px; border: 1px solid var(--schoolos-line); border-radius: 14px; background: var(--schoolos-surface); }
+.schoolos-teacher-roster { min-width: 0; }
+.schoolos-teacher-row { border-color: var(--schoolos-line) !important; background: var(--schoolos-surface) !important; box-shadow: 0 2px 10px rgba(20,45,54,.035); }
+.schoolos-assignment-chip { border-color: var(--schoolos-line); background: var(--schoolos-canvas); color: var(--schoolos-ink); }
+.schoolos-assignment-chip input { width: 14px; min-height: 14px; accent-color: var(--schoolos-accent); }
+.schoolos-assignment-chip button { min-height: 24px !important; }
+.schoolos-timetable-page :where(table) { min-width: 660px; }
+.schoolos-timetable-page :where(tbody td) { min-width: 82px; }
+.schoolos-timetable-page :where(tbody td > div) { min-height: 54px; }
+.schoolos-timetable-page :where(button,select,input) { min-height: 40px; }
+.schoolos-marks-page :where(label) { line-height: 1.5; }
+.schoolos-marks-page :where(input[type="number"]) { font-variant-numeric: tabular-nums; }
+.schoolos-marks-page :where(button:disabled) { cursor: not-allowed; opacity: .48; }
+.dark .schoolos-assignment-toolbar { background: var(--schoolos-surface); border-color: var(--schoolos-line); }
+.dark .schoolos-assignment-chip { background: #17252b; border-color: #34474d; color: #d7e6e8; }
+.dark .schoolos-timetable-page :where(.bg-white) { background-color: var(--schoolos-surface); }
+.dark .schoolos-marks-page :where(.bg-white) { background-color: var(--schoolos-surface); }
+@media (max-width: 719px) {
+  .schoolos-assignment-toolbar { display: grid; grid-template-columns: minmax(0,1fr); }
+  .schoolos-teacher-roster > div:first-child { display: none; }
+  .schoolos-teacher-row { grid-template-columns: minmax(0,1fr) !important; }
+  .schoolos-teacher-row > div { min-width: 0; }
+}
+@media (min-width: 720px) and (max-width: 1023px) {
+  .schoolos-teacher-row { grid-template-columns: minmax(150px,.8fr) minmax(220px,1.5fr) minmax(130px,.7fr) !important; }
+}
+@media (max-width: 390px) {
+  .schoolos-assignment-page { padding-inline: 10px !important; }
+  .schoolos-timetable-page { padding-inline: 10px !important; }
+  .schoolos-marks-page { padding-inline: 10px !important; }
+}
