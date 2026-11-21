@@ -8265,8 +8265,12 @@ async function syncWizardAcademicRecords(client: any, schoolId: string, setupDat
 
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  try { await syncWizardAcademicRecords(classGroupsClient(), school.id, school.setupData || {}); }
-  catch (error: any) { res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin.' }); return; }
+  try {
+    const client = classGroupsClient();
+    const { data: setupRow, error } = await client.from('schools').select('setup_data').eq('id', school.id).maybeSingle();
+    if (error) throw error;
+    await syncWizardAcademicRecords(client, school.id, setupRow?.setup_data || school.setupData || {});
+  } catch (error: any) { res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin.' }); return; }
   const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
   res.json({ data: current, school: { name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: school.setupProgress || { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } });
 });
@@ -9520,8 +9524,11 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
   const client = teacherAssignmentClient();
   try {
-    // The five-step Wizard stores its year/terms in schools.setup_data; hydrate the normalized tables Step 6 reads.
-    await syncWizardAcademicRecords(client, school.id, school.setupData || {});
+    // Always read the persisted Wizard payload from Supabase: req.school may be a stale auth-context snapshot.
+    const { data: setupRow, error: setupReadError } = await client.from('schools').select('setup_data').eq('id', school.id).maybeSingle();
+    if (setupReadError) throw new Error('Dejinta Setup Wizard lama akhrin karin. Dib u cusboonaysii bogga.');
+    const persistedSetup = setupRow?.setup_data || school.setupData || {};
+    await syncWizardAcademicRecords(client, school.id, persistedSetup);
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
       client.from('terms').select('id,name,academic_year_id,is_current').eq('school_id', school.id).order('start_date'),
