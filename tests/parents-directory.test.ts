@@ -25,6 +25,9 @@ test('guardian phone numbers are normalized and deduplicated per school', () => 
   assert.match(route, /contacts\.get\(normalizedPhone\)/);
   assert.match(route, /contacts\.set\(normalizedPhone, contact\)/);
   assert.match(route, /contact\.students\.some\(item => item\.id === child\.id\)/);
+  assert.match(route, /addContact\(student\.motherPhone, '', 'Mother', child\)/);
+  assert.match(route, /guardianLinks/);
+  assert.match(route, /addContact\(guardian\.phone, guardian\.fullName, 'Guardian', child\)/);
 });
 
 test('unique contacts are searched, sorted, and paginated after deduplication', () => {
