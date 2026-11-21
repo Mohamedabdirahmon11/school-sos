@@ -276,27 +276,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           </div>
         </section>)}
 
-        <div className="mt-5 border-t border-white/10 pt-3">
-          <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
-            <Languages size={15} aria-hidden="true" />
-            <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
-            <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
-              style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
-              <option value="en" className="text-slate-900">English</option>
-              <option value="so" className="text-slate-900">Soomaali</option>
-              <option value="am" className="text-slate-900">አማርኛ</option>
-              <option value="ar" className="text-slate-900">العربية</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
-            style={{ color: "var(--sidebar-text)" }}
-            className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
-            <LogOut size={15} aria-hidden="true" />
-            <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
-          </button>
 
-        </div>
       </nav>
+
+      <div className="school-admin-sidebar-controls shrink-0 border-t border-white/10 px-3 pt-3 pb-2">
+<div className="mt-5 border-t border-white/10 pt-3">
+  <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
+    <Languages size={15} aria-hidden="true" />
+    <span className={isCollapsed ? "md:hidden" : ""}>Language</span>
+    <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
+      style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
+      <option value="en" className="text-slate-900">English</option>
+      <option value="so" className="text-slate-900">Soomaali</option>
+      <option value="am" className="text-slate-900">አማርኛ</option>
+      <option value="ar" className="text-slate-900">العربية</option>
+    </select>
+  </label>
+  <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
+    style={{ color: "var(--sidebar-text)" }}
+    className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
+    <LogOut size={15} aria-hidden="true" />
+    <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
+  </button>
+
+</div>
+      </div>
 
       {school?.sidebarTheme?.showUserCard !== false && <div className={`shrink-0 border-t border-white/10 bg-black/10 px-3 py-3`}>
         <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
