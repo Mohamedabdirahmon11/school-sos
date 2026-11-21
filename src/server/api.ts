@@ -9520,6 +9520,8 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
   const client = teacherAssignmentClient();
   try {
+    // The five-step Wizard stores its year/terms in schools.setup_data; hydrate the normalized tables Step 6 reads.
+    await syncWizardAcademicRecords(client, school.id, school.setupData || {});
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
       client.from('terms').select('id,name,academic_year_id,is_current').eq('school_id', school.id).order('start_date'),
