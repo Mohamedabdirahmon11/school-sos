@@ -11,12 +11,25 @@ test('parent contacts are derived from active students scoped to the current sch
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);
-  assert.match(route, /requireAuth, requireSchoolContext/);
-  assert.match(route, /Only school administrators and the assigned Form Teacher/);
-  assert.match(route, /studentClassFilter = requestedClassId \\|\\| ownClassIds/);
-  assert.match(route, /school_id: school\.id/);
-  assert.match(route, /status: 'active'/);
-  assert.match(route, /class_id: studentClassFilter/);
+  assert.ok(route.includes('requireAuth, requireSchoolContext'))
+  assert.ok(route.includes('Only school administrators and the assigned Form Teacher'))
+  assert.ok(route.includes('studentClassFilter = requestedClassId || ownClassIds'))
+  assert.ok(route.includes('school_id: school.id'))
+  assert.ok(route.includes("status: 'active'"))
+  assert.ok(route.includes('class_id: studentClassFilter'))
+});
+
+test('guardian phone numbers are normalized and deduplicated per school', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.ok(route.includes("rawPhone.replace(/\\D/g, '')"));
+  assert.ok(route.includes('contacts.get(contactKey)'));
+  assert.ok(route.includes('contacts.set(contactKey, contact)'));
+  assert.ok(route.includes('contact.students.some(item => item.id === child.id)'));
+  assert.ok(route.includes("addContact(student.motherPhone, '', 'Mother', child)"));
+  assert.ok(route.includes('guardianLinks'));
+  assert.ok(route.includes("addContact(guardian.phone, guardian.fullName, 'Guardian', child)"));
 });
 
 test('guardian phone numbers are normalized and deduplicated per school', () => {
