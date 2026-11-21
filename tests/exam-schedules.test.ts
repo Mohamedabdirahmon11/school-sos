@@ -137,7 +137,9 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
-  assert.ok(ui.includes("setActiveTab('schedule')"));
+  assert.ok(ui.includes("setActiveTab('marks')"));
+  assert.ok(ui.includes("setActiveTab('approval')"));
+  assert.ok(!ui.includes("setActiveTab('schedule')"), 'Exam schedule is intentionally hidden from the simplified Marks workspace until it is redesigned separately.');
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
   assert.ok(ui.includes('Cancel draft'));
