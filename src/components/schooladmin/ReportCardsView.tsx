@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { School, SchoolBranch, SchoolClass, ExamConfig, ReportCardDesign } from '../../types/index.ts';
 import { adminRemark, formatReportCardMark, gradeLabelForPercentage, initialsFor, teacherRemark } from '../../lib/report-card.ts';
 import {
@@ -527,9 +528,7 @@ export const ReportCardsView: React.FC = () => {
             </div>
 
             {isLoading ? (
-              <div className="space-y-2 py-2">
-                {[0, 1, 2].map(index => <div key={index} className="h-10 rounded-lg bg-slate-100 animate-pulse" />)}
-              </div>
+              <LoadingState label="Loading class results" className="min-h-24 border-0 bg-transparent" />
             ) : filteredRankings.length === 0 ? (
               <p className="rounded-lg bg-[#F8FAFC] p-4 text-center text-xs text-[#64748B]">
                 {yearlyRankings.length === 0 ? 'No students are enrolled in this class yet.' : 'No students match this search.'}
@@ -562,11 +561,7 @@ export const ReportCardsView: React.FC = () => {
 
           <div className="lg:col-span-2">
             {isLoading ? (
-              <div className="rounded-xl border border-[#CBD5E1] bg-white p-8 space-y-4">
-                <div className="h-6 w-1/2 mx-auto rounded bg-slate-100 animate-pulse" />
-                <div className="h-24 rounded bg-slate-100 animate-pulse" />
-                <div className="h-40 rounded bg-slate-100 animate-pulse" />
-              </div>
+              <LoadingState label="Loading report card preview" className="min-h-40" />
             ) : selectedStudentResult && design && school ? (
               <ReportCardDocument school={school} design={design} className={className} result={selectedStudentResult} totalStudents={yearlyRankings.length} />
             ) : (
