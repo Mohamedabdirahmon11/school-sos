@@ -39,18 +39,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   useEffect(() => {
     const theme = school?.sidebarTheme;
     const presets: Record<string, { background: string; text: string; accent: string }> = {
-      light: { background: '#f8fafc', text: '#172033', accent: '#0f766e' },
-      dark: { background: '#102c2a', text: '#ffffff', accent: '#14b8a6' },
-      brand: { background: '#102c2a', text: '#ffffff', accent: '#0f766e' },
-      soft: { background: '#eaf2f1', text: '#183b38', accent: '#0f766e' }
+      light: { background: '#f8fafc', text: '#172033', accent: '#2563eb' },
+      dark: { background: '#0a101b', text: '#ffffff', accent: '#6b9bff' },
+      brand: { background: '#0f2a5c', text: '#ffffff', accent: '#2563eb' },
+      soft: { background: '#e8f0ff', text: '#18202c', accent: '#2563eb' }
     };
     const preset = presets[theme?.preset || 'brand'];
     const background = theme?.preset === 'gradient'
-      ? 'linear-gradient(160deg, #102c2a 0%, #164e63 55%, #0f766e 100%)'
-      : theme?.preset === 'glass' ? 'rgba(15, 23, 42, 0.94)'
+      ? 'linear-gradient(180deg, #0f2a5c 0%, #16408f 100%)'
+      : theme?.preset === 'glass' ? 'rgba(10, 16, 27, 0.96)'
       : theme?.preset === 'custom' ? theme.backgroundColor : (preset?.background || '#102c2a');
     const root = document.documentElement;
-    const accent = theme?.accentColor || preset?.accent || '#0f766e';
+    const accent = theme?.accentColor || preset?.accent || '#2563eb';
     const channels = [1, 3, 5].map(index => parseInt(accent.slice(index, index + 2), 16) / 255);
     const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
     const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
@@ -276,10 +276,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 title={isCollapsed ? entry.label : undefined}
-                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-[52px]' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
+                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-[52px]' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
                 style={{ borderRadius: active && school?.sidebarTheme?.activeStyle === 'pill' ? '999px' : 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' && school?.sidebarTheme?.activeStyle !== 'outline' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
                 <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active && school?.sidebarTheme?.activeStyle === 'bar' ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--sidebar-accent)" } : undefined}/>
-                <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-teal-100/65 group-hover:text-teal-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
+                <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-blue-100/65 group-hover:text-blue-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
                 <span className={`min-w-0 flex-1 truncate ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
                 {active && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCollapsed ? "hidden" : ""}`} style={{ backgroundColor: "var(--sidebar-accent-foreground)" }}/>}
               </button>;
