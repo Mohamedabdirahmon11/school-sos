@@ -371,3 +371,15 @@ test('Form Teachers may update profiles only inside their current Form Teacher c
   assert.match(route, /formTeacherEditableFields/);
   assert.match(route, /Only school administrators can change student enrollment/);
 });
+
+
+test('teacher subject directory is restricted to active class-subject assignments', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.get('/subjects'");
+  const end = api.indexOf("apiRouter.get('/teacher/form-teacher-classes'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /'teachers\.user_id': user\.id/);
+  assert.match(route, /'teachers\.school_id': school\.id/);
+  assert.match(route, /is_active: 'true'/);
+  assert.match(route, /assignedSubjectIds\.has\(subject\.id\)/);
+});

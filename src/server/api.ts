@@ -3495,7 +3495,19 @@ apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperA
  const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) === 'teacher') {
+    const assignedRows = await queryAllRows('class_subjects', {
+      school_id: school.id, is_active: 'true',
+      'teachers.user_id': user.id, 'teachers.school_id': school.id
+    }, 'subject_id,teachers!class_subjects_teacher_id_fkey!inner(user_id)');
+    const assignedSubjectIds = new Set(assignedRows.map((row: any) => String(row.subjectId)));
+    const subjects = (await db.getSubjects(school.id)).filter(subject => assignedSubjectIds.has(subject.id));
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json(subjects);
+    return;
+  }
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
