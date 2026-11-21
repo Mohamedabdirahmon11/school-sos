@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -2005,4 +2006,72 @@ button:disabled, [aria-disabled="true"] {
 @media (max-width: 767px) {
   .school-admin-role { zoom: 1; }
   .school-admin-role .school-dashboard-hero { border-radius: 14px; }
+}
+
+
+/* SchoolOS academic workspace — shared visual tokens (presentation only). */
+:root {
+  --schoolos-font-body: "Inter", system-ui, sans-serif;
+  --schoolos-font-heading: "Space Grotesk", "Inter", sans-serif;
+  --schoolos-accent: #0e6a62;
+  --schoolos-accent-hover: #0a5751;
+  --schoolos-surface: #ffffff;
+  --schoolos-canvas: #f5f8fa;
+  --schoolos-ink: #172b2a;
+  --schoolos-muted: #64748b;
+  --schoolos-line: #dce5e8;
+  --schoolos-control: 40px;
+  --schoolos-radius: 12px;
+  --schoolos-gap: 12px;
+  --schoolos-subject-1: #176b87;
+  --schoolos-subject-2: #7354a5;
+  --schoolos-subject-3: #28744e;
+  --schoolos-subject-4: #a15c19;
+  --schoolos-subject-5: #a13f63;
+  --schoolos-subject-6: #4c61a8;
+}
+.dark {
+  --schoolos-accent: #4cc3b5;
+  --schoolos-accent-hover: #72d5c9;
+  --schoolos-surface: #111d24;
+  --schoolos-canvas: #0b141a;
+  --schoolos-ink: #e6f0f1;
+  --schoolos-muted: #a6b8bd;
+  --schoolos-line: #2b3b42;
+}
+body { font-family: var(--schoolos-font-body); }
+:where(h1,h2,h3,h4,.ds-page-header h1) { font-family: var(--schoolos-font-heading); }
+:where(button,input,select,textarea) { font-family: var(--schoolos-font-body); }
+:where(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline: 2px solid var(--schoolos-accent) !important;
+  outline-offset: 2px;
+}
+.school-admin-role main :where(input,select,textarea,button) { min-height: var(--schoolos-control); }
+.school-admin-role main :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+}
+.school-admin-role main :where(button) { border-radius: 10px; }
+.school-admin-role main :where(.rounded-xl,.rounded-2xl) { border-radius: var(--schoolos-radius); }
+.school-admin-role main :where(.border-slate-200,.border-\\[\\#E2E8F0\\],.border-\\[\\#CBD5E1\\]) { border-color: var(--schoolos-line); }
+.schoolos-assignment-page { color: var(--schoolos-ink); }
+.schoolos-assignment-page > :where(section,div) { min-width: 0; }
+.schoolos-assignment-page .ds-card {
+  border: 1px solid var(--schoolos-line);
+  border-radius: 14px;
+  background: var(--schoolos-surface);
+  box-shadow: 0 2px 10px rgba(20,45,54,.045);
+}
+.schoolos-assignment-page .ds-button { min-height: 40px; border-radius: 10px; }
+.schoolos-assignment-page .ds-button-primary { background: var(--schoolos-accent); }
+.schoolos-assignment-page .ds-button-primary:hover { background: var(--schoolos-accent-hover); }
+.schoolos-assignment-page .ds-pill { border-radius: 999px; }
+.schoolos-assignment-page .overflow-x-auto { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+@media (max-width: 719px) {
+  .schoolos-assignment-page { padding: 14px !important; }
+  .schoolos-assignment-page > .grid { grid-template-columns: 1fr !important; }
+  .schoolos-assignment-page :where(.flex.items-end,.flex.flex-wrap) { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-role * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
