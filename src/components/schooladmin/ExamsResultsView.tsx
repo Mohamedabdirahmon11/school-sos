@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { ErrorState } from '../common/AsyncState.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
 import { buildResultsCsv } from '../../lib/results-csv.ts';
 import { ExamTimetablePrint, formatSomaliExamDate, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
@@ -1099,7 +1100,7 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
         </div>
       </div>
 
-      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => void (classes.length && subjects.length ? loadClassData() : loadExamSetup())} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
+      {loadError && <ErrorState error={loadError} onRetry={() => void (classes.length && subjects.length ? loadClassData() : loadExamSetup())} />}
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
