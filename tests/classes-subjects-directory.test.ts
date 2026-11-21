@@ -23,10 +23,12 @@ test('Subjects remain editable with class-specific teacher, periods and exam ass
   assert.match(classesSource, /Credit units and departments are not required/);
 });
 
-test('Teacher directory includes Form Teacher classes as well as profile class assignments', () => {
-  assert.match(teachersSource, /classes\.filter\(klass => klass\.classTeacherId === t\.userId/);
-  assert.match(teachersSource, /displayedClassIds = Array\.from\(new Set/);
-  assert.match(teachersSource, /\(Form Teacher\)/);
+test('Teacher directory separates classes taught from the Form Teacher class', () => {
+  assert.match(teachersSource, /Classes taught/);
+  assert.match(teachersSource, /Form Teacher class/);
+  assert.match(teachersSource, /const displayedClassIds = Array\\.from\\(new Set\\(t\\.assignedClasses \\|\\| \\[\\]\\)\\)/);
+  assert.match(teachersSource, /const formTeacherClass = classes\\.find/);
+  assert.doesNotMatch(teachersSource, /\\(Form Teacher\\)/);
 });
 
 
