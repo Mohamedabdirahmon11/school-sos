@@ -84,6 +84,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   --admin-sidebar: #0f2a5c;
   --admin-active: #2563eb;
   --admin-primary: #2563eb;
+  --sidebar-width: 250px;
   background: var(--admin-canvas) !important;
   color: var(--admin-ink);
 }
@@ -106,7 +107,9 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   border-color: var(--admin-line);
 }
 .school-admin-design main > div {
-  max-width: none;
+  width: 100%;
+  max-width: 1250px;
+  margin-inline: auto;
   padding: 20px;
 }
 .school-admin-design main .rounded-xl { border-radius: 14px; }
