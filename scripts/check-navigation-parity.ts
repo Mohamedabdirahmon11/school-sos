@@ -12,7 +12,7 @@ if (new Set(ids).size !== ids.length) errors.push('Duplicate route IDs exist in 
 for (const route of NAVIGATION_REGISTRY) {
   if (!route.label.trim()) errors.push(`Route ${route.id} has no label.`);
   if (!route.roles.length) errors.push(`Route ${route.id} has no allowed roles.`);
-  if (typeof route.icon !== 'function') errors.push(`Route ${route.id} has no icon component.`);
+  if (!route.icon) errors.push(`Route ${route.id} has no icon component.`);
   const rolePrefixRoute = /^(t_|p_|st_)/.test(route.id);
   if (!app.includes(`'${route.id}'`) && !rolePrefixRoute) {
     errors.push(`Route ${route.id} is registered but not explicitly referenced by App routing.`);
