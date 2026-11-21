@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { translations, TranslationDict } from '../../lib/translations.ts';
+import { translations, LanguageCode, TranslationDict } from '../../lib/translations.ts';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { hasStaffNavigationPermission, type StaffPermission } from '../../lib/staff-permissions.ts';
