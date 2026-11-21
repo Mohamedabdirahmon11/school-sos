@@ -17,10 +17,15 @@ export const TeachersView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const [subjectFilter, setSubjectFilter] = useState('');
-  const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20, search, subjectId: subjectFilter }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page, search, subjectFilter], Boolean(school));
+  const teacherLoad = useApi(async signal => Promise.all([
+    ApiClient.getTeachers({ page, pageSize: 20, search: debouncedSearch, subjectId: subjectFilter, signal }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page, debouncedSearch, subjectFilter], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
