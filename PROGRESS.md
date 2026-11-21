@@ -686,3 +686,10 @@ pm run dev and apply migrations 001-014.
 - ADDED: unit tests in `tests/term-exam-scheduling.test.ts` for curriculum grouping, mixed seating, class exam numbering, shift compatibility, capacity validation, and invigilator conflicts.
 - VERIFIED: GitHub Actions run 44494116498 passed TypeScript checks, all 466 tests, route parity audit, RLS source audit, and production build.
 - NOT LIVE VERIFIED: the migration has not been applied to Supabase, and authenticated School Admin end-to-end flows still need a controlled staging-school test. Apply the migration only after review against the intended Supabase project.
+
+
+## 2026-11-21 — School Admin dashboard and workspace controls
+- DONE: refreshed the School Admin Dashboard while preserving its Dashboard label, live school-scoped data, role checks, and navigation actions.
+- DONE: added a validated school-wide workspace zoom preference (90–100%, default 96%) alongside sidebar width in School Settings → Appearance.
+- No database migration or school-data changes were required; the preference uses the existing school sidebarTheme settings JSON.
+- VERIFIED: GitHub Actions run 44924076640 passed TypeScript checks, all 501 tests, route parity, navigation registry, RLS source audit, and production build.

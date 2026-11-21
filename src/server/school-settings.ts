@@ -103,6 +103,7 @@ const sidebarThemeSchema = z.object({
   iconStyle: z.enum(['outline', 'filled']),
   showGroupLabels: z.boolean(),
   width: z.number().int().min(240).max(320),
+  zoom: z.number().int().min(90).max(100),
   defaultCollapsed: z.boolean(),
   fontSize: z.enum(['small', 'normal', 'large']),
   showLogo: z.boolean(),

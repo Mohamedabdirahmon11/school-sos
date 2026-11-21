@@ -15,6 +15,7 @@ const DEFAULT_THEME: SidebarTheme = {
   iconStyle: 'outline',
   showGroupLabels: true,
   width: 260,
+  zoom: 96,
   defaultCollapsed: false,
   fontSize: 'normal',
   showLogo: true,
@@ -79,6 +80,7 @@ export const SidebarAppearanceSettings: React.FC = () => {
       root.style.setProperty('--sidebar-accent', value.accentColor);
       root.style.setProperty('--sidebar-accent-foreground', readableText(value.accentColor));
       root.style.setProperty('--sidebar-width', `${value.width}px`);
+      root.style.setProperty('--school-ui-zoom', String(value.zoom / 100));
       root.style.setProperty('--sidebar-radius', value.radius === 'sharp' ? '4px' : value.radius === 'medium' ? '10px' : '14px');
       root.style.setProperty('--sidebar-font-size', value.fontSize === 'small' ? '12px' : value.fontSize === 'large' ? '14px' : '13px');
     };
@@ -190,7 +192,8 @@ export const SidebarAppearanceSettings: React.FC = () => {
             <label className="text-xs font-semibold text-slate-600">Density<select value={theme.density} onChange={e => update('density', e.target.value as SidebarTheme['density'])} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
             <label className="text-xs font-semibold text-slate-600">Icon style<select value={theme.iconStyle} onChange={e => update('iconStyle', e.target.value as SidebarTheme['iconStyle'])} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"><option value="outline">Outline</option><option value="filled">Filled</option></select></label>
             <label className="text-xs font-semibold text-slate-600">Font size<select value={theme.fontSize} onChange={e => update('fontSize', e.target.value as SidebarTheme['fontSize'])} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
-            <label className="text-xs font-semibold text-slate-600">Sidebar width: {theme.width}px<input type="range" min="240" max="320" step="4" value={theme.width} onChange={e => update('width', Number(e.target.value))} className="mt-3 w-full accent-teal-700"/></label>
+            <label className="text-xs font-semibold text-slate-600">Sidebar width: {theme.width}px<input aria-label="Sidebar width" type="range" min="240" max="320" step="4" value={theme.width} onChange={e => update('width', Number(e.target.value))} className="mt-3 w-full accent-teal-700"/></label>
+            <label className="text-xs font-semibold text-slate-600">Workspace zoom: {theme.zoom}%<input aria-label="Workspace zoom" type="range" min="90" max="100" step="1" value={theme.zoom} onChange={e => update('zoom', Number(e.target.value))} className="mt-3 w-full accent-teal-700"/><span className="mt-1 block text-[11px] font-normal text-slate-500">Adjust the size of the School Admin workspace. Default: 96%.</span></label>
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">

@@ -1983,3 +1983,26 @@ button:disabled, [aria-disabled="true"] {
 @media(prefers-reduced-motion:reduce) {
   .school-admin-sidebar > nav section button {transition:none !important;}
 }
+
+
+/* School Admin workspace scale and refreshed dashboard surface. */
+.school-admin-role { zoom: var(--school-ui-zoom, 0.96); }
+.school-admin-role .school-dashboard-hero {
+  background: radial-gradient(circle at 88% 8%, rgba(120,169,255,.24), transparent 30%), linear-gradient(112deg, #102b55 0%, #173e79 58%, #1d4f91 100%);
+  box-shadow: 0 12px 30px rgba(17, 50, 99, .14);
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel {
+  border: 1px solid #e1e8f2; border-radius: 15px; background: #fff;
+  box-shadow: 0 3px 12px rgba(25, 47, 82, .045);
+}
+.school-admin-role .school-dashboard-page .school-admin-metric {
+  min-height: 106px; border-radius: 14px !important;
+  box-shadow: 0 3px 12px rgba(25, 47, 82, .045) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric:hover {
+  border-color: #c9d9f2 !important; box-shadow: 0 8px 18px rgba(25, 47, 82, .09) !important;
+}
+@media (max-width: 767px) {
+  .school-admin-role { zoom: 1; }
+  .school-admin-role .school-dashboard-hero { border-radius: 14px; }
+}
