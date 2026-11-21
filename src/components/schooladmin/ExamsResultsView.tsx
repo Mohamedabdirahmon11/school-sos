@@ -476,6 +476,7 @@ const EXAM_REDESIGN_STYLES = `
 `;
 
 export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> = ({ initialTab = 'marks' }) => {
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const { school, isReadOnly, t, refreshUser } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
