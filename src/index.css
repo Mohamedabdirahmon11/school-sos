@@ -1547,9 +1547,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   padding-bottom: max(8px, env(safe-area-inset-bottom));
   background: var(--sidebar-background, #0f2a5c);
 }
-.school-admin-role aside.school-admin-sidebar > div:has(> div > p) {
-  flex: 0 0 auto;
-}
 .school-admin-role aside.school-admin-sidebar nav button[aria-current="page"] {
   border-color: color-mix(in srgb, var(--sidebar-accent, #2563eb) 38%, transparent);
   box-shadow: 0 4px 12px rgba(15, 23, 42, .12);
