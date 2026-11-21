@@ -3844,10 +3844,11 @@ async function getTeacherTermAssignmentScope(
   const academicYear = years[0] as any;
   if (!academicYear?.id) return null;
 
+  const termNames = semester === 'Semester 1' ? ['Term 1', 'Semester 1'] : ['Term 2', 'Semester 2'];
   const terms = await queryAllRows('terms', {
-    school_id: school.id, academic_year_id: String(academicYear.id), name: semester
-  }, 'id');
-  const term = terms[0] as any;
+    school_id: school.id, academic_year_id: String(academicYear.id), name: termNames
+  }, 'id,name');
+  const term = terms.find((item: any) => termNames.includes(String(item.name || ''))) as any;
   if (!term?.id) return null;
   if (requireOpenTerm) {
     const termStatuses = await queryAllRows('term_status', {
