@@ -3767,10 +3767,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, undefined, columns);
+    const result = await db.queryPage(table, filters, page, 100, undefined, columns, orderBy);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -4706,7 +4706,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
     db.getClasses(school.id),
     queryAllRows('students', { school_id: school.id, status: 'active', ...(classId ? { class_id: classId } : {}) }, LIST_QUERY_COLUMNS.students),
     queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary')
+    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
   ]);
   const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
   if (classId && !classById.has(classId)) {
@@ -4725,13 +4725,16 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const studentById = new Map<string, any>();
   const guardianById = new Map<string, any>(guardianRows.map((guardian: any) => [String(guardian.id), guardian]));
   const addContact = (phoneValue: unknown, nameValue: unknown, relationship: string, child: { id: string; studentId: string; fullName: string; className: string }) => {
-    const phone = String(phoneValue || '').trim();
-    const normalizedPhone = phone.replace(/\D/g, '');
-    if (!normalizedPhone) return;
-    let contact = contacts.get(normalizedPhone);
+    const rawPhone = String(phoneValue || '').trim();
+    const normalizedPhone = rawPhone.replace(/\D/g, '');
+    // A missing phone must remain visible; group those guardian roles per child
+    // because there is no safe phone-based identity to deduplicate across families.
+    const contactKey = normalizedPhone || `missing:${child.id}`;
+    const phone = normalizedPhone ? rawPhone : 'Phone not provided';
+    let contact = contacts.get(contactKey);
     if (!contact) {
-      contact = { id: `${school.id}:${normalizedPhone}`, phone, normalizedPhone, name: String(nameValue || ''), relationships: new Set<string>(), students: [] };
-      contacts.set(normalizedPhone, contact);
+      contact = { id: `${school.id}:${contactKey}`, phone, normalizedPhone, name: String(nameValue || ''), relationships: new Set<string>(), students: [] };
+      contacts.set(contactKey, contact);
     }
     if (!contact.name && nameValue) contact.name = String(nameValue);
     contact.relationships.add(relationship);

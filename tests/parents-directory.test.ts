@@ -49,3 +49,20 @@ test('Parents directory uses the unique contacts endpoint and exposes class All 
   assert.match(view, /<option value="">All classes<\/option>/);
   assert.match(view, /contact\.students\.map/);
 });
+
+
+test('guardian links are paginated by existing composite-key columns, not a nonexistent id column', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /queryAllRows\('student_guardians',[^\n]*'guardian_id,student_id,relation,is_primary',[^\n]*'guardian_id,student_id'\)/);
+});
+
+test('parents without phone numbers remain visible with a safe placeholder', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /const contactKey = normalizedPhone \|\| `missing:\$\{child\.id\}`/);
+  assert.match(route, /'Phone not provided'/);
+  assert.match(view, /if \(!digits\) return null/);
+});

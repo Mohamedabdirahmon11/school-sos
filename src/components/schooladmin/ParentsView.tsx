@@ -81,6 +81,7 @@ export const ParentsView: React.FC = () => {
   const contactActions = (phone: string) => {
     const value = phone.trim();
     const digits = value.replace(/\D/g, '');
+    if (!digits) return null;
     return (
       <div className="flex flex-wrap gap-1.5 mt-1">
         <a href={`tel:${value}`} aria-label={`Call ${value}`}
