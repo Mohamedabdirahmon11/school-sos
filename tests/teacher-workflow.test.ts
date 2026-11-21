@@ -28,7 +28,7 @@ test('teacher marks access is scoped by active teacher, academic year, term, sec
   assert.match(api, /getTeacherTermAssignmentScope/);
   assert.match(api, /teacher_class_subject_assignments/);
   assert.match(api, /academic_year_id/);
-  assert.match(api, /normalizeAcademicYear = \(value: unknown\) => String\(value \|\| ''\)\.replace\(\/[\\/-]\/g, ''\)/);
+  assert.ok(api.includes("normalizeAcademicYear = (value: unknown) => String(value || '').replace(/[/-]/g, '')"));
   assert.match(api, /termNames = semester === 'Semester 1' \? \['Term 1', 'Semester 1'\]/);
   assert.match(api, /termId === term\.id/);
   assert.match(api, /assignment\.sectionId === enrollment\.sectionId/);
