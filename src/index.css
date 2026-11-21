@@ -2136,3 +2136,68 @@ body { font-family: var(--schoolos-font-body); }
   .schoolos-timetable-page > div:first-child > div:last-child select { flex: 1 1 145px; }
   .schoolos-timetable-page :where(table) { min-width: 660px; }
 }
+
+
+/* Marks and academic results: fast-entry friendly, dense but readable controls. */
+.schoolos-marks-page {
+  --exam-teal: var(--schoolos-accent);
+  --exam-line: var(--schoolos-line);
+  color: var(--schoolos-ink);
+}
+.schoolos-marks-page :where(input,select,textarea,button) {
+  min-height: 40px;
+  border-radius: 10px;
+  font-family: var(--schoolos-font-body);
+}
+.schoolos-marks-page :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-marks-page :where(table) { width: 100%; border-collapse: separate; border-spacing: 0; }
+.schoolos-marks-page :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f1f6f6;
+  color: #365451;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .035em;
+}
+.dark .schoolos-marks-page :where(thead th) { background: #172a30; color: #c5dcda; }
+.schoolos-marks-page :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-marks-page :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-marks-page :where(button.bg-teal-600,button.bg-teal-700,button.bg-\\[\\#0F766E\\]) {
+  background-color: var(--schoolos-accent);
+}
+.schoolos-marks-page :where(button.bg-teal-600,button.bg-teal-700,button.bg-\\[\\#0F766E\\]):hover {
+  background-color: var(--schoolos-accent-hover);
+}
+.schoolos-academic-results {
+  min-width: 0;
+  color: var(--schoolos-ink);
+}
+.schoolos-academic-results :where(input,select,button) { min-height: 40px; }
+.schoolos-academic-results :where(input,select) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-academic-results :where(.overflow-x-auto) { max-width: 100%; overflow-x: auto; }
+.schoolos-academic-results :where(table) { min-width: 760px; }
+@media (max-width: 767px) {
+  .schoolos-marks-page { padding: 14px !important; border-radius: 16px; }
+  .schoolos-marks-page :where(table) { min-width: 660px; }
+  .schoolos-academic-results { gap: 14px; }
+}
+@media (max-width: 420px) {
+  .schoolos-marks-page { padding: 12px !important; }
+  .schoolos-marks-page :where(input,select,button) { min-height: 42px; }
+}
