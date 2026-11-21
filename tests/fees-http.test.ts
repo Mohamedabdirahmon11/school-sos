@@ -299,3 +299,78 @@ test('bank reconciliation supports split allocations and prevents over-allocatio
     'a reconciled fee receipt must not be voidable'
   );
 });
+
+test('Phase 2 role matrix returns 403 for teacher, parent and student on fee writes', async () => {
+  const roleCases = [
+    { role: 'school_admin', expected: 400 },
+    { role: 'accountant', expected: 400 },
+    { role: 'teacher', expected: 403 },
+    { role: 'parent', expected: 403 },
+    { role: 'student', expected: 403 }
+  ] as const;
+
+  const headersFor = async (role: typeof roleCases[number]['role']) => {
+    const account = storage.db.createUser({
+      schoolId: school.id, role, permissions: [], fullName: `Role ${role}`,
+      email: `phase2-${role}@example.test`, passwordHash: '', isBlocked: false
+    } as any);
+    if (role === 'accountant') {
+      await memory.from('staff_members').insert([{
+        id: 'phase2-accountant-staff', schoolId: school.id, staffId: 'P2-ACCOUNTANT',
+        fullName: account.fullName, roleTitle: 'Accountant', email: account.email!,
+        phone: '', monthlySalary: 0, permissions: ['fees_manage'], status: 'active', userId: account.id
+      }]);
+    }
+    const sessionId = `phase2-session-${role}`;
+    const now = Date.now();
+    memory.rows('user_sessions').push({
+      id: sessionId, userId: account.id, userRole: role, schoolId: school.id,
+      ipAddress: '127.0.0.1', userAgent: 'phase2-role-matrix',
+      createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 60_000).toISOString(),
+      lastActivityAt: new Date(now).toISOString()
+    });
+    const signed = auth.createSignedSessionToken({
+      sessionId, userId: account.id, role, schoolId: school.id,
+      createdAt: now, expiresAt: now + 60_000
+    });
+    return { Cookie: `schoolos_session=${signed}`, 'Content-Type': 'application/json' };
+  };
+
+  for (const item of roleCases) {
+    const response = await fetch(`${baseUrl}/student-invoices/generate`, {
+      method: 'POST', headers: await headersFor(item.role), body: JSON.stringify({})
+    });
+    assert.equal(response.status, item.expected, `${item.role} fee-write status`);
+  }
+});
+
+test('school admins cannot switch tenant scope with an x-school-id header', async () => {
+  const otherSchool = storage.db.createSchool({
+    name: 'Other Tenant', code: 'OTHER-TENANT', address: '', city: '', phone: '',
+    email: 'other-tenant@example.test', currency: 'ETB', academicYear: '2026-2027',
+    currentSemester: 'Semester 1', defaultClassCapacity: 30, studentAccessEnabled: false,
+    subscription: { plan: 'basic', cadence: 'yearly', status: 'active', startDate: today, validUntil: '2099-12-31', graceDays: 7, pricePaid: 0, autoRenew: false }
+  } as any);
+  const account = storage.db.createUser({
+    schoolId: school.id, role: 'school_admin', permissions: [], fullName: 'Tenant Boundary Admin',
+    email: 'phase2-tenant-admin@example.test', passwordHash: '', isBlocked: false
+  } as any);
+  const sessionId = 'phase2-cross-school-session';
+  const now = Date.now();
+  memory.rows('user_sessions').push({
+    id: sessionId, userId: account.id, userRole: 'school_admin', schoolId: school.id,
+    ipAddress: '127.0.0.1', userAgent: 'phase2-cross-school',
+    createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 60_000).toISOString(),
+    lastActivityAt: new Date(now).toISOString()
+  });
+  const signed = auth.createSignedSessionToken({
+    sessionId, userId: account.id, role: 'school_admin', schoolId: school.id,
+    createdAt: now, expiresAt: now + 60_000
+  });
+  const response = await fetch(`${baseUrl}/student-invoices/generate`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${signed}`, 'Content-Type': 'application/json', 'x-school-id': otherSchool.id },
+    body: JSON.stringify({})
+  });
+  assert.equal(response.status, 403);
+});
