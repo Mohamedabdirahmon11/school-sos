@@ -21,6 +21,7 @@ export interface NavigationRoute {
 
 const platform: readonly SchoolOSRole[] = ['super_admin'];
 const school: readonly SchoolOSRole[] = ['school_admin', 'super_admin'];
+const schoolAndFormTeacher: readonly SchoolOSRole[] = ['school_admin', 'super_admin', 'teacher'];
 const accountant: readonly SchoolOSRole[] = ['accountant'];
 const teacher: readonly SchoolOSRole[] = ['teacher'];
 const parent: readonly SchoolOSRole[] = ['parent'];
@@ -42,7 +43,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'sch_dashboard', label: 'Dashboard', labelKey: 'dashboard', icon: LayoutDashboard, roles: school, group: 'Overview', mobile: ['school_admin'] },
   { id: 'sch_students', label: 'Students', labelKey: 'students', icon: GraduationCap, roles: school, group: 'People', mobile: ['school_admin'] },
   { id: 'sch_teachers', label: 'Teachers', labelKey: 'teachers', icon: UserCheck, roles: school, group: 'People' },
-  { id: 'sch_parents', label: 'Parents & Contacts', labelKey: 'parents_contacts', icon: PhoneCall, roles: school, group: 'People' },
+  { id: 'sch_parents', label: 'Parents & Contacts', labelKey: 'parents_contacts', icon: PhoneCall, roles: schoolAndFormTeacher, group: 'People' },
   { id: 'sch_admissions', label: 'Admissions Pipeline', icon: UserPlus, roles: school, group: 'People' },
   { id: 'sch_staff', label: 'Staff Roles & Permissions', icon: ShieldCheck, roles: school, group: 'People' },
   { id: 'sch_classes', label: 'Classes', labelKey: 'classes', icon: Layers, roles: school, group: 'Academic', mobile: ['school_admin'] },
