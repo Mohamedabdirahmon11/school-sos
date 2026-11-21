@@ -191,7 +191,12 @@ USING (
   OR (
     (private.auth_user_role())::text = 'teacher'
     AND EXISTS (
-      SELECT 1 FROM public.classes c
+      SELECT 1
+        FROM public.classes c
+        JOIN public.teachers t
+          ON t.user_id = c.class_teacher_id
+         AND t.school_id = c.school_id
+         AND lower(t.status) = 'active'
        WHERE c.id = attendance_records.class_id
          AND c.school_id = attendance_records.school_id
          AND c.class_teacher_id = private.auth_user_id()
@@ -274,7 +279,12 @@ USING (
            AND lower(t.status) = 'active'
       )
       OR EXISTS (
-        SELECT 1 FROM public.classes c
+        SELECT 1
+          FROM public.classes c
+          JOIN public.teachers t
+            ON t.user_id = c.class_teacher_id
+           AND t.school_id = c.school_id
+           AND lower(t.status) = 'active'
          WHERE c.id = timetable_slots.class_id
            AND c.school_id = timetable_slots.school_id
            AND c.class_teacher_id = private.auth_user_id()
