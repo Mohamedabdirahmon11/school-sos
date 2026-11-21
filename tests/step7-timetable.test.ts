@@ -79,3 +79,16 @@ test('copy, clear, swap and overlap guardrails are implemented', () => {
   assert.match(ui, /selectedSectionId/);
   assert.match(ui, /handleSwapSlots/);
 });
+
+
+test('timetable generation requires active year-and-term teacher assignments before replacing any slots', () => {
+  assert.match(api, /candidate\.academicYearId === termRecord\.academicYearId/);
+  assert.match(api, /activeTeacherIds/);
+  assert.match(api, /unresolvedAssignments/);
+  assert.match(api, /inactiveTeacherAssignments/);
+  assert.match(api, /Existing timetable was not changed/);
+  assert.match(api, /An active teacher profile is required to view the timetable/);
+  assert.ok(api.includes("String((own.items[0] as any).status || '').toLowerCase() !== 'active'"));
+  assert.doesNotMatch(api, /: \[\{ \.\.\.item, teacherId: item\.teacherId/);
+});
+

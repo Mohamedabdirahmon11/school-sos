@@ -44,7 +44,7 @@ test('Form Teachers review all homeroom subjects but can edit only assigned subj
   assert.match(api, /isFormTeacherClass: true/);
   assert.match(api, /isFormTeacher: true/);
   assert.match(api, /canEditMarks: true/);
-  assert.match(api, /You may enter marks only for a subject explicitly assigned to your teacher profile/);
+  assert.match(api, /You may submit marks only for a subject and section assigned to your active teacher profile in this open academic term/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
@@ -328,4 +328,37 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(sidebar, /item\('t_assignments'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
+});
+
+
+test('teacher marks authorization is scoped by active teacher, academic year, term, subject, section and enrollment', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /getTeacherTermAssignmentScope/);
+  assert.match(api, /teacher_class_subject_assignments/);
+  assert.match(api, /academic_year_id/);
+  assert.ok(api.includes("academicYearName.replace(/[/-]/g, '')"));
+  assert.ok(api.includes("semester === 'Semester 1' ? ['Term 1', 'Semester 1']"));
+  assert.match(api, /requireOpenTerm = false/);
+  assert.match(api, /const statuses = await queryAllRows\('term_status'/);
+  assert.ok(api.includes("(assignment as any).sectionId === (enrollment as any).sectionId"));
+  assert.match(api, /subjectStudentIds\.get\(String\(mark\.subjectId\)\)/);
+  assert.match(api, /subjectStudentIds\.get\(String\(subjectId\)\)/);
+  const postStart = api.indexOf("apiRouter.post('/exams/marks'");
+  const postEnd = api.indexOf("apiRouter.post('/exams/forward-class'", postStart);
+  const post = api.slice(postStart, postEnd);
+  assert.doesNotMatch(post, /queryPage\('class_subjects'/);
+  assert.match(post, /actively enrolled in the assigned class section/);
+});
+
+
+
+test('daily attendance submission requires an active teacher before Form Teacher class ownership is checked', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.post('/attendance'");
+  const end = api.indexOf("apiRouter.", start + 20);
+  const route = api.slice(start, end);
+  assert.match(route, /teacherProfile/);
+  assert.match(route, /status.*active/);
+  assert.match(route, /An active teacher profile is required to submit class attendance/);
+  assert.match(route, /attendanceClass\.classTeacherId !== user\.id/);
 });
