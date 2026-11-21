@@ -59,7 +59,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'sch_promotion', label: 'Student Progression & Alumni', icon: Award, roles: school, group: 'Academic' },
   { id: 'sch_notices', label: 'Notices', labelKey: 'notice_board', icon: BellRing, roles: school, group: 'Communication' },
   { id: 'sch_messages', label: 'Messages', labelKey: 'messages', icon: MessageSquare, roles: school, group: 'Communication' },
-  { id: 'sch_whatsapp', label: 'WhatsApp Parent Alerts', icon: MessageCircle, roles: school, group: 'Communication' },
+  { id: 'sch_whatsapp', label: 'WhatsApp Parent Alerts', icon: MessageCircle, roles: ['school_admin'], group: 'Communication' },
   { id: 'sch_events', label: 'Academic Calendar', icon: CalendarDays, roles: school, group: 'Communication' },
   { id: 'sch_fees', label: 'Fees & Payments', labelKey: 'fees_payments', icon: CreditCard, roles: ['school_admin', 'super_admin', 'accountant'], group: 'Finance', mobile: true, permission: 'fees_manage' },
   { id: 'sch_student_invoices', label: 'Fee Invoices', icon: FileText, roles: ['school_admin', 'super_admin', 'accountant'], group: 'Finance', permission: 'fees_manage' },
@@ -71,7 +71,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'sch_health', label: 'Clinic & Health Records', icon: HeartPulse, roles: school, group: 'Resources' },
   { id: 'sch_settings', label: 'School Settings', icon: Sliders, roles: school, group: 'Settings' },
   { id: 'sch_support', label: 'Help Centre', icon: LifeBuoy, roles: school, group: 'Settings' },
-  { id: 'sch_payroll', label: 'Payroll', labelKey: 'payroll_management', icon: Wallet, roles: ['school_admin', 'super_admin', 'accountant'], group: 'Finance', permission: 'payroll_manage' },
+  { id: 'sch_payroll', label: 'Payroll', labelKey: 'payroll_management', icon: Wallet, roles: accountant, group: 'Finance', permission: 'payroll_manage' },
 
   { id: 'acc_dashboard', label: 'Dashboard', labelKey: 'dashboard', icon: LayoutDashboard, roles: accountant, group: 'Finance Workspace', mobile: true },
   { id: 'acc_expenses', label: 'Expenses', icon: Wallet, roles: accountant, group: 'Daily Operations', mobile: true, permission: 'fees_manage' },
