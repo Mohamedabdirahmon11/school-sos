@@ -287,7 +287,7 @@ const AppContent: React.FC = () => {
               <YearEndPromotionView />
             )}
             {(activeView === 'sch_events' || activeView === 'sch_notices') && (
-              <NoticesEventsView />
+              <NoticesEventsView initialTab={activeView === 'sch_notices' ? 'notices' : 'events'} />
             )}
             {activeView === 'sch_messages' && (
               <MessagesView />
