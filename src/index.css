@@ -89,7 +89,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 }
 .school-admin-design main { background: var(--admin-canvas); }
 .school-admin-design aside {
-  width: 268px;
+  width: var(--sidebar-width, 260px);
   background: var(--admin-sidebar) !important;
 }
 .school-admin-design aside .h-14 { min-height: 76px; height: 76px; padding-left: 22px; padding-right: 22px; }
@@ -195,11 +195,11 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   overflow: hidden;
 }
 .school-admin-design aside {
-  width: 250px;
+  width: var(--sidebar-width, 260px);
   height: 100%;
   max-height: 100%;
-  flex: 0 0 250px;
-  background: linear-gradient(180deg, #0b302d 0%, #082522 100%) !important;
+  flex: 0 0 var(--sidebar-width, 260px);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar-background, #0b302d) 92%, white), var(--sidebar-background, #082522)) !important;
   box-shadow: 8px 0 28px rgba(6, 29, 26, .10);
 }
 .school-admin-design aside nav {
@@ -247,7 +247,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design aside > div:last-child {
   min-height: 52px;
   padding: 12px 14px;
-  background: #071f1d;
+  background: color-mix(in srgb, var(--sidebar-background, #071f1d) 78%, black);
   border-top-color: rgba(194, 225, 219, .12);
 }
 .school-admin-design main {
@@ -829,8 +829,8 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   accent-color: var(--ui-accent);
   box-shadow: none !important;
 }
-.school-admin-design main label,
-.super-admin-design main label {
+.school-admin-design main label:not(.flex):not([class*="inline-flex"]),
+.super-admin-design main label:not(.flex):not([class*="inline-flex"]) {
   display: block;
   margin-bottom: 5px;
   color: #526779;
@@ -1308,3 +1308,173 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
     animation-iteration-count: 1 !important;
   }
 }
+
+/* AL-BUSHRA School Admin visual system — presentation only; existing routes and data flows are preserved. */
+.school-admin-design {
+  --admin-canvas:#f2f5fa; --admin-ink:#17264a; --admin-muted:#66758c;
+  --admin-line:#e1e8f3; --admin-sidebar:#0f2a5c; --admin-active:#1673ee;
+  --admin-primary:var(--brand-color,#2563eb);
+  background:var(--admin-canvas)!important;color:var(--admin-ink);
+}
+.school-admin-design aside {
+  background:var(--sidebar-background,linear-gradient(180deg,#102d63 0%,#0b214c 100%))!important;
+  border-right:1px solid rgba(255,255,255,.08);
+  box-shadow:8px 0 28px rgba(15,42,92,.10);
+}
+.school-admin-design aside > div:first-child { min-height:92px;height:92px;border-bottom-color:rgba(214,228,255,.14); }
+.school-admin-design aside nav { gap:4px;padding:16px 11px 20px; }
+.school-admin-design aside nav section h2 {
+  margin:15px 10px 6px;color:#8fa9d4;font-size:9px;font-weight:800;
+  letter-spacing:.13em;text-transform:uppercase;
+}
+.school-admin-design aside nav button {
+  min-height:39px;padding:8px 11px;border:1px solid transparent;border-radius:10px;
+  color:#d6e4ff;font-size:12px;font-weight:550;
+}
+.school-admin-design aside nav button:hover { color:#fff;background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.04); }
+.school-admin-design aside nav button[aria-current="page"] {
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 5px 14px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.12);
+}
+.school-admin-design aside nav button svg { color:#a9c3ed; }
+.school-admin-design aside nav button[aria-current="page"] svg { color:#fff; }
+.school-admin-design aside > div:last-child { background:rgba(3,17,43,.55)!important;border-top-color:rgba(214,228,255,.14); }
+.school-admin-design header {
+  min-height:68px;height:68px;padding-inline:clamp(16px,2.3vw,32px);
+  background:rgba(255,255,255,.97);border-color:var(--admin-line);
+  box-shadow:0 2px 12px rgba(24,48,84,.035);backdrop-filter:blur(14px);
+}
+.school-admin-design header button:hover { background:#f1f5fc; }
+.school-admin-design main {
+  background:radial-gradient(ellipse at 95% 0%,rgba(37,99,235,.045),transparent 34%),var(--admin-canvas);
+  scrollbar-width:thin;scrollbar-color:#c6d3e5 transparent;
+}
+.school-admin-design main > div { width:100%;max-width:1600px;margin-inline:auto; }
+.school-admin-design main h1 { color:#17264a;font-weight:800;letter-spacing:-.04em; }
+.school-admin-design main h2 { color:#1b3156;font-weight:800; }
+.school-admin-design main :is(.bg-white,[class*="bg-white/"]) { background-color:#fff; }
+.school-admin-design main :is(.rounded-xl,.rounded-2xl) { border-radius:16px; }
+.school-admin-design main :is(.border,.border-b,.border-t) { border-color:#e1e8f3; }
+.school-admin-design main :is(.shadow-sm,.shadow-md) { box-shadow:0 5px 20px rgba(27,55,99,.045),0 1px 2px rgba(27,55,99,.025); }
+.school-admin-design main :is(input,select,textarea) {
+  min-height:40px;color:#263957;background:#fff;border:1px solid #d9e2ef;border-radius:10px;font-size:13px;
+}
+.school-admin-design main :is(input,select,textarea):focus {
+  border-color:var(--admin-primary)!important;outline:0;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--admin-primary) 16%,transparent)!important;
+}
+.school-admin-design main label { color:#52647e;font-weight:700; }
+.school-admin-design main table { border-collapse:separate;border-spacing:0; }
+.school-admin-design main table thead { background:#f5f8fd; }
+.school-admin-design main table thead th { color:#70809a;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase; }
+.school-admin-design main table tbody td { color:#425570; }
+.school-admin-design main table tbody tr:hover { background:#f5f8ff; }
+.school-admin-design main button:focus-visible,.school-admin-design aside button:focus-visible {
+  outline:3px solid color-mix(in srgb,var(--admin-primary) 30%,transparent);outline-offset:2px;
+}
+.school-admin-design .school-admin-metric {
+  position:relative;min-height:132px;overflow:hidden;border:0!important;border-radius:16px!important;
+  padding:19px!important;color:#fff!important;box-shadow:0 8px 20px rgba(28,55,100,.12)!important;
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+.school-admin-design .school-admin-metric:hover { transform:translateY(-2px);box-shadow:0 12px 26px rgba(28,55,100,.17)!important; }
+.school-admin-design .school-admin-metric[data-tone="blue"] { background:linear-gradient(120deg,#1680f7,#075bd5)!important; }
+.school-admin-design .school-admin-metric[data-tone="green"] { background:linear-gradient(120deg,#10b981,#059669)!important; }
+.school-admin-design .school-admin-metric[data-tone="purple"] { background:linear-gradient(120deg,#8547ee,#6226d8)!important; }
+.school-admin-design .school-admin-metric[data-tone="amber"] { background:linear-gradient(120deg,#f6aa18,#e27a08)!important; }
+.school-admin-design .school-admin-metric .metric-label { color:rgba(255,255,255,.88);font-size:12px;font-weight:650; }
+.school-admin-design .school-admin-metric .metric-value { color:#fff;font-size:clamp(25px,2.3vw,32px);font-weight:850;letter-spacing:-.04em; }
+.school-admin-design .school-admin-metric .metric-hint { color:#fff;background:rgba(255,255,255,.17); }
+.school-admin-design .school-admin-metric .metric-icon {
+  display:grid;width:42px;height:42px;place-items:center;border-radius:13px;color:#fff;background:rgba(255,255,255,.17);
+}
+.school-admin-design .school-dashboard-panel { border:1px solid #e1e8f3;border-radius:16px;background:#fff;box-shadow:0 5px 20px rgba(27,55,99,.045); }
+@media(max-width:767px) {
+  .school-admin-design header { min-height:58px;height:58px;padding-inline:12px; }
+  .school-admin-design aside { width:min(84vw,310px); }
+
+  .school-admin-design .school-admin-metric { min-height:116px;padding:15px!important; }
+  .school-admin-design .school-admin-metric .metric-value { font-size:25px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .school-admin-design *, .school-admin-design *::before, .school-admin-design *::after {
+    transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;
+  }
+}
+
+
+/* Final School Admin polish: consistent module cards, controls and dense-data layouts. */
+.school-admin-design main :is(.bg-white.rounded-xl,.bg-white.rounded-2xl,.bg-white.rounded-lg) {
+  border-color:var(--admin-line);
+  box-shadow:0 4px 18px rgba(24,48,84,.045);
+}
+.school-admin-design main :is(.bg-slate-50,.bg-gray-50) {
+  background-color:#f6f8fc;
+}
+.school-admin-design main :is(button,a)[class*="border"]:not(:disabled):hover {
+  border-color:#b8c9e2;
+}
+.school-admin-design main :is(input,select,textarea):disabled {
+  color:#8290a5;
+  background:#f4f6fa;
+  cursor:not-allowed;
+}
+.school-admin-design main input[type="checkbox"],
+.school-admin-design main input[type="radio"] {
+  min-height:0;
+  accent-color:var(--admin-primary);
+}
+.school-admin-design main input[type="file"] {
+  min-height:42px;
+  padding:7px;
+  background:#f8faff;
+}
+.school-admin-design main :is(.overflow-x-auto,.overflow-auto) {
+  scrollbar-width:thin;
+  scrollbar-color:#c7d4e7 transparent;
+}
+.school-admin-design main .overflow-x-auto table {
+  min-width:620px;
+}
+.school-admin-design main table tbody tr {
+  transition:background-color .12s ease;
+}
+.school-admin-design main table tbody td :is(button,a) {
+  white-space:nowrap;
+}
+.school-admin-design main :is([role="tablist"],.border-b.flex) {
+  scrollbar-width:thin;
+}
+.school-admin-design main :is([role="tab"],[role="tablist"] button) {
+  white-space:nowrap;
+}
+.school-admin-design main :is(.text-red-600,.text-red-700) { color:#c2414b; }
+.school-admin-design main :is(.text-green-600,.text-green-700) { color:#16845c; }
+.school-admin-design main :is(.text-amber-600,.text-amber-700) { color:#a66b12; }
+@media(max-width:767px) {
+  .school-admin-design main .overflow-x-auto table { min-width:620px; }
+  .school-admin-design main :is(.grid-cols-3,.grid-cols-4) {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:420px) {
+  .school-admin-design main :is(.grid-cols-3,.grid-cols-4) {
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+
+
+/* Respect the school's configured width while keeping the collapsed desktop rail compact. */
+@media (min-width: 768px) {
+  .school-admin-design aside.school-admin-sidebar-collapsed {
+    width: 72px;
+    flex-basis: 72px;
+  }
+}
+
+
+/* Keep the AL-BUSHRA primary controls in sync with each school's saved brand color. */
+.school-admin-design main [class*="bg-[#2563eb]"] { background-color:var(--brand-color)!important; }
+.school-admin-design main [class*="text-[#2563eb]"] { color:var(--brand-color)!important; }
+.school-admin-design main [class*="border-[#2563eb]"] { border-color:var(--brand-color)!important; }
+.school-admin-design main [class*="hover:bg-[#1d4ed8]"]:hover { background-color:var(--brand-color-dark)!important; }

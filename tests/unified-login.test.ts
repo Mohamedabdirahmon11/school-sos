@@ -22,7 +22,10 @@ test('School Admin can use School ID and issued PIN on the shared login page', (
 });
 
 test('shared login sends email passwords and ID-based PINs to the correct credential fields', () => {
-  assert.ok(loginView.includes('pin,') && loginView.includes("password: activeTab === 'super_admin' ? password : undefined"));
+  assert.ok(loginView.includes("const isSuperAdminLogin = activeTab === 'school_admin' && email.trim().includes('@')"));
+  assert.ok(loginView.includes("role: isSuperAdminLogin ? 'super_admin' : activeTab"));
+  assert.ok(loginView.includes('pin: isSuperAdminLogin ? undefined : pin'));
+  assert.ok(loginView.includes('password: isSuperAdminLogin ? password : undefined'));
   assert.ok(loginView.includes('Enter your staff ID'));
   assert.ok(loginView.includes('4–6 digit PIN'));
   assert.ok(loginView.includes('Set your School Admin PIN'));
