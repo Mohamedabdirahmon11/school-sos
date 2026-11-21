@@ -82,6 +82,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Settings: { so: 'Dejinta', am: 'ቅንብሮች', ar: 'الإعدادات' },
     'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'درجات الامتحان' },
     'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'نتائج الامتحانات' },
+    'Marks Entry': { so: 'Gelinta Dhibcaha', am: 'ውጤት ማስገባት', ar: 'إدخال الدرجات' },
+    'Marks Approval': { so: 'Ansixinta Dhibcaha', am: 'ውጤት ማጽደቅ', ar: 'اعتماد الدرجات' },
 
 
 
