@@ -977,7 +977,7 @@ export class ApiClient {
     return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass), { gender: params?.gender, status: params?.status, signal: params?.signal });
   }
 
-  public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string }) {
+  public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string; signal?: AbortSignal }) {
     const query = new URLSearchParams({
       page: String(params?.page || 1),
       pageSize: String(params?.pageSize || 50)
@@ -990,7 +990,7 @@ export class ApiClient {
       name: string;
       relationships: string[];
       students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
-    }>>(`/parents/contacts?${query.toString()}`);
+    }>>(`/parents/contacts?${query.toString()}`, { signal: params?.signal });
   }
 
   public static async getStudentGuardians(studentId: string) {
@@ -1075,7 +1075,8 @@ export class ApiClient {
   }
 
   public static async getTeachers(params?: any) {
-    return this.request<Teacher[]>(`/teachers${this.pageQuery(params)}`);
+    const { signal, ...query } = params || {};
+    return this.request<Teacher[]>(`/teachers${this.pageQuery(query)}`, { signal });
   }
 
   public static async createTeacher(data: Partial<Teacher>, schoolId?: string) {
