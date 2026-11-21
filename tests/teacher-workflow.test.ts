@@ -31,7 +31,7 @@ test('teacher marks access is scoped by active teacher, academic year, term, sec
   assert.ok(api.includes("normalizeAcademicYear = (value: unknown) => String(value || '').replace(/[/-]/g, '')"));
   assert.match(api, /termNames = semester === 'Semester 1' \? \['Term 1', 'Semester 1'\]/);
   assert.match(api, /termId === term\.id/);
-  assert.match(api, /assignment\.sectionId === enrollment\.sectionId/);
+  assert.ok(api.includes("(assignment as any).sectionId === (enrollment as any).sectionId"));
   assert.match(api, /subjectStudentIds\.get\(String\(mark\.subjectId\)\)/);
   assert.match(api, /subjectStudentIds\.get\(String\(subjectId\)\)/);
   assert.match(api, /An active teacher profile is required to access results/);
