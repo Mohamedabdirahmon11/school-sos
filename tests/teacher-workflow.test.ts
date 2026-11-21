@@ -332,6 +332,7 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
 
 
 test('teacher directory separates subject-teaching classes from Form Teacher class and relies on server-side subject filtering', () => {
+  const view = read('../src/components/schooladmin/TeachersView.tsx');
   const start = view.indexOf('const filteredTeachers = teachers;');
   assert.notEqual(start, -1);
   assert.match(view, /Classes taught/);
@@ -340,6 +341,7 @@ test('teacher directory separates subject-teaching classes from Form Teacher cla
 });
 
 test('Form Teachers are restricted to their own parent-contact class and attendance reads', () => {
+  const api = read('../src/server/api.ts');
   const parentStart = api.indexOf("apiRouter.get('/parents/contacts'");
   const parentEnd = api.indexOf("apiRouter.get('/students'", parentStart);
   const parentRoute = api.slice(parentStart, parentEnd);
