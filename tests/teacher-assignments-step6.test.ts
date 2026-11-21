@@ -61,3 +61,11 @@ test('Assignment page is reachable from the School Admin app and sidebar', () =>
   assert.match(app, /sch_teacher_assignments/);
   assert.match(sidebar, /sch_teacher_assignments/);
 });
+
+test('Step 6 syncs the persisted Setup Wizard academic year and semesters before loading assignments', () => {
+  assert.match(api, /async function syncWizardAcademicRecords/);
+  assert.match(api, /from\('schools'\)[\s\S]*select\('academic_year,terms'\)/);
+  assert.match(api, /startDate: savedTerms\.semester1Start/);
+  assert.match(api, /endDate: savedTerms\.semester2End/);
+  assert.match(api, /await syncWizardAcademicRecords\(client, school\.id/);
+});
