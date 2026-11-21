@@ -144,10 +144,12 @@ export const ClassesSubjectsView: React.FC = () => {
         classTeacherId: formTeacherId || null
       };
       let subjectTemplateWarning = '';
+      let subjectTemplateApplied = false;
       if (editingClass) await ApiClient.updateClass(editingClass.id, payload);
       else {
         const createdClass = await ApiClient.addClass(payload, school?.id);
         subjectTemplateWarning = String((createdClass as any)?.subjectTemplateWarning || '');
+        subjectTemplateApplied = Boolean((createdClass as any)?.subjectTemplateApplied);
       }
       setShowClassModal(false);
       setEditingClass(null);
@@ -157,7 +159,9 @@ export const ClassesSubjectsView: React.FC = () => {
       setSection('');
       setClassShift(1);
       setCapacity(school?.defaultClassCapacity || 40);
-      setNotice(subjectTemplateWarning || `Class "${className}" ${editingClass ? 'updated' : 'created'}.`);
+      setNotice(subjectTemplateWarning || (subjectTemplateApplied
+        ? `Class "${className}" created and primary subjects were attached to its curriculum.`
+        : `Class "${className}" ${editingClass ? 'updated' : 'created'}.`));
       await fetchData();
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
