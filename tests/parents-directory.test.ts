@@ -32,18 +32,7 @@ test('guardian phone numbers are normalized and deduplicated per school', () => 
   assert.ok(route.includes("addContact(guardian.phone, guardian.fullName, 'Guardian', child)"));
 });
 
-test('guardian phone numbers are normalized and deduplicated per school', () => {
-  const start = api.indexOf("apiRouter.get('/parents/contacts'");
-  const end = api.indexOf("apiRouter.get('/students'", start);
-  const route = api.slice(start, end);
-  assert.match(route, /phone\.replace\(\/\\D\/g, ''\)/);
-  assert.match(route, /contacts\.get\(normalizedPhone\)/);
-  assert.match(route, /contacts\.set\(normalizedPhone, contact\)/);
-  assert.match(route, /contact\.students\.some\(item => item\.id === child\.id\)/);
-  assert.match(route, /addContact\(student\.motherPhone, '', 'Mother', child\)/);
-  assert.match(route, /guardianLinks/);
-  assert.match(route, /addContact\(guardian\.phone, guardian\.fullName, 'Guardian', child\)/);
-});
+
 
 test('unique contacts are searched, sorted, and paginated after deduplication', () => {
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
