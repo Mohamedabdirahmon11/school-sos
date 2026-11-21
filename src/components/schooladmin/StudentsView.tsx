@@ -317,6 +317,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     if (branchFilter) params.set('branchId', branchFilter);
     if (search.trim()) params.set('search', search.trim());
     if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+    if (genderFilter !== 'all') params.set('gender', genderFilter);
+    if (studentStatusFilter !== 'all') params.set('status', studentStatusFilter);
     return params.toString();
   };
 
