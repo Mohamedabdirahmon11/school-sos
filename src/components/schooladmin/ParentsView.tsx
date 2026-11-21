@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Search, ExternalLink, Phone, MessageSquare, Users } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export const ParentsView: React.FC = () => {
   const { school } = useAuth();
   const [contacts, setContacts] = useState<ParentContact[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [classFilter, setClassFilter] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -49,9 +51,10 @@ export const ParentsView: React.FC = () => {
       return;
     }
     let active = true;
+    const controller = new AbortController();
     setIsLoading(true);
     setLoadError(null);
-    ApiClient.getParentContacts({ page, pageSize: 50, search, classId: classFilter })
+    ApiClient.getParentContacts({ page, pageSize: 50, search: debouncedSearch, classId: classFilter }, controller.signal)
       .then((rows: ParentContact[]) => {
         if (!active) return;
         setContacts(Array.isArray(rows) ? rows : []);
@@ -64,8 +67,8 @@ export const ParentsView: React.FC = () => {
         setPageInfo(null);
       })
       .finally(() => { if (active) setIsLoading(false); });
-    return () => { active = false; };
-  }, [school?.id, page, search, classFilter, reloadCount]);
+    return () => { active = false; controller.abort(); };
+  }, [school?.id, page, debouncedSearch, classFilter, reloadCount]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
