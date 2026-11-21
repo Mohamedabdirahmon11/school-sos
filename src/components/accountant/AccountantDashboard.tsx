@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { getSchoolLocalDate } from '../../lib/school-local-date.ts';
 import { Student, FeePayment, FeeType, FeeStructureItem } from '../../types/index.ts';
@@ -134,7 +135,7 @@ export const AccountantDashboard: React.FC = () => {
   });
 
   if (dashboardData.error) return <ErrorState error={dashboardData.error} onRetry={dashboardData.retry} />;
-  if (loading) return <div className="p-6 space-y-4" aria-label="Loading finance dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-3">{[1, 2, 3].map(item => <div key={item} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />)}</div></div>;
+  if (loading) return <LoadingState label="Loading finance dashboard…" className="max-w-7xl" />;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
