@@ -1313,14 +1313,11 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design {
   --admin-canvas:#f2f5fa; --admin-ink:#17264a; --admin-muted:#66758c;
   --admin-line:#e1e8f3; --admin-sidebar:#0f2a5c; --admin-active:#1673ee;
-  --admin-primary:#2563eb; --brand-color:#2563eb; --brand-color-dark:#1d4ed8;
-  --sidebar-background:#0f2a5c; --sidebar-accent:#2563eb;
-  --ui-ink:#17264a; --ui-muted:#66758c; --ui-line:#e1e8f3;
-  --ui-canvas:#f2f5fa; --ui-accent:#2563eb; --ui-accent-soft:#e8f0ff;
+  --admin-primary:#2563eb;
   background:var(--admin-canvas)!important;color:var(--admin-ink);
 }
 .school-admin-design aside {
-  background:linear-gradient(180deg,#102d63 0%,#0b214c 100%)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--sidebar-background,#102d63) 92%,#fff),var(--sidebar-background,#0b214c))!important;
   border-right:1px solid rgba(255,255,255,.08);
   box-shadow:8px 0 28px rgba(15,42,92,.10);
 }
@@ -1335,10 +1332,9 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   color:#d6e4ff;font-size:12px;font-weight:550;
 }
 .school-admin-design aside nav button:hover { color:#fff;background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.04); }
-.school-admin-design aside nav button[aria-current="page"],
-.school-admin-design aside nav button[class*="bg-[#0F766E]"] {
-  color:#fff!important;background:linear-gradient(105deg,#1678f5,#0863db)!important;
-  border-color:rgba(255,255,255,.12);box-shadow:0 5px 14px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.12);
+.school-admin-design aside nav button[aria-current="page"] {
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 5px 14px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.12);
 }
 .school-admin-design aside nav button svg { color:#a9c3ed; }
 .school-admin-design aside nav button[aria-current="page"] svg { color:#fff; }
