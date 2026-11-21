@@ -11,10 +11,12 @@ test('parent contacts are derived from active students scoped to the current sch
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);
-  assert.match(route, /requireSchoolAdminOrSuperAdmin, requireSchoolContext/);
+  assert.match(route, /requireAuth, requireSchoolContext/);
+  assert.match(route, /Only school administrators and the assigned Form Teacher/);
+  assert.match(route, /studentClassFilter = requestedClassId \\|\\| ownClassIds/);
   assert.match(route, /school_id: school\.id/);
   assert.match(route, /status: 'active'/);
-  assert.match(route, /class_id: classId/);
+  assert.match(route, /class_id: studentClassFilter/);
 });
 
 test('guardian phone numbers are normalized and deduplicated per school', () => {
