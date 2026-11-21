@@ -1742,11 +1742,11 @@ button:disabled, [aria-disabled="true"] {
   min-height: 36px;
   border-radius: 10px;
 }
-.school-admin-sidebar > div:nth-last-child(2) {
+.school-admin-sidebar > div:last-child {
   padding-top: 9px;
   padding-bottom: 9px;
 }
-.school-admin-sidebar > div:nth-last-child(2) > div {
+.school-admin-sidebar > div:last-child > div {
   border-radius: 10px;
 }
 .school-admin-sidebar .school-admin-sidebar-controls {
@@ -1835,11 +1835,11 @@ button:disabled, [aria-disabled="true"] {
 .school-admin-sidebar > nav section button {
   letter-spacing: -.01em;
 }
-.school-admin-sidebar > div:nth-last-child(2) {
+.school-admin-sidebar > div:last-child {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-.school-admin-sidebar > div:nth-last-child(2) > div {
+.school-admin-sidebar > div:last-child > div {
   min-height: 38px;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -1930,22 +1930,22 @@ button:disabled, [aria-disabled="true"] {
 .school-admin-sidebar > nav section button[aria-current="page"] > span:first-of-type {
   color:#fff !important;
 }
-.school-admin-sidebar > div:nth-last-child(2) {
+.school-admin-sidebar > div:last-child {
   margin:0 10px 9px;
   padding:9px 8px !important;
   border:1px solid rgba(226,238,255,.11);
   border-radius:13px;
   background:rgba(255,255,255,.055) !important;
 }
-.school-admin-sidebar > div:nth-last-child(2) > div {
+.school-admin-sidebar > div:last-child > div {
   min-height:38px;
   padding:3px 5px !important;
 }
-.school-admin-sidebar > div:nth-last-child(2) span {
+.school-admin-sidebar > div:last-child span {
   background:rgba(115,164,235,.18) !important;
   border:1px solid rgba(191,219,254,.12);
 }
-.school-admin-sidebar.school-admin-sidebar-collapsed > div:nth-last-child(2) {
+.school-admin-sidebar.school-admin-sidebar-collapsed > div:last-child {
   margin-inline:7px;
   padding-inline:4px !important;
 }
