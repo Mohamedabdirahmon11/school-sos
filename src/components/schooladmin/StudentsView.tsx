@@ -516,8 +516,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
-                        <td className="px-5 py-4 text-[#334155]">{s.className}</td>
-                        <td className="px-5 py-4 text-[#334155]"><><span className="block font-medium">{s.fatherName || 'Parent / Guardian'}</span><span className="font-mono text-[11px] text-slate-500">{s.fatherPhone || '—'}</span></></td>
+                        <td className="px-5 py-4 text-[#334155]">{s.className || '—'}</td>
+                        <td className="px-5 py-4 capitalize text-[#334155]">{s.gender || '—'}</td>
+                        <td className="px-5 py-4 font-mono text-xs text-[#334155]">{s.fatherPhone || s.motherPhone || '—'}</td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
                             normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
