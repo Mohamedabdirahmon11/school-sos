@@ -194,7 +194,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
         </section>}
         <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">Only school opening, closing, and shift times are configured here. Lesson periods and the timetable are managed in Timetable. Shift 2 must start after Shift 1 and finish at or before the school closing time.</p>
-      </div>}iv>}
+      </div>}
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
         <button type="button" disabled={step === 1 || saving} onClick={() => setStep(step - 1)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40"><ArrowLeft size={16} /> Back</button>
