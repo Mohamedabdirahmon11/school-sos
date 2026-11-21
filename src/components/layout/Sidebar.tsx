@@ -173,76 +173,123 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     const label = route.labelKey ? menuT(route.labelKey as keyof TranslationDict) : menuText(route.label);
     return { id, label, icon: route.icon, permission: route.permission };
   };
+  // Keep each role's navigation short, predictable, and grouped by the work users do.
   const groups: NavGroup[] = (() => {
-    if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform Management', items: [
-      item('sa_dashboard', menuT('dashboard'), LayoutDashboard), item('sa_schools', menuT('schools'), Building2),
-      item('sa_plans', menuT('plans_billing'), Receipt), item('sa_users', menuT('users'), Users),
-      item('sa_analytics', menuT('analytics'), BarChart3), item('sa_broadcasts', menuT('broadcasts'), Radio),
-      item('sa_support', menuT('support_audit'), LifeBuoy), item('sa_settings', menuT('platform_settings'), Settings)
+    if (role === 'super_admin' && !inspectedSchool) return [
+      { title: 'Platform', items: [
+        item('sa_dashboard', menuT('dashboard'), LayoutDashboard),
+        item('sa_schools', menuT('schools'), Building2),
+        item('sa_users', menuT('users'), Users),
+        item('sa_analytics', menuT('analytics'), BarChart3)
+      ] },
+      { title: 'Operations', items: [
+        item('sa_plans', menuT('plans_billing'), Receipt),
+        item('sa_broadcasts', menuT('broadcasts'), Radio),
+        item('sa_support', menuT('support_audit'), LifeBuoy),
+        item('sa_settings', menuT('platform_settings'), Settings)
+      ] }
+    ];
+    if (role === 'teacher') return [
+      { title: 'My workspace', items: [
+        item('t_dashboard', menuT('dashboard'), LayoutDashboard),
+        item('t_timetable', menuT('timetable'), CalendarDays),
+        item('t_students', menuT('students'), GraduationCap)
+      ] },
+      { title: 'Teaching', items: [
+        item('t_attendance', menuT('attendance'), CalendarCheck),
+        item('t_grades', 'Exam Marks', FileSpreadsheet),
+        item('t_exam_results', 'Exam Results', FileCheck2),
+        item('t_assignments', menuT('assignments'), FileCheck2),
+        item('sch_documents', 'School Documents', FileText)
+      ] },
+      { title: 'Communication', items: [
+        item('t_notices', noticeLabel, BellRing),
+        item('t_messages', menuT('messages'), MessageSquare),
+        item('t_payslips', menuT('payroll_payslip'), Wallet)
+      ] }
+    ];
+    if (role === 'parent') return [{ title: 'Family', items: [
+      item('p_overview', menuT('dashboard'), LayoutDashboard),
+      item('p_attendance', menuT('attendance'), CalendarCheck),
+      item('p_results', menuT('exams_results'), FileSpreadsheet),
+      item('p_fees', menuT('fees_payments'), CreditCard),
+      item('p_notices', noticeLabel, BellRing),
+      item('sch_documents', 'School Documents', FileText),
+      item('p_messages', menuT('messages'), MessageSquare)
     ] }];
-    if (role === 'teacher') return [{ title: 'Teaching & Learning', items: [
-      item('t_dashboard', menuT('dashboard'), LayoutDashboard), item('t_timetable', menuT('timetable'), CalendarDays),
-      item('t_students', menuT('students'), GraduationCap), item('t_attendance', menuT('attendance'), CalendarCheck),
-      item('t_grades', 'Exam Marks', FileSpreadsheet), item('t_exam_results', 'Exam Results', FileCheck2),
-      item('t_assignments', menuT('assignments'), FileCheck2), item('sch_documents', 'School Documents', FileText), item('t_notices', noticeLabel, BellRing),
-      item('t_messages', menuT('messages'), MessageSquare), item('t_payslips', menuT('payroll_payslip'), Wallet)
-    ] }];
-    if (role === 'parent') return [{ title: 'Parent Portal', items: [
-      item('p_overview', menuT('dashboard'), LayoutDashboard), item('p_attendance', menuT('attendance'), CalendarCheck),
-      item('p_results', menuT('exams_results'), FileSpreadsheet), item('p_fees', menuT('fees_payments'), CreditCard),
-      item('p_notices', noticeLabel, BellRing), item('sch_documents', 'School Documents', FileText), item('p_messages', menuT('messages'), MessageSquare)
-    ] }];
-    if (role === 'student') return [{ title: 'Student Portal', items: [
-      item('st_dashboard', menuT('dashboard'), LayoutDashboard), item('st_timetable', menuT('timetable'), CalendarDays),
-      item('st_assignments', menuT('assignments'), FileCheck2), item('st_results', menuT('exams_results'), FileSpreadsheet),
-      item('st_attendance', menuT('attendance'), CalendarCheck), item('st_notices', noticeLabel, BellRing), item('sch_documents', 'School Documents', FileText),
-      item('st_messages', menuT('messages'), MessageSquare)
-    ] }];
+    if (role === 'student') return [
+      { title: 'My learning', items: [
+        item('st_dashboard', menuT('dashboard'), LayoutDashboard),
+        item('st_timetable', menuT('timetable'), CalendarDays),
+        item('st_assignments', menuT('assignments'), FileCheck2),
+        item('st_results', menuT('exams_results'), FileSpreadsheet),
+        item('st_attendance', menuT('attendance'), CalendarCheck)
+      ] },
+      { title: 'Updates', items: [
+        item('st_notices', noticeLabel, BellRing),
+        item('sch_documents', 'School Documents', FileText),
+        item('st_messages', menuT('messages'), MessageSquare)
+      ] }
+    ];
     if (role === 'accountant') return [
-      { title: 'Finance Workspace', items: [item('acc_dashboard', menuT('dashboard'), LayoutDashboard), item('sch_documents', 'School Documents', FileText)] },
-      { title: 'Daily Operations', items: [
+      { title: 'Overview', items: [
+        item('acc_dashboard', menuT('dashboard'), LayoutDashboard),
+        item('sch_documents', 'School Documents', FileText)
+      ] },
+      { title: 'Transactions', items: [
         { ...item('sch_fees', menuT('fees_payments'), CreditCard), permission: 'fees_manage' },
         { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' },
         { ...item('acc_expenses', 'Expenses & Cash Book', Wallet), permission: 'fees_manage' },
         { ...item('acc_bank_reconciliation', 'Bank Reconciliation', Building2), permission: 'fees_manage' }
       ] },
-      { title: 'Finance & Payroll', items: [
-        { ...item('sch_reports', menuT('reports_export'), BarChart3), permission: 'reports_export' },
-        { ...item('sch_payroll', menuT('payroll_management'), Wallet), permission: 'payroll_manage' }
+      { title: 'Finance & Reports', items: [
+        { ...item('sch_payroll', menuT('payroll_management'), Wallet), permission: 'payroll_manage' },
+        { ...item('sch_reports', menuT('reports_export'), BarChart3), permission: 'reports_export' }
       ] }
     ];
 
     return [
       { title: 'Overview', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
       { title: 'People', items: [
-        item('sch_students', menuT('students'), GraduationCap), item('sch_teachers', menuT('teachers'), UserCheck),
-        item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', 'Admissions Pipeline', UserPlus),
+        item('sch_students', menuT('students'), GraduationCap),
+        item('sch_teachers', menuT('teachers'), UserCheck),
+        item('sch_parents', menuT('parents_contacts'), PhoneCall),
+        item('sch_admissions', 'Admissions Pipeline', UserPlus),
         item('sch_staff', 'Staff Roles & Permissions', ShieldCheck)
       ] },
-      { title: 'Academic', items: [
-        item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
-        item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
-        item('sch_marks', 'Marks', FileSpreadsheet), item('sch_marks_approval', 'Marks Approval', ShieldCheck), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
+      { title: 'Academics', items: [
+        item('sch_classes', 'Classes', Layers),
+        item('sch_subjects', 'Subjects', BookOpen),
+        item('sch_curriculum', 'Class Curriculum', BookOpen),
+        item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
+        item('sch_timetable', menuT('timetable'), CalendarDays),
+        item('sch_attendance', menuT('attendance'), CalendarCheck),
+        item('sch_marks', 'Marks', FileSpreadsheet),
+        item('sch_marks_approval', 'Marks Approval', ShieldCheck),
+        item('sch_report_cards', menuT('report_cards'), FileText),
         item('sch_promotion', 'Student Progression & Alumni', Award)
       ] },
       { title: 'Communication', items: [
-        item('sch_notices', noticeLabel, BellRing), item('sch_messages', menuT('messages'), MessageSquare),
+        item('sch_notices', noticeLabel, BellRing),
+        item('sch_messages', menuT('messages'), MessageSquare),
         item('sch_whatsapp', 'WhatsApp Parent Alerts', MessageCircle),
         item('sch_events', 'Academic Calendar', CalendarDays)
       ] },
-      { title: 'Finance', items: [
-        { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' }
-      ] },
-      { title: 'Reports', items: [
+      { title: 'Finance & Reports', items: [
+        { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' },
         item('sch_reports', menuT('reports_export'), BarChart3)
       ] },
-      { title: 'Resources', items: [
-        item('sch_library', menuT('library'), Library), item('sch_transport', menuT('transport'), Bus),
-        item('sch_inventory', menuT('inventory'), Boxes), item('sch_discipline', menuT('discipline'), AlertTriangle),
+      { title: 'School resources', items: [
+        item('sch_documents', 'School Documents', FileText),
+        item('sch_library', menuT('library'), Library),
+        item('sch_transport', menuT('transport'), Bus),
+        item('sch_inventory', menuT('inventory'), Boxes),
+        item('sch_discipline', menuT('discipline'), AlertTriangle),
         item('sch_health', 'Clinic & Health Records', HeartPulse)
       ] },
-      { title: 'Settings', items: [
-        item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help Centre', LifeBuoy)
+      { title: 'Administration', items: [
+        item('sch_settings', 'School Settings', Sliders),
+        item('sch_support', 'Help Centre', LifeBuoy)
       ] }
     ];
   })();
@@ -260,8 +307,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label={menuText('Close navigation')} onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside style={{ background: 'var(--sidebar-background, #0f2a5c)', color: 'var(--sidebar-text, #ffffff)' }} className={`school-admin-sidebar ${isCollapsed ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,250px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,250px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className={`relative flex h-[76px] shrink-0 flex-row items-center gap-3 border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'justify-start px-5'}`}>
+    <aside style={{ background: 'var(--sidebar-background, #0f2a5c)', color: 'var(--sidebar-text, #ffffff)' }} className={`school-admin-sidebar ${isCollapsed ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,250px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,250px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-xl transition-[width,transform] duration-200 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`relative flex h-[68px] shrink-0 flex-row items-center gap-3 border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'justify-start px-5'}`}>
         {school?.sidebarTheme?.showLogo !== false && <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--sidebar-accent)', color: 'var(--sidebar-accent-foreground)' } : undefined}>
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>}
@@ -272,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         <button onClick={onCloseMobile} aria-label={menuText('Close menu')} style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
 
-      <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-5 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
+      <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain ${isCollapsed ? "px-2" : "px-3"} py-4 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
         <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={menuText(isCollapsed ? "Expand sidebar" : "Collapse sidebar")} aria-expanded={!isCollapsed} title={menuText(isCollapsed ? "Expand sidebar" : "Collapse sidebar")} style={{ color: "var(--sidebar-text)" }} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 hover:bg-black/10 md:flex">
           {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
         </button>
@@ -281,14 +328,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder={menuText('Search menu')} aria-label={menuText('Search navigation menu')} style={{ color: "var(--sidebar-text)" }} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-50" />
         </label>}
         {visibleGroups.map(group => <section key={group.title}>
-          {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[.17em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
-          <div className="space-y-1">
+          {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 px-3 text-[9px] font-bold uppercase tracking-[.16em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
+          <div className="space-y-0.5">
             {group.items.filter(entry => role !== 'accountant' || !entry.permission || hasStaffNavigationPermission(user?.permissions, entry.permission)).map(entry => {
               const Icon = entry.icon;
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 title={isCollapsed ? entry.label : undefined}
-                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-[52px]' : 'min-h-11'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
+                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-11' : 'min-h-10'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
                 style={{ borderRadius: active && school?.sidebarTheme?.activeStyle === 'pill' ? '999px' : 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' && school?.sidebarTheme?.activeStyle !== 'outline' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
                 <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active && school?.sidebarTheme?.activeStyle === 'bar' ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--sidebar-accent)" } : undefined}/>
                 <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-blue-100/65 group-hover:text-blue-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
