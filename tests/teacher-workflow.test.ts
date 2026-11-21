@@ -32,6 +32,9 @@ test('teacher marks access is scoped by active teacher, academic year, term, sec
   assert.match(api, /assignment\.sectionId === enrollment\.sectionId/);
   assert.match(api, /An active teacher profile is required to access results/);
   assert.match(api, /actively enrolled in the assigned class section/);
+  assert.match(api, /requireOpenTerm = false/);
+  assert.match(api, /termStatuses/);
+  assert.match(api, /status.*open/);
   assert.doesNotMatch(api.slice(api.indexOf("apiRouter.post('/exams/marks'"), api.indexOf("apiRouter.post('/exams/forward-class'")), /queryPage\('class_subjects'/);
 });
 

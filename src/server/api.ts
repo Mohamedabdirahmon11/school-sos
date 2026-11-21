@@ -3833,7 +3833,8 @@ async function getTeacherTermAssignmentScope(
   classId: string,
   subjectId?: string,
   studentId?: string,
-  requireActiveEnrollment = false
+  requireActiveEnrollment = false,
+  requireOpenTerm = false
 ): Promise<TeacherTermAssignmentScope | null> {
   const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: userId }, 1, 1, undefined, 'id,status');
   const teacher = teacherPage.items[0] as any;
@@ -3848,6 +3849,12 @@ async function getTeacherTermAssignmentScope(
   }, 'id');
   const term = terms[0] as any;
   if (!term?.id) return null;
+  if (requireOpenTerm) {
+    const termStatuses = await queryAllRows('term_status', {
+      school_id: school.id, term_id: String(term.id)
+    }, 'status');
+    if (String((termStatuses[0] as any)?.status || '').toLowerCase() !== 'open') return null;
+  }
 
   const assignmentFilters: Record<string, string | string[] | undefined> = {
     school_id: school.id,
@@ -7099,7 +7106,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
   const teacherScope = await getTeacherTermAssignmentScope(
     school, user.id, String(klass.academicYear || school.academicYear || ''),
-    semester as 'Semester 1' | 'Semester 2', String(classId), subjectId, undefined, true
+    semester as 'Semester 1' | 'Semester 2', String(classId), subjectId, undefined, true, true
   );
   if (!teacherScope || !teacherScope.allowedSubjectIds.has(String(subjectId))) {
     res.status(403).json({ error: 'You may submit marks only for a subject and section assigned to your active teacher profile in this academic term. Form Teacher access is review-only.' });
