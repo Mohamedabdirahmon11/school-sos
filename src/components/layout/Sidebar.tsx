@@ -116,6 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Student Progression & Alumni': { so: 'U Gudbinta Ardayda & Qalin-jabiyeyaasha', am: 'የተማሪ ደረጃ ማሳደግ እና ተመራቂዎች', ar: 'ترفيع الطلاب والخريجون' },
     'WhatsApp Parent Alerts': { so: 'Digniinaha Waalidiinta WhatsApp', am: 'የወላጆች WhatsApp ማሳወቂያዎች', ar: 'تنبيهات أولياء الأمور عبر واتساب' },
     'School Configuration': { so: 'Habaynta Dugsiga', am: 'የትምህርት ቤት ውቅር', ar: 'تهيئة المدرسة' },
+    'School Settings': { so: 'Dejinta Dugsiga', am: 'የትምህርት ቤት ቅንብሮች', ar: 'إعدادات المدرسة' },
     'Help Centre': { so: 'Xarunta Caawinta', am: 'የእገዛ ማዕከል', ar: 'مركز المساعدة' },
     'Log out': { so: 'Ka bax', am: 'ውጣ', ar: 'تسجيل الخروج' }
   };
@@ -193,12 +194,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
     return [
       { title: 'Overview', items: [item('sch_dashboard', menuT('dashboard'), LayoutDashboard)] },
-      { title: 'People & Admissions', items: [
+      { title: 'People', items: [
         item('sch_students', menuT('students'), GraduationCap), item('sch_teachers', menuT('teachers'), UserCheck),
         item('sch_parents', menuT('parents_contacts'), PhoneCall), item('sch_admissions', menuT('admissions'), UserPlus),
         item('sch_staff', menuT('staff_access'), ShieldCheck)
       ] },
-      { title: 'Academic Management', items: [
+      { title: 'Academic', items: [
         item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
         item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
@@ -209,19 +210,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_whatsapp', 'WhatsApp Parent Alerts', MessageCircle),
         item('sch_events', menuT('events_holidays'), CalendarDays)
       ] },
-      { title: 'Finance & Billing', items: [
+      { title: 'Finance', items: [
         { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' }
       ] },
-      { title: 'Reports & Analytics', items: [
+      { title: 'Reports', items: [
         item('sch_reports', menuT('reports_export'), BarChart3)
       ] },
-      { title: 'School Resources', items: [
+      { title: 'Resources', items: [
         item('sch_library', menuT('library'), Library), item('sch_transport', menuT('transport'), Bus),
         item('sch_inventory', menuT('inventory'), Boxes), item('sch_discipline', menuT('discipline'), AlertTriangle),
         item('sch_health', menuT('health_nurse'), HeartPulse)
       ] },
-      { title: 'Settings & Support', items: [
-        item('sch_settings', 'School Configuration', Sliders), item('sch_support', 'Help Centre', LifeBuoy)
+      { title: 'Settings', items: [
+        item('sch_settings', 'School Settings', Sliders), item('sch_support', 'Help Centre', LifeBuoy)
       ] }
     ];
   })();
