@@ -2876,50 +2876,12 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
     }
     if (role === 'teacher') {
       const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
-      if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
-      const teaching = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.items[0].id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
-      const classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
-      if (!classIds.length) {
-        res.json({ stats: { totalStudents: 0, totalTeachers: 1, attendanceRate: 0 }, totalClasses: 0, attendanceRecordedToday: 0, todayAttendance: 0, recentStudents: [], notices: [] });
+      if (!teacher.items.length) {
+        res.status(403).json({ error: 'Teacher profile is required for the dashboard.' });
         return;
       }
-      const [allStudents, allAttendance, notices] = await Promise.all([
-        db.getStudents(school.id),
-        db.getSchoolAttendance(school.id),
-        db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, 1, 100, undefined, 'id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role')
-      ]);
-      const scopedStudents = allStudents.filter((student: any) => classIds.includes(student.classId) && student.status === 'active');
-      const localDate = new Intl.DateTimeFormat('en-CA', {
-        timeZone: school.timezone || 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit'
-      }).format(new Date());
-      const activeStudentIds = new Set(scopedStudents.map((student: any) => student.id));
-      const today = allAttendance.filter((item: any) => item.date === localDate && classIds.includes(item.classId) && activeStudentIds.has(item.studentId));
-      const attended = today.filter((item: any) => item.status === 'present' || item.status === 'late').length;
-      const excused = today.filter((item: any) => item.status === 'excused').length;
-      const attendanceDenominator = Math.max(0, scopedStudents.length - excused);
-      const scopedNotices = notices.items.filter((notice: any) => !notice.classId || classIds.includes(notice.classId));
-      res.json({
-        stats: {
-          totalStudents: scopedStudents.length,
-          totalTeachers: 1,
-          attendanceRate: attendanceDenominator ? Math.round(attended * 100 / attendanceDenominator) : 0
-        },
-        totalClasses: classIds.length,
-        attendanceRecordedToday: today.length,
-        todayAttendance: attended,
-        recentStudents: scopedStudents
-          .slice()
-          .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-          .slice(0, 5)
-          .map((student: any) => ({
-            id: student.id, studentId: student.studentId, firstName: student.firstName,
-            middleName: student.middleName, lastName: student.lastName, classId: student.classId,
-            admissionDate: student.admissionDate
-          })),
-        notices: scopedNotices
-          .filter((notice: any) => !notice.publishDate || notice.publishDate <= localDate)
-          .slice(0, 3)
-      });
+      const teacherSummary = await db.getTeacherDashboardSummary(school.id, teacher.items[0].id);
+      res.json(teacherSummary);
       return;
     }
     const summary = await db.getSchoolDashboardSummary(school.id);
