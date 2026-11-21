@@ -4847,12 +4847,22 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   if (currentYearId && classScope) studentFilters.id = studentIdsForFilter || [];
   else if (!currentYearId && studentClassFilter) studentFilters.class_id = studentClassFilter;
   const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
-  const [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
-    currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
-    queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
-    sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
-  ]);
+  let students: any[] = [];
+  let guardianRows: any[] = [];
+  let guardianLinks: any[] = [];
+  let sectionRows: any[] = [];
+  try {
+    [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
+      currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
+      queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
+      queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
+      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
+    ]);
+  } catch (error) {
+    console.error('[parents/contacts] Failed to load parent directory data.', { schoolId: school.id, error });
+    res.status(503).json({ error: 'Parent contacts are temporarily unavailable. Please retry.', code: 'PARENT_CONTACTS_UNAVAILABLE', retryable: true });
+    return;
+  }
   const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
   const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
   if (classId && !classById.has(classId)) {

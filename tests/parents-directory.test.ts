@@ -70,3 +70,13 @@ test('parents without phone numbers remain visible with a safe placeholder', () 
   assert.match(route, /'Phone not provided'/);
   assert.match(view, /if \(!digits\) return null/);
 });
+
+test('parent contact API returns a retryable service error and the frontend retries transient failures', () => {
+  const api = read('../src/server/api.ts');
+  const view = read('../src/components/schooladmin/ParentsView.tsx');
+  assert.match(api, /PARENT_CONTACTS_UNAVAILABLE/);
+  assert.match(api, /retryable: true/);
+  assert.match(view, /const fetchWithRetry = async/);
+  assert.match(view, /attempt < 3/);
+  assert.match(view, /status >= 500/);
+});
