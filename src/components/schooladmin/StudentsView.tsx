@@ -424,6 +424,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
+            aria-label="Search students by name, ID or phone"
             placeholder="Search by student name, ID, or phone..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
