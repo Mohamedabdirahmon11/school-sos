@@ -20,9 +20,10 @@ import {
   Search
 } from 'lucide-react';
 
-export const NoticesEventsView: React.FC = () => {
+export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> = ({ initialTab = 'events' }) => {
   const { school, user, t } = useAuth();
-  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'notices'>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [eventSearch, setEventSearch] = useState('');
   const [notices, setNotices] = useState<SchoolNotice[]>([]);
