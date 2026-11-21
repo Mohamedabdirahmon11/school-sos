@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { StaffMember } from '../../types/index.ts';
+import { STAFF_PERMISSION_REGISTRY } from '../../lib/staff-permissions.ts';
 import { ApiClient } from '../../services/api.ts';
 import { 
   Users, 
@@ -16,17 +17,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 
-const AVAILABLE_PERMISSIONS = [
-  { id: 'fees_manage', label: 'Fees & Finance Ledger (Record payments, issue receipts)' },
-  { id: 'admissions_manage', label: 'Student Admissions (Review and admit new applicants)' },
-  { id: 'attendance_manage', label: 'Attendance Review (View class attendance and absences)' },
-  { id: 'grades_manage', label: 'Exam Results Review (Review and approve submitted marks)' },
-  { id: 'library_manage', label: 'Library Catalog & Loans' },
-  { id: 'transport_manage', label: 'Transport Fleet & Student Routes' },
-  { id: 'inventory_manage', label: 'School Inventory & Asset Registry' },
-  { id: 'reports_export', label: 'Export Reports & Financial CSVs' },
-  { id: 'payroll_manage', label: 'Payroll Management (Create, approve and pay salaries)' }
-];
+const AVAILABLE_PERMISSIONS = STAFF_PERMISSION_REGISTRY;
 
 export const StaffAccessView: React.FC = () => {
   const { school, t } = useAuth();
