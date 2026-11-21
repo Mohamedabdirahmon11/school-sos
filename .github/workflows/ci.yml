@@ -1,4 +1,5 @@
 name: SchoolOS CI
+# Keep Phase 2 branch pushes covered by the same required validation pipeline.
 
 on:
   push:
