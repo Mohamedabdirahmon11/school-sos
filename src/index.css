@@ -84,7 +84,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   --admin-sidebar: #0f2a5c;
   --admin-active: #2563eb;
   --admin-primary: #2563eb;
-  --sidebar-width: 250px;
   background: var(--admin-canvas) !important;
   color: var(--admin-ink);
 }
@@ -1510,4 +1509,103 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 @media(max-width:767px) {
   .school-admin-design header { min-height:54px; height:54px; padding:8px 12px; }
   .school-admin-design main > div { padding:14px; }
+}
+
+
+/* School Admin-only layout corrections. Keep inspected-school Super Admin views untouched. */
+.school-admin-role {
+  --admin-primary: var(--brand-color, #2563eb);
+  min-width: 0;
+}
+.school-admin-role > .flex-1.flex.overflow-hidden {
+  min-width: 0;
+  min-height: 0;
+}
+.school-admin-role aside.school-admin-sidebar {
+  box-sizing: border-box;
+  width: var(--sidebar-width, 260px) !important;
+  flex: 0 0 var(--sidebar-width, 260px) !important;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sidebar-background, #0f2a5c) !important;
+  color: var(--sidebar-text, #fff);
+}
+.school-admin-role aside.school-admin-sidebar.school-admin-sidebar-collapsed {
+  width: 72px !important;
+  flex-basis: 72px !important;
+}
+.school-admin-role aside.school-admin-sidebar > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.school-admin-role aside.school-admin-sidebar > .school-admin-sidebar-controls {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  background: var(--sidebar-background, #0f2a5c);
+}
+.school-admin-role aside.school-admin-sidebar nav button[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--sidebar-accent, #2563eb) 38%, transparent);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .12);
+}
+.school-admin-role aside.school-admin-sidebar nav button:focus-visible,
+.school-admin-role aside.school-admin-sidebar button:focus-visible {
+  outline: 2px solid var(--sidebar-accent, #2563eb);
+  outline-offset: 2px;
+}
+.school-admin-role main {
+  min-width: 0;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.school-admin-role main > div {
+  max-width: 1600px;
+  padding: 24px 30px 32px;
+}
+.school-admin-role main h1 {
+  font-size: clamp(20px, 1.55vw, 24px);
+  line-height: 1.3;
+}
+.school-admin-role main h2 {
+  font-size: 15px;
+  line-height: 1.4;
+}
+.school-admin-role main :is(p, label, td, input, select, textarea) {
+  line-height: 1.45;
+}
+.school-admin-role main input,
+.school-admin-role main select,
+.school-admin-role main textarea {
+  min-height: 40px;
+  font-size: 13px;
+}
+.school-admin-role main button {
+  font-size: 13px;
+}
+ .school-admin-role main table {
+  min-width: 0;
+}
+.school-admin-role main .overflow-x-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+@media (min-width: 768px) {
+  .school-admin-role main { padding-bottom: 24px; }
+}
+@media (max-width: 767px) {
+  .school-admin-role aside.school-admin-sidebar,
+  .school-admin-role aside.school-admin-sidebar.school-admin-sidebar-collapsed {
+    width: min(84vw, 320px) !important;
+    flex: 0 0 min(84vw, 320px) !important;
+  }
+  .school-admin-role main > div {
+    padding: 18px 14px calc(28px + env(safe-area-inset-bottom));
+  }
+  .school-admin-role main h1 { font-size: 20px; }
+  .school-admin-role main .overflow-x-auto table { min-width: 640px; }
+  .school-admin-role header { min-height: 56px; }
 }
