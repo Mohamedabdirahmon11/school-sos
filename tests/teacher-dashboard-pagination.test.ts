@@ -7,7 +7,8 @@ test('teacher dashboard pagination compatibility migration is additive and prese
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.teacher_dashboard_summary/);
   assert.match(migration, /ORDER BY id\s+LIMIT 100/);
   assert.match(migration, /AS first_page/);
-  assert.match(migration, /FROM first_page/);
+  assert.match(migration, /first_page\.publish_date/);
+  assert.match(migration, /first_page\.class_id/);
   assert.match(migration, /LIMIT 3/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|DELETE FROM/i);
 });
