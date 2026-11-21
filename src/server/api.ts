@@ -3822,6 +3822,7 @@ type TeacherTermAssignmentScope = {
   termId: string;
   allowedSubjectIds: Set<string>;
   allowedStudentIds: Set<string>;
+  subjectStudentIds: Map<string, Set<string>>;
 };
 
 /** Resolve teacher access from the immutable academic-year/term assignment and enrollment history. */
@@ -3882,15 +3883,26 @@ async function getTeacherTermAssignmentScope(
   const applicableAssignments = assignments.filter((assignment: any) =>
     !assignment.sectionId || eligibleEnrollments.some((enrollment: any) => enrollment.sectionId === assignment.sectionId)
   );
-  const allowedEnrollments = eligibleEnrollments.filter((enrollment: any) =>
-    applicableAssignments.some((assignment: any) => !assignment.sectionId || assignment.sectionId === enrollment.sectionId)
-  );
+  const subjectStudentIds = new Map<string, Set<string>>();
+  for (const assignment of applicableAssignments) {
+    const subjectKey = String((assignment as any).subjectId);
+    const subjectStudents = subjectStudentIds.get(subjectKey) || new Set<string>();
+    for (const enrollment of eligibleEnrollments) {
+      if (!(assignment as any).sectionId || (assignment as any).sectionId === (enrollment as any).sectionId) {
+        subjectStudents.add(String((enrollment as any).studentId));
+      }
+    }
+    subjectStudentIds.set(subjectKey, subjectStudents);
+  }
+  const allowedStudentIds = new Set<string>();
+  subjectStudentIds.forEach(studentIds => studentIds.forEach(studentId => allowedStudentIds.add(studentId)));
 
   return {
     academicYearId: String(academicYear.id),
     termId: String(term.id),
     allowedSubjectIds: new Set(applicableAssignments.map((item: any) => String(item.subjectId))),
-    allowedStudentIds: new Set(allowedEnrollments.map((item: any) => String(item.studentId)))
+    allowedStudentIds,
+    subjectStudentIds
   };
 }
 const formatSimpleStudentId = (number: number) => `S${String(number).padStart(3, '0')}`;
@@ -7062,7 +7074,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
           ));
         }
         const scope = await scopeCache.get(key)!;
-        return Boolean(scope && scope.allowedStudentIds.has(studentId as string) && scope.allowedSubjectIds.has(String(mark.subjectId)));
+        return Boolean(scope && scope.subjectStudentIds.get(String(mark.subjectId))?.has(studentId as string));
       };
       const visibility = await Promise.all(marks.map(canReadMark));
       marks = marks.filter((_mark, index) => visibility[index]);
@@ -7101,7 +7113,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, requestedSemester as any);
     res.json(isFormTeacher
       ? classMarks
-      : classMarks.filter(mark => scope!.allowedSubjectIds.has(mark.subjectId) && scope!.allowedStudentIds.has(mark.studentId)));
+      : classMarks.filter(mark => scope!.subjectStudentIds.get(String(mark.subjectId))?.has(String(mark.studentId))));
     return;
   }
   if (user.role === 'parent' || user.role === 'student') {
@@ -7159,7 +7171,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     }
     seenStudentIds.add(mark.studentId);
   }
-  if (marks.some(mark => !teacherScope.allowedStudentIds.has(mark.studentId))) {
+  if (marks.some(mark => !teacherScope.subjectStudentIds.get(String(subjectId))?.has(mark.studentId))) {
     res.status(403).json({ error: 'Marks can only be entered for students actively enrolled in the assigned class section for this academic year and term.' });
     return;
   }
