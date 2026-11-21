@@ -4709,7 +4709,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
-  if (!['school_admin', 'super_admin', 'teacher'].includes(role)) {
+  if (!role || !['school_admin', 'super_admin', 'teacher'].includes(role)) {
     res.status(403).json({ error: 'Only school administrators and the assigned Form Teacher can view parent contacts.' }); return;
   }
   const page = Math.max(1, Number(req.query.page) || 1);
