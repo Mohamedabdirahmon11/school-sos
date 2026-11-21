@@ -1360,7 +1360,8 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   min-height:40px;color:#263957;background:#fff;border:1px solid #d9e2ef;border-radius:10px;font-size:13px;
 }
 .school-admin-design main :is(input,select,textarea):focus {
-  border-color:#2563eb!important;outline:0;box-shadow:0 0 0 3px rgba(37,99,235,.13)!important;
+  border-color:var(--admin-primary)!important;outline:0;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--admin-primary) 16%,transparent)!important;
 }
 .school-admin-design main label { color:#52647e;font-weight:700; }
 .school-admin-design main table { border-collapse:separate;border-spacing:0; }
@@ -1369,7 +1370,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design main table tbody td { color:#425570; }
 .school-admin-design main table tbody tr:hover { background:#f5f8ff; }
 .school-admin-design main button:focus-visible,.school-admin-design aside button:focus-visible {
-  outline:3px solid rgba(37,99,235,.28);outline-offset:2px;
+  outline:3px solid color-mix(in srgb,var(--admin-primary) 30%,transparent);outline-offset:2px;
 }
 .school-admin-design .school-admin-metric {
   position:relative;min-height:132px;overflow:hidden;border:0!important;border-radius:16px!important;
