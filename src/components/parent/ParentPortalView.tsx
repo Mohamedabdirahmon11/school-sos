@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
-import { ErrorState } from '../common/ErrorState.tsx';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
@@ -69,10 +69,10 @@ export const ParentPortalView: React.FC = () => {
     }
   };
 
-  if (childrenState.loading) return <div className="p-6 space-y-3" aria-label="Loading parent portal"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div>;
+  if (childrenState.loading) return <LoadingState label="Loading parent portal" />;
   if (childrenState.error) return <ErrorState error={childrenState.error} onRetry={childrenState.retry} />;
   if (!currentChild) return <div className="p-6 text-xs text-[#64748B]">No children are linked to this parent account.</div>;
-  if (childState.loading) return <div className="p-6 space-y-3" aria-label="Loading child details"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
+  if (childState.loading) return <LoadingState label="Loading child details" />;
   if (childState.error) return <ErrorState error={childState.error} onRetry={childState.retry} />;
   const attendanceRecords = childData?.attendance || [];
   const presentCount = attendanceRecords.filter((record: any) => record.status === 'present' || record.status === 'late').length;
@@ -149,12 +149,12 @@ export const ParentPortalView: React.FC = () => {
 
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
         <h2 className="text-sm font-bold text-[#132A29]">{t('timetable')} · {currentChild.firstName}</h2>
-        {timetableState.loading ? <div className="h-24 animate-pulse rounded-lg bg-slate-100" /> : timetableState.error ? <ErrorState error={timetableState.error} onRetry={timetableState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1]"><p className="font-bold text-[#132A29]">{slot.dayOfWeek} · Period {slot.periodNumber}</p><p className="text-[#334155]">{slot.subjectName || slot.subjectId}</p><p className="text-[#64748B]">{slot.startTime}–{slot.endTime} · {slot.roomNumber}{slot.teacherName ? ` · ${slot.teacherName}` : ''}</p></div>)}</div>}
+        {timetableState.loading ? <LoadingState label="Loading child timetable" className="min-h-20 border-0 bg-transparent" /> : timetableState.error ? <ErrorState error={timetableState.error} onRetry={timetableState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1]"><p className="font-bold text-[#132A29]">{slot.dayOfWeek} · Period {slot.periodNumber}</p><p className="text-[#334155]">{slot.subjectName || slot.subjectId}</p><p className="text-[#64748B]">{slot.startTime}–{slot.endTime} · {slot.roomNumber}{slot.teacherName ? ` · ${slot.teacherName}` : ''}</p></div>)}</div>}
       </section>
 
       <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
         <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
-        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || currentChild.className || school?.examTimetableClassGroup} />}
+        {examSchedulesState.loading ? <LoadingState label="Loading exam schedule" className="min-h-20 border-0 bg-transparent" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || currentChild.className || school?.examTimetableClassGroup} />}
       </section>
 
       {/* Academic Results & Fee Invoices */}
