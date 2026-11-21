@@ -80,7 +80,10 @@ test('Super Admin uses email/password separately while School Admin and Accounta
   assert.match(apiSource, /const sharedAdminLogin = requestedRole === 'school_admin'\s*&& \(normalizedRole === 'school_admin' \|\| normalizedRole === 'accountant'\)/);
   assert.doesNotMatch(apiSource, /normalizedRole === 'super_admin' \|\| normalizedRole === 'school_admin'/);
   const loginSource = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
-  assert.match(loginSource, /School Admin, Accountant, and Teacher sign in with their school-issued ID and PIN\. Super Admin uses email and password/);
+  assert.match(loginSource, /Super Admin: Email \+ Password/);
+  assert.match(loginSource, /School Admin: School ID or Admin ID \+ PIN/);
+  assert.match(loginSource, /Accountant: School-issued Staff ID \+ PIN/);
+  assert.match(loginSource, /Teacher: School-issued Teacher ID \+ PIN/);
 });
 
 
