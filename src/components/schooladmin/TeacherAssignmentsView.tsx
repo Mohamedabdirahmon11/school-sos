@@ -257,7 +257,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
           <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[var(--schoolos-muted)] md:hidden">Form Teacher</p><div className="flex min-h-10 items-center rounded-lg border border-dashed border-[var(--schoolos-line)] px-3 text-xs text-[var(--schoolos-muted)]">— Lama dejin (ma jiro xulasho API ah)</div></div>
         </Card>;
       })}
-    </section>
+    </section>}
     {!!data.unassigned.length && <Card className="p-4"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-amber-600" />Maaddooyinka aan weli macallin loo qoondeyn</div><p className="mt-1 text-xs text-slate-500">{data.unassigned.length} maaddo/fasal ayaa sugaya qoondeyn.</p><div className="mt-3 flex flex-wrap gap-2">{data.unassigned.map((r,i) => <Pill key={i}>{className(r.classId)} · {subjectName(r.subjectId)} ({r.periodsPerWeek})</Pill>)}</div></Card>}
     {!data.teachers.length && <Card><EmptyState><Users className="mx-auto h-8 w-8 text-teal-700" /><p>Macallimiin lama helin.</p><Button onClick={() => onNavigate('sch_teachers')}>Tag Macallimiinta (Tallaabada 5)</Button></EmptyState></Card>}
   </main>;
