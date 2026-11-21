@@ -155,6 +155,7 @@ export class ApiClient {
         }
       });
     } catch (error) {
+      if (requestOptions.signal?.aborted) throw error;
       if (typeof window !== 'undefined' && endpoint !== '/auth/login') {
         window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 500, message: 'The server could not be reached.' } }));
       }
@@ -517,8 +518,8 @@ export class ApiClient {
   }
 
   // Branches
-  public static async getBranches() {
-    return this.request<SchoolBranch[]>('/branches?pageSize=100');
+  public static async getBranches(signal?: AbortSignal) {
+    return this.request<SchoolBranch[]>('/branches?pageSize=100', { signal });
   }
 
   public static async createBranch(branchData: Partial<SchoolBranch>) {
@@ -542,10 +543,10 @@ export class ApiClient {
   }
 
   // Classes, Subjects, Timetable
-  public static async getClasses(branchIdOrParams?: any) {
+  public static async getClasses(branchIdOrParams?: any, signal?: AbortSignal) {
     let branchId = typeof branchIdOrParams === 'string' ? branchIdOrParams : branchIdOrParams?.branchId;
     const q = branchId ? `?branchId=${branchId}` : '';
-    return this.request<SchoolClass[]>(`/classes${q}`);
+    return this.request<SchoolClass[]>(`/classes${q}`, { signal });
   }
 
   public static async createClass(classData: Partial<SchoolClass>, schoolId?: string) {
@@ -622,8 +623,8 @@ export class ApiClient {
     return this.request<{created:number;skipped:number}>('/class-groups/defaults',{method:'POST'});
   }
 
-  public static async getSubjects(params?: any) {
-    return this.request<Subject[]>('/subjects');
+  public static async getSubjects(params?: any, signal?: AbortSignal) {
+    return this.request<Subject[]>('/subjects', { signal });
   }
 
   public static async addDefaultSubjects() {
@@ -929,7 +930,7 @@ export class ApiClient {
   }
 
   // Students & Teachers
-  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string, allClass = false, filters?: { gender?: string; status?: string }) {
+  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string, allClass = false, filters?: { gender?: string; status?: string }, signal?: AbortSignal) {
     const params = new URLSearchParams();
     if (classId) params.append('classId', classId);
     if (branchId) params.append('branchId', branchId);
@@ -940,7 +941,7 @@ export class ApiClient {
     if (allClass) params.append('allClass', 'true');
     if (filters?.gender && filters.gender !== 'all') params.append('gender', filters.gender);
     if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
-    return this.request<Student[]>(`/students?${params.toString()}`);
+    return this.request<Student[]>(`/students?${params.toString()}`, { signal });
   }
 
   public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100): Promise<Student[]> {
@@ -973,11 +974,11 @@ export class ApiClient {
     });
   }
 
-  public static async getSchoolStudents(params?: any) {
-    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass), { gender: params?.gender, status: params?.status });
+  public static async getSchoolStudents(params?: any, signal?: AbortSignal) {
+    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass), { gender: params?.gender, status: params?.status }, signal);
   }
 
-  public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string }) {
+  public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string }, signal?: AbortSignal) {
     const query = new URLSearchParams({
       page: String(params?.page || 1),
       pageSize: String(params?.pageSize || 50)
@@ -990,7 +991,7 @@ export class ApiClient {
       name: string;
       relationships: string[];
       students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
-    }>>(`/parents/contacts?${query.toString()}`);
+    }>>(`/parents/contacts?${query.toString()}`, { signal });
   }
 
   public static async getStudentGuardians(studentId: string) {
@@ -1074,8 +1075,8 @@ export class ApiClient {
     });
   }
 
-  public static async getTeachers(params?: any) {
-    return this.request<Teacher[]>(`/teachers${this.pageQuery(params)}`);
+  public static async getTeachers(params?: any, signal?: AbortSignal) {
+    return this.request<Teacher[]>(`/teachers${this.pageQuery(params)}`, { signal });
   }
 
   public static async createTeacher(data: Partial<Teacher>, schoolId?: string) {
