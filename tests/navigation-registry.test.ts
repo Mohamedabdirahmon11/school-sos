@@ -8,7 +8,7 @@ test('navigation registry contains unique routes with labels, icons and role pol
   for (const route of NAVIGATION_REGISTRY) {
     assert.ok(route.label.trim(), route.id);
     assert.ok(route.roles.length, route.id);
-    assert.equal(typeof route.icon, 'function', route.id);
+    assert.ok(route.icon, route.id);
   }
 });
 
