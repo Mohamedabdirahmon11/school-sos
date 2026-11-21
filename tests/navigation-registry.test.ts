@@ -22,6 +22,14 @@ test('role quick navigation is a filtered projection of the shared registry', ()
   }
 });
 
+test('mobile quick links preserve role-specific shortcuts without exposing school admin fees', () => {
+  const schoolAdminIds = getMobileNavigation('school_admin').map(route => route.id);
+  const accountantIds = getMobileNavigation('accountant').map(route => route.id);
+  assert.ok(schoolAdminIds.includes('sch_attendance'));
+  assert.ok(!schoolAdminIds.includes('sch_fees'));
+  assert.ok(accountantIds.includes('sch_fees'));
+});
+
 test('registry metadata has no duplicate route keys and role routes remain scoped', () => {
   assert.equal(getNavigationRoute('not-a-route'), undefined);
   assert.ok(getNavigationRoute('sa_dashboard')?.roles.includes('super_admin'));
