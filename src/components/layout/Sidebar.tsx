@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     root.style.setProperty('--sidebar-text', theme?.textColor || preset?.text || '#ffffff');
     root.style.setProperty('--sidebar-accent', accent);
     root.style.setProperty('--sidebar-accent-foreground', luminance > 0.42 ? '#111827' : '#ffffff');
-    root.style.setProperty('--sidebar-width', (theme?.width || 260) + 'px');
+    root.style.setProperty('--sidebar-width', (theme?.width || 250) + 'px');
     root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
     root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
   }, [school?.id, school?.sidebarTheme]);
@@ -248,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label={menuText('Close navigation')} onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside style={{ background: 'var(--sidebar-background, #102c2a)', color: 'var(--sidebar-text, #ffffff)' }} className={`school-admin-sidebar ${isCollapsed ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,276px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,260px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside style={{ background: 'var(--sidebar-background, #0f2a5c)', color: 'var(--sidebar-text, #ffffff)' }} className={`school-admin-sidebar ${isCollapsed ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,250px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,250px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-2xl transition-[width,transform] duration-300 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className={`relative flex h-[76px] shrink-0 flex-row items-center gap-3 border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'justify-start px-5'}`}>
         {school?.sidebarTheme?.showLogo !== false && <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--sidebar-accent)', color: 'var(--sidebar-accent-foreground)' } : undefined}>
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
