@@ -9321,11 +9321,10 @@ async function syncWizardAcademicRecords(client: any, schoolId: string, setupDat
     .select('id,name,start_date,end_date,is_current').eq('school_id', schoolId).eq('academic_year_id', year.id);
   if (termReadError) throw new Error('Xiisadaha Setup Wizard lama akhrin karin.');
   const today = new Date().toISOString().slice(0, 10);
-  const currentTerm = configuredTerms.find((term: any) => term.startDate <= today && term.endDate >= today);
-  if (currentTerm) {
-    const { error } = await client.from('terms').update({ is_current: false, updated_at: new Date().toISOString() }).eq('school_id', schoolId);
-    if (error) throw new Error('Xiisadda hadda jirta lama waafajin karin.');
-  }
+  const { error: clearCurrentTermError } = await client.from('terms')
+    .update({ is_current: false, updated_at: new Date().toISOString() })
+    .eq('school_id', schoolId).eq('academic_year_id', year.id);
+  if (clearCurrentTermError) throw new Error('Xiisadda hadda jirta lama waafajin karin.');
   for (const term of configuredTerms) {
     const name = String(term?.name || '').trim();
     const startDate = String(term?.startDate || '');
