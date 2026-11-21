@@ -15,6 +15,7 @@ import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
 import { getPendingPinSlips } from '../../lib/bulk-pin-results.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
   GraduationCap, 
@@ -356,7 +357,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
   // The PIN wizard stays mounted while the list reloads so one-time PINs are never lost.
   const pinResetWizard = <BulkStudentPinResetWizard open={showBulkPinReset} schoolId={school?.id} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />;
-  if (isLoading) return <><div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>{pinResetWizard}</>;
+  if (isLoading) return <><LoadingState label="Loading students…" />{pinResetWizard}</>;
   if (studentLoad.error) return <><ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />{pinResetWizard}</>;
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
